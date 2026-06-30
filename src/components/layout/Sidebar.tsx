@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../api';
 import { type Page, adminPath, GLOBAL_TABS } from '../../routes';
@@ -6,6 +6,7 @@ import {
   NAV_REGISTRY, type NavEntry, type NavGroupKey,
   resolveNavLabel, resolveNavDescription, isNavEntryHidden,
 } from '../../lib/navRegistry';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import type { FeatureFlagKey } from '../../../shared/types/feature-flags';
 import { WorkspaceSelector, type Workspace } from '../WorkspaceSelector';
 import { NotificationBell } from '../NotificationBell';
@@ -56,7 +57,7 @@ interface SidebarProps {
   onExitHidden?: () => void;
 }
 
-const ALL_GROUP_LABELS = ['MONITORING', 'SITE HEALTH', 'SEO STRATEGY', 'OPTIMIZATION', 'CONTENT', 'ADMIN'];
+const ALL_GROUP_LABELS = ['MONITORING', 'SITE HEALTH', 'STRATEGY', 'OPTIMIZATION', 'CONTENT', 'ADMIN'];
 
 /**
  * Sidebar-local PRESENTATION for each registry group: the uppercase label,
@@ -77,7 +78,7 @@ const GROUP_PRESENTATION: Array<{
     activeBg: 'bg-blue-500/10', activeText: 'text-blue-300', activeIcon: 'text-blue-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-blue-500/5', hoverText: 'hover:text-blue-300' },
   { key: 'site-health', label: 'SITE HEALTH', groupIcon: Shield, groupColor: 'text-emerald-400',
     activeBg: 'bg-emerald-500/10', activeText: 'text-emerald-300', activeIcon: 'text-emerald-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-emerald-500/5', hoverText: 'hover:text-emerald-300' },
-  { key: 'seo-strategy', label: 'SEO STRATEGY', groupIcon: Target, groupColor: 'text-teal-400',
+  { key: 'seo-strategy', label: 'STRATEGY', groupIcon: Target, groupColor: 'text-teal-400',
     activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300' },
   { key: 'optimization', label: 'OPTIMIZATION', groupIcon: Sparkles, groupColor: 'text-teal-400',
     activeBg: 'bg-teal-500/10', activeText: 'text-teal-300', activeIcon: 'text-teal-400', inactiveIcon: 'text-[var(--brand-text-muted)]', hoverBg: 'hover:bg-teal-500/5', hoverText: 'hover:text-teal-300' },
@@ -123,21 +124,20 @@ export function Sidebar({
 }: SidebarProps) {
   const navigate = useNavigate();
 
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+  const [collapsedGroups, toggleGroup, setCollapsedGroups] = useToggleSet<string>(() => {
     try {
       const stored = localStorage.getItem('admin-sidebar-collapsed');
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch { return new Set(); }
-  });
+      return stored ? new Set<string>(JSON.parse(stored) as string[]) : new Set<string>();
+    } catch { return new Set<string>(); }
+  }, UNBOUNDED_TOGGLE_SET_OPTIONS);
 
-  const toggleGroup = useCallback((label: string) => {
-    setCollapsedGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(label)) next.delete(label); else next.add(label);
-      try { localStorage.setItem('admin-sidebar-collapsed', JSON.stringify([...next])); } catch (err) { console.error('App operation failed:', err); }
-      return next;
-    });
-  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem('admin-sidebar-collapsed', JSON.stringify([...collapsedGroups]));
+    } catch (err) {
+      console.error('App operation failed:', err);
+    }
+  }, [collapsedGroups]);
 
   // No nav entry currently uses flagBehavior, so all flags resolve as OFF.
   const navGroups = buildNavGroups(() => false);
@@ -149,7 +149,6 @@ export function Sidebar({
       setCollapsedGroups(prev => {
         const next = new Set(prev);
         next.delete(activeGroup.label);
-        try { localStorage.setItem('admin-sidebar-collapsed', JSON.stringify([...next])); } catch (err) { console.error('App operation failed:', err); }
         return next;
       });
     }

@@ -8,7 +8,7 @@ import { getDataDir } from './data-dir.js';
 import { createLogger } from './logger.js';
 import { aiDeduplicator } from './ai-deduplication.js';
 import type * as AiDeduplication from './ai-deduplication.js';
-import { stripCodeFences } from './helpers.js';
+import { stripCodeFences } from './utils/text.js';
 import { composeTimeoutSignal, throwIfSignalAborted } from './abort-helpers.js';
 import { buildProviderRetryDelayMs, RetryableProviderError, withProviderRetry } from './ai-provider-retry.js';
 import { recordOperationTrace } from './platform-observability.js';

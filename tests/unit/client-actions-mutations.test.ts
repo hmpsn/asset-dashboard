@@ -47,7 +47,7 @@ vi.mock('../../server/broadcast.js', () => ({
   broadcastToWorkspace: mockBroadcastToWorkspace,
 }));
 
-vi.mock('../../server/workspace-intelligence.js', () => ({
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
   invalidateIntelligenceCache: mockInvalidateIntelligenceCache,
 }));
 

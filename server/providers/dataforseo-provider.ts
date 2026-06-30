@@ -36,10 +36,20 @@ import type {
   KeywordGapEntry,
   BacklinksOverview,
   ReferringDomain,
+  NationalSerpProviderRequest,
+  NationalSerpResult,
+  BusinessListingResult,
+  BusinessListingsRequest,
+  GbpAttributes,
+  LlmMentionsRequest,
+  LlmMentionsResult,
+  LlmMentionCompetitor,
+  LlmMentionSource,
 } from '../seo-data-provider.js';
-import { normalizeProviderDate } from '../seo-data-provider.js';
+import { normalizeProviderDate, markCapabilityDisabled } from '../seo-data-provider.js';
 import { fetchProviderJson, isExternalFetchError } from '../external-fetch.js';
 import { normalizeDomainValue } from '../domain-normalization.js';
+import { parseListingRating, deriveGbpCompletenessScore } from '../listing-rating.js';
 
 const log = createLogger('dataforseo');
 const UPLOAD_ROOT = getUploadRoot();
@@ -52,6 +62,29 @@ const LOCATION_CODES: Record<string, number> = {
   au: 2036,
   de: 2276,
   fr: 2250,
+};
+
+const LLM_LOCATION_NAMES_BY_CODE: Record<number, string> = {
+  2036: 'Australia',
+  2056: 'Belgium',
+  2076: 'Brazil',
+  2124: 'Canada',
+  2250: 'France',
+  2276: 'Germany',
+  2356: 'India',
+  2372: 'Ireland',
+  2380: 'Italy',
+  2392: 'Japan',
+  2484: 'Mexico',
+  2528: 'Netherlands',
+  2554: 'New Zealand',
+  2616: 'Poland',
+  2702: 'Singapore',
+  2710: 'South Africa',
+  2724: 'Spain',
+  2752: 'Sweden',
+  2826: 'United Kingdom',
+  2840: 'United States',
 };
 
 function locationCodeFromDatabase(database = 'us'): number {
@@ -92,6 +125,19 @@ export function cacheRegionToken(geo: string, languageCode = DEFAULT_LANGUAGE_CO
  */
 function discoveryGeoToken(database: string, locationCode?: number): string {
   return locationCode != null ? String(locationCode) : database;
+}
+
+/**
+ * Cache geo token for the DOMAIN-analysis methods (SEO Decision Engine P4). Unlike the
+ * discovery methods — whose caches are short-lived and already accept a one-time v2 re-warm
+ * — the domain caches have a 7-14 day TTL and are expensive to re-warm, so flag-OFF must stay
+ * BYTE-IDENTICAL: when no `locationCode` is threaded (flag-OFF), the token is the legacy
+ * `database` string, preserving the exact pre-P4 key. Flag-ON keys on the resolved location
+ * AND language (`v2:<loc>:<lang>`) so two workspaces sharing a location but differing in
+ * language (e.g. Canada en vs fr) cannot poison each other's cache.
+ */
+function domainGeoToken(database: string, locationCode: number | undefined, languageCode: string): string {
+  return locationCode != null ? cacheRegionToken(String(locationCode), languageCode) : database;
 }
 
 // ── Auth ──
@@ -163,6 +209,15 @@ function isSubscriptionError(err: unknown): boolean {
   return msg.includes('40204') || msg.includes('subscription');
 }
 
+/**
+ * TTL for the backlinks capability breaker (P5). A 40204 means the account has no
+ * backlinks subscription — re-hitting the paid endpoint every call just burns the
+ * request budget. Trip the in-memory breaker for 6h so `getBacklinksProvider()`
+ * short-circuits to null (callers degrade the optional backlink fields); it
+ * self-recovers after the TTL in case the subscription is added.
+ */
+const BACKLINKS_BREAKER_TTL_MS = 6 * 60 * 60 * 1000;
+
 // ── Per-workspace file cache ──
 
 const CACHE_TTL_KEYWORD = 720;         // 30 days
@@ -174,6 +229,9 @@ const CACHE_TTL_BACKLINKS = 168;       // 7 days
 const CACHE_TTL_COMPETITORS = 336;     // 14 days
 const CACHE_TTL_LOCAL_VISIBILITY = 168; // 7 days
 const CACHE_TTL_LOCAL_LOCATIONS = 720;  // 30 days
+const CACHE_TTL_NATIONAL_SERP = 168;    // 7 days (P6 national-serp-tracking)
+const CACHE_TTL_BUSINESS_LISTINGS = 24; // 1 day (P7 local-gbp — GBP + reviews)
+const CACHE_TTL_LLM_MENTIONS = 336;     // ~14 days (P8 ai-visibility — slow-moving LLM mentions DB)
 
 function getCacheDir(workspaceId: string): string {
   const dir = path.join(UPLOAD_ROOT, workspaceId, '.dataforseo-cache');
@@ -472,6 +530,300 @@ function rowsReturnedForValue(value: unknown): number {
   return value == null ? 0 : 1;
 }
 
+// ── National SERP parser (P6 / national-serp-tracking) ──
+// Pure, fixture-grounded parser for `serp/google/organic/live/advanced` items.
+// Built against `tests/fixtures/dataforseo-serp-advanced.ts` — field names validated,
+// not guessed. Defensive against malformed items: never throws, skips bad entries.
+
+/** Strip a leading `www.` and lowercase, so 'www.Reddit.com' and 'reddit.com' compare equal. */
+function normalizeSerpDomain(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value.trim().toLowerCase().replace(/^www\./, '');
+}
+
+/** Domain equality after `www.`-strip + lowercase normalization. Empty strings never match. */
+function domainMatches(a: unknown, b: unknown): boolean {
+  const na = normalizeSerpDomain(a);
+  const nb = normalizeSerpDomain(b);
+  return na !== '' && na === nb;
+}
+
+/**
+ * Parse a national advanced-SERP `items[]` array into a `NationalSerpResult` relative to
+ * `ownerDomain`. Logic derived from the ground-truth fixture:
+ *  - `features`: distinct top-level `item.type` values, first-seen order preserved.
+ *  - AI Overview: top-level `type === 'ai_overview'` item. `aiOverviewCited` matches `ownerDomain`
+ *    against the AGGREGATED top-level `references[].domain` (the canonical citation list). `null`
+ *    when no AI Overview is present.
+ *  - Client organic rank: lowest `rank_group` among `type === 'organic'` items whose `domain`
+ *    matches `ownerDomain`. Only `organic` items count toward the client's own rank.
+ */
+export function parseNationalSerp(items: unknown[], ownerDomain: string, query: string): NationalSerpResult {
+  const safeItems: Record<string, unknown>[] = Array.isArray(items)
+    ? items.filter((it): it is Record<string, unknown> => typeof it === 'object' && it !== null)
+    : [];
+
+  // features: distinct top-level types, first-seen order.
+  const features: string[] = [];
+  const seenTypes = new Set<string>();
+  for (const item of safeItems) {
+    const type = typeof item.type === 'string' ? item.type : '';
+    if (type && !seenTypes.has(type)) {
+      seenTypes.add(type);
+      features.push(type);
+    }
+  }
+
+  // AI Overview presence + citation (aggregated top-level references[]).
+  const aiOverviewItem = safeItems.find(item => item.type === 'ai_overview');
+  const aiOverviewPresent = !!aiOverviewItem;
+  let aiOverviewCited: boolean | null = null;
+  if (aiOverviewItem) {
+    const references = Array.isArray(aiOverviewItem.references) ? aiOverviewItem.references : [];
+    aiOverviewCited = references.some(ref =>
+      typeof ref === 'object' && ref !== null && domainMatches((ref as Record<string, unknown>).domain, ownerDomain),
+    );
+  }
+
+  // Client best organic rank: lowest rank_group among matching organic items only.
+  let position: number | null = null;
+  let matchedUrl: string | null = null;
+  for (const item of safeItems) {
+    if (item.type !== 'organic') continue;
+    if (!domainMatches(item.domain, ownerDomain)) continue;
+    const rank = typeof item.rank_group === 'number' ? item.rank_group : null;
+    if (rank === null) continue;
+    if (position === null || rank < position) {
+      position = rank;
+      matchedUrl = typeof item.url === 'string' ? item.url : null;
+    }
+  }
+
+  return { query, position, matchedUrl, features, aiOverviewPresent, aiOverviewCited };
+}
+
+// ── Business listings parser (P7 / local-gbp — GBP + reviews) ──
+// Pure, fixture-grounded parser for `business_data/business_listings_search` items.
+// Built against `tests/fixtures/dataforseo-business-listings.ts` — field names validated,
+// not guessed. Defensive against malformed items: never throws, skips non-objects.
+
+/** Flatten `attributes.available_attributes` ({ group: string[] }) into a deduped key list. */
+function flattenGbpAttributes(attributes: unknown): string[] {
+  if (typeof attributes !== 'object' || attributes === null) return [];
+  const available = (attributes as Record<string, unknown>).available_attributes;
+  if (typeof available !== 'object' || available === null) return [];
+  const items: string[] = [];
+  const seen = new Set<string>();
+  for (const group of Object.values(available as Record<string, unknown>)) {
+    if (!Array.isArray(group)) continue;
+    for (const key of group) {
+      if (typeof key === 'string' && key.trim() && !seen.has(key)) {
+        seen.add(key);
+        items.push(key);
+      }
+    }
+  }
+  return items;
+}
+
+/** A valid rating_distribution is a plain object whose 1..5 keys are all numbers. */
+function parseRatingDistribution(raw: unknown): Record<'1' | '2' | '3' | '4' | '5', number> | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const obj = raw as Record<string, unknown>;
+  const keys = ['1', '2', '3', '4', '5'] as const;
+  const out = {} as Record<'1' | '2' | '3' | '4' | '5', number>;
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v !== 'number' || !Number.isFinite(v)) return undefined;
+    out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * Parse a `business_listings_search` `items[]` array into `BusinessListingResult[]` relative to
+ * the request owner. Per item:
+ *  - rating/reviewCount via `parseListingRating` (undefined = no reviews, NEVER 0).
+ *  - attributes flattened from `attributes.available_attributes` + an equal-weight completeness score.
+ *  - claimed: derived from a claimed-ish signal (presence of url/domain). Unknowable → undefined.
+ *  - isOwned: `request.ownerPlaceIds` includes place_id OR cid, else domain matches ownerDomain.
+ */
+export function parseBusinessListings(items: unknown[], request: BusinessListingsRequest): BusinessListingResult[] {
+  const safeItems: Record<string, unknown>[] = Array.isArray(items)
+    ? items.filter((it): it is Record<string, unknown> => typeof it === 'object' && it !== null)
+    : [];
+
+  const ownerPlaceIds = new Set((request.ownerPlaceIds ?? []).filter(id => typeof id === 'string' && id.trim()));
+
+  const results: BusinessListingResult[] = [];
+  for (const item of safeItems) {
+    const title = stringFromUnknown(item.title) ?? stringFromUnknown(item.name);
+    if (!title) continue;
+
+    const placeId = stringFromUnknown(item.place_id) ?? '';
+    const cid = stringFromUnknown(item.cid);
+    const domain = stringFromUnknown(item.domain) ?? (stringFromUnknown(item.url) ? cleanDomain(stringFromUnknown(item.url)!) : undefined);
+    const category = stringFromUnknown(item.category);
+    const addressInfo = (typeof item.address_info === 'object' && item.address_info !== null)
+      ? item.address_info as Record<string, unknown>
+      : undefined;
+    const city = stringFromUnknown(addressInfo?.city);
+
+    const { rating, reviewCount } = parseListingRating(item.rating);
+    const ratingDistribution = parseRatingDistribution(item.rating_distribution);
+
+    const attributeItems = flattenGbpAttributes(item.attributes);
+    const totalPhotos = numberFromUnknown(item.total_photos);
+    // No explicit boolean claimed field in the response; presence of a url/domain is the
+    // best available claimed-ish signal. Absent both → unknowable → undefined.
+    const claimed: boolean | undefined = domain ? true : undefined;
+    const completenessScore = deriveGbpCompletenessScore({
+      claimed,
+      totalPhotos,
+      attributeCount: attributeItems.length,
+      category,
+    });
+    const attributes: GbpAttributes = { items: attributeItems, completenessScore };
+
+    const ownedByPlace = (placeId && ownerPlaceIds.has(placeId)) || (cid !== undefined && ownerPlaceIds.has(cid));
+    const isOwned = ownedByPlace || domainMatches(domain, request.ownerDomain);
+
+    results.push({
+      title,
+      placeId,
+      cid,
+      domain,
+      category,
+      city,
+      rating,
+      reviewCount,
+      ratingDistribution,
+      attributes,
+      totalPhotos,
+      claimed,
+      isOwned,
+    });
+  }
+  return results;
+}
+
+// ── LLM mentions parser (P8 / ai-visibility — AI citation) ──
+// Pure, fixture-grounded parser for `ai_optimization/llm_mentions/aggregated_metrics` items.
+// Built against `tests/fixtures/dataforseo-llm-mentions.ts` — field names validated, not guessed.
+// Defensive against malformed items: never throws, skips non-objects.
+//
+// Shape: items[0].total.{platform,brand_entities_title,sources_domain,...} — each is an ARRAY of
+// `{ type:'group_element', key, mentions, ai_search_volume }`. A zero-presence target returns
+// EMPTY group arrays → mentions 0, NEVER invented.
+
+interface LlmGroupElement {
+  key: string;
+  mentions: number;
+  aiSearchVolume?: number;
+}
+
+/** Coerce a raw group array into typed `{ key, mentions, aiSearchVolume }` elements, skipping bad rows. */
+function parseLlmGroup(raw: unknown): LlmGroupElement[] {
+  if (!Array.isArray(raw)) return [];
+  const out: LlmGroupElement[] = [];
+  for (const el of raw) {
+    if (typeof el !== 'object' || el === null) continue;
+    const obj = el as Record<string, unknown>;
+    const key = stringFromUnknown(obj.key);
+    if (!key) continue;
+    const mentions = numberFromUnknown(obj.mentions) ?? 0;
+    const aiSearchVolume = numberFromUnknown(obj.ai_search_volume);
+    out.push({ key, mentions, aiSearchVolume });
+  }
+  return out;
+}
+
+/**
+ * Parse an aggregated-metrics `items[]` array into an `LlmMentionsResult` relative to `ownerDomain`
+ * + `platform`. Derived from the ground-truth fixture (`items[0].total`):
+ *  - `mentions` / `aiSearchVolume`: the `platform` group element matching `platform` (else the first
+ *    element when no exact key match) → its mentions / ai_search_volume, else 0.
+ *  - `competitors`: `brand_entities_title[]` → `{ name: key, mentions, aiSearchVolume }`.
+ *  - `sourceDomains`: `sources_domain[]` → `{ domain: key, mentions }`.
+ *  - `shareOfVoice`: own mentions ÷ (own + Σ competitor mentions), clamped 0..1; 0 when denom ≤ 0.
+ *  - Empty arrays / missing `total` → mentions 0, aiSearchVolume 0, shareOfVoice 0, empty lists.
+ */
+export function parseLlmMentions(
+  items: unknown[],
+  ownerDomain: string,
+  platform: string,
+  ownerBrandNames: string[] = [],
+): LlmMentionsResult {
+  const empty: LlmMentionsResult = {
+    domain: ownerDomain,
+    platform,
+    mentions: 0,
+    aiSearchVolume: 0,
+    shareOfVoice: undefined, // no data → not measured, NOT a real 0%
+    competitors: [],
+    sourceDomains: [],
+  };
+  // Normalize a brand name for owner-vs-competitor matching (lowercase, strip non-alphanumerics).
+  const normBrand = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const ownerKeys = ownerBrandNames.map(normBrand).filter(Boolean);
+  // Owner-vs-competitor match: exact normalized equality, OR a substring match ONLY when the
+  // shorter token is ≥4 chars AND ≥60% of the longer's length. The ratio+length floor stops the
+  // over-match the P8 review flagged: 'Pay'→'Apple Pay'/'Google Pay', 'Square'→'Squarespace' (6/11=
+  // 0.55 <0.6, rejected), while still matching 'Square'↔'Square Up' (6/8=0.75) and 'Square Inc'↔'Square'.
+  const isOwnerBrand = (name: string): boolean => {
+    const n = normBrand(name);
+    if (n === '') return false;
+    return ownerKeys.some(k => {
+      if (k === n) return true;
+      const [shorter, longer] = k.length <= n.length ? [k, n] : [n, k];
+      return shorter.length >= 4 && longer.includes(shorter) && shorter.length / longer.length >= 0.6;
+    });
+  };
+
+  const safeItems: Record<string, unknown>[] = Array.isArray(items)
+    ? items.filter((it): it is Record<string, unknown> => typeof it === 'object' && it !== null)
+    : [];
+  const first = safeItems[0];
+  if (!first) return empty;
+  const total = (typeof first.total === 'object' && first.total !== null)
+    ? first.total as Record<string, unknown>
+    : undefined;
+  if (!total) return empty;
+
+  // Headline VOLUME: how often the client's content/domain is cited in LLM answers on this platform.
+  const platformGroup = parseLlmGroup(total.platform);
+  const platformEl = platformGroup.find(el => el.key === platform) ?? platformGroup[0];
+  const mentions = platformEl?.mentions ?? 0;
+  const aiSearchVolume = platformEl?.aiSearchVolume ?? 0;
+
+  // Co-mentioned brands (brand_entities_title) — the category's AI-answer brand set. Split the
+  // client's OWN brand out of the competitor list so share-of-voice is like-to-like.
+  const allBrands = parseLlmGroup(total.brand_entities_title);
+  const ownerMatched = allBrands.some(el => isOwnerBrand(el.key));
+  const ownBrandMentions = allBrands.filter(el => isOwnerBrand(el.key)).reduce((s, el) => s + el.mentions, 0);
+  const allBrandMentions = allBrands.reduce((s, el) => s + el.mentions, 0);
+  const competitors: LlmMentionCompetitor[] = allBrands
+    .filter(el => !isOwnerBrand(el.key))
+    .map(el => ({ name: el.key, mentions: el.mentions, aiSearchVolume: el.aiSearchVolume }));
+
+  // Content domains cited when the target is mentioned (AEO targeting list).
+  const sourceDomains: LlmMentionSource[] = parseLlmGroup(total.sources_domain).map(el => ({
+    domain: el.key,
+    mentions: el.mentions,
+  }));
+
+  // shareOfVoice (like-to-like): the client's BRAND mentions ÷ ALL co-mentioned brand mentions.
+  // UNDEFINED ("not measured") when we couldn't identify the client's brand among the co-mentioned
+  // brands (no brand provided, or it isn't in the set) — NOT a real 0% (the P8 review: a red 0%
+  // next to a high citation count reads as broken). A real 0 only when the client IS in the set
+  // but has 0 brand mentions. Never mix the domain-citation count with brand counts.
+  const shareOfVoice = (ownerMatched && allBrandMentions > 0)
+    ? Math.min(1, Math.max(0, ownBrandMentions / allBrandMentions))
+    : undefined;
+
+  return { domain: ownerDomain, platform, mentions, aiSearchVolume, shareOfVoice, competitors, sourceDomains };
+}
+
 async function runDataForSeoOperation<T>({
   workspaceId,
   cacheKey,
@@ -683,6 +1035,10 @@ function normalizeLocalResultItem(item: Record<string, unknown>, fallbackRank?: 
   let domain = stringFromUnknown(item.domain);
   if (!domain && url) domain = cleanDomain(url);
   const address = stringFromUnknown(item.address) ?? stringFromUnknown(item.description);
+  // P7 free half (local-gbp, unflagged): the local_pack item already carries
+  // rating.value / rating.votes_count — extract them via the shared parser (undefined,
+  // never 0, when a business has no reviews). Zero new endpoint cost.
+  const { rating, reviewCount } = parseListingRating(item.rating);
   return {
     title,
     rank: numberFromUnknown(item.rank_group) ?? numberFromUnknown(item.rank_absolute) ?? fallbackRank,
@@ -691,6 +1047,8 @@ function normalizeLocalResultItem(item: Record<string, unknown>, fallbackRank?: 
     phone: stringFromUnknown(item.phone),
     address,
     cid: stringFromUnknown(item.cid) ?? stringFromUnknown(item.place_id),
+    rating,
+    reviewCount,
   };
 }
 
@@ -717,6 +1075,16 @@ function extractLocalPackItems(result: Record<string, unknown>): LocalVisibility
     if (single) results.push(single);
   }
   return results;
+}
+
+/**
+ * TEST-ONLY: parse a raw `local_pack` SERP result envelope (the `{ items: [...] }` shape from
+ * `serp/google/organic/live/advanced`) into normalized business results. Exposes the otherwise
+ * private `extractLocalPackItems` path so the U3 free rating extraction can be unit-tested
+ * against the ground-truth fixture without spinning up the full provider/network stack.
+ */
+export function __testParseLocalPackResult(result: Record<string, unknown>): LocalVisibilityBusinessResult[] {
+  return extractLocalPackItems(result);
 }
 
 function localVisibilityLocationIdentity(market: LocalVisibilityProviderRequest['market']): string {
@@ -1097,11 +1465,13 @@ export class DataForSeoProvider implements SeoDataProvider {
     });
   }
 
-  async getKeywordsForKeywords(keywords: string[], workspaceId: string, limit = 50, database = 'us'): Promise<KeywordSourceEvidence[]> {
+  async getKeywordsForKeywords(keywords: string[], workspaceId: string, limit = 50, database = 'us', locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]> {
     const seeds = normalizeSeedKeywords(keywords, 20);
     if (seeds.length === 0) return [];
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
+    const lang = normalizeLanguageCode(languageCode);
     const cappedLimit = Math.min(Math.max(limit, 1), 200);
-    const cacheKey = `google_ads_keywords_${database}_${cacheKeyPart(seeds.join('_'))}_${cappedLimit}`;
+    const cacheKey = `google_ads_keywords_${domainGeoToken(database, locationCode, lang)}_${cacheKeyPart(seeds.join('_'))}_${cappedLimit}`;
     const query = seeds.join(',').slice(0, 100);
     return runDataForSeoOperation<KeywordSourceEvidence[]>({
       workspaceId,
@@ -1113,8 +1483,8 @@ export class DataForSeoProvider implements SeoDataProvider {
       endpoint: 'keywords_data/google_ads/keywords_for_keywords/live',
       body: [{
         keywords: seeds,
-        location_code: locationCodeFromDatabase(database),
-        language_code: 'en',
+        location_code: resolvedLocationCode,
+        language_code: lang,
         sort_by: 'relevance',
       }],
       mapResult: (json) => {
@@ -1286,9 +1656,11 @@ export class DataForSeoProvider implements SeoDataProvider {
   }
 
   // ── getDomainKeywords → ranked_keywords ──
-  async getDomainKeywords(domain: string, workspaceId: string, limit = 100, database = 'us'): Promise<DomainKeyword[]> {
+  async getDomainKeywords(domain: string, workspaceId: string, limit = 100, database = 'us', locationCode?: number, languageCode?: string): Promise<DomainKeyword[]> {
     const target = cleanDomain(domain);
-    const cacheKey = `domain_ranked_${database}_${target.replace(/\./g, '_')}_${limit}_vol`;
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
+    const lang = normalizeLanguageCode(languageCode);
+    const cacheKey = `domain_ranked_${domainGeoToken(database, locationCode, lang)}_${target.replace(/\./g, '_')}_${limit}_vol`;
     return runDataForSeoOperation<DomainKeyword[]>({
       workspaceId,
       cacheKey,
@@ -1299,8 +1671,8 @@ export class DataForSeoProvider implements SeoDataProvider {
       endpoint: 'dataforseo_labs/google/ranked_keywords/live',
       body: [{
         target,
-        location_code: locationCodeFromDatabase(database),
-        language_code: 'en',
+        location_code: resolvedLocationCode,
+        language_code: lang,
         limit,
         order_by: ['keyword_data.keyword_info.search_volume,desc'],
       }],
@@ -1357,9 +1729,11 @@ export class DataForSeoProvider implements SeoDataProvider {
     });
   }
 
-  async getUrlKeywords(url: string, workspaceId: string, limit = 20, database = 'us'): Promise<DomainKeyword[]> {
+  async getUrlKeywords(url: string, workspaceId: string, limit = 20, database = 'us', locationCode?: number, languageCode?: string): Promise<DomainKeyword[]> {
     const target = cleanUrlTarget(url);
-    const cacheKey = `url_ranked_${database}_${target.replace(/[^a-zA-Z0-9_-]/g, '_')}_${limit}`;
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
+    const lang = normalizeLanguageCode(languageCode);
+    const cacheKey = `url_ranked_${domainGeoToken(database, locationCode, lang)}_${target.replace(/[^a-zA-Z0-9_-]/g, '_')}_${limit}`;
     return runDataForSeoOperation<DomainKeyword[]>({
       workspaceId,
       cacheKey,
@@ -1370,8 +1744,8 @@ export class DataForSeoProvider implements SeoDataProvider {
       endpoint: 'dataforseo_labs/google/ranked_keywords/live',
       body: [{
         target,
-        location_code: locationCodeFromDatabase(database),
-        language_code: 'en',
+        location_code: resolvedLocationCode,
+        language_code: lang,
         limit,
         order_by: ['keyword_data.keyword_info.search_volume,desc'],
       }],
@@ -1412,9 +1786,11 @@ export class DataForSeoProvider implements SeoDataProvider {
   }
 
   // ── getDomainOverview → ranked_keywords with limit=1 (only `metrics` aggregate is read) ──
-  async getDomainOverview(domain: string, workspaceId: string, database = 'us'): Promise<DomainOverview | null> {
+  async getDomainOverview(domain: string, workspaceId: string, database = 'us', locationCode?: number, languageCode?: string): Promise<DomainOverview | null> {
     const target = cleanDomain(domain);
-    const cacheKey = `domain_overview_${database}_${target.replace(/\./g, '_')}`;
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
+    const lang = normalizeLanguageCode(languageCode);
+    const cacheKey = `domain_overview_${domainGeoToken(database, locationCode, lang)}_${target.replace(/\./g, '_')}`;
     return runDataForSeoOperation<DomainOverview | null>({
       workspaceId,
       cacheKey,
@@ -1425,8 +1801,8 @@ export class DataForSeoProvider implements SeoDataProvider {
       endpoint: 'dataforseo_labs/google/ranked_keywords/live',
       body: [{
         target,
-        location_code: locationCodeFromDatabase(database),
-        language_code: 'en',
+        location_code: resolvedLocationCode,
+        language_code: lang,
         limit: 1,
       }],
       mapResult: (json) => {
@@ -1457,9 +1833,11 @@ export class DataForSeoProvider implements SeoDataProvider {
   }
 
   // ── getCompetitors → competitors_domain ──
-  async getCompetitors(domain: string, workspaceId: string, limit = 10, database = 'us'): Promise<OrganicCompetitor[]> {
+  async getCompetitors(domain: string, workspaceId: string, limit = 10, database = 'us', locationCode?: number, languageCode?: string): Promise<OrganicCompetitor[]> {
     const target = cleanDomain(domain);
-    const cacheKey = `competitors_${database}_${target.replace(/\./g, '_')}_${limit}`;
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
+    const lang = normalizeLanguageCode(languageCode);
+    const cacheKey = `competitors_${domainGeoToken(database, locationCode, lang)}_${target.replace(/\./g, '_')}_${limit}`;
     return runDataForSeoOperation<OrganicCompetitor[]>({
       workspaceId,
       cacheKey,
@@ -1470,8 +1848,8 @@ export class DataForSeoProvider implements SeoDataProvider {
       endpoint: 'dataforseo_labs/google/competitors_domain/live',
       body: [{
         target,
-        location_code: locationCodeFromDatabase(database),
-        language_code: 'en',
+        location_code: resolvedLocationCode,
+        language_code: lang,
         limit,
         item_types: ['organic'],
       }],
@@ -1507,13 +1885,17 @@ export class DataForSeoProvider implements SeoDataProvider {
   }
 
   // ── getKeywordGap — same approach as semrush: compare domain keywords ──
-  async getKeywordGap(clientDomain: string, competitorDomains: string[], workspaceId: string, limit = 50, database = 'us'): Promise<KeywordGapEntry[]> {
+  async getKeywordGap(clientDomain: string, competitorDomains: string[], workspaceId: string, limit = 50, database = 'us', locationCode?: number, languageCode?: string): Promise<KeywordGapEntry[]> {
+    // Geo is threaded entirely via the nested getDomainKeywords calls (gap has no own
+    // request body); both the client and competitor domains are queried in the CLIENT's
+    // market. `lang` only feeds the gap cache key (byte-identical on flag-OFF).
+    const lang = normalizeLanguageCode(languageCode);
     const allGaps: KeywordGapEntry[] = [];
     let clientKwSet: Set<string> | null = null;
 
     const getClientKeywordSet = async (): Promise<Set<string>> => {
       if (!clientKwSet) {
-        const clientKeywords = await this.getDomainKeywords(clientDomain, workspaceId, 200, database);
+        const clientKeywords = await this.getDomainKeywords(clientDomain, workspaceId, 200, database, locationCode, languageCode);
         clientKwSet = new Set(clientKeywords.map(k => k.keyword.toLowerCase()));
       }
       return clientKwSet;
@@ -1521,7 +1903,7 @@ export class DataForSeoProvider implements SeoDataProvider {
 
     for (const comp of competitorDomains.slice(0, MAX_COMPETITORS)) {
       const cleanComp = cleanDomain(comp);
-      const cacheKey = `gap_${database}_${cleanDomain(clientDomain).replace(/\./g, '_')}_vs_${cleanComp.replace(/\./g, '_')}_${limit}_comp${KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT}`;
+      const cacheKey = `gap_${domainGeoToken(database, locationCode, lang)}_${cleanDomain(clientDomain).replace(/\./g, '_')}_vs_${cleanComp.replace(/\./g, '_')}_${limit}_comp${KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT}`;
       const cached = readCache<KeywordGapEntry[]>(workspaceId, cacheKey, CACHE_TTL_DOMAIN_ORGANIC);
 
       if (cached) {
@@ -1530,7 +1912,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       }
 
       try {
-        const compKeywords = await this.getDomainKeywords(cleanComp, workspaceId, KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, database);
+        const compKeywords = await this.getDomainKeywords(cleanComp, workspaceId, KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, database, locationCode, languageCode);
         const clientKeywords = await getClientKeywordSet();
 
         const gaps: KeywordGapEntry[] = compKeywords
@@ -1602,6 +1984,7 @@ export class DataForSeoProvider implements SeoDataProvider {
       },
       handleError: (err) => {
         if (isSubscriptionError(err)) {
+          markCapabilityDisabled('dataforseo', 'backlinks', BACKLINKS_BREAKER_TTL_MS);
           log.warn({ err }, `DataForSEO backlinks summary unavailable for "${target}"`);
           return null;
         }
@@ -1646,11 +2029,178 @@ export class DataForSeoProvider implements SeoDataProvider {
       },
       handleError: (err) => {
         if (isSubscriptionError(err)) {
+          markCapabilityDisabled('dataforseo', 'backlinks', BACKLINKS_BREAKER_TTL_MS);
           log.warn({ err }, `DataForSEO referring domains unavailable for "${target}"`);
           return [];
         }
         log.error({ err }, `DataForSEO referring domains error for "${target}"`);
         return [];
+      },
+    });
+  }
+
+  // ── getNationalSerp → serp/google/organic/live/advanced (P6 national-serp-tracking) ──
+  async getNationalSerp(request: NationalSerpProviderRequest, workspaceId: string): Promise<NationalSerpResult> {
+    const keyword = request.keyword.trim();
+    const ownerDomain = request.ownerDomain;
+    const locationCode = request.locationCode ?? locationCodeFromDatabase('us');
+    const languageCode = request.languageCode ?? 'en';
+    const device = request.device ?? 'desktop';
+    const emptyResult: NationalSerpResult = {
+      query: keyword,
+      position: null,
+      matchedUrl: null,
+      features: [],
+      aiOverviewPresent: false,
+      aiOverviewCited: null,
+    };
+    const cacheKey = [
+      'national_serp',
+      cacheKeyPart(keyword),
+      cacheKeyPart(cleanDomain(ownerDomain)),
+      locationCode,
+      languageCode,
+      device,
+    ].join('_');
+
+    return runDataForSeoOperation<NationalSerpResult>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_NATIONAL_SERP,
+      endpointLabel: 'national_serp_google_organic_advanced',
+      query: keyword,
+      emptyValue: emptyResult,
+      endpoint: 'serp/google/organic/live/advanced',
+      body: [{
+        keyword,
+        location_code: locationCode,
+        language_code: languageCode,
+        device,
+      }],
+      mapResult: (json) => {
+        const result = getTaskResult(json)[0];
+        const items = Array.isArray(result?.items) ? (result.items as unknown[]) : [];
+        const value = parseNationalSerp(items, ownerDomain, keyword);
+        return { value, rowsReturned: value.position !== null ? 1 : 0 };
+      },
+      handleError: (err) => {
+        log.error({ err, keyword, ownerDomain }, `DataForSEO national SERP error for "${keyword}"`);
+        return emptyResult;
+      },
+    });
+  }
+
+  // ── getBusinessListings → business_data/business_listings_search (P7 local-gbp) ──
+  async getBusinessListings(request: BusinessListingsRequest, workspaceId: string): Promise<BusinessListingResult[]> {
+    const category = request.category?.trim() || undefined;
+    const title = request.title?.trim() || undefined;
+    const limit = request.limit ?? 20;
+    // At least one search axis is required by the endpoint. Category = competitor landscape;
+    // title = the client's own listing (often too few reviews to surface in a category search).
+    if (!category && !title) return [];
+    const cacheKey = [
+      'business_listings',
+      cacheKeyPart(category ?? ''),
+      cacheKeyPart(title ?? ''),
+      cacheKeyPart(request.locationCoordinate),
+      cacheKeyPart(cleanDomain(request.ownerDomain)),
+      limit,
+    ].join('_');
+
+    return runDataForSeoOperation<BusinessListingResult[]>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_BUSINESS_LISTINGS,
+      endpointLabel: 'business_listings_search',
+      query: category ?? title ?? '',
+      emptyValue: [],
+      endpoint: 'business_data/business_listings_search',
+      body: [{
+        ...(category ? { categories: [category] } : {}),
+        ...(title ? { title } : {}),
+        location_coordinate: request.locationCoordinate,
+        order_by: ['rating.votes_count,desc'],
+        limit,
+      }],
+      mapResult: (json) => {
+        const items = Array.isArray(getTaskResult(json)[0]?.items)
+          ? (getTaskResult(json)[0]!.items as unknown[])
+          : [];
+        const value = parseBusinessListings(items, request);
+        return { value, rowsReturned: value.length };
+      },
+      handleError: (err) => {
+        // 40204 (no business_data subscription): trip the capability breaker like backlinks
+        // so we stop burning the request budget on an unsubscribed endpoint.
+        if (isSubscriptionError(err)) {
+          markCapabilityDisabled('dataforseo', 'business_listings', BACKLINKS_BREAKER_TTL_MS);
+          log.warn({ err, category }, `DataForSEO business listings unavailable for "${category}"`);
+          return [];
+        }
+        log.error({ err, category }, `DataForSEO business listings error for "${category}"`);
+        return [];
+      },
+    });
+  }
+
+  // ── getLlmMentions → ai_optimization/llm_mentions/aggregated_metrics (P8 ai-visibility) ──
+  async getLlmMentions(request: LlmMentionsRequest, workspaceId: string): Promise<LlmMentionsResult> {
+    const domain = cleanDomain(request.domain);
+    const platform = request.platform ?? 'chat_gpt';
+    const locationName = request.locationName?.trim() || LLM_LOCATION_NAMES_BY_CODE[request.locationCode ?? 0] || 'United States';
+    const languageCode = normalizeLanguageCode(request.languageCode);
+    const ownerBrandNames = request.ownerBrandNames ?? [];
+    const emptyResult: LlmMentionsResult = {
+      domain,
+      platform,
+      mentions: 0,
+      aiSearchVolume: 0,
+      shareOfVoice: undefined, // no data → not measured, NOT a real 0%
+      competitors: [],
+      sourceDomains: [],
+    };
+    const cacheKey = [
+      'llm_mentions',
+      cacheKeyPart(domain),
+      cacheKeyPart(platform),
+      cacheKeyPart(request.locationCode != null ? String(request.locationCode) : locationName),
+      cacheKeyPart(languageCode),
+    ].join('_');
+
+    return runDataForSeoOperation<LlmMentionsResult>({
+      workspaceId,
+      cacheKey,
+      cacheTtlHours: CACHE_TTL_LLM_MENTIONS,
+      endpointLabel: 'ai_optimization_llm_mentions_aggregated_metrics',
+      query: domain,
+      emptyValue: emptyResult,
+      // VERIFY-ON-LIVE: this REST path + body key (`target` vs `targets`) is the deploy-time unknown —
+      // confirm against DataForSEO docs on the first live run. The RESPONSE shape the parser reads is
+      // fixture-validated and certain; only the request envelope is unverified until a live call.
+      endpoint: 'ai_optimization/llm_mentions/aggregated_metrics/live',
+      body: [{
+        target: [{ domain }],
+        platform,
+        location_name: locationName,
+        language_code: languageCode,
+      }],
+      mapResult: (json) => {
+        // This endpoint's result object IS the `items`-bearing object: getTaskResult(json)[0] = { items: [...] }.
+        const result = getTaskResult(json)[0];
+        const items = Array.isArray(result?.items) ? (result.items as unknown[]) : [];
+        const value = parseLlmMentions(items, domain, platform, ownerBrandNames);
+        return { value, rowsReturned: value.mentions > 0 ? 1 : 0 };
+      },
+      handleError: (err) => {
+        // 40204 (no ai_optimization subscription): trip the capability breaker so we stop burning
+        // the request budget on an unsubscribed endpoint (mirrors backlinks / business_listings).
+        if (isSubscriptionError(err)) {
+          markCapabilityDisabled('dataforseo', 'ai_optimization', BACKLINKS_BREAKER_TTL_MS);
+          log.warn({ err, domain }, `DataForSEO LLM mentions unavailable for "${domain}"`);
+          return emptyResult;
+        }
+        log.error({ err, domain }, `DataForSEO LLM mentions error for "${domain}"`);
+        return emptyResult;
       },
     });
   }

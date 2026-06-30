@@ -10,7 +10,7 @@
  * returned 200 instead of 409 for an unforced lifecycle action on a gap-sourced row.
  *
  * Fix: resolve from listTrackedKeywordRows() (provenance-bearing table read, identical
- * to the deleteKeywordHard approach documented at :3470-3481).
+ * to the deleteKeywordHard table-read approach).
  *
  * Assertions per the W2.2 spec:
  *   1. Unforced retire of gap-approved keyword → 409

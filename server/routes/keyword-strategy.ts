@@ -10,7 +10,8 @@ const router = Router();
 
 import { addActivity } from '../activity-log.js';
 import { getTrackedKeywords } from '../rank-tracking.js';
-import { buildWorkspaceIntelligence, invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { updateWorkspace, getWorkspace } from '../workspaces.js';
 import { upsertAndCleanPageKeywords, listPageKeywords } from '../page-keywords.js';
@@ -19,6 +20,7 @@ import { listQuickWins, replaceAllQuickWins } from '../quick-wins.js';
 import { listKeywordGaps, replaceAllKeywordGaps } from '../keyword-gaps.js';
 import { listTopicClusters, replaceAllTopicClusters } from '../topic-clusters.js';
 import { listCannibalizationIssues, replaceAllCannibalizationIssues } from '../cannibalization-issues.js';
+import { snapshotStrategyHistory } from '../keyword-strategy-persistence.js';
 import { assembleStoredKeywordStrategy } from '../keyword-strategy-assembler.js';
 import type { KeywordStrategySiteKeywordMetric } from '../keyword-strategy-enrichment.js';
 import { validate, z } from '../middleware/validate.js';
@@ -26,6 +28,7 @@ import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonSafe, parseJsonSafeArray } from '../db/json-validation.js';
 import { strategyHistoryStrategySchema, strategyHistoryPageMapSchema, type StrategyHistoryStrategy } from '../schemas/workspace-schemas.js';
+import { computeOrientMetrics } from '../keyword-strategy-orient.js';
 import { getInsights } from '../analytics-insights-store.js';
 import type { KeywordStrategy, ContentGap, QuickWin, KeywordGapItem, TopicCluster, CannibalizationItem } from '../../shared/types/workspace.js';
 import { buildStrategySignals } from '../insight-feedback.js';
@@ -43,7 +46,8 @@ import { requireWorkspaceAccess } from '../auth.js';
 import { isProgrammingError } from '../errors.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { hasActiveJob } from '../jobs.js';
+import { hasActiveJob, createJob } from '../jobs.js';
+import { runIntelligenceRecomputeJob } from '../intelligence-recompute-job.js';
 import { generateKeywordStrategy, KeywordStrategyGenerationError, KEYWORD_STRATEGY_MAX_PAGE_CAP } from '../keyword-strategy-generation.js';
 import { normalizeRuntimeSeoDataProvider } from '../seo-data-provider.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
@@ -60,6 +64,12 @@ import {
 } from '../keyword-strategy-ux.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
 import { getLocalStrategySyncStatus } from '../local-strategy-sync.js';
+import {
+  getStrategyKeywordSet,
+  addStrategyKeyword,
+  removeStrategyKeyword,
+  keepStrategyKeyword,
+} from '../domains/strategy/managed-keyword-set.js';
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from '../keyword-strategy-generation.js';
 
 const log = createLogger('keyword-strategy');
@@ -300,6 +310,9 @@ router.get('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAccess(
       surface: 'admin',
     });
     strategyUx.localSync = localSync;
+    // Strategy command-center Orient-zone metrics (visibility score + clicks/impressions/position
+    // deltas). The command-center is the baseline layout (v2 cutover), so the Orient zone always reads this.
+    strategyUx.orient = computeOrientMetrics(ws.id, pageMap);
     res.json(serializeKeywordStrategy(strategy, pageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, siteKeywordMetrics, strategyUx));
   } catch (err) {
     next(err);
@@ -464,6 +477,17 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   let pageMapChanged = false;
   const applyPatch = db.transaction(() => {
+    // Phase 5 (deliverable #4): snapshot the prior strategy boundary BEFORE the edits clobber the
+    // table-backed arrays, so "What Changed" attributes this human edit to the right boundary instead
+    // of the last AI regeneration. Reads prior state first; no-ops when there's no prior generatedAt.
+    snapshotStrategyHistory(ws.id, ws.keywordStrategy, {
+      pageMap: listPageKeywords(ws.id),
+      contentGaps: listContentGaps(ws.id),
+      quickWins: listQuickWins(ws.id),
+      keywordGaps: listKeywordGaps(ws.id),
+      topicClusters: listTopicClusters(ws.id),
+      cannibalization: listCannibalizationIssues(ws.id),
+    });
     if (req.body.pageMap) {
       pageMapChanged = true;
       upsertAndCleanPageKeywords(ws.id, req.body.pageMap);
@@ -681,6 +705,11 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/signals', requireWorkspac
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   try {
     const insights = getInsights(ws.id);
+    // Freshness for the "Computed X ago" caption: the newest computed_at across the workspace's
+    // insight rows (matches the throttle's MAX semantics in analytics-intelligence.getOrComputeInsights).
+    const computedAt = insights.length
+      ? insights.reduce((newest, i) => (i.computedAt > newest ? i.computedAt : newest), insights[0].computedAt)
+      : undefined;
     try {
       const intelligence = await buildWorkspaceIntelligence(ws.id, { slices: ['seoContext', 'clientSignals'] });
       const keywordEvaluationContext = buildStrategyKeywordEvaluationContext({
@@ -695,15 +724,98 @@ router.get('/api/webflow/keyword-strategy/:workspaceId/signals', requireWorkspac
         strictBusinessFit: true,
       });
       const signals = buildStrategySignals(insights, { keywordEvaluationContext });
-      return res.json({ signals });
+      return res.json({ signals, computedAt });
     } catch (err) {
       log.warn({ err, workspaceId: ws.id }, 'Failed to build keyword context for strategy signals; returning unfiltered signals');
-      return res.json({ signals: buildStrategySignals(insights) });
+      return res.json({ signals: buildStrategySignals(insights), computedAt });
     }
   } catch (err) {
     log.error({ err, workspaceId: ws.id }, 'Failed to build strategy signals');
-    res.json({ signals: [] });
+    res.json({ signals: [], computedAt: undefined });
   }
+});
+
+// POST /api/webflow/keyword-strategy/:workspaceId/signals/recompute
+// Manual "Recompute now" — enqueues the background recompute (pulls GSC/GA4 → must NOT run inline per
+// the long-running-provider-work rule). Returns { jobId }; NotificationBell surfaces progress, and the
+// recompute's feedback loop broadcasts INTELLIGENCE_SIGNALS_UPDATED to refresh the card.
+router.post('/api/webflow/keyword-strategy/:workspaceId/signals/recompute', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+
+  const active = hasActiveJob(BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE, ws.id);
+  if (active) return res.json({ jobId: active.id, existing: true });
+
+  const job = createJob(BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE, { workspaceId: ws.id, message: 'Refreshing signals...' });
+  res.json({ jobId: job.id });
+  setTimeout(() => { void runIntelligenceRecomputeJob(job.id, ws.id); }, 100);
+});
+
+// --- Managed Keyword Set (Strategy redesign graft 1) ---
+// The curated working-set of target keywords, backed by the dedicated strategy_keyword_set
+// table (migration 139). Survives both strategy regen and rank-tracking sync. The domain
+// functions (server/domains/strategy/managed-keyword-set.ts) are the sole writers and already
+// call addActivity; the routes own the WS broadcast.
+
+const addKeywordSchema = z.object({
+  keyword: z.string().trim().min(1, 'keyword is required'),
+  // 'regen_computed' is reconciler-only — operators add via client_request or manual_add.
+  source: z.enum(['client_request', 'manual_add']),
+});
+
+const removeKeywordSchema = z.object({
+  keyword: z.string().trim().min(1, 'keyword is required'),
+});
+
+const keepKeywordSchema = z.object({
+  keyword: z.string().trim().min(1, 'keyword is required'),
+});
+
+// GET the active managed set (removed_at IS NULL), ordered by slot_order.
+router.get('/api/webflow/keyword-strategy/:workspaceId/keyword-set', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  res.json({ keywords: getStrategyKeywordSet(ws.id) });
+});
+
+// POST add a keyword to the managed set (client_request | manual_add).
+router.post('/api/webflow/keyword-strategy/:workspaceId/keyword-set', requireWorkspaceAccess('workspaceId'), validate(addKeywordSchema), (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const { keyword, source } = req.body as z.infer<typeof addKeywordSchema>;
+  const row = addStrategyKeyword(ws.id, keyword, source);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_KEYWORD_SET_UPDATED, { reason: 'add', keyword: row.keyword });
+  res.json({ keyword: row });
+});
+
+// POST keep a keyword (stamps kept_at — survives regen AND the tracked-keywords clobber).
+router.post('/api/webflow/keyword-strategy/:workspaceId/keyword-set/keep', requireWorkspaceAccess('workspaceId'), validate(keepKeywordSchema), (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const { keyword } = req.body as z.infer<typeof keepKeywordSchema>;
+  keepStrategyKeyword(ws.id, keyword);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_KEYWORD_SET_UPDATED, { reason: 'keep', keyword });
+  res.json({ keywords: getStrategyKeywordSet(ws.id) });
+});
+
+// POST remove (body-based) — soft delete (sets removed_at; survives regen, excluded from replenish).
+router.post('/api/webflow/keyword-strategy/:workspaceId/keyword-set/remove', requireWorkspaceAccess('workspaceId'), validate(removeKeywordSchema), (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const { keyword } = req.body as z.infer<typeof removeKeywordSchema>;
+  removeStrategyKeyword(ws.id, keyword);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_KEYWORD_SET_UPDATED, { reason: 'remove', keyword });
+  res.json({ keywords: getStrategyKeywordSet(ws.id) });
+});
+
+// DELETE remove (path-param) — same soft delete, RESTful variant mirroring keyword-feedback DELETE.
+router.delete('/api/webflow/keyword-strategy/:workspaceId/keyword-set/:keyword', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const ws = getWorkspace(req.params.workspaceId);
+  if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const keyword = decodeURIComponent(req.params.keyword);
+  removeStrategyKeyword(ws.id, keyword);
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_KEYWORD_SET_UPDATED, { reason: 'remove', keyword });
+  res.json({ keywords: getStrategyKeywordSet(ws.id) });
 });
 
 export default router;

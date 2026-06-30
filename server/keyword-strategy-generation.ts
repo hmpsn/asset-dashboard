@@ -26,7 +26,7 @@ import { listQuickWins } from './quick-wins.js';
 import { listKeywordGaps } from './keyword-gaps.js';
 import { listTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues } from './cannibalization-issues.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { backfillContentGapsToFloor, STRATEGY_CONTENT_GAP_FLOOR } from './keyword-strategy-helpers.js';
 import { recordGenerationQuality } from './generation-quality-store.js';
@@ -363,6 +363,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
           questionKeywords: existingStrategy?.questionKeywords ?? allQuestionKws,
           businessContext,
           seoDataMode,
+          maxPages: maxPagesParam,
           seoDataStatus,
           searchData: {
             deviceBreakdown,
@@ -560,6 +561,7 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       questionKeywords: enrichmentQuestionKeywords,
       businessContext,
       seoDataMode,
+      maxPages: maxPagesParam,
       seoDataStatus,
       searchData: {
         deviceBreakdown,

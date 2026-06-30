@@ -3,7 +3,9 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from './bridge-infrastructure.js';
 import { parseJsonSafe } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
-import { applyBulkKeywordGuards, decodeEntities, resolvePagePath, sanitizeForPromptInjection, stripCodeFences, stripHtmlToText } from './helpers.js';
+import { applyBulkKeywordGuards } from './utils/keyword-analysis-guards.js';
+import { decodeEntities, sanitizeForPromptInjection, stripCodeFences, stripHtmlToText } from './utils/text.js';
+import { resolvePagePath } from './utils/page-address.js';
 import { updateJob, unregisterAbort, isJobCancelled } from './jobs.js';
 import { resolveWorkspaceLocationCode } from './local-seo.js';
 import { createLogger } from './logger.js';
@@ -27,9 +29,7 @@ import { listEeatAssets } from './eeat-assets.js';
 import { EEAT_RECOMMENDATION_SURFACE, evaluatePageTrustSignals } from './eeat-trust-signals.js';
 import { buildSeoPromptContext } from './intelligence/generation-context-builders.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
-import {
-  invalidateIntelligenceCache,
-} from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { WS_EVENTS } from './ws-events.js';
 
 const log = createLogger('page-analysis-job');

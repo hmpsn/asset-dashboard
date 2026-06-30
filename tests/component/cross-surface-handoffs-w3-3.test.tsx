@@ -194,6 +194,9 @@ vi.mock('../../src/hooks/admin', () => ({
   useLocalSeoLocationLookup: () => ({ data: [], isLoading: false }),
   useLocalSeoLocations: () => ({ data: [], isLoading: false }),
   useSetPrimaryMarket: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  // GbpReviewsPanel (P7 / local-gbp) mounts inside LocalSeoVisibilityPanel and reads these.
+  useGbpReviews: () => ({ data: { owned: null, competitors: [], completenessScore: null } }),
+  useLocalGbpRefresh: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
 
 vi.mock('../../src/hooks/useBackgroundTasks', () => ({

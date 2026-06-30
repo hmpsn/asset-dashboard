@@ -27,7 +27,8 @@ import {
   Settings, Clipboard, BarChart3, Globe, Image, Gauge, Search,
   Pencil, Target, Code2, Link2, MessageSquare,
   LayoutDashboard, Activity, Sparkles, Layers, FileSearch, Map, ListChecks,
-  DollarSign, Trophy,
+  DollarSign, Trophy, BriefcaseBusiness, ChartSpline, Stethoscope, WandSparkles,
+  MapPinned,
 } from 'lucide-react';
 import type { Page } from '../routes';
 import type { FeatureFlagKey } from '../../shared/types/feature-flags';
@@ -101,6 +102,8 @@ export const NON_REGISTRY_PAGES: Page[] = [
   'calendar',       // redirect → content-pipeline?tab=calendar
   'subscriptions',  // folded into content-pipeline (Subscriptions sub-tab)
   'workspace-settings', // reached via per-workspace settings, not the main nav
+  'competitors',    // The Issue Phase 6 — dedicated competitor interior page; reached via a deep-link
+                    // from The Issue cockpit (flag-ON), not the global nav, so flag-OFF nav is byte-identical
 ];
 
 /**
@@ -128,13 +131,15 @@ export const NAV_REGISTRY: NavEntry[] = [
   { id: 'media', label: 'Assets', icon: Image, group: 'site-health',
     description: 'Images, alt text, and media optimization' },
 
-  // ── SEO Strategy ──
+  // ── Strategy ──
   { id: 'seo-strategy', label: 'Strategy', icon: Target, group: 'seo-strategy', needsSite: true,
     description: 'Keyword strategy with page-keyword mapping' },
   { id: 'seo-keywords', label: 'Keyword Hub', icon: ListChecks, group: 'seo-strategy', needsSite: true,
     description: 'Unified keyword surface: lifecycle, tracking, national + local rank, and handoffs' },
   { id: 'page-intelligence', label: 'Page Intelligence', icon: Search, group: 'seo-strategy', needsSite: true,
     description: 'Per-page keyword analysis, metrics, and optimization' },
+  { id: 'local-seo', label: 'Local Presence', icon: MapPinned, group: 'seo-strategy', needsSite: true,
+    description: 'Local markets, local-pack visibility, GBP review aggregates, and setup' },
 
   // ── Optimization ──
   { id: 'seo-editor', label: 'SEO Editor', icon: Pencil, group: 'optimization', needsSite: true,
@@ -143,7 +148,7 @@ export const NAV_REGISTRY: NavEntry[] = [
     description: 'Structured data and schema markup' },
   { id: 'brand', label: 'Brand & AI', icon: Sparkles, group: 'optimization', needsSite: true,
     description: 'Brand voice, knowledge base, and audience personas' },
-  { id: 'rewrite', label: 'Page Rewriter', icon: Pencil, group: 'optimization', needsSite: true,
+  { id: 'rewrite', label: 'Page Rewriter', icon: WandSparkles, group: 'optimization', needsSite: true,
     description: 'AI-assisted page rewriting with playbook instructions' },
 
   // ── Content ──
@@ -153,11 +158,11 @@ export const NAV_REGISTRY: NavEntry[] = [
   // during onboarding, before a Webflow site is linked.
   { id: 'requests', label: 'Requests', icon: MessageSquare, group: 'content',
     description: 'Client content requests and feedback' },
-  { id: 'content-perf', label: 'Content Perf', icon: BarChart3, group: 'content', needsSite: true,
+  { id: 'content-perf', label: 'Content Perf', icon: ChartSpline, group: 'content', needsSite: true,
     description: 'Post-publish content performance metrics' },
 
   // ── Admin (global) ──
-  { id: 'outcomes-overview', label: 'Team Outcomes', icon: Trophy, group: 'admin',
+  { id: 'outcomes-overview', label: 'Team Outcomes', icon: BriefcaseBusiness, group: 'admin',
     description: 'Cross-workspace outcomes overview' },
   { id: 'prospect', label: 'Prospect', icon: FileSearch, group: 'admin',
     description: 'Sales prospect research' },
@@ -169,7 +174,7 @@ export const NAV_REGISTRY: NavEntry[] = [
     description: 'Feature library and changelog' },
   // Drift fix: diagnostics was missing from two of three surfaces. It is a
   // workspace-scoped surface that needs no Webflow site.
-  { id: 'diagnostics', label: 'Diagnostics', icon: FileSearch, group: 'admin',
+  { id: 'diagnostics', label: 'Diagnostics', icon: Stethoscope, group: 'admin',
     description: 'Deep diagnostic investigation reports' },
 
   // ── Utility (footer / global; not in the main sidebar nav list) ──

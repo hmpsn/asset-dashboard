@@ -3,7 +3,7 @@
 import type { ImpactBand } from './impact-band.js';
 
 export type RecPriority = 'fix_now' | 'fix_soon' | 'fix_later' | 'ongoing';
-export type RecType = 'technical' | 'content' | 'content_refresh' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy' | 'aeo' | 'keyword_gap' | 'topic_cluster' | 'cannibalization' | 'local_visibility' | 'local_service_gap';
+export type RecType = 'technical' | 'content' | 'content_refresh' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy' | 'aeo' | 'keyword_gap' | 'topic_cluster' | 'cannibalization' | 'local_visibility' | 'local_service_gap' | 'competitor';
 export type RecStatus = 'pending' | 'in_progress' | 'completed' | 'dismissed';
 export type RecActionType = 'automated' | 'manual' | 'content_creation' | 'purchase';
 
@@ -36,7 +36,7 @@ export interface Recommendation {
   targetKeyword?: string;
   status: RecStatus;
   /** Client-safe banded monthly impact (D-IMPACT). Set ONLY on the public projection
-   *  (server/routes/recommendations.ts stripEmvFromPublicRecs), derived from the
+   *  (server/recommendation-public-projection.ts stripEmvFromPublicRecs), derived from the
    *  admin/AI-only opportunity.emvPerWeek which is stripped in the same pass. Absent on
    *  admin-facing payloads (they carry the raw opportunity instead) and when the projected
    *  monthly value is below the display floor. NEVER populated from raw emv client-side. */
@@ -47,6 +47,38 @@ export interface Recommendation {
    *  emails can exclude marginal backfill. Only set (to true) on the flag-ON path —
    *  absent on every legacy/flag-OFF rec, preserving byte-identical output. */
   backfilled?: boolean;
+  // ── Strategy v3 — two-axis client-facing lifecycle (SEPARATE from RecStatus) ──
+  // RecStatus (status, above) stays the INTERNAL admin triage axis (pending/in_progress/
+  // completed/dismissed). clientStatus + lifecycle are the v3 curation axes. strike/throttle/
+  // send NEVER write RecStatus — a struck rec must never be swept to 'completed' and read as
+  // "✓ done" to the client (the trust-critical graft, spec §6.1). All optional → byte-identical
+  // on every legacy/flag-OFF rec (absent ⇒ treated as clientStatus:'system', lifecycle:'active').
+  /** Curation axis: system (minted, not yet curated) → curated (operator picked) → sent
+   *  (delivered to client) → approved | declined | discussing (client responded). */
+  clientStatus?: 'system' | 'curated' | 'sent' | 'approved' | 'declined' | 'discussing';
+  /** Suppression axis, orthogonal to clientStatus: active (default) | throttled (hidden
+   *  until throttledUntil) | struck (permanently suppressed, won't be re-suggested). */
+  lifecycle?: 'active' | 'throttled' | 'struck';
+  /** ISO timestamp the throttle expires; the rec auto-resurfaces as active on-read once
+   *  Date.now() passes this (no cron — spec §8). Only set when lifecycle==='throttled'. */
+  throttledUntil?: string;
+  /** ISO timestamp the rec was sent to the client. Set when clientStatus → 'sent'. */
+  sentAt?: string;
+  /** The Issue Phase 4 (trust ladder): true when this rec was AUTO-sent by the weekly cron
+   *  (an earned + enabled low-risk archetype), NOT operator-sent. Carried over on regen.
+   *  Powers the auto-send doorbell count + the cockpit's auto-sent badge / recall affordance. */
+  autoSent?: boolean;
+  /** ISO timestamp the rec was struck. Set when lifecycle → 'struck'. */
+  struckAt?: string;
+  /** Cascade metadata for keyword/topic strikes that also remove items from strategy
+   *  (spec §4.3 "removes from strategy — reversible"). Carries the reversal payload so
+   *  Undo can restore the strategy items the strike removed. Absent on non-cascading strikes. */
+  cascade?: { removedKeywords?: string[]; removedClusters?: string[]; reversible: boolean };
+  /** Where a Send routes. 'deliverable' for RecTypes with a registered deliverable adapter
+   *  (content_decay/cannibalization) — their Send goes to the deliverable spine and the rec
+   *  reads its lifecycle from client_actions, NOT an independent clientStatus (spec §6.3).
+   *  'rec' (default/absent) for all other RecTypes — Send mutates clientStatus directly. */
+  sendChannel?: 'deliverable' | 'rec';
   createdAt: string;
   updatedAt: string;
 }
@@ -170,4 +202,152 @@ export interface OpportunityWeights {
   timing: number;
   evidence: number;
   calibrationVersion: string;
+}
+
+/** One entry in a recommendation discussion thread (spec §6.7). Backed by the rec_discussion
+ *  table (migration 138). `author` is a display role, not a user id — 'client' (the client's
+ *  question) or 'strategist' (the agency reply). Read by the cockpit Discuss filter (P2) and
+ *  the client CuratedRecDiscussThread (P4); both build against THIS shape before the substrate
+ *  exists (the pre-committed Track-B↔Track-C contract). */
+export interface RecDiscussionEntry {
+  id: string;
+  recId: string;
+  workspaceId: string;
+  author: 'client' | 'strategist';
+  body: string;
+  createdAt: string;        // ISO timestamp
+}
+
+/** Strategy v3 — the payload an adapter emits to turn a domain item (keyword opportunity,
+ *  topic cluster, content gap) INTO a sendable recommendation via the per-row Send spine.
+ *  P5 Lane 5C (#6b) builds the keyword-opportunity adapter against this; the policy registry
+ *  (below) decides routing (rec vs deliverable) per RecType. Net-new — zero prior matches. */
+export interface StrategyRecommendationPayload {
+  type: RecType;
+  title: string;
+  description: string;
+  insight: string;                        // "why this matters" — feeds the curated card's why-line
+  affectedPages: string[];
+  /** Optional pre-resolved product for the priced CTA (decision 1 — Add-to-plan only when set). */
+  productType?: string;
+  productPrice?: number;
+  /** The source domain entity id (e.g. the keyword string or cluster topic) for de-dup + lineage. */
+  sourceKey: string;
+  source: string;                         // which analysis produced it (mirrors Recommendation.source)
+}
+
+/** Per-RecType curation policy (spec §6.2 single-writer policy registry). One entry per RecType
+ *  the single-writer (server/recommendation-lifecycle.ts) knows how to mutate. `sendChannel`
+ *  decides whether Send mutates clientStatus directly ('rec') or routes to the deliverable spine
+ *  ('deliverable' — content_decay/cannibalization read lifecycle from client_actions, spec §6.3).
+ *  `cascadeOnStrike` marks RecTypes whose strike also removes strategy items (keyword/topic). */
+export interface RecPolicy {
+  sendChannel: 'rec' | 'deliverable';
+  cascadeOnStrike: boolean;
+  /** True when this RecType resolves a productType → a priced Add-to-plan CTA is allowed. */
+  monetizable: boolean;
+}
+
+/** The registry shape the single-writer consumes. Keyed by RecType; an unlisted RecType is a
+ *  bug (it cannot be curated until a policy is registered). Populated in P1 Lane 1B. */
+export type RecPolicyRegistry = Partial<Record<RecType, RecPolicy>>;
+
+// ── Client-safe rec projection (Phase 2 TheIssueClientPage) ──────────────────
+//
+// This is the EXACT field set the client feed consumes from the public rec route
+// (`GET /api/public/recommendations/:workspaceId?clientStatus=sent`).
+// The server route's `stripEmvFromPublicRecs` projects Recommendation → this shape.
+// Lane A (BE, Track C) implements the projection to this type.
+// Lane B (FE, Track E) consumes it — import from this type, not from Recommendation.
+//
+// Rules for this type:
+//  - Never project the admin-only TOP-LEVEL rec axes: lifecycle, struckAt, cascade, sendChannel.
+//  - The $/ROI exposure on `opportunity` is STRIPPED in `stripEmvFromPublicRecs` by an explicit
+//    destructure ({ emvPerWeek, predictedEmv, roiPerEffortDay, ...publicOpportunity }): those
+//    three are dropped, and the REMAINING opportunity sub-fields PASS THROUGH the rest-spread
+//    intentionally — value, components (with evidence), confidence, calibration, groundedSpine,
+//    calibrationVersion, modelVersion. They are client-safe (no raw $) and power the #1 "why this
+//    is #1" breakdown. (L5: this reconciles the comment with the projection — only the three
+//    $/ROI sub-fields are blocked, not the whole OpportunityScore.)
+//  - `clientStatus` is restricted to the post-send states only (a client never
+//    sees a 'system' or 'curated' rec — those haven't been sent yet).
+//  - `delivered` is a synthetic boolean set by the route: true once the rec's
+//    downstream content/work is marked complete by the operator.
+
+/** Restricted clientStatus values a client may ever observe.
+ *  Recs with clientStatus 'system' or 'curated' are never exposed to the client. */
+export type ClientFacingClientStatus = 'sent' | 'approved' | 'declined' | 'discussing';
+
+/**
+ * The client-safe projection of a Recommendation.
+ *
+ * The public route (`GET /api/public/recommendations/:workspaceId`) projects
+ * Recommendation → ClientFacingRecommendation, stripping all admin/AI-only fields.
+ * Lane A (Track C) implements the projection; Lane B (Track E) consumes it.
+ *
+ * DO NOT add fields here without updating `stripEmvFromPublicRecs` in
+ * `server/recommendation-public-projection.ts` to project them.
+ */
+export interface ClientFacingRecommendation {
+  id: string;
+  workspaceId: string;
+  type: RecType;
+  /** Human-readable "why this matters" explanation. Safe for client display. */
+  insight: string;
+  /** Human-readable expected improvement (e.g. "~240 clicks/mo at rank #3"). */
+  estimatedGain: string;
+  /** One-line rationale for the #1 rec derived from its opportunity.components.
+   *  Present only when this is the top rec; absent on others. */
+  topOpportunityRationale?: string;
+  /** Contribution bars for the "why this is #1" progressive-disclosure section.
+   *  Carries dimension, normalized, weight, contribution, and the client-safe
+   *  evidence string — never emvPerWeek, predictedEmv, or raw $ figures. */
+  opportunityComponents?: Array<Pick<OpportunityComponent, 'dimension' | 'normalized' | 'weight' | 'contribution' | 'evidence'>>;
+  /** The keyword this rec targets. Set on content-gap recs; absent on others. */
+  targetKeyword?: string;
+  // B4: no strategyCardContext — act-on derives StrategyCardContext server-side from the rec
+  // (buildStrategyCardContextFromRec), and the public allow-list never projected this field, so
+  // it was a dead contract on the client surface. Removed to keep the projection honest.
+  /** Client-safe banded monthly impact. Present when projected monthly value is
+   *  above the display floor; absent otherwise. Never shows raw $ from emvPerWeek. */
+  impactBand?: ImpactBand;
+  /** Post-send client status. Restricted to states the client can observe. */
+  clientStatus: ClientFacingClientStatus;
+  /**
+   * True once the operator has marked the downstream content/work complete.
+   * Synthetic field set by the route projection — not a DB column.
+   * Powers the "what's working" section: the client's own greenlit-and-won moves.
+   */
+  delivered: boolean;
+  /**
+   * The Issue — server-authoritative "Request this" descriptor (audit blocker #1). Computed once in
+   * `stripEmvFromPublicRecs` from the workspace's effective tier + the rec's monetizable policy, so
+   * the client can never be tricked by a hidden button. `locked` → render a <TierGate> upsell (the
+   * request route also 403s); `included` → the request is covered by the client's plan (confirm,
+   * no charge at click); `priced` → reserved for the future à-la-carte path (fast-follow). The
+   * `requiredTier` names the upgrade for a `locked` rec. ABSENT when strategy-the-issue is OFF
+   * (gated exactly like the restricted clientStatus projection — keeps flag-OFF byte-identical).
+   */
+  actOn?: { mode: 'included' | 'priced' | 'locked'; requiredTier?: 'growth'; monetizable: boolean };
+}
+
+/**
+ * Client-safe summary of the client's own responses to sent recs — powers the Strategy "The Issue"
+ * loop footer ("you've greenlit N moves · 1 in discussion", spec §5.5 / §7). Projected by the public
+ * route from the rec set's clientStatus axis. Carries ONLY client-safe fields (rec TITLE + the
+ * restricted clientStatus + a respondedAt proxy) — NEVER admin/AI-only fields, lifecycle, or $/ROI.
+ * Mirrors the server-only `ClientSignalsSlice.recResponses` shape (counts + recent), but is the
+ * dedicated CLIENT read (that slice is admin-only). `recent` titles are operator-authored rec
+ * titles, which are already client-facing prose (the same titles the client saw when the rec was
+ * sent).
+ */
+export interface ClientRecResponseSummary {
+  /** Count of recs the client greenlit (clientStatus 'approved'). */
+  approved: number;
+  /** Count of recs the client declined (clientStatus 'declined'). */
+  declined: number;
+  /** Count of recs the client is still discussing (clientStatus 'discussing'). */
+  discussing: number;
+  /** The most-recent responses (newest first, capped). Title + restricted status + a respondedAt proxy. */
+  recent: Array<{ title: string; clientStatus: ClientFacingClientStatus; respondedAt: string }>;
 }

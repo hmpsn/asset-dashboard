@@ -3,7 +3,8 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { callCreativeAI } from './content-posts-ai.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
-import { findPageMapEntryForPage, matchGscUrlToPath, sanitizeForPromptInjection, sanitizeQueryForPrompt, stripCodeFences, stripHtmlToText, tryResolvePagePath } from './helpers.js';
+import { findPageMapEntryForPage, matchGscUrlToPath, tryResolvePagePath } from './utils/page-address.js';
+import { sanitizeForPromptInjection, sanitizeQueryForPrompt, stripCodeFences, stripHtmlToText } from './utils/text.js';
 import { buildPageAssistContext } from './intelligence/page-assist-context-builder.js';
 import { updateJob, unregisterAbort, isJobCancelled } from './jobs.js';
 import { createLogger } from './logger.js';
@@ -12,6 +13,7 @@ import { getQueryPageData } from './search-console.js';
 import { saveSuggestion, type SeoSuggestion } from './seo-suggestions.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import {
+  ctrUnderperformanceFlag,
   normalizeSeoRewritePairs,
   normalizeSeoRewriteVariations,
 } from './webflow-seo-rewrite-utils.js';
@@ -119,16 +121,7 @@ export async function runSeoBulkRewriteJob({
             .slice(0, 15);
           if (pageQueries.length > 0) {
             gscBlock = `\n\nREAL SEARCH QUERIES:\n${pageQueries.map(q => `- "${sanitizeQueryForPrompt(q.query)}" (${q.impressions} impr, ${q.clicks} clicks, pos ${q.position.toFixed(1)}, CTR ${q.ctr}%)`).join('\n')}`;
-            const totalImpr = pageQueries.reduce((sum, q) => sum + q.impressions, 0);
-            const totalClicks = pageQueries.reduce((sum, q) => sum + q.clicks, 0);
-            const avgCtr = totalImpr > 0 ? (totalClicks / totalImpr) * 100 : 0;
-            const avgPos = pageQueries.reduce((sum, q) => sum + q.position * q.impressions, 0) / (totalImpr || 1);
-            if (totalImpr >= 50) {
-              const expectedCtr = avgPos <= 3 ? 8 : avgPos <= 5 ? 5 : avgPos <= 10 ? 2.5 : 1;
-              if (avgCtr < expectedCtr * 0.7) {
-                ctrFlag = `\n\n⚠️ CTR UNDERPERFORMANCE: ${avgCtr.toFixed(1)}% CTR (expected ~${expectedCtr}% for position ${avgPos.toFixed(0)}).`;
-              }
-            }
+            ctrFlag = ctrUnderperformanceFlag(pageQueries, { compact: true });
           }
         }
 

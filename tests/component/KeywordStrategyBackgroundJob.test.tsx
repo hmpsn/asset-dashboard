@@ -57,6 +57,15 @@ vi.mock('../../src/hooks/useBackgroundTasks', () => ({
   }),
 }));
 
+vi.mock('../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: () => false,
+}));
+
+vi.mock('../../src/hooks/admin/useAdminRecommendations', () => ({
+  useAdminRecommendationSet: () => ({ data: undefined, isLoading: false }),
+  useAdminUndismissRecommendation: () => ({ mutate: vi.fn() }),
+}));
+
 vi.mock('../../src/api/seo', () => ({
   keywords: {
     providerStatus: mocks.providerStatus,
@@ -114,6 +123,14 @@ describe('KeywordStrategyPanel background job wiring', () => {
       providers: [{ name: 'dataforseo', configured: true }],
       workspaceData: { competitorDomains: ['competitor.test'], seoDataProvider: 'dataforseo' },
     };
+  });
+
+  it('renders the strategy analysis layout with Settings open', () => {
+    renderPanel();
+    // Single sequential analysis layout — no decision-bands labels.
+    expect(screen.queryByText('Decide')).not.toBeInTheDocument();
+    // Settings is open by default, so its body (the "All" page-limit option) is visible.
+    expect(screen.getByText('All')).toBeInTheDocument();
   });
 
   it('starts keyword strategy generation through the shared background job API', async () => {

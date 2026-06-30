@@ -46,9 +46,13 @@ The global admin gate (`server/app.ts:234-239`) accepts any valid internal JWT w
 **High · bug · M effort · data-flow · CONFIRMED**
 `deleteApprovalBatchForClient` (`server/domains/inbox/approval-batch-admin-mutations.ts:82-125`) deletes the legacy batch but never touches the `client_deliverable` mirror created at send time; the deliverable store has no delete/cancel function. The orphan stays `awaiting_client` forever in the live client Inbox. Worse (verifier finding): responding to the orphan returns `{handled:true}` from the missing-batch path, so the client "approves" withdrawn content with **no team email, no activity, no source write** — and a unit test currently asserts the orphaning behavior. The schema-plan family already has the correct template (`cancelSchemaPlanDeliverable` + `DELIVERABLE_UPDATED`). **Fix:** add `cancelDeliverable` via `findBySourceRef`, call it from batch delete, broadcast `DELIVERABLE_UPDATED`; audit client-action and work-order deletion for the same orphan pattern.
 
+> Follow-up update 2026-06-13: current staging now calls `cancelApprovalBatchDeliverable` from `deleteApprovalBatchForClient`, and `approval-batch-dual-write.test.ts` pins the `cancelled` mirror + `DELIVERABLE_UPDATED` behavior.
+
 ### 4. Unified client Inbox is never invalidated when admin sends approval batches / client actions
 **High · bug · M effort · data-flow · CONFIRMED**
 The live client Inbox renders exclusively from the deliverables query, subscribing only to `DELIVERABLE_*` (+copy/post/work-order events) — but the approval-batch and client-action dual-write mirrors never broadcast `DELIVERABLE_SENT/UPDATED`; they fire only legacy `APPROVAL_UPDATE`/`CLIENT_ACTION_UPDATE`/`APPROVAL_APPLIED`, which map to legacy keys, not `client-unified-inbox`. A client with the Inbox open never sees new Decisions appear or decided cards leave until refocus. The broadcast-pairs meta-test can't catch it (the events *are* handled — just not for this scope). The schema-plan path in the same bounded context proves the correct pattern (`schema-plan-admin-mutations.ts:97-102`). Verifier correction: the briefing leg is moot (briefing mirrors are born `completed`/`notification` and never client-facing). **Fix:** broadcast `DELIVERABLE_SENT/UPDATED` at the approval-batch and client-action mirror seams; add the pairings to the meta-test.
+
+> Follow-up update 2026-06-13: approval-batch and client-action mirrors already carry the `DELIVERABLE_*` broadcasts on staging. The remaining physical mirror families now have the same realtime contract: schema-plan send already broadcasts `DELIVERABLE_SENT` at its route/service seam while schema-plan sync/cancel broadcasts `DELIVERABLE_UPDATED`; work-order and briefing mirrors broadcast `DELIVERABLE_SENT` on first mirror and `DELIVERABLE_UPDATED` on re-mirror. Focused dual-write tests plus the deliverable subscriber wiring contract pin the behavior.
 
 ### 5. Audit bridge and analytics recompute fight over the same `page_health` insight row
 **High · bug · M effort · insights · CONFIRMED**
@@ -62,9 +66,11 @@ Bridge #12 (`server/reports.ts:230-256`) upserts `page_health` with **hardcoded 
 **High · performance · M effort · content-generation · CONFIRMED**
 `POST /api/page-strategy/:workspaceId/generate` awaits one Claude call then a **sequential `generateBrief()` per page** (gpt-5.4 + researchMode each — the code's own comment admits "30–90+ seconds"). No `background-generation-ok` hatch; the pr-check rule's allowlist doesn't include the route file and only matches post-response patterns, not sync awaits. Verifier corrections: a proxy timeout doesn't strand partial state (the loop completes server-side) — the real hazards are deploy/restart mid-loop and **retry-duplication**: the client sees an error while AI spend continues, and a retry creates a duplicate blueprint plus a second full N-brief fan-out. The sibling copy path already uses the job platform. **Fix:** convert to a background job with per-entry progress, or return after the blueprint and run the brief loop as a follow-up job.
 
-### 8. `REQUEST_TRANSITIONS` state machine is defined, claims to close a known bug, but is wired into nothing
-**Medium (downgraded from high) · bug · S effort · decision-intelligence · CONFIRMED**
-`server/state-machines.ts:238-245` defines the map with a comment saying "This map closes that gap" — zero production imports. `updateRequest` writes any merged status; the PATCH route emails the client on **every** status change including illegal `closed→new` reopens. The guard-coverage contract test omits the requests entity, and the pr-check "unguarded SET status" rule misses the statement shape. Downgraded because all mutation paths are admin-gated — harms are convention violation, spurious client emails, and an actively misleading comment. **Fix:** wire `validateTransition` into `updateRequest`, add the entity to `GUARD_SIGNALS`, surface `InvalidTransitionError` as 400. Do the same for `MATRIX_CELL_TRANSITIONS` (same pattern, also unwired — see Decision/intelligence below).
+### 8. `REQUEST_TRANSITIONS` state-machine closure
+**Medium (downgraded from high) · bug · S effort · decision-intelligence · RESOLVED 2026-06-13**
+Original finding: `server/state-machines.ts:238-245` defined the map with a comment saying "This map closes that gap" but had zero production imports. `updateRequest` wrote any merged status; the PATCH route emailed the client on **every** status change including illegal `closed→new` reopens. The guard-coverage contract test omitted the requests entity, and the pr-check "unguarded SET status" rule missed the statement shape. Downgraded because all mutation paths are admin-gated — harms were convention violation, spurious client emails, and an actively misleading comment.
+
+Follow-up: `updateRequest` now validates `REQUEST_TRANSITIONS`, `PATCH /api/requests/:id` maps `InvalidTransitionError` to 409, the bulk request route preflights all requested status transitions before mutating any row, and regression coverage asserts illegal transitions do not broadcast or send status emails. `MATRIX_CELL_TRANSITIONS` is also wired through `updateMatrixCell` and wholesale matrix cell rewrites, with `request` and `matrix_cell` both present in `GUARD_SIGNALS`.
 
 ### 9. Four admin crawl/AI operations run as synchronous requests with only a spinner
 **Medium (downgraded from high) · ux · L effort · admin-ux · CONFIRMED**
@@ -88,7 +94,7 @@ Independently flagged by three auditors. Eight client components have **zero liv
 **Fix as one cleanup PR:** delete the dead files, strip the props/threading, then update CLAUDE.md's inbox component list (live set: `DecisionCard`, `InlineApprovalCard`, `DeliverableDetailModal`, `ProjectedReviewModal`, `PriorityStrip`, `SubmitRequestChooserModal`), rewrite inbox-section-routing.md's enforcement table, and correct the dual-write headers — same commit, per the project's own doc-sync rule.
 
 ### B. Contracts that exist but are enforced nowhere (the audit's signature defect shape)
-- `REQUEST_TRANSITIONS` / `MATRIX_CELL_TRANSITIONS` defined, never imported (confirmed #8).
+- Resolved 2026-06-13: `REQUEST_TRANSITIONS` / `MATRIX_CELL_TRANSITIONS` are now imported, enforced, and covered by `GUARD_SIGNALS` (finding #8).
 - `executionMode: 'background-only'` in the operation registry — no runtime/pr-check/test enforcement (confirmed #6).
 - `bridge-authoring.md` claims a pr-check rule (`bridgeSource missing on upsertInsight inside bridge`) that **does not exist**, claims per-bridge feature flags that are retired, and lists 5 registered bridge sources with no implementation.
 - `getWorkspaceHealthScore` peeks the all-13-slices cache key that no production path warms (cron warms a 7-slice key) — outcome-measurement prioritization silently never runs (`server/workspace-intelligence.ts:151-157` vs `server/intelligence-crons.ts:38-40`).
@@ -177,8 +183,8 @@ Strengths: facade with LRU + single-flight + per-slice degradation, no bypasses 
 
 | Finding | Sev/Effort | Where |
 |---|---|---|
-| REQUEST_TRANSITIONS unwired (confirmed #8) | M/S | `state-machines.ts:238`, `requests.ts:151` |
-| MATRIX_CELL_TRANSITIONS also unwired — published→anything possible today; deferred to content_plan cutover but untracked | M/S | `content-matrices.ts:289` |
+| REQUEST_TRANSITIONS guard wired; bulk route now preflights invalid mixes before mutating | Resolved 2026-06-13 | `requests.ts`, `routes/requests.ts`, `state-machine-guard-coverage-contract.test.ts` |
+| MATRIX_CELL_TRANSITIONS guard wired for single-cell updates and wholesale cell rewrites | Resolved 2026-06-13 | `content-matrices.ts`, `content-matrices-routes.test.ts` |
 | getWorkspaceHealthScore peeks never-warmed cache key — outcome-measurement prioritization is dead code (theme B) | M/S | `workspace-intelligence.ts:151`, `intelligence-crons.ts:38` |
 | InsightsSlice.byType unbounded (caps exist only on `all`) — multi-MB MCP/admin JSON + LRU bloat for insight-heavy workspaces | M/S | `insights-slice.ts:44` |
 | Legacy public approval respond endpoints update the batch but never sync the deliverable mirror (deferred follow-up that never landed; live API surface) | M/M | `approval-batch-respond.ts`, `routes/approvals.ts:141` |
@@ -248,7 +254,7 @@ Strengths: exceptional guardrail mechanization; real flag lifecycle hygiene (all
 5. Purple outside `src/components/client/` against an allowlist (warn tier); cyan-styled buttons in the blue-drift rule.
 6. Background-generation rule: extend route allowlist (webflow-analysis, aeo-review, llms-txt, page-strategy, copy-pipeline) and add a sync-awaited-AI-loop pattern.
 7. Implement the `bridgeSource missing on upsertInsight inside bridge` rule bridge-authoring.md already specifies (or correct the doc).
-8. Contract tests: requests + matrix_cell entities in `GUARD_SIGNALS`; template-literal `adminPath` regex in tab-deep-link test; "every InsightDataMap key has a non-default renderer"; "cron-warmed intelligence key is readable by getWorkspaceHealthScore"; explicit-'none' seoDataMode makes zero provider calls.
+8. Contract tests: template-literal `adminPath` regex in tab-deep-link test; "every InsightDataMap key has a non-default renderer"; "cron-warmed intelligence key is readable by getWorkspaceHealthScore"; explicit-'none' seoDataMode makes zero provider calls. The requests + matrix_cell `GUARD_SIGNALS` coverage item was completed on 2026-06-13.
 9. `confirm()` rule: widen pathFilter from `src/components/client/` to `src/components/`.
 10. Enforce `executionMode: 'background-only'` at the `callAI` dispatch boundary (runtime, not regex).
 

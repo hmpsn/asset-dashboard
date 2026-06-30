@@ -20,17 +20,18 @@ import { getWorkOrder } from '../work-orders.js';
 import { addWorkOrderComment, listWorkOrderComments } from '../work-order-comments.js';
 import { getPost, updatePostField, snapshotPostVersion, getMostRecentPostVersion } from '../content-posts.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
-import { normalizePageUrl, validateEnum } from '../helpers.js';
+import { normalizePageUrl } from '../utils/page-address.js';
+import { validateEnum } from '../utils/request-validation.js';
 import { sanitizeRichText, sanitizePlainText } from '../html-sanitize.js';
 import { countHtmlWords } from '../content-posts-ai.js';
 import { getPageKeyword, listPageKeywords, listPageKeywordsPaged } from '../page-keywords.js';
 import { assembleStoredKeywordStrategy } from '../keyword-strategy-assembler.js';
 import { getClientActor, requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
 import { getPageTrend, getQueryPageData } from '../search-console.js';
-import { getWorkspace } from '../workspaces.js';
+import { getWorkspace, computeEffectiveTier } from '../workspaces.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../rank-tracking.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
-import { handleContentPerformance } from './content-requests.js';
+import { handlePublicContentPerformance } from '../domains/content/content-performance.js';
 import { isProgrammingError } from '../errors.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';
 import { resolveWorkspaceLocationCode } from '../local-seo.js';
@@ -39,6 +40,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import { validate } from '../middleware/validate.js';
 import { computeOpportunityScore } from './keyword-strategy.js';
 import { buildKeywordStrategyUxPayload, buildLatestKeywordStrategyRefreshSummary } from '../keyword-strategy-ux.js';
+import { computeOrientMetrics } from '../keyword-strategy-orient.js';
 import { buildPageRankStories } from '../page-rank-stories.js';
 import {
   createContentRequestSchema,
@@ -63,6 +65,7 @@ const router = Router();
 const ACTIVITY_COMMENT_PREVIEW_LENGTH = 200;
 type TrackedKeywordActivityType = 'client_keyword_tracked' | 'client_keyword_removed';
 const requirePublicContentWriteAuth = requireAuthenticatedClientPortalAuth('workspaceId');
+const PUBLIC_CONTENT_PERFORMANCE_STATUSES = new Set(['delivered', 'published']);
 
 router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));
 
@@ -140,6 +143,10 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
     if (!assembled) return res.json(null);
     const { pageMap: fullPageMap, contentGaps, quickWins, keywordGaps, topicClusters, cannibalization, siteKeywordMetrics } = assembled;
     // Return client-safe subset (no SEO data mode/provider internals)
+    // Raw cpc is an admin/scoring-internal money input — gate it server-side so a
+    // free-tier client cannot read it from the network payload (the drawer's
+    // client-side hide is not a security boundary). See the pageMap projection below.
+    const includeCpc = computeEffectiveTier(ws) !== 'free';
     const trackedKeywords = getTrackedKeywords(ws.id, { includeInactive: true });
     const strategyUx = await buildKeywordStrategyUxPayload({
       workspaceId: ws.id,
@@ -165,6 +172,14 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
         trackedKeywords,
       }),
     });
+    // Strategy v2 client Orient metrics — the CTR-weighted visibility score (0–100) plus aggregate
+    // clicks / impressions / ranked-keywords / avg-position and their deltas. OrientMetrics is
+    // money-free by construction (its only inputs are per-page {position, volume}; there is NO emv,
+    // opportunity.value, or per-keyword $ breakdown anywhere in it), so it is safe to expose on the
+    // public client path. Consumed by the client Strategy command-center Orient header — the baseline
+    // layout after the v2 cutover (always read). The no-money-field invariant is locked by
+    // tests/integration/client-strategy-orient-public-read.test.ts.
+    strategyUx.orient = computeOrientMetrics(ws.id, fullPageMap);
     res.json({
       siteKeywords: strategy?.siteKeywords || [],
       // #19b dual-read: table-first via the assembler, blob fallback. Strip is 3b-ii.
@@ -181,11 +196,14 @@ router.get('/api/public/seo-strategy/:workspaceId', async (req, res, next) => {
         clicks: p.clicks,
         volume: p.volume,
         difficulty: p.difficulty,
-        // Task 3.2: cpc is the realized-$ input for the per-keyword "Revenue
-        // potential" block on the (Growth+ gated) strategy drawer. It is the same
-        // clicks×cpc realized value ROIDashboard already shows Growth+ clients —
-        // exposed alongside the other raw pageMap metrics (clicks/impressions/volume).
-        cpc: p.cpc,
+        // Task 3.2 / Phase 6a follow-up: cpc is the realized-$ input behind the
+        // per-keyword "Revenue potential" block on the Growth+ strategy drawer.
+        // It is admin/scoring-internal money data, so it is GENUINELY tier-gated
+        // here (omitted entirely for free tier via `includeCpc`) — not merely
+        // hidden client-side. The drawer itself renders server-computed
+        // currentMonthly/upsideMonthly (off `strategyUx`, derived from the full
+        // internal pageMap), so omitting raw cpc never breaks the paid drawer.
+        ...(includeCpc ? { cpc: p.cpc } : {}),
         metricsSource: p.metricsSource,
         validated: p.validated,
         gscKeywords: p.gscKeywords || [],
@@ -546,7 +564,7 @@ router.get('/api/public/content-brief/:workspaceId/:briefId/export', (req, res) 
 
 router.get('/api/public/content-performance/:workspaceId', async (req, res) => {
   try {
-    const data = await handleContentPerformance(req.params.workspaceId);
+    const data = await handlePublicContentPerformance(req.params.workspaceId);
     res.json(data);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -560,6 +578,9 @@ router.get('/api/public/content-performance/:workspaceId/:requestId/trend', asyn
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
     const request = getContentRequest(req.params.workspaceId, req.params.requestId);
     if (!request) return res.status(404).json({ error: 'Request not found' });
+    if (!PUBLIC_CONTENT_PERFORMANCE_STATUSES.has(request.status)) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
     if (!request.targetPageSlug || !ws.gscPropertyUrl || !ws.webflowSiteId) {
       return res.json({ trend: [] });
     }
@@ -578,8 +599,8 @@ router.get('/api/public/content-performance/:workspaceId/:requestId/trend', asyn
     const trend = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, pageUrl, 90, { startDate, endDate });
     res.json({ trend });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    res.status(500).json({ error: msg });
+    log.warn({ err, workspaceId: req.params.workspaceId, requestId: req.params.requestId }, 'public content performance trend failed');
+    res.status(500).json({ error: 'Unable to load content performance trend' });
   }
 });
 

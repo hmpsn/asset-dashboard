@@ -60,8 +60,7 @@ export interface KeywordStrategyExplanation {
   nextAction: KeywordStrategyNextAction;
   /**
    * Plain-language reasons explaining the keyword's value score (Task 2.3).
-   * Populated server-side in buildKeywordStrategyUxPayload when the
-   * keyword-value-scoring flag is ON. Absent when the flag is OFF or the
+   * Populated server-side in buildKeywordStrategyUxPayload. Absent when the
    * keyword has no value signal (signal gate fails).
    * Safe for all tiers (no $ amounts).
    */
@@ -103,6 +102,29 @@ export interface KeywordStrategyRefreshSummary {
   resolvedContentGaps: number;
 }
 
+/**
+ * Strategy v2 Orient-zone metrics — the top-line "where the site sits" glance.
+ * Computed server-side on the admin GET (`/api/webflow/keyword-strategy/:id`) AND the public client
+ * read (`/api/public/seo-strategy/:id`, Phase 6a) — the visibility score depends on the CTR-decay curve
+ * and the deltas require the prior strategy_history snapshot. The metric is client-safe by construction:
+ * its only inputs are per-page {position, volume}; there is NO emv / opportunity.value / per-keyword $.
+ * Each stat pairs a current value with a delta vs the previous strategy generation
+ * (null when there is no prior snapshot). `avgPositionDelta` is signed
+ * (current − prior); negative means improved (a lower position is better).
+ */
+export interface OrientMetrics {
+  visibilityScore: number;
+  visibilityScoreDelta: number | null;
+  clicks: number;
+  clicksDelta: number | null;
+  impressions: number;
+  impressionsDelta: number | null;
+  rankedKeywords: number;
+  rankedKeywordsDelta: number | null;
+  avgPosition: number;
+  avgPositionDelta: number | null;
+}
+
 export interface KeywordStrategyUxPayload {
   refreshSummary?: KeywordStrategyRefreshSummary;
   explanations: KeywordStrategyExplanation[];
@@ -114,6 +136,11 @@ export interface KeywordStrategyUxPayload {
    * (page_keywords only). Absent on client-facing reads.
    */
   localSync?: LocalStrategySyncStatus;
+  /**
+   * Strategy v2 Orient-zone metrics. Present on the admin GET and the public client read (Phase 6a)
+   * whenever assembled strategy data exists (pages and/or a strategy blob). Client-safe — see OrientMetrics.
+   */
+  orient?: OrientMetrics;
 }
 
 export interface KeywordStrategyKeywordChange {

@@ -65,7 +65,7 @@ vi.mock('../../server/local-seo.js', () => ({
   getPrimaryMarketLocationCode: mocks.getPrimaryMarketLocationCode,
 }));
 
-vi.mock('../../server/helpers.js', () => ({
+vi.mock('../../server/utils/page-address.js', () => ({
   findPageMapEntry: mocks.findPageMapEntry,
 }));
 
@@ -169,7 +169,7 @@ describe('assembleSeoContext', () => {
         pageTitle: 'Live',
         primaryKeyword: 'live keyword',
         secondaryKeywords: ['secondary'],
-        serpFeatures: ['featured_snippet', 'people_also_ask', 'video'],
+        serpFeatures: ['featured_snippet', 'people_also_ask', 'video', 'ai_overview'],
       },
       {
         pagePath: '/live-2',
@@ -188,6 +188,7 @@ describe('assembleSeoContext', () => {
       peopleAlsoAsk: 1,
       localPack: true,
       videoCarousel: 2,
+      aiOverview: 1,
     });
   });
 

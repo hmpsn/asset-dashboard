@@ -25,7 +25,14 @@ describe('deliverable websocket subscriber wiring', () => {
 
     expect(source).toContain('[WS_EVENTS.DELIVERABLE_SENT]: () => invalidateClientEvent(WS_EVENTS.DELIVERABLE_SENT)');
     expect(source).toContain('[WS_EVENTS.DELIVERABLE_UPDATED]: () => invalidateClientEvent(WS_EVENTS.DELIVERABLE_UPDATED)');
-    expect(keys).toEqual([queryKeys.client.unifiedInbox('ws-deliverables')]);
+    // strategy-the-issue (Phase 2): DELIVERABLE_SENT/UPDATED also refresh the evergreen curated
+    // feed + the loop-footer response summary (both halves of the loop) for the always-mounted
+    // client-dashboard subscriber.
+    expect(keys).toEqual([
+      queryKeys.client.unifiedInbox('ws-deliverables'),
+      queryKeys.client.theIssue('ws-deliverables'),
+      queryKeys.client.recResponses('ws-deliverables'),
+    ]);
   });
 
   it('mounted deliverables surfaces keep their local subscribers for live in-view updates', () => {

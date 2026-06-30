@@ -1252,6 +1252,40 @@ describe('formatPageMapForPrompt', () => {
     const result = formatPageMapForPrompt(seo);
     expect(result.startsWith('\n')).toBe(true);
   });
+
+  it('renders page-map metrics when present and omits missing metrics', () => {
+    const seo: SeoContextSlice = {
+      ...SEO_EMPTY,
+      strategy: {
+        siteKeywords: [],
+        pageMap: [
+          {
+            pagePath: '/features',
+            pageTitle: 'Features',
+            primaryKeyword: 'enterprise seo',
+            secondaryKeywords: ['seo analytics'],
+            searchIntent: 'commercial',
+            volume: 1450,
+            keywordDifficulty: 42,
+            cpc: 8,
+          },
+          {
+            pagePath: '/pricing',
+            pageTitle: 'Pricing',
+            primaryKeyword: 'seo pricing',
+            secondaryKeywords: [],
+          },
+        ],
+        opportunities: [],
+        businessContext: '',
+        generatedAt: '2026-01-01',
+      },
+    };
+    const result = formatPageMapForPrompt(seo);
+    expect(result).toContain('/features: "enterprise seo" (also: seo analytics) [intent: commercial; vol: 1,450; KD: 42; CPC: $8.00]');
+    expect(result).toContain('/pricing: "seo pricing"');
+    expect(result).not.toContain('/pricing: "seo pricing" [');
+  });
 });
 
 // ─── localSeo section rendering ───────────────────────────────────────────────

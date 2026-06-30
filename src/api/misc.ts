@@ -9,6 +9,7 @@ import type {
 import type { FeatureFlagKey } from '../../shared/types/feature-flags';
 import type { KeywordFeedbackDeleteResponse, KeywordFeedbackListRow, KeywordFeedbackMutationResponse } from '../../shared/types/keyword-feedback';
 import type { TrackedKeyword } from '../../shared/types/rank-tracking';
+import type { Recommendation, RecDiscussionEntry } from '../../shared/types/recommendations';
 export {
   jobs,
   roadmap,
@@ -184,6 +185,30 @@ export const recommendations = {
 
   remove: (wsId: string, recId: string) =>
     del(`/api/public/recommendations/${wsId}/${recId}`),
+
+  // P4 Lane C — mint a competitor-gap rec (idempotent on targetKeyword). Returns the
+  // existing rec when one already exists for the keyword (safe on double-click). Admin-only.
+  mintCompetitor: (
+    wsId: string,
+    body: { keyword: string; competitorDomain?: string; title?: string; description?: string; insight?: string },
+  ) => post<Recommendation>(`/api/recommendations/${wsId}/competitor-rec`, body),
+
+  // Strategy v3 admin curation lifecycle (admin-only routes).
+  send: (wsId: string, recId: string, note?: string) =>
+    patch<Recommendation>(`/api/recommendations/${wsId}/${recId}/send`, { note }),
+  strike: (wsId: string, recId: string) =>
+    patch<Recommendation>(`/api/recommendations/${wsId}/${recId}/strike`, {}),
+  unstrike: (wsId: string, recId: string) =>
+    patch<Recommendation>(`/api/recommendations/${wsId}/${recId}/unstrike`, {}),
+  throttle: (wsId: string, recId: string, days: 7 | 30 | 90) =>
+    patch<Recommendation>(`/api/recommendations/${wsId}/${recId}/throttle`, { days }),
+  fix: (wsId: string, recId: string) =>
+    patch<Recommendation>(`/api/recommendations/${wsId}/${recId}/fix`, {}),
+  // Discussion thread (admin cockpit Discuss filter).
+  listDiscussion: (wsId: string, recId: string) =>
+    get<RecDiscussionEntry[]>(`/api/recommendations/${wsId}/${recId}/discussion`),
+  postDiscussion: (wsId: string, recId: string, body: string) =>
+    post<RecDiscussionEntry>(`/api/recommendations/${wsId}/${recId}/discussion`, { body }),
 };
 
 // ── Upload ──────────────────────────────────────────────────────

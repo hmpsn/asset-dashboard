@@ -9,12 +9,26 @@ import type { SchemaValidation } from '../schema-validator.js';
 import type { SeoChangeEvent } from '../seo-change-tracker.js';
 import type { RankEntry } from '../rank-tracking.js';
 import type { ContentBrief, GeneratedPost } from '../../shared/types/content.js';
-import type { DecayAnalysis } from '../content-decay.js';
+import type { DecayAnalysis } from '../../shared/types/content-decay.js';
+import type { InternalLinkResult } from '../../shared/types/internal-links.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { createLogger } from '../logger.js';
-import { matchPageIdentity, matchPagePath, toAuditFindingPageId } from '../helpers.js';
+import { matchPageIdentity, matchPagePath, toAuditFindingPageId } from '../utils/page-address.js';
 
 const log = createLogger('workspace-intelligence/page-profile');
+
+type AuditSnapshotViewsModule = {
+  getLatestEffectiveSnapshot: (
+    siteId: string,
+    suppressions: Workspace['auditSuppressions'] | undefined,
+  ) => {
+    audit?: { pages?: PageSeoResult[] };
+  } | null;
+};
+
+function serverModulePath(name: 'audit-snapshot-views'): `../${typeof name}.js` {
+  return `../${name}.js`;
+}
 
 export async function assemblePageProfile(
   workspaceId: string,
@@ -63,11 +77,11 @@ export async function assemblePageProfile(
   // Recommendations for this page
   let recommendations: string[] = [];
   try {
-    const { loadRecommendations } = await import('../recommendations.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    const { loadRecommendations, isActiveRec } = await import('../recommendations.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     const recSetPP: RecommendationSet | null = loadRecommendations(workspaceId);
     if (recSetPP?.recommendations) {
       recommendations = recSetPP.recommendations
-        .filter(r => r.affectedPages?.some(p => matchPageIdentity(p, pagePath)) && (r.status === 'pending' || !r.status))
+        .filter(r => r.affectedPages?.some(p => matchPageIdentity(p, pagePath)) && isActiveRec(r))
         .map(r => r.title ?? r.description ?? '')
         .filter(Boolean);
     }
@@ -107,7 +121,8 @@ export async function assemblePageProfile(
   let auditIssues: string[] = [];
   try {
     if (ws?.webflowSiteId) {
-      const { getLatestEffectiveSnapshot } = await import('../audit-snapshot-views.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const { getLatestEffectiveSnapshot } =
+        await import(serverModulePath('audit-snapshot-views')) as AuditSnapshotViewsModule; // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
       const snap = getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions);
       if (snap?.audit?.pages) {
         const pagData = (snap.audit.pages as PageSeoResult[]).find(p =>
@@ -162,7 +177,7 @@ export async function assemblePageProfile(
       try {
         const { getInternalLinks } = await import('../performance-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
         const linkSnapshot = getInternalLinks(wsForLinks.webflowSiteId);
-        const linkData = linkSnapshot?.result as import('../internal-links.js').InternalLinkResult | null;
+        const linkData = linkSnapshot?.result as InternalLinkResult | null;
         if (linkData?.pageHealth) {
           const entry = linkData.pageHealth.find(
             ph => matchPagePath(ph.path, pagePath),
@@ -226,7 +241,7 @@ export async function assemblePageProfile(
   // Content status
   let contentStatus: PageProfileSlice['contentStatus'] = null;
   try {
-    const { listBriefs } = await import('../content-brief.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+    const { listBriefs } = await import('../content-brief-read-model.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     const briefs: ContentBrief[] = listBriefs(workspaceId);
     // ContentBrief matches pages via targetKeyword, not URL
     const primaryKw = keywordComparisonKey(pageKw?.primaryKeyword);
@@ -249,7 +264,7 @@ export async function assemblePageProfile(
 
     let isDecaying = false;
     try {
-      const { loadDecayAnalysis } = await import('../content-decay.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const { loadDecayAnalysis } = await import('../content-decay-read-model.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
       const decayPP: DecayAnalysis | null = loadDecayAnalysis(workspaceId);
       isDecaying = decayPP?.decayingPages?.some(d => matchPageIdentity(d.page, pagePath)) ?? false;
     } catch (err) {
@@ -291,17 +306,10 @@ export async function assemblePageProfile(
     const { getWorkspace } = await import('../workspaces.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     const ws = getWorkspace(workspaceId);
     if (ws?.webflowSiteId) {
-      const { getPageSpeed } = await import('../performance-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      const speedSnap = getPageSpeed(ws.webflowSiteId, 'mobile');
-      if (speedSnap?.result) {
-        const result = speedSnap.result as { pages?: Array<{ url?: string; slug?: string; score?: number }> }; // as-any-ok: untyped PageSpeed JSON blob
-        const pages = result.pages ?? [];
-        const pageData = pages.find(p =>
-          p.url ? matchPageIdentity(p.url, pagePath) : !!p.slug && matchPageIdentity(p.slug, pagePath)
-        );
-        if (pageData?.score != null) {
-          cwvStatus = pageData.score >= 90 ? 'good' : pageData.score >= 50 ? 'needs_improvement' : 'poor';
-        }
+      const { getPageSpeedPageScore } = await import('../performance-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const score = getPageSpeedPageScore(ws.webflowSiteId, 'mobile', pagePath);
+      if (score != null) {
+        cwvStatus = score >= 90 ? 'good' : score >= 50 ? 'needs_improvement' : 'poor';
       }
     }
   } catch (err) {

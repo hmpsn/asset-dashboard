@@ -731,6 +731,40 @@ describe('formatPageMapForPrompt', () => {
     const result = formatPageMapForPrompt(seo);
     expect(result).toContain('cannibalization');
   });
+
+  it('includes available per-page keyword metrics without requiring every metric', () => {
+    const seo = makeSeoContext({
+      strategy: {
+        id: 's1',
+        workspaceId: 'ws1',
+        siteKeywords: [],
+        pageMap: [
+          {
+            pagePath: '/services',
+            primaryKeyword: 'dental seo',
+            secondaryKeywords: [],
+            searchIntent: 'commercial',
+            volume: 1200,
+            difficulty: 34,
+            cpc: 6.5,
+          },
+          {
+            pagePath: '/about',
+            primaryKeyword: 'about dental practice',
+            secondaryKeywords: [],
+          },
+        ],
+        businessContext: '',
+        status: 'active',
+        createdAt: '2026-01-01',
+        updatedAt: '2026-01-01',
+      } as never,
+    });
+    const result = formatPageMapForPrompt(seo);
+    expect(result).toContain('/services: "dental seo" [intent: commercial; vol: 1,200; KD: 34; CPC: $6.50]');
+    expect(result).toContain('/about: "about dental practice"');
+    expect(result).not.toContain('/about: "about dental practice" [');
+  });
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -898,6 +932,74 @@ describe('formatForPrompt — seoContext section', () => {
     expect(result).toContain('12.3');
   });
 
+  it('includes named keyword movers in standard rank tracking context', () => {
+    const intel = makeIntelligence({
+      seoContext: makeSeoContext({
+        businessContext: 'Dental',
+        rankTracking: {
+          trackedKeywords: 25,
+          avgPosition: 12.3,
+          positionChanges: { improved: 5, declined: 2, stable: 18 },
+          topKeywordMovers: [
+            {
+              query: 'dental implants',
+              position: 4,
+              change: -3,
+              direction: 'improved',
+              clicks: 12,
+              impressions: 300,
+              ctr: 4,
+            },
+            {
+              query: 'emergency dentist',
+              position: 9,
+              change: 2,
+              direction: 'declined',
+              clicks: 4,
+              impressions: 900,
+              ctr: 0.44,
+              valueScore: 71,
+            },
+          ],
+        },
+      }),
+    });
+    const result = formatForPrompt(intel);
+    expect(result).toContain('Top keyword movers');
+    expect(result).toContain('improved "dental implants" #4');
+    expect(result).toContain('declined "emergency dentist" #9');
+    expect(result).toContain('value 71');
+  });
+
+  it('can omit named keyword movers while preserving aggregate rank tracking context', () => {
+    const intel = makeIntelligence({
+      seoContext: makeSeoContext({
+        businessContext: 'Dental',
+        rankTracking: {
+          trackedKeywords: 25,
+          avgPosition: 12.3,
+          positionChanges: { improved: 5, declined: 2, stable: 18 },
+          topKeywordMovers: [
+            {
+              query: 'dental implants',
+              position: 4,
+              change: -3,
+              direction: 'improved',
+              clicks: 12,
+              impressions: 300,
+              ctr: 4,
+            },
+          ],
+        },
+      }),
+    });
+    const result = formatForPrompt(intel, { includeRankMovers: false });
+    expect(result).toContain('Rank tracking');
+    expect(result).toContain('25 keywords');
+    expect(result).not.toContain('Top keyword movers');
+    expect(result).not.toContain('dental implants');
+  });
+
   it('omits rank tracking in compact verbosity', () => {
     const intel = makeIntelligence({
       seoContext: makeSeoContext({
@@ -930,7 +1032,7 @@ describe('formatForPrompt — seoContext section', () => {
     const intel = makeIntelligence({
       seoContext: makeSeoContext({
         businessContext: 'Dental',
-        serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: true, videoCarousel: 0 },
+        serpFeatures: { featuredSnippets: 3, peopleAlsoAsk: 5, localPack: true, videoCarousel: 0, aiOverview: 0 },
       }),
     });
     const result = formatForPrompt(intel);

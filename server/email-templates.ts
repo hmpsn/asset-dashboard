@@ -180,7 +180,6 @@ export type EmailEventType =
   | 'payment_received'
   | 'fixes_applied'
   | 'recommendations_ready'
-  | 'audit_improved'
   | 'anomaly_alert'
   | 'content_published'
   | 'audit_complete'
@@ -189,7 +188,73 @@ export type EmailEventType =
   | 'content_changes_requested'
   | 'action_approved'
   | 'work_order_comment_team'
-  | 'work_order_comment_client';
+  | 'work_order_comment_client'
+  | 'curated_recs_sent'
+  | 'client_return_hook';
+
+type PayloadRule = {
+  requiredStrings?: string[];
+  requiredNumbers?: string[];
+  requiredArrays?: string[];
+};
+
+const CLIENT_EMAIL_PAYLOAD_RULES: Partial<Record<EmailEventType, PayloadRule>> = {
+  approval_ready: { requiredStrings: ['batchName'], requiredNumbers: ['itemCount'] },
+  request_status: { requiredStrings: ['requestTitle', 'newStatus'] },
+  request_response: { requiredStrings: ['requestTitle', 'noteContent'] },
+  content_brief_ready: { requiredStrings: ['topic', 'targetKeyword'] },
+  content_post_ready: { requiredStrings: ['topic', 'targetKeyword'] },
+  client_welcome: { requiredStrings: ['clientName'] },
+  trial_expiry_warning: { requiredNumbers: ['daysRemaining'] },
+  password_reset: { requiredStrings: ['resetUrl'] },
+  fixes_applied: { requiredStrings: ['productType'], requiredNumbers: ['pageCount'] },
+  recommendations_ready: { requiredNumbers: ['recCount'] },
+  anomaly_alert: { requiredStrings: ['title', 'description', 'severity', 'source'], requiredNumbers: ['changePct'] },
+  content_published: { requiredStrings: ['topic'] },
+  audit_complete: {
+    requiredNumbers: ['score', 'totalPages', 'errors', 'warnings', 'fixedCount'],
+    requiredArrays: ['topIssues'],
+  },
+  client_briefing_ready: { requiredStrings: ['weekOf', 'heroHeadline'], requiredNumbers: ['storyCount'] },
+  work_order_comment_client: { requiredStrings: ['orderTitle', 'message'] },
+  curated_recs_sent: { requiredNumbers: ['recCount'] },
+  // P1c return-hook: outcomeNoun is always required (segment framing); the three sections
+  // (leads/money/decision) are conditional and validated by the assembler, not here.
+  client_return_hook: { requiredStrings: ['outcomeNoun'] },
+};
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+export function getEmailEventPayloadIssues(event: EmailEvent): string[] {
+  const issues: string[] = [];
+  if (!isNonEmptyString(event.recipient)) issues.push('recipient must be a non-empty string');
+  if (!isNonEmptyString(event.workspaceName)) issues.push('workspaceName must be a non-empty string');
+  if (!event.data || typeof event.data !== 'object' || Array.isArray(event.data)) {
+    issues.push('data must be an object');
+    return issues;
+  }
+
+  const rule = CLIENT_EMAIL_PAYLOAD_RULES[event.type];
+  if (!rule) return issues;
+
+  for (const field of rule.requiredStrings ?? []) {
+    if (!isNonEmptyString(event.data[field])) issues.push(`data.${field} must be a non-empty string`);
+  }
+  for (const field of rule.requiredNumbers ?? []) {
+    if (!isFiniteNumber(event.data[field])) issues.push(`data.${field} must be a finite number`);
+  }
+  for (const field of rule.requiredArrays ?? []) {
+    if (!Array.isArray(event.data[field])) issues.push(`data.${field} must be an array`);
+  }
+
+  return issues;
+}
 
 // ── Template renderers ──
 
@@ -218,6 +283,19 @@ function deriveLogoUrl(dashUrl?: string): string | undefined {
 }
 
 export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subject: string; html: string } {
+  if (events.length === 0) {
+    throw new Error(`Cannot render ${type} email without events`);
+  }
+  const payloadIssues = events.flatMap((event, index) => {
+    const issues = event.type === type
+      ? getEmailEventPayloadIssues(event)
+      : [`event type ${event.type} does not match digest type ${type}`];
+    return issues.map(issue => `event[${index}]: ${issue}`);
+  });
+  if (payloadIssues.length > 0) {
+    throw new Error(`Invalid ${type} email payload: ${payloadIssues.join('; ')}`);
+  }
+
   const count = events.length;
   const ws = events[0].workspaceName;
   const dashUrl = events.find(e => e.dashboardUrl)?.dashboardUrl;
@@ -255,8 +333,6 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       result = renderFixesApplied(events, count, ws, dashUrl, logoUrl); break;
     case 'recommendations_ready':
       result = renderRecommendationsReady(events, count, ws, dashUrl, logoUrl); break;
-    case 'audit_improved':
-      result = renderAuditImproved(events, count, ws, dashUrl, logoUrl); break;
     case 'anomaly_alert':
       result = renderAnomalyAlert(events, count, ws, dashUrl, logoUrl); break;
     case 'content_published':
@@ -275,6 +351,10 @@ export function renderDigest(type: EmailEventType, events: EmailEvent[]): { subj
       result = renderWorkOrderCommentTeam(events, count, ws, dashUrl, logoUrl); break;
     case 'work_order_comment_client':
       result = renderWorkOrderCommentClient(events, count, ws, dashUrl, logoUrl); break;
+    case 'curated_recs_sent':
+      result = renderCuratedRecsSent(events, count, ws, dashUrl, logoUrl); break;
+    case 'client_return_hook':
+      result = renderClientReturnHook(events, count, ws, dashUrl, logoUrl); break;
     default:
       result = { subject: 'Notification', html: '' };
   }
@@ -942,22 +1022,88 @@ function renderRecommendationsReady(_events: EmailEvent[], _count: number, ws: s
   };
 }
 
-function renderAuditImproved(_events: EmailEvent[], _count: number, ws: string, dashUrl?: string, logoUrl?: string) {
-  const e = _events[0];
-  const score = (e.data.score as number) || 0;
-  const prev = (e.data.previousScore as number) || 0;
-  const delta = score - prev;
+// Strategy v3 (spec §7.1) — the curation doorbell. Sent from the admin send endpoint when an
+// operator delivers curated rec(s) to the client. Decision-framed (NOT "recommendations_ready",
+// whose 14-day audit cooldown would swallow curated sends — see email-throttle CATEGORY_MAP).
+function renderCuratedRecsSent(_events: EmailEvent[], _count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  // Sum recCount across batched events from one curation session (spec §7.1).
+  const recCount = _events.reduce((s, e) => s + ((e.data.recCount as number) || 0), 0);
+  const plural = recCount !== 1;
   return {
-    subject: `🎉 Your site health improved to ${score} — ${ws}`,
+    subject: `${recCount} recommendation${plural ? 's' : ''} ready for your decision — ${ws}`,
     html: layout({
-      preheader: `Site health went from ${prev} to ${score}`,
-      headline: 'Site Health Improved!',
+      preheader: `${recCount} recommendation${plural ? 's' : ''} need${plural ? '' : 's'} your decision`,
+      headline: 'Ready for your decision',
       subtitle: ws,
-      body: `<div style="padding:16px 24px;text-align:center;">
-        <div style="font-size:48px;font-weight:800;color:#4ade80;">${score}</div>
-        <div style="font-size:14px;color:#a1a1aa;margin-top:4px;">Up ${delta} point${delta !== 1 ? 's' : ''} from ${prev}</div>
-      </div>`,
-      cta: dashUrl ? { label: 'View Your Dashboard', url: dashUrl } : undefined,
+      body: `<div style="padding:16px 24px;font-size:14px;color:#a1a1aa;">Your strategist curated ${recCount} recommendation${plural ? 's' : ''} for you. Review the why, the projected result, and approve or ask a question — right from your dashboard.</div>`,
+      cta: dashUrl ? { label: 'Review recommendations', url: dashUrl } : undefined,
+      logoUrl,
+    }),
+  };
+}
+
+// The Issue (Client) P1c — weekly return-hook digest. ONE consolidated "what came in this week"
+// email with up to three conditional sections (new customers · new measured money · decision waiting).
+// The cron sends a single event per workspace per week, so events[0] IS the digest. Email-only,
+// literal hex (server-only template, not a src/ component): teal=leads, blue=money, amber=decision.
+function renderClientReturnHook(events: EmailEvent[], _count: number, ws: string, dashUrl?: string, logoUrl?: string) {
+  const d = events[0].data;
+  const outcomeNoun = esc(String(d.outcomeNoun ?? 'results'));
+  const sections: string[] = [];
+
+  // 1) New customers / leads captured this week.
+  const leadCount = typeof d.leadCount === 'number' ? d.leadCount : 0;
+  if (leadCount > 0) {
+    const names = Array.isArray(d.recentNames)
+      ? (d.recentNames as unknown[]).filter((n): n is string => typeof n === 'string')
+      : [];
+    const nameLine = names.length
+      ? `<div style="font-size:12px;color:#6b7280;margin-top:4px;">Most recent: ${names.map((n) => esc(n)).join(', ')}</div>`
+      : '';
+    sections.push(`
+      <div style="background:#f0fdf9;border:1px solid #ccfbf1;border-radius:8px;padding:14px 20px;margin-bottom:14px;">
+        <div><span style="font-size:24px;font-weight:700;color:#0d9488;">${leadCount}</span>
+        <span style="font-size:14px;color:#374151;margin-left:6px;">${outcomeNoun} this week</span></div>
+        ${nameLine}
+      </div>`);
+  }
+
+  // 2) New measured money (only present when the cron confirmed measured_action + value + this-week activity).
+  const moneyValue = typeof d.moneyValue === 'number' ? d.moneyValue : null;
+  if (moneyValue != null) {
+    const delta = typeof d.sinceStartDelta === 'number' ? d.sinceStartDelta : null;
+    const deltaLine = delta != null && delta > 0
+      ? `<div style="font-size:12px;color:#15803d;margin-top:4px;">+${delta.toLocaleString('en-US')} ${outcomeNoun} since we started</div>`
+      : '';
+    sections.push(`
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 20px;margin-bottom:14px;">
+        <div><span style="font-size:22px;font-weight:700;color:#2563eb;">$${moneyValue.toLocaleString('en-US')}</span>
+        <span style="font-size:14px;color:#374151;margin-left:6px;">in measured value</span></div>
+        ${deltaLine}
+      </div>`);
+  }
+
+  // 3) Decision still waiting on the client (a gentle week-later nudge, not the original send).
+  const pendingCount = typeof d.pendingCount === 'number' ? d.pendingCount : 0;
+  if (pendingCount > 0) {
+    const plural = pendingCount !== 1;
+    sections.push(`
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px 20px;margin-bottom:14px;">
+        <span style="font-size:14px;color:#92400e;font-weight:600;">${pendingCount} item${plural ? 's' : ''} still waiting for your input</span>
+      </div>`);
+  }
+
+  return {
+    subject: `What came in this week at ${ws}`,
+    html: layout({
+      preheader: `Your weekly recap from ${STUDIO_NAME}`,
+      headline: "Here's what came in this week",
+      subtitle: ws,
+      // The one-pager export is an authed client-portal page (no passwordless email link), so the CTA
+      // routes the client to their dashboard, where the P1b export bar offers the one-pager.
+      body: sections.join(''),
+      cta: dashUrl ? { label: 'See your dashboard', url: dashUrl } : undefined,
+      footer: `You're receiving this because ${STUDIO_NAME} manages your site — reply to stop these.`,
       logoUrl,
     }),
   };

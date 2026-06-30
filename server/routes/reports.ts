@@ -316,15 +316,15 @@ router.get('/report/:id', (req, res) => {
   res.type('html').send(renderReportHTML(getEffectiveSnapshotForRead(snapshot)));
 });
 
-// Public: JSON report data (no auth required)
-router.get('/api/public/report/:id', (req, res) => {
+// Public: JSON report data (share-link snapshot id; no workspace credential available)
+router.get('/api/public/report/:id', (req, res) => { // public-no-auth-ok: intentional share-link report JSON endpoint
   const snapshot = getSnapshot(req.params.id);
   if (!snapshot) return res.status(404).json({ error: 'Report not found' });
   res.json(getEffectiveSnapshotForRead(snapshot));
 });
 
-// Public: Latest audit for a site (client dashboard)
-router.get('/api/public/client/:siteId', (req, res) => {
+// Public: Latest audit for a site (legacy share-link site id endpoint)
+router.get('/api/public/client/:siteId', (req, res) => { // public-no-auth-ok: legacy share-link audit endpoint keyed by siteId
   const ws = getWorkspaceForSite(req.params.siteId);
   if (isClientPortalDisabled(ws)) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
   const latest = getLatestEffectiveSnapshot(req.params.siteId, ws?.auditSuppressions || []);

@@ -25,7 +25,7 @@ vi.mock('../../server/page-keywords.js', () => ({
 vi.mock('../../server/broadcast.js', () => ({
   broadcastToWorkspace: vi.fn(),
 }));
-vi.mock('../../server/workspace-intelligence.js', () => ({
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
   invalidateIntelligenceCache: vi.fn(),
 }));
 vi.mock('../../server/activity-log.js', () => ({
@@ -44,7 +44,7 @@ import {
   upsertPageKeywordsBatch,
 } from '../../server/page-keywords.js';
 import { broadcastToWorkspace } from '../../server/broadcast.js';
-import { invalidateIntelligenceCache } from '../../server/workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../../server/intelligence/cache-invalidation.js';
 import { addActivity } from '../../server/activity-log.js';
 import { handleKeywordActionTool, keywordActionTools } from '../../server/mcp/tools/keyword-actions.js';
 

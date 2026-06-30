@@ -52,6 +52,7 @@ Each slice is independently assembled. A failed assembler logs a warning and lea
 | `siteInventory` | `SiteInventorySlice` | Webflow page/CMS inventory for schema and site-aware workflows — **only assembled when `opts.siteId` and `opts.siteBaseUrl` are provided** |
 | `localSeo` | `LocalSeoSlice` | Local SEO markets, visibility snapshots, candidates, and sampled prompt block |
 | `entityResolution` | `EntityResolutionSlice` | Typed entity grounding candidates/results for schema surfaces (`knowsAbout`, `about`, `mentions`, `areaServed`) |
+| `brand` | `BrandSlice` | Unified brand voice — authority-resolved Layer-1 block (`voicePromptBlock`) **plus** Layer-2 voice DNA + guardrails (`voiceDnaBlock`, calibrated-only) — + approved identity (structured + `identityPromptBlock`). Read-only; non-formattable; assembled on request. Consumed by the MCP `prepare_*_context` path (P2): inject `voiceDnaBlock` + `identityPromptBlock` only — NEVER `voicePromptBlock` alongside `seoContext.effectiveBrandVoiceBlock` (double-voice). |
 
 `shared/types/intelligence.ts` owns the registry constants:
 
@@ -85,6 +86,7 @@ Each assembler is an `async` function that loads data from modules via dynamic `
 | `assembleSiteHealth` | `reports.ts` (audit snapshot), `performance-store.ts` (dead links, PageSpeed/CWV), `redirect-store.ts`, `site-architecture.ts` (orphan pages), `schema-validator.ts`, `anomaly-detection.ts`, `seo-change-tracker.ts`, `diagnostic-store.ts`, AEO review files |
 | `assembleClientSignals` | `keyword_feedback` table, `content_gap_votes` table, `client_business_priorities` table, `churn-signals.ts`, `approvals.ts`, `client-users.ts`, `chat-memory.ts`, `activity-log.ts`, `roi.ts`, `requests.ts`, `client-signals-store.ts` |
 | `assembleOperational` | `activity-log.ts`, `analytics-annotations.ts`, `annotations.ts`, `jobs.ts`, `usage-tracking.ts`, `approvals.ts`, `recommendations.ts`, `outcome-tracking.ts`, `outcome-playbooks.ts`, `work-orders.ts`, `analytics-insights-store.ts` |
+| `assembleBrand` | `intelligence/seo-context-source.ts` (`buildEffectiveBrandVoiceBlock` authority-resolved voice block + `getRawBrandVoice` legacy detection), `voice-profile-read-model.ts` (`getVoiceProfile` calibration status), `brand-deliverable-read-model.ts` (`listDeliverables` → approved identity), `voice-dna-layer2.ts` (`voiceDNAToPromptInstructions` + `guardrailsToPromptInstructions` → `voiceDnaBlock`, calibrated-only). Leaf-import only — never `brand-identity.ts` or `voice-calibration.ts` (would close a facade cycle). |
 
 The `siteHealth` assembler has a 5-second timeout. If it exceeds the timeout the slice is omitted rather than blocking the full assembly.
 
@@ -316,4 +318,4 @@ The `localSeo` slice (added 2026-05-21) is the canonical source of local SEO con
 
 **Empty-but-valid baseline:** when the `local-seo-visibility` feature flag is off OR no markets are configured, the slice returns a typed object with empty arrays and a short explanatory `effectiveLocalSeoBlock`. Consumers never see `undefined`. Token cost on non-local workspaces is ~80 characters when the slice is requested.
 
-**Known limitation:** `LocalSeoKeywordCandidate` in `server/local-seo.ts` does not currently expose a `marketId` field. Until it does, the stratified sampler in `assembleLocalSeo` falls back to flat score-sorted top-N, and the relevance helper's market-bonus heuristic is a no-op. The follow-up is tracked in the slice file with a `TODO(local-seo-marketId-passthrough)` comment.
+**Market-scoped candidates:** `LocalSeoKeywordCandidate` is owned by `server/domains/local-seo/types.ts` and includes `marketId`, so the stratified sampler in `assembleLocalSeo` can group candidates by active market and the relevance helper can apply market-bonus scoring.

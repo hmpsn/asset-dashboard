@@ -195,10 +195,6 @@ vi.mock('../../src/hooks/useBackgroundTasks', () => ({
   useBackgroundTasks: () => ({ tasks: [] }),
 }));
 
-vi.mock('../../src/components/TaskPanel', () => ({
-  TaskPanel: () => <div data-testid="task-panel" />,
-}));
-
 vi.mock('../../src/components/AdminChat', () => ({
   AdminChat: () => <div data-testid="admin-chat" />,
 }));
@@ -610,10 +606,10 @@ describe('LandingPage route', () => {
   });
 });
 
-// ── ClientRoutes legacy alias redirects ───────────────────────────────────
+// ── ClientRoutes retired alias compatibility ───────────────────────────────
 
-describe('ClientRoutes — legacy inbox alias redirects', () => {
-  it('redirects /client/:id/approvals to /client/:id/inbox?tab=decisions', async () => {
+describe('ClientRoutes — retired inbox alias compatibility', () => {
+  it('redirects /client/:id/approvals to the Inbox tab', async () => {
     const { ClientRoutes } = await importClientRoutes();
     const qc = makeQueryClient();
     render(
@@ -625,11 +621,12 @@ describe('ClientRoutes — legacy inbox alias redirects', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    // After redirect, it should render the ClientDashboard (since inbox is the target)
-    await waitFor(() => expect(screen.getByTestId('client-dashboard')).toBeInTheDocument());
+    await waitFor(() => {
+      expect(screen.getByTestId('client-dashboard')).toHaveAttribute('data-tab', 'inbox');
+    });
   });
 
-  it('redirects /client/:id/requests to inbox with conversations tab', async () => {
+  it('redirects /client/:id/requests to the Inbox tab', async () => {
     const { ClientRoutes } = await importClientRoutes();
     const qc = makeQueryClient();
     render(
@@ -641,10 +638,12 @@ describe('ClientRoutes — legacy inbox alias redirects', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    await waitFor(() => expect(screen.getByTestId('client-dashboard')).toBeInTheDocument());
+    await waitFor(() => {
+      expect(screen.getByTestId('client-dashboard')).toHaveAttribute('data-tab', 'inbox');
+    });
   });
 
-  it('redirects /client/:id/content to inbox with reviews tab', async () => {
+  it('redirects /client/:id/content to the Inbox tab', async () => {
     const { ClientRoutes } = await importClientRoutes();
     const qc = makeQueryClient();
     render(
@@ -656,7 +655,26 @@ describe('ClientRoutes — legacy inbox alias redirects', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    await waitFor(() => expect(screen.getByTestId('client-dashboard')).toBeInTheDocument());
+    await waitFor(() => {
+      expect(screen.getByTestId('client-dashboard')).toHaveAttribute('data-tab', 'inbox');
+    });
+  });
+
+  it('redirects /client/:id/schema-review to the Inbox tab', async () => {
+    const { ClientRoutes } = await importClientRoutes();
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/client/ws-1/schema-review']}>
+          <Routes>
+            <Route path="/client/:workspaceId/*" element={<ClientRoutes />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('client-dashboard')).toHaveAttribute('data-tab', 'inbox');
+    });
   });
 });
 
@@ -723,7 +741,6 @@ async function importAdminApp() {
   // We use a local re-implementation based on the real AdminApp logic but with mocked auth.
   const { useAuth } = await import('../../src/hooks/useAuth');
   const { LoginScreen } = await import('../../src/components/LoginScreen');
-  const { TaskPanel } = await import('../../src/components/TaskPanel');
   const React = await import('react');
 
   // Build a thin AdminApp that mirrors the real one but uses MemoryRouter-compatible rendering.
@@ -743,7 +760,6 @@ async function importAdminApp() {
         <div data-testid="sidebar" />
         <div data-testid="breadcrumbs" />
         <div data-testid="status-bar" />
-        <TaskPanel />
         <div data-testid="theme-class" data-theme={theme} />
       </>
     );
@@ -755,7 +771,7 @@ async function importAdminApp() {
 async function importClientRoutes() {
   const React = await import('react');
   const { useParams, useSearchParams, Navigate } = await import('react-router-dom');
-  const { clientPath, isClientInboxAlias } = await import('../../src/routes');
+  const { clientPath, resolveClientInboxRouteAlias } = await import('../../src/routes');
   const { ClientDashboard } = await import('../../src/components/ClientDashboard');
 
   function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
@@ -763,7 +779,15 @@ async function importClientRoutes() {
     const [searchParams] = useSearchParams();
     const workspaceId = params.workspaceId!;
     const splatTab = params['*'] || undefined;
-    const splatRoot = splatTab?.split('/')[0];
+    const splatTabId = splatTab?.split('/')[0];
+    const legacyInboxFilter = resolveClientInboxRouteAlias(splatTabId);
+    if (legacyInboxFilter && workspaceId) {
+      const remaining = new URLSearchParams(searchParams);
+      remaining.delete('tab');
+      const qs = remaining.toString();
+      const target = clientPath(workspaceId, splatTabId, betaMode);
+      return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
+    }
     const queryTab = searchParams.get('tab');
 
     if (queryTab && workspaceId && !splatTab) {
@@ -771,13 +795,6 @@ async function importClientRoutes() {
       remaining.delete('tab');
       const qs = remaining.toString();
       const target = clientPath(workspaceId, queryTab, betaMode);
-      return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
-    }
-    if (workspaceId && isClientInboxAlias(splatRoot)) {
-      const remaining = new URLSearchParams(searchParams);
-      remaining.delete('tab');
-      const qs = remaining.toString();
-      const target = clientPath(workspaceId, splatRoot, betaMode);
       return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
     }
     return <ClientDashboard workspaceId={workspaceId} initialTab={splatTab} betaMode={betaMode} />;

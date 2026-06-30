@@ -14,7 +14,7 @@ import { queryKeys } from '../lib/queryKeys';
 import { inlineMarkdownToHtml } from '../lib/inline-markdown';
 import { resolveTabSearchParam } from '../lib/tab-search-param';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
-import type { AudiencePersona } from '../../shared/types/workspace';
+import type { AudiencePersona, TargetGeo } from '../../shared/types/workspace';
 import { BrandscriptTab } from './brand/BrandscriptTab';
 import { DiscoveryTab } from './brand/DiscoveryTab';
 import { VoiceTab } from './brand/VoiceTab';
@@ -38,6 +38,7 @@ interface WorkspaceData {
   knowledgeBase?: string;
   brandVoice?: string;
   personas?: AudiencePersona[];
+  targetGeo?: TargetGeo | null;
   businessProfile?: {
     email?: string;
     phone?: string;
@@ -63,8 +64,8 @@ interface Props {
 }
 
 type BrandHubLegacyTab = 'business-profile' | 'locations';
-type BrandHubTab = 'overview' | 'brandscript' | 'discovery' | 'voice' | 'identity' | 'business-footprint' | 'eeat-assets' | 'intelligence-profile';
-const VALID_BRAND_TABS: readonly BrandHubTab[] = ['overview', 'brandscript', 'discovery', 'voice', 'identity', 'business-footprint', 'eeat-assets', 'intelligence-profile'];
+type BrandHubTab = 'overview' | 'context' | 'brandscript' | 'discovery' | 'voice' | 'identity' | 'business-footprint' | 'eeat-assets' | 'intelligence-profile';
+const VALID_BRAND_TABS: readonly BrandHubTab[] = ['overview', 'context', 'brandscript', 'discovery', 'voice', 'identity', 'business-footprint', 'eeat-assets', 'intelligence-profile'];
 const BRAND_TAB_ALIASES: Record<BrandHubLegacyTab, BrandHubTab> = {
   'business-profile': 'business-footprint',
   locations: 'business-footprint',
@@ -504,6 +505,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
         onChange={(id) => setActiveTab(id as BrandHubTab)}
         tabs={[
           { id: 'overview', label: 'Overview', icon: Sparkles },
+          { id: 'context', label: 'Context', icon: MessageSquare },
           { id: 'brandscript', label: 'Brandscript', icon: BookOpen },
           { id: 'discovery', label: 'Discovery', icon: Upload },
           { id: 'voice', label: 'Voice', icon: Mic },
@@ -524,6 +526,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
           workspaceName={ws?.name || 'Workspace'}
           liveDomain={ws?.liveDomain}
           businessProfile={ws?.businessProfile}
+          targetGeo={ws?.targetGeo}
           businessContext={ws?.keywordStrategy?.businessContext}
           brandLogoUrl={ws?.brandLogoUrl}
           siteHasSearch={ws?.siteHasSearch}
@@ -545,17 +548,19 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
           }}
         />
       )}
-      {activeTab === 'overview' && <>
-      <BrandOverviewTab
-        workspaceId={workspaceId}
-        brandVoice={ws?.brandVoice}
-        knowledgeBase={ws?.knowledgeBase}
-        personasCount={ws?.personas?.length ?? 0}
-        businessContext={ws?.keywordStrategy?.businessContext}
-        intelligenceProfile={ws?.intelligenceProfile}
-        businessProfile={ws?.businessProfile}
-      />
+      {activeTab === 'overview' && (
+        <BrandOverviewTab
+          workspaceId={workspaceId}
+          brandVoice={ws?.brandVoice}
+          knowledgeBase={ws?.knowledgeBase}
+          personasCount={ws?.personas?.length ?? 0}
+          businessContext={ws?.keywordStrategy?.businessContext}
+          intelligenceProfile={ws?.intelligenceProfile}
+          businessProfile={ws?.businessProfile}
+        />
+      )}
 
+      {activeTab === 'context' && (
       <div id="brand-hub-current-context" className="space-y-8">
       {/* ═══ BRAND VOICE ═══ */}
       <SectionCard
@@ -1008,7 +1013,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
         </div>
       </div>
       </div>
-      </>}
+      )}
     </div>
 
     <ConfirmDialog

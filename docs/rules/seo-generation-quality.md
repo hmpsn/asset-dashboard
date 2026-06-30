@@ -44,7 +44,7 @@ real money, until P6 threads GA4 `estimatedRevenue` — its JSDoc must say so. I
   here (CLAUDE.md "Schema vs stored shape"). Recs are a JSON blob
   (`recommendation_sets.recommendations` TEXT) — the lockstep is the **Zod schema**, not a
   DB column.
-- `server/routes/recommendations.ts` → **`stripEmvFromPublicRecs`** — destructure-and-spread
+- `server/recommendation-public-projection.ts` → **`stripEmvFromPublicRecs`** — destructure-and-spread
   strip. A new admin-money field **LEAKS to clients** unless added to the destructure
   (and mirrored at the PATCH response). **This is enforced by pr-check rule
   `opportunity-money-field-must-be-stripped`.**
@@ -102,7 +102,7 @@ it to the public strip (no dollarized string may reach a client).
   `src/components/client/Briefing/RecommendedForYou.tsx` (its independent `volume × 0.103`
   clicks estimate + the legacy `/100` badge are **flag-gated**, not unconditionally removed —
   see the client-gate contract below).
-- `server/routes/recommendations.ts` → `stripEmvFromPublicRecs` (must add `estimatedGain`).
+- `server/recommendation-public-projection.ts` → `stripEmvFromPublicRecs` (must add `estimatedGain`).
 
 **Client-gate contract (`ovGainActive`) — `RecommendedForYou` flag exposure (P4 review C2).**
 The client has **no** per-workspace flag mechanism for `seo-generation-quality`. The two
@@ -281,9 +281,9 @@ apply. P6 swaps the calibration basis to `median(attributedValue / predictedEmv)
 When P5 surfaces `keyword_gaps` / `topic_clusters` / `cannibalization_issues` as
 first-class recs, a new `RecType`/`RecSource` value must NOT fall through the
 non-exhaustive maps (G2 — silent mislabel + distorted calibration + false auto-resolve):
-- `REC_SOURCE_CATEGORIES` + `getRecSourceCategory` (`server/recommendations.ts`) — a source
+- `REC_SOURCE_CATEGORIES` + `getRecSourceCategory` (`server/domains/recommendations/rules.ts`) — a source
   with no category bypasses the auto-resolve safety check.
-- `recommendationOutcomeActionType` (`server/recommendations.ts`) — a real `ActionType` case
+- `recommendationOutcomeActionType` (`server/domains/recommendations/outcome-action-type.ts`) — a real `ActionType` case
   (define new `ActionType`s in `shared/types/outcome-tracking.ts`), **not** the
   `audit_fix_applied` fallback, which feeds `winRateByActionType` and distorts calibration.
   This function is an **exhaustive `switch` over `RecType` with a `never` default**, so adding

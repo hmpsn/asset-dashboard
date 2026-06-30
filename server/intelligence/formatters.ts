@@ -10,13 +10,14 @@ import type {
   LocalSeoSlice,
   EeatAssetsSlice,
 } from '../../shared/types/intelligence.js';
-import type { AudiencePersona } from '../../shared/types/workspace.js';
-import { matchPagePath } from '../helpers.js';
+import { matchPagePath } from '../utils/page-address.js';
 import { formatContentPipelineSection } from './formatter-content-pipeline.js';
 import { formatOperationalSection } from './formatter-operational.js';
 import { pct } from './formatter-shared.js';
 import { formatSiteHealthSection } from './formatter-site-health.js';
 import { formatPageElementsSection } from './page-elements-slice.js';
+import { compareKeywordOpportunityScoreDesc } from '../../shared/keyword-opportunity-projection.js';
+export { formatPersonasForPrompt } from './persona-format.js';
 
 export function formatForPrompt(
   intelligence: WorkspaceIntelligence,
@@ -85,7 +86,7 @@ export function formatForPrompt(
 
   // SEO Context
   if (intelligence.seoContext && (!include || include.has('seoContext'))) {
-    sections.push(formatSeoContextSection(intelligence.seoContext, verbosity));
+    sections.push(formatSeoContextSection(intelligence.seoContext, verbosity, opts?.includeRankMovers ?? true));
   }
 
   // Insights
@@ -281,7 +282,7 @@ function applyFilteredTokenBudget(
   return render(content);
 }
 
-function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosity): string {
+function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosity, includeRankMovers = true): string {
   const lines: string[] = ['## SEO Context'];
 
   if (ctx.businessContext) lines.push(`Business: ${ctx.businessContext}`);
@@ -350,6 +351,18 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
   if (ctx.rankTracking && verbosity !== 'compact') {
     const rt = ctx.rankTracking;
     lines.push(`Rank tracking: ${rt.trackedKeywords} keywords, avg position ${rt.avgPosition?.toFixed(1) ?? 'n/a'} (↑${rt.positionChanges.improved} ↓${rt.positionChanges.declined})`);
+    if (includeRankMovers && rt.topKeywordMovers?.length) {
+      const movers = rt.topKeywordMovers
+        .slice(0, 5)
+        .map((mover) => {
+          const icon = mover.direction === 'improved' ? '↑' : '↓';
+          const rankLabel = mover.position > 0 ? `#${Number.isInteger(mover.position) ? mover.position : mover.position.toFixed(1)}` : 'unranked';
+          const valueLabel = typeof mover.valueScore === 'number' ? `, value ${mover.valueScore}` : '';
+          return `${mover.direction} "${mover.query}" ${rankLabel} (${icon}${Math.abs(mover.change)}${valueLabel}, ${mover.impressions.toLocaleString()} impressions)`;
+        })
+        .join('; ');
+      lines.push(`Top keyword movers: ${movers}`);
+    }
   }
 
   // GSC discovered query summary — at standard+ verbosity
@@ -386,8 +399,22 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
     if (sf.featuredSnippets > 0) parts.push(`${sf.featuredSnippets} featured snippet opportunit${sf.featuredSnippets === 1 ? 'y' : 'ies'}`);
     if (sf.peopleAlsoAsk > 0) parts.push(`${sf.peopleAlsoAsk} People Also Ask opportunit${sf.peopleAlsoAsk === 1 ? 'y' : 'ies'}`);
     if (sf.videoCarousel > 0) parts.push(`${sf.videoCarousel} video carousel opportunit${sf.videoCarousel === 1 ? 'y' : 'ies'}`);
+    if (sf.aiOverview > 0) parts.push(`${sf.aiOverview} AI Overview opportunit${sf.aiOverview === 1 ? 'y' : 'ies'}`);
     if (sf.localPack) parts.push('local pack present');
     if (parts.length > 0) lines.push(`SERP features: ${parts.join(', ')}`);
+  }
+
+  // AI visibility — aggregates-only LLM-citation summary (SEO Decision Engine P8); only
+  // present when the `ai-visibility` flag is on AND a snapshot exists. At standard+ verbosity.
+  if (ctx.aiVisibility && verbosity !== 'compact') {
+    const av = ctx.aiVisibility;
+    if (av.mentions != null || av.shareOfVoice != null) {
+      const sov = av.shareOfVoice != null ? `${Math.round(av.shareOfVoice * 100)}% share of voice vs co-mentioned brands` : null;
+      const top = av.topCompetitor ? ` (top: ${av.topCompetitor.name})` : '';
+      const cited = av.mentions != null ? `cited ${av.mentions.toLocaleString()} time${av.mentions === 1 ? '' : 's'} in LLM answers` : null;
+      const parts = [cited, sov ? `${sov}${top}` : null].filter(Boolean);
+      if (parts.length > 0) lines.push(`AI visibility: ${parts.join('; ')}.`);
+    }
   }
 
   // Site keywords — always include when present; compact shows fewer
@@ -447,7 +474,7 @@ function formatSeoContextSection(ctx: SeoContextSlice, verbosity: PromptVerbosit
   if (ctx.strategy?.contentGaps && ctx.strategy.contentGaps.length > 0 && verbosity !== 'compact') {
     const limit = verbosity === 'detailed' ? 8 : 4;
     const gaps = [...ctx.strategy.contentGaps]
-      .sort((a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0))
+      .sort(compareKeywordOpportunityScoreDesc)
       .slice(0, limit);
     lines.push('Content gaps (opportunity-ranked):');
     for (const g of gaps) {
@@ -869,20 +896,36 @@ export function formatKeywordsForPrompt(seo: SeoContextSlice | null | undefined)
   return `\n\nKEYWORD STRATEGY (incorporate these naturally):\n${keywordBlock}`;
 }
 
-export function formatPersonasForPrompt(personas: AudiencePersona[] | null | undefined): string {
-  if (!personas?.length) return '';
+type PageMapPromptEntry = NonNullable<NonNullable<SeoContextSlice['strategy']>['pageMap']>[number] & {
+  opportunityScore?: number;
+  valueScore?: number;
+};
 
-  // Keep this shape stable because schema, chat, and prompt callers share it.
-  const personaStr = personas.map(p => {
-    const parts = [`**${p.name}**${p.buyingStage ? ` (${p.buyingStage} stage)` : ''}: ${p.description}`];
-    if (p.painPoints.length) parts.push(`  Pain points: ${p.painPoints.join('; ')}`);
-    if (p.goals.length) parts.push(`  Goals: ${p.goals.join('; ')}`);
-    if (p.objections.length) parts.push(`  Objections: ${p.objections.join('; ')}`);
-    if (p.preferredContentFormat) parts.push(`  Prefers: ${p.preferredContentFormat}`);
-    return parts.join('\n');
-  }).join('\n\n');
+function finiteMetric(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
 
-  return `\n\nTARGET AUDIENCE PERSONAS (write to address these specific people — their pain points, goals, and objections):\n${personaStr}`;
+function formatMetricNumber(value: number): string {
+  return Number.isInteger(value) ? value.toLocaleString('en-US') : value.toLocaleString('en-US', { maximumFractionDigits: 1 });
+}
+
+function formatPageMapMetrics(page: PageMapPromptEntry): string {
+  const metrics: string[] = [];
+  if (page.searchIntent) metrics.push(`intent: ${page.searchIntent}`);
+
+  const volume = finiteMetric(page.volume) ?? finiteMetric(page.monthlyVolume);
+  if (volume != null) metrics.push(`vol: ${formatMetricNumber(volume)}`);
+
+  const difficulty = finiteMetric(page.difficulty) ?? finiteMetric(page.keywordDifficulty);
+  if (difficulty != null) metrics.push(`KD: ${formatMetricNumber(difficulty)}`);
+
+  const cpc = finiteMetric(page.cpc);
+  if (cpc != null) metrics.push(`CPC: $${cpc.toFixed(2)}`);
+
+  const valueScore = finiteMetric(page.valueScore) ?? finiteMetric(page.opportunityScore);
+  if (valueScore != null) metrics.push(`value: ${formatMetricNumber(valueScore)}`);
+
+  return metrics.length ? ` [${metrics.join('; ')}]` : '';
 }
 
 export function formatPageMapForPrompt(seo: SeoContextSlice | null | undefined, pagePath?: string): string {
@@ -896,7 +939,7 @@ export function formatPageMapForPrompt(seo: SeoContextSlice | null | undefined, 
 
   // Preserves the legacy keyword-map prompt shape used before retirement.
   const mapStr = pageMap.map(
-    p => `${p.pagePath}: "${p.primaryKeyword}"${p.secondaryKeywords?.length ? ` (also: ${p.secondaryKeywords.slice(0, 3).join(', ')})` : ''}`
+    p => `${p.pagePath}: "${p.primaryKeyword}"${p.secondaryKeywords?.length ? ` (also: ${p.secondaryKeywords.slice(0, 3).join(', ')})` : ''}${formatPageMapMetrics(p)}`
   ).join('\n');
 
   return `\n\nEXISTING KEYWORD MAP (avoid cannibalization, suggest internal links where relevant):\n${mapStr}`;

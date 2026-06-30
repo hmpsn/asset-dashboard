@@ -116,8 +116,14 @@ describe('Breadcrumbs', () => {
     expect(TAB_LABELS['home']).toBe('Home');
     expect(TAB_LABELS['seo-audit']).toBe('Site Audit');
     expect(TAB_LABELS['analytics-hub']).toBe('Search & Traffic');
+    expect(TAB_LABELS['local-seo']).toBe('Local Presence');
     expect(TAB_LABELS['settings']).toBe('Settings');
     expect(TAB_LABELS['revenue']).toBe('Revenue');
+  });
+
+  it('resolves local-seo as Local Presence', () => {
+    renderBreadcrumbs({ tab: 'local-seo' });
+    expect(screen.getByText('Local Presence')).toBeInTheDocument();
   });
 
   // ── Keyword Hub crumb (post-W4-cutover: unconditional) ──────────────────────

@@ -8,6 +8,8 @@
  *   PATCH /api/public/deliverables/:workspaceId/:id/respond   (client)
  *     → requireAuthenticatedClientPortalAuth (DENIES passwordless — this mutates state;
  *       param is :workspaceId, NOT :ws, to avoid the silent-undefined auth bypass, M1).
+ *   POST  /api/public/deliverables/:workspaceId/:id/apply     (client)
+ *     → canonical apply URL; delegates to the proven approval-batch apply service.
  *   POST  /api/deliverables/:workspaceId/:id/remind            (admin)
  *     → requireWorkspaceAccess (HMAC-gated admin route; never requireAuth — auth conventions).
  *
@@ -30,9 +32,12 @@ import {
   remindDeliverable,
   SendToClientError,
 } from '../domains/inbox/send-to-client.js';
+import { GbpReviewResponseError } from '../google-business-profile-review-responses-store.js';
+import { applyApprovedBatchItems } from '../domains/inbox/approval-batch-apply.js';
 import { SchemaPlanFeedbackConflictError } from '../domains/schema/schema-plan-feedback.js';
 import { listClientFacingDeliverables } from '../domains/inbox/unified-inbox-read.js';
 import { listAdminDeliverables } from '../domains/inbox/admin-inbox-read.js';
+import { getDeliverable } from '../client-deliverables.js';
 import { InvalidTransitionError } from '../state-machines.js';
 import {
   DELIVERABLE_KINDS,
@@ -225,6 +230,9 @@ router.patch(
       if (err instanceof SendToClientError) {
         return res.status(err.status).json({ error: err.message });
       }
+      if (err instanceof GbpReviewResponseError) {
+        return res.status(err.status).json({ error: err.message });
+      }
       if (err instanceof SchemaPlanFeedbackConflictError) {
         return res.status(err.status).json({ error: err.message, jobId: err.jobId });
       }
@@ -237,14 +245,39 @@ router.patch(
   },
 );
 
+// POST /api/public/deliverables/:workspaceId/:id/apply — canonical client apply URL.
+// The deliverable is the client-facing object; the legacy approval batch id is resolved server-side
+// and delegated to applyApprovedBatchItems so Webflow writes, page-state updates, activity,
+// outcome tracking, recommendation resolution, and broadcasts stay in the existing domain service.
+router.post(
+  '/api/public/deliverables/:workspaceId/:id/apply',
+  requireClientPortalAuth('workspaceId'),
+  async (req, res) => {
+    const { workspaceId, id } = req.params;
+    const deliverable = getDeliverable(id);
+    if (!deliverable || deliverable.workspaceId !== workspaceId) {
+      return res.status(404).json({ error: 'Deliverable not found' });
+    }
+
+    const legacyBatchId = deliverable.payload.legacyBatchId;
+    if (typeof legacyBatchId !== 'string' || !legacyBatchId) {
+      return res.status(400).json({ error: 'Deliverable is missing its approval batch reference' });
+    }
+
+    const result = await applyApprovedBatchItems(workspaceId, legacyBatchId);
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    res.json({ results: result.results, applied: result.applied, failed: result.failed });
+  },
+);
+
 // POST /api/deliverables/:workspaceId/:id/remind — admin re-nudges the client.
 router.post(
   '/api/deliverables/:workspaceId/:id/remind',
   requireWorkspaceAccess('workspaceId'),
-  (req, res) => {
+  async (req, res) => {
     const { workspaceId, id } = req.params;
     try {
-      const deliverable = remindDeliverable(workspaceId, id);
+      const deliverable = await remindDeliverable(workspaceId, id);
       // Data-Flow Rule #4: the sibling respond handler logs activity; a remind is an
       // operator-initiated client-facing nudge, so it must too (NOT client-visible).
       addActivity(

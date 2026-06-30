@@ -34,6 +34,8 @@
     "phase2:baseline:update": "playwright test --config=playwright.visual.config.ts --update-snapshots",
     "pr-check": "tsx scripts/pr-check.ts",
     "pr-check:all": "tsx scripts/pr-check.ts --all",
+    "check:circular-deps": "tsx scripts/check-circular-deps.ts",
+    "lint:hooks": "eslint -c eslint.rules-of-hooks.config.js src",
     "verify:organization": "tsx scripts/report-platform-organization.ts",
     "verify:coverage-baseline": "tsx scripts/report-critical-domain-coverage.ts",
     "verify:ai-reliability": "tsx scripts/report-ai-reliability.ts",
@@ -46,6 +48,7 @@
     "verify:data-integrity": "tsx scripts/report-data-integrity-recovery.ts",
     "verify:observability": "tsx scripts/report-platform-observability.ts",
     "verify:feature-flags": "tsx scripts/feature-flag-lifecycle.ts",
+    "verify:governance": "tsx scripts/report-verification-governance.ts",
     "verify:stripe-prices": "tsx scripts/verify-stripe-prices.ts",
     "verify:deprecations": "tsx scripts/deprecation-lifecycle.ts",
     "verify:platform-health-cadence": "tsx scripts/platform-health-cadence.ts",
@@ -58,6 +61,7 @@
     "scaffold:coverage-campaign": "tsx scripts/coverage-campaign.ts --top 200 --since-days 180 --scaffold-plans --plan-count 25",
     "verify:staging-merge-integrity": "tsx scripts/report-staging-merge-integrity.ts",
     "report:style-drift": "tsx scripts/report-style-drift.ts --json --output reports/style-drift-report.json",
+    "report:keyword-hub-health": "tsx scripts/report-keyword-hub-health.ts",
     "report:risky-modules": "tsx scripts/report-risky-modules.ts --json --top 40 --since-days 180",
     "verify:performance-budgets": "tsx scripts/performance-budgets.ts",
     "verify:platform": "tsx scripts/verify-platform.ts",
@@ -67,7 +71,9 @@
     "verify:release-safety": "tsx scripts/platform-release-safety.ts",
     "report:release-safety": "tsx scripts/report-release-safety.ts",
     "verify:tenant-boundary": "tsx scripts/platform-tenant-boundary-audit.ts",
-    "report:tenant-boundary": "tsx scripts/report-tenant-boundary-audit.ts"
+    "report:tenant-boundary": "tsx scripts/report-tenant-boundary-audit.ts",
+    "verify:the-issue-flag-off": "tsx scripts/verify/the-issue-flag-off-domprobe.ts",
+    "verify:the-issue-measured-off": "PROBE_SCENARIO=measured-capture-off tsx scripts/verify/the-issue-flag-off-domprobe.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
@@ -154,6 +160,7 @@
     "globals": "^16.5.0",
     "husky": "^9.1.7",
     "jsdom": "^28.1.0",
+    "madge": "^8.0.0",
     "typescript-eslint": "^8.48.0",
     "vitest": "^4.0.18"
   },

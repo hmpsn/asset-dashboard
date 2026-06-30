@@ -6,12 +6,13 @@
  * GPT-4.1-mini for keyword clustering/assignment.
  */
 import { randomUUID } from 'node:crypto';
-import { stripCodeFences } from './helpers.js';
+import { stripCodeFences } from './utils/text.js';
 import { callAI } from './ai.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { z } from 'zod';
 import { getBrandscript } from './brandscript.js';
 import { resolveWorkspaceLocationCode } from './local-seo.js';
+import { workspaceProviderGeo } from './seo-target-geo.js';
 import { getConfiguredProvider } from './seo-data-provider.js';
 import { getWorkspace } from './workspaces.js';
 import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
@@ -80,6 +81,13 @@ export function parseBlueprintGenerationOutput(raw: string): ValidatedGeneratedB
 // are assigned at runtime by getDefaultSectionPlan()).
 
 const DEFAULT_SECTION_PLANS: Record<string, Omit<SectionPlanItem, 'id'>[]> = {
+  landing: [
+    { sectionType: 'hero', narrativeRole: 'hook', brandNote: 'Lead with the value proposition and the pain point it resolves', seoNote: 'Primary keyword in H1', wordCountTarget: 140, order: 0 },
+    { sectionType: 'problem', narrativeRole: 'problem', brandNote: 'Make the cost of inaction clear without article-style setup', seoNote: 'Problem-aware terms only where natural', wordCountTarget: 170, order: 1 },
+    { sectionType: 'solution', narrativeRole: 'guide', brandNote: 'Show the offer, outcome, and differentiator in one focused section', seoNote: 'Primary and secondary terms naturally woven in', wordCountTarget: 220, order: 2 },
+    { sectionType: 'social-proof', narrativeRole: 'success-transformation', brandNote: 'Use the strongest proof or trust signal available', seoNote: 'Proof terms only when supported by context', wordCountTarget: 170, order: 3 },
+    { sectionType: 'cta', narrativeRole: 'call-to-action', brandNote: 'One clear primary action with a short reassurance line', seoNote: 'Branded terms only if natural', wordCountTarget: 120, order: 4 },
+  ],
   homepage: [
     { sectionType: 'hero', narrativeRole: 'hook', brandNote: 'Lead with the transformation the customer wants', seoNote: 'Primary keyword in H1', wordCountTarget: 150, order: 0 },
     { sectionType: 'problem', narrativeRole: 'problem', brandNote: 'Name the external and internal problems your customer faces', seoNote: 'Secondary keywords naturally woven in', wordCountTarget: 200, order: 1 },
@@ -89,13 +97,11 @@ const DEFAULT_SECTION_PLANS: Record<string, Omit<SectionPlanItem, 'id'>[]> = {
     { sectionType: 'cta', narrativeRole: 'call-to-action', brandNote: 'Clear primary CTA + softer secondary option', seoNote: 'Branded terms', wordCountTarget: 100, order: 5 },
   ],
   service: [
-    { sectionType: 'hero', narrativeRole: 'hook', brandNote: 'Service-specific hook — what transformation does this service deliver', seoNote: 'Primary service keyword in H1', wordCountTarget: 150, order: 0 },
-    { sectionType: 'problem', narrativeRole: 'problem', brandNote: 'Pain points specific to this service need', seoNote: 'Problem-aware keywords', wordCountTarget: 200, order: 1 },
-    { sectionType: 'features-benefits', narrativeRole: 'guide', brandNote: 'What you offer and why it matters — benefits over features', seoNote: 'Feature and benefit keywords', wordCountTarget: 300, order: 2 },
-    { sectionType: 'process', narrativeRole: 'plan', brandNote: 'Step-by-step process for this service', seoNote: 'Process-related long-tail keywords', wordCountTarget: 200, order: 3 },
-    { sectionType: 'faq', narrativeRole: 'objection-handling', brandNote: 'Address top objections and questions', seoNote: 'Question keywords — people also ask', wordCountTarget: 300, order: 4 },
-    { sectionType: 'social-proof', narrativeRole: 'success-transformation', brandNote: 'Service-specific testimonials or case studies', seoNote: 'Service + location keywords in social proof', wordCountTarget: 200, order: 5 },
-    { sectionType: 'cta', narrativeRole: 'call-to-action', brandNote: 'Service-specific call to action', seoNote: 'Branded + service terms', wordCountTarget: 100, order: 6 },
+    { sectionType: 'hero', narrativeRole: 'hook', brandNote: 'Service-specific hook — what transformation does this service deliver', seoNote: 'Primary service keyword in H1', wordCountTarget: 140, order: 0 },
+    { sectionType: 'problem', narrativeRole: 'problem', brandNote: 'Pain points specific to this service need', seoNote: 'Problem-aware terms only where natural', wordCountTarget: 160, order: 1 },
+    { sectionType: 'features-benefits', narrativeRole: 'guide', brandNote: 'What is included, who it fits, and why it matters — benefits over features', seoNote: 'Service terms and differentiators only where supported', wordCountTarget: 260, order: 2 },
+    { sectionType: 'process', narrativeRole: 'plan', brandNote: 'Simple next steps for engaging this service', seoNote: 'Process terms only if they match real buyer questions', wordCountTarget: 200, order: 3 },
+    { sectionType: 'faq', narrativeRole: 'objection-handling', brandNote: 'Answer buying objections, include proof where available, and close with one CTA', seoNote: 'Question terms only where helpful', wordCountTarget: 220, order: 4 },
   ],
   about: [
     { sectionType: 'hero', narrativeRole: 'hook', brandNote: 'Who are you and why should they trust you', seoNote: 'Brand name + location keywords', wordCountTarget: 150, order: 0 },
@@ -105,18 +111,17 @@ const DEFAULT_SECTION_PLANS: Record<string, Omit<SectionPlanItem, 'id'>[]> = {
     { sectionType: 'cta', narrativeRole: 'call-to-action', brandNote: 'Invite them to take the next step', seoNote: 'Branded terms', wordCountTarget: 100, order: 4 },
   ],
   location: [
-    { sectionType: 'hero', narrativeRole: 'hook', brandNote: 'Location-specific hook — serving this community', seoNote: 'Service + city keyword in H1', wordCountTarget: 150, order: 0 },
-    { sectionType: 'features-benefits', narrativeRole: 'guide', brandNote: 'Services available at this location', seoNote: 'Location-specific service keywords', wordCountTarget: 250, order: 1 },
-    { sectionType: 'location-info', narrativeRole: 'plan', brandNote: 'Address, hours, directions, parking — make it easy', seoNote: 'NAP consistency, local keywords', wordCountTarget: 150, order: 2 },
-    { sectionType: 'social-proof', narrativeRole: 'success-transformation', brandNote: 'Location-specific reviews', seoNote: 'Location + review keywords', wordCountTarget: 200, order: 3 },
-    { sectionType: 'faq', narrativeRole: 'objection-handling', brandNote: 'Location-specific FAQs', seoNote: 'Local question keywords', wordCountTarget: 250, order: 4 },
-    { sectionType: 'cta', narrativeRole: 'call-to-action', brandNote: 'Location-specific CTA — book at this location', seoNote: 'Location + action keywords', wordCountTarget: 100, order: 5 },
+    { sectionType: 'hero', narrativeRole: 'hook', brandNote: 'Location-specific hook — serving this community', seoNote: 'Service and place terms in the H1 when natural', wordCountTarget: 130, order: 0 },
+    { sectionType: 'features-benefits', narrativeRole: 'guide', brandNote: 'Services available at this location and who they help', seoNote: 'Local service terms only where supported by context', wordCountTarget: 220, order: 1 },
+    { sectionType: 'location-info', narrativeRole: 'plan', brandNote: 'Useful visit/contact facts such as address, hours, directions, or parking when provided', seoNote: 'Place terms only where natural', wordCountTarget: 150, order: 2 },
+    { sectionType: 'social-proof', narrativeRole: 'success-transformation', brandNote: 'Location-specific reviews, proof, or community relevance', seoNote: 'Review/place terms only when supported', wordCountTarget: 170, order: 3 },
+    { sectionType: 'cta', narrativeRole: 'call-to-action', brandNote: 'One local contact or booking close', seoNote: 'Action terms only where natural', wordCountTarget: 120, order: 4 },
   ],
   contact: [
     { sectionType: 'hero', narrativeRole: 'hook', brandNote: 'Welcoming, low-friction — make reaching out feel easy', seoNote: 'Contact + brand keywords', wordCountTarget: 100, order: 0 },
-    { sectionType: 'contact-form', narrativeRole: 'call-to-action', brandNote: 'Simple form — name, email, message at minimum', seoNote: 'Contact page structured data', wordCountTarget: 50, order: 1 },
-    { sectionType: 'location-info', narrativeRole: 'plan', brandNote: 'Address, phone, email, hours', seoNote: 'NAP consistency', wordCountTarget: 100, order: 2 },
-    { sectionType: 'faq', narrativeRole: 'objection-handling', brandNote: 'Quick answers to common questions before they ask', seoNote: 'FAQ schema keywords', wordCountTarget: 200, order: 3 },
+    { sectionType: 'contact-form', narrativeRole: 'call-to-action', brandNote: 'Simple form — name, email, message at minimum', seoNote: 'Contact intent terms only where natural', wordCountTarget: 50, order: 1 },
+    { sectionType: 'location-info', narrativeRole: 'plan', brandNote: 'Address, phone, email, or hours when provided', seoNote: 'Brand and contact terms only where natural', wordCountTarget: 100, order: 2 },
+    { sectionType: 'faq', narrativeRole: 'objection-handling', brandNote: 'Quick answers to common questions before they ask', seoNote: 'Concise contact questions only where helpful', wordCountTarget: 200, order: 3 },
   ],
   faq: [
     { sectionType: 'hero', narrativeRole: 'hook', brandNote: 'Helpful framing — we have answers', seoNote: 'FAQ + brand keywords', wordCountTarget: 100, order: 0 },
@@ -187,8 +192,9 @@ export async function generateBlueprint(
   if (input.domain) {
     try {
       const provider = getConfiguredProvider(workspace?.seoDataProvider);
+      const geo = workspaceProviderGeo(workspaceId);
       const organicKeywords = provider
-        ? await provider.getDomainKeywords(input.domain, workspaceId, 50)
+        ? await provider.getDomainKeywords(input.domain, workspaceId, 50, undefined, geo.locationCode, geo.languageCode)
         : [];
       if (organicKeywords.length > 0) {
         keywordContext = `\n\nExisting organic keywords for ${input.domain}:\n` +

@@ -1,6 +1,9 @@
 // ── Workspace domain types ──────────────────────────────────────
 import type { MetricsSource, PageOptimizationScoreSnapshot, UrlLevelKeyword } from './keywords.ts';
 import type { EeatAssetRecommendation, MissingTrustSignal } from './eeat-assets.ts';
+import type { ImpactBand } from './impact-band.ts';
+import type { OutcomeType } from './the-issue.ts';
+import type { WebflowFormMapping } from './form-submission.ts';
 
 export interface EventGroup {
   id: string;
@@ -16,6 +19,58 @@ export interface EventDisplayConfig {
   displayName: string;
   pinned: boolean;
   group?: string;
+  outcomeType?: OutcomeType;   // P1a: which website action this pinned event measures
+}
+
+// ── The Issue (Client) — segment model (P0) ──────────────────────
+// Backing column: segment_config (typed JSON, parseJsonSafe at the read boundary).
+
+export type ClientSegment =
+  | 'local_smb'             // single-location service: calls/forms/bookings
+  | 'b2b_saas'              // pipeline-led: leads/demos → pipeline $ → influenced revenue
+  | 'board_vc'              // efficiency-led: organic CAC vs paid
+  | 'professional_services' // authority-led: qualified inbound by title/firm
+  | 'multi_location';       // portfolio/triage: roll-up + ranked needs-attention
+
+export interface SegmentConfig {
+  segment: ClientSegment;
+  outcomeNounSingular?: string;   // admin override, e.g. "new patient"
+  outcomeNounPlural?: string;     // "new patients"
+  reportingAudience?: 'self' | 'board' | 'partners' | 'owners';
+}
+
+/**
+ * Workspace-level SERP target geo (SEO Decision Engine P4), decoupled from the local
+ * SEO primary-market table. Resolved ONCE at admin write-time (the picker drives a
+ * serp/locations lookup), so query-time needs no country→code mapping. Threaded through
+ * the DataForSEO domain/keyword methods when the `geo-targeting` flag is ON. Absent →
+ * resolveWorkspaceTargetGeo falls back to the local primary market, then US/'en'.
+ */
+export interface TargetGeo {
+  /** DataForSEO location_code (e.g. 2840 US, 2826 UK). */
+  locationCode: number;
+  /** DataForSEO language_code valid for the location (co-resolved — never default 'en' for a non-US location). */
+  languageCode: string;
+  /** Optional ISO country code for display (e.g. 'GB'). */
+  countryCode?: string;
+  /** Optional human label (e.g. 'United Kingdom'). */
+  label?: string;
+}
+
+/**
+ * Single pre-resolved representation injected directly into the client surface
+ * (authority-layered-fields rule). Sections read the boolean flags, never the raw segment,
+ * so segment logic lives in one place (resolveSegmentProfile in server/workspaces.ts).
+ */
+export interface ResolvedSegmentProfile {
+  segment: ClientSegment;
+  outcomeNounSingular: string;
+  outcomeNounPlural: string;
+  moneyFrameAltitude: 'production_vs_retainer' | 'pipeline_ratio' | 'cac_vs_paid' | 'portfolio_cost_per_lead';
+  showCompetitorAuthority: boolean;   // gates the B2B/services insert
+  showPortfolioRollup: boolean;       // gates the multi-location inversion
+  showLocalMapAndReviews: boolean;    // gates the local-only first-screen insert
+  exportProfile: 'sms_recap' | 'board_one_pager' | 'partner_summary' | 'owner_portfolio' | null;
 }
 
 export interface PageKeywordMap {
@@ -126,6 +181,12 @@ export interface TopicCluster {
   topCompetitor?: string;        // competitor with highest coverage in this cluster
   topCompetitorCoverage?: number;
   gap: string[];                 // keywords in cluster without ranking or strategy/page coverage
+  /** Strategy v3 (#9) — operator/AI rationale for prioritizing this cluster. Optional: legacy
+   *  blobs and clusters minted before v3 lack it; the cluster card hides the line when absent. */
+  rationale?: string;
+  /** Strategy v3 (#9) — banded projected impact of closing this cluster's gap. Client-safe
+   *  (banded, never a raw $ figure — mirrors Recommendation.impactBand). Optional on legacy blobs. */
+  projectedImpact?: ImpactBand;
 }
 
 export interface CannibalizationItem {
@@ -154,6 +215,15 @@ export interface KeywordStrategy {
   /** Stored separately in the page_keywords table; omitted in the workspace JSON blob. */
   pageMap?: PageKeywordMap[];    // keyword assignments per page
   opportunities: string[];       // keyword gaps / untapped opportunities
+  /** Typed parallel to `opportunities` (Strategy v3 §12b) — carries volume/difficulty/rationale so the
+   *  curated keyword-opportunity send (P5 #6b) and the public read can present them without re-deriving.
+   *  Optional: legacy strategies have only the bare `opportunities` string[]. */
+  opportunitiesDetailed?: Array<{
+    keyword: string;
+    volume?: number;
+    difficulty?: number;
+    rationale?: string;
+  }>;
   /** Stored separately in the content_gaps table; omitted in the workspace JSON blob. */
   contentGaps?: ContentGap[];    // specific content pieces that should be created
   /** Stored separately in the quick_wins table; omitted in the workspace JSON blob. */
@@ -182,6 +252,8 @@ export interface KeywordStrategy {
   questionKeywords?: { seed: string; questions: { keyword: string; volume: number }[] }[]; // question-based keywords for FAQ/AEO
   businessContext?: string;      // user-provided context (locations, services, industry)
   seoDataMode?: SeoDataMode; // which SEO provider enrichment mode was used
+  /** The effective (clamped) page-limit used for the last generation. 0 = no limit. Persisted so the Settings UI can rehydrate it after a remount. */
+  maxPages?: number;
   seoDataStatus?: SeoDataStatus; // whether provider grounding was available or degraded during generation
   /** Enriched search signals stored alongside strategy (not included in pageMap). */
   searchSignals?: {
@@ -340,6 +412,17 @@ export interface Workspace {
     briefDescription?: string;
     fullPostDescription?: string;
   };
+  /**
+   * The Issue (Client) P0: per-workspace converted-outcome value powering the dollar verdict.
+   * Absent = count-only (no dollar verdict). Backing column: outcome_value (typed JSON).
+   */
+  outcomeValue?: {
+    valuePerOutcome: number;
+    unitLabel: string;                 // 'new patient' | 'qualified lead' | 'booking' …
+    currency: string;                  // reuse contentPricing currency convention
+    basis: 'client_provided' | 'agency_estimate' | 'ai_enriched';
+    monthlyRetainer?: number;          // optional — enables value-vs-spend in one line
+  };
   // SEO data provider preference
   seoDataProvider?: 'dataforseo';
   // Verified business contact info for schema generation (bypasses page-content verification)
@@ -360,6 +443,25 @@ export interface Workspace {
     goals?: string[];
     targetAudience?: string;
   };
+  /**
+   * The Issue (Client) P0/P1: admin-confirmed segment classification override.
+   * Backing column: segment_config (typed JSON, parseJsonSafe at read boundary).
+   * resolveSegmentProfile() reads this for the non-local 3-way; the local/multi axis is
+   * deterministic from client_locations count and ignores this override.
+   */
+  segmentConfig?: SegmentConfig;
+  /** SERP target geo for non-local/national clients (P4, admin-only). Absent → local primary market → US/'en'. */
+  targetGeo?: TargetGeo;
+  /**
+   * The Issue (Client) P1a — Webflow form-capture config (website-native measured outcome capture).
+   * Capture is via Webflow Data-API POLLING (server/webflow-form-poller.ts), not a webhook. ALL
+   * admin-only: webflowFormSources maps each selected Webflow form to a typed outcome;
+   * conversionTrackingConfirmedAt marks confirmed setup (the provenance-flip basis). Sources are NEVER
+   * serialized into any public/client payload (D7). Backing columns: webflow_form_sources (JSON),
+   * conversion_tracking_confirmed_at (149). The legacy webhook signing secret was dropped in 150.
+   */
+  webflowFormSources?: WebflowFormMapping[];
+  conversionTrackingConfirmedAt?: string;  // ISO; set by the admin form-sources save / first captured lead
   // Client Briefing (weekly editorial)
   /** Auto-publish briefings without admin review after N hours */
   autoPublishBriefings?: boolean;
@@ -367,6 +469,10 @@ export interface Workspace {
   autoPublishAfterHours?: number;
   /** ISO-week marker (YYYY-MM-DD) of last briefing run, prevents duplicate runs */
   lastBriefingRunWeekOf?: string | null;
+  /** ISO-week marker (YYYY-MM-DD) of last pushed-Issue cron run (The Issue, Phase 3) — prevents duplicate weekly pushes */
+  lastIssuePushedWeekOf?: string | null;
+  /** ISO-week marker (YYYY-MM-DD) of last weekly email return-hook send (The Issue, P1c) — prevents duplicate weekly sends */
+  lastReturnHookSentWeekOf?: string | null;
   folder: string;
   createdAt: string;
 }
@@ -409,15 +515,25 @@ export interface AdminWorkspaceView {
   pageEditStates?: Record<string, PageEditState>;
   publishTarget?: Workspace['publishTarget'];
   contentPricing?: Workspace['contentPricing'];
+  outcomeValue?: Workspace['outcomeValue'];
   seoDataProvider?: 'dataforseo';
   businessProfile?: BusinessProfileContact | null;
   businessPriorities?: string[];
   customPromptNotes?: string;
   scoringConfig?: Workspace['scoringConfig'];
   intelligenceProfile?: Workspace['intelligenceProfile'];
+  segmentConfig?: Workspace['segmentConfig'];
+  targetGeo?: Workspace['targetGeo'];
+  /** Pre-resolved segment profile (authority-layered) the admin segment UI reads to seed the override + gate the local/multi axis. */
+  segmentProfile?: ResolvedSegmentProfile;
+  // The Issue (Client) P1a — Webflow form-capture config (admin view). Capture is via Data-API polling;
+  // the admin reads back the selected form-source mapping + the setup-confirmation marker.
+  webflowFormSources?: Workspace['webflowFormSources'];
+  conversionTrackingConfirmedAt?: string;
   autoPublishBriefings?: boolean;
   autoPublishAfterHours?: number;
   lastBriefingRunWeekOf?: string | null;
+  lastIssuePushedWeekOf?: string | null;
   folder: string;
   createdAt: string;
   // Computed fields (not on Workspace row)

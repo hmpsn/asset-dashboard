@@ -21,8 +21,16 @@ import { WS_EVENTS } from '../ws-events.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { GSC_METRIC_WINDOW_DAYS } from '../../shared/keyword-window.js';
+import { isFeatureEnabled } from '../feature-flags.js';
+import { startTrackedRefresh } from '../seo-refresh-runtime.js';
+import { runNationalSerpRefreshJob } from '../national-serp.js';
+import { runLlmMentionsRefreshJob } from '../llm-mentions.js';
+import { getLatestLlmMentions, getLlmMentionsTrend } from '../llm-mentions-store.js';
+import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { createLogger } from '../logger.js';
 
 const router = Router();
+const log = createLogger('rank-tracking-routes');
 
 function parseHistoryLimit(rawLimit: unknown): number | null {
   if (rawLimit == null) return 90;
@@ -118,6 +126,96 @@ router.post('/api/rank-tracking/:workspaceId/snapshot', requireWorkspaceAccess('
   } catch (err) {
     next(err);
   }
+});
+
+// Trigger a national SERP rank refresh (SEO Decision Engine P6 / national-serp-tracking).
+// Manual-trigger for P6 (no cron in this unit). Gated: feature flag → tier (Growth+) →
+// observe-only budget gate → global + per-workspace job serialization. Fire-and-forget.
+router.post('/api/rank-tracking/:workspaceId/refresh-national', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const workspaceId = req.params.workspaceId;
+  startTrackedRefresh({
+    workspaceId,
+    res,
+    logger: log,
+    jobType: BACKGROUND_JOB_TYPES.NATIONAL_SERP_REFRESH,
+    preparingMessage: 'Preparing national SERP rank refresh...',
+    workspaceConflictError: 'A national SERP refresh is already running for this workspace',
+    globalConflictError: 'Another workspace is currently running a national SERP refresh — please wait for it to complete',
+    unexpectedFailureLogMessage: 'national-serp refresh: unhandled error escaped job runner — marking failed',
+    unexpectedFailureMessage: 'National SERP refresh failed unexpectedly',
+    featureGate: {
+      flag: 'national-serp-tracking',
+      disabledError: 'National SERP tracking is not enabled',
+    },
+    tierGate: {
+      forbiddenError: 'National SERP tracking requires a Growth or Premium plan',
+    },
+    budgetGate: {
+      endpoint: 'national_serp',
+      wouldBlockLogMessage: 'national-serp refresh: credit budget would-block at route entry (proceeding — observe-only)',
+    },
+    run: jobId => runNationalSerpRefreshJob(workspaceId, jobId),
+  });
+});
+
+// P8 ai-visibility: start the LLM-mention (AI visibility) refresh job. Gated server-side by the
+// `ai-visibility` flag + Growth/Premium tier. Mirrors the refresh-national route exactly (the
+// READ route — GET /ai-visibility — is added in U4 to this same file).
+router.post('/api/rank-tracking/:workspaceId/refresh-ai-visibility', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const workspaceId = req.params.workspaceId;
+  startTrackedRefresh({
+    workspaceId,
+    res,
+    logger: log,
+    jobType: BACKGROUND_JOB_TYPES.LLM_MENTIONS_REFRESH,
+    preparingMessage: 'Preparing AI visibility refresh...',
+    workspaceConflictError: 'An AI visibility refresh is already running for this workspace',
+    globalConflictError: 'Another workspace is currently running an AI visibility refresh — please wait for it to complete',
+    unexpectedFailureLogMessage: 'ai-visibility refresh: unhandled error escaped job runner — marking failed',
+    unexpectedFailureMessage: 'AI visibility refresh failed unexpectedly',
+    featureGate: {
+      flag: 'ai-visibility',
+      disabledError: 'AI visibility tracking is not enabled',
+    },
+    tierGate: {
+      forbiddenError: 'AI visibility tracking requires a Growth or Premium plan',
+    },
+    budgetGate: {
+      endpoint: 'llm_mentions',
+      wouldBlockLogMessage: 'ai-visibility refresh: credit budget would-block at route entry (proceeding — observe-only)',
+    },
+    run: jobId => runLlmMentionsRefreshJob(workspaceId, jobId),
+  });
+});
+
+// P8 ai-visibility: admin AI-visibility (LLM-mention) KPI readout. Aggregates ONLY — own
+// share-of-voice + mention volume + the dated trend (the before/after AEO proof) + the
+// co-mentioned competitor breakdown + the cited source domains (AEO targets). Never returns
+// raw LLM transcripts/answers (the store holds none). When the `ai-visibility` flag is off,
+// returns an empty payload (not 404) so the panel simply renders nothing — mirrors the P7
+// gbp-reviews read endpoint. `requireWorkspaceAccess` only (HMAC admin auth is covered by the
+// global app gate — never add requireAuth here).
+router.get('/api/rank-tracking/:workspaceId/ai-visibility', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const workspaceId = req.params.workspaceId;
+
+  if (!isFeatureEnabled('ai-visibility', workspaceId)) {
+    return res.json({ latest: null, trend: [], competitors: [], sourceDomains: [] });
+  }
+
+  // chat_gpt is the only platform for v1 (the column leaves room for 'google').
+  const latest = getLatestLlmMentions(workspaceId, 'chat_gpt') ?? null;
+  const trend = getLlmMentionsTrend(workspaceId, 'chat_gpt').map(snapshot => ({
+    date: snapshot.snapshotDate,
+    mentions: snapshot.mentions ?? 0,
+    shareOfVoice: snapshot.shareOfVoice ?? 0,
+  }));
+
+  res.json({
+    latest,
+    trend,
+    competitors: latest?.competitors ?? [],
+    sourceDomains: latest?.sourceDomains ?? [],
+  });
 });
 
 // Get rank history (for charting)

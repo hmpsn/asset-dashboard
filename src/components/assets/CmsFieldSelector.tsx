@@ -8,6 +8,7 @@
  */
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Database } from 'lucide-react';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { Checkbox, Icon, cn, Button } from '../ui';
 import type { CmsCollectionImageInfo } from '../../../shared/types/cms-images';
 
@@ -53,8 +54,9 @@ interface Props {
 
 export function CmsFieldSelector({ collections, selectedFields, onChange }: Props) {
   const [open, setOpen] = useState(true);
-  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(
+  const [expandedCollections, toggleExpanded] = useToggleSet<string>(
     () => new Set(collections.map(c => c.collectionId)),
+    UNBOUNDED_TOGGLE_SET_OPTIONS,
   );
 
   const toggleField = (key: string) => {
@@ -70,14 +72,6 @@ export function CmsFieldSelector({ collections, selectedFields, onChange }: Prop
       if (checked) next.add(key); else next.delete(key);
     }
     onChange(next);
-  };
-
-  const toggleExpanded = (collectionId: string) => {
-    setExpandedCollections(prev => {
-      const next = new Set(prev);
-      if (next.has(collectionId)) next.delete(collectionId); else next.add(collectionId);
-      return next;
-    });
   };
 
   if (collections.length === 0) return null;

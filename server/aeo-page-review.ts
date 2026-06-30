@@ -13,7 +13,7 @@ import { callAI } from './ai.js';
 import { buildIntelPrompt } from './workspace-intelligence.js';
 import type { SeoIssue } from './seo-audit.js';
 import { createLogger } from './logger.js';
-import { decodeEntities, stripHtmlToText } from './helpers.js';
+import { decodeEntities, stripHtmlToText } from './utils/text.js';
 import { parseAeoReview, type AiAeoReview } from './schemas/ai-aeo-review.js';
 import { z } from './middleware/validate.js';
 import type { AeoEffort, AeoPageReview, AeoSiteReview } from '../shared/types/aeo.js';

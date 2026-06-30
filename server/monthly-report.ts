@@ -1,5 +1,5 @@
 import { getUploadRoot, getWorkspace, listWorkspaces, type Workspace } from './workspaces.js';
-import { applySuppressionsToAudit } from './helpers.js';
+import { applySuppressionsToAudit } from './seo-audit-suppressions.js';
 import { getLatestSnapshot } from './reports.js';
 import { listActivity } from './activity-log.js';
 import { listRequests } from './requests.js';

@@ -16,18 +16,12 @@ import type { SchemaSitePlan, SchemaPageRole } from '../../../shared/types/schem
 import { SCHEMA_ROLE_LABELS, SCHEMA_ROLE_INDEX, SCHEMA_ROLE_PRIMARY_TYPE, SCHEMA_ROLES_THAT_REFERENCE_CANONICAL_ENTITIES } from '../../../shared/types/schema-plan';
 import { Badge, FormSelect, Icon, cn, Button, StatusBadge, type BadgeTone } from '../ui';
 import { formatDate } from '../../utils/formatDates';
+import { SCHEMA_PAGE_ROLE_VALUES } from './schemaPageTypeOptions';
 
 interface Props {
   siteId: string;
   workspaceId?: string;
 }
-
-const ROLE_OPTIONS: SchemaPageRole[] = [
-  'homepage', 'pillar', 'service', 'audience', 'lead-gen', 'blog', 'about',
-  'contact', 'location', 'product', 'partnership', 'faq', 'case-study',
-  'comparison', 'author', 'howto', 'video', 'job-posting', 'course', 'event',
-  'review', 'pricing', 'recipe', 'generic',
-];
 
 const ROLE_COLORS: Partial<Record<SchemaPageRole, string>> = {
   homepage: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
@@ -489,7 +483,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
             </Button>
             {showGuide && (
               <div className="mt-2 bg-[var(--surface-1)]/50 rounded-[var(--radius-md)] border border-[var(--brand-border)] overflow-hidden max-h-[320px] overflow-y-auto">
-                {ROLE_OPTIONS.map(role => {
+                {SCHEMA_PAGE_ROLE_VALUES.map(role => {
                   const info = SCHEMA_ROLE_INDEX[role];
                   return (
                     <div key={role} className="px-3 py-2 border-b border-[var(--brand-border)]/50 last:border-b-0">
@@ -560,7 +554,7 @@ export function SchemaPlanPanel({ siteId, workspaceId }: Props) {
                       value={pr.role}
                       onChange={value => handleRoleChange(pr.pagePath, value as SchemaPageRole)}
                       disabled={planMutationsLocked}
-                      options={ROLE_OPTIONS.map(role => ({
+                      options={SCHEMA_PAGE_ROLE_VALUES.map(role => ({
                         value: role,
                         label: SCHEMA_ROLE_LABELS[role],
                       }))}

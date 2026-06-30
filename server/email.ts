@@ -347,18 +347,57 @@ export function notifyClientRecommendationsReady(opts: {
   }));
 }
 
-export function notifyClientAuditImproved(opts: {
+// Strategy v3 (spec §7.1) — the curation doorbell. Fired from the admin send endpoint when an
+// operator sends curated rec(s) to the client. Batched per curation session by the 'action'
+// throttle bucket (server/email-throttle.ts CATEGORY_MAP). Distinct from recommendations_ready,
+// whose 14-day audit cooldown would silently swallow curated sends.
+export function notifyClientCuratedRecsSent(opts: {
   clientEmail: string;
   workspaceName: string;
   workspaceId: string;
-  score: number;
-  previousScore: number;
+  recCount: number;
   dashboardUrl?: string;
 }): void {
   if (!isEmailConfigured()) return;
-  queueEmail(makeEvent('audit_improved', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
-    score: opts.score, previousScore: opts.previousScore,
+  queueEmail(makeEvent('curated_recs_sent', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
+    recCount: opts.recCount,
   }));
+}
+
+/**
+ * The Issue (Client) P1c — weekly return-hook digest. Queues ONE consolidated "what came in this
+ * week" email. The cron owns the flag gate + content gate + weekly idempotency; this helper validates
+ * transport + recipient and enqueues (mirrors the other notifyClient* helpers).
+ *
+ * RETURNS whether it actually enqueued: the cron stamps its ISO-week marker ONLY on `true`, so an
+ * unconfigured-SMTP no-op (or absent recipient) does NOT burn the week or log a false "sent". Once the
+ * email is enqueued the existing queue persists it to disk + the 'return' category is throttle-exempt,
+ * so an enqueue reliably means committed delivery.
+ *
+ * outcomeNoun is always sent (segment framing); the three sections are conditional fields.
+ */
+export function notifyClientReturnHook(opts: {
+  clientEmail: string;
+  workspaceName: string;
+  workspaceId: string;
+  outcomeNoun: string;
+  leadCount?: number;
+  recentNames?: string[];
+  moneyValue?: number;
+  sinceStartDelta?: number | null;
+  pendingCount?: number;
+  dashboardUrl?: string;
+}): boolean {
+  if (!isEmailConfigured() || !opts.clientEmail) return false;
+  queueEmail(makeEvent('client_return_hook', opts.clientEmail, opts.workspaceId, opts.workspaceName, opts.dashboardUrl, {
+    outcomeNoun: opts.outcomeNoun,
+    leadCount: opts.leadCount,
+    recentNames: opts.recentNames,
+    moneyValue: opts.moneyValue,
+    sinceStartDelta: opts.sinceStartDelta,
+    pendingCount: opts.pendingCount,
+  }));
+  return true;
 }
 
 export function notifyClientAuditComplete(opts: {

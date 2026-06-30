@@ -8,6 +8,7 @@ import { Send, Trash2, ChevronDown, Bell, Check } from 'lucide-react';
 import { Button, Icon, IconButton, StatusBadge, cn } from './ui';
 import { approvals } from '../api/misc';
 import { queryKeys } from '../lib/queryKeys';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
 import type { ApprovalBatch } from '../../shared/types/approvals';
 import { formatDateShort } from '../utils/formatDates';
 
@@ -27,7 +28,7 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
   const queryClient = useQueryClient();
   const [reminding, setReminding] = useState<string | null>(null);
   const [reminderSent, setReminderSent] = useState<Set<string>>(new Set());
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, toggleExpand] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const { data: rawBatches = [], isLoading: loading } = useQuery({
@@ -63,14 +64,6 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
       setReminderSent(prev => new Set(prev).add(batchId));
     } catch (err) { console.error('PendingApprovals reminder failed:', err); }
     finally { setReminding(null); }
-  };
-
-  const toggleExpand = (id: string) => {
-    setExpanded(prev => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
-    });
   };
 
   const statusBadge = (status: string) => {
@@ -183,15 +176,12 @@ export function PendingApprovals({ workspaceId, nameFilter, onRetracted, refresh
               </div>
               {isExpanded && (
                 <div className="px-3 pb-2 pl-8 space-y-1">
-                  {batch.items.map(item => {
-                    const itemStatus = item.status === 'approved' ? 'text-emerald-400' : item.status === 'rejected' ? 'text-red-400' : 'text-[var(--brand-text)]';
-                    return (
-                      <div key={item.id} className="flex items-center gap-2 t-caption-sm">
-                        <span className={cn('uppercase font-medium', itemStatus)}>{item.status}</span>
-                        <span className="text-[var(--brand-text-muted)] truncate">{item.pageTitle} — {item.field}</span>
-                      </div>
-                    );
-                  })}
+                  {batch.items.map(item => (
+                    <div key={item.id} className="flex items-center gap-2 t-caption-sm">
+                      <StatusBadge status={item.status} domain="approval" fallback="neutral" />
+                      <span className="text-[var(--brand-text-muted)] truncate">{item.pageTitle} — {item.field}</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

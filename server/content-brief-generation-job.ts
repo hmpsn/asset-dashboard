@@ -9,7 +9,8 @@ import { getContentRequest, updateContentRequest } from './content-requests.js';
 import { loadDecayAnalysis } from './content-decay.js';
 import { isProgrammingError } from './errors.js';
 import { getGA4LandingPages } from './google-analytics.js';
-import { normalizePageUrl, sanitizeQueryForPrompt } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
+import { sanitizeQueryForPrompt } from './utils/text.js';
 import { invalidateContentPipelineIntelligence } from './intelligence-freshness.js';
 import { createJob, updateJob } from './jobs.js';
 import { createLogger } from './logger.js';
@@ -39,6 +40,13 @@ export interface StandaloneContentBriefGenerationParams {
     recommendations?: string[];
     contentGaps?: string[];
     searchIntent?: string;
+    // Brief pre-seed fields from Content Gaps / strategy layer (Lane E)
+    rationale?: string;
+    competitorProof?: string;
+    volume?: number;
+    intent?: string;
+    questionKeywords?: string[];
+    serpFeatures?: string[];
   };
   generationStyle?: ContentGenerationStyle;
   /** W2.5 Bug 1 fix: Page Intelligence "Draft Brief" flow — the page being refreshed/updated */

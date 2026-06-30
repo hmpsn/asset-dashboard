@@ -66,6 +66,16 @@ export const checkoutLimiter = rateLimit(60 * 1000, 5);
 export const clientLoginLimiter = rateLimit(60 * 1000, 5); // 5 attempts per minute per IP
 export const aiLimiter = rateLimit(60 * 1000, 3); // 3 AI requests per minute per IP
 export const globalPublicLimiter = rateLimit(60 * 1000, 200, 'global'); // 200 requests per minute per IP across all public routes
+// MCP action server (Bearer-token auth). Per-IP cap to bound a runaway agent loop
+// or a leaked-key abuser; the default is generous for a normal multi-step agent
+// workflow and tunable via MCP_RATE_LIMIT_PER_MIN. Applied at the /mcp mount in app.ts
+// via a top-level path check so req.path is the full '/mcp' (giving a dedicated
+// `${ip}:/mcp` bucket). Do NOT use keyMode 'global' here — that shares
+// globalPublicLimiter's `global:${ip}` bucket and would cross-contaminate /mcp with
+// /api/public/ traffic. (app.ts skips wiring this in NODE_ENV=test, where high-volume
+// integration tests legitimately exceed it; the limiter itself is unit-tested directly.)
+const MCP_RATE_LIMIT_PER_MIN = Number(process.env.MCP_RATE_LIMIT_PER_MIN) || 120;
+export const mcpLimiter = rateLimit(60 * 1000, MCP_RATE_LIMIT_PER_MIN);
 
 // ── Credential Stuffing Protection ──
 

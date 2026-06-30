@@ -27,7 +27,7 @@ export interface BriefListProps {
   onSetBriefSort: (value: 'date' | 'keyword' | 'difficulty') => void;
   onCopyAsMarkdown: (brief: ContentBrief) => void;
   onExportClientHTML: (brief: ContentBrief) => void;
-  onSendToClient: (brief: ContentBrief) => void;
+  onSendToClient: (brief: ContentBrief, note?: string) => void;
   onConfirmDeleteBrief: (brief: ContentBrief) => void;
   onSaveBriefField: (briefId: string, updates: Partial<ContentBrief>) => void;
   onSetEditingBrief: (id: string | null) => void;
@@ -120,7 +120,7 @@ export function BriefList({
                   {brief.contentFormat && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400/80 border border-amber-500/20 capitalize hidden sm:inline-block">{brief.contentFormat}</span>}
                 </div>
                 {/* Quick actions */}
-                <div className="flex items-center gap-0.5 flex-shrink-0 opacity-40 group-hover/brief:opacity-100 transition-opacity">
+                <div className="flex items-center gap-0.5 flex-shrink-0 opacity-40 group-hover/brief:opacity-100 group-focus-within/brief:opacity-100 transition-opacity">
                   <IconButton
                     icon={Copy}
                     label="Copy for AI tool"

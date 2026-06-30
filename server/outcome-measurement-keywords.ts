@@ -10,7 +10,7 @@
 //      position fabricates deltas.
 //   2. The Hub recording helper — `recordAction` for Keyword Hub lifecycle actions
 //      (track / promote / add-to-strategy), called from B2's contract point in
-//      `applyKeywordCommandCenterActionInternal`. Reuses A3's
+//      the KCC action service. Reuses A3's
 //      STRATEGY_PAGE_KEYWORD_SOURCE_TYPE + strategyPageKeywordSourceId() so both
 //      write sites (strategy regeneration and the Hub) share one dedup space.
 //
@@ -25,7 +25,7 @@ import {
   STRATEGY_PAGE_KEYWORD_SOURCE_TYPE,
   strategyPageKeywordSourceId,
 } from './outcome-tracking.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import type { BaselineSnapshot, TrackedAction } from '../shared/types/outcome-tracking.js';
 
 const log = createLogger('outcome-measurement-keywords');

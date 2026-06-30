@@ -209,12 +209,12 @@ export async function assembleOperational(
     workspaceId,
     { fixNow: 0, fixSoon: 0, fixLater: 0 },
     async () => {
-      const { loadRecommendations } = await import('../recommendations.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const { loadRecommendations, isActiveRec } = await import('../recommendations.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
       const recSet: RecommendationSet | null = loadRecommendations(workspaceId);
       const queue = { fixNow: 0, fixSoon: 0, fixLater: 0 };
       if (recSet?.recommendations) {
         for (const rec of recSet.recommendations) {
-          if (rec.status === 'pending' || !rec.status) {
+          if (isActiveRec(rec)) {
             if (rec.priority === 'fix_now') queue.fixNow++;
             else if (rec.priority === 'fix_soon') queue.fixSoon++;
             else queue.fixLater++;

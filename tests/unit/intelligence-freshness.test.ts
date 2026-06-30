@@ -9,7 +9,7 @@ vi.mock('../../server/workspace-data.js', () => ({
   invalidateContentPipelineCache: mocks.invalidateContentPipelineCache,
 }));
 
-vi.mock('../../server/workspace-intelligence.js', () => ({
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
   invalidateIntelligenceCache: mocks.invalidateIntelligenceCache,
 }));
 

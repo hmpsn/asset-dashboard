@@ -7,6 +7,7 @@ import { useLocalSeo, useLocalSeoRefresh } from '../../hooks/admin';
 import { useRankTrackingAddKeyword } from '../../hooks/admin/useKeywordCommandCenter';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
 import { Badge, Button, ErrorState, Icon, IconButton, SectionCard, StatCard, cn } from '../ui';
+import { GbpReviewsPanel } from './GbpReviewsPanel';
 import { LocalSeoMarketSetupDrawer } from './LocalSeoMarketSetupDrawer';
 import { LocalSeoVisibilityTrend } from './LocalSeoVisibilityTrend';
 
@@ -16,6 +17,7 @@ interface LocalSeoVisibilityPanelProps {
   workspaceId: string;
   mode?: LocalSeoVisibilityPanelMode;
   onOpenKeywords?: () => void;
+  showGbpReviews?: boolean;
 }
 
 const POSTURE_TONE: Record<LocalSeoVisibilityPosture, 'blue' | 'emerald' | 'amber' | 'red' | 'zinc'> = {
@@ -192,7 +194,10 @@ function LocalSeoSetupCallout({
 }
 
 function LocalSeoStatGrid({ report, mode }: { report: LocalSeoReportSummary; mode: 'strategy' | 'keywords' }) {
-  const columns = mode === 'strategy' ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-5';
+  const hasDegradedResults = report.degradedCount > 0;
+  const columns = hasDegradedResults
+    ? mode === 'strategy' ? 'grid-cols-2 lg:grid-cols-5' : 'grid-cols-2 lg:grid-cols-6'
+    : mode === 'strategy' ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-5';
   return (
     <div className={`grid ${columns} gap-3`}>
       <StatCard label="Markets" value={report.activeMarketCount} icon={MapPin} iconColor="#60a5fa" valueColor="text-blue-400" sub={`${report.configuredMarketCount} configured`} />
@@ -205,6 +210,9 @@ function LocalSeoStatGrid({ report, mode }: { report: LocalSeoReportSummary; mod
         </>
       ) : (
         <StatCard label="Needs Review" value={report.possibleMatchCount + report.notVisibleCount} icon={AlertTriangle} iconColor="#fbbf24" valueColor="text-amber-400/80" sub={`${report.localPackPresentCount} local packs`} />
+      )}
+      {hasDegradedResults && (
+        <StatCard label="Degraded" value={report.degradedCount} icon={AlertTriangle} iconColor="#fbbf24" valueColor="text-amber-400/80" sub="provider warnings" />
       )}
     </div>
   );
@@ -295,7 +303,7 @@ function LocalSeoPageAnnotationPanel({
   );
 }
 
-export function LocalSeoVisibilityPanel({ workspaceId, mode = 'keywords', onOpenKeywords }: LocalSeoVisibilityPanelProps) {
+export function LocalSeoVisibilityPanel({ workspaceId, mode = 'keywords', onOpenKeywords, showGbpReviews = true }: LocalSeoVisibilityPanelProps) {
   const [setupOpen, setSetupOpen] = useState(false);
   const { data, isLoading, isError, error, refetch } = useLocalSeo(workspaceId);
   const refresh = useLocalSeoRefresh(workspaceId);
@@ -444,6 +452,10 @@ export function LocalSeoVisibilityPanel({ workspaceId, mode = 'keywords', onOpen
         trackingErrors={trackingErrors}
       />
     )}
+    {/* SEO Decision Engine P7 (local-gbp): GBP + reviews readout. Self-gates on data presence
+        (server returns an empty payload when the flag is off), so this renders nothing until a
+        GBP refresh has captured listings. */}
+    {mode === 'keywords' && showGbpReviews && <GbpReviewsPanel workspaceId={workspaceId} />}
     </>
   );
 }

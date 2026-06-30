@@ -63,11 +63,13 @@ describe('Task 4.1 — Cache-invalidation cluster (A-9/11/12/13) — bounded sou
     expect(read('server/routes/webflow-schema.ts')).toContain('invalidateIntelligenceCache');
   });
 
-  it('server/routes/webflow-schema.ts calls invalidateIntelligenceCache on schema-publish (bounded — not whole-file)', () => {
-    const src = read('server/routes/webflow-schema.ts');
-    // The old slice ran to EOF (whole file). Bound it to the next route decl.
-    const section = boundedSection(src, "router.post('/api/webflow/schema-publish/:siteId'", ['\nrouter.']);
-    expect(section).toContain('invalidateIntelligenceCache');
+  it('schema-publish invalidates the intelligence cache via the shared publishSchemaToLive service', () => {
+    // C2: schema-publish's intelligence-cache invalidation (and the rest of the
+    // post-publish follow-on set) moved out of the route into the shared
+    // publishSchemaToLive domain service, consumed by both the admin route and the
+    // MCP publish_schema tool. The route's schema-publish handler now delegates.
+    expect(read('server/domains/schema/publish-schema-to-live.ts')).toContain('invalidateIntelligenceCache');
+    expect(read('server/routes/webflow-schema.ts')).toContain('publishSchemaToLive');
   });
 
   it('server/routes/webflow-schema.ts calls invalidateIntelligenceCache on schema-rollback (bounded)', () => {
@@ -159,11 +161,10 @@ describe('Task 4.1 — Cache-invalidation cluster (A-9/11/12/13) — bounded sou
 });
 
 // ── Behavioral test — actually invoke the service fn and assert the spy fired.
-// Mock workspace-intelligence so invalidateIntelligenceCache is a spy; everything
+// Mock the invalidation leaf so invalidateIntelligenceCache is a spy; everything
 // else in approvals.ts (db, state machine) runs for real against the worker DB.
-vi.mock('../server/workspace-intelligence.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../server/workspace-intelligence.js')>();
-  return { ...actual, invalidateIntelligenceCache: vi.fn() };
+vi.mock('../server/intelligence/cache-invalidation.js', () => {
+  return { invalidateIntelligenceCache: vi.fn() };
 });
 
 describe('Task 4.1 — Cache-invalidation cluster — behavioral (spy fires with workspaceId)', () => {
@@ -172,7 +173,7 @@ describe('Task 4.1 — Cache-invalidation cluster — behavioral (spy fires with
   });
 
   it('markBatchApplied calls invalidateIntelligenceCache with the workspaceId', async () => {
-    const { invalidateIntelligenceCache } = await import('../server/workspace-intelligence.js');
+    const { invalidateIntelligenceCache } = await import('../server/intelligence/cache-invalidation.js');
     const { createBatch, updateItem, markBatchApplied } = await import('../server/approvals.js');
     const { createWorkspace, deleteWorkspace } = await import('../server/workspaces.js');
 
@@ -200,7 +201,7 @@ describe('Task 4.1 — Cache-invalidation cluster — behavioral (spy fires with
   });
 
   it('updateItem calls invalidateIntelligenceCache with the workspaceId', async () => {
-    const { invalidateIntelligenceCache } = await import('../server/workspace-intelligence.js');
+    const { invalidateIntelligenceCache } = await import('../server/intelligence/cache-invalidation.js');
     const { createBatch, updateItem } = await import('../server/approvals.js');
     const { createWorkspace, deleteWorkspace } = await import('../server/workspaces.js');
 

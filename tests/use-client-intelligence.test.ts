@@ -7,20 +7,28 @@ describe('useClientIntelligence hook contract', () => {
     join(import.meta.dirname, '../src/hooks/client/useClientIntelligence.ts'),
     'utf-8'
   );
+  const viewModelSrc = readFileSync(
+    join(import.meta.dirname, '../src/hooks/client/useClientInsightViewModel.ts'),
+    'utf-8'
+  );
+
+  it('delegates to the client insight view-model owner', () => {
+    expect(src).toMatch(/useClientIntelligenceView/);
+  });
 
   it('uses queryKeys.client.intelligence for the query key', () => {
-    expect(src).toMatch(/queryKeys\.client\.intelligence/);
+    expect(viewModelSrc).toMatch(/queryKeys\.client\.intelligence/);
   });
 
   it('calls fetchClientIntelligence as queryFn', () => {
-    expect(src).toMatch(/fetchClientIntelligence/);
+    expect(viewModelSrc).toMatch(/fetchClientIntelligence/);
   });
 
   it('has staleTime set (data changes slowly)', () => {
-    expect(src).toMatch(/staleTime/);
+    expect(viewModelSrc).toMatch(/staleTime/);
   });
 
   it('is only enabled when workspaceId is truthy', () => {
-    expect(src).toMatch(/enabled.*workspaceId|!!workspaceId/);
+    expect(viewModelSrc).toMatch(/enabled.*workspaceId|!!workspaceId/);
   });
 });

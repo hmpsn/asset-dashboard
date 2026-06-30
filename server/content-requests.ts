@@ -1,12 +1,29 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { parseJsonFallback } from './db/json-validation.js';
+import { parseJsonFallback, parseJsonSafe } from './db/json-validation.js';
 import { validateTransition, CONTENT_REQUEST_TRANSITIONS } from './state-machines.js';
 import { invalidateContentPipelineCache } from './workspace-data.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
+import { z } from './middleware/validate.js';
 
 export type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';
-import type { ContentTopicRequest } from '../shared/types/content.ts';
+import type { ContentTopicRequest, StrategyCardContext } from '../shared/types/content.ts';
+
+/** Zod schema for the `strategy_card_context` JSON column.
+ *  All fields optional — mirrors StrategyCardContext exactly.
+ *  Used by rowToRequest's parseJsonSafe call. */
+const strategyCardContextSchema = z.object({
+  rationale: z.string().optional(),
+  volume: z.number().optional(),
+  difficulty: z.number().optional(),
+  trendDirection: z.enum(['rising', 'declining', 'stable']).optional(),
+  serpFeatures: z.array(z.string()).optional(),
+  competitorProof: z.string().optional(),
+  impressions: z.number().optional(),
+  intent: z.string().optional(),
+  priority: z.string().optional(),
+  journeyStage: z.enum(['awareness', 'consideration', 'decision']).optional(),
+});
 
 // ── Concluded statuses for brief-dedupe ──
 // A content request only blocks a re-send (send-to-client dedupe) while it is still
@@ -49,6 +66,8 @@ interface RequestRow {
   delivery_notes: string | null;
   target_page_id: string | null;
   target_page_slug: string | null;
+  recommendation_id: string | null;
+  strategy_card_context: string | null;
   comments: string;
   requested_at: string;
   updated_at: string;
@@ -60,12 +79,14 @@ const stmts = createStmtCache(() => ({
            (id, workspace_id, topic, target_keyword, intent, priority, rationale, status,
             brief_id, post_id, client_note, internal_note, decline_reason, client_feedback,
             source, service_type, page_type, upgraded_at, delivery_url, delivery_notes,
-            target_page_id, target_page_slug, comments, requested_at, updated_at)
+            target_page_id, target_page_slug, recommendation_id, strategy_card_context,
+            comments, requested_at, updated_at)
          VALUES
            (@id, @workspace_id, @topic, @target_keyword, @intent, @priority, @rationale, @status,
             @brief_id, @post_id, @client_note, @internal_note, @decline_reason, @client_feedback,
             @source, @service_type, @page_type, @upgraded_at, @delivery_url, @delivery_notes,
-            @target_page_id, @target_page_slug, @comments, @requested_at, @updated_at)`,
+            @target_page_id, @target_page_slug, @recommendation_id, @strategy_card_context,
+            @comments, @requested_at, @updated_at)`,
   ),
   selectByWorkspace: db.prepare(
     `SELECT * FROM content_topic_requests WHERE workspace_id = ? ORDER BY requested_at DESC`,
@@ -123,6 +144,15 @@ function rowToRequest(row: RequestRow): ContentTopicRequest {
     deliveryNotes: row.delivery_notes ?? undefined,
     targetPageId: row.target_page_id ?? undefined,
     targetPageSlug: row.target_page_slug ?? undefined,
+    recommendationId: row.recommendation_id ?? undefined,
+    strategyCardContext: row.strategy_card_context
+      ? parseJsonSafe<StrategyCardContext, null>(
+          row.strategy_card_context,
+          strategyCardContextSchema,
+          null,
+          { field: 'strategy_card_context', table: 'content_topic_requests' },
+        ) ?? undefined
+      : undefined,
     comments: parseJsonFallback(row.comments, []),
     requestedAt: row.requested_at,
     updatedAt: row.updated_at,
@@ -176,7 +206,25 @@ export function getOpenRequestForBrief(workspaceId: string, briefId: string): Co
 
 export function createContentRequest(
   workspaceId: string,
-  data: { topic: string; targetKeyword: string; intent: string; priority: string; rationale: string; clientNote?: string; source?: 'strategy' | 'client'; serviceType?: 'brief_only' | 'full_post'; pageType?: ContentTopicRequest['pageType']; initialStatus?: 'pending_payment' | 'requested' | 'brief_generated' | 'in_progress'; targetPageId?: string; targetPageSlug?: string; dedupe?: boolean }
+  data: {
+    topic: string;
+    targetKeyword: string;
+    intent: string;
+    priority: string;
+    rationale: string;
+    clientNote?: string;
+    source?: 'strategy' | 'client';
+    serviceType?: 'brief_only' | 'full_post';
+    pageType?: ContentTopicRequest['pageType'];
+    initialStatus?: 'pending_payment' | 'requested' | 'brief_generated' | 'in_progress';
+    targetPageId?: string;
+    targetPageSlug?: string;
+    /** Originating recommendation id — set when client "Act on this" creates the request. */
+    recommendationId?: string;
+    /** Strategy card context captured at act-on time. Persisted as JSON. */
+    strategyCardContext?: StrategyCardContext;
+    dedupe?: boolean;
+  }
 ): ContentTopicRequest {
   // Prevent duplicate requests for the same keyword
   if (data.dedupe !== false) {
@@ -198,6 +246,8 @@ export function createContentRequest(
     pageType: data.pageType || 'blog',
     targetPageId: data.targetPageId,
     targetPageSlug: data.targetPageSlug,
+    recommendationId: data.recommendationId,
+    strategyCardContext: data.strategyCardContext,
     comments: [],
     status: data.initialStatus || 'requested',
     requestedAt: new Date().toISOString(),
@@ -227,6 +277,10 @@ export function createContentRequest(
     delivery_notes: request.deliveryNotes ?? null,
     target_page_id: request.targetPageId ?? null,
     target_page_slug: request.targetPageSlug ?? null,
+    recommendation_id: request.recommendationId ?? null,
+    strategy_card_context: request.strategyCardContext
+      ? JSON.stringify(request.strategyCardContext)
+      : null,
     comments: JSON.stringify(request.comments || []),
     requested_at: request.requestedAt,
     updated_at: request.updatedAt,

@@ -206,11 +206,14 @@ describe('HubKeywordList — loading state', () => {
 // Error state
 // ---------------------------------------------------------------------------
 describe('HubKeywordList — error state', () => {
-  it('renders ErrorState when isError=true', () => {
-    render(<HubKeywordList {...defaultProps({ isError: true, rows: [] })} />);
+  it('renders ErrorState with a retry action when isError=true', () => {
+    const onRetry = vi.fn();
+    render(<HubKeywordList {...defaultProps({ isError: true, rows: [], onRetry })} />);
     // ErrorState should be rendered (not the keyword table)
     expect(screen.queryByTestId('keyword-table')).toBeNull();
     expect(screen.queryByTestId('keyword-table-loading')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -241,9 +244,10 @@ describe('HubKeywordList — empty state', () => {
 
   // A3 blocker 9: unfiltered empty → action-oriented CTA; filtered empty → "adjust filters"
   it('unfiltered empty: shows "No keywords yet" title (not "No keywords match your filters") when isFiltered=false', () => {
+    const onFocusAddKeyword = vi.fn();
     render(
       <HubKeywordList
-        {...defaultProps({ rows: [], isLoading: false, isError: false, isFiltered: false })}
+        {...defaultProps({ rows: [], isLoading: false, isError: false, isFiltered: false, onFocusAddKeyword })}
       />,
     );
     const emptyEl = screen.getByTestId('keyword-table-empty');
@@ -254,6 +258,8 @@ describe('HubKeywordList — empty state', () => {
     expect(emptyEl.textContent).not.toContain('No keywords match your filters');
     // And should show an action-oriented title
     expect(emptyEl.textContent).toMatch(/no keywords yet|add.*keyword|get started/i);
+    fireEvent.click(screen.getByRole('button', { name: /add a keyword/i }));
+    expect(onFocusAddKeyword).toHaveBeenCalledTimes(1);
   });
 
   it('filtered empty: shows "No keywords match your filters" and Clear filters button when isFiltered=true', () => {
@@ -443,25 +449,29 @@ describe('localSeoColumnLabel', () => {
 });
 
 // ---------------------------------------------------------------------------
-// A3 blocker 10: bulk-bar clearance — root container gets pb-24 when someSelected
+// A3 blocker 10: bulk-bar clearance — pb-24 lives in KeywordHub.tsx (outer wrapper),
+// NOT in HubKeywordList, because SectionCard's overflow-hidden breaks sticky
+// positioning. The fixed bulk bar anchors to the viewport; the scroll clearance
+// must be outside the overflow-hidden boundary.
 // ---------------------------------------------------------------------------
 describe('HubKeywordList — bulk-bar clearance (A3 blocker 10)', () => {
-  it('root container has pb-24 when someSelected=true (bulk bar visible)', () => {
+  it('root container does NOT have pb-24 (clearance is in KeywordHub.tsx outer wrapper)', () => {
     const selectedKeys = new Set(['example-keyword']);
     const { container } = render(
       <HubKeywordList {...defaultProps({ someSelected: true, selectedKeys })} />,
     );
-    // The outermost div must have pb-24 to clear the fixed bulk bar
-    const root = container.firstChild as HTMLElement;
-    expect(root.className).toContain('pb-24');
-  });
-
-  it('root container does NOT have pb-24 when someSelected=false (no bulk bar)', () => {
-    const { container } = render(
-      <HubKeywordList {...defaultProps({ someSelected: false })} />,
-    );
+    // pb-24 is applied by KeywordHub.tsx on the outer space-y-4 div, outside
+    // SectionCard.overflow-hidden — not by HubKeywordList itself.
     const root = container.firstChild as HTMLElement;
     expect(root.className).not.toContain('pb-24');
+  });
+
+  it('bulk bar is rendered when someSelected=true', () => {
+    const selectedKeys = new Set(['example-keyword']);
+    render(
+      <HubKeywordList {...defaultProps({ someSelected: true, selectedKeys })} />,
+    );
+    expect(screen.getByTestId('bulk-action-bar')).toBeInTheDocument();
   });
 });
 

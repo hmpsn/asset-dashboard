@@ -323,9 +323,82 @@ export interface ContentTopicRequest {
   deliveryNotes?: string;
   targetPageId?: string;
   targetPageSlug?: string;
+  /** Originating recommendation id for requests created via client "Act on this".
+   *  Absent on operator-created or legacy requests.
+   *  @see StrategyCardContext for the accompanying context blob. */
+  recommendationId?: string;
+  /** Strategy card context captured at act-on time (rationale, volume, difficulty,
+   *  trendDirection, serpFeatures, intent, priority, etc.).
+   *  Parsed from the `strategy_card_context` JSON column via parseJsonSafe.
+   *  Absent when no strategy context was available at request creation. */
+  strategyCardContext?: StrategyCardContext;
   comments?: ContentRequestComment[];
   requestedAt: string;
   updatedAt: string;
+}
+
+export interface ContentPerformanceGscMetrics {
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+export interface ContentPerformanceGa4Metrics {
+  sessions: number;
+  users: number;
+  bounceRate: number;
+  avgEngagementTime: number;
+  conversions: number;
+}
+
+export type ContentPerformanceSource = 'request' | 'matrix';
+export type ContentTermCoverageStatus = 'strong' | 'partial' | 'weak' | 'unavailable';
+
+export interface ContentTermCoverageGrade {
+  status: ContentTermCoverageStatus;
+  /** Already a percentage (e.g., 71 for 71%). Do NOT multiply by 100. */
+  coveragePct: number | null;
+  requiredCount: number;
+  matchedCount: number;
+  missingCount: number;
+  missingTerms: string[];
+  reason?: string;
+}
+
+export interface ContentPerformanceJoinback {
+  briefId?: string;
+  postId?: string;
+  briefTitle?: string;
+  briefTargetKeyword?: string;
+  postTitle?: string;
+  hasSourceEvidence: boolean;
+  evidenceSourceCounts: {
+    scrapedReferences: number;
+    serpResults: number;
+    styleExamples: number;
+    peopleAlsoAsk: number;
+  };
+}
+
+export interface ContentPerformanceItem {
+  requestId: string;
+  topic: string;
+  targetKeyword: string;
+  targetPageSlug?: string;
+  pageType?: string;
+  status: string;
+  publishedAt?: string;
+  daysSincePublish: number;
+  gsc: ContentPerformanceGscMetrics | null;
+  ga4: ContentPerformanceGa4Metrics | null;
+  source?: ContentPerformanceSource;
+  coverage: ContentTermCoverageGrade;
+  joinback?: ContentPerformanceJoinback;
+}
+
+export interface ContentPerformanceResponse {
+  items: ContentPerformanceItem[];
 }
 
 // ── Content Subscriptions (recurring monthly packages) ──────────

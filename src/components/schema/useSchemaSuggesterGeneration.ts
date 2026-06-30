@@ -49,7 +49,7 @@ export function useSchemaSuggesterGeneration({
   const fixConsumed = useRef(false);
   const fixTriggerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { data: snapshotData } = useSchemaSnapshot(siteId, workspaceId);
+  const { data: snapshotData, isLoading: snapshotLoading } = useSchemaSnapshot(siteId, workspaceId);
   useEffect(() => { // effect-layout-ok: saved snapshot arrives asynchronously from React Query.
     if (!snapshotData) {
       setSnapshotDate(null);
@@ -299,6 +299,7 @@ export function useSchemaSuggesterGeneration({
     setPageTypes,
     setSinglePageTypeOverrides,
     snapshotDate,
+    snapshotLoading,
     filteredInitialPages,
     runScan,
     stopScan,

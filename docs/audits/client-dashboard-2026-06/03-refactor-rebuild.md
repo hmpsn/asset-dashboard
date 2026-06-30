@@ -98,14 +98,13 @@ Old values redirect; **no client bookmark ever 404s.**
 | `brand` | `/client/:ws/strategy?tab=brand` | redirect map |
 | `roi` | `/client/:ws/value` (default view) | redirect map |
 | `plans` | `/client/:ws/value?tab=plan` | redirect map |
-| `approvals`/`requests`/`content`/`schema-review` (legacy) | existing Inbox alias machinery (`CLIENT_INBOX_ALIASES` in `src/routes.ts`) | keep as-is |
+| `approvals`/`requests`/`content`/`schema-review` (retired) | dashboard unknown-tab fallback | aliases removed 2026-06-14 |
 
 Implementation notes:
 
-- Extend the proven `CLIENT_INBOX_ALIASES` pattern into a general
-  `CLIENT_TAB_MIGRATIONS: Record<LegacyClientTab, { tab: ClientTab; search?: string }>` in
-  `src/routes.ts`, consumed by `clientPath()` and the resolver in
-  `src/lib/client-dashboard-tab.ts`. One table, one resolver, contract-tested.
+- Do not rebuild the retired top-level inbox alias table. If a future client route migration is
+  needed, add a fresh migration table with an explicit sunset window and tests rather than
+  reviving the removed route aliases.
 - The route-removal checklist (`docs/rules/route-removal-checklist.md`) governs `Page` changes —
   7 files per change. `ClientTab` changes touch their own fixed set (`src/routes.ts`,
   `src/lib/client-dashboard-tab.ts`, `clientDashboardNav.ts`, `ClientDashboard.tsx`, the deep-link

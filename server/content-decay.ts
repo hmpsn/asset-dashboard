@@ -12,62 +12,26 @@ import { callAI } from './ai.js';
 import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
 import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
 import type { Workspace } from './workspaces.js';
+import type { DecayingPage, DecayAnalysis } from '../shared/types/content-decay.js';
 import { createLogger } from './logger.js';
-import { parseJsonFallback } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
-import { normalizePageUrl, sanitizeQueryForPrompt } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
+import { sanitizeQueryForPrompt } from './utils/text.js';
 import type * as OutcomeTracking from './outcome-tracking.js';
 
 const log = createLogger('content-decay');
 
 // ── Types ──
-
-export interface DecayingPage {
-  page: string;           // URL path
-  title?: string;
-  currentClicks: number;
-  previousClicks: number;
-  clickDeclinePct: number;
-  currentImpressions: number;
-  previousImpressions: number;
-  impressionChangePct: number;
-  currentPosition: number;
-  previousPosition: number;
-  positionChange: number;
-  severity: 'critical' | 'warning' | 'watch';
-  refreshRecommendation?: string;
-  isRepeatDecay?: boolean;
-  priority?: string;
-}
-
-export interface DecayAnalysis {
-  workspaceId: string;
-  analyzedAt: string;
-  totalPages: number;
-  decayingPages: DecayingPage[];
-  summary: {
-    critical: number;
-    warning: number;
-    watch: number;
-    totalDecaying: number;
-    avgDeclinePct: number;
-  };
-}
+// DecayingPage / DecayAnalysis are the GET /api/content-decay/:wsId contract — single source of
+// truth now lives in shared/types/content-decay.ts (imported at the top of this file) so frontend
+// consumers import the same shape. Re-exported here to preserve every existing
+// `import { DecayingPage } from './content-decay.js'` consumer.
+export type { DecayingPage, DecayAnalysis };
+export { loadDecayAnalysis } from './content-decay-read-model.js';
 
 // ── SQLite row shape ──
 
-interface DecayRow {
-  workspace_id: string;
-  analyzed_at: string;
-  total_pages: number;
-  decaying_pages: string;
-  summary: string;
-}
-
 const stmts = createStmtCache(() => ({
-  select: db.prepare(
-    `SELECT * FROM decay_analyses WHERE workspace_id = ?`,
-  ),
   upsert: db.prepare(
     `INSERT INTO decay_analyses (workspace_id, analyzed_at, total_pages, decaying_pages, summary)
          VALUES (@workspace_id, @analyzed_at, @total_pages, @decaying_pages, @summary)
@@ -78,18 +42,6 @@ const stmts = createStmtCache(() => ({
 }));
 
 // ── Storage ──
-
-export function loadDecayAnalysis(workspaceId: string): DecayAnalysis | null {
-  const row = stmts().select.get(workspaceId) as DecayRow | undefined;
-  if (!row) return null;
-  return {
-    workspaceId: row.workspace_id,
-    analyzedAt: row.analyzed_at,
-    totalPages: row.total_pages,
-    decayingPages: parseJsonFallback(row.decaying_pages, []),
-    summary: parseJsonFallback(row.summary, { critical: 0, warning: 0, watch: 0, totalDecaying: 0, avgDeclinePct: 0 }),
-  };
-}
 
 function saveDecayAnalysis(analysis: DecayAnalysis): void {
   stmts().upsert.run({

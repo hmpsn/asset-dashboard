@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { post } from '../../api/client';
 import { filterWritableIds } from '../../hooks/admin/seoEditorFilters';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import {
   buildSeoApprovalItemsForPage,
   buildSeoApprovalItemsForSelection,
@@ -42,16 +43,12 @@ export function useSeoEditorApprovalWorkflow({
   toast,
   onApprovalBatchMutated,
 }: UseSeoEditorApprovalWorkflowArgs) {
-  const [approvalSelected, setApprovalSelected] = useState<Set<string>>(new Set());
+  const [approvalSelected, toggleApprovalSelect, setApprovalSelected] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [sendingApproval, setSendingApproval] = useState(false);
   const [approvalSent, setApprovalSent] = useState(false);
   const [approvalRefreshKey, setApprovalRefreshKey] = useState(0);
   const [sendingPage, setSendingPage] = useState<Set<string>>(new Set());
   const [sentPage, setSentPage] = useState<Set<string>>(new Set());
-
-  const toggleApprovalSelect = useCallback((pageId: string) => {
-    setApprovalSelected(prev => toggleStringSet(prev, pageId));
-  }, []);
 
   const selectAllForApproval = useCallback(() => {
     setApprovalSelected(prev => toggleSelectAllInSet(prev, filteredPageIds));

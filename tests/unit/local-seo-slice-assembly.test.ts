@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { LocalSeoSlice } from '../../shared/types/intelligence.js';
+import type { LocalSeoIntelligenceInputs } from '../../server/domains/local-seo/intelligence-read-model.js';
 
 // ── vi.mock declarations must come before any import that transitively loads
 //    the module under test (hoisting contract). ────────────────────────────────
@@ -14,17 +15,15 @@ vi.mock('../../server/feature-flags.js', () => ({
   isFeatureEnabled: vi.fn().mockReturnValue(true),
 }));
 
-// The local-seo.ts module is dynamically imported inside assembleLocalSeo.
-// We mock it so DB-heavy code doesn't run, while the feature-flag mock above
-// lets us flip "enabled" per test.
-vi.mock('../../server/local-seo.js', () => ({
-  listLocalSeoMarkets: vi.fn().mockReturnValue([]),
-  buildLocalSeoKeywordCandidates: vi.fn().mockReturnValue([]),
-  buildLocalSeoKeywordVisibilitySummaryByKey: vi.fn().mockReturnValue(new Map()),
-  listLatestLocalVisibilitySnapshots: vi.fn().mockReturnValue([]),
-  // P7.1 — the slice now also reads the service-gap + competitor-brand readers.
-  getLocalSeoServiceGaps: vi.fn().mockReturnValue([]),
-  getLocalSeoCompetitorBrands: vi.fn().mockReturnValue([]),
+vi.mock('../../server/domains/local-seo/intelligence-read-model.js', () => ({
+  loadLocalSeoIntelligenceInputs: vi.fn().mockResolvedValue({
+    markets: [],
+    candidates: [],
+    visibilityByKey: new Map(),
+    latestSnapshots: [],
+    serviceGaps: [],
+    competitorBrands: [],
+  }),
 }));
 
 vi.mock('../../server/client-locations.js', () => ({
@@ -33,12 +32,28 @@ vi.mock('../../server/client-locations.js', () => ({
 
 import { selectRelevantLocalCandidates, assembleLocalSeo } from '../../server/intelligence/local-seo-slice.js';
 import { isFeatureEnabled } from '../../server/feature-flags.js';
-import * as localSeoModule from '../../server/local-seo.js';
+import { loadLocalSeoIntelligenceInputs } from '../../server/domains/local-seo/intelligence-read-model.js';
 import * as clientLocationsModule from '../../server/client-locations.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 type Candidate = LocalSeoSlice['candidates'][number];
+
+function localSeoInputs(overrides: Partial<LocalSeoIntelligenceInputs> = {}): LocalSeoIntelligenceInputs {
+  return {
+    markets: [],
+    candidates: [],
+    visibilityByKey: new Map(),
+    latestSnapshots: [],
+    serviceGaps: [],
+    competitorBrands: [],
+    ...overrides,
+  };
+}
+
+function mockLocalSeoInputs(overrides: Partial<LocalSeoIntelligenceInputs> = {}): void {
+  vi.mocked(loadLocalSeoIntelligenceInputs).mockResolvedValue(localSeoInputs(overrides));
+}
 
 function makeCandidate(keyword: string, score: number, marketId?: string | null): Candidate {
   return {
@@ -334,29 +349,25 @@ describe('assembleLocalSeo — per-market stratified sampling (P7.0)', () => {
   afterEach(() => {
     vi.clearAllMocks();
     vi.mocked(isFeatureEnabled).mockReturnValue(true);
-    vi.mocked(localSeoModule.listLocalSeoMarkets).mockReturnValue([]);
-    vi.mocked(localSeoModule.buildLocalSeoKeywordCandidates).mockReturnValue([]);
-    vi.mocked(localSeoModule.buildLocalSeoKeywordVisibilitySummaryByKey).mockReturnValue(new Map());
-    vi.mocked(localSeoModule.listLatestLocalVisibilitySnapshots).mockReturnValue([]);
+    mockLocalSeoInputs();
     vi.mocked(clientLocationsModule.getClientLocations).mockReturnValue([]);
   });
 
   it('surfaces both markets in the prompt block even when one market dominates by score', async () => {
     vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(clientLocationsModule.getClientLocations).mockReturnValue([]);
-    vi.mocked(localSeoModule.listLocalSeoMarkets).mockReturnValue([
-      { id: 'market-austin', label: 'Austin, TX', status: 'active' as const, city: 'Austin', stateOrRegion: 'TX', country: 'US' } as any,
-      { id: 'market-houston', label: 'Houston, TX', status: 'active' as const, city: 'Houston', stateOrRegion: 'TX', country: 'US' } as any,
-    ]);
-    // Houston candidates all score higher than Austin's. With flat top-N and a
-    // small cap, Austin would be crowded out. Per-market stratification guarantees
-    // Austin coverage.
-    vi.mocked(localSeoModule.buildLocalSeoKeywordCandidates).mockReturnValue([
-      { keyword: 'dental implants houston', normalizedKeyword: 'dental implants houston', source: 'local_variant', sourceLabel: 'Local candidate', marketId: 'market-houston', score: 95, selected: false, reasons: [], intent: 'transactional' },
-      { keyword: 'emergency dentist houston', normalizedKeyword: 'emergency dentist houston', source: 'local_variant', sourceLabel: 'Local candidate', marketId: 'market-houston', score: 92, selected: false, reasons: [], intent: 'transactional' },
-      { keyword: 'dental implants austin', normalizedKeyword: 'dental implants austin', source: 'local_variant', sourceLabel: 'Local candidate', marketId: 'market-austin', score: 60, selected: false, reasons: [], intent: 'transactional' },
-      { keyword: 'emergency dentist austin', normalizedKeyword: 'emergency dentist austin', source: 'local_variant', sourceLabel: 'Local candidate', marketId: 'market-austin', score: 55, selected: false, reasons: [], intent: 'transactional' },
-    ] as any);
+    mockLocalSeoInputs({
+      markets: [
+        { id: 'market-austin', label: 'Austin, TX', status: 'active' as const, city: 'Austin', stateOrRegion: 'TX', country: 'US' } as any,
+        { id: 'market-houston', label: 'Houston, TX', status: 'active' as const, city: 'Houston', stateOrRegion: 'TX', country: 'US' } as any,
+      ],
+      candidates: [
+        { keyword: 'dental implants houston', normalizedKeyword: 'dental implants houston', source: 'local_variant', sourceLabel: 'Local candidate', marketId: 'market-houston', score: 95, selected: false, reasons: [], intent: 'transactional' },
+        { keyword: 'emergency dentist houston', normalizedKeyword: 'emergency dentist houston', source: 'local_variant', sourceLabel: 'Local candidate', marketId: 'market-houston', score: 92, selected: false, reasons: [], intent: 'transactional' },
+        { keyword: 'dental implants austin', normalizedKeyword: 'dental implants austin', source: 'local_variant', sourceLabel: 'Local candidate', marketId: 'market-austin', score: 60, selected: false, reasons: [], intent: 'transactional' },
+        { keyword: 'emergency dentist austin', normalizedKeyword: 'emergency dentist austin', source: 'local_variant', sourceLabel: 'Local candidate', marketId: 'market-austin', score: 55, selected: false, reasons: [], intent: 'transactional' },
+      ] as any,
+    });
 
     const result = await assembleLocalSeo('ws-stratified');
     const block = result.effectiveLocalSeoBlock;
@@ -378,14 +389,14 @@ describe('assembleLocalSeo — per-market stratified sampling (P7.0)', () => {
   it('single-market workspace with >8 market-scoped candidates surfaces >8 (not capped at per-market 8)', async () => {
     vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(clientLocationsModule.getClientLocations).mockReturnValue([]);
-    vi.mocked(localSeoModule.listLocalSeoMarkets).mockReturnValue([
-      { id: 'market-austin', label: 'Austin, TX', status: 'active' as const, city: 'Austin', stateOrRegion: 'TX', country: 'US' } as any,
-    ]);
     // 12 market-scoped candidates for the single active market — more than the
     // per-market cap of 8, fewer than the total cap of 50.
     const candidateCount = 12;
-    vi.mocked(localSeoModule.buildLocalSeoKeywordCandidates).mockReturnValue(
-      Array.from({ length: candidateCount }, (_, i) => ({
+    mockLocalSeoInputs({
+      markets: [
+        { id: 'market-austin', label: 'Austin, TX', status: 'active' as const, city: 'Austin', stateOrRegion: 'TX', country: 'US' } as any,
+      ],
+      candidates: Array.from({ length: candidateCount }, (_, i) => ({
         keyword: `austin candidate ${i}`,
         normalizedKeyword: `austin candidate ${i}`,
         source: 'local_variant',
@@ -396,7 +407,7 @@ describe('assembleLocalSeo — per-market stratified sampling (P7.0)', () => {
         reasons: [],
         intent: 'transactional',
       })) as any,
-    );
+    });
 
     const result = await assembleLocalSeo('ws-single-market-many');
     const block = result.effectiveLocalSeoBlock;
@@ -419,10 +430,7 @@ describe('assembleLocalSeo', () => {
     vi.clearAllMocks();
     // Restore default mock state.
     vi.mocked(isFeatureEnabled).mockReturnValue(true);
-    vi.mocked(localSeoModule.listLocalSeoMarkets).mockReturnValue([]);
-    vi.mocked(localSeoModule.buildLocalSeoKeywordCandidates).mockReturnValue([]);
-    vi.mocked(localSeoModule.buildLocalSeoKeywordVisibilitySummaryByKey).mockReturnValue(new Map());
-    vi.mocked(localSeoModule.listLatestLocalVisibilitySnapshots).mockReturnValue([]);
+    mockLocalSeoInputs();
     vi.mocked(clientLocationsModule.getClientLocations).mockReturnValue([]);
   });
 
@@ -443,7 +451,7 @@ describe('assembleLocalSeo', () => {
     ]);
 
     // No markets configured
-    vi.mocked(localSeoModule.listLocalSeoMarkets).mockReturnValue([]);
+    mockLocalSeoInputs();
 
     const result = await assembleLocalSeo('ws-no-markets');
 
@@ -462,7 +470,7 @@ describe('assembleLocalSeo', () => {
       { id: 'loc-confirmed', workspaceId: 'ws-loc', name: 'Confirmed Branch', isPrimary: false, status: 'confirmed' } as any,
       { id: 'loc-pending', workspaceId: 'ws-loc', name: 'Pending Branch', isPrimary: false, status: 'needs_review' } as any,
     ]);
-    vi.mocked(localSeoModule.listLocalSeoMarkets).mockReturnValue([]);
+    mockLocalSeoInputs();
 
     const result = await assembleLocalSeo('ws-loc-filter');
 
@@ -491,7 +499,7 @@ describe('assembleLocalSeo', () => {
   it('returns baseline when listLocalSeoMarkets throws — no re-throw', async () => {
     vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(clientLocationsModule.getClientLocations).mockReturnValue([]);
-    vi.mocked(localSeoModule.listLocalSeoMarkets).mockImplementation(() => {
+    vi.mocked(loadLocalSeoIntelligenceInputs).mockImplementation(async () => {
       throw new Error('Market table missing');
     });
 
@@ -504,100 +512,101 @@ describe('assembleLocalSeo', () => {
   it('counts notChecked per active market and dedupes duplicate market visibility entries', async () => {
     vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(clientLocationsModule.getClientLocations).mockReturnValue([]);
-    vi.mocked(localSeoModule.listLocalSeoMarkets).mockReturnValue([
-      {
-        id: 'market-austin',
-        label: 'Austin, TX',
-        status: 'active' as const,
-        city: 'Austin',
-        stateOrRegion: 'TX',
-        country: 'US',
-      } as any,
-      {
-        id: 'market-dallas',
-        label: 'Dallas, TX',
-        status: 'active' as const,
-        city: 'Dallas',
-        stateOrRegion: 'TX',
-        country: 'US',
-      } as any,
-    ]);
-    vi.mocked(localSeoModule.buildLocalSeoKeywordCandidates).mockReturnValue([
-      {
-        keyword: 'dentist austin',
-        normalizedKeyword: 'dentist austin',
-        source: 'local_variant',
-        sourceLabel: 'Local Variant',
-        score: 90,
-        selected: false,
-        reasons: [],
-      },
-      {
-        keyword: 'emergency dentist',
-        normalizedKeyword: 'emergency dentist',
-        source: 'strategy',
-        sourceLabel: 'Strategy',
-        score: 75,
-        selected: false,
-        reasons: [],
-      },
-    ]);
-    vi.mocked(localSeoModule.buildLocalSeoKeywordVisibilitySummaryByKey).mockReturnValue(new Map([
-      ['dentist austin', {
-        keyword: 'dentist austin',
-        normalizedKeyword: 'dentist austin',
-        marketId: 'market-austin',
-        marketLabel: 'Austin, TX',
-        capturedAt: '2026-05-26T00:00:00.000Z',
-        posture: 'visible',
-        label: 'Visible #1',
-        detail: 'Visible',
-        localPackPresent: true,
-        businessFound: true,
-        businessMatchConfidence: 'verified',
-        sourceEndpoint: 'google_organic_serp',
-        provider: 'dataforseo',
-        marketCount: 2,
-        visibleMarketCount: 1,
-        possibleMatchMarketCount: 1,
-        localPackOnlyMarketCount: 0,
-        notVisibleMarketCount: 0,
-        degradedMarketCount: 0,
-        markets: [
-          {
-            keyword: 'dentist austin',
-            normalizedKeyword: 'dentist austin',
-            marketId: 'market-austin',
-            marketLabel: 'Austin, TX',
-            capturedAt: '2026-05-26T00:00:00.000Z',
-            posture: 'possible_match',
-            label: 'Possible',
-            detail: 'Possible',
-            localPackPresent: true,
-            businessFound: true,
-            businessMatchConfidence: 'possible_match',
-            sourceEndpoint: 'google_organic_serp',
-            provider: 'dataforseo',
-          },
-          {
-            keyword: 'dentist austin',
-            normalizedKeyword: 'dentist austin',
-            marketId: 'market-austin',
-            marketLabel: 'Austin, TX',
-            capturedAt: '2026-05-26T00:00:00.000Z',
-            posture: 'visible',
-            label: 'Visible #1',
-            detail: 'Visible',
-            localPackPresent: true,
-            businessFound: true,
-            businessMatchConfidence: 'verified',
-            sourceEndpoint: 'google_organic_serp',
-            provider: 'dataforseo',
-          },
-        ],
-      } as any],
-    ]));
-    vi.mocked(localSeoModule.listLatestLocalVisibilitySnapshots).mockReturnValue([]);
+    mockLocalSeoInputs({
+      markets: [
+        {
+          id: 'market-austin',
+          label: 'Austin, TX',
+          status: 'active' as const,
+          city: 'Austin',
+          stateOrRegion: 'TX',
+          country: 'US',
+        } as any,
+        {
+          id: 'market-dallas',
+          label: 'Dallas, TX',
+          status: 'active' as const,
+          city: 'Dallas',
+          stateOrRegion: 'TX',
+          country: 'US',
+        } as any,
+      ],
+      candidates: [
+        {
+          keyword: 'dentist austin',
+          normalizedKeyword: 'dentist austin',
+          source: 'local_variant',
+          sourceLabel: 'Local Variant',
+          score: 90,
+          selected: false,
+          reasons: [],
+        },
+        {
+          keyword: 'emergency dentist',
+          normalizedKeyword: 'emergency dentist',
+          source: 'strategy',
+          sourceLabel: 'Strategy',
+          score: 75,
+          selected: false,
+          reasons: [],
+        },
+      ] as any,
+      visibilityByKey: new Map([
+        ['dentist austin', {
+          keyword: 'dentist austin',
+          normalizedKeyword: 'dentist austin',
+          marketId: 'market-austin',
+          marketLabel: 'Austin, TX',
+          capturedAt: '2026-05-26T00:00:00.000Z',
+          posture: 'visible',
+          label: 'Visible #1',
+          detail: 'Visible',
+          localPackPresent: true,
+          businessFound: true,
+          businessMatchConfidence: 'verified',
+          sourceEndpoint: 'google_organic_serp',
+          provider: 'dataforseo',
+          marketCount: 2,
+          visibleMarketCount: 1,
+          possibleMatchMarketCount: 1,
+          localPackOnlyMarketCount: 0,
+          notVisibleMarketCount: 0,
+          degradedMarketCount: 0,
+          markets: [
+            {
+              keyword: 'dentist austin',
+              normalizedKeyword: 'dentist austin',
+              marketId: 'market-austin',
+              marketLabel: 'Austin, TX',
+              capturedAt: '2026-05-26T00:00:00.000Z',
+              posture: 'possible_match',
+              label: 'Possible',
+              detail: 'Possible',
+              localPackPresent: true,
+              businessFound: true,
+              businessMatchConfidence: 'possible_match',
+              sourceEndpoint: 'google_organic_serp',
+              provider: 'dataforseo',
+            },
+            {
+              keyword: 'dentist austin',
+              normalizedKeyword: 'dentist austin',
+              marketId: 'market-austin',
+              marketLabel: 'Austin, TX',
+              capturedAt: '2026-05-26T00:00:00.000Z',
+              posture: 'visible',
+              label: 'Visible #1',
+              detail: 'Visible',
+              localPackPresent: true,
+              businessFound: true,
+              businessMatchConfidence: 'verified',
+              sourceEndpoint: 'google_organic_serp',
+              provider: 'dataforseo',
+            },
+          ],
+        } as any],
+      ]),
+    });
 
     const result = await assembleLocalSeo('ws-local-coverage');
 
@@ -611,35 +620,35 @@ describe('assembleLocalSeo', () => {
   it('assembles a full slice when markets and candidates are present', async () => {
     vi.mocked(isFeatureEnabled).mockReturnValue(true);
     vi.mocked(clientLocationsModule.getClientLocations).mockReturnValue([]);
-    vi.mocked(localSeoModule.listLocalSeoMarkets).mockReturnValue([
-      {
-        id: 'market-1',
-        label: 'Austin, TX',
-        status: 'active' as const,
-        city: 'Austin',
-        stateOrRegion: 'TX',
-        country: 'US',
-        providerLocationCode: 1026201,
-        workspaceId: 'ws-full',
-        posture: 'local' as const,
-        deviceMix: ['desktop', 'mobile'] as const,
-        languageCode: 'en',
-        updatedAt: '2026-01-01T00:00:00Z',
-      },
-    ]);
-    vi.mocked(localSeoModule.buildLocalSeoKeywordCandidates).mockReturnValue([
-      {
-        keyword: 'dentist austin',
-        normalizedKeyword: 'dentist austin',
-        source: 'local_variant',
-        sourceLabel: 'Local Variant',
-        score: 75,
-        selected: false,
-        reasons: [],
-      },
-    ]);
-    vi.mocked(localSeoModule.buildLocalSeoKeywordVisibilitySummaryByKey).mockReturnValue(new Map());
-    vi.mocked(localSeoModule.listLatestLocalVisibilitySnapshots).mockReturnValue([]);
+    mockLocalSeoInputs({
+      markets: [
+        {
+          id: 'market-1',
+          label: 'Austin, TX',
+          status: 'active' as const,
+          city: 'Austin',
+          stateOrRegion: 'TX',
+          country: 'US',
+          providerLocationCode: 1026201,
+          workspaceId: 'ws-full',
+          posture: 'local' as const,
+          deviceMix: ['desktop', 'mobile'] as const,
+          languageCode: 'en',
+          updatedAt: '2026-01-01T00:00:00Z',
+        },
+      ] as any,
+      candidates: [
+        {
+          keyword: 'dentist austin',
+          normalizedKeyword: 'dentist austin',
+          source: 'local_variant',
+          sourceLabel: 'Local Variant',
+          score: 75,
+          selected: false,
+          reasons: [],
+        },
+      ] as any,
+    });
 
     const result = await assembleLocalSeo('ws-full');
 

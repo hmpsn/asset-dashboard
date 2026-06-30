@@ -5,6 +5,7 @@ on:
     branches: [main, staging]
   pull_request:
     branches: [main, staging]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -18,6 +19,7 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: read
     outputs:
       quality: ${{ steps.filter.outputs.quality }}
@@ -71,6 +73,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.quality == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v5
         with:
@@ -90,7 +95,27 @@ jobs:
           node-version: 24
           cache: npm
 
+      # Cache the fully-installed node_modules (including the compiled
+      # better-sqlite3 / sharp native binaries) keyed on the exact lockfile.
+      # setup-node's `cache: npm` only restores the download cache (~/.npm) —
+      # npm ci still rebuilds node_modules from scratch every run. Skipping that
+      # rebuild on a hit is the single biggest CI-time lever here because the
+      # install cost is paid by every parallel job (quality + 7 test lanes).
+      # The key pins OS+arch+node-major so a restored tree can never carry
+      # native binaries built for a different platform; bump the v1 token to
+      # force a rebuild if a runner-image change ever breaks native ABI compat.
+      - name: Cache node_modules
+        id: node-modules-cache
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-v1-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('package-lock.json') }}
+
+      # Only reinstall on a cache miss. On a hit, node_modules is already the
+      # exact tree for this lockfile, so npm ci would be wasted work. HUSKY=0
+      # (job env) makes the skipped `prepare` script a no-op either way.
       - name: Install dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       # Use the npm script, which invokes `tsc -b --noEmit` (project-aware).
@@ -105,6 +130,21 @@ jobs:
 
       - name: PR checks
         run: npm run pr-check
+
+      - name: Circular dependency ratchet
+        run: npm run check:circular-deps
+
+      - name: Feature flag lifecycle checks
+        run: npm run verify:feature-flags
+
+      - name: Verification governance checks
+        run: npm run verify:governance
+
+      # Hard correctness gate: a conditionally-called React hook crashes the component at runtime
+      # ("Rendered more hooks than during the previous render"). eslint has the rule but was never run
+      # in CI; this focused config enforces ONLY react-hooks/rules-of-hooks (no exhaustive-deps noise).
+      - name: Rules-of-Hooks lint
+        run: npm run lint:hooks
 
       - name: Style drift checks
         run: npm run verify:style-drift
@@ -168,7 +208,10 @@ jobs:
   # Keep PR feedback aligned with Vitest's real project boundaries.
   # The prior mixed 6-way shard pool consistently left one hot lane around
   # 188-195s at the job level, so we split the heaviest projects directly:
-  # integration gets 3 lanes, unit gets 2, and component/contract stay discrete.
+  # integration gets 3 lanes, unit and component get 2 each, contract stays discrete.
+  # Component is the heaviest jsdom project (~300 files) and was being OOM-killed as a
+  # single un-sharded process (killed mid-run, no assertion) — sharding it ×2 halves the
+  # per-process memory accumulation, the same way unit/integration are split.
   test-lane:
     name: pr-test (${{ matrix.lane.name }})
     needs: changes
@@ -177,8 +220,10 @@ jobs:
       fail-fast: false
       matrix:
         lane:
-          - name: component
-            command: npm run test:component -- --reporter=dot
+          - name: component (1/2)
+            command: npm run test:component -- --reporter=dot --shard=1/2
+          - name: component (2/2)
+            command: npm run test:component -- --reporter=dot --shard=2/2
           - name: contract
             command: npm run test:contract -- --reporter=dot
           - name: unit (1/2)
@@ -200,14 +245,34 @@ jobs:
           node-version: 24
           cache: npm
 
+      # Cache the fully-installed node_modules (including the compiled
+      # better-sqlite3 / sharp native binaries) keyed on the exact lockfile.
+      # setup-node's `cache: npm` only restores the download cache (~/.npm) —
+      # npm ci still rebuilds node_modules from scratch every run. Skipping that
+      # rebuild on a hit is the single biggest CI-time lever here because the
+      # install cost is paid by every parallel job (quality + 7 test lanes).
+      # The key pins OS+arch+node-major so a restored tree can never carry
+      # native binaries built for a different platform; bump the v1 token to
+      # force a rebuild if a runner-image change ever breaks native ABI compat.
+      - name: Cache node_modules
+        id: node-modules-cache
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-v1-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('package-lock.json') }}
+
+      # Only reinstall on a cache miss. On a hit, node_modules is already the
+      # exact tree for this lockfile, so npm ci would be wasted work. HUSKY=0
+      # (job env) makes the skipped `prepare` script a no-op either way.
       - name: Install dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Run tests (${{ matrix.lane.name }})
         run: ${{ matrix.lane.command }}
 
   test:
-    if: always() && github.event_name == 'pull_request'
+    if: ${{ always() && !cancelled() && github.event_name == 'pull_request' }}
     needs: [changes, test-lane]
     runs-on: ubuntu-latest
     steps:
@@ -225,7 +290,11 @@ jobs:
 
   coverage:
     needs: changes
-    if: github.event_name == 'push' && needs.changes.outputs.coverage == 'true'
+    # Full-suite coverage takes ~20 minutes and is intentionally not part of
+    # automatic PR, staging, or main push CI. Run this workflow manually before
+    # a release when a fresh ratchet summary is needed; normal merges stay
+    # covered by fast quality gates plus PR test lanes.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -235,7 +304,27 @@ jobs:
           node-version: 24
           cache: npm
 
+      # Cache the fully-installed node_modules (including the compiled
+      # better-sqlite3 / sharp native binaries) keyed on the exact lockfile.
+      # setup-node's `cache: npm` only restores the download cache (~/.npm) —
+      # npm ci still rebuilds node_modules from scratch every run. Skipping that
+      # rebuild on a hit is the single biggest CI-time lever here because the
+      # install cost is paid by every parallel job (quality + 7 test lanes).
+      # The key pins OS+arch+node-major so a restored tree can never carry
+      # native binaries built for a different platform; bump the v1 token to
+      # force a rebuild if a runner-image change ever breaks native ABI compat.
+      - name: Cache node_modules
+        id: node-modules-cache
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-v1-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('package-lock.json') }}
+
+      # Only reinstall on a cache miss. On a hit, node_modules is already the
+      # exact tree for this lockfile, so npm ci would be wasted work. HUSKY=0
+      # (job env) makes the skipped `prepare` script a no-op either way.
       - name: Install dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Run tests with coverage
@@ -246,7 +335,7 @@ jobs:
 
       - name: Upload coverage artifacts
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-artifacts
           path: |
@@ -255,13 +344,14 @@ jobs:
           retention-days: 14
 
   check:
-    if: always()
+    if: ${{ always() && !cancelled() }}
     needs: [changes, quality, test, coverage]
     runs-on: ubuntu-latest
     steps:
       - name: Verify required CI jobs passed
         env:
           EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
           QUALITY_NEEDED: ${{ needs.changes.outputs.quality }}
           TEST_NEEDED: ${{ needs.changes.outputs.test }}
           COVERAGE_NEEDED: ${{ needs.changes.outputs.coverage }}
@@ -272,6 +362,7 @@ jobs:
           echo "quality needed:  $QUALITY_NEEDED"
           echo "test needed:     $TEST_NEEDED"
           echo "coverage needed: $COVERAGE_NEEDED"
+          echo "ref:      $REF_NAME"
           echo "quality:  $QUALITY_RESULT"
           echo "test:     $TEST_RESULT"
           echo "coverage: $COVERAGE_RESULT"
@@ -286,7 +377,4 @@ jobs:
             exit 1
           fi
 
-          if [[ "$EVENT_NAME" == "push" && "$COVERAGE_NEEDED" == "true" && "$COVERAGE_RESULT" != "success" ]]; then
-            echo "::error::coverage job failed"
-            exit 1
-          fi
+          echo "coverage is manual-only; failed manual coverage runs fail via the coverage job itself"

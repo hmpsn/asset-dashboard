@@ -1,7 +1,7 @@
-import { buildSchemaContext } from './helpers.js';
+import { buildSchemaContext } from './schema/context-builder.js';
 import { getCachedArchitecture } from './site-architecture.js';
 import { getValidation } from './schema-validator.js';
-import type { SchemaContext } from './schema-suggester.js';
+import type { SchemaContext } from './schema/suggestion-types.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 

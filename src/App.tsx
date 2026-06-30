@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { lazyWithRetry } from './lib/lazyWithRetry';
 import { postForm } from './api/client';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, useParams } from 'react-router-dom';
-import { type Page, adminPath, clientPath, GLOBAL_TABS, isClientInboxAlias } from './routes';
+import { type Page, adminPath, clientPath, GLOBAL_TABS, resolveClientInboxRouteAlias } from './routes';
 import { StatusBar } from './components/StatusBar';
 import { LoginScreen } from './components/LoginScreen';
 import { MobileGuard } from './components/MobileGuard';
@@ -22,6 +22,7 @@ import { Breadcrumbs } from './components/layout/Breadcrumbs';
 import { ScannerReveal } from './components/ui/ScannerReveal';
 import { TabBar } from './components/ui/TabBar';
 import { Clipboard, Globe } from 'lucide-react';
+import type { FixContext } from './types/fix-context';
 
 // ── Lazy-loaded route-level chunks ──
 const ClientDashboard = lazyWithRetry(() => import('./components/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
@@ -46,6 +47,8 @@ const WorkspaceHome = lazyWithRetry(() => import('./components/WorkspaceHome').t
 const SeoEditorWrapper = lazyWithRetry(() => import('./components/SeoEditorWrapper').then(m => ({ default: m.SeoEditorWrapper })));
 const KeywordStrategyPanel = lazyWithRetry(() => import('./components/KeywordStrategy').then(m => ({ default: m.KeywordStrategyPanel })));
 const KeywordHub = lazyWithRetry(() => import('./components/KeywordHub').then(m => ({ default: m.KeywordHub })));
+const LocalPresencePage = lazyWithRetry(() => import('./components/local-seo/LocalPresencePage').then(m => ({ default: m.LocalPresencePage })));
+const CompetitorsPage = lazyWithRetry(() => import('./components/competitors/CompetitorsPage').then(m => ({ default: m.CompetitorsPage })));
 const PageIntelligence = lazyWithRetry(() => import('./components/PageIntelligence').then(m => ({ default: m.PageIntelligence })));
 const SchemaSuggester = lazyWithRetry(() => import('./components/SchemaSuggester').then(m => ({ default: m.SchemaSuggester })));
 const ContentPerformance = lazyWithRetry(() => import('./components/ContentPerformance').then(m => ({ default: m.ContentPerformance })));
@@ -74,44 +77,26 @@ function StyleguideRedirect() {
   return null;
 }
 
-export interface FixContext {
-  /** Which admin route this fixContext is intended for (e.g. 'content-pipeline', 'seo-editor').
-   *  REQUIRED — components check this before reacting. Without it, stale fixContext from one
-   *  tab leaks into another. Making this required ensures TypeScript catches missing values
-   *  at every navigation call site. */
-  targetRoute: string;
-  pageId?: string;
-  pageSlug?: string;
-  pageName?: string;
-  issueCheck?: string;
-  issueMessage?: string;
-  // Brief generation context from Page Intelligence / Content Gaps
-  primaryKeyword?: string;
-  searchIntent?: string;
-  optimizationScore?: number;
-  optimizationIssues?: string[];
-  recommendations?: string[];
-  contentGaps?: string[];
-  autoGenerate?: boolean;
-  /** Suggested page type from content gaps (e.g. 'blog', 'service', 'landing'). */
-  pageType?: string;
-}
-
 /** Client routes with backward-compat redirect: /client/:id?tab=X → /client/:id/X */
 function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
   const params = useParams<{ workspaceId: string; '*': string }>();
   const [searchParams] = useSearchParams();
   const workspaceId = params.workspaceId!;
   const splatTab = params['*'] || undefined;
-  const splatRoot = splatTab?.split('/')[0];
+  const splatTabId = splatTab?.split('/')[0];
+  const legacyInboxFilter = resolveClientInboxRouteAlias(splatTabId);
+  if (legacyInboxFilter && workspaceId) {
+    const remaining = new URLSearchParams(searchParams);
+    remaining.delete('tab');
+    const qs = remaining.toString();
+    const target = clientPath(workspaceId, splatTabId, betaMode);
+    return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
+  }
   // Backward-compat: redirect old `/client/:id?tab=X` URLs to path-based
   // `/client/:id/X`. ONLY fires when the splat is empty — when a tab path is
-  // already present (e.g. `/client/:id/inbox?tab=approvals`), `?tab=X` is a
+  // already present (e.g. `/client/:id/inbox?tab=reviews`), `?tab=X` is a
   // filter param for the inner page (e.g. <InboxTab>'s useSearchParams
-  // reader), NOT the tab name. Without this guard, `<ActionQueueStrip>`
-  // chips that deep-link to `/inbox?tab=approvals` get rewritten to
-  // `/approvals` (which renders nothing — see ClientDashboard.tsx tab
-  // dispatch) — silent navigation bug that would only manifest at click time.
+  // reader), NOT the tab name.
   const queryTab = searchParams.get('tab');
   if (queryTab && workspaceId && !splatTab) {
     const remaining = new URLSearchParams(searchParams);
@@ -120,33 +105,21 @@ function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
     const target = clientPath(workspaceId, queryTab, betaMode);
     return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
   }
-  if (workspaceId && isClientInboxAlias(splatRoot)) {
-    const remaining = new URLSearchParams(searchParams);
-    remaining.delete('tab');
-    const qs = remaining.toString();
-    const target = clientPath(workspaceId, splatRoot, betaMode);
-    return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
-  }
-  if (workspaceId && splatRoot === 'schema-review') {
-    const remaining = new URLSearchParams(searchParams);
-    remaining.delete('tab');
-    const qs = remaining.toString();
-    const target = clientPath(workspaceId, 'schema-review', betaMode);
-    return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
-  }
   return <ClientDashboard workspaceId={workspaceId} initialTab={splatTab} betaMode={betaMode} />;
 }
 
 function ClientRouteShell({ betaMode = false }: { betaMode?: boolean }) {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   return (
-    <BackgroundTaskProvider workspaceId={workspaceId} publicMode>
-      <MobileGuard>
-        <Suspense fallback={<ChunkFallback />}>
-          <ClientRoutes betaMode={betaMode} />
-        </Suspense>
-      </MobileGuard>
-    </BackgroundTaskProvider>
+    <ToastProvider durationMs={5000} placement="bottom-center" mode="single" variant="client">
+      <BackgroundTaskProvider workspaceId={workspaceId} publicMode>
+        <MobileGuard>
+          <Suspense fallback={<ChunkFallback />}>
+            <ClientRoutes betaMode={betaMode} />
+          </Suspense>
+        </MobileGuard>
+      </BackgroundTaskProvider>
+    </ToastProvider>
   );
 }
 
@@ -384,7 +357,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     : queue;
 
   // ── Content renderer ──
-  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-keywords', 'seo-schema', 'seo-briefs', 'content-perf', 'content', 'subscriptions', 'brand', 'content-pipeline']);
+  const SEO_TABS = new Set<Page>(['seo-audit', 'seo-editor', 'links', 'seo-strategy', 'seo-keywords', 'local-seo', 'seo-schema', 'seo-briefs', 'content-perf', 'content', 'subscriptions', 'brand', 'content-pipeline']);
   const needsSite = !!(SEO_TABS.has(tab) || tab === 'analytics-hub' || tab === 'performance');
   const renderContent = () => {
     if (tab === 'settings') return <SettingsPanel />;
@@ -425,6 +398,10 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     if (tab === 'seo-editor') return <SeoEditorWrapper key={`editor-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} />;
     if (tab === 'seo-strategy') return <KeywordStrategyPanel key={`strategy-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} />;
     if (tab === 'seo-keywords') return <KeywordHub key={`hub-${selected.id}`} workspaceId={selected.id} />;
+    if (tab === 'local-seo') return <LocalPresencePage key={`local-presence-${selected.id}`} workspaceId={selected.id} />;
+    // The Issue Phase 6 — dedicated Competitors page. NON_REGISTRY (no global nav); reachable by URL,
+    // entered via a flag-ON deep-link from The Issue cockpit.
+    if (tab === 'competitors') return <CompetitorsPage key={`competitors-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'page-intelligence') return <PageIntelligence key={`pageintel-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId!} fixContext={fixContext} />;
     if (tab === 'links') return <LinksPanel key={`links-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
     if (tab === 'seo-schema') return <SchemaSuggester key={`schema-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} fixContext={fixContext} businessProfile={selected.businessProfile} intelligenceProfile={selected.intelligenceProfile} />;

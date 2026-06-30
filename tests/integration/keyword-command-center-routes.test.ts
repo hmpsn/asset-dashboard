@@ -8,7 +8,13 @@ import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { updateTrackedKeywords } from '../../server/rank-tracking.js';
 import { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS, type TrackedKeyword } from '../../shared/types/rank-tracking.js';
-import type { KeywordCommandCenterRow } from '../../shared/types/keyword-command-center.js';
+import type {
+  KeywordCommandCenterInitialViewResponse,
+  KeywordCommandCenterRow,
+  KeywordCommandCenterRowsResponse,
+  KeywordCommandCenterSummaryResponse,
+} from '../../shared/types/keyword-command-center.js';
+import { KEYWORD_COMMAND_CENTER_FILTERS } from '../../shared/types/keyword-command-center.js';
 
 const ctx = createEphemeralTestContext(import.meta.url);
 const { api, postJson } = ctx;
@@ -39,7 +45,7 @@ describe('Keyword Command Center routes', () => {
 
     const summary = await api(`/api/webflow/keyword-command-center/${workspaceId}/summary`);
     expect(summary.status).toBe(200);
-    const summaryBody = await summary.json();
+    const summaryBody = await summary.json() as KeywordCommandCenterSummaryResponse;
     expect(summaryBody).toEqual(expect.objectContaining({
       counts: expect.objectContaining({ total: expect.any(Number) }),
       filters: expect.any(Array),
@@ -49,7 +55,7 @@ describe('Keyword Command Center routes', () => {
 
     const rows = await api(`/api/webflow/keyword-command-center/${workspaceId}/rows?search=split&page=1&pageSize=2`);
     expect(rows.status).toBe(200);
-    const rowsBody = await rows.json();
+    const rowsBody = await rows.json() as KeywordCommandCenterRowsResponse;
     expect(rowsBody.pageInfo).toEqual(expect.objectContaining({
       page: 1,
       pageSize: 2,
@@ -65,6 +71,23 @@ describe('Keyword Command Center routes', () => {
     await expect(detail.json()).resolves.toEqual(expect.objectContaining({
       row: expect.objectContaining({ normalizedKeyword: 'split route keyword' }),
     }));
+
+    const initial = await api(`/api/webflow/keyword-command-center/${workspaceId}/initial?search=split&page=1&pageSize=2`);
+    expect(initial.status).toBe(200);
+    const initialBody = await initial.json() as KeywordCommandCenterInitialViewResponse;
+    const stripSummary = (body: KeywordCommandCenterSummaryResponse) => ({ ...body, summarizedAt: '' });
+    expect(stripSummary(initialBody.summary)).toEqual(stripSummary(summaryBody));
+    expect(initialBody.rows).toEqual(rowsBody);
+  });
+
+  it('GET initial rejects local_candidates so first paint stays on the skinny read path', async () => {
+    const res = await api(
+      `/api/webflow/keyword-command-center/${workspaceId}/initial?filter=${KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES}`,
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: 'Initial Keyword Hub read does not support local_candidates',
+    });
   });
 
   it('POST track activates a keyword and protected lifecycle actions require explicit confirmation', async () => {
@@ -280,14 +303,15 @@ describe('discovered_queries integration', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Phase 1 Task 1.5 — value-first opportunity sort (flag-gated). The flag is set
-// via the admin HTTP route so the server PROCESS's in-memory flag cache is
-// invalidated immediately (a direct in-process setWorkspaceFlagOverride would
-// not invalidate the spawned server's cache for ~10s). Seeding is via direct DB
-// writes the server reads fresh on each /rows request.
+// Value-first opportunity sort — now UNCONDITIONAL (the keyword-value-scoring flag
+// was retired in SEO Decision Engine P1). This exercises the full row-side pipeline
+// finalizeDraftRow → rowValueScore WeakMap → ROW_SORT_ACCESSORS.opportunity → the
+// real /rows HTTP response. The candidate-comparator unit test hand-sets valueScore
+// and never materializes a row, so this is the only coverage that fails if the
+// row-side opportunity accessor regresses (e.g. WeakMap read returns undefined).
 // ---------------------------------------------------------------------------
 
-describe('Keyword Command Center — value-first opportunity sort (flag-gated)', () => {
+describe('Keyword Command Center — value-first opportunity sort', () => {
   let wsId = '';
 
   function tracked(query: string, extra: Partial<TrackedKeyword>): TrackedKeyword {
@@ -301,15 +325,6 @@ describe('Keyword Command Center — value-first opportunity sort (flag-gated)',
     };
   }
 
-  async function setFlag(enabled: boolean | null): Promise<void> {
-    const res = await api(`/api/admin/workspaces/${wsId}/feature-flags/keyword-value-scoring`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled }),
-    });
-    expect(res.status).toBe(200);
-  }
-
   async function rowOrder(): Promise<string[]> {
     const res = await api(`/api/webflow/keyword-command-center/${wsId}/rows?sort=opportunity&direction=desc&pageSize=50`);
     expect(res.status).toBe(200);
@@ -319,9 +334,9 @@ describe('Keyword Command Center — value-first opportunity sort (flag-gated)',
 
   beforeEach(() => {
     wsId = createWorkspace(`Value Scoring Test ${Date.now()}`).id;
-    // A high-volume INFORMATIONAL national query vs a modest TRANSACTIONAL query
-    // with real CPC. Volume-weighted opportunity (flag OFF) leads with bad-breath;
-    // value-first (flag ON) leads with the transactional+CPC keyword.
+    // A high-volume INFORMATIONAL national query vs a modest TRANSACTIONAL query with
+    // real CPC. Value-first opportunity leads with the transactional+CPC keyword
+    // despite its far lower volume — it must NOT collapse to volume-weighting.
     updateTrackedKeywords(wsId, () => [
       tracked('what causes bad breath', { volume: 22000, difficulty: 40, intent: 'informational' }),
       tracked('teeth cleaning service', { volume: 480, difficulty: 30, cpc: 6, intent: 'transactional' }),
@@ -333,14 +348,7 @@ describe('Keyword Command Center — value-first opportunity sort (flag-gated)',
     wsId = '';
   });
 
-  it('flag OFF: opportunity sort is volume-weighted (informational high-volume leads)', async () => {
-    await setFlag(false);
-    const order = await rowOrder();
-    expect(order.indexOf('what causes bad breath')).toBeLessThan(order.indexOf('teeth cleaning service'));
-  });
-
-  it('flag ON: opportunity sort is value-first (transactional + CPC leads despite far lower volume)', async () => {
-    await setFlag(true);
+  it('opportunity sort is value-first through the real /rows route (transactional + CPC leads despite far lower volume)', async () => {
     const order = await rowOrder();
     expect(order.indexOf('teeth cleaning service')).toBeLessThan(order.indexOf('what causes bad breath'));
   });

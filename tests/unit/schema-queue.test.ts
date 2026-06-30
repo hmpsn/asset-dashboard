@@ -45,8 +45,11 @@ vi.mock('../../server/logger.js', () => ({
   }),
 }));
 
-vi.mock('../../server/content-matrices.js', () => ({
+vi.mock('../../server/content-matrix-read-model.js', () => ({
   getMatrix: mocks.getMatrix,
+}));
+
+vi.mock('../../server/schema/template-schema-types.js', () => ({
   getSchemaTypesForTemplate: mocks.getSchemaTypesForTemplate,
 }));
 

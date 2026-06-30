@@ -9,7 +9,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { getValidToken } from './google-auth.js';
 import { createLogger } from './logger.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 
 const log = createLogger('seo-change-tracker');
 

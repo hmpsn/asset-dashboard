@@ -1,4 +1,4 @@
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { debouncedStrategyInvalidate, debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from './bridge-infrastructure.js';
 import { updateWorkspace } from './workspaces.js';
 import { upsertAndCleanPageKeywords, upsertPageKeywordsBatch, listPageKeywords } from './page-keywords.js';
@@ -8,6 +8,7 @@ import { listKeywordGaps, replaceAllKeywordGaps } from './keyword-gaps.js';
 import { listTopicClusters, replaceAllTopicClusters } from './topic-clusters.js';
 import { listCannibalizationIssues, replaceAllCannibalizationIssues } from './cannibalization-issues.js';
 import { replaceAllSiteKeywordMetrics } from './site-keyword-metrics.js';
+import { reconcileStrategyKeywordSet } from './domains/strategy/managed-keyword-set.js';
 import db from './db/index.js';
 import {
   recordAction,
@@ -18,7 +19,7 @@ import {
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { addActivity } from './activity-log.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import type { KeywordGapEntry } from './seo-data-provider.js';
 import type { Workspace, PageKeywordMap, KeywordStrategy, ContentGap, QuickWin, SeoDataStatus } from '../shared/types/workspace.js';
 import type { KeywordStrategySeoDataMode, CompetitorKeywordData, QuestionKeywordGroup } from './keyword-strategy-seo-data.js';
@@ -46,6 +47,7 @@ export interface PersistKeywordStrategyOptions {
   questionKeywords: QuestionKeywordGroup[];
   businessContext: string;
   seoDataMode: KeywordStrategySeoDataMode;
+  maxPages?: number;
   seoDataStatus: SeoDataStatus;
   searchData: Pick<KeywordStrategySearchData, 'deviceBreakdown' | 'countryBreakdown' | 'periodComparison' | 'organicLandingPages' | 'organicOverview'>;
 }
@@ -53,6 +55,80 @@ export interface PersistKeywordStrategyOptions {
 export interface PersistKeywordStrategyResult {
   keywordStrategy: KeywordStrategy;
   pageMap: PageKeywordMap[];
+}
+
+function mergeIncrementalPageKeyword(previous: PageKeywordMap | undefined, next: PageKeywordMap): PageKeywordMap {
+  if (!previous) return next;
+  return {
+    ...previous,
+    ...next,
+    searchIntent: next.searchIntent ?? previous.searchIntent,
+    currentPosition: next.currentPosition ?? previous.currentPosition,
+    previousPosition: next.previousPosition ?? previous.previousPosition,
+    impressions: next.impressions ?? previous.impressions,
+    clicks: next.clicks ?? previous.clicks,
+    gscKeywords: next.gscKeywords ?? previous.gscKeywords,
+    volume: next.volume ?? previous.volume,
+    difficulty: next.difficulty ?? previous.difficulty,
+    cpc: next.cpc ?? previous.cpc,
+    secondaryMetrics: next.secondaryMetrics ?? previous.secondaryMetrics,
+    metricsSource: next.metricsSource ?? previous.metricsSource,
+    validated: next.validated ?? previous.validated,
+    urlLevelKeywords: next.urlLevelKeywords ?? previous.urlLevelKeywords,
+    urlLevelKeywordSource: next.urlLevelKeywordSource ?? previous.urlLevelKeywordSource,
+    optimizationScore: next.optimizationScore ?? previous.optimizationScore,
+    analysisGeneratedAt: next.analysisGeneratedAt ?? previous.analysisGeneratedAt,
+    optimizationIssues: next.optimizationIssues ?? previous.optimizationIssues,
+    recommendations: next.recommendations ?? previous.recommendations,
+    contentGaps: next.contentGaps ?? previous.contentGaps,
+    primaryKeywordPresence: next.primaryKeywordPresence ?? previous.primaryKeywordPresence,
+    longTailKeywords: next.longTailKeywords ?? previous.longTailKeywords,
+    competitorKeywords: next.competitorKeywords ?? previous.competitorKeywords,
+    estimatedDifficulty: next.estimatedDifficulty ?? previous.estimatedDifficulty,
+    keywordDifficulty: next.keywordDifficulty ?? previous.keywordDifficulty,
+    monthlyVolume: next.monthlyVolume ?? previous.monthlyVolume,
+    topicCluster: next.topicCluster ?? previous.topicCluster,
+    searchIntentConfidence: next.searchIntentConfidence ?? previous.searchIntentConfidence,
+    serpFeatures: next.serpFeatures ?? previous.serpFeatures,
+    missingTrustSignals: next.missingTrustSignals ?? previous.missingTrustSignals,
+    eeatAssetRecommendations: next.eeatAssetRecommendations ?? previous.eeatAssetRecommendations,
+  };
+}
+
+/**
+ * Snapshot the prior strategy state into strategy_history (capped to 5 rows), so the "What Changed"
+ * (StrategyDiff) boundary moves to this point. Reused by BOTH the AI-regen path and the manual PATCH
+ * edit path so human edits don't get misattributed to the last regeneration.
+ *
+ * MUST be called INSIDE a db.transaction(), and BEFORE the replaceAll/upsert calls clobber the
+ * table-backed arrays (callers pass the prior arrays read just before mutating). No-ops when there is
+ * no prior `generatedAt` (a table-backed-only workspace with no blob has no boundary to record).
+ */
+export function snapshotStrategyHistory(
+  workspaceId: string,
+  previousStrategy: KeywordStrategy | undefined,
+  prior: {
+    pageMap: ReturnType<typeof listPageKeywords>;
+    contentGaps: ReturnType<typeof listContentGaps>;
+    quickWins: ReturnType<typeof listQuickWins>;
+    keywordGaps: ReturnType<typeof listKeywordGaps>;
+    topicClusters: ReturnType<typeof listTopicClusters>;
+    cannibalization: ReturnType<typeof listCannibalizationIssues>;
+  },
+): void {
+  if (!previousStrategy?.generatedAt) return;
+  const previousStrategySnapshot = {
+    ...previousStrategy,
+    contentGaps: prior.contentGaps,
+    quickWins: prior.quickWins,
+    keywordGaps: prior.keywordGaps,
+    topicClusters: prior.topicClusters,
+    cannibalization: prior.cannibalization,
+  };
+  db.prepare(`INSERT INTO strategy_history (workspace_id, strategy_json, page_map_json, generated_at) VALUES (?, ?, ?, ?)`).run( // txn-ok: callers (writeKeywordStrategy + PATCH applyPatch) invoke this inside db.transaction()
+    workspaceId, JSON.stringify(previousStrategySnapshot), JSON.stringify(prior.pageMap), previousStrategy.generatedAt
+  );
+  db.prepare(`DELETE FROM strategy_history WHERE workspace_id = ? AND id NOT IN (SELECT id FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 5)`).run(workspaceId, workspaceId); // txn-ok: enclosed by caller's transaction
 }
 
 export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): PersistKeywordStrategyResult {
@@ -69,6 +145,7 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     questionKeywords,
     businessContext,
     seoDataMode,
+    maxPages,
     seoDataStatus,
     searchData,
   } = options;
@@ -115,6 +192,7 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     questionKeywords: questionKeywords.length > 0 ? questionKeywords : undefined,
     businessContext: businessContext || undefined,
     seoDataMode,
+    maxPages: maxPages != null ? maxPages : undefined,
     seoDataStatus,
     // Enriched search signals
     searchSignals: {
@@ -143,7 +221,10 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     let persistedEntries: PageKeywordMap[];
     if (strategyMode === 'full') {
       const stampedMap = pageMap.map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
-      upsertAndCleanPageKeywords(ws.id, stampedMap);
+      // rotate=true: this is the strategy-refresh boundary, so each surviving page's
+      // prior current_position rotates into previous_position — the producer the
+      // Rankings-tab movements card reads (improved/declined/lost vs the last refresh).
+      upsertAndCleanPageKeywords(ws.id, stampedMap, true);
       persistedEntries = stampedMap;
     } else {
       // Only update pages actually re-analyzed in this incremental run.
@@ -151,10 +232,17 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
       const extraPagePaths = new Set((options.extraPagePaths ?? []).map(pagePath => normalizePageUrl(pagePath)));
       const pathsToUpdate = new Set([...analyzedPaths, ...extraPagePaths]);
       const explicitlyRemovedPaths = new Set((options.removedPagePaths ?? []).map(pagePath => normalizePageUrl(pagePath)));
+      const previousByPath = new Map(prevPageMapForHistory.map((pm) => [normalizePageUrl(pm.pagePath), pm]));
       const analyzedMappings = pageMap
         .filter((pm) => pathsToUpdate.has(normalizePageUrl(pm.pagePath)))
-        .map((pm) => ({ ...pm, analysisGeneratedAt: now })) as PageKeywordMap[];
-      upsertPageKeywordsBatch(ws.id, analyzedMappings);
+        .map((pm) => {
+          const normalizedPath = normalizePageUrl(pm.pagePath);
+          return mergeIncrementalPageKeyword(previousByPath.get(normalizedPath), { ...pm, analysisGeneratedAt: now });
+        }) as PageKeywordMap[];
+      // rotate=true: incremental is still a refresh boundary for the pages it touches,
+      // so re-analyzed pages rotate prior current_position → previous_position. Untouched
+      // pages aren't upserted, so their movement baseline stays frozen until next refreshed.
+      upsertPageKeywordsBatch(ws.id, analyzedMappings, true);
       persistedEntries = analyzedMappings;
       for (const pagePath of explicitlyRemovedPaths) {
         db.prepare('DELETE FROM page_keywords WHERE workspace_id = ? AND page_path = ?').run(ws.id, pagePath); // txn-ok: enclosed by writeKeywordStrategy transaction and scoped by workspace_id
@@ -167,6 +255,18 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     replaceAllKeywordGaps(ws.id, keywordGaps);
     replaceAllTopicClusters(ws.id, topicClusters);
     replaceAllCannibalizationIssues(ws.id, cannibalization);
+    // Strategy redesign (graft 1) — reconcile the managed keyword working-set IN this same
+    // transaction so it is atomic with the strategy write (a regen + its set update commit or
+    // roll back together). The reconciler is PURE read-diff-insert (NO AI) and runs inside this
+    // txn (does NOT open its own). It seeds net-new siteKeywords as 'regen_computed' and
+    // auto-replenishes operator-removed slots from the freshly-computed opportunity pool
+    // (contentGaps/keywordGaps/opportunities). Kept/active rows survive; soft-removed rows stay
+    // removed. The STRATEGY_KEYWORD_SET_UPDATED broadcast fires AFTER commit (outside this body).
+    reconcileStrategyKeywordSet(ws.id, {
+      ...keywordStrategy,
+      keywordGaps,
+      contentGaps: newContentGaps,
+    } as KeywordStrategy);
     // SOLE STORE (#19b, Wave 3b-ii strip; table-as-truth): the
     // site_keyword_metrics table is now the only persisted home for
     // siteKeywordMetrics. The blob siteKeywordMetrics write was cut above
@@ -174,21 +274,14 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
     // is the source of truth every reader resolves through.
     replaceAllSiteKeywordMetrics(ws.id, siteKeywordMetrics);
 
-    const previousStrategy = ws.keywordStrategy;
-    if (previousStrategy?.generatedAt) {
-      const previousStrategySnapshot = {
-        ...previousStrategy,
-        contentGaps: prevContentGapsForHistory,
-        quickWins: prevQuickWinsForHistory,
-        keywordGaps: prevKeywordGapsForHistory,
-        topicClusters: prevTopicClustersForHistory,
-        cannibalization: prevCannibalizationForHistory,
-      };
-      db.prepare(`INSERT INTO strategy_history (workspace_id, strategy_json, page_map_json, generated_at) VALUES (?, ?, ?, ?)`).run( // txn-ok: enclosed by writeKeywordStrategy transaction
-        ws.id, JSON.stringify(previousStrategySnapshot), JSON.stringify(prevPageMapForHistory), previousStrategy.generatedAt
-      );
-      db.prepare(`DELETE FROM strategy_history WHERE workspace_id = ? AND id NOT IN (SELECT id FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 5)`).run(ws.id, ws.id);
-    }
+    snapshotStrategyHistory(ws.id, ws.keywordStrategy, {
+      pageMap: prevPageMapForHistory,
+      contentGaps: prevContentGapsForHistory,
+      quickWins: prevQuickWinsForHistory,
+      keywordGaps: prevKeywordGapsForHistory,
+      topicClusters: prevTopicClustersForHistory,
+      cannibalization: prevCannibalizationForHistory,
+    });
 
     updateWorkspace(ws.id, { keywordStrategy: keywordStrategy as KeywordStrategy });
     addActivity(ws.id, 'strategy_generated', 'Keyword strategy generated', `${pageMap.length} pages mapped with keywords and search intent`);
@@ -269,6 +362,12 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
   broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_UPDATED, {
     pageCount: pageMap.length,
     siteKeywords: keywordStrategy.siteKeywords?.length || 0,
+  });
+  // Strategy redesign (graft 1) — the managed keyword set was reconciled inside the txn above
+  // (atomic with the strategy write). Broadcast its update AFTER the commit so the
+  // useStrategyKeywordSet hook invalidates and refetches the curated working-set.
+  broadcastToWorkspace(ws.id, WS_EVENTS.STRATEGY_KEYWORD_SET_UPDATED, {
+    reason: 'regen',
   });
   invalidateIntelligenceCache(ws.id);
   debouncedStrategyInvalidate(ws.id, () => {

@@ -1,13 +1,13 @@
 /**
- * R3b — Apply to Website (DARK). Verifies that the SEPARATE client "Apply to Website" step reuses
- * the PROVEN legacy `/api/public/approvals/:workspaceId/:batchId/apply` route (no new apply logic),
- * and that the unified deliverable mirror flips to `applied` after
- * the legacy apply. Mirror status is asserted via `getDeliverable` DIRECTLY, never the public client
- * list (which filters `applied` out).
+ * R3b — Apply to Website (DARK). Verifies that the SEPARATE client "Apply to Website" step calls
+ * the canonical `/api/public/deliverables/:workspaceId/:id/apply` route, which delegates to the
+ * proven approval-batch apply service (no new Webflow apply logic), and that the unified deliverable
+ * mirror flips to `applied` after apply. Mirror status is asserted via `getDeliverable` DIRECTLY,
+ * never the public client list (which filters `applied` out).
  *
  * The faithful flow exercised here: send (mirror born awaiting_client) → client approves via the
  * shared `respondToDeliverable` (mirror → approved, legacy items → approved/held) → client applies
- * via the legacy /apply route (Webflow write + mirror flip to applied). This matches production: the
+ * via the deliverables /apply route (Webflow write + mirror flip to applied). This matches production: the
  * mirror is `approved` (not `awaiting_client`) by the time apply runs, so `approved → applied` is the
  * legal transition.
  *
@@ -49,7 +49,8 @@ import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { createBatch, getBatch } from '../../server/approvals.js';
 import { getDeliverable } from '../../server/client-deliverables.js';
 import { mirrorApprovalBatchToDeliverable } from '../../server/domains/inbox/approval-batch-dual-write.js';
-import { markDeliverableApplied, respondToDeliverable } from '../../server/domains/inbox/send-to-client.js';
+import { markDeliverableApplied } from '../../server/domains/inbox/deliverable-apply-state.js';
+import { respondToDeliverable } from '../../server/domains/inbox/send-to-client.js';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable.js';
 import { withPublicTestAuth } from './public-auth-test-helpers.js';
 
@@ -106,7 +107,7 @@ afterEach(() => {
   ws.cleanup();
 });
 
-describe('R3b — Apply to Website (legacy route reuse + mirror flip)', () => {
+describe('R3b — Apply to Website (canonical deliverable apply + mirror flip)', () => {
   it('applies an approved static seoTitle deliverable and flips the mirror to applied', async () => {
     const batch = createBatch(ws.workspaceId, ws.webflowSiteId, 'SEO Changes', [{
       pageId: 'page-static-1',
@@ -123,7 +124,7 @@ describe('R3b — Apply to Website (legacy route reuse + mirror flip)', () => {
     await respondToDeliverable(ws.workspaceId, mirror.id, { decision: 'approved' });
     expect(getDeliverable(mirror.id)?.status).toBe('approved');
 
-    const res = await postJson(`/api/public/approvals/${ws.workspaceId}/${batch.id}/apply`, {});
+    const res = await postJson(`/api/public/deliverables/${ws.workspaceId}/${mirror.id}/apply`, {});
     expect(res.status).toBe(200);
     const body = await res.json() as { applied: number };
     expect(body.applied).toBeGreaterThanOrEqual(1);
@@ -135,6 +136,27 @@ describe('R3b — Apply to Website (legacy route reuse + mirror flip)', () => {
     const appliedMirror = getDeliverable(mirror.id);
     expect(appliedMirror?.status).toBe('applied');
     expect(appliedMirror?.appliedAt).toBeTruthy();
+  });
+
+  it('keeps the legacy approval apply URL as deprecated compatibility', async () => {
+    const batch = createBatch(ws.workspaceId, ws.webflowSiteId, 'SEO Changes', [{
+      pageId: 'page-legacy-compat',
+      pageTitle: 'Home',
+      pageSlug: '/home',
+      field: 'seoTitle',
+      currentValue: 'Old title',
+      proposedValue: 'New title',
+    }]);
+    const mirror = mirrorApprovalBatchToDeliverable(ws.workspaceId, batch)!;
+
+    await respondToDeliverable(ws.workspaceId, mirror.id, { decision: 'approved' });
+
+    const res = await postJson(`/api/public/approvals/${ws.workspaceId}/${batch.id}/apply`, {});
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-deprecated-route')).toBe('/api/public/deliverables/:workspaceId/:id/apply');
+    const body = await res.json() as { applied: number };
+    expect(body.applied).toBeGreaterThanOrEqual(1);
+    expect(getDeliverable(mirror.id)?.status).toBe('applied');
   });
 
   it('does not apply a subset-held item; only the approved item is applied; mirror still flips', async () => {
@@ -157,7 +179,7 @@ describe('R3b — Apply to Website (legacy route reuse + mirror flip)', () => {
     expect(itemA.status).toBe('approved');
     expect(itemB.status).toBe('rejected');
 
-    const res = await postJson(`/api/public/approvals/${ws.workspaceId}/${batch.id}/apply`, {});
+    const res = await postJson(`/api/public/deliverables/${ws.workspaceId}/${mirror.id}/apply`, {});
     expect(res.status).toBe(200);
     const body = await res.json() as { applied: number };
     expect(body.applied).toBe(1);
@@ -190,7 +212,7 @@ describe('R3b — Apply to Website (legacy route reuse + mirror flip)', () => {
 
     await respondToDeliverable(ws.workspaceId, mirror.id, { decision: 'approved' });
 
-    const res = await postJson(`/api/public/approvals/${ws.workspaceId}/${batch.id}/apply`, {});
+    const res = await postJson(`/api/public/deliverables/${ws.workspaceId}/${mirror.id}/apply`, {});
     expect(res.status).toBe(400);
 
     // No apply happened → mirror unchanged (stays approved, never applied).
@@ -198,7 +220,7 @@ describe('R3b — Apply to Website (legacy route reuse + mirror flip)', () => {
   });
 
   it('total Webflow write failure: applied:0/failed:1 (HTTP 200), item NOT applied, mirror stays approved (flip skipped)', async () => {
-    // FM-2 external-API-error test: mock the Webflow SEO write to FAIL at runtime. The legacy /apply
+    // FM-2 external-API-error test: mock the Webflow SEO write to FAIL at runtime. The apply
     // route catches the failure per-item and falls through to res.json with applied:0/failed:N — a
     // success-shaped HTTP 200 envelope, NOT a 4xx. The mirror flip must therefore see failed > 0
     // and skip the transition, leaving the mirror `approved` so the client can retry.
@@ -218,7 +240,7 @@ describe('R3b — Apply to Website (legacy route reuse + mirror flip)', () => {
     await respondToDeliverable(ws.workspaceId, mirror.id, { decision: 'approved' });
     expect(getDeliverable(mirror.id)?.status).toBe('approved');
 
-    const res = await postJson(`/api/public/approvals/${ws.workspaceId}/${batch.id}/apply`, {});
+    const res = await postJson(`/api/public/deliverables/${ws.workspaceId}/${mirror.id}/apply`, {});
     // Total runtime write failure is still HTTP 200 with a failed count (not a 4xx).
     expect(res.status).toBe(200);
     const body = await res.json() as { applied: number; failed: number; results: unknown[] };
@@ -248,7 +270,7 @@ describe('R3b — Apply to Website (legacy route reuse + mirror flip)', () => {
     const mirror = mirrorApprovalBatchToDeliverable(ws.workspaceId, batch)!;
     await respondToDeliverable(ws.workspaceId, mirror.id, { decision: 'approved' });
 
-    await postJson(`/api/public/approvals/${ws.workspaceId}/${batch.id}/apply`, {});
+    await postJson(`/api/public/deliverables/${ws.workspaceId}/${mirror.id}/apply`, {});
     expect(getDeliverable(mirror.id)?.status).toBe('applied');
 
     // Second call directly — must short-circuit (already applied), not throw InvalidTransitionError.

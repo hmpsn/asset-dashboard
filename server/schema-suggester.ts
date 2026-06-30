@@ -4,8 +4,10 @@ import { getWorkspaceBySiteId } from './workspaces.js';
 import { generateLeanSchema } from './schema/index.js';
 import type { ContentBrief } from '../shared/types/content.ts';
 import { fetchPageMeta } from './seo-audit.js';
-import { fetchPublishedHtml, resolvePagePath } from './helpers.js';
+import { fetchPublishedHtml } from './published-html.js';
+import { resolvePagePath } from './utils/page-address.js';
 import { resolveBaseUrl } from './url-helpers.js';
+import { dedupeBy } from './utils/collections.js';
 import { createAiBudget } from './schema/extractors/page-elements/ai-budget.js';
 import type { AiBudget } from './schema/extractors/page-elements/ai-budget.js';
 import { buildSchemaIntelligence } from './schema-intelligence.js';
@@ -20,13 +22,13 @@ import {
 import { getPageTypes, getSchemaPlan } from './schema-store.js';
 import type { PageKind } from './schema/classifier.js';
 import type { SchemaPageRole } from '../shared/types/schema-plan.js';
-import type { SchemaGenerationDiagnostics } from '../shared/types/schema-generation.js';
+import type { SchemaSourcePageMeta } from '../shared/types/schema-generation.js';
 import { isUtilitySchemaPath } from './schema/site-inventory.js';
 import type { SchemaCmsDeliveryStatus, SchemaCollectionIdentity, SiteInventoryCmsItem, SiteInventorySlice } from '../shared/types/site-inventory.js';
 import type { WebflowPage } from './webflow-pages.js';
 import { ENTITY_SURFACES } from '../shared/types/entity-resolution.js';
 import type { EntityResolutionSlice, ResolvedEntity } from '../shared/types/entity-resolution.js';
-import type { EeatAsset } from '../shared/types/eeat-assets.js';
+import type { SchemaContext, SchemaPageSuggestion } from './schema/suggestion-types.js';
 
 /**
  * AI budget allocation for the page-element AI extractors.
@@ -42,33 +44,7 @@ function allocateElementAiBudget(): AiBudget {
 // import between schema-suggester.ts and the schema/ package.
 export { checkRichResultsEligibility } from './schema/rich-results.js';
 export type { RichResultEligibility } from './schema/rich-results.js';
-import type { RichResultEligibility } from './schema/rich-results.js';
-import type { ValidationFinding } from '../shared/types/schema-validation.js';
-
-export interface SchemaPageSuggestion {
-  pageId: string;
-  pageTitle: string;
-  slug: string;
-  publishedPath?: string | null;
-  url: string;
-  existingSchemas: string[];
-  existingSchemaJson?: Record<string, unknown>[];
-  suggestedSchemas: SchemaSuggestion[];
-  validationErrors?: string[];
-  validationFindings?: ValidationFinding[];
-  richResultsEligibility?: RichResultEligibility[];
-  generationDiagnostics?: SchemaGenerationDiagnostics;
-  collectionIdentity?: SchemaCollectionIdentity;
-  cmsDeliveryStatus?: SchemaCmsDeliveryStatus;
-  savedPageType?: string;  // Persisted page type from DB
-}
-
-export interface SchemaSuggestion {
-  type: string;
-  reason: string;
-  priority: 'high' | 'medium' | 'low';
-  template: Record<string, unknown>;
-}
+export type { SchemaContext, SchemaPageSuggestion, SchemaSuggestion } from './schema/suggestion-types.js';
 
 export { PAGE_TYPE_LABELS, PAGE_TYPE_SCHEMA_MAP, SCHEMA_ROLE_TO_PAGE_KIND };
 export type { SchemaPageType };
@@ -150,14 +126,6 @@ async function readSchemaPageIntelligence(
   }
 }
 
-function uniqueEntities(entities: ResolvedEntity[]): ResolvedEntity[] {
-  const byId = new Map<string, ResolvedEntity>();
-  for (const entity of entities) {
-    if (!byId.has(entity.id)) byId.set(entity.id, entity);
-  }
-  return Array.from(byId.values());
-}
-
 function entityResolutionForPage(
   slice: EntityResolutionSlice | undefined,
   pagePath: string,
@@ -174,21 +142,21 @@ function entityResolutionForPage(
   }
 
   const relevant = slice.entities;
-  const knowsAbout = uniqueEntities(relevant.filter(entity =>
+  const knowsAbout = dedupeBy(relevant.filter(entity =>
     entity.surfaces.includes(ENTITY_SURFACES.organizationKnowsAbout)
       && entity.type === 'Thing',
-  ));
+  ), entity => entity.id);
   const pageScoped = (entity: ResolvedEntity) => !entity.pagePath || entity.pagePath === pagePath;
   const articleAbout = relevant.find(entity =>
     pageScoped(entity)
       && entity.type === 'Thing'
       && entity.surfaces.includes(ENTITY_SURFACES.articleAbout),
   );
-  const articleMentions = uniqueEntities(relevant.filter(entity =>
+  const articleMentions = dedupeBy(relevant.filter(entity =>
     pageScoped(entity)
       && entity.type === 'Thing'
       && entity.surfaces.includes(ENTITY_SURFACES.articleMentions),
-  ));
+  ), entity => entity.id);
   const areaServed = relevant.find(entity =>
     entity.type === 'Place'
       && entity.surfaces.includes(ENTITY_SURFACES.areaServed),
@@ -303,43 +271,6 @@ function resolveRoleOverride(opts: {
 
 // (RICH_RESULTS_ELIGIBLE + checkRichResultsEligibility moved to ./schema/rich-results.ts
 //  to break circular import. Re-exports near the top of this file preserve the public API.)
-
-// Context from the workspace/strategy for richer schema generation
-export interface SchemaContext {
-  companyName?: string;
-  liveDomain?: string;
-  logoUrl?: string;
-  businessContext?: string;
-  pageKeywords?: { primary: string; secondary: string[] };
-  searchIntent?: string;
-  siteKeywords?: string[];
-  workspaceId?: string;
-  knowledgeBase?: string;
-  pageType?: SchemaPageType;
-  _siteId?: string;  // Internal: passed through for site template storage
-  _architectureTree?: import('./site-architecture.js').SiteNode;    // Full site tree for breadcrumb + nav generation
-  _personasBlock?: string;  // Internal: audience personas for richer schema targeting
-  _gscPageData?: { clicks: number; impressions: number; position: number; ctr: number };  // Internal: GSC per-page metrics
-  _ga4PageData?: { pageviews: number; users: number; avgEngagementTime: number };  // Internal: GA4 per-page metrics
-  _businessProfile?: {  // Internal: verified business data — bypasses page-content verification checks
-    phone?: string;
-    email?: string;
-    address?: { street?: string; city?: string; state?: string; zip?: string; country?: string };
-    socialProfiles?: string[];
-    openingHours?: string;
-    foundedDate?: string;
-    numberOfEmployees?: string;
-  };
-  /** Default site-wide BCP-47 locale from Webflow site.locales.primary.tag. Defaults to 'en' when unset. */
-  _defaultLocale?: string;
-  /** When true, WebSite.potentialAction (sitelinks SearchAction) is emitted.
-   *  Source: Workspace.siteHasSearch DB column. PR1 always reads as undefined
-   *  (DB column defaults to 0 / false); PR2 ships the admin toggle UI. */
-  _siteHasSearch?: boolean;
-  /** Validation errors from the prior schema generation for this page — used to avoid repeating known mistakes. */
-  _existingErrors?: Array<{ message: string }>;
-  _eeatAssets?: EeatAsset[];
-}
 
 // ── E-E-A-T extraction from content briefs ─────────────────────────
 interface EeatData {
@@ -497,6 +428,24 @@ function cmsItemToSiteContextPage(item: SiteInventoryCmsItem): WebflowPage {
   };
 }
 
+function optionalTimestamp(value: unknown): string | null | undefined {
+  if (typeof value === 'string') return value;
+  return value === null ? null : undefined;
+}
+
+function sourcePageMetaFromWebflowPage(page: WebflowPage): SchemaSourcePageMeta {
+  return {
+    id: page.id,
+    title: page.title || '',
+    slug: page.slug || resolvePagePath(page).replace(/^\//, ''),
+    publishedPath: page.publishedPath,
+    seo: page.seo,
+    openGraph: page.openGraph,
+    lastPublished: optionalTimestamp(page.lastPublished),
+    createdOn: optionalTimestamp(page.createdOn),
+  };
+}
+
 export function buildSiteContextPages(
   staticPages: WebflowPage[],
   cmsItems: SiteInventoryCmsItem[] = [],
@@ -613,19 +562,7 @@ export async function generateSchemaForPage(
   }
 
   const matchedPage = allPages.find(p => p.id === pageId);
-  const meta = matchedPage ? {
-    id: matchedPage.id,
-    title: matchedPage.title || '',
-    slug: matchedPage.slug || resolvePagePath(matchedPage).replace(/^\//, ''),
-    seo: matchedPage.seo,
-    openGraph: matchedPage.openGraph,
-    lastPublished: typeof (matchedPage as Record<string, unknown>).lastPublished === 'string'
-      ? ((matchedPage as Record<string, unknown>).lastPublished as string)
-      : undefined,
-    createdOn: typeof (matchedPage as Record<string, unknown>).createdOn === 'string'
-      ? ((matchedPage as Record<string, unknown>).createdOn as string)
-      : undefined,
-  } : await fetchPageMeta(pageId, tokenOverride);
+  const meta = matchedPage ? sourcePageMetaFromWebflowPage(matchedPage) : await fetchPageMeta(pageId, tokenOverride);
   if (!meta) return null;
 
   const slug = meta.slug || '';
@@ -678,16 +615,14 @@ export async function generateSchemaForPage(
       slug,
       publishedPath,
       seo: meta.seo,
-      // Fix 4: pass CMS timestamps for datePublished/dateModified fallback —
-      // The Webflow API may return these even though the local PageMeta interface omits them.
-      lastPublished: (meta as unknown as Record<string, unknown>).lastPublished as string | undefined,
-      createdOn: (meta as unknown as Record<string, unknown>).createdOn as string | undefined,
+      lastPublished: meta.lastPublished,
+      createdOn: meta.createdOn,
       pageKeywords: pageIntel?.pageKeywords,
       elements: pageIntel?.pageElements,
       // Static pages can carry a Webflow `lastPublished` timestamp too — pass
       // it through so isCatalogStale can drive lazy refresh on republish.
       // Falls back to null when the Webflow response omits the field.
-      sourcePublishedAt: ((meta as unknown as Record<string, unknown>).lastPublished as string | undefined) ?? null,
+      sourcePublishedAt: meta.lastPublished ?? null,
       entityResolution: {
         articleAbout: entities.articleAbout,
         articleMentions: entities.articleMentions,
@@ -773,6 +708,7 @@ export async function generateSchemaSuggestions(
     }
     const url = publishedPath === '/' ? baseUrl : `${baseUrl}${publishedPath}`;
     const html = await fetchPublishedHtml(url);
+    const pageMeta = sourcePageMetaFromWebflowPage(page);
     const roleOverride = resolveRoleOverride({
       siteId,
       pagePath: publishedPath,
@@ -794,16 +730,8 @@ export async function generateSchemaSuggestions(
         seo: page.seo,
         pageKeywords: pageIntel?.pageKeywords,
         elements: pageIntel?.pageElements,
-        // Pass Webflow `lastPublished` through when available — drives
-        // isCatalogStale-based refresh on static-page republish. The
-        // WebflowPage interface uses [key: string]: unknown so we read
-        // the field via index access.
-        lastPublished: typeof (page as Record<string, unknown>).lastPublished === 'string'
-          ? ((page as Record<string, unknown>).lastPublished as string)
-          : undefined,
-        sourcePublishedAt: typeof (page as Record<string, unknown>).lastPublished === 'string'
-          ? ((page as Record<string, unknown>).lastPublished as string)
-          : null,
+        lastPublished: pageMeta.lastPublished,
+        sourcePublishedAt: pageMeta.lastPublished ?? null,
         entityResolution: {
           articleAbout: entities.articleAbout,
           articleMentions: entities.articleMentions,

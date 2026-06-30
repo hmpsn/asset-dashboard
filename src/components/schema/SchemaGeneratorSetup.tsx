@@ -3,15 +3,11 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, HelpCircle, Loader2, Sparkles, X } from 'lucide-react';
 import type { BusinessProfileContact } from '../../../shared/types/workspace';
 import type { SchemaFieldTarget } from '../../../shared/types/site-inventory';
-import { SCHEMA_ROLE_INDEX, SCHEMA_ROLE_LABELS } from '../../../shared/types/schema-plan';
+import { SCHEMA_ROLE_INDEX } from '../../../shared/types/schema-plan';
 import { adminPath } from '../../routes';
 import { Button, FormInput, FormSelect, Icon, IconButton } from '../ui';
 import type { SchemaMappingCollection, SchemaPageOption } from './schemaSuggesterTypes';
-
-export const SCHEMA_PAGE_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'auto', label: 'Auto-detect' },
-  ...Object.entries(SCHEMA_ROLE_LABELS).map(([value, label]) => ({ value, label })),
-];
+import { SCHEMA_PAGE_TYPE_OPTIONS } from './schemaPageTypeOptions';
 
 interface SchemaBusinessProfileCalloutProps {
   businessProfile?: BusinessProfileContact | null;

@@ -70,14 +70,13 @@ export function CompetitorGapsSection({ workspaceId, tier }: CompetitorGapsSecti
           feature="Competitor keyword gaps"
           teaser="See the exact keywords your competitors rank for that you're missing — and who's winning them. Available on Premium."
         >
-          {/* Representative teaser rows — blurred behind the gate. No real
-              competitor data is fetched for non-Premium tiers; these are
-              illustrative placeholders only. */}
-          <div className="space-y-1.5">
-            {[
-              { keyword: 'emergency service near me', competitorDomain: 'a-competitor.com', competitorPosition: 2, opportunityBand: 'high' as const, demandLabel: 'High search demand', benchmark: 'A competitor ranks in the top 3 — you\'re not on page one yet.' },
-              { keyword: 'same-day repair', competitorDomain: 'a-competitor.com', competitorPosition: 4, opportunityBand: 'medium' as const, demandLabel: 'Moderate search demand', benchmark: 'A competitor ranks on page one — you\'re not yet.' },
-            ].map((g, i) => <GapRow key={i} gap={g} />)}
+          {/* Audit blocker #6: NO fabricated/blurred competitor rows. Non-Premium tiers fetch
+              no real competitor data, so we show one honest, generic placeholder — never invented
+              "near me"/keyword teaser strings. The TierGate overlay is the upsell payoff. */}
+          <div className="px-3 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/40">
+            <p className="t-caption-sm text-[var(--brand-text-muted)] leading-relaxed">
+              Your strategist is mapping your competitive landscape.
+            </p>
           </div>
         </TierGate>
       </SectionCard>

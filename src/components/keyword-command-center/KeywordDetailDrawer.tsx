@@ -16,6 +16,7 @@ import { useScrollLock } from '../../hooks/useScrollLock';
 import type { KeywordCommandCenterNextAction, KeywordCommandCenterRow } from '../../../shared/types/keyword-command-center';
 import type { OutcomeReadback } from '../../../shared/types/outcome-tracking';
 import { LocalSeoVisibilityBadge } from '../local-seo/LocalSeoVisibilityPanel';
+import { serpBadges } from '../shared/serpFeatureBadges';
 import { RankHistoryChart } from '../shared/RankTable';
 import { Badge, Button, EmptyState, Icon, IconButton, OutcomeReadbackChip, Skeleton, StatusBadge, TableSkeleton } from '../ui';
 import { KeywordDetailPanel } from './KeywordDetailPanel';
@@ -474,6 +475,39 @@ export function KeywordDetailDrawer({
                         </div>
                       </div>
                     </div>
+                    {/* Live SERP detail (P6 / national-serp-tracking). Additive — distinct from the
+                        GSC "Current position" above. Rendered only when a national snapshot exists.
+                        Color law: live rank + features are DATA (blue); the AI-Overview citation is
+                        success/neutral (emerald cited / zinc not-cited) — never purple. */}
+                    {(row.metrics.nationalPosition != null
+                      || (row.metrics.serpFeatures?.length ?? 0) > 0
+                      || row.metrics.aiOverviewPresent) && (
+                      <div className="mt-3 pt-3 border-t border-[var(--brand-border)] space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="t-caption-sm text-[var(--brand-text-muted)]">Live SERP rank</p>
+                            <p className="t-caption font-semibold text-blue-400 tabular-nums">
+                              {typeof row.metrics.nationalPosition === 'number'
+                                ? `#${row.metrics.nationalPosition}`
+                                : 'Not ranking'}
+                            </p>
+                          </div>
+                          {row.metrics.aiOverviewPresent && (
+                            <Badge
+                              tone={row.metrics.aiOverviewCited ? 'emerald' : 'zinc'}
+                              variant="outline"
+                              label={row.metrics.aiOverviewCited ? 'Cited in AI Overview' : 'Not cited in AI Overview'}
+                            />
+                          )}
+                        </div>
+                        {row.metrics.matchedUrl && (
+                          <p className="t-caption-sm text-[var(--brand-text-muted)] truncate">
+                            Ranking URL: <span className="text-[var(--brand-text)]">{row.metrics.matchedUrl}</span>
+                          </p>
+                        )}
+                        {serpBadges(row.metrics.serpFeatures, 'plain')}
+                      </div>
+                    )}
                     <div className="mt-3">
                       {rankHistory.isLoading ? (
                         <Skeleton className="h-10 w-full" />

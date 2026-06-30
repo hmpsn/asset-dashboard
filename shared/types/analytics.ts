@@ -207,7 +207,8 @@ export type InsightType =
   | 'freshness_alert'        // Tier 2: stale content detected via page_keywords age
   | 'milestone_attribution'  // Phase 2.5c: delivered brief crossed a traffic threshold
   | 'lost_visibility'        // G1: queries that dropped off GSC after sustained presence
-  | 'local_visibility_shift'; // W5.3: local pack visible↔not_visible transition or new repeat competitor
+  | 'local_visibility_shift' // W5.3: local pack visible↔not_visible transition or new repeat competitor
+  | 'serp_feature_opportunity'; // P6: live SERP shows a feature (AI Overview / featured snippet) the client ranks for but isn't capturing
 
 export type InsightDomain = 'search' | 'traffic' | 'cross';
 
@@ -327,6 +328,27 @@ export interface RankingMoverData extends InsightDataBase {
   currentClicks: number;
   previousClicks: number;
   impressions: number;
+}
+
+/**
+ * Data shape for serp_feature_opportunity insights (P6, national-serp-tracking).
+ * Keyword-centric: the client ranks for `keyword` (matchedUrl becomes pageId) on a SERP
+ * that shows a high-value feature (AI Overview, featured snippet) the client is not
+ * capturing. The flagship signal is `aiOverviewPresent && !aiOverviewCited`.
+ */
+export interface SerpFeatureOpportunityData extends InsightDataBase {
+  keyword: string;
+  /** The ranking page → becomes pageId. The insight only fires when this is present. */
+  matchedUrl: string;
+  /** Client current true-SERP rank for the keyword. */
+  currentPosition: number;
+  /** SERP feature labels present (e.g. 'ai_overview', 'featured_snippet', 'people_also_ask'). */
+  presentFeatures: string[];
+  aiOverviewPresent: boolean;
+  /** Owner domain in ai_overview.references — false = the opportunity. */
+  aiOverviewCited: boolean;
+  /** Rough volume-derived upside if the client captured the feature. */
+  estimatedMonthlyCitations: number;
 }
 
 export interface CtrOpportunityData extends InsightDataBase {
@@ -554,6 +576,7 @@ export interface InsightDataMap {
   milestone_attribution: MilestoneAttributionData;
   lost_visibility: LostVisibilityData;
   local_visibility_shift: LocalVisibilityShiftData;
+  serp_feature_opportunity: SerpFeatureOpportunityData;
 }
 
 // ── Insight Feed Filter Keys ──────────────────────────────────────

@@ -3,10 +3,17 @@ import { buildWorkspaceIntelligence } from '../../workspace-intelligence.js';
 import { listBatches } from '../../approvals.js';
 import { listRequests } from '../../requests.js';
 import { listClientActions, countPendingClientActions } from '../../client-actions.js';
+import { updateAdminClientAction } from '../../domains/inbox/client-actions-mutations.js';
+import { respondToApprovalBatchItem } from '../../domains/inbox/approval-batch-item-respond.js';
 import { getWorkspace, listWorkspaces } from '../../workspaces.js';
 import { pendingCounts } from './workspaces.js';
+import {
+  respondToClientActionInputSchema,
+  respondToApprovalItemInputSchema,
+} from '../../../shared/types/mcp-action-schemas.js';
 import type { IntelligenceSlice } from '../../../shared/types/intelligence.js';
 import { createLogger } from '../../logger.js';
+import { toMcpJsonSchema } from '../json-schema.js';
 
 const log = createLogger('mcp-tools-clients');
 
@@ -40,6 +47,18 @@ export const clientTools: Tool[] = [
       },
       required: [],
     },
+  },
+  {
+    name: 'respond_to_client_action',
+    description:
+      "Update a client action's status to close the loop on it (use the actionId from get_pending_work's clientActions). status: 'completed' (done), 'archived' (dismiss), 'approved', 'changes_requested', or 'pending' (reopen). Resolving (completed/approved) also updates the linked insight + outcome learning. Errors on an illegal status transition or unknown id.",
+    inputSchema: toMcpJsonSchema(respondToClientActionInputSchema),
+  },
+  {
+    name: 'respond_to_approval_item',
+    description:
+      "Decline / request changes on a single approval item (use batchId + itemId from get_pending_work's approvalBatches). Provide clientNote with the requested changes — the team is notified. NOTE: this is the ONLY approval action available via MCP: an agent CANNOT approve approval items on the client's behalf (approval is the client's own review decision), so this tool only ever rejects/requests-changes.",
+    inputSchema: toMcpJsonSchema(respondToApprovalItemInputSchema),
   },
 ];
 
@@ -130,6 +149,57 @@ export async function handleClientTool(
           text: JSON.stringify({ totalPending, workspaces }),
         }],
       };
+    }
+
+    if (name === 'respond_to_client_action') {
+      const parsed = respondToClientActionInputSchema.safeParse(args);
+      if (!parsed.success) {
+        return { isError: true, content: [{ type: 'text' as const, text: `Validation failed: ${JSON.stringify(parsed.error.issues)}` }] };
+      }
+      const { workspaceId, actionId, status, clientNote } = parsed.data;
+      const ws = getWorkspace(workspaceId);
+      if (!ws) {
+        return { isError: true, content: [{ type: 'text' as const, text: `Workspace not found: ${workspaceId}` }] };
+      }
+      // Routes through the admin client-action service, which validates the status
+      // transition and fires its own activity + broadcast + insight/outcome feedback.
+      // It throws (404 not found / 409 invalid transition) — caught by the outer handler.
+      const updated = updateAdminClientAction(workspaceId, actionId, {
+        status,
+        ...(clientNote !== undefined ? { clientNote } : {}),
+      });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(updated) }] };
+    }
+
+    if (name === 'respond_to_approval_item') {
+      const parsed = respondToApprovalItemInputSchema.safeParse(args);
+      if (!parsed.success) {
+        return { isError: true, content: [{ type: 'text' as const, text: `Validation failed: ${JSON.stringify(parsed.error.issues)}` }] };
+      }
+      const { workspaceId, batchId, itemId, clientNote } = parsed.data;
+      const ws = getWorkspace(workspaceId);
+      if (!ws) {
+        return { isError: true, content: [{ type: 'text' as const, text: `Workspace not found: ${workspaceId}` }] };
+      }
+      // Decline-only: always 'rejected' (request changes). Agents cannot approve on the
+      // client's behalf. actor is named honestly so the ACTIVITY LOG (the user-facing
+      // "who decided" surface) attributes the decision to the agent, not the client.
+      // (The internal page-edit-state provenance marker still records updatedBy:'client'
+      // — its union has no 'agent' value — but that is a coarse internal marker, not the
+      // user-facing attribution, so it is left as the existing model.) The service
+      // validates the transition, syncs page state, notifies the team, and broadcasts
+      // APPROVAL_UPDATE.
+      const result = respondToApprovalBatchItem({
+        workspaceId,
+        batchId,
+        itemId,
+        update: { status: 'rejected', ...(clientNote !== undefined ? { clientNote } : {}) },
+        actor: { name: 'MCP agent' },
+      });
+      if (!result) {
+        return { isError: true, content: [{ type: 'text' as const, text: `Approval item not found: ${batchId}/${itemId}` }] };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result.batch) }] };
     }
 
     return {

@@ -8,24 +8,32 @@ import {
 } from '../../server/intelligence/generation-context-builders.js';
 import {
   buildWorkspaceIntelligence,
+} from '../../server/workspace-intelligence.js';
+import {
   formatForPrompt,
   formatKeywordsForPrompt,
   formatKnowledgeBaseForPrompt,
   formatPageMapForPrompt,
-  formatPersonasForPrompt,
-} from '../../server/workspace-intelligence.js';
-import { listLocalSeoMarkets } from '../../server/local-seo.js';
+} from '../../server/intelligence/formatters.js';
+import { formatPersonasForPrompt } from '../../server/intelligence/persona-format.js';
+import { listLocalSeoMarkets } from '../../server/domains/local-seo/configuration-service.js';
 
 vi.mock('../../server/workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: vi.fn(),
+}));
+
+vi.mock('../../server/intelligence/formatters.js', () => ({
   formatForPrompt: vi.fn(),
   formatKeywordsForPrompt: vi.fn(),
   formatKnowledgeBaseForPrompt: vi.fn(),
   formatPageMapForPrompt: vi.fn(),
+}));
+
+vi.mock('../../server/intelligence/persona-format.js', () => ({
   formatPersonasForPrompt: vi.fn(),
 }));
 
-vi.mock('../../server/local-seo.js', () => ({
+vi.mock('../../server/domains/local-seo/configuration-service.js', () => ({
   listLocalSeoMarkets: vi.fn(() => []),
 }));
 

@@ -187,7 +187,6 @@ function TrafficDetail({ workspaceId, ga4PropertyId }: Props) {
                 : undefined
             }
             onToggleLine={handleToggleTrafficLine}
-            maxActiveLines={3}
           />
         </SectionCard>
       )}

@@ -138,7 +138,11 @@ export function buildFeatureFlagLifecycleReport(
       invalidLifecycle.push(`${key}: lastReviewedAt is in the future (${lifecycle.lastReviewedAt})`);
     }
 
-    const reviewDue = daysSinceReview != null && daysSinceReview > cadenceThreshold;
+    // Reserved flags (catalog pre-registered for an in-progress/deferred feature whose gating code
+    // isn't wired yet) are intentionally unwired — exempt them from the review-due/stale nag so
+    // genuine phantom flags stay distinguishable. They flip to active/omit when the gating ships.
+    const reserved = lifecycle.status === 'reserved';
+    const reviewDue = !reserved && daysSinceReview != null && daysSinceReview > cadenceThreshold;
     const staleCandidate =
       reviewDue &&
       daysSinceCreated != null &&
@@ -320,7 +324,15 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   }
 
   const roadmap = loadRoadmap(options.roadmapPath);
-  const report = buildFeatureFlagLifecycleReport(roadmap, options.asOf);
+  // Shipped roadmap items are moved out to roadmap.archive.json. A feature flag's
+  // linkedRoadmapItemId legitimately references its now-archived (shipped) item until the
+  // flag itself is retired, so resolve links against BOTH the active roadmap and the archive.
+  const archivePath = path.resolve(path.dirname(options.roadmapPath), 'roadmap.archive.json');
+  const archivedSprints = fs.existsSync(archivePath)
+    ? ((JSON.parse(fs.readFileSync(archivePath, 'utf8')) as RoadmapData).sprints ?? [])
+    : [];
+  const combined: RoadmapData = { sprints: [...roadmap.sprints, ...archivedSprints] };
+  const report = buildFeatureFlagLifecycleReport(combined, options.asOf);
 
   if (options.json) {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);

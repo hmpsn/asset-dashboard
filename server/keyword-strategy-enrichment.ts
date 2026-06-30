@@ -1,8 +1,9 @@
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import { z } from 'zod';
-import { resolveWorkspaceLocationCode, getLocalSeoPosture, listLocalSeoMarkets } from './local-seo.js';
+import { resolveWorkspaceLocationCode, getLocalSeoPosture, listLocalSeoMarkets } from './domains/local-seo/configuration-service.js';
+import { workspaceProviderGeo } from './seo-target-geo.js';
 import { trendDirection, hasSerpOpportunity } from './seo-provider-signals.js';
 import type { SeoDataProvider, DomainKeyword } from './seo-data-provider.js';
 import type { CompetitorKeywordData, QuestionKeywordGroup, KeywordStrategySeoDataMode } from './keyword-strategy-seo-data.js';
@@ -18,10 +19,10 @@ import { computeOpportunityScore, isSuspiciousPlannerGroupedVolume } from './key
 import { computeOpportunityValue } from './scoring/opportunity-value.js';
 import { computeKeywordValueScore, deriveValueIntent } from './scoring/keyword-value-score.js';
 import { matchesQuestionKeyword } from './strategy-filters.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { getWorkspace } from './workspaces.js';
 import { METRICS_SOURCE } from '../shared/types/keywords.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { compareContentGapDemandDisplayOrder, compareKeywordOpportunityScoreDesc } from '../shared/keyword-opportunity-projection.js';
 
 const log = createLogger('keyword-strategy:enrichment');
 const URL_LEVEL_KEYWORD_PAGE_LIMIT = 12;
@@ -91,10 +92,9 @@ export interface EnrichKeywordStrategyOptions {
   provider: SeoDataProvider | null;
   seoDataMode: KeywordStrategySeoDataMode;
   /**
-   * SEO Generation Quality P2 (flag `seo-generation-quality`, per-workspace).
-   * Computed once per generation and threaded in. On flag-ON the page-coverage
-   * prune uses token-subset containment instead of substring `.includes()`.
-   * Flag-OFF (default false) is byte-identical to today.
+   * SEO Generation Quality P2 is now the canonical synthesis path.
+   * Computed once per generation and threaded in. When enabled, page-coverage
+   * pruning uses token-subset containment instead of substring `.includes()`.
    */
   relaxConservatism?: boolean;
   sendProgress: (step: string, detail: string, progress: number) => void;
@@ -232,6 +232,10 @@ async function applyUrlLevelKeywordIntelligence(options: {
   const getUrlKeywords = options.provider.getUrlKeywords;
   if (!getUrlKeywords || !options.strategy.pageMap?.length) return 0;
 
+  // CLIENT-workspace SERP geo for the per-URL ranked-keyword queries — `{}` when the
+  // geo-targeting flag is OFF (byte-identical to pre-P4), resolved geo when ON. (P4)
+  const geo = workspaceProviderGeo(options.workspaceId);
+
   const candidates = options.strategy.pageMap
     .filter(pm => !!pm.pagePath)
     .slice(0, URL_LEVEL_KEYWORD_PAGE_LIMIT);
@@ -242,7 +246,7 @@ async function applyUrlLevelKeywordIntelligence(options: {
     const pageUrl = _resolvePageUrl(options.baseUrl, pm.pagePath);
     if (!pageUrl) return false;
     try {
-      const urlKeywords = await getUrlKeywords(pageUrl, options.workspaceId, URL_LEVEL_KEYWORD_PER_PAGE_LIMIT);
+      const urlKeywords = await getUrlKeywords(pageUrl, options.workspaceId, URL_LEVEL_KEYWORD_PER_PAGE_LIMIT, undefined, geo.locationCode, geo.languageCode);
       const top = _chooseUrlLevelKeyword(urlKeywords);
       if (!top) return false;
       pm.urlLevelKeywords = urlKeywords.slice(0, URL_LEVEL_KEYWORD_PER_PAGE_LIMIT).map(k => ({
@@ -363,6 +367,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
         if (serp.paa) features.push('people_also_ask');
         if (serp.video) features.push('video');
         if (serp.localPack) features.push('local_pack');
+        if (serp.aiOverview) features.push('ai_overview');
         // Always write serpFeatures for exact matches (even empty) so COALESCE overwrites
         // stale features if provider data changed. Pages with no exact match are left
         // undefined → null → COALESCE keeps previous value (correct for unmatched pages).
@@ -535,6 +540,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
         if (serp.paa) features.push('people_also_ask');
         if (serp.video) features.push('video');
         if (serp.localPack) features.push('local_pack');
+        if (serp.aiOverview) features.push('ai_overview');
         if (features.length > 0) cg.serpFeatures = features;
       }
       // Attach related question keywords to each gap
@@ -597,34 +603,29 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
   // reads cg.opportunityScore back as a 0..100 composite — feeding it an unbounded EMV would
   // break the `opportunityScore/100` math).
   //
-  // Phase 2 (keyword-value-scoring flag): build the base score ONCE at the top of the per-gap
-  // loop so all three computeOpportunityScore sites (spine input, OV fallback, P4-OFF write) use
-  // the same value. Flag-OFF keeps the legacy computeOpportunityScore (byte-identical regardless
-  // of the P4 / relaxConservatism state). ctx is built once per enrichment run, never per gap.
+  // Build the value-first base score ONCE at the top of the per-gap loop so the spine input
+  // and the OV fallback use the same value. computeKeywordValueScore is the base; the legacy
+  // computeOpportunityScore is the signal-gate fallback. Value-first scoring is unconditional
+  // (the keyword-value-scoring flag was retired in SEO Decision Engine P1). ctx is built once
+  // per enrichment run, never per gap.
   if (strategy.contentGaps?.length) {
-    // Build ctx once per enrichment run — only when the flag is ON (avoids extra DB reads on the
-    // flag-OFF path, preserving byte-identity and perf).
-    const valueScoringOn = isFeatureEnabled('keyword-value-scoring', workspaceId);
-    const scoringCtx = valueScoringOn ? (() => {
-      const ws = getWorkspace(workspaceId);
-      return {
-        posture: getLocalSeoPosture(workspaceId),
-        markets: listLocalSeoMarkets(workspaceId),
-        city: ws?.businessProfile?.address?.city?.toLowerCase(),
-        state: ws?.businessProfile?.address?.state?.toLowerCase(),
-      };
-    })() : null;
+    // Build the value-scoring ctx once per enrichment run.
+    const ws = getWorkspace(workspaceId);
+    const scoringCtx = {
+      posture: getLocalSeoPosture(workspaceId),
+      markets: listLocalSeoMarkets(workspaceId),
+      city: ws?.businessProfile?.address?.city?.toLowerCase(),
+      state: ws?.businessProfile?.address?.state?.toLowerCase(),
+    };
 
     for (const cg of strategy.contentGaps) {
-      // base = value-first score when the flag is ON; legacy score when OFF.
-      // computeKeywordValueScore may return undefined (signal gate) — fall back to
-      // computeOpportunityScore in that case so a gap is never silently dropped.
-      const base: number | undefined = valueScoringOn && scoringCtx != null
-        ? (computeKeywordValueScore(
-            { keyword: cg.targetKeyword, volume: cg.volume, difficulty: cg.difficulty, cpc: cg.cpc, intent: cg.intent },
-            scoringCtx,
-          ) ?? computeOpportunityScore(cg))
-        : computeOpportunityScore(cg);
+      // Value-first score; computeKeywordValueScore may return undefined (signal
+      // gate) — fall back to computeOpportunityScore so a gap is never silently dropped.
+      const base: number | undefined =
+        computeKeywordValueScore(
+          { keyword: cg.targetKeyword, volume: cg.volume, difficulty: cg.difficulty, cpc: cg.cpc, intent: cg.intent },
+          scoringCtx,
+        ) ?? computeOpportunityScore(cg);
 
       if (relaxConservatism) {
         const ov = computeOpportunityValue({
@@ -649,7 +650,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
       }
     }
     // Sort descending so highest-value gaps surface first in the UI
-    strategy.contentGaps.sort((a, b) => (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0));
+    strategy.contentGaps.sort(compareKeywordOpportunityScoreDesc);
     log.info({ workspaceId, count: strategy.contentGaps.length, basis: relaxConservatism ? 'ov-emv' : 'legacy' }, 'Computed content gap opportunity scores');
   }
 
@@ -903,28 +904,7 @@ Rules:
   // opportunities after enrichment. Now we keep all and sort: positive-volume first,
   // then unenriched (no data yet), then confirmed-zero-volume at bottom.
   if (strategy.contentGaps?.length) {
-    const prioWeight = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
-    strategy.contentGaps = [...strategy.contentGaps].sort(
-      (a: StrategyContentGap, b: StrategyContentGap) => {
-        // Bucket values (higher = sorted first, descending):
-        //   2 = Positive volume (>0) OR GSC-proven impressions — confirmed demand
-        //   1 = Unenriched (null/undefined) — not yet checked, potential
-        //   0 = Zero volume with no impressions — enriched but no proven demand
-        const getBundle = (gap: StrategyContentGap) => {
-          if (gap.volume == null) return { bucket: 1, vol: 0 };  // unenriched bucket 1 (null OR undefined)
-          if (gap.volume > 0) return { bucket: 2, vol: gap.volume };   // positive volume bucket 2
-          if ((gap.impressions ?? 0) > 0) return { bucket: 2, vol: gap.impressions! }; // GSC-proven demand even at volume=0
-          return { bucket: 0, vol: 0 };                                 // confirmed zero demand bucket 0
-        };
-        const aBundle = getBundle(a);
-        const bBundle = getBundle(b);
-
-        // Sort by bucket desc, then by volume desc within bucket, then by priority desc
-        return bBundle.bucket - aBundle.bucket ||
-               bBundle.vol - aBundle.vol ||
-               prioWeight(b.priority ?? '') - prioWeight(a.priority ?? '');
-      }
-    );
+    strategy.contentGaps = [...strategy.contentGaps].sort(compareContentGapDemandDisplayOrder);
     log.info(`Content gaps: ${strategy.contentGaps.length} total (sorted, none dropped)`);
   }
 

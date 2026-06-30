@@ -20,6 +20,15 @@ const {
   mockUpsertAnomalyDigestInsight,
   mockApplyScoreAdjustment,
   mockInvalidateIntelligenceCache,
+  mockDeleteStaleInsightsByType,
+  mockGetSearchPeriodComparison,
+  mockGetTopDroppedGscPage,
+  mockGetTopSpikedGscPage,
+  mockGetGA4PeriodComparison,
+  mockGetGA4Conversions,
+  mockGetTopDroppedGA4Page,
+  mockGetTopSpikedGA4Page,
+  mockNotifyAnomalyAlert,
 } = vi.hoisted(() => ({
   mockGetInsights: vi.fn().mockReturnValue([]),
   mockUpsertInsight: vi.fn(),
@@ -28,13 +37,33 @@ const {
   mockUpsertAnomalyDigestInsight: vi.fn(),
   mockApplyScoreAdjustment: vi.fn().mockReturnValue({ data: {}, adjustedScore: 50 }),
   mockInvalidateIntelligenceCache: vi.fn(),
+  mockDeleteStaleInsightsByType: vi.fn(),
+  mockGetSearchPeriodComparison: vi.fn(),
+  mockGetTopDroppedGscPage: vi.fn(),
+  mockGetTopSpikedGscPage: vi.fn(),
+  mockGetGA4PeriodComparison: vi.fn(),
+  mockGetGA4Conversions: vi.fn(),
+  mockGetTopDroppedGA4Page: vi.fn(),
+  mockGetTopSpikedGA4Page: vi.fn(),
+  mockNotifyAnomalyAlert: vi.fn(),
 }));
 
 // --- Mock all side-effecting dependencies BEFORE importing the module under test ---
 vi.mock('../../server/broadcast.js', () => ({ broadcastToWorkspace: vi.fn() }));
 vi.mock('../../server/ws-events.js', () => ({ WS_EVENTS: {} }));
-vi.mock('../../server/email.js', () => ({ notifyAnomalyAlert: vi.fn() }));
+vi.mock('../../server/email.js', () => ({ notifyAnomalyAlert: mockNotifyAnomalyAlert }));
 vi.mock('../../server/ai.js', () => ({ callAI: vi.fn() }));
+vi.mock('../../server/search-console.js', () => ({
+  getSearchPeriodComparison: mockGetSearchPeriodComparison,
+  getTopDroppedGscPage: mockGetTopDroppedGscPage,
+  getTopSpikedGscPage: mockGetTopSpikedGscPage,
+}));
+vi.mock('../../server/google-analytics.js', () => ({
+  getGA4PeriodComparison: mockGetGA4PeriodComparison,
+  getGA4Conversions: mockGetGA4Conversions,
+  getTopDroppedGA4Page: mockGetTopDroppedGA4Page,
+  getTopSpikedGA4Page: mockGetTopSpikedGA4Page,
+}));
 vi.mock('../../server/logger.js', () => ({
   createLogger: () => ({
     info: vi.fn(),
@@ -49,14 +78,17 @@ vi.mock('../../server/analytics-insights-store.js', () => ({
   cloneInsightParams: mockCloneInsightParams,
   getInsight: mockGetInsight,
   upsertAnomalyDigestInsight: mockUpsertAnomalyDigestInsight,
+  deleteStaleInsightsByType: mockDeleteStaleInsightsByType,
 }));
 vi.mock('../../server/insight-score-adjustments.js', () => ({
   applyScoreAdjustment: mockApplyScoreAdjustment,
 }));
 vi.mock('../../server/workspace-intelligence.js', () => ({
-  invalidateIntelligenceCache: mockInvalidateIntelligenceCache,
   buildWorkspaceIntelligence: vi.fn(),
   buildIntelPrompt: vi.fn(),
+}));
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
+  invalidateIntelligenceCache: mockInvalidateIntelligenceCache,
 }));
 vi.mock('../../server/bridge-infrastructure.js', () => ({
   debouncedAnomalyBoost: vi.fn(),
@@ -70,6 +102,7 @@ import {
   acknowledgeAnomaly,
   reverseAnomalyBoostIfNoneRemain,
   clearOldAnomalies,
+  runAnomalyDetection,
 } from '../../server/anomaly-detection.js';
 
 // ─── Helper: insert anomaly row directly (createAnomaly is private) ───────────
@@ -142,10 +175,16 @@ beforeEach(() => {
   cleanAnomalies(ws.workspaceId);
   cleanAnomalies(wsA.workspaceId);
   cleanAnomalies(wsB.workspaceId);
+  db.prepare("DELETE FROM anomalies WHERE id = '__last_scan__'").run();
   vi.clearAllMocks();
   mockGetInsights.mockReturnValue([]);
   mockApplyScoreAdjustment.mockReturnValue({ data: {}, adjustedScore: 50 });
   mockCloneInsightParams.mockImplementation((i: unknown) => ({ ...(i as object) }));
+  mockGetSearchPeriodComparison.mockRejectedValue(new Error('GSC not configured'));
+  mockGetTopDroppedGscPage.mockResolvedValue(null);
+  mockGetTopSpikedGscPage.mockResolvedValue(null);
+  mockGetGA4PeriodComparison.mockRejectedValue(new Error('GA4 not configured'));
+  mockGetGA4Conversions.mockResolvedValue([]);
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -273,6 +312,47 @@ describe('listAnomalies', () => {
     const result = listAnomalies(ws.workspaceId, false);
     const ids = result.map(a => a.id);
     expect(ids.indexOf(newer)).toBeLessThan(ids.indexOf(older));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// runAnomalyDetection notifications
+// ═══════════════════════════════════════════════════════════
+
+describe('runAnomalyDetection — client anomaly email payload', () => {
+  const originalAppUrl = process.env.APP_URL;
+
+  afterAll(() => {
+    if (originalAppUrl === undefined) {
+      delete process.env.APP_URL;
+    } else {
+      process.env.APP_URL = originalAppUrl;
+    }
+  });
+
+  it('passes a dashboard URL into critical client anomaly alerts', async () => {
+    process.env.APP_URL = 'https://portal.test';
+    const anomalyWs = seedWorkspace({ gscPropertyUrl: 'https://example.com/' });
+    db.prepare('UPDATE workspaces SET client_email = ? WHERE id = ?').run('client@example.com', anomalyWs.workspaceId);
+    mockGetSearchPeriodComparison.mockResolvedValue({
+      current: { clicks: 300, impressions: 4000, ctr: 3, position: 8 },
+      previous: { clicks: 600, impressions: 4100, ctr: 4, position: 7 },
+      change: { clicks: -300, impressions: -100, ctr: -1, position: 1 },
+      changePercent: { clicks: -50, impressions: -2.4, ctr: -25, position: 14.2 },
+    });
+
+    try {
+      await runAnomalyDetection(true);
+
+      expect(mockNotifyAnomalyAlert).toHaveBeenCalledWith(expect.objectContaining({
+        workspaceId: anomalyWs.workspaceId,
+        clientEmail: 'client@example.com',
+        dashboardUrl: `https://portal.test/client/${anomalyWs.workspaceId}`,
+      }));
+    } finally {
+      cleanAnomalies(anomalyWs.workspaceId);
+      anomalyWs.cleanup();
+    }
   });
 });
 

@@ -14,7 +14,7 @@ import type {
   TemplateSection,
 } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
-import { getSchemaTypesForTemplate } from './content-matrices.js';
+import { getSchemaTypesForTemplate } from './schema/template-schema-types.js';
 
 const log = createLogger('content-templates');
 

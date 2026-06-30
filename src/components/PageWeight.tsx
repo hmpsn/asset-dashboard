@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { pageWeight as pageWeightApi } from '../api/seo';
 import { EmptyState, Icon, Button, ClickableRow, FormInput, FormSelect } from './ui';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
 import { formatBytes } from '../utils/formatNumbers';
 
 interface PageAsset {
@@ -54,7 +55,7 @@ function PageWeight({ siteId, workspaceId }: Props) {
   const [data, setData] = useState<PageWeightResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasRun, setHasRun] = useState(false);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, toggleExpand] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'page' | 'cms' | 'css'>('all');
   const [error, setError] = useState<string | null>(null);
@@ -81,14 +82,6 @@ function PageWeight({ siteId, workspaceId }: Props) {
       .catch((err) => { console.error('PageWeight operation failed:', err); });
     return () => { cancelled = true; };
   }, [siteId, workspaceId]);
-
-  const toggleExpand = (page: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(page)) next.delete(page); else next.add(page);
-      return next;
-    });
-  };
 
   if (!hasRun) {
     return (

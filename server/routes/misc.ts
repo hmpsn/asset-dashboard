@@ -11,7 +11,7 @@ import { broadcast } from '../broadcast.js';
 import type * as OpenAIMod from 'openai';
 import type { default as SharpConstructor } from 'sharp';
 import { getUploadRoot } from '../data-dir.js';
-import { getAuditTrafficForWorkspace } from '../helpers.js';
+import { getAuditTrafficForWorkspace } from '../audit-traffic.js';
 import { upload, moveUploadedFiles, requireClientPortalAuth } from '../middleware.js';
 import { triggerOptimize } from '../processor.js';
 import { listSites, getPageDom } from '../webflow.js';

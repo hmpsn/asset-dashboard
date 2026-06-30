@@ -52,8 +52,13 @@ vi.mock('../../server/provider-keyword-metrics.js', () => ({
 vi.mock('../../server/url-helpers.js', () => ({ resolveBaseUrl: mocks.resolveBaseUrl }));
 vi.mock('../../server/workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: mocks.buildWorkspaceIntelligence,
+}));
+
+vi.mock('../../server/intelligence/formatters.js', () => ({
   formatForPrompt: mocks.formatForPrompt,
   formatPageMapForPrompt: mocks.formatPageMapForPrompt,
+}));
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
   invalidateIntelligenceCache: mocks.invalidateIntelligenceCache,
 }));
 vi.mock('../../server/workspaces.js', () => ({ getTokenForSite: mocks.getTokenForSite }));

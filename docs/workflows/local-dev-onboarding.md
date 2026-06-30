@@ -21,6 +21,15 @@ Wave 5 item: `platform-reliability-local-dev-onboarding`
 - Run core smoke coverage: `npm run smoke:core`
 - Safety guard: `seed:demo` is blocked in `production`; non-local environments require `ALLOW_NON_LOCAL_DEMO_SEED=true`.
 
+## Local database location (read before configuring/seeding via a script)
+
+The SQLite DB is `$DATA_DIR/dashboard.db`; in dev with `DATA_DIR` unset it defaults to `~/.asset-dashboard/dashboard.db` (resolved in `server/data-dir.js` → `server/db/index.ts`). Migrations apply automatically on **server boot** (tracked in the `_migrations` table) — there is no separate migrate step (`npm run db:migrate` is a legacy JSON-data script, not the `.sql` runner; and `db:sync-staging` syncs **prod → staging**, never down to local).
+
+**Worktree gotcha (cost a real debugging detour):** a separate git worktree/checkout should set its own `DATA_DIR` in `.env` (e.g. `DATA_DIR=$HOME/.asset-dashboard-<suffix>`) to isolate its DB from the main checkout. Two consequences to remember:
+
+- The server reads **`DATA_DIR`**, not `DATA_BASE` — a `DATA_BASE=...` env (e.g. in a `.claude/launch.json` runner) is **ignored**, so the DB path silently falls back to the `DATA_DIR` default.
+- A standalone `tsx scripts/...` that configures or seeds a workspace must run with the **same `DATA_DIR`** the server uses (`DATA_DIR=$HOME/.asset-dashboard-<suffix> npx tsx scripts/...`), or it writes to a *different* `dashboard.db` than the running server reads — the config appears to "not take effect." Confirm which file the server actually has open with `lsof -p <server-pid> | grep dashboard.db`.
+
 ## Fixture Workspaces
 
 `npm run seed:demo` creates or updates:

@@ -38,6 +38,9 @@ function contentSubscriptionKeys(workspaceId: string): readonly QueryInvalidatio
 function strategyMutationKeys(workspaceId: string): readonly QueryInvalidationKey[] {
   return [
     queryKeys.admin.keywordStrategy(workspaceId),
+    queryKeys.admin.strategyDiff(workspaceId),
+    queryKeys.admin.backlinkProfile(workspaceId),
+    queryKeys.admin.competitorIntelAll(workspaceId),
     queryKeys.admin.keywordFeedback(workspaceId),
     queryKeys.admin.keywordCommandCenter(workspaceId),
     queryKeys.admin.rankTrackingKeywords(workspaceId),
@@ -217,6 +220,10 @@ function adminInvalidationKeys(
         queryKeys.client.intelligence(workspaceId),
         queryKeys.client.rankHistory(workspaceId),
         queryKeys.client.latestRanks(workspaceId),
+        // The Issue (Client) P0 — a saved outcomeValue/segmentConfig changes the dollar verdict, so
+        // the ROI caches (which now carry outcomeVerdict) must refresh on workspace update.
+        queryKeys.admin.roi(workspaceId),
+        queryKeys.client.roi(workspaceId),
       ] as const;
     case WS_EVENTS.PAGE_STATE_UPDATED:
       return [
@@ -253,7 +260,6 @@ function adminInvalidationKeys(
       return [queryKeys.admin.workspaceDeliverables(workspaceId)] as const;
     case WS_EVENTS.INSIGHT_RESOLVED:
       return [
-        queryKeys.admin.actionQueue(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.client.clientInsights(workspaceId),
         queryKeys.client.intelligence(workspaceId),
@@ -318,6 +324,12 @@ function adminInvalidationKeys(
         queryKeys.admin.outcomePlaybooks(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
       ] as const;
+    case WS_EVENTS.FORM_CAPTURE_CONFIG_UPDATED:
+      return [
+        queryKeys.admin.conversionTrackingStatus(workspaceId),
+        queryKeys.admin.roi(workspaceId),
+        queryKeys.client.roi(workspaceId),
+      ] as const;
     case WS_EVENTS.SUGGESTED_BRIEF_UPDATED:
       return [
         queryKeys.admin.aiSuggestedBriefs(workspaceId),
@@ -327,7 +339,6 @@ function adminInvalidationKeys(
       ] as const;
     case WS_EVENTS.INSIGHT_BRIDGE_UPDATED:
       return [
-        queryKeys.admin.actionQueue(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.client.clientInsights(workspaceId),
         // Bridge score adjustments change feed ordering (2026-06-09 audit).
@@ -402,15 +413,62 @@ function adminInvalidationKeys(
         queryKeys.admin.recommendations(workspaceId),
         queryKeys.shared.pageEditStates(workspaceId, false),
         queryKeys.shared.pageEditStates(workspaceId, true),
-        queryKeys.admin.actionQueue(workspaceId),
         queryKeys.admin.workspaceHome(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.client.intelligence(workspaceId),
+      ] as const;
+    case WS_EVENTS.RECOMMENDATIONS_DISCUSSION_UPDATED:
+      return [
+        queryKeys.admin.recDiscussion(workspaceId),
+        queryKeys.client.curatedRecommendations(workspaceId),
       ] as const;
     case WS_EVENTS.STRATEGY_UPDATED:
       return strategyMutationKeys(workspaceId);
     case WS_EVENTS.RANK_TRACKING_UPDATED:
       return rankTrackingMutationKeys(workspaceId);
+    case WS_EVENTS.SERP_SNAPSHOTS_REFRESHED:
+      // P6 national-serp-tracking: a national SERP refresh upserted serp_snapshots →
+      // re-pull the command center so the drawer's live-SERP / AI-Overview detail updates.
+      return [queryKeys.admin.keywordCommandCenter(workspaceId)] as const;
+    case WS_EVENTS.LOCAL_GBP_SNAPSHOTS_REFRESHED:
+      // P7 local-gbp: a GBP/reviews refresh upserted business_listing_snapshots → re-pull the
+      // GbpReviewsPanel's OWN query key (a distinct prefix; localSeo does NOT cascade to it),
+      // plus the local-SEO panel + command center. Without localGbpReviews the panel only refreshes
+      // from the triggering mutation — mid-job progress + other tabs would go stale (P7 review).
+      return [
+        queryKeys.admin.localGbpReviews(workspaceId),
+        queryKeys.admin.localSeo(workspaceId),
+        queryKeys.admin.keywordCommandCenter(workspaceId),
+      ] as const;
+    case WS_EVENTS.GBP_CONNECTION_UPDATED:
+      return [
+        queryKeys.admin.gbpConnection(),
+        queryKeys.admin.gbpAccounts(),
+        queryKeys.admin.gbpLocations(),
+        queryKeys.admin.gbpWorkspaceMappings(workspaceId),
+        queryKeys.admin.gbpAuthenticatedReviews(workspaceId),
+        queryKeys.admin.localSeoLocations(workspaceId),
+      ] as const;
+    case WS_EVENTS.GBP_REVIEWS_UPDATED:
+      return [
+        queryKeys.admin.gbpAuthenticatedReviews(workspaceId),
+        queryKeys.admin.localGbpReviews(workspaceId),
+      ] as const;
+    case WS_EVENTS.GBP_REVIEW_RESPONSES_UPDATED:
+      return [
+        queryKeys.admin.gbpReviewResponses(workspaceId),
+        queryKeys.admin.gbpAuthenticatedReviews(workspaceId),
+        queryKeys.admin.workspaceDeliverables(workspaceId),
+      ] as const;
+    case WS_EVENTS.LLM_MENTIONS_SNAPSHOTS_REFRESHED:
+      // P8 ai-visibility: a llm-mentions refresh upserted llm_mention_snapshots → re-pull the
+      // AI-visibility KPI's OWN query key (distinct prefix; must be listed explicitly) + the
+      // strategy/intelligence surfaces that carry the AI-visibility slice summary.
+      return [
+        queryKeys.admin.aiVisibility(workspaceId),
+        queryKeys.admin.keywordStrategy(workspaceId),
+        queryKeys.admin.intelligenceAll(workspaceId),
+      ] as const;
     case WS_EVENTS.LOCAL_SEO_UPDATED:
       return [
         queryKeys.admin.localSeo(workspaceId),
@@ -545,7 +603,14 @@ function clientDashboardInvalidationKeys(
       return [queryKeys.client.contentSubscription(workspaceId)] as const;
     case WS_EVENTS.DELIVERABLE_SENT:
     case WS_EVENTS.DELIVERABLE_UPDATED:
-      return [queryKeys.client.unifiedInbox(workspaceId)] as const;
+    case WS_EVENTS.GBP_REVIEW_RESPONSES_UPDATED:
+      // strategy-the-issue (Phase 2): a rec→deliverable send / response surfaces in the
+      // evergreen curated feed + the loop footer — refresh both halves of the loop.
+      return [
+        queryKeys.client.unifiedInbox(workspaceId),
+        queryKeys.client.theIssue(workspaceId),
+        queryKeys.client.recResponses(workspaceId),
+      ] as const;
     case WS_EVENTS.COPY_SECTION_UPDATED:
       return [
         queryKeys.client.copyEntries(workspaceId),
@@ -560,7 +625,13 @@ function clientDashboardInvalidationKeys(
         queryKeys.client.workFeedActivity(workspaceId),
       ] as const;
     case WS_EVENTS.WORKSPACE_UPDATED:
-      return [queryKeys.client.pricing(workspaceId)] as const;
+      // client.roi carries the outcomeVerdict (The Issue P0), which depends on the workspace's
+      // outcomeValue/segmentConfig — refresh it when those are saved.
+      return [queryKeys.client.pricing(workspaceId), queryKeys.client.roi(workspaceId)] as const;
+    case WS_EVENTS.FORM_CAPTURE_CONFIG_UPDATED:
+      // client.roi carries the outcomeVerdict provenance label; saving tracked forms can flip it to
+      // measured_action before the next capture poll.
+      return [queryKeys.client.roi(workspaceId)] as const;
     case WS_EVENTS.PAGE_STATE_UPDATED:
       return [
         queryKeys.shared.pageEditStates(workspaceId, false),
@@ -569,7 +640,18 @@ function clientDashboardInvalidationKeys(
         queryKeys.client.workFeedActivity(workspaceId),
       ] as const;
     case WS_EVENTS.RECOMMENDATIONS_UPDATED:
-      return [queryKeys.shared.recommendations(workspaceId)] as const;
+      // strategy-the-issue (Phase 2): the curated feed + the loop-footer response summary
+      // both derive from the rec set — refresh them alongside the shared raw read so a
+      // greenlit/sent rec updates the client surface immediately (both-halves contract).
+      return [
+        queryKeys.shared.recommendations(workspaceId),
+        queryKeys.client.theIssue(workspaceId),
+        queryKeys.client.recResponses(workspaceId),
+      ] as const;
+    case WS_EVENTS.RECOMMENDATIONS_DISCUSSION_UPDATED:
+      // Client reads rec discussion via the curated read — refresh it on a discussion update
+      // (both halves of the broadcast; the curated consumer lands in Phase 4).
+      return [queryKeys.client.curatedRecommendations(workspaceId)] as const;
     case WS_EVENTS.BRIEFING_PUBLISHED:
       return [queryKeys.client.briefing(workspaceId)] as const;
     case WS_EVENTS.STRATEGY_UPDATED:
@@ -638,6 +720,9 @@ function clientDashboardInvalidationKeys(
       return [queryKeys.client.annotations(workspaceId)] as const;
     case WS_EVENTS.ANOMALIES_UPDATE:
       return [queryKeys.client.anomalies(workspaceId)] as const;
+    case WS_EVENTS.DIAGNOSTIC_COMPLETE:
+    case WS_EVENTS.DIAGNOSTIC_FAILED:
+      return [queryKeys.client.diagnostics(workspaceId)] as const;
     case WS_EVENTS.SCHEMA_PLAN_SENT:
     case WS_EVENTS.SCHEMA_PLAN_UPDATED:
       return [queryKeys.client.schemaPlan(workspaceId)] as const;
@@ -679,6 +764,7 @@ function clientUnifiedInboxInvalidationKeys(
     case WS_EVENTS.CONTENT_REQUEST_UPDATE:
     case WS_EVENTS.POST_UPDATED:
     case WS_EVENTS.WORK_ORDER_UPDATE:
+    case WS_EVENTS.GBP_REVIEW_RESPONSES_UPDATED:
       return [queryKeys.client.unifiedInbox(workspaceId)] as const;
     case WS_EVENTS.WORK_ORDER_COMMENT: {
       const orderId = readStringField(data, 'id');

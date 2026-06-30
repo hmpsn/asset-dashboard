@@ -20,8 +20,14 @@ const state = vi.hoisted(() => ({
   aiResult: null as { text: string; tokens: { prompt: number; completion: number; total: number } } | null,
 }));
 
-vi.mock('../../server/webflow-pages.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../server/webflow-pages.js')>();
+// The route imports getSiteSubdomain from the `server/webflow.js` BARREL (which re-exports it
+// via `export * from './webflow-pages.js'`). Mocking the underlying webflow-pages.js module did
+// NOT reliably propagate through the `export *` re-export — under some test-shard evaluation
+// orders the barrel bound the real function before the mock applied, so getSiteSubdomain returned
+// null and the "404 when subdomain resolved" case got a 400. Mock the exact module the route
+// imports from (the barrel) so interception is order-independent.
+vi.mock('../../server/webflow.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/webflow.js')>();
   return {
     ...actual,
     getSiteSubdomain: vi.fn(async () => state.siteSubdomain),

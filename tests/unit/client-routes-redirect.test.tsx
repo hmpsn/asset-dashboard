@@ -3,10 +3,9 @@
 // Pin the backward-compat redirect contract for client routes:
 //   /client/:id?tab=X        → /client/:id/X     (legacy redirect fires)
 //   /client/:id/inbox?tab=X  → render as-is      (`?tab=` is filter, not tab)
-//   /client/:id/content      → /client/:id/inbox?tab=content
 //
 // The legacy redirect was originally intended for old-style URLs of the form
-// `/client/:id?tab=approvals`. When `<ActionQueueStrip>` (Phase 2 of
+// `/client/:id?tab=performance`. When `<ActionQueueStrip>` (Phase 2 of
 // client-briefing-v2) started deep-linking to `/client/:id/inbox?tab=X` to
 // pass a filter selection to <InboxTab>, the redirect over-fired and rewrote
 // the URL to `/client/:id/X` — losing the inbox base and silently routing
@@ -16,7 +15,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, useParams, useSearchParams } from 'react-router-dom';
 import { Navigate } from 'react-router-dom';
-import { clientPath, isClientInboxAlias } from '../../src/routes';
+import { clientPath, resolveClientInboxRouteAlias } from '../../src/routes';
 
 // Re-implement the function under test inline. The production version lives
 // in App.tsx and is not exported. Keeping the test isolated to the redirect
@@ -27,27 +26,21 @@ function ClientRoutes({ betaMode = false }: { betaMode?: boolean }) {
   const [searchParams] = useSearchParams();
   const workspaceId = params.workspaceId!;
   const splatTab = params['*'] || undefined;
-  const splatRoot = splatTab?.split('/')[0];
+  const splatTabId = splatTab?.split('/')[0];
+  const legacyInboxFilter = resolveClientInboxRouteAlias(splatTabId);
+  if (legacyInboxFilter && workspaceId) {
+    const remaining = new URLSearchParams(searchParams);
+    remaining.delete('tab');
+    const qs = remaining.toString();
+    const target = clientPath(workspaceId, splatTabId);
+    return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
+  }
   const queryTab = searchParams.get('tab');
   if (queryTab && workspaceId && !splatTab) {
     const remaining = new URLSearchParams(searchParams);
     remaining.delete('tab');
     const qs = remaining.toString();
     const target = clientPath(workspaceId, queryTab, betaMode);
-    return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
-  }
-  if (workspaceId && isClientInboxAlias(splatRoot)) {
-    const remaining = new URLSearchParams(searchParams);
-    remaining.delete('tab');
-    const qs = remaining.toString();
-    const target = clientPath(workspaceId, splatRoot, betaMode);
-    return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
-  }
-  if (workspaceId && splatRoot === 'schema-review') {
-    const remaining = new URLSearchParams(searchParams);
-    remaining.delete('tab');
-    const qs = remaining.toString();
-    const target = clientPath(workspaceId, 'schema-review', betaMode);
     return <Navigate to={target + (qs ? `${target.includes('?') ? '&' : '?'}${qs}` : '')} replace />;
   }
   // Stand-in for ClientDashboard so we can introspect what initialTab + URL
@@ -84,24 +77,24 @@ describe('ClientRoutes legacy ?tab= redirect', () => {
     expect(getByTestId('tabParam').textContent).toBe('<none>');
   });
 
-  it('redirects legacy ?tab=content to the unified inbox reviews filter', () => {
-    const { getByTestId } = renderRoutes('/client/ws_test?tab=content');
+  it('redirects old-style ?tab=inbox to /client/:id/inbox and leaves no tab query', () => {
+    const { getByTestId } = renderRoutes('/client/ws_test?tab=inbox');
+    expect(getByTestId('initialTab').textContent).toBe('inbox');
+    expect(getByTestId('tabParam').textContent).toBe('<none>');
+  });
+
+  it('preserves /client/:id/inbox?tab=reviews without redirecting', () => {
+    // The Phase-2 deep-link contract: when a tab path is already present,
+    // ?tab= is a filter for the inner page, not the top-level tab.
+    const { getByTestId } = renderRoutes('/client/ws_test/inbox?tab=reviews');
     expect(getByTestId('initialTab').textContent).toBe('inbox');
     expect(getByTestId('tabParam').textContent).toBe('reviews');
   });
 
-  it('preserves /client/:id/inbox?tab=X without redirecting', () => {
-    // The Phase-2 deep-link contract: when a tab path is already present,
-    // ?tab= is a filter for the inner page, not the top-level tab.
-    const { getByTestId } = renderRoutes('/client/ws_test/inbox?tab=approvals');
-    expect(getByTestId('initialTab').textContent).toBe('inbox');
-    expect(getByTestId('tabParam').textContent).toBe('approvals');
-  });
-
   it('preserves multi-key query params on inbox path', () => {
-    const { getByTestId } = renderRoutes('/client/ws_test/inbox?tab=content&filter=published');
+    const { getByTestId } = renderRoutes('/client/ws_test/inbox?tab=decisions&filter=pending');
     expect(getByTestId('initialTab').textContent).toBe('inbox');
-    expect(getByTestId('tabParam').textContent).toBe('content');
+    expect(getByTestId('tabParam').textContent).toBe('decisions');
   });
 
   it('still passes through /client/:id with no params', () => {
@@ -116,41 +109,41 @@ describe('ClientRoutes legacy ?tab= redirect', () => {
     expect(getByTestId('tabParam').textContent).toBe('<none>');
   });
 
-  it('redirects legacy /client/:id/content to the inbox reviews filter', () => {
+  it('redirects retired /client/:id/content to Inbox Reviews', () => {
     const { getByTestId } = renderRoutes('/client/ws_test/content');
     expect(getByTestId('initialTab').textContent).toBe('inbox');
     expect(getByTestId('tabParam').textContent).toBe('reviews');
   });
 
-  it('redirects legacy /client/:id/requests to the inbox conversations filter', () => {
+  it('redirects retired /client/:id/requests to Inbox Conversations', () => {
     const { getByTestId } = renderRoutes('/client/ws_test/requests');
     expect(getByTestId('initialTab').textContent).toBe('inbox');
     expect(getByTestId('tabParam').textContent).toBe('conversations');
   });
 
-  it('redirects legacy /client/:id/approvals to the inbox decisions filter', () => {
+  it('redirects retired /client/:id/approvals to Inbox Decisions', () => {
     const { getByTestId } = renderRoutes('/client/ws_test/approvals');
     expect(getByTestId('initialTab').textContent).toBe('inbox');
     expect(getByTestId('tabParam').textContent).toBe('decisions');
   });
 
-  it('redirects legacy /client/:id/schema-review to inbox reviews filter', () => {
+  it('redirects retired /client/:id/schema-review to Inbox Reviews', () => {
     const { getByTestId } = renderRoutes('/client/ws_test/schema-review');
     expect(getByTestId('initialTab').textContent).toBe('inbox');
     expect(getByTestId('tabParam').textContent).toBe('reviews');
   });
 });
 
-describe('clientPath legacy client inbox aliases', () => {
-  it('points content navigation at the inbox reviews filter', () => {
+describe('clientPath client routes', () => {
+  it('canonicalizes retired content route aliases to Inbox Reviews', () => {
     expect(clientPath('ws_test', 'content')).toBe('/client/ws_test/inbox?tab=reviews');
   });
 
-  it('points requests navigation at the inbox conversations filter', () => {
+  it('canonicalizes retired requests route aliases to Inbox Conversations', () => {
     expect(clientPath('ws_test', 'requests')).toBe('/client/ws_test/inbox?tab=conversations');
   });
 
-  it('points approvals navigation at the inbox decisions filter', () => {
+  it('canonicalizes retired approvals route aliases to Inbox Decisions', () => {
     expect(clientPath('ws_test', 'approvals')).toBe('/client/ws_test/inbox?tab=decisions');
   });
 
@@ -158,7 +151,7 @@ describe('clientPath legacy client inbox aliases', () => {
     expect(clientPath('ws_test', 'performance')).toBe('/client/ws_test/performance');
   });
 
-  it('maps retired schema-review links to the inbox reviews filter', () => {
+  it('canonicalizes retired schema-review links to Inbox Reviews', () => {
     expect(clientPath('ws_test', 'schema-review')).toBe('/client/ws_test/inbox?tab=reviews');
   });
 });

@@ -7,8 +7,8 @@
  * - selecting a filter calls onChange(filterId) and closes dropdown
  * - clear button appears when a filter is active
  * - clear calls onChange(null)
- * - does NOT include the 6 primary segment filters (all, in_strategy, tracked,
- *   needs_review, retired, local)
+ * - does NOT include primary segment filters (all, striking_distance, in_strategy,
+ *   tracked, needs_review, retired, local)
  */
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within, fireEvent } from '@testing-library/react';
@@ -30,6 +30,7 @@ function allFilterMetas(): KeywordCommandCenterFilterMeta[] {
     { id: KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW, label: 'Needs Review', count: 12 },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.RETIRED, label: 'Retired', count: 8 },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL, label: 'Local', count: 22 },
+    { id: KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE, label: 'Striking Distance', count: 14 },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.CONTENT, label: 'Content', count: 15 },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.PAGE_ASSIGNED, label: 'Page Assigned', count: 10 },
     { id: KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE, label: 'Raw Evidence', count: 5 },
@@ -111,7 +112,7 @@ describe('HubAdvancedFilters', () => {
     expect(listbox).toBeInTheDocument();
   });
 
-  it('does NOT include the 6 primary segment filters in the dropdown', () => {
+  it('does NOT include the primary segment filters in the dropdown', () => {
     render(
       <HubAdvancedFilters
         activeAdvancedFilter={null}
@@ -128,6 +129,7 @@ describe('HubAdvancedFilters', () => {
 
     // Primary filters must NOT appear in the dropdown
     expect(listboxText).not.toContain('In Strategy');
+    expect(listboxText).not.toContain('Striking Distance');
     expect(listboxText).not.toContain('Needs Review');
     expect(listboxText).not.toContain('Retired');
 

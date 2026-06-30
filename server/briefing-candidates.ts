@@ -5,7 +5,7 @@ import { getSchedule } from './scheduled-audits.js';
 import { listContentGaps } from './content-gaps.js';
 import { getActionsByWorkspace, getOutcomesForAction } from './outcome-tracking.js';
 import { computeROI } from './roi.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import { createLogger } from './logger.js';
 import type {
   BriefingCategory,

@@ -42,7 +42,7 @@ interface InlineApprovalCardProps {
 
 /**
  * Item 2 — the ONLY fields that are client-editable before approve (seoTitle / seoDescription).
- * NEVER `schema` — the legacy ApprovalsTab hid Edit for schema (long JSON-LD is not hand-edited).
+ * NEVER `schema` — the retired approvals UI hid Edit for schema (long JSON-LD is not hand-edited).
  */
 const EDITABLE_FIELDS = new Set(['seoTitle', 'seoDescription']);
 

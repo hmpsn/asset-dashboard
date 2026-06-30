@@ -10,11 +10,11 @@ import {
   setDeliverableStatus, updateDeliverableContent, exportDeliverables,
 } from '../brand-identity.js';
 import type { DeliverableTier } from '../../shared/types/brand-engine.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { getWorkspace } from '../workspaces.js';
 import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 import { aiLimiter } from '../middleware.js';
-import { sanitizeErrorMessage } from '../helpers.js';
+import { sanitizeErrorMessage } from '../utils/text.js';
 
 const router = Router();
 

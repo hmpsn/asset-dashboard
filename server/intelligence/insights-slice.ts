@@ -1,7 +1,7 @@
 import type { IntelligenceOptions, InsightsSlice } from '../../shared/types/intelligence.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity } from '../../shared/types/analytics.js';
 import { createLogger } from '../logger.js';
-import { matchPageIdentity } from '../helpers.js';
+import { matchPageIdentity } from '../utils/page-address.js';
 
 const log = createLogger('workspace-intelligence/insights');
 

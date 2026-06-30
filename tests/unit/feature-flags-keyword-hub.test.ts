@@ -7,8 +7,9 @@ import {
 
 // Wave 4 — Keyword Hub Phase C cutover (2026-06-11). The `keyword-hub` umbrella flag
 // was RETIRED once the Hub became the only keyword surface (KCC + Rank Tracker deleted).
-// The "Keyword Hub" group survives with its two coverage/scoring sub-flags, which keep
-// their own independent removal conditions.
+// The `keyword-value-scoring` flag was also RETIRED (value-first scoring is now
+// unconditional), leaving `keyword-universe-full` as the sole surviving member of the
+// "Keyword Hub" group, with its own independent removal condition.
 describe('Keyword Hub feature-flag group (post-keyword-hub retirement)', () => {
   it('keyword-hub flag is fully retired (removed from defaults, catalog, and groups)', () => {
     expect('keyword-hub' in FEATURE_FLAGS).toBe(false);
@@ -29,17 +30,18 @@ describe('Keyword Hub feature-flag group (post-keyword-hub retirement)', () => {
     expect(hubBucket?.keys).toContain('keyword-universe-full');
   });
 
-  it('keyword-value-scoring survives, defaults OFF, and stays in the Keyword Hub group', () => {
-    expect(FEATURE_FLAGS['keyword-value-scoring']).toBe(false);
-    const entry = FEATURE_FLAG_CATALOG['keyword-value-scoring'];
-    expect(entry.group).toBe('Keyword Hub');
-    const hubBucket = FEATURE_FLAG_GROUPS.find(g => g.label === 'Keyword Hub');
-    expect(hubBucket?.keys).toContain('keyword-value-scoring');
+  it('keyword-value-scoring is fully retired (removed from defaults, catalog, and groups)', () => {
+    expect('keyword-value-scoring' in FEATURE_FLAGS).toBe(false);
+    expect('keyword-value-scoring' in FEATURE_FLAG_CATALOG).toBe(false);
+    const groupsWithKey = FEATURE_FLAG_GROUPS.filter(g =>
+      (g.keys as readonly string[]).includes('keyword-value-scoring'),
+    );
+    expect(groupsWithKey).toHaveLength(0);
   });
 
-  it('the Keyword Hub group retains exactly the two surviving keys', () => {
+  it('the Keyword Hub group retains exactly the one surviving key', () => {
     const hubBucket = FEATURE_FLAG_GROUPS.find(g => g.label === 'Keyword Hub');
-    expect(hubBucket?.keys).toEqual(['keyword-universe-full', 'keyword-value-scoring']);
+    expect(hubBucket?.keys).toEqual(['keyword-universe-full']);
   });
 
   it('importing the module runs assertFeatureFlagGroupingConsistency() without throwing', () => {

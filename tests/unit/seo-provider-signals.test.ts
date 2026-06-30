@@ -141,6 +141,16 @@ describe('hasSerpOpportunity', () => {
     expect(result.localPack).toBe(true);
   });
 
+  it('detects ai_overview (string label — ranked_keywords has no numeric code for it)', () => {
+    const result = hasSerpOpportunity('ai_overview');
+    expect(result.aiOverview).toBe(true);
+    expect(result.featuredSnippet).toBe(false);
+  });
+
+  it('ai_overview is false when absent', () => {
+    expect(hasSerpOpportunity('0,3,11').aiOverview).toBe(false);
+  });
+
   it('detects multiple opportunities from combined codes', () => {
     // 0=featured_snippet, 3=people_also_ask, 5=video, 11=local_pack
     const result = hasSerpOpportunity('0,3,5,11');

@@ -44,12 +44,15 @@ describe('Task 2 — rank-tracking key collapse', () => {
     expect(src).not.toContain('rankTrackingKeywordRows');
   });
 
-  // ── Sanity: KeywordStrategy still reads rankTrackingKeywords ─────────────
+  // ── Sanity: the rank-tracking consumer still reads rankTrackingKeywords ──
+  // The read moved out of KeywordStrategy.tsx into the useTrackKeyword hook during the
+  // Phase 0 strategy-page decomposition; this guard follows the code to its new home.
 
-  it('KeywordStrategy.tsx still reads rankTrackingKeywords (unchanged)', () => {
-    const src = read('src/components/KeywordStrategy.tsx');
-    expect(src).toContain('rankTrackingKeywords');
-    // And it must not have acquired the deleted key
-    expect(src).not.toContain('rankTrackingKeywordRows');
+  it('useTrackKeyword reads rankTrackingKeywords and never the deleted Rows key', () => {
+    const hook = read('src/components/strategy/hooks/useTrackKeyword.ts');
+    expect(hook).toContain('rankTrackingKeywords');
+    expect(hook).not.toContain('rankTrackingKeywordRows');
+    // The orchestrator must not reintroduce the deleted key either.
+    expect(read('src/components/KeywordStrategy.tsx')).not.toContain('rankTrackingKeywordRows');
   });
 });

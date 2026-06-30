@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "updatedAt": "2026-06-27",
+  "cycles": {
+    "server": 0,
+    "src": 0
+  },
+  "maxCircularComponentFiles": {
+    "server": 0,
+    "src": 0
+  },
+  "allowedDirectRouteDbIndexImports": [
+    "server/routes/content-briefs.ts",
+    "server/routes/copy-pipeline.ts",
+    "server/routes/health.ts",
+    "server/routes/keyword-strategy.ts",
+    "server/routes/local-seo.ts",
+    "server/routes/public-portal.ts",
+    "server/routes/recommendations.ts"
+  ]
+}

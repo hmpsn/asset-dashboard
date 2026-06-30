@@ -43,6 +43,7 @@ const ROWS = [
 ];
 
 vi.mock('../../../src/hooks/admin/useKeywordCommandCenter', () => ({
+  useKeywordCommandCenterInitialView: () => ({ data: undefined, isLoading: false, isError: true, error: new Error('initial disabled in test') }),
   useKeywordCommandCenterSummary: () => ({ data: { counts: {}, filters: [] }, isLoading: false }),
   useKeywordCommandCenterRows: () => ({
     data: { rows: ROWS, pageInfo: undefined },
@@ -55,6 +56,7 @@ vi.mock('../../../src/hooks/admin/useKeywordCommandCenter', () => ({
   useKeywordCommandCenterDetail: () => ({ data: undefined, isFetching: false }),
   useRankTrackingAddKeyword: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, error: null }),
   useRankTrackingTogglePin: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  useNationalSerpRefresh: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
 
 vi.mock('../../../src/hooks/admin/useLocalSeo', () => ({

@@ -36,8 +36,10 @@ export const MODEL_VERSION = 'ov-1';
  *  outcome time-to-measure (P5) will tune this per action type. */
 const HORIZON_WEEKS = 12;
 
-/** Default effort (person-days) per branch. Calibration path: P5 derives real
- *  time-to-implement from action_outcomes once history accrues. */
+/** Default effort (person-days) per branch — the FALLBACK. recommendations.ts now
+ *  overrides this per recommendation with the workspace's MEASURED median
+ *  time-to-implement (getEffortPriorDays → input.effortDays) once ≥ MIN_EFFORT_SAMPLES
+ *  outcomes of that action type accrue; this default applies until then. */
 const DEFAULT_EFFORT_DAYS: Record<OpportunityInput['branch'], number> = {
   quick_win: 1,
   ranking_opp: 5,
@@ -48,7 +50,7 @@ const DEFAULT_EFFORT_DAYS: Record<OpportunityInput['branch'], number> = {
   diagnostic: 2,
   // local: targeting a local market (a service page + local-intent content/tracking) is
   // comparable to a content-gap play in effort — neither a one-line fix nor a multi-week
-  // technical project. Calibration path: P5 derives real time-to-implement from outcomes.
+  // technical project. Overridden by measured effort priors (getEffortPriorDays) once outcomes accrue.
   local: 4,
 };
 

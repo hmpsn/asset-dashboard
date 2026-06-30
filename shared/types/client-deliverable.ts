@@ -24,12 +24,15 @@ export const DELIVERABLE_TYPES = [
   'internal_link',
   'aeo_change',
   'content_decay',
+  'cannibalization',
   'content_plan_sample',
   'content_plan_template',
   'work_order',
   'briefing',
   'copy_section',
   'content_request',
+  'recommendation',
+  'gbp_review_response',
 ] as const;
 export type DeliverableType = (typeof DELIVERABLE_TYPES)[number];
 

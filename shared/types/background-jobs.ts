@@ -32,6 +32,11 @@ export const BACKGROUND_JOB_TYPES = {
   CONTENT_POST_REVIEW: 'content-post-review',
   CONTENT_POST_FIX: 'content-post-fix',
   CONTENT_POST_VOICE_SCORE: 'content-post-voice-score',
+  INTELLIGENCE_RECOMPUTE: 'intelligence-recompute',
+  NATIONAL_SERP_REFRESH: 'national-serp-refresh',
+  LOCAL_GBP_REFRESH: 'local-gbp-refresh',
+  GBP_REVIEW_REPLY_PUBLISH: 'gbp-review-reply-publish',
+  LLM_MENTIONS_REFRESH: 'llm-mentions-refresh',
 } as const;
 
 export type BackgroundJobType = typeof BACKGROUND_JOB_TYPES[keyof typeof BACKGROUND_JOB_TYPES];
@@ -272,6 +277,36 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     description: 'Scores a generated post against the workspace brand voice.',
     cancellable: false,
     resultBehavior: 'domain-store-and-result',
+  },
+  [BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE]: {
+    label: 'Refreshing signals',
+    description: 'Recomputes analytics insights / intelligence signals for a workspace.',
+    cancellable: false,
+    resultBehavior: 'domain-store',
+  },
+  [BACKGROUND_JOB_TYPES.NATIONAL_SERP_REFRESH]: {
+    label: 'Refreshing national SERP ranks',
+    description: 'Reads national advanced-SERP rank + AI-Overview citation for tracked keywords.',
+    cancellable: true,
+    resultBehavior: 'domain-store',
+  },
+  [BACKGROUND_JOB_TYPES.LOCAL_GBP_REFRESH]: {
+    label: 'Refreshing GBP + reviews',
+    description: 'Reads Google Business Profile health + review counts for the client and local competitors.',
+    cancellable: true,
+    resultBehavior: 'domain-store',
+  },
+  [BACKGROUND_JOB_TYPES.GBP_REVIEW_REPLY_PUBLISH]: {
+    label: 'Publishing GBP review reply',
+    description: 'Publishes an explicitly approved Google Business Profile review response.',
+    cancellable: false,
+    resultBehavior: 'domain-store',
+  },
+  [BACKGROUND_JOB_TYPES.LLM_MENTIONS_REFRESH]: {
+    label: 'Refreshing AI visibility',
+    description: 'Reads the LLM-mention share-of-voice + source domains for the client domain.',
+    cancellable: true,
+    resultBehavior: 'domain-store',
   },
 };
 

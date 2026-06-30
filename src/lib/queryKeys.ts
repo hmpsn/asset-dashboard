@@ -57,9 +57,18 @@ export const queryKeys = {
     contentTemplates: (wsId: string) => ['content-templates', wsId] as const,
     contentMatrices: (wsId: string) => ['content-matrices', wsId] as const,
     roi: (wsId: string) => ['admin-roi', wsId] as const,
+    // The Issue (Client) P1a — admin conversion-tracking verification readout (pinned/typed/
+    // forms-connected/last-lead). Invalidated by form capture + form-source config broadcasts.
+    conversionTrackingStatus: (wsId: string) => ['admin-conversion-tracking-status', wsId] as const,
+    // The Issue (Client) P1b — admin paginated named-leads readout (PII; requireWorkspaceAccess).
+    formSubmissions: (wsId: string) => ['admin-form-submissions', wsId] as const,
 
     // SEO / Audit
     auditAll: () => ['admin-audit'] as const,
+    auditLatest: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-audit', 'latest', siteId, wsId] as const : ['admin-audit', 'latest', siteId] as const,
+    auditHistory: (siteId: string, wsId?: string) =>
+      wsId ? ['admin-audit', 'history', siteId, wsId] as const : ['admin-audit', 'history', siteId] as const,
     auditTraffic: (siteId: string) => ['admin-audit-traffic', siteId] as const,
     auditTrafficAll: () => ['admin-audit-traffic'] as const,
     auditSuppressions: (wsId: string) => ['admin-audit-suppressions', wsId] as const,
@@ -88,8 +97,15 @@ export const queryKeys = {
     seoSuggestions: (wsId: string) => ['seo-suggestions', wsId] as const,
     rewritePages: (wsId: string) => ['admin-rewrite-pages', wsId] as const,
     keywordStrategy: (wsId: string) => ['keyword-strategy', wsId] as const,
+    strategyDiff: (wsId: string) => ['admin-strategy-diff', wsId] as const,
+    /** Strategy redesign P2 pre-commit (consumed in P3) — the managed keyword working set
+     *  (strategy_keyword_set). Invalidated by the STRATEGY_KEYWORD_SET_UPDATED handler. */
+    strategyKeywordSet: (wsId: string) => ['admin-strategy-keyword-set', wsId] as const,
+    contentDecay: (wsId: string) => ['admin-content-decay', wsId] as const,
+    backlinkProfile: (wsId: string) => ['admin-backlink-profile', wsId] as const,
     keywordFeedback: (wsId: string) => ['admin-keyword-feedback', wsId] as const,
     keywordCommandCenter: (wsId: string) => ['admin-keyword-command-center', wsId] as const,
+    keywordCommandCenterInitial: (wsId: string, query: unknown) => ['admin-keyword-command-center', wsId, 'initial', query] as const,
     keywordCommandCenterSummary: (wsId: string) => ['admin-keyword-command-center', wsId, 'summary'] as const,
     keywordCommandCenterRows: (wsId: string, query: unknown) => ['admin-keyword-command-center', wsId, 'rows', query] as const,
     keywordCommandCenterDetail: (wsId: string, keyword: string) => ['admin-keyword-command-center', wsId, 'detail', keyword] as const,
@@ -97,6 +113,14 @@ export const queryKeys = {
     localSeoVariant: (wsId: string, includeSnapshots: boolean) =>
       ['admin-local-seo', wsId, includeSnapshots ? 'with-snapshots' : 'summary'] as const,
     localSeoLocations: (wsId: string) => ['admin-local-seo-locations', wsId] as const,
+    localGbpReviews: (wsId: string) => ['admin-local-gbp-reviews', wsId] as const,
+    gbpConnection: () => ['admin-gbp-connection'] as const,
+    gbpAccounts: () => ['admin-gbp-accounts'] as const,
+    gbpLocations: () => ['admin-gbp-locations'] as const,
+    gbpWorkspaceMappings: (wsId: string) => ['admin-gbp-workspace-mappings', wsId] as const,
+    gbpAuthenticatedReviews: (wsId: string) => ['admin-gbp-authenticated-reviews', wsId] as const,
+    gbpReviewResponses: (wsId: string) => ['admin-gbp-review-responses', wsId] as const,
+    aiVisibility: (wsId: string) => ['admin-ai-visibility', wsId] as const,
     eeatAssets: (wsId: string) => ['admin-eeat-assets', wsId] as const,
     rankTrackingKeywords: (wsId: string) => ['admin-rank-tracking-keywords', wsId] as const,
     rankTrackingLatest: (wsId: string) => ['admin-rank-tracking-latest', wsId] as const,
@@ -113,9 +137,15 @@ export const queryKeys = {
     insightFeed: (wsId: string) => ['admin-insight-feed', wsId] as const,
     intelligenceSignals: (wsId: string) => ['admin-intelligence-signals', wsId] as const,
     aiSuggestedBriefs: (wsId: string) => ['admin-ai-suggested-briefs', wsId] as const,
-    actionQueue: (wsId: string) => ['admin-action-queue', wsId] as const,
     meetingBrief: (wsId: string) => ['admin-meeting-brief', wsId] as const,
+    strategyPov: (wsId: string) => ['admin-strategy-pov', wsId] as const,
+    autoSendPolicy: (wsId: string) => ['admin-auto-send-policy', wsId] as const,
+    issueLenses: (wsId: string) => ['admin-issue-lenses', wsId] as const,
+    competitorAlerts: (wsId: string) => ['admin-competitor-alerts', wsId] as const,
+    operatorOverrides: (wsId: string) => ['admin-operator-overrides', wsId] as const,
     recommendations: (wsId: string) => ['admin-recommendations', wsId] as const,
+    /** Strategy v3 — discussion thread for a workspace's recs (admin cockpit Discuss filter). */
+    recDiscussion: (wsId: string) => ['admin-rec-discussion', wsId] as const,
 
     // Brand Engine — Brandscripts
     brandscripts: (wsId: string) => ['admin-brandscripts', wsId] as const,
@@ -218,6 +248,10 @@ export const queryKeys = {
 
     // Data
     activity: (wsId: string) => ['client-activity', wsId] as const,
+    /** Strategy v3 — the curated, clientStatus='sent' recs the client actually sees (spec §7.2).
+     *  DISTINCT from shared.recommendations (the raw read) — its own key so the curated overview
+     *  invalidates independently and the byte-identical shared key is never disturbed. */
+    curatedRecommendations: (wsId: string) => ['client-curated-recommendations', wsId] as const,
     /**
      * R2-B agency "work feed" activity. DISTINCT from `activity` above: the work
      * feed query (`useClientActivityFeed`) fetches a different shape
@@ -252,6 +286,8 @@ export const queryKeys = {
     strategy: (wsId: string) => ['client-strategy', wsId] as const,
     strategyGuidance: (wsId: string) => ['client-strategy-guidance', wsId] as const,
     roi: (wsId: string) => ['client-roi', wsId] as const,
+    // The Issue (Client) P1b — the client's OWN captured leads (authed client-portal read).
+    myLeads: (wsId: string) => ['client-my-leads', wsId] as const,
     keywordFeedback: (wsId: string) => ['client-keyword-feedback', wsId] as const,
     pricing: (wsId: string) => ['client-pricing', wsId] as const,
     contentSubscription: (wsId: string) => ['client-content-subscription', wsId] as const,
@@ -267,6 +303,7 @@ export const queryKeys = {
     outcomeSummary: (wsId: string) => ['client-outcome-summary', wsId] as const,
     outcomeWins: (wsId: string) => ['client-outcome-wins', wsId] as const,
     intelligence: (wsId: string) => ['client-intelligence', wsId] as const,
+    diagnostics: (wsId: string) => ['client-diagnostics', wsId] as const,
 
     // Client Copy Review
     copyEntries: (wsId: string) => ['client-copy-entries', wsId] as const,
@@ -283,6 +320,21 @@ export const queryKeys = {
     postPreview: (wsId: string, postId: string | undefined) => ['client', 'post-preview', wsId, postId] as const,
     /** Active background jobs visible to this workspace's client portal. */
     jobs: (wsId: string) => ['client-jobs', wsId] as const,
+    /**
+     * Phase 2 (strategy-the-issue) — the evergreen curated recommendation feed the
+     * client sees on TheIssueClientPage. Reads the public `?clientStatus=sent` projection.
+     * Distinct from `shared.recommendations` (raw read) and `curatedRecommendations`
+     * (admin-projection v1) so each surface invalidates independently.
+     * Invalidated by the RECOMMENDATIONS_UPDATED + DELIVERABLE_SENT WS handlers.
+     */
+    theIssue: (wsId: string) => ['client-the-issue', wsId] as const,
+    /**
+     * Phase 2 (strategy-the-issue) — pre-aggregated client response summary for the
+     * loop footer ("you've greenlit N moves · 1 in discussion"). Reads a client-safe
+     * projection of rec responses from the public route.
+     * Invalidated alongside `theIssue` on RECOMMENDATIONS_UPDATED.
+     */
+    recResponses: (wsId: string) => ['client-rec-responses', wsId] as const,
   },
 
   // ── Shared (used by both admin and client contexts) ────────────────

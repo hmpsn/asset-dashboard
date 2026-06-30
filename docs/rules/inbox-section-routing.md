@@ -48,6 +48,9 @@ re-apply routing logic.
 4. Update this doc's "Three sections" table if the new type has special routing.
 5. Check that the `keyword-strategy-action-type` pr-check rule does not affect the new type (it only blocks `'keyword_strategy'` specifically).
 
+> **Source types (current):** `aeo_change`, `internal_link`, `redirect_proposal`, `content_decay`, `cannibalization`.
+> **Worked example — `cannibalization` (Strategy Phase 3b-ii, 2026-06-16):** the production client inbox renders unified `client_deliverable` rows, so the renderer case lives in `src/components/client/DeliverableDetailModal.tsx` (+ the legacy `DecisionDetailModal.tsx`) via a shared `CannibalizationRenderer` in `decision-renderers.tsx` — NOT `ClientActionDetailModal.tsx` (deprecated). A dedicated client-action type ALSO needs, in lockstep (compile-gated): `validSources` (`server/client-actions.ts`), `sourceTypeSchema` (`server/routes/client-actions.ts`), `clientActionDeliverableType` + `CLIENT_ACTION_FAMILY_TYPES` (`deliverable-adapters/client-action-shared.ts`), a new `DeliverableType` in `DELIVERABLE_TYPES` + the parallel `scripts/pr-check.ts` list, a registered adapter (`deliverable-adapters/<type>.ts` + `index.ts`), and the frontend `DELIVERABLE_TYPE_BADGES`/`CLIENT_ACTION_BADGES` maps. Sent without a note → Decisions.
+
 ## Adding a new batch source
 
 Same as above. Verify the `approval_batches.note` column is read by the public endpoint serializer in `server/public-portal.ts`.

@@ -18,10 +18,12 @@ import { humanizeFieldLabel } from '../../lib/decision-adapters';
 import type { ApprovalItem } from '../../../shared/types/approvals';
 import type {
   AeoChangePayload,
+  CannibalizationPayload,
   InternalLinkPayload,
   RedirectProposalPayload,
 } from '../../../shared/types/client-actions';
 import { normalizeInternalLinkSuggestion } from '../../lib/internal-link-client-action';
+import { matchPageIdentity } from '../../lib/pathUtils';
 
 // ── Presentational per-item diff row (the shared per-item flag UX) ──────────
 
@@ -428,6 +430,42 @@ export function RedirectRenderer({ payload }: { payload: RedirectProposalPayload
           <p className="t-caption text-accent-brand flex-1 min-w-0 break-all">{r.target}</p>
         </div>
       ))}
+    </div>
+  );
+}
+
+export function CannibalizationRenderer({ payload }: { payload: CannibalizationPayload }) {
+  const pages = payload.pages ?? [];
+  return (
+    <div className="space-y-3">
+      <p className="t-body text-[var(--brand-text)]">
+        Several of your pages are competing for the same search term, which splits their ranking
+        strength. We recommend consolidating them so one strong page ranks instead of several weak ones.
+      </p>
+      {payload.keyword && (
+        <p className="t-caption text-[var(--brand-text-muted)]">
+          Search term: <span className="text-[var(--brand-text-bright)] font-medium">{payload.keyword}</span>
+        </p>
+      )}
+      {pages.length > 0 && (
+        <div className="space-y-1.5">
+          {pages.map((p, i) => {
+            const isKeeper = payload.canonicalPath ? matchPageIdentity(p.path, payload.canonicalPath) : false;
+            return (
+              <div
+                key={`${p.path}-${i}`}
+                className="flex items-center justify-between gap-3 py-1.5 border-b border-[var(--brand-border)] last:border-b-0"
+              >
+                <span className="t-caption text-[var(--brand-text)] flex-1 min-w-0 break-all">{p.path}</span>
+                {isKeeper && <span className="t-caption-sm text-emerald-400 flex-shrink-0">Recommended to keep</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {payload.recommendation && (
+        <p className="t-caption text-[var(--brand-text-muted)]">{payload.recommendation}</p>
+      )}
     </div>
   );
 }

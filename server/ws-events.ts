@@ -76,6 +76,16 @@ export const WS_EVENTS = {
   OUTCOME_EXTERNAL_DETECTED: 'outcome:external',
   OUTCOME_LEARNINGS_UPDATED: 'outcome:learnings_updated',
   OUTCOME_PLAYBOOK_DISCOVERED: 'outcome:playbook',
+  // The Issue (Client) P1a — Webflow named-lead captured via the forms Data API poller.
+  // Broadcast by the conversion-tracking poller on a NEW (non-duplicate) insert; the
+  // admin conversion-tracking-status query handler (useConversionTrackingStatus) invalidates so the
+  // verification readout's last-lead/connected state refreshes without a poll. PII is never in the
+  // payload (D7) — only { workspaceId, outcomeType }.
+  FORM_SUBMISSION_CAPTURED: 'outcome:form_captured',
+  // The Issue (Client) P1a — operator saved the tracked Webflow form-source mapping. This can flip
+  // the measured_action provenance basis before the next poller capture, so admin setup readouts and
+  // client ROI/provenance caches refresh immediately.
+  FORM_CAPTURE_CONFIG_UPDATED: 'outcome:form_capture_config_updated',
 
   // Intelligence layer cache
   INTELLIGENCE_CACHE_UPDATED: 'intelligence:cache_updated',
@@ -97,6 +107,15 @@ export const WS_EVENTS = {
 
   // Meeting Brief
   MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
+
+  // The Issue — strategy POV (Lane B). Broadcast on generate/regenerate and on every operator
+  // edit (PATCH bumps the version) so the cockpit's useStrategyPov handler invalidates its cache.
+  STRATEGY_POV_GENERATED: 'strategy:pov-generated',
+
+  // The Issue — trust ladder (Phase 4). Broadcast when an operator toggles a per-archetype
+  // auto-send policy; handled locally by src/hooks/admin/useAutoSendPolicy.ts via
+  // useWorkspaceEvents (invalidates queryKeys.admin.autoSendPolicy).
+  STRATEGY_AUTOSEND_POLICY_UPDATED: 'strategy:autosend-policy-updated',
 
   // Brand Engine (Phase 1 — brandscript, discovery, voice, identity)
   BRANDSCRIPT_UPDATED: 'brandscript:updated',
@@ -133,13 +152,33 @@ export const WS_EVENTS = {
 
   // Recommendations
   RECOMMENDATIONS_UPDATED: 'recommendations:updated',
+  RECOMMENDATIONS_DISCUSSION_UPDATED: 'recommendations:discussion_updated',
 
   // Keyword Strategy
   STRATEGY_UPDATED: 'strategy:updated',
+  // Strategy redesign P2 pre-commit (consumed in P3) — broadcast on every managed
+  // keyword working-set mutation (add/remove/keep/reconcile). Hyphen-in-segment form is
+  // canonical (execution-map §1.4), matching the STRATEGY_SIGNAL_FOLD_UPDATED sibling.
+  STRATEGY_KEYWORD_SET_UPDATED: 'strategy:keyword-set-updated',
   RANK_TRACKING_UPDATED: 'rank-tracking:updated',
+  // National SERP rank tracking (SEO Decision Engine P6 / national-serp-tracking) —
+  // fired after a national_serp_refresh job upserts a fresh batch of serp_snapshots.
+  SERP_SNAPSHOTS_REFRESHED: 'serp:snapshots_refreshed',
 
   // Local SEO
   LOCAL_SEO_UPDATED: 'local-seo:updated',
+  // GBP + reviews (SEO Decision Engine P7 / local-gbp) — fired after a local-gbp-refresh
+  // job upserts business_listing_snapshots; refreshes the local-SEO panel + command center.
+  LOCAL_GBP_SNAPSHOTS_REFRESHED: 'local-gbp:snapshots_refreshed',
+  // Authenticated Google Business Profile connection + workspace-location mapping (Phase 2A).
+  GBP_CONNECTION_UPDATED: 'gbp:connection_updated',
+  // Authenticated Google Business Profile review sync + read model (Phase 2B).
+  GBP_REVIEWS_UPDATED: 'gbp:reviews_updated',
+  // Authenticated Google Business Profile review response draft/approval/publish workflow (Phase 2C).
+  GBP_REVIEW_RESPONSES_UPDATED: 'gbp:review_responses_updated',
+  // AI visibility (SEO Decision Engine P8 / ai-visibility) — fired after a llm-mentions-refresh
+  // job upserts a llm_mention_snapshots row; refreshes the AI-visibility KPI + intelligence.
+  LLM_MENTIONS_SNAPSHOTS_REFRESHED: 'llm-mentions:snapshots_refreshed',
 
   // E-E-A-T asset inventory
   EEAT_ASSETS_UPDATED: 'eeat-assets:updated',

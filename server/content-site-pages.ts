@@ -1,5 +1,5 @@
 import { isProgrammingError } from './errors.js';
-import { normalizePageUrl, resolvePagePath } from './helpers.js';
+import { normalizePageUrl, resolvePagePath } from './utils/page-address.js';
 import { createLogger } from './logger.js';
 import { listPageKeywords } from './page-keywords.js';
 import { discoverSitemapUrls, getSiteSubdomain } from './webflow.js';

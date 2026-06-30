@@ -12,6 +12,8 @@ const BRAND_ENGINE_RULES = resolve(ROOT_DIR, 'docs/rules/brand-engine.md');
 const DISPATCHER_AND_HELPERS = new Set([
   'server/ai.ts',
   'server/anthropic-helpers.ts',
+  'server/keyword-strategy-synthesis/ai-callers.ts',
+  'server/narrative-ai.ts',
   'server/openai-helpers.ts',
 ]);
 
@@ -35,11 +37,14 @@ const VOICE_AUTHORITY_INVENTORY: Array<{
   { file: 'server/copy-refresh.ts', classification: 'documented-exception' },
   { file: 'server/diagnostic-orchestrator.ts', classification: 'correct' },
   { file: 'server/discovery-ingestion.ts', classification: 'documented-exception' },
+  { file: 'server/google-business-profile-review-response-ai.ts', classification: 'correct' },
   { file: 'server/internal-links.ts', classification: 'correct' },
   { file: 'server/keyword-recommendations.ts', classification: 'builder-backed' },
   { file: 'server/keyword-strategy-ai-synthesis.ts', classification: 'correct' },
   { file: 'server/llms-txt-generator.ts', classification: 'documented-exception' },
   { file: 'server/meeting-brief-generator.ts', classification: 'correct' },
+  { file: 'server/strategy-pov-generator.ts', classification: 'correct' },
+  { file: 'server/the-issue-lead-value-ai.ts', classification: 'documented-exception' },
   { file: 'server/monthly-digest.ts', classification: 'correct' },
   { file: 'server/page-analysis-job.ts', classification: 'documented-exception' },
   { file: 'server/schema-plan.ts', classification: 'documented-exception' },
@@ -80,7 +85,7 @@ function listTypeScriptFiles(dir: string): string[] {
 function isAiConsumer(relPath: string, source: string): boolean {
   if (DISPATCHER_AND_HELPERS.has(relPath)) return false;
   if (relPath.includes('/__tests__/')) return false;
-  return /\bcallAI\(|\bcallCreativeAI\(|\bcallAnthropic\(|\bcallOpenAI\(/.test(source);
+  return /\bcallAI\(|\bcallCreativeAI\(|\bcallAnthropic\(|\bcallOpenAI\(|\bcallKeywordStrategyAI\(|\bcallNarrativeAI\(/.test(source);
 }
 
 function countByClassification(): Record<VoiceAuthorityClass, number> {
@@ -161,9 +166,11 @@ describe('voice authority consumer inventory', () => {
 
   it('prevents manual voice DNA prompt assembly outside canonical brand-engine authority helpers', () => {
     const allowed = new Set([
+      'server/intelligence/brand-slice.ts',
       'server/intelligence/seo-context-source.ts',
       'server/prompt-assembly.ts',
       'server/voice-calibration.ts',
+      'server/voice-dna-layer2.ts',
       'server/voice-dna-render.ts',
     ]);
 

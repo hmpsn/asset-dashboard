@@ -34,6 +34,18 @@ const keywordStrategySynthesisSrc = fs.readFileSync(
   path.join(serverDir, 'keyword-strategy-ai-synthesis.ts'),
   'utf-8',
 );
+const keywordStrategySiteSynthesisSrc = fs.readFileSync( // readFile-ok — intentional static analysis of OP2 site-synthesis stage ownership
+  path.join(serverDir, 'keyword-strategy-synthesis/site-synthesis.ts'),
+  'utf-8',
+);
+const keywordStrategyPoolSrc = fs.readFileSync( // readFile-ok — intentional static analysis of keyword-pool brand-filter ownership
+  path.join(serverDir, 'keyword-strategy-synthesis/pool.ts'),
+  'utf-8',
+);
+const keywordStrategyFinalizeSrc = fs.readFileSync( // readFile-ok — intentional static analysis of content-gap brand-filter ownership
+  path.join(serverDir, 'keyword-strategy-synthesis/finalize.ts'),
+  'utf-8',
+);
 const contentBriefSrc = fs.readFileSync(
   path.join(serverDir, 'content-brief.ts'),
   'utf-8',
@@ -132,19 +144,19 @@ afterAll(() => {
 
 describe('strategy generation pipeline — static wiring', () => {
   it('imports filterBrandedKeywords and filterBrandedContentGaps from competitor-brand-filter', () => {
-    expect(keywordStrategySynthesisSrc).toContain(
-      "import { filterBrandedKeywords, filterBrandedContentGaps",
-    );
-    expect(keywordStrategySynthesisSrc).toContain('competitor-brand-filter');
+    expect(keywordStrategyPoolSrc).toContain('filterBrandedKeywords');
+    expect(keywordStrategyPoolSrc).toContain('competitor-brand-filter');
+    expect(keywordStrategyFinalizeSrc).toContain('filterBrandedContentGaps');
+    expect(keywordStrategyFinalizeSrc).toContain('competitor-brand-filter');
   });
 
   it('calls filterBrandedKeywords on the keyword pool before AI prompt is built', () => {
     // The call must exist in the shared strategy generation service.
-    expect(keywordStrategySynthesisSrc).toContain('filterBrandedKeywords(keywordPool, competitorDomains)');
+    expect(keywordStrategyPoolSrc).toContain('filterBrandedKeywords(keywordPool, competitorDomains)');
   });
 
   it('calls filterBrandedContentGaps on the AI-returned content gaps before strategy is saved', () => {
-    expect(keywordStrategySynthesisSrc).toContain('filterBrandedContentGaps(rawContentGaps, competitorDomains)');
+    expect(keywordStrategyFinalizeSrc).toContain('filterBrandedContentGaps(rawContentGaps, competitorDomains)');
   });
 
   it('reads competitorDomains from workspace when not provided in request body', () => {
@@ -172,14 +184,17 @@ describe('content gap analysis sub-pipeline — static wiring', () => {
     expect(keywordStrategySynthesisSrc).toContain(
       'Post-generation hard filter: remove any content gaps containing competitor brand names',
     );
-    // The filter call must be present after the master AI call (callStrategyAI for 'master').
-    // We use the specific variable assignment "masterRaw = await callStrategyAI" to locate
-    // the master call — not lastIndexOf('callStrategyAI') which would match a later cluster
-    // AI call that appears after the filter in the file.
-    const afterMasterIdx = keywordStrategySynthesisSrc.indexOf('masterRaw = await callStrategyAI');
-    const filterCallIdx = keywordStrategySynthesisSrc.indexOf('filterBrandedContentGaps(rawContentGaps');
-    expect(afterMasterIdx).toBeGreaterThan(0); // guard: master call must exist
-    expect(filterCallIdx).toBeGreaterThan(afterMasterIdx);
+    // The OP2 master AI call now lives in the site-synthesis stage owner. The
+    // facade must call that stage, then apply the hard content-gap filter before
+    // final strategy assembly.
+    const masterCallIdx = keywordStrategySiteSynthesisSrc.indexOf("], 3000, 'master'");
+    const afterMasterIdx = keywordStrategySynthesisSrc.indexOf('const masterData: MasterStrategyData = await runSiteSynthesis');
+    const filterDelegateIdx = keywordStrategySynthesisSrc.indexOf('filterMasterContentGaps(');
+    const filterCallIdx = keywordStrategyFinalizeSrc.indexOf('filterBrandedContentGaps(rawContentGaps');
+    expect(masterCallIdx).toBeGreaterThan(0); // guard: legacy master call must exist in the OP2 stage owner
+    expect(afterMasterIdx).toBeGreaterThan(0); // guard: OP2 stage invocation must exist in the facade
+    expect(filterDelegateIdx).toBeGreaterThan(afterMasterIdx);
+    expect(filterCallIdx).toBeGreaterThan(0);
   });
 
   it('branded gaps count is logged so the filtering is observable in prod', () => {
@@ -197,15 +212,15 @@ describe('keyword pool — static wiring', () => {
     // The runtime contract is preserved: `runLegacyPoolBuild()` is called (both on the
     // flag-OFF branch AND as the M2 degradation fallback) BEFORE the KEYWORD POOL
     // prompt section is serialized. The brand filter itself runs inside that fold.
-    const filterIdx = keywordStrategySynthesisSrc.indexOf('filterBrandedKeywords(keywordPool');
+    const filterIdx = keywordStrategyPoolSrc.indexOf('filterBrandedKeywords(keywordPool');
     expect(filterIdx).toBeGreaterThan(0); // the filter call must exist in the legacy fold
     // Every `runLegacyPoolBuild()` invocation (flag-OFF + M2 fallback) must precede
     // the prompt build so the pool fed to the AI is already brand-filtered.
-    const promptBuildIdx = keywordStrategySynthesisSrc.indexOf('KEYWORD POOL — VERIFIED search terms');
+    const promptBuildIdx = keywordStrategyPoolSrc.indexOf('KEYWORD POOL — VERIFIED search terms');
     expect(promptBuildIdx).toBeGreaterThan(0);
     const lastInvokeIdx = keywordStrategySynthesisSrc.lastIndexOf('runLegacyPoolBuild();');
     expect(lastInvokeIdx).toBeGreaterThan(0);
-    expect(promptBuildIdx).toBeGreaterThan(lastInvokeIdx);
+    expect(keywordStrategySynthesisSrc.indexOf('buildKeywordPoolSection(keywordPool)')).toBeGreaterThan(lastInvokeIdx);
   });
 
   it('branded keyword removal count is logged', () => {

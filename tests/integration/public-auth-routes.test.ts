@@ -4,6 +4,7 @@
  * Covers:
  * - POST /api/public/auth/:id — shared-password auth
  * - POST /api/public/client-login/:id — client user login (Zod validated)
+ * - POST /api/public/client-refresh/:id — refresh client user JWT cookies
  * - GET /api/public/auth-mode/:id — workspace auth info
  * - POST /api/public/capture-email/:id — portal email capture
  * - POST /api/public/forgot-password/:id — password reset request
@@ -17,10 +18,14 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
-import { createClientUser, createResetToken, deleteClientUser } from '../../server/client-users.js';
+import { createClientUser, createResetToken, deleteClientUser, signClientToken } from '../../server/client-users.js';
 
 const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson } = ctx;
+
+function setCookies(res: Response): string[] {
+  return res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie') ?? ''].filter(Boolean);
+}
 
 // Each describe block that calls rate-limited endpoints gets its own workspace
 // so different rate-limit buckets are used (key = ip:path, path includes wsId).
@@ -165,6 +170,80 @@ describe('POST /api/public/client-login/:id — client user login', () => {
       });
       expect(res.status).toBe(400);
     } finally { deleteWorkspace(ws); }
+  });
+});
+
+// ── POST /api/public/client-refresh/:id ───────────────────────────────────────
+
+describe('POST /api/public/client-refresh/:id — client user token refresh', () => {
+  it('returns 401 when no client user token cookie is present', async () => {
+    ctx.clearCookies();
+    const res = await postJson(`/api/public/client-refresh/${wsLoginTests}`, {});
+    expect(res.status).toBe(401);
+    const body = await res.json() as { error: string };
+    expect(body.error).toMatch(/authentication required/i);
+  });
+
+  it('returns 404 for an unknown workspace', async () => {
+    ctx.clearCookies();
+    const res = await postJson('/api/public/client-refresh/no-such-ws-13500', {});
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects malformed tokens', async () => {
+    ctx.clearCookies();
+    const res = await api(`/api/public/client-refresh/${wsLoginTests}`, {
+      method: 'POST',
+      headers: { Cookie: `client_user_token_${wsLoginTests}=not.a.jwt` },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a valid token issued for another workspace', async () => {
+    const wsA = createWorkspace('PublicAuth-13500-Refresh-A').id;
+    const wsB = createWorkspace('PublicAuth-13500-Refresh-B').id;
+    const userA = await createClientUser('refresh-a@test.local', 'ClientPass1!', 'Refresh A', wsA);
+    try {
+      const tokenA = signClientToken(userA);
+      ctx.clearCookies();
+      const res = await api(`/api/public/client-refresh/${wsB}`, {
+        method: 'POST',
+        headers: { Cookie: `client_user_token_${wsB}=${tokenA}` },
+      });
+      expect(res.status).toBe(401);
+    } finally {
+      deleteClientUser(userA.id, wsA);
+      deleteWorkspace(wsA);
+      deleteWorkspace(wsB);
+    }
+  });
+
+  it('renews both client JWT and legacy session cookies for a valid client user session', async () => {
+    const ws = createWorkspace('PublicAuth-13500-Refresh-Valid').id;
+    const user = await createClientUser('refresh-valid@test.local', 'ClientPass1!', 'Refresh Valid', ws);
+    try {
+      ctx.clearCookies();
+      const loginRes = await postJson(`/api/public/client-login/${ws}`, {
+        email: user.email,
+        password: 'ClientPass1!',
+      });
+      expect(loginRes.status).toBe(200);
+      expect(setCookies(loginRes).some(c => c.startsWith(`client_user_token_${ws}`))).toBe(true);
+      expect(setCookies(loginRes).some(c => c.startsWith(`client_session_${ws}`))).toBe(true);
+
+      const refreshRes = await postJson(`/api/public/client-refresh/${ws}`, {});
+      expect(refreshRes.status).toBe(200);
+      const body = await refreshRes.json() as { ok: boolean; user: { id: string; email: string } };
+      expect(body.ok).toBe(true);
+      expect(body.user).toMatchObject({ id: user.id, email: user.email });
+      const cookies = setCookies(refreshRes);
+      expect(cookies.some(c => c.startsWith(`client_user_token_${ws}`))).toBe(true);
+      expect(cookies.some(c => c.startsWith(`client_session_${ws}`))).toBe(true);
+    } finally {
+      deleteClientUser(user.id, ws);
+      deleteWorkspace(ws);
+      ctx.clearCookies();
+    }
   });
 });
 

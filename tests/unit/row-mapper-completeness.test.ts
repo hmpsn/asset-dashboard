@@ -165,6 +165,9 @@ describe('rowToWorkspace mapper completeness', () => {
       autoPublishAfterHours: 12,
       lastBriefingRunWeekOf: '2026-04-27',
       siteHasSearch: true,
+      outcomeValue: { valuePerOutcome: 600, unitLabel: 'new patient', currency: 'USD', basis: 'agency_estimate', monthlyRetainer: 1500 },
+      segmentConfig: { segment: 'b2b_saas' },
+      targetGeo: { locationCode: 2840, languageCode: 'en', countryCode: 'US', label: 'United States · English' },
     });
 
     const result = getWorkspace(ws.id);
@@ -198,6 +201,10 @@ describe('rowToWorkspace mapper completeness', () => {
       // stripe_subscription_id is set only during Stripe webhook flows; not populated here
       // but IS correctly mapped (ws.stripeSubscriptionId)
       'stripe_subscription_id',
+      // The Issue (Client) P1a — these are set via the conversion-tracking admin form-sources route
+      // (Data-API polling model), NOT updateWorkspace's public Pick, but both ARE mapped (rowToWorkspace).
+      // The legacy webflow_form_webhook_secret column was dropped in migration 150.
+      'webflow_form_sources', 'conversion_tracking_confirmed_at',
       // site_intelligence_client_view uses loose != null check, not if() guard — tested separately
       'site_intelligence_client_view',
       // businessPriorities (camelCase) is a legacy column name from an older migration that used

@@ -5,9 +5,9 @@ import type {
 } from '../../shared/types/intelligence.js';
 import type { StoredKeywordStrategy } from '../../shared/types/keyword-strategy.js';
 import type { RankEntry } from '../rank-tracking.js';
-import { getPrimaryMarketLocationCode } from '../local-seo.js';
+import { getPrimaryMarketLocationCode } from '../domains/local-seo/configuration-service.js';
 import { createLogger } from '../logger.js';
-import { findPageMapEntry } from '../helpers.js';
+import { findPageMapEntry } from '../utils/page-address.js';
 import { createStmtCache } from '../db/stmt-cache.js';
 import db from '../db/index.js';
 import { normalizeSocialProfiles } from '../social-profiles.js';
@@ -25,6 +25,40 @@ const stmts = createStmtCache(() => ({
     'SELECT generated_at FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC',
   ),
 }));
+
+type KeywordStrategyAssemblerModule = {
+  assembleStoredKeywordStrategy: (workspaceId: string) => StoredKeywordStrategy | null;
+};
+
+function serverModulePath(name: 'keyword-strategy-assembler'): `../${typeof name}.js` {
+  return `../${name}.js`;
+}
+
+function buildTopKeywordMovers(
+  latest: RankEntry[],
+): NonNullable<SeoContextSlice['rankTracking']>['topKeywordMovers'] {
+  return [...latest]
+    .filter((rank) => typeof rank.change === 'number' && rank.change !== 0)
+    .sort((a, b) => {
+      const movementDelta = Math.abs(b.change ?? 0) - Math.abs(a.change ?? 0);
+      if (movementDelta !== 0) return movementDelta;
+      const impressionDelta = b.impressions - a.impressions;
+      if (impressionDelta !== 0) return impressionDelta;
+      return a.query.localeCompare(b.query);
+    })
+    .slice(0, 8)
+    .map((rank) => ({
+      query: rank.query,
+      position: rank.position,
+      change: rank.change!,
+      direction: rank.change! < 0 ? 'improved' : 'declined',
+      clicks: rank.clicks,
+      impressions: rank.impressions,
+      ctr: rank.ctr,
+      ...(rank.pagePath ? { pagePath: rank.pagePath } : {}),
+      ...(rank.pageTitle ? { pageTitle: rank.pageTitle } : {}),
+    }));
+}
 
 export async function assembleSeoContext(
   workspaceId: string,
@@ -57,7 +91,7 @@ export async function assembleSeoContext(
   let assembled: StoredKeywordStrategy | null = null;
   try {
     const { assembleStoredKeywordStrategy } =
-      await import('../keyword-strategy-assembler.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      await import(serverModulePath('keyword-strategy-assembler')) as KeywordStrategyAssemblerModule; // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     assembled = assembleStoredKeywordStrategy(workspaceId);
   } catch (asmErr) {
     log.warn(
@@ -98,6 +132,9 @@ export async function assembleSeoContext(
     // prompt handles DNA/guardrails) or (b) the rendered voiceProfileBlock is authoritative.
     // Intelligence-path callers inject this DIRECTLY — it already carries the emphatic
     // BRAND VOICE header when non-empty.
+    // INVARIANT: must stay byte-identical to BrandSlice.voicePromptBlock (brand-slice.ts),
+    // which calls the SAME buildEffectiveBrandVoiceBlock(). Enforced by
+    // tests/contract/voice-block-slice-parity.test.ts — don't change one source without the other.
     effectiveBrandVoiceBlock: buildEffectiveBrandVoiceBlock(workspaceId),
     businessContext: workspace?.keywordStrategy?.businessContext ?? '',
     personas: workspace?.personas ?? [],
@@ -134,6 +171,7 @@ export async function assembleSeoContext(
         trackedKeywords: tracked.length,
         avgPosition,
         positionChanges: { improved, declined, stable },
+        topKeywordMovers: buildTopKeywordMovers(latest),
       };
     },
     { logger: log },
@@ -330,6 +368,7 @@ export async function assembleSeoContext(
           .length,
         localPack: allFeatures.some((f) => f === 'local_pack'),
         videoCarousel: allFeatures.filter((f) => f === 'video').length,
+        aiOverview: allFeatures.filter((f) => f === 'ai_overview').length,
       };
       base.serpFeatures = serpFeatures;
     }
@@ -447,15 +486,14 @@ export async function assembleSeoContext(
     workspaceId,
     undefined,
     async () => {
-      const { loadRecommendations } = await import('../recommendations.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const { loadRecommendations, isActiveRec } = await import('../recommendations.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
       const recSet = loadRecommendations(workspaceId);
       const topId = recSet?.summary?.topRecommendationId ?? null;
       if (topId) {
         const topRec = recSet?.recommendations.find(
           (r) =>
             r.id === topId &&
-            r.status !== 'completed' &&
-            r.status !== 'dismissed',
+            isActiveRec(r),
         );
         if (topRec?.opportunity) {
           return {
@@ -471,6 +509,39 @@ export async function assembleSeoContext(
     { logger: log },
   );
   if (topOpportunity) base.topOpportunity = topOpportunity;
+
+  // AI visibility — aggregates-only LLM-citation summary (SEO Decision Engine P8).
+  // Gated on the `ai-visibility` flag (per-workspace): OFF / no-snapshot = undefined,
+  // so a flag-off or no-data workspace produces no `aiVisibility` and no prose change.
+  // Reads the latest `chat_gpt` snapshot and derives the top competitor / top source
+  // domain (each max by mentions). AGGREGATES ONLY — never raw LLM transcripts. Mirrors
+  // the P7 reviewSummary best-effort pattern.
+  const aiVisibility = await readOptionalSlicePart<SeoContextSlice['aiVisibility']>(
+    'assembleSeoContext: ai visibility',
+    workspaceId,
+    undefined,
+    async () => {
+      const { isFeatureEnabled } = await import('../feature-flags.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      if (!isFeatureEnabled('ai-visibility', workspaceId)) return undefined;
+      const { getLatestLlmMentions } = await import('../llm-mentions-store.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const snapshot = getLatestLlmMentions(workspaceId, 'chat_gpt');
+      if (!snapshot) return undefined;
+      const topCompetitor = snapshot.competitors.reduce<
+        { name: string; mentions: number } | undefined
+      >((best, c) => (best && best.mentions >= c.mentions ? best : { name: c.name, mentions: c.mentions }), undefined);
+      const topSourceDomain = snapshot.sourceDomains.reduce<
+        { domain: string; mentions: number } | undefined
+      >((best, s) => (best && best.mentions >= s.mentions ? best : { domain: s.domain, mentions: s.mentions }), undefined);
+      return {
+        mentions: snapshot.mentions,
+        shareOfVoice: snapshot.shareOfVoice,
+        ...(topCompetitor ? { topCompetitor } : {}),
+        ...(topSourceDomain ? { topSourceDomain } : {}),
+      };
+    },
+    { logger: log },
+  );
+  if (aiVisibility) base.aiVisibility = aiVisibility;
 
   return base;
 }

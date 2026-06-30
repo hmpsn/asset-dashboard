@@ -27,7 +27,7 @@ interface BriefDetailProps {
   regeneratingOutline?: string | null;
   onCopyAsMarkdown: (brief: ContentBrief) => void;
   onExportClientHTML: (brief: ContentBrief) => void;
-  onSendToClient: (brief: ContentBrief) => void;
+  onSendToClient: (brief: ContentBrief, note?: string) => void;
   onConfirmDelete: (brief: ContentBrief) => void;
   hideActions?: ('sendToClient' | 'generatePost' | 'delete')[];
   defaultFeedback?: string;
@@ -43,6 +43,8 @@ export function BriefDetail({
 }: BriefDetailProps) {
   const [showRegenerate, setShowRegenerate] = useState(autoShowRegenerate ?? false);
   const [regenFeedback, setRegenFeedback] = useState(defaultFeedback ?? '');
+  const [showSendNote, setShowSendNote] = useState(false);
+  const [sendNote, setSendNote] = useState('');
   const [showOutlineRegen, setShowOutlineRegen] = useState(false);
   const [outlineRegenFeedback, setOutlineRegenFeedback] = useState('');
   const [postGenerationStyle, setPostGenerationStyle] = useState<ContentGenerationStyle>(
@@ -83,9 +85,9 @@ export function BriefDetail({
           <Icon as={Download} size="sm" /> Export PDF
         </Button>
         {!hideActions?.includes('sendToClient') && (
-        <Button onClick={() => onSendToClient(brief)} disabled={sendingToClient === brief.id} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-cyan-600/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-600/30 transition-colors disabled:opacity-50">
+        <Button onClick={() => setShowSendNote(v => !v)} disabled={sendingToClient === brief.id} variant="ghost" size="sm" className={`rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors disabled:opacity-50 ${showSendNote ? 'bg-teal-600/30 border border-teal-500/40 text-teal-200' : 'bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30'}`}>
           <Icon as={sendingToClient === brief.id ? Loader2 : Send} size="sm" className={sendingToClient === brief.id ? 'animate-spin' : ''} />
-          {sendingToClient === brief.id ? 'Sending...' : 'Send to Client'}
+          {sendingToClient === brief.id ? 'Sending...' : 'Send brief to client'}
         </Button>
         )}
         <Button onClick={() => { navigator.clipboard.writeText(JSON.stringify(brief, null, 2)); }} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
@@ -98,6 +100,43 @@ export function BriefDetail({
           {regeneratingBrief === brief.id ? 'Regenerating...' : 'Regenerate'}
         </Button>
       </div>
+
+      {/* Send brief to client — inline optional note (Admin Send Convention: one button + optional note).
+          Distinct from RequestList's "Send to client": this CREATES a new client request for a
+          standalone brief, so the note seeds the new request's client-facing message. */}
+      {!hideActions?.includes('sendToClient') && showSendNote && sendingToClient !== brief.id && (
+        <div className="bg-teal-500/5 border border-teal-500/20 rounded-[var(--radius-lg)] px-4 py-3 space-y-2">
+          <div className="t-caption-sm text-teal-400 font-medium uppercase tracking-wider">Send brief to client</div>
+          <div className="t-caption-sm text-[var(--brand-text-muted)]">Creates a client request and sends this brief for review. Add an optional note:</div>
+          <FormInput
+            value={sendNote}
+            onChange={setSendNote}
+            placeholder="Optional note for the client…"
+            maxLength={5000}
+            aria-label="Optional note for the client"
+            className="w-full"
+          />
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => { onSendToClient(brief, sendNote.trim() || undefined); setShowSendNote(false); setSendNote(''); }}
+              disabled={sendingToClient === brief.id}
+              variant="ghost"
+              size="sm"
+              className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+            >
+              <Icon as={Send} size="sm" /> Send brief to client
+            </Button>
+            <Button
+              onClick={() => { setShowSendNote(false); setSendNote(''); }}
+              variant="ghost"
+              size="sm"
+              className="rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Regenerate with feedback */}
       {showRegenerate && regeneratingBrief !== brief.id && (

@@ -75,6 +75,16 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
     { expectedLabel: 'Keyword Strategy', expectedCancellable: false, expectedResultBehavior: 'domain-store' },
     'tests/integration/keyword-strategy-job-mutation-safety.test.ts',
   ),
+  [BACKGROUND_JOB_TYPES.NATIONAL_SERP_REFRESH]: entry(
+    'NATIONAL_SERP_REFRESH',
+    { expectedLabel: 'Refreshing national SERP ranks', expectedCancellable: true, expectedResultBehavior: 'domain-store' },
+    'tests/integration/national-serp-routes.test.ts',
+  ),
+  [BACKGROUND_JOB_TYPES.LLM_MENTIONS_REFRESH]: entry(
+    'LLM_MENTIONS_REFRESH',
+    { expectedLabel: 'Refreshing AI visibility', expectedCancellable: true, expectedResultBehavior: 'domain-store' },
+    'tests/integration/ai-visibility-routes.test.ts',
+  ),
   [BACKGROUND_JOB_TYPES.SCHEMA_GENERATOR]: entry(
     'SCHEMA_GENERATOR',
     { expectedLabel: 'Schema Generator', expectedCancellable: true, expectedResultBehavior: 'domain-store-and-result' },
@@ -199,6 +209,24 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
     },
     'tests/integration/local-seo-routes.test.ts',
   ),
+  [BACKGROUND_JOB_TYPES.LOCAL_GBP_REFRESH]: entry(
+    'LOCAL_GBP_REFRESH',
+    {
+      expectedLabel: 'Refreshing GBP + reviews',
+      expectedCancellable: true,
+      expectedResultBehavior: 'domain-store',
+    },
+    'tests/integration/local-gbp-routes.test.ts',
+  ),
+  [BACKGROUND_JOB_TYPES.GBP_REVIEW_REPLY_PUBLISH]: entry(
+    'GBP_REVIEW_REPLY_PUBLISH',
+    {
+      expectedLabel: 'Publishing GBP review reply',
+      expectedCancellable: false,
+      expectedResultBehavior: 'domain-store',
+    },
+    'tests/unit/google-business-profile-review-responses-store.test.ts',
+  ),
   [BACKGROUND_JOB_TYPES.LOCAL_SEO_LOCATION_BACKFILL]: entry(
     'LOCAL_SEO_LOCATION_BACKFILL',
     {
@@ -294,5 +322,14 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
       expectedResultBehavior: 'domain-store-and-result',
     },
     'tests/integration/w6-ai-ops-to-jobs.test.ts',
+  ),
+  [BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE]: entry(
+    'INTELLIGENCE_RECOMPUTE',
+    {
+      expectedLabel: 'Refreshing signals',
+      expectedCancellable: false,
+      expectedResultBehavior: 'domain-store',
+    },
+    'tests/unit/intelligence-recompute-job.test.ts',
   ),
 };

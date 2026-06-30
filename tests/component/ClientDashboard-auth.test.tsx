@@ -39,7 +39,7 @@ vi.mock('../../src/api/client', () => ({
 }));
 
 import { post } from '../../src/api/client';
-import { useClientAuth } from '../../src/hooks/useClientAuth';
+import { CLIENT_SESSION_REFRESH_INTERVAL_MS, useClientAuth } from '../../src/hooks/useClientAuth';
 import type { WorkspaceInfo } from '../../src/components/client/types';
 
 const mockPost = vi.mocked(post);
@@ -289,6 +289,71 @@ describe('useClientAuth — client-user login', () => {
     await waitFor(() => expect(onTurnstileReset).toHaveBeenCalledTimes(1));
     expect(result.current.authError).toBe('Invalid email or password');
     expect(result.current.authenticated).toBe(false);
+  });
+
+  it('silently refreshes auto-restored client-user sessions and renews them on the interval', async () => {
+    const initialUser = { id: 'u1', email: 'a@b.com', name: 'A', role: 'client_member' };
+    const refreshedUser = { ...initialUser, name: 'A Refreshed' };
+    const intervalUser = { ...initialUser, name: 'A Interval' };
+    const setIntervalSpy = vi.spyOn(window, 'setInterval');
+    const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
+    mockPost.mockResolvedValueOnce({ user: refreshedUser });
+
+    try {
+      const { result, unmount } = renderHook(() =>
+        useClientAuth('ws-1', stubWorkspace(), () => {}),
+      );
+
+      act(() => {
+        result.current.setClientUser(initialUser);
+        result.current.setAuthenticated(true);
+      });
+
+      await waitFor(() => expect(mockPost).toHaveBeenCalledWith('/api/public/client-refresh/ws-1'));
+      await waitFor(() => expect(result.current.clientUser).toEqual(refreshedUser));
+      expect(sessionStorage.getItem('dash_auth_ws-1')).toBe('true');
+      expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), CLIENT_SESSION_REFRESH_INTERVAL_MS);
+
+      const refreshIntervalEntries = setIntervalSpy.mock.calls
+        .map((call, index) => ({ call, index }))
+        .filter(({ call }) => call[1] === CLIENT_SESSION_REFRESH_INTERVAL_MS);
+      const latestIntervalEntry = refreshIntervalEntries.at(-1);
+      expect(latestIntervalEntry).toBeDefined();
+      const refreshCallback = latestIntervalEntry!.call[0] as () => Promise<void>;
+      const refreshTimerId = setIntervalSpy.mock.results[latestIntervalEntry!.index].value;
+      mockPost.mockClear();
+      mockPost.mockResolvedValueOnce({ user: intervalUser });
+      await act(async () => {
+        await refreshCallback();
+      });
+
+      expect(mockPost).toHaveBeenCalledWith('/api/public/client-refresh/ws-1');
+      await waitFor(() => expect(result.current.clientUser).toEqual(intervalUser));
+
+      unmount();
+      expect(clearIntervalSpy).toHaveBeenCalledWith(refreshTimerId);
+    } finally {
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+    }
+  });
+
+  it('does not schedule client JWT refresh for shared-password sessions', async () => {
+    const setIntervalSpy = vi.spyOn(window, 'setInterval');
+    try {
+      const { result } = renderHook(() =>
+        useClientAuth('ws-1', stubWorkspace(), () => {}),
+      );
+
+      act(() => {
+        result.current.setAuthenticated(true);
+      });
+
+      expect(mockPost).not.toHaveBeenCalledWith('/api/public/client-refresh/ws-1');
+      expect(setIntervalSpy).not.toHaveBeenCalled();
+    } finally {
+      setIntervalSpy.mockRestore();
+    }
   });
 });
 

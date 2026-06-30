@@ -256,6 +256,7 @@ function makeGenerationHook(overrides: Record<string, unknown> = {}) {
     setPageTypes: vi.fn(),
     setSinglePageTypeOverrides: vi.fn(),
     snapshotDate: null,
+    snapshotLoading: false,
     filteredInitialPages: [],
     runScan: runScanMock,
     stopScan: stopScanMock,
@@ -267,13 +268,13 @@ function makeGenerationHook(overrides: Record<string, unknown> = {}) {
 }
 
 // ── Wrapper ───────────────────────────────────────────────────────────────────
-function makeWrapper() {
+function makeWrapper(initialEntries: string[] = ['/ws/ws-1/seo-schema']) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>{children}</MemoryRouter>
+      <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
     </QueryClientProvider>
   );
 }
@@ -303,14 +304,26 @@ describe('SchemaSuggester', () => {
 
   it('renders without crash showing Generator and Workflow Guide tabs', () => {
     render(<SchemaSuggester siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper() });
-    expect(screen.getByRole('button', { name: /generator/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /workflow guide/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /generator/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /workflow guide/i })).toBeInTheDocument();
   });
 
   it('shows pre-scan generator hero with Generate Schema button when not started', () => {
     render(<SchemaSuggester siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper() });
     expect(screen.getByTestId('schema-generator-hero')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /generate schema/i })).toBeInTheDocument();
+  });
+
+  it('does not flash the generator hero while saved schema results hydrate', async () => {
+    const genMod = await import('../../src/components/schema/useSchemaSuggesterGeneration');
+    vi.mocked(genMod.useSchemaSuggesterGeneration).mockReturnValue(
+      makeGenerationHook({ started: false, snapshotLoading: true }) as ReturnType<typeof genMod.useSchemaSuggesterGeneration>,
+    );
+
+    render(<SchemaSuggester siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper() });
+
+    expect(screen.getByText(/checking saved schema results/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('schema-generator-hero')).not.toBeInTheDocument();
   });
 
   it('calls runScan when Generate Schema button is clicked', () => {
@@ -321,8 +334,17 @@ describe('SchemaSuggester', () => {
 
   it('shows workflow guide when Workflow Guide tab is clicked', async () => {
     render(<SchemaSuggester siteId="site-1" workspaceId="ws-1" />, { wrapper: makeWrapper() });
-    fireEvent.click(screen.getByRole('button', { name: /workflow guide/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /workflow guide/i }));
     expect(screen.getByTestId('schema-workflow-guide')).toBeInTheDocument();
+  });
+
+  it('opens the workflow guide from a ?tab=guide deep link', async () => {
+    render(<SchemaSuggester siteId="site-1" workspaceId="ws-1" />, {
+      wrapper: makeWrapper(['/ws/ws-1/seo-schema?tab=guide']),
+    });
+
+    expect(screen.getByTestId('schema-workflow-guide')).toBeInTheDocument();
+    expect(screen.queryByTestId('schema-generator-hero')).not.toBeInTheDocument();
   });
 
   it('shows loading progress indicator when scan is started and loading', async () => {

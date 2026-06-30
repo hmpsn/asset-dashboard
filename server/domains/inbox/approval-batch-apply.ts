@@ -3,12 +3,12 @@ import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { findBySourceRef } from '../../client-deliverables.js';
 import { classifyApprovalBatch } from './deliverable-adapters/approval-batch-classifier.js';
-import { markDeliverableApplied } from './send-to-client.js';
-import { normalizePageUrl } from '../../helpers.js';
+import { markDeliverableApplied } from './deliverable-apply-state.js';
+import { normalizePageUrl } from '../../utils/page-address.js';
 import { createLogger } from '../../logger.js';
 import { captureBaselineFromGsc } from '../../outcome-measurement.js';
 import { getActionBySource, recordAction } from '../../outcome-tracking.js';
-import { resolveRecommendationsForChange } from '../../recommendations.js';
+import { resolveRecommendationsForChange } from '../recommendations/resolution-service.js';
 import { recordSeoChange } from '../../seo-change-tracker.js';
 import {
   publishCollectionItems,

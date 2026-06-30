@@ -1,15 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import type { BacklinkData } from '../../src/api/seo';
 import { BacklinkProfile } from '../../src/components/strategy/BacklinkProfile';
 
-// Mock the API module
-vi.mock('../../src/api', () => ({
-  backlinks: {
-    get: vi.fn(),
-  },
+// BacklinkProfile now reads via the useBacklinkProfile React Query hook — mock the hook
+// (mirrors the DecayingPagesCard/useContentDecay test pattern) so no QueryClientProvider is needed.
+const state = vi.hoisted(() => ({
+  data: null as BacklinkData | null,
+  isLoading: false,
+  error: null as Error | null,
 }));
-
-import { backlinks } from '../../src/api';
+vi.mock('../../src/hooks/admin/useBacklinkProfile', () => ({
+  useBacklinkProfile: () => ({ data: state.data, isLoading: state.isLoading, error: state.error }),
+}));
 
 const baseOverview = {
   totalBacklinks: 100,
@@ -25,77 +28,51 @@ const baseOverview = {
 describe('BacklinkProfile - Link Types stat card visibility', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    state.data = null;
+    state.isLoading = false;
+    state.error = null;
   });
 
-  it('hides Link Types stat card when all link type counts are 0', async () => {
-    vi.mocked(backlinks.get).mockResolvedValue({
-      domain: 'example.com',
-      overview: { ...baseOverview },
-      referringDomains: [],
-    });
-
+  it('hides Link Types stat card when all link type counts are 0', () => {
+    state.data = { domain: 'example.com', overview: { ...baseOverview }, referringDomains: [] };
     render(<BacklinkProfile workspaceId="test-workspace" />);
-    await screen.findByText('Backlink Profile');
+    expect(screen.getByText('Backlink Profile')).toBeInTheDocument();
     expect(screen.queryByText('Link Types')).not.toBeInTheDocument();
   });
 
-  it('shows Link Types stat card when textLinks > 0', async () => {
-    vi.mocked(backlinks.get).mockResolvedValue({
-      domain: 'example.com',
-      overview: { ...baseOverview, textLinks: 750 },
-      referringDomains: [],
-    });
-
+  it('shows Link Types stat card when textLinks > 0', () => {
+    state.data = { domain: 'example.com', overview: { ...baseOverview, textLinks: 750 }, referringDomains: [] };
     render(<BacklinkProfile workspaceId="test-workspace" />);
-    await screen.findByText('Backlink Profile');
     expect(screen.getByText('Link Types')).toBeInTheDocument();
   });
 
-  it('shows Link Types stat card when imageLinks > 0', async () => {
-    vi.mocked(backlinks.get).mockResolvedValue({
-      domain: 'example.com',
-      overview: { ...baseOverview, imageLinks: 50 },
-      referringDomains: [],
-    });
-
+  it('shows Link Types stat card when imageLinks > 0', () => {
+    state.data = { domain: 'example.com', overview: { ...baseOverview, imageLinks: 50 }, referringDomains: [] };
     render(<BacklinkProfile workspaceId="test-workspace" />);
-    await screen.findByText('Backlink Profile');
     expect(screen.getByText('Link Types')).toBeInTheDocument();
   });
 
-  it('shows Link Types stat card when formLinks > 0', async () => {
-    vi.mocked(backlinks.get).mockResolvedValue({
-      domain: 'example.com',
-      overview: { ...baseOverview, formLinks: 5 },
-      referringDomains: [],
-    });
-
+  it('shows Link Types stat card when formLinks > 0', () => {
+    state.data = { domain: 'example.com', overview: { ...baseOverview, formLinks: 5 }, referringDomains: [] };
     render(<BacklinkProfile workspaceId="test-workspace" />);
-    await screen.findByText('Backlink Profile');
     expect(screen.getByText('Link Types')).toBeInTheDocument();
   });
 
-  it('shows Link Types stat card when frameLinks > 0', async () => {
-    vi.mocked(backlinks.get).mockResolvedValue({
-      domain: 'example.com',
-      overview: { ...baseOverview, frameLinks: 3 },
-      referringDomains: [],
-    });
-
+  it('shows Link Types stat card when frameLinks > 0', () => {
+    state.data = { domain: 'example.com', overview: { ...baseOverview, frameLinks: 3 }, referringDomains: [] };
     render(<BacklinkProfile workspaceId="test-workspace" />);
-    await screen.findByText('Backlink Profile');
     expect(screen.getByText('Link Types')).toBeInTheDocument();
   });
 
-  it('shows Link Types stat card when both textLinks and imageLinks > 0', async () => {
-    vi.mocked(backlinks.get).mockResolvedValue({
-      domain: 'example.com',
-      overview: { ...baseOverview, textLinks: 750, imageLinks: 50 },
-      referringDomains: [],
-    });
-
+  it('shows Link Types stat card when both textLinks and imageLinks > 0', () => {
+    state.data = { domain: 'example.com', overview: { ...baseOverview, textLinks: 750, imageLinks: 50 }, referringDomains: [] };
     render(<BacklinkProfile workspaceId="test-workspace" />);
-    await screen.findByText('Backlink Profile');
     expect(screen.getByText('Link Types')).toBeInTheDocument();
+  });
+
+  it('shows the DataForSEO-required message on a no-provider error', () => {
+    state.error = new Error('No SEO data provider configured. Set DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD to enable backlink data.');
+    render(<BacklinkProfile workspaceId="test-workspace" />);
+    expect(screen.getByText(/requires DataForSEO/i)).toBeInTheDocument();
   });
 });

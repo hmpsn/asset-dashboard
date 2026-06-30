@@ -129,9 +129,10 @@ export interface BriefingSummary {
  * A subset of `ContentGap` (from `shared/types/workspace.ts`) — the fields
  * surfaced in the briefing's "Recommended for You" section. Computed at
  * serve-time from the workspace's current `keywordStrategy.contentGaps[]`,
- * NOT persisted on the briefing draft. Top N (sorted by `opportunityScore`)
- * are returned. The full ContentGap type is imported by name to avoid a
- * cross-module import cycle on the briefing endpoint hot path.
+ * NOT persisted on the briefing draft. Top N are sorted by the server's
+ * private keyword-value sort key when ranking signals exist; `opportunityScore`
+ * remains the public display score. The full ContentGap type is imported by
+ * name to avoid a cross-module import cycle on the briefing endpoint hot path.
  *
  * Phase 2.5b addition.
  */

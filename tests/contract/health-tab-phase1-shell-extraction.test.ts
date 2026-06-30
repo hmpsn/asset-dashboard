@@ -33,7 +33,8 @@ describe('HealthTab phase-1 shell extraction contract', () => {
     const sectionsSource = readFileSync(HEALTH_TAB_SECTIONS_PATH, 'utf-8'); // readFile-ok - migration guard: section module should own detailed audit-detail rendering blocks.
 
     expect(shellSource).toContain('export function useHealthTabShell');
-    expect(shellSource).toContain('const [expandedSections, setExpandedSections]');
+    expect(shellSource).toContain('useToggleSet');
+    expect(shellSource).toContain('const [expandedSections, toggleSection]');
     expect(shellSource).toContain('const [shareOpen, setShareOpen]');
     expect(shellSource).toContain("document.addEventListener('mousedown'");
     expect(shellSource).toContain('const filteredPages = useMemo(');

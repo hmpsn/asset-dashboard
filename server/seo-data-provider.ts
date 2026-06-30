@@ -97,6 +97,130 @@ export interface ReferringDomain {
   lastSeen: string;
 }
 
+// ── National SERP (P6 / national-serp-tracking) ───────────────
+
+/**
+ * Request for a single national advanced-SERP read. `ownerDomain` is the client's live
+ * domain — the provider computes `position`/`matchedUrl`/`aiOverviewCited` RELATIVE to it.
+ * Mirrors the `(request, workspaceId)` shape of `getLocalVisibility`.
+ */
+export interface NationalSerpProviderRequest {
+  keyword: string;
+  /** Client domain to match against organic results + AI-Overview references. */
+  ownerDomain: string;
+  /** Target-geo location code (P4); omit for the US default. */
+  locationCode?: number;
+  /** Target-geo language code (P4); omit for 'en'. */
+  languageCode?: string;
+  device?: 'desktop' | 'mobile';
+}
+
+/**
+ * Parsed national advanced-SERP result for one keyword. All position/citation fields are
+ * relative to `request.ownerDomain`. Built from `serp/google/organic/live/advanced` against
+ * the ground-truth fixture `tests/fixtures/dataforseo-serp-advanced.ts` — not guessed shapes.
+ */
+export interface NationalSerpResult {
+  query: string;
+  /** Client best organic rank_group, or null when the client does not rank. */
+  position: number | null;
+  /** That ranking result's URL, or null when the client does not rank. */
+  matchedUrl: string | null;
+  /** Distinct SERP item types present (e.g. 'ai_overview', 'featured_snippet', 'people_also_ask', 'organic'). */
+  features: string[];
+  /** True when an ai_overview block is present on the SERP at all. */
+  aiOverviewPresent: boolean;
+  /** True when ownerDomain ∈ ai_overview.references[].domain; null when no AI Overview present. */
+  aiOverviewCited: boolean | null;
+}
+
+// ── Business listings / GBP + reviews (P7 / local-gbp) ────────
+// Built against the ground-truth fixture `tests/fixtures/dataforseo-business-listings.ts`.
+// Gotcha: a zero-review business has NO rating value/votes_count (absent, not 0) → undefined.
+
+export interface GbpAttributes {
+  /** Flattened completeness attribute keys (e.g. 'has_wheelchair_accessible_entrance', 'recommends_appointment'). */
+  items: string[];
+  /** 0..100 derived completeness signal (presence of hours/photos/attributes/claimed). */
+  completenessScore: number;
+}
+
+export interface BusinessListingResult {
+  title: string;
+  placeId: string;
+  cid?: string;
+  domain?: string;
+  category?: string;
+  city?: string;
+  /** Star rating; undefined = no reviews (NEVER 0). */
+  rating?: number;
+  /** Review count; undefined = no reviews (NEVER 0). */
+  reviewCount?: number;
+  ratingDistribution?: Record<'1' | '2' | '3' | '4' | '5', number>;
+  attributes?: GbpAttributes;
+  totalPhotos?: number;
+  claimed?: boolean;
+  /** True when this listing matches the client (place_id/cid → client_locations, else domain). */
+  isOwned: boolean;
+}
+
+export interface BusinessListingsRequest {
+  /** Category search (competitor landscape, sorted by review count). Omit when doing a pure title lookup. */
+  category?: string;
+  /**
+   * Business-name search. Used to find the CLIENT's OWN listing directly — the owner often has too
+   * few reviews to surface in a review-count-sorted category search (that IS the review-gap case),
+   * so the job looks them up by name. At least one of `category`/`title` must be set.
+   */
+  title?: string;
+  /** "lat,lng,radiusKm" per DataForSEO location_coordinate. */
+  locationCoordinate: string;
+  ownerDomain: string;
+  /** client_locations.gbp_place_id values for isOwned matching (place_id/cid). */
+  ownerPlaceIds?: string[];
+  limit?: number;
+}
+
+// ── LLM mentions / AI visibility (P8 / ai-visibility) ─────────
+// Built against the ground-truth fixture `tests/fixtures/dataforseo-llm-mentions.ts`.
+// Gotcha: a zero-presence target returns EMPTY group arrays → mentions 0, never invented.
+
+export interface LlmMentionsRequest {
+  domain: string;
+  platform?: 'chat_gpt' | 'google';   // default chat_gpt
+  /**
+   * The workspace's brand/business name(s) — used to identify the CLIENT's own brand among the
+   * co-mentioned `brand_entities_title`, so share-of-voice is computed like-to-like (client brand
+   * ÷ all brands) instead of mixing the domain-citation count with brand co-mention counts.
+   */
+  ownerBrandNames?: string[];
+  /** Optional DataForSEO country/location code; used as a fallback to resolve `locationName`. */
+  locationCode?: number;
+  /** DataForSEO location_name. LLM mentions accepts a name rather than a location_code. */
+  locationName?: string;
+  languageCode?: string;
+}
+export interface LlmMentionCompetitor { name: string; mentions: number; aiSearchVolume?: number; }
+export interface LlmMentionSource { domain: string; mentions: number; }
+export interface LlmMentionsResult {
+  domain: string;
+  platform: string;
+  /** Headline mention count; 0 when no LLM presence (NEVER invented). */
+  mentions: number;
+  aiSearchVolume: number;
+  /**
+   * 0..1 = the client's BRAND mentions ÷ ALL co-mentioned brand mentions (like-to-like).
+   * `undefined` = NOT MEASURED — the client's brand could not be identified among the
+   * co-mentioned brands (no brand name provided, or the brand isn't in brand_entities_title).
+   * Never conflate undefined with a real 0% (a red "0%" next to a high mention count reads as broken).
+   */
+  shareOfVoice?: number;
+  /** Co-mentioned brands (brand_entities_title) — the AI-answer competitive set. */
+  competitors: LlmMentionCompetitor[];
+  /** Domains LLM answers cite when mentioning the target (sources_domain) — the AEO targets. */
+  sourceDomains: LlmMentionSource[];
+}
+
 // ── Provider Interface ────────────────────────────────────────
 
 export interface SeoDataProvider {
@@ -123,16 +247,20 @@ export interface SeoDataProvider {
   getKeywordIdeas?(keywords: string[], workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]>;
   getKeywordsForSite?(target: string, workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]>;
   getKeywordSuggestions?(keyword: string, workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]>;
-  getKeywordsForKeywords?(keywords: string[], workspaceId: string, limit?: number, database?: string): Promise<KeywordSourceEvidence[]>;
+  getKeywordsForKeywords?(keywords: string[], workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<KeywordSourceEvidence[]>;
 
   // Domain Analysis
-  getDomainKeywords(domain: string, workspaceId: string, limit?: number, database?: string): Promise<DomainKeyword[]>;
-  getUrlKeywords?(url: string, workspaceId: string, limit?: number, database?: string): Promise<DomainKeyword[]>;
-  getDomainOverview(domain: string, workspaceId: string, database?: string): Promise<DomainOverview | null>;
-  getCompetitors(domain: string, workspaceId: string, limit?: number, database?: string): Promise<OrganicCompetitor[]>;
+  // `locationCode`/`languageCode` (optional, P4 / geo-targeting) thread the resolved
+  // workspace target-geo so non-US clients' ranked keywords, domain overview, competitor
+  // set, and keyword gap reflect their own market, not the US/'en' SERP. Omitting both
+  // preserves the pre-P4 `locationCodeFromDatabase(database)` + 'en' behavior exactly.
+  getDomainKeywords(domain: string, workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<DomainKeyword[]>;
+  getUrlKeywords?(url: string, workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<DomainKeyword[]>;
+  getDomainOverview(domain: string, workspaceId: string, database?: string, locationCode?: number, languageCode?: string): Promise<DomainOverview | null>;
+  getCompetitors(domain: string, workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<OrganicCompetitor[]>;
 
   // Competitive Analysis
-  getKeywordGap(clientDomain: string, competitorDomains: string[], workspaceId: string, limit?: number, database?: string): Promise<KeywordGapEntry[]>;
+  getKeywordGap(clientDomain: string, competitorDomains: string[], workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<KeywordGapEntry[]>;
 
   // Backlinks
   getBacklinksOverview(domain: string, workspaceId: string, database?: string): Promise<BacklinksOverview | null>;
@@ -141,6 +269,16 @@ export interface SeoDataProvider {
   // Local SEO visibility
   resolveLocalSeoLocation?(request: LocalSeoLocationLookupRequest, workspaceId: string): Promise<LocalSeoLocationLookupResponse>;
   getLocalVisibility?(request: LocalVisibilityProviderRequest, workspaceId: string): Promise<LocalVisibilityProviderResult>;
+
+  // National SERP rank + features (P6 / national-serp-tracking). Optional: providers without
+  // advanced-SERP support omit it; callers must feature-detect before calling.
+  getNationalSerp?(request: NationalSerpProviderRequest, workspaceId: string): Promise<NationalSerpResult>;
+
+  // GBP + reviews business listings (P7 / local-gbp). Optional: feature-detect before calling.
+  getBusinessListings?(request: BusinessListingsRequest, workspaceId: string): Promise<BusinessListingResult[]>;
+
+  // LLM mentions / AI visibility (P8 / ai-visibility). Optional: feature-detect before calling.
+  getLlmMentions?(request: LlmMentionsRequest, workspaceId: string): Promise<LlmMentionsResult>;
 }
 
 // ── Provider Registry ─────────────────────────────────────────
@@ -224,7 +362,11 @@ export function getProviderForCapability(capability: string, preferred?: Provide
   if (!primary) return null;
 
   const primaryName = [...providers.entries()].find(([, p]) => p === primary)?.[0];
-  if (capability !== 'backlinks' && primaryName && isCapabilityDisabled(primaryName, capability)) {
+  // Backlinks IS gated here (P5): once a 40204 trips the backlinks breaker, this
+  // returns null and callers degrade the optional backlink fields — matching the
+  // getBacklinksProvider doc contract — instead of re-hitting the unsubscribed
+  // endpoint every call. (Previously `capability !== 'backlinks'` skipped the check.)
+  if (primaryName && isCapabilityDisabled(primaryName, capability)) {
     return null;
   }
 

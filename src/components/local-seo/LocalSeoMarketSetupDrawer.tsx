@@ -11,6 +11,7 @@ import type {
 } from '../../../shared/types/local-seo';
 import { buildDataForSeoLocationName } from '../../../shared/local-seo-location';
 import {
+  LOCAL_SEO_DATAFORSEO_KEYWORD_COST_USD,
   LOCAL_SEO_MARKET_STATUS,
   LOCAL_SEO_POSTURE,
 } from '../../../shared/types/local-seo';
@@ -827,7 +828,7 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
             <div className="mb-3">
               <h3 className="t-body font-semibold text-[var(--brand-text-bright)]">Refresh keyword budget</h3>
               <p className="t-caption-sm text-[var(--brand-text-muted)]">
-                Each refresh spends ~$0.002 per keyword per market via DataForSEO. Default is {data.caps.keywordsPerRefreshDefault}; raise it for local-first clients where broader local-pack coverage matters.
+                Each refresh spends ~${LOCAL_SEO_DATAFORSEO_KEYWORD_COST_USD.toFixed(3)} per keyword per market via DataForSEO. Default is {data.caps.keywordsPerRefreshDefault}; raise it for local-first clients where broader local-pack coverage matters.
               </p>
             </div>
             <FormField
@@ -847,7 +848,7 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
                     const parsed = Number(keywordsPerRefreshInput);
                     if (!Number.isInteger(parsed)) return 'Enter a whole number or leave empty for default.';
                     const activeCount = Math.max(1, markets.filter(m => m.status === LOCAL_SEO_MARKET_STATUS.ACTIVE).length);
-                    const cost = (parsed * activeCount * 0.002).toFixed(2);
+                    const cost = (parsed * activeCount * LOCAL_SEO_DATAFORSEO_KEYWORD_COST_USD).toFixed(2);
                     return `Estimated cost per refresh: ~$${cost} (${parsed} keywords × ${activeCount} active market${activeCount === 1 ? '' : 's'}).`;
                   })()}
             </p>

@@ -28,7 +28,7 @@
  * for the scheduler to call via fireBridge(). Returns { modified: N }.
  */
 import { createLogger } from './logger.js';
-import { getLostVisibilityQueries } from './client-discovered-queries.js';
+import { getLostVisibilityCount, getLostVisibilityQueries } from './client-discovered-queries.js';
 import {
   upsertInsight,
   getInsight,
@@ -66,7 +66,7 @@ function computeImpactScore(lostCount: number): number {
  */
 export async function runLostVisibilityBridge(workspaceId: string): Promise<BridgeResult> {
   const rawQueries = getLostVisibilityQueries(workspaceId);
-  const lostCount = rawQueries.length;
+  const lostCount = getLostVisibilityCount(workspaceId);
   const existing = getInsight(workspaceId, null, 'lost_visibility');
 
   if (lostCount === 0) {

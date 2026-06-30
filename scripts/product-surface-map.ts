@@ -25,6 +25,7 @@ export const LIFECYCLE_STATES = [
   'flagged-dark-launch',
   'deprecated-but-present',
   'legacy-alias',
+  'removed',
 ] as const;
 
 export const RECOMMENDATIONS = [
@@ -331,14 +332,14 @@ export const PRODUCT_SURFACE_MAP: ProductSurfaceEntry[] = [
     boundedContextId: 'inbox',
     placement: 'context-triggered',
     role: 'support-system',
-    lifecycle: 'legacy-alias',
-    recommendation: 'deprecate-after-redirect-window',
+    lifecycle: 'removed',
+    recommendation: 'keep',
     clientFacing: true,
     monetizable: false,
-    requiresHumanVerification: true,
+    requiresHumanVerification: false,
     owner: 'inbox',
-    notes: 'Legacy route aliases prevent bookmark breakage; remove only after measured alias traffic cool-down.',
-    evidence: ['src/routes.ts (CLIENT_INBOX_ALIASES approvals/requests/content)'],
+    notes: 'Removed after the unified Inbox became the live client experience; retired top-level aliases now fall through to the dashboard fallback.',
+    evidence: ['src/lib/client-dashboard-tab.ts (retired inbox aliases fall back to overview)'],
   },
   {
     id: 'schema-review-standalone-tab-retirement',
@@ -346,14 +347,14 @@ export const PRODUCT_SURFACE_MAP: ProductSurfaceEntry[] = [
     boundedContextId: 'inbox',
     placement: 'context-triggered',
     role: 'support-system',
-    lifecycle: 'deprecated-but-present',
-    recommendation: 'deprecate-after-redirect-window',
+    lifecycle: 'removed',
+    recommendation: 'keep',
     clientFacing: true,
     monetizable: false,
-    requiresHumanVerification: true,
+    requiresHumanVerification: false,
     owner: 'inbox',
-    notes: 'Already migrated into Inbox > Reviews with redirects preserved; monitor and eventually trim legacy links.',
-    evidence: ['src/components/client/InboxTab.tsx (SchemaReviewModal mounted in Reviews section)'],
+    notes: 'Standalone route removed after SchemaReviewModal became part of Inbox > Reviews.',
+    evidence: ['src/components/client/SchemaReviewModal.tsx (modal mounted from Inbox Reviews)', 'src/lib/client-dashboard-tab.ts (unknown tab fallback)'],
   },
 ];
 

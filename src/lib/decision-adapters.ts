@@ -1,6 +1,5 @@
-import type { ClientAction, ClientActionSourceType } from '../../shared/types/client-actions.js';
-import type { ApprovalBatch } from '../../shared/types/approvals.js';
-import type { DecisionKind, NormalizedDecision } from '../../shared/types/decision.js';
+import type { ClientActionSourceType } from '../../shared/types/client-actions.js';
+import type { NormalizedDecision } from '../../shared/types/decision.js';
 import type { ClientDeliverable, DeliverableType } from '../../shared/types/client-deliverable.js';
 
 // ── Badge labels ───────────────────────────────────────────────────────────
@@ -10,6 +9,7 @@ const CLIENT_ACTION_BADGES: Record<string, string> = {
   internal_link:     'Internal Links',
   redirect_proposal: 'Redirects',
   content_decay:     'Content',
+  cannibalization:   'Keywords',
   keyword_strategy:  'Keywords',   // deprecated; archived rows only
 };
 
@@ -57,70 +57,7 @@ export function badgeForBatch(name: string): string {
   return 'SEO';   // fallback
 }
 
-// ── Item count helpers ────────────────────────────────────────────────────
-
-/**
- * For client_actions, itemCount reflects the number of individual changes
- * inside the payload. Falls back to 1 (the action itself is the single item).
- */
-function itemCountForAction(action: ClientAction): number {
-  const p = action.payload as Record<string, unknown>;
-  if (Array.isArray(p?.diffs)) return (p.diffs as unknown[]).length;
-  if (Array.isArray(p?.suggestions)) return (p.suggestions as unknown[]).length;
-  if (Array.isArray(p?.redirects)) return (p.redirects as unknown[]).length;
-  return 1;  // content_decay and unknown types
-}
-
-// ── Public adapters ────────────────────────────────────────────────────────
-
-/**
- * Normalize a `client_action` row into a `NormalizedDecision` for `<DecisionCard>`.
- *
- * `isSingleAction` is true only for `content_decay` — those render inline
- * with approve/flag buttons; all other types open `<DecisionDetailModal>`.
- */
-export function normalizeClientAction(action: ClientAction): NormalizedDecision {
-  // content_decay → inline single-action ('decision' kind); all others open the modal ('batch').
-  const kind: DecisionKind = action.sourceType === 'content_decay' ? 'decision' : 'batch';
-  return {
-    id: `ca-${action.id}`,
-    source: 'client_action',
-    sourceId: action.id,
-    title: action.title,
-    summary: action.summary,
-    priority: action.priority,
-    itemCount: itemCountForAction(action),
-    kind,
-    isSingleAction: kind === 'decision',
-    badge: clientActionSourceLabel(action.sourceType),
-    createdAt: action.createdAt,
-  };
-}
-
-/**
- * Normalize an `approval_batch` row into a `NormalizedDecision` for `<DecisionCard>`.
- *
- * Approval batches never have isSingleAction=true — they always open the
- * full-screen `<DecisionDetailModal>` regardless of item count.
- */
-export function normalizeApprovalBatch(batch: ApprovalBatch): NormalizedDecision {
-  return {
-    id: `ab-${batch.id}`,
-    source: 'approval_batch',
-    sourceId: batch.id,
-    title: batch.name,
-    summary: `${batch.items.length} change${batch.items.length !== 1 ? 's' : ''} ready for your approval`,
-    priority: undefined,
-    itemCount: batch.items.length,
-    // Approval batches always open the full-screen modal (never inline) regardless of item count.
-    kind: 'batch',
-    isSingleAction: false,
-    badge: badgeForBatch(batch.name),
-    createdAt: batch.createdAt,
-  };
-}
-
-// ── Unified ClientDeliverable adapter (PR-2a) ───────────────────────────────
+// ── Canonical ClientDeliverable adapter ─────────────────────────────────────
 
 /** Short human badge for each unified deliverable type — shown in the inbox card/strip. */
 const DELIVERABLE_TYPE_BADGES: Record<DeliverableType, string> = {
@@ -132,12 +69,15 @@ const DELIVERABLE_TYPE_BADGES: Record<DeliverableType, string> = {
   internal_link:         'Internal Links',
   aeo_change:            'AEO',
   content_decay:         'Content',
+  cannibalization:       'Keywords',
   content_plan_sample:   'Content Plan',
   content_plan_template: 'Content Plan',
   work_order:            'Work Order',
   briefing:              'Briefing',
   copy_section:          'Copy',
   content_request:       'Content',
+  recommendation:        'Recommendation',
+  gbp_review_response:   'Google Review',
 };
 
 export function deliverableTypeBadge(type: DeliverableType | string): string {

@@ -35,9 +35,9 @@ export interface BuildStrategyKeywordEvaluationContextOptions {
   approvedKeywords?: string[];
   strictBusinessFit?: boolean;
   /**
-   * SEO Generation Quality P2 (flag `seo-generation-quality`, per-workspace).
-   * Computed ONCE per generation and threaded here; do NOT call isFeatureEnabled
-   * in the per-candidate hot loop. Flag-OFF (undefined/false) is byte-identical.
+   * SEO Generation Quality P2 is now the canonical synthesis path.
+   * Computed once per generation and threaded here; keep feature-flag checks out
+   * of the per-candidate hot loop.
    */
   relaxConservatism?: boolean;
 }

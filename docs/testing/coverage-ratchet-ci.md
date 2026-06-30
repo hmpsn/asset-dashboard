@@ -4,6 +4,10 @@ This document defines the Wave 2b coverage ratchet operating model.
 
 Source of truth: `scripts/report-coverage-ratchet.ts`
 
+`vite.config.ts` is coverage collection configuration only. It does not own
+coverage floors or thresholds; `COVERAGE_RATCHET_FLOORS` in
+`scripts/report-coverage-ratchet.ts` is the only required floor authority.
+
 Run:
 
 ```bash
@@ -43,23 +47,26 @@ Domain guardrail gaps are reported as advisory output so planning can continue w
 
 ## CI Integration
 
-PR CI intentionally uses fast project-aware Vitest lanes for feedback, while
-coverage remains a push-only full-suite job in this phase so artifact merging
-and ratchet enforcement can stay simple until a dedicated follow-up.
+PR CI intentionally uses fast project-aware Vitest lanes for feedback. Staging
+and main push CI also stay fast; they do not run full-suite coverage on every
+merge or promotion. Coverage remains a deliberate release check because artifact
+generation and ratchet enforcement are still single-summary operations in this
+phase.
 
-The push coverage job in `.github/workflows/ci.yml` now runs:
+The manually dispatched coverage job in `.github/workflows/ci.yml` runs:
 
 1. `npm run test:coverage`
 2. `npm run verify:coverage-ratchet`
 3. uploads `coverage/coverage-summary.json` + `coverage/lcov.info` as artifacts
 
-Any floor regression fails the coverage job.
+Any floor regression fails the manually dispatched coverage job.
 
 ## Ratchet Maintenance
 
 When coverage improves and remains stable for multiple merges:
 
-1. raise the floor values in `COVERAGE_RATCHET_FLOORS`,
+1. raise the floor values in `COVERAGE_RATCHET_FLOORS` in
+   `scripts/report-coverage-ratchet.ts`,
 2. run `npm run test:coverage`,
 3. run `npm run verify:coverage-ratchet`,
 4. update this document if thresholds changed.

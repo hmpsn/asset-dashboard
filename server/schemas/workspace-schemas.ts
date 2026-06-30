@@ -17,6 +17,9 @@ export const eventDisplayConfigSchema = z.object({
   displayName: z.string(),
   pinned: z.boolean(),
   group: z.string().optional(),
+  // P1a: which website action this pinned event measures. Optional + additive → flag-OFF
+  // byte-identical; existing pinned events with no outcomeType aggregate as 'other'.
+  outcomeType: z.enum(['form_fill', 'call', 'booking', 'email', 'directions', 'chat', 'other']).optional(),
 }).passthrough();
 
 export const eventDisplayConfigArraySchema = z.array(eventDisplayConfigSchema);
@@ -157,12 +160,21 @@ export const keywordStrategySchema = z.object({
   siteKeywords: z.array(z.string()).optional(),
   pageMap: z.array(pageKeywordMapSchema).optional(),
   opportunities: z.array(z.string()).optional(),
+  // Strategy v3 §12b — typed parallel to `opportunities`; optional so legacy/sparse blobs still parse,
+  // and so parseJsonSafe preserves it once the curated keyword-opportunity path (P5 #6b) writes it.
+  opportunitiesDetailed: z.array(z.object({
+    keyword: z.string(),
+    volume: z.number().optional(),
+    difficulty: z.number().optional(),
+    rationale: z.string().optional(),
+  })).optional(),
   siteKeywordMetrics: z.array(z.object({
     keyword: z.string(),
     volume: z.number(),
     difficulty: z.number(),
   })).optional(),
   generatedAt: z.string().optional(),
+  maxPages: z.number().optional(),
   seoDataStatus: z.object({
     mode: z.enum(['quick', 'full', 'none']),
     provider: z.string().optional(),
@@ -207,6 +219,22 @@ export type StrategyHistoryStrategy = z.infer<typeof strategyHistoryStrategySche
 export const strategyHistoryPageMapSchema = z.object({
   pagePath: z.string(),
   primaryKeyword: z.string(),
+}).passthrough();
+
+// Prior-snapshot page shape needed to recompute Orient-zone metrics (visibility
+// score + clicks/impressions/position deltas). page_map_json stores the full
+// PageKeywordMap, so these fields are present; this schema types the subset we read.
+export const strategyHistoryOrientPageSchema = z.object({
+  currentPosition: z.number().optional(),
+  volume: z.number().optional(),
+  clicks: z.number().optional(),
+  impressions: z.number().optional(),
+  gscKeywords: z.array(z.object({
+    query: z.string(),
+    clicks: z.number(),
+    impressions: z.number(),
+    position: z.number(),
+  })).optional(),
 }).passthrough();
 
 // ── Personas ──
@@ -360,6 +388,9 @@ export const recommendationSchema = z.object({
     // SEO Gen-Quality P7.1 — first-class local-visibility rec types. Same lockstep rule:
     // omitting either of these drops every local rec on the next reload (P5's hard-won lesson).
     'local_visibility', 'local_service_gap',
+    // P4 Lane C — competitor gap send. Same lockstep rule: absent here → every competitor
+    // rec silently dropped on reload (Schema vs stored shape rule, CLAUDE.md).
+    'competitor',
   ]),
   title: z.string(),
   description: z.string(),
@@ -380,6 +411,22 @@ export const recommendationSchema = z.object({
   targetKeyword: z.string().optional(),
   status: z.enum(['pending', 'in_progress', 'completed', 'dismissed']),
   assignedTo: z.enum(['team', 'client']).optional(),
+  // ── Strategy v3 lifecycle axes (lockstep with Recommendation in shared/types/recommendations.ts).
+  // All .optional(): every PRE-v3 stored blob lacks these keys, so a REQUIRED field would drop the
+  // whole rec on read (the "Schema vs stored shape" rule). Explicit (not passthrough-only) so a
+  // mistyped write — e.g. clientStatus:'snet' — is caught at the read boundary, not silently kept.
+  clientStatus: z.enum(['system', 'curated', 'sent', 'approved', 'declined', 'discussing']).optional(),
+  lifecycle: z.enum(['active', 'throttled', 'struck']).optional(),
+  throttledUntil: z.string().optional(),
+  sentAt: z.string().optional(),
+  autoSent: z.boolean().optional(),
+  struckAt: z.string().optional(),
+  cascade: z.object({
+    removedKeywords: z.array(z.string()).optional(),
+    removedClusters: z.array(z.string()).optional(),
+    reversible: z.boolean(),
+  }).optional(),
+  sendChannel: z.enum(['deliverable', 'rec']).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   // Unified Opportunity Value breakdown (PR1). Optional on legacy rows; a malformed
@@ -506,4 +553,43 @@ export const actionItemSchema = z.object({
   category: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
+}).passthrough();
+
+// ── The Issue (Client) — outcome value + segment config (P0) ──────
+
+/** Per-workspace converted-outcome value powering the dollar verdict. */
+export const outcomeValueSchema = z.object({
+  valuePerOutcome: z.number().nonnegative(),
+  unitLabel: z.string().min(1),
+  currency: z.string().min(1),
+  basis: z.enum(['client_provided', 'agency_estimate', 'ai_enriched']),
+  monthlyRetainer: z.number().nonnegative().optional(),
+}).passthrough();
+
+/** Admin-confirmed segment classification override (non-local 3-way). */
+export const segmentConfigSchema = z.object({
+  segment: z.enum(['local_smb', 'b2b_saas', 'board_vc', 'professional_services', 'multi_location']),
+  outcomeNounSingular: z.string().optional(),
+  outcomeNounPlural: z.string().optional(),
+  reportingAudience: z.enum(['self', 'board', 'partners', 'owners']).optional(),
+}).passthrough();
+
+// SEO Decision Engine P4 — workspace SERP target geo. Required fields (locationCode +
+// languageCode) MUST match what BusinessFootprintTab writes, or parseJsonSafe returns
+// the null fallback and the override silently vanishes (CLAUDE.md "Schema vs stored shape").
+export const targetGeoSchema = z.object({
+  locationCode: z.number(),
+  languageCode: z.string().min(1),
+  countryCode: z.string().optional(),
+  label: z.string().optional(),
+}).passthrough();
+
+// ── The Issue (Client) — Webflow form-source mapping (P1a) ────────
+
+/** Per-workspace mapping of a Webflow form to a typed outcome. Stored in the webflow_form_sources
+ *  JSON column; parsed item-by-item via parseJsonSafeArray so one bad mapping doesn't drop the rest. */
+export const webflowFormMappingSchema = z.object({
+  formId: z.string(),
+  formName: z.string(),
+  outcomeType: z.enum(['form_fill', 'call', 'booking', 'email', 'directions', 'chat', 'other']),
 }).passthrough();

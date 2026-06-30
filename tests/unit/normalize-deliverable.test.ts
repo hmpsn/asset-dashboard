@@ -1,19 +1,15 @@
 /**
- * Unit tests for normalizeDeliverable (PR-2a) — the unified ClientDeliverable → NormalizedDecision
+ * Unit tests for normalizeDeliverable — the canonical ClientDeliverable → NormalizedDecision
  * adapter. Asserts each deliverable kind adapts correctly (the inline-vs-modal discriminant,
- * item count, badge, and the sentAt staleness clock), and that legacy adapters still carry `kind`.
+ * item count, badge, and the sentAt staleness clock), and that compatibility adapters still carry `kind`.
  */
 import { describe, it, expect } from 'vitest';
 import {
   normalizeDeliverable,
-  normalizeClientAction,
-  normalizeApprovalBatch,
   deliverableTypeBadge,
   isProjectedDeliverable,
 } from '../../src/lib/decision-adapters.js';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable.js';
-import type { ClientAction } from '../../shared/types/client-actions.js';
-import type { ApprovalBatch } from '../../shared/types/approvals.js';
 
 function makeDeliverable(overrides: Partial<ClientDeliverable> = {}): ClientDeliverable {
   return {
@@ -207,7 +203,7 @@ describe('normalizeDeliverable — carries items + payload to the card contract 
   it('source is "deliverable" so the additive fields never leak onto legacy adapters', () => {
     const d = normalizeDeliverable(makeDeliverable());
     expect(d.source).toBe('deliverable');
-    // The legacy adapters (normalizeClientAction/normalizeApprovalBatch) never set items/payload.
+    // Retired client_action/approval_batch adapters never participate in the canonical deliverable path.
   });
 });
 
@@ -233,39 +229,5 @@ describe('isProjectedDeliverable (projected vs physical tagging)', () => {
 
   it('an unknown type is not projected (safe default)', () => {
     expect(isProjectedDeliverable('totally_unknown')).toBe(false);
-  });
-});
-
-describe('legacy adapters carry kind (back-compat widening)', () => {
-  it('content_decay client action → decision kind + isSingleAction', () => {
-    const action = {
-      id: 'ca1', title: 'Decay', summary: 's', sourceType: 'content_decay',
-      status: 'pending', priority: 'high', payload: {}, createdAt: '2026-01-01T00:00:00.000Z',
-    } as unknown as ClientAction;
-    const d = normalizeClientAction(action);
-    expect(d.kind).toBe('decision');
-    expect(d.isSingleAction).toBe(true);
-  });
-
-  it('non-decay client action → batch kind (opens modal)', () => {
-    const action = {
-      id: 'ca2', title: 'AEO', summary: 's', sourceType: 'aeo_change',
-      status: 'pending', priority: 'medium', payload: { diffs: [{}, {}] }, createdAt: '2026-01-01T00:00:00.000Z',
-    } as unknown as ClientAction;
-    const d = normalizeClientAction(action);
-    expect(d.kind).toBe('batch');
-    expect(d.isSingleAction).toBe(false);
-    expect(d.itemCount).toBe(2);
-  });
-
-  it('approval batch → batch kind, never single-action', () => {
-    const batch = {
-      id: 'ab1', name: 'SEO Editor — 3 pages',
-      items: [{ id: '1' }, { id: '2' }, { id: '3' }], createdAt: '2026-01-01T00:00:00.000Z',
-    } as unknown as ApprovalBatch;
-    const d = normalizeApprovalBatch(batch);
-    expect(d.kind).toBe('batch');
-    expect(d.isSingleAction).toBe(false);
-    expect(d.itemCount).toBe(3);
   });
 });

@@ -100,6 +100,9 @@ vi.mock('../../server/helpers.js', () => ({ normalizePageUrl: mockNormalizePageU
 vi.mock('../../server/logger.js', () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn() }),
 }));
+vi.mock('../../server/domains/strategy/managed-keyword-set.js', () => ({
+  reconcileStrategyKeywordSet: vi.fn(),
+}));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -254,9 +257,12 @@ describe('persistKeywordStrategy', () => {
       searchData: makeSearchData(),
     });
 
+    // Third arg `true` = rotatePreviousPosition: the refresh boundary rotates each
+    // surviving page's prior current_position into previous_position (Rankings movements).
     expect(mockUpsertAndCleanPageKeywords).toHaveBeenCalledWith(
       'ws_persist',
       expect.arrayContaining([expect.objectContaining({ pagePath: '/services' })]),
+      true,
     );
     expect(mockUpsertPageKeywordsBatch).not.toHaveBeenCalled();
   });
@@ -283,8 +289,87 @@ describe('persistKeywordStrategy', () => {
       searchData: makeSearchData(),
     });
 
-    expect(mockUpsertPageKeywordsBatch).toHaveBeenCalled();
+    // Incremental is still a refresh boundary for the pages it touches → rotate flag true.
+    expect(mockUpsertPageKeywordsBatch).toHaveBeenCalledWith(
+      'ws_persist',
+      expect.any(Array),
+      true,
+    );
     expect(mockUpsertAndCleanPageKeywords).not.toHaveBeenCalled();
+  });
+
+  it('preserves existing page keyword metrics when incremental extra paths carry a skinny mapping', async () => {
+    const { persistKeywordStrategy } = await import('../../server/keyword-strategy-persistence.js');
+    const existing: PageKeywordMap = {
+      pagePath: '/preserved',
+      pageTitle: 'Preserved',
+      primaryKeyword: 'preserved keyword',
+      secondaryKeywords: ['existing secondary'],
+      searchIntent: 'commercial',
+      currentPosition: 8,
+      previousPosition: 11,
+      impressions: 1200,
+      clicks: 48,
+      volume: 900,
+      difficulty: 22,
+      cpc: 6.5,
+      metricsSource: 'semrush',
+      secondaryMetrics: [{ keyword: 'existing secondary', volume: 300, difficulty: 18 }],
+      validated: true,
+      urlLevelKeywords: [{ keyword: 'preserved keyword', position: 8, volume: 900, difficulty: 22, cpc: 6.5, url: '/preserved' }],
+      urlLevelKeywordSource: 'semrush',
+    };
+    mockListPageKeywords.mockReturnValue([existing]);
+
+    persistKeywordStrategy({
+      ws: makeWorkspace(),
+      strategy: makeStrategyOutput({
+        pageMap: [
+          {
+            pagePath: '/preserved',
+            pageTitle: 'Preserved',
+            primaryKeyword: 'preserved keyword',
+            secondaryKeywords: ['existing secondary'],
+          },
+        ],
+      }) as Parameters<typeof persistKeywordStrategy>[0]['strategy'],
+      strategyMode: 'incremental',
+      pagesToAnalyze: [],
+      extraPagePaths: ['/preserved'],
+      siteKeywordMetrics: [],
+      keywordGaps: [],
+      competitorKeywordData: [],
+      topicClusters: [],
+      cannibalization: [],
+      questionKeywords: [],
+      businessContext: '',
+      seoDataMode: 'quick',
+      seoDataStatus: { mode: 'quick', status: 'available' },
+      searchData: makeSearchData(),
+    });
+
+    expect(mockUpsertPageKeywordsBatch).toHaveBeenCalledWith(
+      'ws_persist',
+      [
+        expect.objectContaining({
+          pagePath: '/preserved',
+          searchIntent: 'commercial',
+          currentPosition: 8,
+          previousPosition: 11,
+          impressions: 1200,
+          clicks: 48,
+          volume: 900,
+          difficulty: 22,
+          cpc: 6.5,
+          metricsSource: 'semrush',
+          secondaryMetrics: [{ keyword: 'existing secondary', volume: 300, difficulty: 18 }],
+          validated: true,
+          urlLevelKeywords: [{ keyword: 'preserved keyword', position: 8, volume: 900, difficulty: 22, cpc: 6.5, url: '/preserved' }],
+          urlLevelKeywordSource: 'semrush',
+        }),
+      ],
+      true,
+    );
   });
 
   it('returns keywordStrategy and pageMap', async () => {

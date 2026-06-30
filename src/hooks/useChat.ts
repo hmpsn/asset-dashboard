@@ -24,7 +24,7 @@ import type { ClientTab } from '../routes';
  */
 const CHAT_TAB_HINTS = new Set<ClientTab>([
   'overview', 'performance', 'search', 'health', 'strategy', 'analytics',
-  'inbox', 'approvals', 'requests', 'content', 'plans', 'roi', 'content-plan', 'brand',
+  'inbox', 'plans', 'roi', 'content-plan', 'brand',
 ]);
 
 export interface ChatDeps {

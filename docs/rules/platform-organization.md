@@ -119,7 +119,7 @@ Owns decision, conversation, approval, and review flows shared between admin and
 - Owned routes/modules:
   `server/routes/approvals.ts`, `server/routes/client-actions.ts`, `server/routes/requests.ts`, `server/routes/public-requests.ts`, `server/approvals.ts`, `server/client-actions.ts`, `server/requests.ts`
 - Owned components/hooks/API wrappers/shared types:
-  `src/components/admin/AdminInbox.tsx`, `src/components/admin/ActionQueue.tsx`, `src/components/admin/BriefingReviewQueue.tsx`, `src/components/client/InboxTab.tsx`, `DecisionCard.tsx`, `DecisionDetailModal.tsx`, `ApprovalBatchCard.tsx`, `PriorityStrip.tsx`, `SchemaReviewModal.tsx`, `ClientActionDetailModal.tsx`, `src/hooks/admin/useActionQueue.ts`, `useQueue.ts`, `src/api/clientActions.ts`, `shared/types/approvals.ts`, `shared/types/client-actions.ts`, `shared/types/decision.ts`, `shared/types/requests.ts`
+  `src/components/admin/AdminInbox.tsx`, `src/components/admin/BriefingReviewQueue.tsx`, `src/components/client/InboxTab.tsx`, `DecisionCard.tsx`, `DecisionDetailModal.tsx`, `ApprovalBatchCard.tsx`, `PriorityStrip.tsx`, `SchemaReviewModal.tsx`, `ClientActionDetailModal.tsx`, `src/hooks/admin/useQueue.ts`, `src/api/clientActions.ts`, `shared/types/approvals.ts`, `shared/types/client-actions.ts`, `shared/types/decision.ts`, `shared/types/requests.ts`
 - WebSocket/events:
   `WS_EVENTS.APPROVAL_UPDATE`, `WS_EVENTS.APPROVAL_APPLIED`, `WS_EVENTS.CLIENT_ACTION_UPDATE`, `WS_EVENTS.REQUEST_CREATED`, `WS_EVENTS.REQUEST_UPDATE`
 - Tests/docs:
@@ -147,7 +147,7 @@ Owns content planning, briefs, matrices, post generation/review/publish, copy pi
 Owns schema generation, validation, plan/review/publish flows, CMS field mapping for schema delivery, and schema-related AI/data extraction.
 
 - Owned routes/modules:
-  `server/routes/webflow-schema.ts`, `server/routes/competitor-schema.ts`, `server/schema-store.ts`, `server/schema-plan.ts`, `server/schema-validator.ts`, `server/schema-suggester.ts`, `server/schema-generation-job.ts`, `server/schema-queue.ts`, `server/helpers.ts:buildSchemaContext`, `server/schema/`
+  `server/routes/webflow-schema.ts`, `server/routes/competitor-schema.ts`, `server/schema-store.ts`, `server/schema-plan.ts`, `server/schema-validator.ts`, `server/schema-suggester.ts`, `server/schema-generation-job.ts`, `server/schema-queue.ts`, `server/schema/context-builder.ts:buildSchemaContext`, `server/schema/`
 - Owned components/hooks/API wrappers/shared types:
   `src/components/SchemaSuggester.tsx`, `src/components/schema/`, `src/hooks/admin/useSchemaValidation.ts`, `src/components/client/SchemaReviewTab.tsx`, `src/components/client/SchemaReviewModal.tsx`, `src/api/seo.ts` for current schema-facing wrappers, `shared/types/schema-generation.ts`, `shared/types/schema-plan.ts`, `shared/types/schema-validation.ts`, `shared/types/site-inventory.ts`, `shared/types/page-elements.ts`
 - WebSocket/events:

@@ -10,6 +10,7 @@ let seeded: SeededFullWorkspace;
 let workspaceId = '';
 let market1Id = '';
 let market2Id = '';
+let market3Id = '';
 
 async function readLocalSeo(): Promise<LocalSeoReadResponse> {
   const res = await api(`/api/local-seo/${workspaceId}`);
@@ -206,6 +207,48 @@ describe('Local SEO primary market', () => {
     expect(after.markets.filter(m => m.isPrimary).length).toBe(1);
   });
 
+  it('auto-promotes the alphabetically first eligible market when multiple successors exist', async () => {
+    const reset = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: [
+          { id: market1Id, label: 'Austin Downtown', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1022162, status: 'active' },
+          { id: market2Id, label: 'Round Rock', city: 'Round Rock', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1027603, status: 'active' },
+          { label: 'bee cave', city: 'Bee Cave', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: 'active' },
+        ],
+      }),
+    });
+    expect(reset.status).toBe(200);
+    const seededMarkets = await reset.json() as LocalSeoReadResponse;
+    const beeCaveId = seededMarkets.markets.find(market => market.label === 'bee cave')?.id;
+    expect(beeCaveId).toBeTruthy();
+    market3Id = beeCaveId!;
+
+    const setPrimary = await api(`/api/local-seo/${workspaceId}/markets/${market1Id}/set-primary`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    expect(setPrimary.status).toBe(200);
+
+    const deactivatePrimary = await api(`/api/local-seo/${workspaceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markets: [
+          { id: market1Id, label: 'Austin Downtown', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1022162, status: 'inactive' },
+        ],
+      }),
+    });
+    expect(deactivatePrimary.status).toBe(200);
+
+    const after = await readLocalSeo();
+    expect(after.markets.find(market => market.id === market1Id)?.isPrimary).toBe(false);
+    expect(after.markets.find(market => market.id === beeCaveId)?.isPrimary).toBe(true);
+    expect(after.markets.find(market => market.id === market2Id)?.isPrimary).toBe(false);
+  });
+
   it('deactivating ALL markets leaves zero primaries (no successor to promote)', async () => {
     // Reactivate both first.
     const reactivate = await api(`/api/local-seo/${workspaceId}`, {
@@ -215,6 +258,7 @@ describe('Local SEO primary market', () => {
         markets: [
           { id: market1Id, label: 'Austin Downtown', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1022162, status: 'active' },
           { id: market2Id, label: 'Round Rock', city: 'Round Rock', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1027603, status: 'active' },
+          ...(market3Id ? [{ id: market3Id, label: 'bee cave', city: 'Bee Cave', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: 'active' }] : []),
         ],
       }),
     });
@@ -228,6 +272,7 @@ describe('Local SEO primary market', () => {
         markets: [
           { id: market1Id, label: 'Austin Downtown', city: 'Austin', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1022162, status: 'inactive' },
           { id: market2Id, label: 'Round Rock', city: 'Round Rock', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1027603, status: 'inactive' },
+          ...(market3Id ? [{ id: market3Id, label: 'bee cave', city: 'Bee Cave', stateOrRegion: 'TX', country: 'US', providerLocationCode: 1026201, status: 'inactive' }] : []),
         ],
       }),
     });

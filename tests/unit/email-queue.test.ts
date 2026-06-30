@@ -22,6 +22,7 @@ const throttleMock = {
 const renderDigestMock = vi.fn<
   (type: EmailEventType, events: EmailEvent[]) => { subject: string; html: string }
 >();
+const getEmailEventPayloadIssuesMock = vi.fn<(event: EmailEvent) => string[]>();
 
 vi.mock('fs', () => ({
   default: fsMock,
@@ -40,6 +41,7 @@ vi.mock('../../server/email-throttle.js', () => ({
 }));
 
 vi.mock('../../server/email-templates.js', () => ({
+  getEmailEventPayloadIssues: (...args: [EmailEvent]) => getEmailEventPayloadIssuesMock(...args),
   renderDigest: (...args: [EmailEventType, EmailEvent[]]) => renderDigestMock(...args),
 }));
 
@@ -86,6 +88,7 @@ beforeEach(() => {
     subject: `${type} digest (${events.length})`,
     html: `<p>${events.length} events</p>`,
   }));
+  getEmailEventPayloadIssuesMock.mockReturnValue([]);
 });
 
 afterEach(() => {
@@ -236,6 +239,27 @@ describe('email-queue behavior', () => {
     expect(send).not.toHaveBeenCalled();
     expect(throttleMock.recordSend).not.toHaveBeenCalled();
     expect(emailQueue.getQueueStats()).toEqual({ buckets: 0, totalEvents: 0 });
+  });
+
+  it('dead-letters invalid email payloads before rendering or sending', async () => {
+    vi.useFakeTimers();
+    const emailQueue = await loadEmailQueueModule();
+    const send = vi.fn().mockResolvedValue(true);
+    emailQueue.registerSendFn(send);
+
+    getEmailEventPayloadIssuesMock.mockReturnValueOnce(['data.topic must be a non-empty string']);
+
+    emailQueue.queueEmail(makeEvent({ type: 'content_post_ready', data: { targetKeyword: 'seo' } }));
+    await vi.advanceTimersByTimeAsync(BATCH_WINDOW_MS);
+
+    expect(renderDigestMock).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+    expect(throttleMock.recordSend).not.toHaveBeenCalled();
+    expect(emailQueue.getQueueStats()).toEqual({ buckets: 0, totalEvents: 0 });
+    expect(fsMock.writeFileSync).toHaveBeenCalledWith(
+      '/mock/email-queue/dead-letter.json',
+      expect.stringContaining('data.topic must be a non-empty string'),
+    );
   });
 
   it('does not record throttle send when outbound sendFn returns false', async () => {

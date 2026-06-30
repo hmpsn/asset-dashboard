@@ -13,6 +13,7 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDebouncedValue } from '../useDebouncedValue';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../useToggleSet';
 import type { KeywordCommandCenterFilter } from '../../../shared/types/keyword-command-center';
 import { KEYWORD_COMMAND_CENTER_FILTERS } from '../../../shared/types/keyword-command-center';
 
@@ -146,7 +147,7 @@ export function useKeywordHubState(
   // keywords lead on load rather than the low-value long-tail.
   const [sort, setSortRaw] = useState<HubSortState>({ key: 'opportunity', direction: 'desc' });
   const [page, setPageRaw] = useState(1);
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [selectedKeys, toggleKey, setSelectedKeys] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
 
   // Debounced search (300 ms via the shared hook, NOT hand-rolled)
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
@@ -204,18 +205,6 @@ export function useKeywordHubState(
   // ---------------------------------------------------------------------------
   // Selection helpers
   // ---------------------------------------------------------------------------
-
-  const toggleKey = useCallback((k: string) => {
-    setSelectedKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(k)) {
-        next.delete(k);
-      } else {
-        next.add(k);
-      }
-      return next;
-    });
-  }, []);
 
   const toggleAll = useCallback((keys: string[]) => {
     setSelectedKeys(new Set(keys));

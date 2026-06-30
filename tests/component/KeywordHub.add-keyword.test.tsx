@@ -33,6 +33,7 @@ const addKeywordMutateMock = vi.fn();
 const addKeywordMutateAsyncMock = vi.fn();
 
 vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
+  useKeywordCommandCenterInitialView: () => ({ data: undefined, isLoading: false, isError: true, error: new Error('initial disabled in test') }),
   useKeywordCommandCenterSummary: (...args: unknown[]) => summaryHookMock(...args),
   useKeywordCommandCenterRows: (...args: unknown[]) => rowsHookMock(...args),
   useKeywordCommandCenterBulkAction: () => ({ mutate: vi.fn(), isPending: false }),
@@ -52,6 +53,8 @@ vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
   }),
   // A2: pin toggle added to KeywordDetailDrawer — must be present in mock to avoid "not exported" error.
   useRankTrackingTogglePin: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  // P6 national-serp-tracking: KeywordHub calls this for the "Refresh national ranks" trigger.
+  useNationalSerpRefresh: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
 
 vi.mock('../../src/hooks/admin/useLocalSeo', () => ({

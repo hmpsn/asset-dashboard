@@ -71,7 +71,7 @@ vi.mock('../../server/intelligence/seo-context-source.js', () => ({
 }));
 
 const mockFindPageMapEntry = vi.fn(() => undefined as PageKeywordMap | undefined);
-vi.mock('../../server/helpers.js', () => ({
+vi.mock('../../server/utils/page-address.js', () => ({
   findPageMapEntry: (...args: unknown[]) => mockFindPageMapEntry(...args),
   normalizePageUrl: (p: string) => p,
 }));
@@ -101,7 +101,7 @@ vi.mock('../../server/content-gaps.js', () => ({
 }));
 
 const mockGetTrackedKeywords = vi.fn(() => [] as Array<{ query: string }>);
-const mockGetLatestRanks = vi.fn(() => [] as Array<{ query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number }>);
+const mockGetLatestRanks = vi.fn(() => [] as Array<{ query: string; position: number; clicks: number; impressions: number; ctr: number; change?: number; pagePath?: string; pageTitle?: string }>);
 vi.mock('../../server/rank-tracking.js', () => ({
   getTrackedKeywords: (...args: unknown[]) => mockGetTrackedKeywords(...args),
   getLatestRanks: (...args: unknown[]) => mockGetLatestRanks(...args),
@@ -138,6 +138,19 @@ vi.mock('../../server/cannibalization-issues.js', () => ({
 const mockLoadRecommendations = vi.fn(() => null as RecommendationSet | null);
 vi.mock('../../server/recommendations.js', () => ({
   loadRecommendations: (...args: unknown[]) => mockLoadRecommendations(...args),
+  // Faithful mirror of server/recommendations.ts:isActiveRec — the real module pulls the DB graph,
+  // so it can't be importActual'd in this pure unit test. Keep in sync with the source (the
+  // seo-context slice resolves topOpportunity through this predicate per Strategy v3 Lane 1C).
+  isActiveRec: (
+    rec: { status?: string; lifecycle?: string; throttledUntil?: string; clientStatus?: string },
+    now: number = Date.now(),
+  ): boolean => {
+    if (rec.status === 'completed' || rec.status === 'dismissed') return false;
+    if (rec.lifecycle === 'struck') return false;
+    if (rec.lifecycle === 'throttled' && rec.throttledUntil && Date.parse(rec.throttledUntil) > now) return false;
+    if (rec.clientStatus === 'sent' || rec.clientStatus === 'approved' || rec.clientStatus === 'declined') return false;
+    return true;
+  },
 }));
 
 // ── Real import (after all mocks) ─────────────────────────────────────────────
@@ -595,6 +608,69 @@ describe('rankTracking assembly', () => {
     const result = await assembleSeoContext('ws-tracked-count');
 
     expect(result.rankTracking?.trackedKeywords).toBe(3);
+  });
+
+  it('keeps named top keyword movers sorted by absolute movement', async () => {
+    mockGetWorkspace.mockReturnValue(makeWorkspace());
+    mockGetTrackedKeywords.mockReturnValue([
+      { query: 'emergency dentist' },
+      { query: 'dental implants' },
+      { query: 'teeth whitening' },
+      { query: 'root canal' },
+    ]);
+    mockGetLatestRanks.mockReturnValue([
+      { query: 'dental implants', position: 4, clicks: 12, impressions: 300, ctr: 4, change: -3, pagePath: '/implants', pageTitle: 'Dental Implants' },
+      { query: 'emergency dentist', position: 9, clicks: 4, impressions: 900, ctr: 0.44, change: 2 },
+      { query: 'root canal', position: 14, clicks: 2, impressions: 200, ctr: 1, change: 2 },
+      { query: 'teeth whitening', position: 3, clicks: 7, impressions: 100, ctr: 7, change: 0 },
+    ]);
+
+    const result = await assembleSeoContext('ws-movers');
+
+    expect(result.rankTracking?.topKeywordMovers).toEqual([
+      {
+        query: 'dental implants',
+        position: 4,
+        change: -3,
+        direction: 'improved',
+        clicks: 12,
+        impressions: 300,
+        ctr: 4,
+        pagePath: '/implants',
+        pageTitle: 'Dental Implants',
+      },
+      {
+        query: 'emergency dentist',
+        position: 9,
+        change: 2,
+        direction: 'declined',
+        clicks: 4,
+        impressions: 900,
+        ctr: 0.44,
+      },
+      {
+        query: 'root canal',
+        position: 14,
+        change: 2,
+        direction: 'declined',
+        clicks: 2,
+        impressions: 200,
+        ctr: 1,
+      },
+    ]);
+  });
+
+  it('returns an empty named mover list when no keywords moved', async () => {
+    mockGetWorkspace.mockReturnValue(makeWorkspace());
+    mockGetTrackedKeywords.mockReturnValue([{ query: 'kw1' }]);
+    mockGetLatestRanks.mockReturnValue([
+      { query: 'kw1', position: 6, clicks: 1, impressions: 20, ctr: 5, change: 0 },
+      { query: 'kw2', position: 11, clicks: 0, impressions: 10, ctr: 0 },
+    ]);
+
+    const result = await assembleSeoContext('ws-no-movers');
+
+    expect(result.rankTracking?.topKeywordMovers).toEqual([]);
   });
 
   it('rankTracking is absent when rank-tracking module throws', async () => {

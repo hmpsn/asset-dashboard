@@ -41,7 +41,7 @@ vi.mock('../../server/ai-deduplication.js', () => ({
   AIRequestDeduplicator: mocks.AIRequestDeduplicator,
   aiDeduplicator: mocks.aiDeduplicator,
 }));
-vi.mock('../../server/helpers.js', () => ({ stripCodeFences: mocks.stripCodeFences }));
+vi.mock('../../server/utils/text.js', () => ({ stripCodeFences: mocks.stripCodeFences }));
 vi.mock('../../server/abort-helpers.js', () => ({
   abortableDelay: mocks.abortableDelay,
   composeTimeoutSignal: mocks.composeTimeoutSignal,

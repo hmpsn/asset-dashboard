@@ -1,11 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Tool } from '@modelcontextprotocol/sdk/types';
 import {
+  advanceContentStatusInputSchema,
   createContentRequestInputSchema,
   deleteBriefInputSchema,
   deletePostInputSchema,
   getContentRequestInputSchema,
   getBriefInputSchema,
+  publishPostInputSchema,
   getPostInputSchema,
   layoutSchema,
   listPostVersionsInputSchema,
@@ -42,8 +44,12 @@ import {
 } from '../../content-posts-db.js';
 import { countHtmlWords } from '../../content-posts-ai.js';
 import { sendPostToClientForReview, PostNotFoundError } from '../../domains/content/send-post-to-client.js';
+import { publishPostToWebflow, PublishPostError } from '../../domains/content/publish-post-to-webflow.js';
+import { onContentRequestLive } from '../../domains/content/on-content-request-live.js';
+import { sanitizeInlinePromptText } from '../../utils/text.js';
 import { invalidateContentPipelineIntelligence } from '../../intelligence-freshness.js';
 import { buildContentGenerationContext } from '../../intelligence/generation-context-builders.js';
+import { buildWorkspaceIntelligence } from '../../workspace-intelligence.js';
 import { createLogger } from '../../logger.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { consumeHandle, issueHandle } from '../handles.js';
@@ -67,6 +73,8 @@ type PostPatchUpdates = NonNullable<typeof updatePostInputSchema['_output']['upd
 
 interface BriefRequestPayload {
   topic: string;
+  targetKeyword?: string;
+  targetPagePath?: string;
   layout: unknown;
   briefId: string;
 }
@@ -126,7 +134,7 @@ export const contentActionTools: Tool[] = [
   },
   {
     name: 'prepare_brief_context',
-    description: 'Build structured context for brief writing and return a short-lived handle for save_brief.',
+    description: 'Build structured context for brief writing — including brand voice rules and identity — and return a short-lived handle for save_brief.',
     inputSchema: toMcpJsonSchema(prepareBriefContextInputSchema),
   },
   {
@@ -136,7 +144,7 @@ export const contentActionTools: Tool[] = [
   },
   {
     name: 'prepare_post_context',
-    description: 'Build structured context for post drafting from a saved brief and return a handle for save_post.',
+    description: 'Build structured context for post drafting from a saved brief — including brand voice rules and identity — and return a handle for save_post.',
     inputSchema: toMcpJsonSchema(preparePostContextInputSchema),
   },
   {
@@ -163,6 +171,18 @@ export const contentActionTools: Tool[] = [
     name: 'create_content_request',
     description: 'Create a content topic request in the workspace request pipeline.',
     inputSchema: toMcpJsonSchema(createContentRequestInputSchema),
+  },
+  {
+    name: 'advance_content_status',
+    description:
+      "Advance a content request through the operator workflow: 'in_progress' (production started) or 'delivered' (delivered to the client). Use after the client has approved, to drive the request toward completion. NOTE: this only sets those two operator states — sending for client review goes through send_to_client (which notifies the client), client approve/decline happens in the client portal, and publishing live is a separate publish_post call.",
+    inputSchema: toMcpJsonSchema(advanceContentStatusInputSchema),
+  },
+  {
+    name: 'publish_post',
+    description:
+      "Publish a post to the workspace's LIVE Webflow site (irreversible, client-visible). The post MUST be status 'approved' — un-reviewed drafts are rejected (take a post through review + approval first). Returns the published item id, slug, and whether it was an update. This is the terminal step of the content loop.",
+    inputSchema: toMcpJsonSchema(publishPostInputSchema),
   },
   {
     name: 'delete_brief',
@@ -304,6 +324,25 @@ function computePostTotalWordCount(post: Pick<GeneratedPost, 'introduction' | 's
     + countHtmlWords(post.conclusion);
 }
 
+function buildBriefTargetPromptBlock(
+  topic: string,
+  targetKeyword: string | undefined,
+  targetPagePath: string | undefined,
+): string {
+  if (!targetKeyword && !targetPagePath) return '';
+
+  const lines = ['## Brief Target', `Topic: ${sanitizeInlinePromptText(topic)}`];
+  if (targetKeyword) lines.push(`Target keyword: ${sanitizeInlinePromptText(targetKeyword)}`);
+  if (targetPagePath) lines.push(`Target page path: ${sanitizeInlinePromptText(targetPagePath)}`);
+  lines.push('Use this target signal as the primary focus for the brief.');
+  return lines.join('\n');
+}
+
+function sanitizeOptionalPromptHint(value: string | undefined): string | undefined {
+  const sanitized = sanitizeInlinePromptText(value);
+  return sanitized || undefined;
+}
+
 async function handleListBriefs(
   args: Record<string, unknown>,
 ): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
@@ -394,6 +433,28 @@ async function handleUpdateBrief(
       ...(patch.internalLinkSuggestions !== undefined ? { internalLinkSuggestions: patch.internalLinkSuggestions } : {}),
       ...(patch.pageType !== undefined ? { pageType: patch.pageType } : {}),
       ...(patch.executiveSummary !== undefined ? { executiveSummary: patch.executiveSummary } : {}),
+      // Enhanced ContentBrief fields (v2–v9) — merge only keys present in the patch.
+      ...(patch.contentFormat !== undefined ? { contentFormat: patch.contentFormat } : {}),
+      ...(patch.toneAndStyle !== undefined ? { toneAndStyle: patch.toneAndStyle } : {}),
+      ...(patch.peopleAlsoAsk !== undefined ? { peopleAlsoAsk: patch.peopleAlsoAsk } : {}),
+      ...(patch.topicalEntities !== undefined ? { topicalEntities: patch.topicalEntities } : {}),
+      ...(patch.serpAnalysis !== undefined ? { serpAnalysis: patch.serpAnalysis } : {}),
+      ...(patch.difficultyScore !== undefined ? { difficultyScore: patch.difficultyScore } : {}),
+      ...(patch.trafficPotential !== undefined ? { trafficPotential: patch.trafficPotential } : {}),
+      ...(patch.ctaRecommendations !== undefined ? { ctaRecommendations: patch.ctaRecommendations } : {}),
+      ...(patch.eeatGuidance !== undefined ? { eeatGuidance: patch.eeatGuidance } : {}),
+      ...(patch.contentChecklist !== undefined ? { contentChecklist: patch.contentChecklist } : {}),
+      ...(patch.schemaRecommendations !== undefined ? { schemaRecommendations: patch.schemaRecommendations } : {}),
+      ...(patch.referenceUrls !== undefined ? { referenceUrls: patch.referenceUrls } : {}),
+      ...(patch.realPeopleAlsoAsk !== undefined ? { realPeopleAlsoAsk: patch.realPeopleAlsoAsk } : {}),
+      ...(patch.realTopResults !== undefined ? { realTopResults: patch.realTopResults } : {}),
+      ...(patch.keywordLocked !== undefined ? { keywordLocked: patch.keywordLocked } : {}),
+      ...(patch.keywordSource !== undefined ? { keywordSource: patch.keywordSource } : {}),
+      ...(patch.keywordValidation !== undefined ? { keywordValidation: patch.keywordValidation } : {}),
+      ...(patch.templateId !== undefined ? { templateId: patch.templateId } : {}),
+      ...(patch.titleVariants !== undefined ? { titleVariants: patch.titleVariants } : {}),
+      ...(patch.metaDescVariants !== undefined ? { metaDescVariants: patch.metaDescVariants } : {}),
+      ...(patch.generationStyle !== undefined ? { generationStyle: patch.generationStyle } : {}),
       ...(patch.outline
         ? {
           outline: patch.outline.map(section => ({
@@ -587,27 +648,53 @@ async function handlePrepareBriefContext(
   const parsed = prepareBriefContextInputSchema.safeParse(args);
   if (!parsed.success) return zodErrorToMcp(parsed.error);
 
-  const { workspace_id: workspaceId, topic, layout } = parsed.data;
+  const {
+    workspace_id: workspaceId,
+    topic,
+    target_keyword: targetKeyword,
+    target_page_path: targetPagePath,
+    layout,
+  } = parsed.data;
   const workspace = requireWorkspace(workspaceId);
   if ('isError' in workspace) return workspace;
+
+  const safeTopic = sanitizeInlinePromptText(topic);
+  const safeTargetKeyword = sanitizeOptionalPromptHint(targetKeyword);
+  const safeTargetPagePath = sanitizeOptionalPromptHint(targetPagePath);
 
   try {
     const context = await buildContentGenerationContext(workspaceId, {
       learningsDomain: 'content',
+      ...(safeTargetPagePath ? { pagePath: safeTargetPagePath } : {}),
     });
+    // Brand identity + Layer-2 voice DNA — fetched separately (the brand slice is
+    // NOT part of the content-generation baseSlices). Inject ONLY voiceDnaBlock +
+    // identityPromptBlock: the Layer-1 voicePromptBlock already lives inside
+    // context.promptContext (via seoContext), so injecting it again would double-voice.
+    const brandIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['brand'] });
+    const brand = brandIntel.brand;
+    const brandIdentity = brand?.availability === 'ready' && Object.keys(brand.identity).length > 0 ? brand.identity : null;
+    const targetBlock = buildBriefTargetPromptBlock(safeTopic, safeTargetKeyword, safeTargetPagePath);
     const briefId = `brief_${randomUUID()}`;
     const handle = issueHandle('brief-request', workspaceId, {
-      topic,
+      topic: safeTopic,
+      targetKeyword: safeTargetKeyword,
+      targetPagePath: safeTargetPagePath,
       layout,
       briefId,
     } satisfies BriefRequestPayload);
     return mcpSuccess({
       brief_request_handle: handle,
-      topic,
+      topic: safeTopic,
+      target_keyword: safeTargetKeyword ?? null,
+      target_page_path: safeTargetPagePath ?? null,
       layout,
       layout_schema: toMcpJsonSchema(layoutSchema),
       brief_schema: toMcpJsonSchema(briefContentSchema),
-      prompt_context: context.promptContext,
+      prompt_context: [targetBlock, context.promptContext, brand?.voiceDnaBlock, brand?.identityPromptBlock]
+        .filter(Boolean).join('\n\n'),
+      brand_identity: brandIdentity,
+      voice_status: brand?.voice.status ?? 'none',
       dashboard_url: buildDashboardUrl(workspaceId, 'content'),
     });
   } catch (err) {
@@ -639,8 +726,30 @@ function buildBriefEntity(
     audience: content.audience,
     competitorInsights: content.competitorInsights,
     internalLinkSuggestions: content.internalLinkSuggestions,
+    // Enhanced ContentBrief fields (v2–v9) — persisted via briefToParams/upsertBrief.
     pageType: content.pageType,
     executiveSummary: content.executiveSummary,
+    contentFormat: content.contentFormat,
+    toneAndStyle: content.toneAndStyle,
+    peopleAlsoAsk: content.peopleAlsoAsk,
+    topicalEntities: content.topicalEntities,
+    serpAnalysis: content.serpAnalysis,
+    difficultyScore: content.difficultyScore,
+    trafficPotential: content.trafficPotential,
+    ctaRecommendations: content.ctaRecommendations,
+    eeatGuidance: content.eeatGuidance,
+    contentChecklist: content.contentChecklist,
+    schemaRecommendations: content.schemaRecommendations,
+    referenceUrls: content.referenceUrls,
+    realPeopleAlsoAsk: content.realPeopleAlsoAsk,
+    realTopResults: content.realTopResults,
+    keywordLocked: content.keywordLocked,
+    keywordSource: content.keywordSource,
+    keywordValidation: content.keywordValidation,
+    templateId: content.templateId,
+    titleVariants: content.titleVariants,
+    metaDescVariants: content.metaDescVariants,
+    generationStyle: content.generationStyle,
     createdAt: now,
   };
 }
@@ -737,6 +846,12 @@ async function handlePreparePostContext(
     const context = await buildContentGenerationContext(workspaceId, {
       learningsDomain: 'content',
     });
+    // Brand identity + Layer-2 voice DNA (workspace-scoped — uses workspaceId, not
+    // the brief's). Inject ONLY voiceDnaBlock + identityPromptBlock; voicePromptBlock
+    // is already inside context.promptContext (avoid double-voice).
+    const brandIntel = await buildWorkspaceIntelligence(workspaceId, { slices: ['brand'] });
+    const brand = brandIntel.brand;
+    const brandIdentity = brand?.availability === 'ready' && Object.keys(brand.identity).length > 0 ? brand.identity : null;
     const postId = `post_${randomUUID()}`;
     const handle = issueHandle('post-request', workspaceId, {
       briefId,
@@ -747,7 +862,10 @@ async function handlePreparePostContext(
       post_request_handle: handle,
       brief,
       post_schema: toMcpJsonSchema(postContentSchema),
-      prompt_context: context.promptContext,
+      prompt_context: [context.promptContext, brand?.voiceDnaBlock, brand?.identityPromptBlock]
+        .filter(Boolean).join('\n\n'),
+      brand_identity: brandIdentity,
+      voice_status: brand?.voice.status ?? 'none',
       dashboard_url: buildDashboardUrl(workspaceId, 'content'),
     });
   } catch (err) {
@@ -1274,6 +1392,85 @@ async function handleSendToClient(
   }
 }
 
+async function handleAdvanceContentStatus(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = advanceContentStatusInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, request_id: requestId, status, internal_note: internalNote } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  let updated;
+  try {
+    // updateContentRequest validates the transition (throws InvalidTransitionError on an illegal move).
+    updated = updateContentRequest(workspaceId, requestId, {
+      status,
+      ...(internalNote !== undefined ? { internalNote } : {}),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return mcpError(`Cannot advance content request to '${status}': ${message}`);
+  }
+  if (!updated) return mcpError(`Content request not found: ${requestId}`);
+
+  // Parity with the admin content-requests route: a transition to `delivered`
+  // makes the target page live, so it must run the same page-state update +
+  // recommendation follow-on enqueue. Shared helper keeps both paths in lockstep.
+  if (status === 'delivered') {
+    onContentRequestLive(workspaceId, updated);
+  }
+
+  addActivity(
+    workspaceId,
+    'content_updated',
+    `Advanced content request to ${status} via MCP`,
+    undefined,
+    { source: 'mcp-chat', requestId, status },
+  );
+  broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: requestId, status });
+  return mcpSuccess({ ok: true, request: updated });
+}
+
+async function handlePublishPost(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = publishPostInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, post_id: postId, generate_image: generateImage } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  // Approved-only guard (owner decision): an agent may publish only reviewed content,
+  // never an un-reviewed draft. publishPostToWebflow itself permits draft/review (admin
+  // override), so this stricter check is enforced here at the MCP boundary.
+  const post = getPost(workspaceId, postId);
+  if (!post) return mcpError(`Post not found: ${postId}`);
+  if (post.status !== 'approved') {
+    return mcpError(`Post status is '${post.status}' — only 'approved' posts can be published via MCP. Take the post through review and approval first.`);
+  }
+
+  try {
+    // The shared service owns the field map, broadcast (CONTENT_PUBLISHED), activity,
+    // outcome tracking, and rec-regen follow-on — the same path the operator UI uses.
+    const result = await publishPostToWebflow(workspaceId, postId, {
+      generateImage: generateImage ?? false,
+      activitySource: 'mcp-chat',
+    });
+    return mcpSuccess({
+      ok: true,
+      item_id: result.itemId,
+      slug: result.slug,
+      is_update: result.isUpdate,
+      post: result.post,
+    });
+  } catch (err) {
+    if (err instanceof PublishPostError) return mcpError(err.message);
+    const message = err instanceof Error ? err.message : String(err);
+    return mcpError(`Publish failed: ${message}`);
+  }
+}
+
 export async function handleContentActionTool(
   name: string,
   args: Record<string, unknown>,
@@ -1292,6 +1489,8 @@ export async function handleContentActionTool(
   if (name === 'list_content_requests') return handleListContentRequests(args);
   if (name === 'get_content_request') return handleGetContentRequestById(args);
   if (name === 'create_content_request') return handleCreateContentRequest(args);
+  if (name === 'advance_content_status') return handleAdvanceContentStatus(args);
+  if (name === 'publish_post') return handlePublishPost(args);
   if (name === 'delete_brief') return handleDeleteBrief(args);
   if (name === 'delete_post') return handleDeletePost(args);
   if (name === 'list_post_versions') return handleListPostVersions(args);

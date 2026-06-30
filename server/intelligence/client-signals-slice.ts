@@ -21,6 +21,8 @@ import {
   getRawClientBusinessPriorities,
 } from './business-priorities-source.js';
 import { readOptionalSlicePart } from './optional-slice-part.js';
+import { loadRecommendations } from '../recommendations.js';
+import type { Recommendation } from '../../shared/types/recommendations.js';
 
 const log = createLogger('workspace-intelligence/client-signals');
 
@@ -544,6 +546,48 @@ export async function assembleClientSignals(
     { logger: log },
   );
 
+  // Strategy v3 (spec §7.5, data-flow rule #6) — the client's responses to SENT curated recs.
+  // Counts derive from Recommendation.clientStatus across the rec set; surfaced so AdminChat/
+  // strategy "see the loop". Degrades to undefined if the rec set is unavailable.
+  const recResponses = await readOptionalSlicePart<ClientSignalsSlice['recResponses']>(
+    'assembleClientSignals: rec responses',
+    workspaceId,
+    undefined,
+    () => {
+      const set = loadRecommendations(workspaceId);
+      const recs: Recommendation[] = set?.recommendations ?? [];
+      const responded = recs.filter(
+        (r) =>
+          r.clientStatus === 'approved' ||
+          r.clientStatus === 'declined' ||
+          r.clientStatus === 'discussing',
+      );
+      // Returns a zeroed shape (not undefined) when there are no responses so consumers
+      // can render "0 responses" rather than treating it as "no data".
+      // respondedAt = updatedAt: the single-writer bumps updatedAt on every clientStatus
+      // mutation, so it is the correct "when the client responded" proxy (Recommendation has no
+      // dedicated response-timestamp). sentAt is when the rec was SENT, not when it was answered.
+      const recentResponses = [...responded]
+        .sort(
+          (a, b) =>
+            Date.parse(b.updatedAt ?? b.createdAt) - Date.parse(a.updatedAt ?? a.createdAt),
+        )
+        .slice(0, 5)
+        .map((r) => ({
+          title: r.title,
+          clientStatus: r.clientStatus ?? 'sent',
+          respondedAt: r.updatedAt ?? r.createdAt,
+        }));
+      return {
+        approved: responded.filter((r) => r.clientStatus === 'approved').length,
+        declined: responded.filter((r) => r.clientStatus === 'declined').length,
+        discussing: responded.filter((r) => r.clientStatus === 'discussing').length,
+        recentResponses,
+      };
+    },
+    { logger: log },
+  );
+
   return {
     keywordFeedback,
     contentGapVotes,
@@ -561,5 +605,6 @@ export async function assembleClientSignals(
     intentSignals,
     latestBriefing,
     clientActions,
+    recResponses,
   };
 }

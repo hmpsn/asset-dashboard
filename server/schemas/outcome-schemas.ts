@@ -4,11 +4,16 @@
 import { z } from '../middleware/validate.js';
 
 // --- Action Type enum for Zod ---
+// Must stay in lockstep with the ActionType union in shared/types/outcome-tracking.ts (the source
+// of truth). Previously omitted the 5 newest types, so the generic POST /api/outcomes/:ws/actions
+// route 400'd on them (incl. cannibalization_resolved) despite them being valid for recordAction.
 export const actionTypeEnum = z.enum([
   'insight_acted_on', 'content_published', 'brief_created',
   'strategy_keyword_added', 'schema_deployed', 'audit_fix_applied',
   'content_refreshed', 'internal_link_added', 'meta_updated',
-  'voice_calibrated',
+  'voice_calibrated', 'competitor_gap_closed', 'cluster_published',
+  'cannibalization_resolved', 'local_visibility_won', 'local_service_added',
+  'content_gap_keep', 'topic_cluster_keep',
 ]);
 
 export const attributionEnum = z.enum([

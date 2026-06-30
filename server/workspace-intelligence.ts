@@ -4,10 +4,7 @@
 
 import { createHash } from 'node:crypto';
 import { createLogger } from './logger.js';
-import { LRUCache, singleFlight } from './intelligence-cache.js';
-import { invalidateSubCachePrefix } from './bridge-infrastructure.js';
-import { broadcastToWorkspace } from './broadcast.js';
-import { WS_EVENTS } from './ws-events.js';
+import { singleFlight } from './intelligence-cache.js';
 import type {
   WorkspaceIntelligence,
   IntelligenceOptions,
@@ -20,19 +17,18 @@ import {
   type IntelligenceSliceMetadataEntry,
   INTELLIGENCE_SLICE_METADATA_REGISTRY,
 } from './intelligence/slice-metadata-registry.js';
+import { INTELLIGENCE_CACHE_TTL, intelligenceCache } from './intelligence/cache-state.js';
 import { formatForPrompt } from './intelligence/formatters.js';
 export {
   formatForPrompt,
   formatKnowledgeBaseForPrompt,
   formatKeywordsForPrompt,
-  formatPersonasForPrompt,
   formatPageMapForPrompt,
 } from './intelligence/formatters.js';
+export { formatPersonasForPrompt } from './intelligence/persona-format.js';
+export { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 
 const log = createLogger('workspace-intelligence');
-
-const intelligenceCache = new LRUCache<WorkspaceIntelligence>(200);
-const INTELLIGENCE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export const ALL_INTELLIGENCE_SLICES: readonly IntelligenceSlice[] = INTELLIGENCE_SLICES;
 
@@ -61,12 +57,17 @@ export async function buildWorkspaceIntelligence(
       assembledAt: new Date().toISOString(),
     };
 
-    for (const slice of requestedSlices) {
+    const assembledSlices = await Promise.all(requestedSlices.map(async (slice) => {
       try {
-        await assembleSlice(result, workspaceId, slice, opts);
+        return await assembleSlice(workspaceId, slice, opts);
       } catch (err) {
         log.warn({ workspaceId, slice, err }, 'Intelligence slice assembly failed — skipping');
+        return undefined;
       }
+    }));
+
+    for (const assembled of assembledSlices) {
+      if (assembled) Object.assign(result, assembled);
     }
 
     intelligenceCache.set(cacheKey, result, INTELLIGENCE_CACHE_TTL);
@@ -83,16 +84,14 @@ export async function buildWorkspaceIntelligence(
 }
 
 async function assembleSlice(
-  result: WorkspaceIntelligence,
   workspaceId: string,
   slice: IntelligenceSlice,
   opts?: IntelligenceOptions,
-): Promise<void> {
+): Promise<Partial<WorkspaceIntelligence> | undefined> {
   const entry: IntelligenceSliceMetadataEntry = INTELLIGENCE_SLICE_METADATA_REGISTRY[slice];
-  if (!canAssembleIntelligenceSlice(entry, opts)) return;
+  if (!canAssembleIntelligenceSlice(entry, opts)) return undefined;
 
-  const assembled = await entry.assemble(workspaceId, opts);
-  Object.assign(result, assembled);
+  return entry.assemble(workspaceId, opts);
 }
 
 export async function buildIntelPrompt(
@@ -122,25 +121,6 @@ function buildCacheKey(workspaceId: string, opts?: IntelligenceOptions): string 
   // entry written by a non-schema caller would silently defeat schema enrichment for 5min.
   const entityRes = opts?.resolveEntityReferences ? ':er' : '';
   return `intelligence:${workspaceId}:${slices}:${page}:${domain}:site=${encodeURIComponent(site)}:base=${encodeURIComponent(baseUrl)}:wf=${token}${backlinks}${entityRes}`;
-}
-
-/** Invalidate all cached intelligence for a workspace */
-export function invalidateIntelligenceCache(workspaceId: string): void {
-  const deleted = intelligenceCache.deleteByPrefix(`intelligence:${workspaceId}:`);
-  try {
-    invalidateSubCachePrefix(workspaceId, '');
-  } catch { // catch-ok — sub-cache table may not exist on older DBs; non-critical
-  }
-
-  try {
-    broadcastToWorkspace(workspaceId, WS_EVENTS.INTELLIGENCE_CACHE_UPDATED, {
-      workspaceId,
-      invalidatedAt: new Date().toISOString(),
-    });
-  } catch { // catch-ok — broadcasting is best-effort; don't fail cache invalidation
-  }
-
-  log.info({ workspaceId, entriesDeleted: deleted }, 'Intelligence cache invalidated (in-memory + persistent + broadcast)');
 }
 
 /** Cache stats for health endpoint (§18) */

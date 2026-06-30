@@ -1,7 +1,7 @@
 /**
  * Unit tests for src/lib/client-dashboard-tab.ts. Covers the tab resolution
  * edge cases that previously lived inline in ClientDashboard.tsx — legacy
- * aliases and the unknown-tab fallback.
+ * performance aliases and the unknown-tab fallback.
  */
 import { describe, it, expect } from 'vitest';
 import { resolveClientTab, KNOWN_CLIENT_TABS } from '../../src/lib/client-dashboard-tab';
@@ -17,8 +17,20 @@ describe('resolveClientTab', () => {
     expect(resolveClientTab('analytics')).toBe('performance');
   });
 
+  it('does NOT alias "roi" → keeps it (pure helper cannot read the flag; an unconditional alias would break the flag-OFF ROI tab)', () => {
+    expect(resolveClientTab('roi')).toBe('roi');
+  });
+
   it('passes through "brand"', () => {
     expect(resolveClientTab('brand')).toBe('brand');
+  });
+
+  // ── Client IA v2 shell tabs pass through unchanged ──
+
+  it('passes through "deep-dive", "results", "settings" unchanged', () => {
+    expect(resolveClientTab('deep-dive')).toBe('deep-dive');
+    expect(resolveClientTab('results')).toBe('results');
+    expect(resolveClientTab('settings')).toBe('settings');
   });
 
   // ── Pass-through for known tabs ──
@@ -26,6 +38,9 @@ describe('resolveClientTab', () => {
   it('passes through every value in KNOWN_CLIENT_TABS unchanged', () => {
     expect(KNOWN_CLIENT_TABS.length).toBeGreaterThan(0);
     for (const tab of KNOWN_CLIENT_TABS) {
+      // Every known tab (incl. 'roi') resolves to itself — no aliases out of
+      // KNOWN_CLIENT_TABS. (search/analytics are aliases but are intentionally NOT
+      // in KNOWN_CLIENT_TABS.)
       expect(resolveClientTab(tab)).toBe(tab);
     }
   });
@@ -37,19 +52,19 @@ describe('resolveClientTab', () => {
     expect(resolveClientTab('strategy')).toBe('strategy');
   });
 
-  it('passes through inbox/approvals/requests/content', () => {
+  it('passes through inbox', () => {
     expect(resolveClientTab('inbox')).toBe('inbox');
-    expect(resolveClientTab('approvals')).toBe('approvals');
-    expect(resolveClientTab('requests')).toBe('requests');
-    expect(resolveClientTab('content')).toBe('content');
   });
 
   it('passes through legacy surface "content-plan"', () => {
     expect(resolveClientTab('content-plan')).toBe('content-plan');
   });
 
-  it('redirects retired "schema-review" tab to inbox', () => {
-    expect(resolveClientTab('schema-review')).toBe('inbox');
+  it('falls back to "overview" for retired inbox route aliases', () => {
+    expect(resolveClientTab('approvals')).toBe('overview');
+    expect(resolveClientTab('requests')).toBe('overview');
+    expect(resolveClientTab('content')).toBe('overview');
+    expect(resolveClientTab('schema-review')).toBe('overview');
   });
 
   // ── Unknown / falsy → "overview" ──

@@ -2,7 +2,8 @@ import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { parseJsonSafe } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
-import { sanitizeForPromptInjection, stripCodeFences, stripHtmlToText, tryResolvePagePath } from './helpers.js';
+import { sanitizeForPromptInjection, stripCodeFences, stripHtmlToText } from './utils/text.js';
+import { tryResolvePagePath } from './utils/page-address.js';
 import { updateJob, unregisterAbort, isJobCancelled } from './jobs.js';
 import { createLogger } from './logger.js';
 import { callAI } from './ai.js';
@@ -10,9 +11,7 @@ import { getPageKeyword, upsertPageKeyword } from './page-keywords.js';
 import { resolvePersistedKeywordMetrics } from './provider-keyword-metrics.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import { buildSeoPromptContext } from './intelligence/generation-context-builders.js';
-import {
-  invalidateIntelligenceCache,
-} from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { getTokenForSite, type Workspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import type { SeoBulkAnalyzePage } from './schemas/seo-bulk-jobs.js';

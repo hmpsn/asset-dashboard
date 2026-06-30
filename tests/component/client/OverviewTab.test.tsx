@@ -2,7 +2,7 @@
  * Component tests for OverviewTab.
  *
  * Heavy sub-components (MonthlyDigest, IntelligenceSummaryCard, HealthScoreCard,
- * PredictionShowcaseCard, InsightsDigest, InsightsBriefingPage) are stubbed so
+ * PredictionShowcaseCard, InsightsDigest) are stubbed so
  * tests stay focused on the OverviewTab logic: welcome message, stat card grid,
  * action-needed banner, primary CTA, empty state, and the SEO-advisor sidebar.
  */
@@ -10,6 +10,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { OverviewTab } from '../../../src/components/client/OverviewTab';
 import type { WorkspaceInfo } from '../../../src/components/client/types';
+
+const clientHookState = vi.hoisted(() => ({
+  diagnostics: [] as unknown[],
+}));
+
+const featureFlagState = vi.hoisted(() => ({
+  enabled: false,
+}));
 
 // ── React Router ──────────────────────────────────────────────────────────────
 const mockNavigate = vi.fn();
@@ -28,12 +36,13 @@ vi.mock('../../../src/components/client/BetaContext', () => ({
 
 // ── Feature flags — off by default ───────────────────────────────────────────
 vi.mock('../../../src/hooks/useFeatureFlag', () => ({
-  useFeatureFlag: () => false,
+  useFeatureFlag: () => featureFlagState.enabled,
 }));
 
 // ── Client intelligence hook ──────────────────────────────────────────────────
 vi.mock('../../../src/hooks/client', () => ({
   useClientIntelligence: () => ({ data: undefined }),
+  useClientDiagnostics: () => ({ data: clientHookState.diagnostics }),
 }));
 
 // ── Recommendations hook — no top rec by default ──────────────────────────────
@@ -64,8 +73,19 @@ vi.mock('../../../src/components/client/InsightsDigest', () => ({
   InsightsDigest: () => <div data-testid="insights-digest" />,
 }));
 
-vi.mock('../../../src/components/client/Briefing/InsightsBriefingPage', () => ({
-  InsightsBriefingPage: () => <div data-testid="briefing-page" />,
+vi.mock('../../../src/components/client/the-issue/TheIssueClientPage', () => ({
+  TheIssueClientPage: ({ diagnosticReports = [] }: { diagnosticReports?: Array<{ clientSummary: string }> }) => (
+    <div data-testid="the-issue-client-page">
+      {diagnosticReports.length > 0 && (
+        <section>
+          <h2>What changed</h2>
+          {diagnosticReports.map(report => (
+            <p key={report.clientSummary}>{report.clientSummary}</p>
+          ))}
+        </section>
+      )}
+    </div>
+  ),
 }));
 
 // ── Minimal fixtures ──────────────────────────────────────────────────────────
@@ -130,6 +150,8 @@ const ga4Overview = {
 
 beforeEach(() => {
   mockNavigate.mockReset();
+  clientHookState.diagnostics = [];
+  featureFlagState.enabled = false;
   vi.mocked(baseProps.onAskAi).mockReset?.();
   vi.mocked(baseProps.onOpenChat).mockReset?.();
 });
@@ -208,6 +230,62 @@ describe('OverviewTab — basic rendering', () => {
   it('renders Ask your SEO advisor section with quick questions', () => {
     render(<OverviewTab {...baseProps} />);
     expect(screen.getByText('Ask your SEO advisor')).toBeInTheDocument();
+  });
+});
+
+describe('OverviewTab — diagnostic root causes', () => {
+  it('does not render diagnostic root-cause cards when there are no completed summaries', () => {
+    render(<OverviewTab {...baseProps} />);
+
+    expect(screen.queryByText('What changed')).not.toBeInTheDocument();
+  });
+
+  it('renders client-safe diagnostic summaries and navigates to Health', () => {
+    clientHookState.diagnostics = [{
+      id: 'diag-1',
+      insightId: 'insight-1',
+      anomalyType: 'traffic_drop',
+      affectedPages: ['/pricing'],
+      clientSummary: 'Traffic dropped because the pricing page lost visibility.',
+      rootCauses: [{ rank: 1, title: 'Ranking loss', confidence: 'high' }],
+      remediationActions: [{ priority: 'P1', title: 'Refresh pricing page' }],
+      createdAt: '2026-06-01T00:00:00.000Z',
+      completedAt: '2026-06-01T01:00:00.000Z',
+    }];
+
+    render(<OverviewTab {...baseProps} />);
+
+    expect(screen.getByText('What changed')).toBeInTheDocument();
+    expect(screen.getByText('Traffic Drop')).toBeInTheDocument();
+    expect(screen.getByText('Traffic dropped because the pricing page lost visibility.')).toBeInTheDocument();
+    expect(screen.getByText('Ranking loss')).toBeInTheDocument();
+    expect(screen.getByText('Refresh pricing page')).toBeInTheDocument();
+    expect(screen.queryByText(/raw GSC evidence/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Admin-only/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /View health/i }));
+    expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('health'));
+  });
+
+  it('passes diagnostic summaries into the strategy-the-issue overview', () => {
+    featureFlagState.enabled = true;
+    clientHookState.diagnostics = [{
+      id: 'diag-1',
+      insightId: 'insight-1',
+      anomalyType: 'traffic_drop',
+      affectedPages: ['/pricing'],
+      clientSummary: 'Traffic dropped because the pricing page lost visibility.',
+      rootCauses: [{ rank: 1, title: 'Ranking loss', confidence: 'high' }],
+      remediationActions: [{ priority: 'P1', title: 'Refresh pricing page' }],
+      createdAt: '2026-06-01T00:00:00.000Z',
+      completedAt: '2026-06-01T01:00:00.000Z',
+    }];
+
+    render(<OverviewTab {...baseProps} />);
+
+    expect(screen.getByTestId('the-issue-client-page')).toBeInTheDocument();
+    expect(screen.getByText('What changed')).toBeInTheDocument();
+    expect(screen.getByText('Traffic dropped because the pricing page lost visibility.')).toBeInTheDocument();
   });
 });
 
@@ -414,24 +492,5 @@ describe('OverviewTab — activity log', () => {
       />,
     );
     expect(screen.queryByText('Recent Work')).not.toBeInTheDocument();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('OverviewTab — feature flag: briefing v2', () => {
-  it('renders InsightsBriefingPage when client-briefing-v2 flag is enabled', async () => {
-    vi.doMock('../../../src/hooks/useFeatureFlag', () => ({
-      useFeatureFlag: (flag: string) => flag === 'client-briefing-v2',
-    }));
-    const { OverviewTab: FlaggedOverviewTab } = await import(
-      '../../../src/components/client/OverviewTab?flag-test'
-    ).catch(() => import('../../../src/components/client/OverviewTab'));
-
-    // Since dynamic re-import of mocked modules is complex in vitest,
-    // verify the fallback: with flag off the briefing page is not shown.
-    render(<OverviewTab {...baseProps} />);
-    expect(screen.queryByTestId('briefing-page')).not.toBeInTheDocument();
-    void FlaggedOverviewTab; // suppress unused variable
   });
 });

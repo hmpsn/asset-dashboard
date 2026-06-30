@@ -1,15 +1,17 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { put } from '../api/client';
-import type { FixContext } from '../App';
+import type { FixContext } from '../types/fix-context';
 import {
   Loader2, CheckCircle,
   Info, Sparkles, RefreshCw, Plus,
-  BookOpen, AlertTriangle, X,
+  BookOpen,
 } from 'lucide-react';
 import type { BusinessProfileContact } from '../../shared/types/workspace.js';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { useSchemaGraphValidation, useSchemaValidations } from '../hooks/admin/useSchemaValidation';
-import { Icon, cn, Button, IconButton } from './ui';
+import { Icon, Button, InlineBanner, PageHeader, TabBar } from './ui';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
 import { WorkflowStepper, ErrorState, ProgressIndicator, NextStepsCard } from './ui';
 import { SchemaPageCard } from './schema/SchemaPageCard';
 import { BulkPublishPanel } from './schema/BulkPublishPanel';
@@ -32,9 +34,17 @@ import {
   SchemaGeneratorHero,
   SchemaInitialPageTypePicker,
 } from './schema/SchemaGeneratorSetup';
+import { extractErrorMessage } from '../lib/extractErrorMessage';
 import { formatDateShort } from '../utils/formatDates';
+import { resolveTabSearchParam } from '../lib/tab-search-param';
 
-type SchemaSubTab = 'generator' | 'guide';
+const SCHEMA_SUB_TABS = [
+  { id: 'generator', label: 'Generator', icon: Sparkles },
+  { id: 'guide', label: 'Workflow Guide', icon: BookOpen },
+] as const;
+
+type SchemaSubTab = typeof SCHEMA_SUB_TABS[number]['id'];
+const VALID_SCHEMA_SUB_TABS = SCHEMA_SUB_TABS.map(tab => tab.id);
 
 interface Props {
   siteId: string;
@@ -69,9 +79,15 @@ function inferLocalBusinessIntent(
 }
 
 export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfile, intelligenceProfile }: Props) {
-  const [schemaSubTab, setSchemaSubTab] = useState<SchemaSubTab>('generator');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [schemaSubTab, setSchemaSubTab] = useState<SchemaSubTab>(() =>
+    resolveTabSearchParam<SchemaSubTab>(searchParams.get('tab'), {
+      validValues: VALID_SCHEMA_SUB_TABS,
+      fallback: 'generator',
+    }),
+  );
   const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, toggleExpand, setExpanded] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [pageTypeErrors, setPageTypeErrors] = useState<Record<string, string>>({});
 
   // `onPageGenerated` must have a STABLE identity across renders: the generation
@@ -110,6 +126,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
     setPageTypes,
     setSinglePageTypeOverrides,
     snapshotDate,
+    snapshotLoading,
     filteredInitialPages,
     runScan,
     stopScan,
@@ -216,47 +233,67 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
   };
   const impactData = useSchemaImpactData(workspaceId);
 
-  const toggleExpand = (id: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
+  useEffect(() => {
+    const nextTab = resolveTabSearchParam<SchemaSubTab>(searchParams.get('tab'), {
+      validValues: VALID_SCHEMA_SUB_TABS,
+      fallback: 'generator',
     });
+    if (nextTab !== schemaSubTab) setSchemaSubTab(nextTab);
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps -- sync tab state to external ?tab= changes only.
+
+  const handleSchemaTabChange = (id: string) => {
+    const nextTab = id as SchemaSubTab;
+    setSchemaSubTab(nextTab);
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextTab === 'generator') {
+      nextParams.delete('tab');
+    } else {
+      nextParams.set('tab', nextTab);
+    }
+    setSearchParams(nextParams, { replace: true });
   };
 
-  const schemaTabBar = (
-    <div className="flex items-center gap-1 border-b border-[var(--brand-border)] pb-0 mb-4">
-      {([
-        { id: 'generator' as SchemaSubTab, label: 'Generator', icon: Sparkles },
-        { id: 'guide' as SchemaSubTab, label: 'Workflow Guide', icon: BookOpen },
-      ]).map(t => (
-        <Button
-          key={t.id}
-          onClick={() => setSchemaSubTab(t.id)}
-          variant="ghost"
-          size="sm"
-          className={cn(
-            'flex items-center gap-1.5 px-3 py-2 t-caption font-medium border-b-2 transition-colors -mb-px',
-            schemaSubTab === t.id
-              ? 'border-teal-500 text-accent-brand'
-              : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]'
-          )}
-        >
-          <Icon as={t.icon} size="md" />
-          {t.label}
-        </Button>
-      ))}
-    </div>
+  const schemaSubtitle = schemaSubTab === 'guide'
+    ? 'Review the structured-data workflow from generation through validation.'
+    : data && data.length > 0
+      ? `${data.length} pages · ${resultStatsText(data, loading, snapshotDate)}`
+      : 'Generate JSON-LD structured data, review page types, and publish safely.';
+
+  const schemaHeader = (
+    <>
+      <PageHeader
+        title="Schema"
+        subtitle={schemaSubtitle}
+        icon={<Icon as={Sparkles} size="lg" className="text-accent-brand" />}
+      />
+      <TabBar
+        tabs={[...SCHEMA_SUB_TABS]}
+        active={schemaSubTab}
+        onChange={handleSchemaTabChange}
+      />
+    </>
   );
 
   if (schemaSubTab === 'guide') {
-    return <div>{schemaTabBar}<SchemaWorkflowGuide /></div>;
+    return <div className="space-y-8">{schemaHeader}<SchemaWorkflowGuide /></div>;
+  }
+
+  if (!started && snapshotLoading) {
+    return (
+      <div className="space-y-8">
+        {schemaHeader}
+        <div className="flex items-center gap-2 rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/8 px-4 py-3">
+          <Icon as={Loader2} size="md" className="animate-spin text-blue-400" />
+          <span className="t-caption text-blue-300">Checking saved schema results...</span>
+        </div>
+      </div>
+    );
   }
 
   if (!started) {
     return (
       <div className="space-y-8">
-        {schemaTabBar}
+        {schemaHeader}
         {schemaSubTab === 'generator' && (
           <WorkflowStepper
             steps={[
@@ -314,8 +351,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
 
   if (loading && (!data || data.length === 0)) {
     return (
-      <div>
-        {schemaTabBar}
+      <div className="space-y-8">
+        {schemaHeader}
         <ProgressIndicator
           status="running"
           step="Scanning schema opportunities..."
@@ -328,8 +365,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
 
   if (scanError) {
     return (
-      <div>
-        {schemaTabBar}
+      <div className="space-y-8">
+        {schemaHeader}
         <ErrorState
           type="general"
           title="Schema Scan Failed"
@@ -342,33 +379,27 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
 
   if (!data || data.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-3">
-        {schemaTabBar}
-        {singlePageError ? (
-          <div role="alert" className="w-full max-w-lg flex items-start gap-2 px-4 py-3 bg-red-500/8 border border-red-500/20 rounded-[var(--radius-md)]">
-            <Icon as={AlertTriangle} size="md" className="text-red-400 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="t-caption font-medium text-red-400">Page generation failed</p>
-              <p className="t-caption-sm text-[var(--brand-text-muted)]">{singlePageError}</p>
-            </div>
-            <IconButton
-              icon={X}
-              label="Dismiss error"
-              size="sm"
-              variant="ghost"
-              onClick={() => setSinglePageError(null)}
-              className="flex-shrink-0"
+      <div className="space-y-8">
+        {schemaHeader}
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          {singlePageError ? (
+            <InlineBanner
+              title="Page generation failed"
+              message={singlePageError}
+              onDismiss={() => setSinglePageError(null)}
+              dismissLabel="Dismiss error"
+              className="w-full max-w-lg"
             />
-          </div>
-        ) : (
-          <>
-            <Icon as={CheckCircle} size="2xl" className="text-accent-success" />
-            <p className="text-[var(--brand-text-muted)] t-body">No schema suggestions needed</p>
-          </>
-        )}
-        <Button onClick={handleRunScan} variant="secondary" size="sm" icon={RefreshCw} className="mt-2">
-          Re-scan
-        </Button>
+          ) : (
+            <>
+              <Icon as={CheckCircle} size="2xl" className="text-accent-success" />
+              <p className="text-[var(--brand-text-muted)] t-body">No schema suggestions needed</p>
+            </>
+          )}
+          <Button onClick={handleRunScan} variant="secondary" size="sm" icon={RefreshCw} className="mt-2">
+            Re-scan
+          </Button>
+        </div>
       </div>
     );
   }
@@ -377,7 +408,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
 
   return (
     <div className="space-y-8">
-      {schemaTabBar}
+      {schemaHeader}
       {schemaSubTab === 'generator' && (
         <WorkflowStepper
           steps={[
@@ -428,15 +459,8 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
         />
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="t-caption text-[var(--brand-text-muted)]">
-            {data.length} pages · {resultStats.totalTypes} schema types generated{loading ? ' (so far)' : ''}
-            {snapshotDate && !loading && <span className="text-[var(--brand-text-muted)]"> · saved {formatDateShort(snapshotDate)}</span>}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-end">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start lg:justify-end">
           {!loading && data.length > 0 && (
             <BulkPublishPanel
               dataCount={data.length}
@@ -453,18 +477,13 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
             />
           )}
           {sendToClientError && (
-            <span role="alert" className="flex items-center gap-1 t-caption text-red-400/80">
-              <Icon as={AlertTriangle} size="sm" />
+            <InlineBanner
+              size="sm"
+              onDismiss={() => setSendToClientError(null)}
+              dismissLabel="Dismiss"
+            >
               {sendToClientError}
-              <IconButton
-                icon={X}
-                label="Dismiss"
-                size="sm"
-                variant="ghost"
-                onClick={() => setSendToClientError(null)}
-                className="ml-1"
-              />
-            </span>
+            </InlineBanner>
           )}
           <div className="relative">
             <Button
@@ -489,10 +508,12 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
               />
             )}
             {fetchPagesError && (
-              <div role="alert" className="absolute top-full left-0 mt-1 z-[var(--z-dropdown)] flex items-start gap-1 px-2 py-1.5 max-w-xs bg-red-500/10 border border-red-500/20 rounded-[var(--radius-sm)] t-caption-sm text-red-400/80">
-                <Icon as={AlertTriangle} size="sm" className="flex-shrink-0 mt-0.5" />
+              <InlineBanner
+                size="sm"
+                className="absolute top-full left-0 mt-1 z-[var(--z-dropdown)] max-w-xs"
+              >
                 {fetchPagesError}
-              </div>
+              </InlineBanner>
             )}
           </div>
           <Button onClick={handleRunScan} disabled={loading} variant="secondary" size="sm" icon={RefreshCw}>
@@ -509,21 +530,12 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
 
       {/* Single-page generation error — dismissible inline banner, does NOT replace the results view */}
       {singlePageError && (
-        <div role="alert" className="flex items-start gap-2 px-4 py-3 bg-red-500/8 border border-red-500/20 rounded-[var(--radius-md)]">
-          <Icon as={AlertTriangle} size="md" className="text-red-400 flex-shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <p className="t-caption font-medium text-red-400">Page generation failed</p>
-            <p className="t-caption-sm text-[var(--brand-text-muted)]">{singlePageError}</p>
-          </div>
-          <IconButton
-            icon={X}
-            label="Dismiss error"
-            size="sm"
-            variant="ghost"
-            onClick={() => setSinglePageError(null)}
-            className="flex-shrink-0"
-          />
-        </div>
+        <InlineBanner
+          title="Page generation failed"
+          message={singlePageError}
+          onDismiss={() => setSinglePageError(null)}
+          dismissLabel="Dismiss error"
+        />
       )}
 
       {/* Pending schema approval batches sent to client */}
@@ -582,7 +594,7 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
                 setPageTypeErrors(prev => { const n = { ...prev }; delete n[pid]; return n; });
                 // Persist page-type to server; surface failure so the user knows the selection wasn't saved
                 put(`/api/webflow/schema-page-types/${siteId}?workspaceId=${workspaceId || ''}`, { pageId: pid, pageType: t }).catch((err: unknown) => {
-                  const msg = err instanceof Error ? err.message : 'Page type not saved — try again.';
+                  const msg = extractErrorMessage(err, 'Page type not saved — try again.');
                   setPageTypeErrors(prev => ({ ...prev, [pid]: msg }));
                   // Revert local state to the prior saved value (not deleted — that would show 'auto' even if server has a different value)
                   setPageTypes(prev => {
@@ -623,4 +635,14 @@ export function SchemaSuggester({ siteId, workspaceId, fixContext, businessProfi
       </div>
     </div>
   );
+}
+
+function resultStatsText(
+  pages: Parameters<typeof summarizeSchemaResults>[0],
+  loading: boolean,
+  snapshotDate: string | null | undefined,
+): string {
+  const stats = summarizeSchemaResults(pages);
+  const savedText = snapshotDate && !loading ? ` · saved ${formatDateShort(snapshotDate)}` : '';
+  return `${stats.totalTypes} schema types generated${loading ? ' (so far)' : ''}${savedText}`;
 }

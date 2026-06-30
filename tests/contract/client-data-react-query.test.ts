@@ -23,11 +23,14 @@ describe('client dashboard React Query data contract', () => {
     expect(existsSync(join(SRC, 'hooks/useClientData.ts'))).toBe(false);
   });
 
+  it('keeps the retired ApprovalsTab component deleted', () => {
+    expect(existsSync(join(SRC, 'components/client/ApprovalsTab.tsx'))).toBe(false);
+  });
+
   it('does not import client data types from the retired facade path', () => {
     const files = [
       'api/seo.ts',
       'components/ClientDashboard.tsx',
-      'components/client/ApprovalsTab.tsx',
       'components/client/InboxTab.tsx',
       'hooks/client/useClientQueries.ts',
     ];

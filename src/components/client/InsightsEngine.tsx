@@ -1,24 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Lightbulb, Zap, Clock, CalendarClock, RefreshCw,
   TrendingUp, TrendingDown, ShoppingCart, Crown, ChevronDown, ChevronRight,
   CheckCircle2, MousePointerClick, Eye,
   FileText, Code2, Image, Wrench, Target, PenTool, Sparkles,
-  Loader2, XCircle, ArrowUpRight, Shield, MapPin,
+  Loader2, XCircle, ArrowUpRight, Shield, MapPin, Globe,
 } from 'lucide-react';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { useCart } from './useCart';
 import type { ProductType } from '../../../shared/types/payments.ts';
 import type { RecPriority, RecType, RecStatus, Recommendation, RecommendationSet } from '../../../shared/types/recommendations.ts';
 import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs.ts';
 import { STUDIO_NAME } from '../../constants';
-import { get, post, patch, del } from '../../api/client';
+import { post, patch, del } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { Button } from '../ui/Button';
 import { fmtMoneyFull, fmtNum } from '../../utils/formatNumbers';
 import { Icon } from '../ui/Icon';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { useToast } from '../Toast';
+import { useClientRecommendationSetView } from '../../hooks/client/useClientInsightViewModel';
 
 // ─── Props ────────────────────────────────────────────────────────
 
@@ -27,10 +30,9 @@ interface InsightsEngineProps {
   tier?: 'free' | 'growth' | 'premium';
   compact?: boolean; // for embedding in overview tab
   onNavigate?: (tab: string, context?: { pageSlug?: string; recType?: string }) => void;
-  /** Optional notification callback for client-portal mounts where no ToastProvider is
-   *  present. When absent the component falls back to the context-based toast (admin
-   *  mounts have ToastProvider; client mounts thread this from ClientDashboard's
-   *  local setToast). Signature mirrors the context toast so both paths look the same. */
+  /** Optional notification callback for client-portal mounts. Client routes now have
+   *  ToastProvider, but this threaded callback keeps notification ownership explicit
+   *  and preserves the older mount/test contract. */
   onNotify?: (message: string, type: 'error' | 'success' | 'info') => void;
 }
 
@@ -50,6 +52,7 @@ const REC_TYPE_TAB: Record<RecType, string> = {
   cannibalization: 'seo-audit',
   local_visibility: 'seo-strategy',
   local_service_gap: 'seo-strategy',
+  competitor: 'seo-strategy',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -110,6 +113,7 @@ const TYPE_ICONS: Record<RecType, typeof FileText> = {
   cannibalization: Wrench,
   local_visibility: MapPin,
   local_service_gap: MapPin,
+  competitor: Globe,
 };
 
 const IMPACT_BADGE: Record<string, { label: string; color: string; bg: string }> = {
@@ -129,16 +133,19 @@ const EFFORT_BADGE: Record<string, { label: string; color: string }> = {
 export function InsightsEngine({ workspaceId, tier, compact, onNavigate, onNotify }: InsightsEngineProps) {
   const cart = useCart();
   const qc = useQueryClient();
+  // strategy-competitor-send: gates the client-side renderer for `competitor` rec rows.
+  // A sent competitor rec must not surface to the client before this renderer is ready.
+  const competitorSendEnabled = useFeatureFlag('strategy-competitor-send');
   const { toast: ctxToast } = useToast();
-  // Prefer the threaded onNotify prop (client-portal mount has no ToastProvider);
-  // fall back to the context toast (admin mount has ToastProvider).
+  // Prefer the threaded onNotify prop (client-portal ownership); fall back to
+  // context toast for reusable/admin mounts.
   const toast = (msg: string, type: 'error' | 'success' | 'info' = 'success') =>
     onNotify ? onNotify(msg, type) : ctxToast(msg, type);
   const { trackJob, findActiveJob, findLatestTerminalJob } = useBackgroundTasks();
   const [startingRegeneration, setStartingRegeneration] = useState(false);
   const lastObservedRecommendationJobId = useRef<string | null>(null);
-  const [expandedPriorities, setExpandedPriorities] = useState<Set<RecPriority>>(new Set(['fix_now']));
-  const [expandedRecs, setExpandedRecs] = useState<Set<string>>(new Set());
+  const [expandedPriorities, togglePriority] = useToggleSet<RecPriority>(['fix_now'], UNBOUNDED_TOGGLE_SET_OPTIONS);
+  const [expandedRecs, toggleRec] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const activeRecommendationJob = findActiveJob({
     type: BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION,
     workspaceId,
@@ -154,12 +161,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate, onNotif
   // queryFn returns RecommendationSet — same shape cached by useRecommendations,
   // which uses select to project to Recommendation[]. Both must cache the same type.
   // Uses get() (throws on non-200) so HTTP errors surface via isError, not silent null.
-  const { data, isLoading, isError } = useQuery<RecommendationSet>({
-    queryKey: queryKeys.shared.recommendations(workspaceId),
-    queryFn: (): Promise<RecommendationSet> =>
-      get<RecommendationSet>(`/api/public/recommendations/${workspaceId}`),
-    staleTime: 60_000,
-  });
+  const { data, isLoading, isError } = useClientRecommendationSetView(workspaceId);
 
   // Re-generate
   const handleRegenerate = async () => {
@@ -222,12 +224,6 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate, onNotif
     }
   };
 
-  const togglePriority = (p: RecPriority) =>
-    setExpandedPriorities(prev => { const n = new Set(prev); if (n.has(p)) n.delete(p); else n.add(p); return n; });
-
-  const toggleRec = (id: string) =>
-    setExpandedRecs(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-
   // Group recommendations by priority, excluding dismissed
   const grouped = useMemo(() => {
     if (!data) return new Map<RecPriority, Recommendation[]>();
@@ -236,6 +232,10 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate, onNotif
     for (const p of priorities) map.set(p, []);
     for (const rec of data.recommendations) {
       if (rec.status === 'dismissed') continue;
+      // strategy-competitor-send: competitor rec rows are gated — hide them from the
+      // client until the flag is ON. A sent competitor rec cannot surface before its
+      // renderer is ready (spec §LC.7 client-renderer gate).
+      if (rec.type === 'competitor' && !competitorSendEnabled) continue;
       map.get(rec.priority)?.push(rec);
     }
     return map;

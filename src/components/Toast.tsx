@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react';
 import { CheckCircle, AlertTriangle, X, Info } from 'lucide-react';
 import { Icon, IconButton } from './ui';
 
@@ -14,35 +14,63 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType>({ toast: () => {} });
 
+interface ToastProviderProps {
+  children: ReactNode;
+  durationMs?: number;
+  placement?: 'bottom-right' | 'bottom-center';
+  mode?: 'stack' | 'single';
+  variant?: 'default' | 'client';
+}
+
 export function useToast() {
   return useContext(ToastContext);
 }
 
-export function ToastProvider({ children }: { children: React.ReactNode }) {
+export function ToastProvider({
+  children,
+  durationMs = 3000,
+  placement = 'bottom-right',
+  mode = 'stack',
+  variant = 'default',
+}: ToastProviderProps) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const toast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = `${Date.now()}-${Math.random()}`;
-    setToasts(prev => [...prev, { id, message, type }]);
-  }, []);
+    setToasts(prev => mode === 'single' ? [{ id, message, type }] : [...prev, { id, message, type }]);
+  }, [mode]);
 
   const dismiss = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
+  const containerClass = placement === 'bottom-center'
+    ? 'fixed bottom-6 left-1/2 -translate-x-1/2 z-[var(--z-client-toast)] flex flex-col gap-2 pointer-events-none'
+    : 'fixed bottom-4 right-4 z-[var(--z-system-toast)] flex flex-col gap-2 pointer-events-none';
+
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-[200] flex flex-col gap-2 pointer-events-none"> {/* z-index-ok — toast must float above all modals */}
+      <div className={containerClass}>
         {toasts.map(t => (
-          <ToastMessage key={t.id} item={t} onDismiss={dismiss} />
+          <ToastMessage key={t.id} item={t} onDismiss={dismiss} durationMs={durationMs} variant={variant} />
         ))}
       </div>
     </ToastContext.Provider>
   );
 }
 
-function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: (id: string) => void }) {
+function ToastMessage({
+  item,
+  onDismiss,
+  durationMs,
+  variant,
+}: {
+  item: ToastItem;
+  onDismiss: (id: string) => void;
+  durationMs: number;
+  variant: 'default' | 'client';
+}) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => { // effect-layout-ok — intentional post-paint animation + dismiss timer
@@ -50,9 +78,9 @@ function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: (id: st
     const timer = setTimeout(() => {
       setVisible(false);
       setTimeout(() => onDismiss(item.id), 200);
-    }, 3000);
+    }, durationMs);
     return () => clearTimeout(timer);
-  }, [item.id, onDismiss]);
+  }, [durationMs, item.id, onDismiss]);
 
   const icons = {
     success: <Icon as={CheckCircle} size="md" className="text-emerald-400 shrink-0" />,
@@ -65,6 +93,31 @@ function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: (id: st
     error: 'border-red-500/20',
     info: 'border-blue-500/20',
   };
+
+  if (variant === 'client') {
+    const clientClasses = {
+      success: 'bg-emerald-500/15 border-emerald-500/30 text-accent-success',
+      error: 'bg-red-500/15 border-red-500/30 text-accent-danger',
+      info: 'bg-blue-500/15 border-blue-500/30 text-blue-400',
+    };
+
+    return (
+      <div
+        className={`pointer-events-auto px-5 py-3 rounded-[var(--radius-xl)] border shadow-lg backdrop-blur-sm flex items-center gap-2.5 t-caption font-medium transition-all duration-200 ${clientClasses[item.type]} ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}
+      >
+        {icons[item.type]}
+        <span className="t-caption font-medium">{item.message}</span>
+        <IconButton
+          onClick={() => { setVisible(false); setTimeout(() => onDismiss(item.id), 200); }}
+          icon={X}
+          label="Dismiss notification"
+          variant="ghost"
+          size="sm"
+          className="ml-1"
+        />
+      </div>
+    );
+  }
 
   return (
     <div

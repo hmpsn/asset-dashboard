@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } 
 import { post, put } from '../../api/client';
 import { schema as schemaApi } from '../../api/schema';
 import { usePageEditStates } from '../../hooks/usePageEditStates';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import type { SchemaDeliveryDecision, SchemaPublishResponse } from '../../../shared/types/schema-generation';
 import type { SchemaPageSuggestion, SchemaSuggestion } from './schemaSuggesterTypes';
 import { formatDate } from '../../utils/formatDates';
@@ -36,7 +37,7 @@ export function useSchemaSuggesterPublishingWorkflow({
   const [retractedPages, setRetractedPages] = useState<Set<string>>(new Set());
   const [bulkPublishing, setBulkPublishing] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
-  const [showDiff, setShowDiff] = useState<Set<string>>(new Set());
+  const [showDiff, toggleDiff] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [editingSchema, setEditingSchema] = useState<Set<string>>(new Set());
   const [editedSchemaJson, setEditedSchemaJson] = useState<Record<string, string>>({});
   const [schemaParseError, setSchemaParseError] = useState<Record<string, string>>({});
@@ -137,6 +138,7 @@ export function useSchemaSuggesterPublishingWorkflow({
     }
   }, [data, refreshStates, siteId, workspaceId]);
 
+  // use-toggle-set-ok -- edit mode also seeds/validates JSON side-channel state in the same transition.
   const toggleSchemaEdit = useCallback((pageId: string, template: Record<string, unknown>) => {
     setEditingSchema(prev => {
       const next = new Set(prev);
@@ -257,14 +259,6 @@ export function useSchemaSuggesterPublishingWorkflow({
     setBulkPublishing(false);
     setBulkProgress(null);
   }, [bulkPublishBlocked, data, getEffectiveSchema, publishToWebflow, published]);
-
-  const toggleDiff = useCallback((pageId: string) => {
-    setShowDiff(prev => {
-      const next = new Set(prev);
-      if (next.has(pageId)) next.delete(pageId); else next.add(pageId);
-      return next;
-    });
-  }, []);
 
   const retractSchema = useCallback(async (pageId: string) => {
     setRetractingPages(prev => new Set(prev).add(pageId));

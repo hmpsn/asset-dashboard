@@ -11,7 +11,7 @@ import type {
 } from '../../shared/types/content.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
 import type { CannibalizationReport } from '../cannibalization-detection.js';
-import type { DecayAnalysis } from '../content-decay.js';
+import type { DecayAnalysis } from '../../shared/types/content-decay.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { createStmtCache } from '../db/stmt-cache.js';
@@ -75,7 +75,7 @@ export async function assembleContentPipeline(
           (k: string | { keyword: string }) =>
             typeof k === 'string' ? k : k.keyword,
         ) ?? [];
-      const { listBriefs } = await import('../content-brief.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const { listBriefs } = await import('../content-brief-read-model.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
       const briefs = listBriefs(workspaceId);
       const briefKeywords = new Set(
         briefs.map((b) => keywordComparisonKey(b.targetKeyword)),
@@ -96,7 +96,7 @@ export async function assembleContentPipeline(
     workspaceId,
     [],
     async () => {
-      const { listBriefs } = await import('../content-brief.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const { listBriefs } = await import('../content-brief-read-model.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
       const { listPosts } = await import('../content-posts-db.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
       const keys = new Set<string>();
       for (const brief of listBriefs(workspaceId)) {
@@ -201,7 +201,7 @@ export async function assembleContentPipeline(
     workspaceId,
     [] as DecayAlert[],
     async () => {
-      const { loadDecayAnalysis } = await import('../content-decay.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const { loadDecayAnalysis } = await import('../content-decay-read-model.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
       const decay: DecayAnalysis | null = loadDecayAnalysis(workspaceId);
       if (decay?.decayingPages) {
         return decay.decayingPages.slice(0, 20).map((p) => ({

@@ -4,11 +4,10 @@
 
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { parseJsonSafeArray } from './db/json-validation.js';
-import { z } from './middleware/validate.js';
 import { createLogger } from './logger.js';
 import { recordAction, getActionBySource, fillPredictedEmvIfNull } from './outcome-tracking.js';
-import { recommendationOutcomeActionType } from './recommendations.js';
+import { recommendationOutcomeActionType } from './domains/recommendations/outcome-action-type.js';
+import { loadRecommendationSet } from './domains/recommendations/storage.js';
 import type { RecType } from '../shared/types/recommendations.js';
 
 const log = createLogger('outcome-backfill');
@@ -30,53 +29,11 @@ interface AnalyticsInsightRow {
   resolved_at: string | null;
 }
 
-interface RecommendationSetRow {
-  workspace_id: string;
-  recommendations: string; // JSON blob
-}
-
 interface WorkspaceIdRow {
   id: string;
 }
 
-interface Recommendation {
-  id: string;
-  status: string;
-  affectedPages?: string[];
-  /** Optional on legacy/regenerated rows: drives the outcome ActionType mapping (A1). */
-  type?: string;
-  source?: string;
-  /** A5 (audit #20): only the predictedEmv field of the OV breakdown is read here —
-   *  it is snapshotted onto the tracked action so the P6 realized-vs-predicted
-   *  calibration has a pairing. Absent on legacy/opportunity-less rows. */
-  opportunity?: { predictedEmv?: number | null };
-}
-
 // ─── Prepared statement cache ────────────────────────────────────────────────
-
-// Shared rec-blob item schema for the completed-recommendations pass AND the A5
-// predictedEmv repair pass. parseJsonSafeArray validates items individually, so one
-// malformed rec never drops the rest; `.catch(undefined)` on `opportunity` means a
-// malformed OV breakdown degrades to "no prediction" instead of dropping the rec item.
-const recommendationSchema = z.object({
-  id: z.string(),
-  status: z.string(),
-  affectedPages: z.array(z.string()).optional(),
-  // type/source drive the outcome ActionType mapping (A1). Optional because legacy /
-  // regenerated rows may omit them — those fall back to audit_fix_applied below.
-  type: z.string().optional(),
-  source: z.string().optional(),
-  // A5 (audit #20): the OV predictedEmv to snapshot onto the tracked action.
-  opportunity: z.object({ predictedEmv: z.number().nullable().optional() }).optional().catch(undefined),
-});
-
-function parseRecommendationBlob(raw: string): Recommendation[] {
-  return parseJsonSafeArray(
-    raw,
-    recommendationSchema,
-    { field: 'recommendations', table: 'recommendation_sets' },
-  ) as Recommendation[];
-}
 
 const stmts = createStmtCache(() => ({
   allWorkspaceIds: db.prepare(`SELECT id FROM workspaces`),
@@ -89,11 +46,6 @@ const stmts = createStmtCache(() => ({
     SELECT id, workspace_id, page_id, resolution_status, resolved_at
     FROM analytics_insights
     WHERE workspace_id = ? AND resolution_status = 'resolved'
-  `),
-  recommendationSet: db.prepare(`
-    SELECT workspace_id, recommendations
-    FROM recommendation_sets
-    WHERE workspace_id = ?
   `),
   // A5 repair pass: recommendation-sourced actions that never captured a predictedEmv
   // snapshot (pre-A5 backfill rows + live completions of opportunity-less recs).
@@ -192,16 +144,15 @@ export function backfillResolvedInsights(workspaceId: string): number {
 
 /**
  * Backfill completed recommendations as 'audit_fix_applied' actions.
- * Recommendations are stored as a JSON blob in recommendation_sets.recommendations.
+ * Recommendations are read through the canonical recommendation read model:
+ * normalized rows are authoritative, with the legacy blob as fallback only.
  * Idempotent: skips recommendations that already have a tracked action via source_type='recommendation'.
  */
 export function backfillCompletedRecommendations(workspaceId: string): number {
-  const row = stmts().recommendationSet.get(workspaceId) as RecommendationSetRow | undefined;
-  if (!row) return 0;
+  const set = loadRecommendationSet(workspaceId);
+  if (!set) return 0;
 
-  const recommendations = parseRecommendationBlob(row.recommendations);
-
-  const completed = recommendations.filter(r => r.status === 'completed');
+  const completed = set.recommendations.filter(r => r.status === 'completed');
   let count = 0;
 
   for (const rec of completed) {
@@ -243,8 +194,9 @@ export function backfillCompletedRecommendations(workspaceId: string): number {
           },
           sourceFlag: 'backfill',
           baselineConfidence: 'estimated',
-          // A5 (audit #20): snapshot the rec's OV predictedEmv from the blob — the same
-          // field the live PATCH-completion route snapshots (routes/recommendations.ts).
+          // A5 (audit #20): snapshot the rec's OV predictedEmv from the current
+          // recommendation read model — the same field the live PATCH-completion route
+          // snapshots (routes/recommendations.ts).
           // Pre-A5 this was hardcoded null, so every rec completed via the in-place
           // resolver (resolveRecommendationsForChange records no action; this weekly
           // pass is its catch-up) lost the P6 realized-vs-predicted pairing. Honest
@@ -268,13 +220,13 @@ export function backfillCompletedRecommendations(workspaceId: string): number {
 
 /**
  * A5 (audit #20) repair pass: fill MISSING predictedEmv snapshots on existing
- * recommendation-sourced tracked actions from the current rec blob.
+ * recommendation-sourced tracked actions from the current recommendation read model.
  *
  * Why these rows exist: (a) every pre-A5 backfill row hardcoded predicted_emv = NULL,
  * and (b) live completions of recs that had no opportunity attached at completion time
  * stored an honest NULL even though a later regen may have attached one.
  *
- * Best-effort semantics, documented: the blob's predictedEmv is the rec's CURRENT
+ * Best-effort semantics, documented: the read model's predictedEmv is the rec's CURRENT
  * prediction, which can postdate action time for regenerated sets — an acceptable
  * estimate for the P6 calibration pairing, far better than no pairing. Three guards
  * keep it honest:
@@ -290,11 +242,11 @@ export function backfillPredictedEmvSnapshots(workspaceId: string): number {
   const candidates = stmts().nullEmvRecActions.all(workspaceId) as Array<{ id: string; source_id: string | null }>;
   if (candidates.length === 0) return 0;
 
-  const row = stmts().recommendationSet.get(workspaceId) as RecommendationSetRow | undefined;
-  if (!row) return 0;
+  const set = loadRecommendationSet(workspaceId);
+  if (!set) return 0;
 
   const emvByRecId = new Map<string, number>();
-  for (const rec of parseRecommendationBlob(row.recommendations)) {
+  for (const rec of set.recommendations) {
     const emv = rec.opportunity?.predictedEmv;
     if (rec.id && typeof emv === 'number' && Number.isFinite(emv) && emv > 0) {
       emvByRecId.set(rec.id, emv);

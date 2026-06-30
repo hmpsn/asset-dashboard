@@ -3,6 +3,7 @@ import { patch, post, del, getSafe, postForm } from '../api/client';
 import { Icon, Button, IconButton, ClickableRow, FormInput, FormSelect, cn } from './ui';
 import { inlineMarkdownToHtml } from '../lib/inline-markdown';
 import { formatDateShort, formatDateTime } from '../utils/formatDates';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
 import {
   MessageSquare, Send, Loader2, ChevronDown, ChevronUp,
   Trash2, ExternalLink, Clock, CheckCircle2, AlertTriangle,
@@ -95,7 +96,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [wsFilter, setWsFilter] = useState<string>(workspaceId || 'all');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, toggleSelect, setSelected] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [bulkUpdating, setBulkUpdating] = useState(false);
 
   useEffect(() => {
@@ -169,14 +170,6 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
       setSelected(new Set());
     } catch (err) { console.error('RequestManager operation failed:', err); }
     setBulkUpdating(false);
-  };
-
-  const toggleSelect = (id: string) => {
-    setSelected(prev => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
-    });
   };
 
   const selectAll = () => {

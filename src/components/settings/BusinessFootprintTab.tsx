@@ -3,8 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { Building2, MapPin } from 'lucide-react';
 import { useDeepLinkFocus } from '../../hooks/useDeepLinkFocus';
 import { SectionCard, Icon } from '../ui';
+import { FeatureFlag } from '../ui/FeatureFlag';
 import { BusinessProfileTab } from './BusinessProfileTab';
 import { LocationsTab } from './LocationsTab';
+import { TargetGeoEditor } from './TargetGeoEditor';
+import { GbpLocationMappingPanel } from './GbpLocationMappingPanel';
+import type { TargetGeo } from '../../../shared/types/workspace';
 
 type LegacyBusinessFootprintSection = 'business-profile' | 'locations';
 
@@ -26,6 +30,7 @@ interface BusinessFootprintTabProps {
   siteHasSearch?: boolean;
   businessContext?: string;
   businessProfile?: BusinessProfile | null;
+  targetGeo?: TargetGeo | null;
   legacySection?: LegacyBusinessFootprintSection | null;
   toast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   onBusinessProfileSave: () => void;
@@ -39,6 +44,7 @@ export function BusinessFootprintTab({
   siteHasSearch,
   businessContext,
   businessProfile,
+  targetGeo,
   legacySection = null,
   toast,
   onBusinessProfileSave,
@@ -92,6 +98,15 @@ export function BusinessFootprintTab({
         />
       </div>
 
+      <FeatureFlag flag="geo-targeting">
+        <TargetGeoEditor
+          workspaceId={workspaceId}
+          targetGeo={targetGeo}
+          toast={toast}
+          onSave={onBusinessProfileSave}
+        />
+      </FeatureFlag>
+
       <div
         ref={locationsRef}
         tabIndex={-1}
@@ -114,6 +129,11 @@ export function BusinessFootprintTab({
           businessProfile={businessProfile}
           toast={toast}
         />
+        <FeatureFlag flag="gbp-auth-connection">
+          <div className="mt-6">
+            <GbpLocationMappingPanel workspaceId={workspaceId} />
+          </div>
+        </FeatureFlag>
       </div>
     </div>
   );

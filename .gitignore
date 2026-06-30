@@ -38,3 +38,7 @@ coverage/
 
 # Local experiment artifacts
 artifacts/
+
+# Ad-hoc walkthrough/scratch scripts (hard-code workspace ids + do DB mutations — never commit)
+scripts/_walkthrough-*.ts
+scripts/_*.ts

@@ -1,45 +1,31 @@
 import {
   Loader2, X, Target, Sparkles, FileText, Shield, Lock, Check,
 } from 'lucide-react';
+import type { Dispatch, SetStateAction } from 'react';
 import { STUDIO_NAME } from '../../constants';
 import { Button, IconButton } from '../ui';
-import type { PricingModalData, StripePaymentData } from '../../hooks/usePayments';
-import type { WorkspaceInfo, ClientContentRequest } from './types';
+import type { PricingModalData } from '../../hooks/usePayments';
+import type { WorkspaceInfo } from './types';
+import { useClientPricing } from './ClientPricingContext';
 
 interface Props {
-  /** @deprecated Kept for call-site compat; no longer gates rendering. */
-  betaMode?: boolean;
   billingMode?: 'platform' | 'external';
   pricingModal: PricingModalData | null;
-  setPricingModal: React.Dispatch<React.SetStateAction<PricingModalData | null>>;
+  setPricingModal: Dispatch<SetStateAction<PricingModalData | null>>;
   pricingConfirming: boolean;
   confirmPricingAndSubmit: () => void;
-  briefPrice: number | null;
-  fullPostPrice: number | null;
-  fmtPrice: (n: number) => string;
   contentPricing: WorkspaceInfo['contentPricing'] | undefined;
-  /** @deprecated Checkout redirects immediately; retained for call-site compatibility. */
-  stripePayment: StripePaymentData | null;
-  /** @deprecated Checkout redirects immediately; retained for call-site compatibility. */
-  setStripePayment: React.Dispatch<React.SetStateAction<StripePaymentData | null>>;
-  workspaceId: string;
-  setContentRequests: React.Dispatch<React.SetStateAction<ClientContentRequest[]>>;
-  setToast: (t: { message: string; type: 'success' | 'error' } | null) => void;
 }
 
 export function PricingConfirmationModal({
-  // betaMode kept in props for prop-spread call sites; no longer gates rendering since
-  // returning null here left the request stuck (setPricingModal was set, modal absent).
   billingMode,
   pricingModal,
   setPricingModal,
   pricingConfirming,
   confirmPricingAndSubmit,
-  briefPrice,
-  fullPostPrice,
-  fmtPrice,
   contentPricing,
 }: Props) {
+  const { briefPrice, fullPostPrice, fmtPrice } = useClientPricing();
   if (!pricingModal) return null;
   const isExternal = billingMode === 'external';
 
@@ -57,11 +43,10 @@ export function PricingConfirmationModal({
         // to null. The CTA below picks the no-price branch automatically.
         const displayPrice = isExternal ? null : (isUpgrade ? upgradePrice : price);
         const fmt = fmtPrice;
-        // z-index-ok — pricing modal above standard modal scale
         return (
           <div
             className={
-              'fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4' // fixed-inset-ok -- Pricing confirmation coordinates with checkout state above the standard modal layer.
+              'fixed inset-0 bg-black/70 backdrop-blur-md z-[var(--z-takeover)] flex items-center justify-center p-4' // fixed-inset-ok -- Pricing confirmation coordinates with checkout state above the standard modal layer.
             }
             onClick={() => !pricingConfirming && setPricingModal(null)}
           >

@@ -56,6 +56,19 @@ import { createLogger } from '../../../logger.js';
 
 const clientActionRespondLog = createLogger('client-action-shared');
 
+type ClientActionsMutationsModule = {
+  respondToPublicClientAction: (
+    workspaceId: string,
+    actionId: string,
+    response: { status: 'approved' | 'changes_requested'; clientNote?: string },
+    actor: RespondToSourceOptions['actor'],
+  ) => ClientAction;
+};
+
+function inboxDomainModulePath(name: 'client-actions-mutations'): `../${typeof name}.js` {
+  return `../${name}.js`;
+}
+
 /**
  * The adapter input for every client_action-family type: the persisted `ClientAction` (as
  * built by `server/client-actions.ts:createClientAction`) plus the resolved Webflow `siteId`
@@ -76,6 +89,7 @@ export const CLIENT_ACTION_FAMILY_TYPES = [
   'internal_link',
   'aeo_change',
   'content_decay',
+  'cannibalization',
 ] as const;
 
 export type ClientActionFamilyType = (typeof CLIENT_ACTION_FAMILY_TYPES)[number];
@@ -97,6 +111,8 @@ export function clientActionDeliverableType(
       return 'aeo_change';
     case 'content_decay':
       return 'content_decay';
+    case 'cannibalization':
+      return 'cannibalization';
   }
 }
 
@@ -149,7 +165,9 @@ export function buildClientActionPayload(
   itemNoun: string,
 ): BuiltDeliverablePayload {
   const count = items.length;
-  const kind = type === 'content_decay' ? 'decision' : 'batch';
+  // content_decay + cannibalization are single inline decisions (one page / one keyword issue);
+  // the array-backed types (redirect / internal_link / aeo_change) open the batch modal.
+  const kind = type === 'content_decay' || type === 'cannibalization' ? 'decision' : 'batch';
   return {
     title: action.title,
     summary:
@@ -250,7 +268,8 @@ export async function respondToClientActionSource(
     // Lazy import to break the module cycle: client-actions-mutations.ts (the reuse target)
     // imports the dual-write barrel, which imports every adapter (including this leaf). A
     // static import here would close that loop; the runtime-only dynamic import does not.
-    const { respondToPublicClientAction } = await import('../client-actions-mutations.js'); // dynamic-import-ok: breaks adapter↔mutations cycle (R2)
+    const { respondToPublicClientAction } =
+      await import(inboxDomainModulePath('client-actions-mutations')) as ClientActionsMutationsModule; // dynamic-import-ok: breaks adapter↔mutations cycle (R2)
     respondToPublicClientAction(
       workspaceId,
       actionId,

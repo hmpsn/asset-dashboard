@@ -9,11 +9,11 @@
  * live in `keyword-strategy-seo-data.ts`).
  *
  * It is the seam the assembler exists to create: one builder, geo + language
- * resolved once and threaded into every provider call, MCP-seedable, behind the
- * `seo-generation-quality` flag. The legacy two-builder path (synthesis-side
- * pool + `seoDataMode === 'full'` discovery) remains verbatim on the flag-OFF
- * path so flag-OFF is byte-identical to today (G3: kill the drift only on
- * flag-ON; never drop GSC/client candidates or skip the declined filter).
+ * resolved once and threaded into every provider call, MCP-seedable, and now
+ * the canonical generation-quality path. The retired legacy two-builder path
+ * (synthesis-side pool + `seoDataMode === 'full'` discovery) is kept only as a
+ * fallback when the assembler fails; never drop GSC/client candidates or skip
+ * the declined filter.
  *
  * The canonical store is an internal `Map<normalizedKeyword, KeywordPoolCandidate>`
  * (the shape synthesis already reads via `keywordPool.get(...)`); `candidates`
@@ -24,7 +24,8 @@ import { isProgrammingError } from './errors.js';
 import { getTrackedKeywords } from './rank-tracking.js';
 import { filterBrandedKeywords } from './competitor-brand-filter.js';
 import { filterDeclinedFromPool } from './strategy-filters.js';
-import { resolveWorkspaceLocationCode, resolveWorkspaceLanguageCode, buildLocalSeoKeywordCandidates } from './local-seo.js';
+import { resolveWorkspaceLocationCode, resolveWorkspaceLanguageCode } from './domains/local-seo/configuration-service.js';
+import { buildLocalSeoKeywordCandidates } from './domains/local-seo/candidate-service.js';
 import {
   upsertKeywordPoolCandidate,
   isStrategyQualityDiscoveryKeyword,
@@ -392,9 +393,9 @@ export async function buildKeywordUniverse(
   // ineligible-first duplicate (e.g. volume:0 first row) as seen and then drop a
   // later eligible duplicate the legacy fold admits — and would also defeat the
   // higher-volume tiebreak. (C2)
-  // P2(c): on the flag-ON assembler path, admit KD-0 long-tail (difficulty >= 0)
+  // P2(c): on the assembler path, admit KD-0 long-tail (difficulty >= 0)
   // behind the volume floor. `relaxConservatism` rides on the threaded eval context
-  // (true whenever the assembler runs, i.e. the flag is ON).
+  // (true whenever the canonical assembler path runs).
   const relaxConservatism = evaluationContext.relaxConservatism ?? false;
   for (const dk of [...discoveryKeywords, ...fetchedDiscovery]) {
     const kw = normalizeKeyword(dk.keyword);
@@ -436,8 +437,8 @@ export async function buildKeywordUniverse(
   }
 
   // ── (9b) Local-intent candidates (P7.2) — STORED reads only ──
-  // Gated by the caller-resolved `includeLocal` boolean (umbrella gen-quality flag +
-  // posture ∈ {local,hybrid} + `local-seo-visibility`). When false, this block is
+  // Gated by the caller-resolved `includeLocal` boolean (workspace posture ∈
+  // {local,hybrid} + `local-seo-visibility`). When false, this block is
   // skipped entirely so the pool + sourceCounts are byte-identical to pre-P7.2.
   //
   // `buildLocalSeoKeywordCandidates` reads STORED local candidates (page-map /

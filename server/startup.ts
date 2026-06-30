@@ -11,8 +11,13 @@ import { startAnomalyDetection } from './anomaly-detection.js';
 import { startOutcomeCrons } from './outcome-crons.js';
 import { startDataRetentionCrons } from './data-retention.js';
 import { startIntelligenceCrons, startCompetitorMonitoringCron } from './intelligence-crons.js';
+import { startInsightRecomputeCron } from './insight-recompute-cron.js';
 import { startRankTrackingScheduler } from './rank-tracking-scheduler.js';
+import { startGa4ConversionSnapshotScheduler } from './ga4-conversion-snapshot-scheduler.js';
+import { startWebflowFormPoller } from './webflow-form-poller.js';
 import { startBriefingCron } from './briefing-cron.js';
+import { startStrategyIssueCron } from './strategy-issue-cron.js';
+import { startReturnHookCron } from './return-hook-cron.js';
 
 /** Start all background schedulers and queues. */
 let started = false;
@@ -34,6 +39,11 @@ export function startSchedulers() {
   startDataRetentionCrons();
   startIntelligenceCrons();
   startCompetitorMonitoringCron();
+  startInsightRecomputeCron();
   startRankTrackingScheduler();
+  startGa4ConversionSnapshotScheduler();
+  startWebflowFormPoller();
   startBriefingCron();
+  startStrategyIssueCron();
+  startReturnHookCron();
 }

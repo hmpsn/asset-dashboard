@@ -116,7 +116,8 @@ describe('SchemaSuggester CMS workflow extraction', () => {
     expect(matchedPageIndex).toBeGreaterThan(singlePageStartIndex);
     expect(fetchMetaIndex).toBeGreaterThan(matchedPageIndex);
     expect(source.slice(matchedPageIndex, fetchMetaIndex + 60)).toContain('matchedPage ?');
-    expect(source).toContain('slug: matchedPage.slug || resolvePagePath(matchedPage)');
+    expect(source.slice(matchedPageIndex, fetchMetaIndex + 60)).toContain('sourcePageMetaFromWebflowPage(matchedPage)');
+    expect(source).toContain('slug: page.slug || resolvePagePath(page)');
   });
 
   it('flags invalid regression when CMS single-page generation drops active-plan context threading', () => {

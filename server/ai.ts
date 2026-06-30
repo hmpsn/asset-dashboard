@@ -8,7 +8,7 @@
 
 import { callOpenAI } from './openai-helpers.js';
 import { callAnthropic } from './anthropic-helpers.js';
-import { getAIOperationContract, type AIOperationId } from './ai-operation-registry.js';
+import { getAIOperationRuntimeDefaults, type AIOperationId } from './ai-operation-registry.js';
 
 export interface AICallOptions {
   /** Registry operation id for auditable operation contracts. */
@@ -66,16 +66,16 @@ function applyResearchMode(system: string | undefined, enabled: boolean | undefi
  * Dispatches to OpenAI or Anthropic based on opts.provider.
  */
 export async function callAI(opts: AICallOptions): Promise<AICallResult> {
-  const operationContract = opts.operation ? getAIOperationContract(opts.operation) : undefined;
-  const provider = opts.provider ?? operationContract?.defaultProvider ?? 'openai';
-  const model = opts.model ?? operationContract?.defaultModel;
-  const feature = opts.feature ?? operationContract?.feature;
+  const operationDefaults = opts.operation ? getAIOperationRuntimeDefaults(opts.operation) : undefined;
+  const provider = opts.provider ?? operationDefaults?.defaultProvider ?? 'openai';
+  const model = opts.model ?? operationDefaults?.defaultModel;
+  const feature = opts.feature ?? operationDefaults?.feature;
   if (!feature) throw new Error('callAI requires either feature or operation');
 
-  const maxRetries = opts.maxRetries ?? operationContract?.defaultMaxRetries;
-  const timeoutMs = opts.timeoutMs ?? operationContract?.defaultTimeoutMs;
-  const responseFormat = opts.responseFormat ?? operationContract?.defaultResponseFormat;
-  const researchMode = opts.researchMode ?? operationContract?.defaultResearchMode ?? false;
+  const maxRetries = opts.maxRetries ?? operationDefaults?.defaultMaxRetries;
+  const timeoutMs = opts.timeoutMs ?? operationDefaults?.defaultTimeoutMs;
+  const responseFormat = opts.responseFormat ?? operationDefaults?.defaultResponseFormat;
+  const researchMode = opts.researchMode ?? operationDefaults?.defaultResearchMode ?? false;
   const effectiveSystem = applyResearchMode(opts.system, researchMode);
 
   if (provider === 'anthropic') {

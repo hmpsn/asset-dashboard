@@ -52,14 +52,6 @@ vi.mock('../../src/hooks/useWorkspaceEvents', () => ({
   useWorkspaceEvents: vi.fn(),
 }));
 
-vi.mock('../../src/hooks/useToast', () => ({
-  useToast: vi.fn(() => ({
-    toast: null,
-    setToast: vi.fn(),
-    clearToast: vi.fn(),
-  })),
-}));
-
 vi.mock('../../src/hooks/useFeatureFlag', () => ({
   useFeatureFlag: vi.fn(() => false),
 }));
@@ -318,8 +310,11 @@ describe('resolveClientTab', () => {
     expect(resolveClientTab('analytics')).toBe('performance');
   });
 
-  it('maps retired "schema-review" to inbox', () => {
-    expect(resolveClientTab('schema-review')).toBe('inbox');
+  it('falls back to overview for retired inbox route aliases', () => {
+    expect(resolveClientTab('approvals')).toBe('overview');
+    expect(resolveClientTab('requests')).toBe('overview');
+    expect(resolveClientTab('content')).toBe('overview');
+    expect(resolveClientTab('schema-review')).toBe('overview');
   });
 
   it('passes through "brand"', () => {
@@ -914,5 +909,59 @@ describe('ClientDashboard — impactBandsByCheck wiring (R1 seam)', () => {
     if (rawBands !== null) {
       expect(JSON.parse(rawBands)).toEqual({});
     }
+  });
+});
+
+// ── Rules of Hooks: loading → loaded hook-count guard ─────────────────────────
+//
+// ClientDashboard calls ~40 hooks unconditionally and then performs several
+// early returns (`if (loading) return`, `if (error || !ws) return`, the
+// auth-gate and email-gate returns). `loading` starts `true` and flips to
+// `false` once useClientWorkspaceBootstrap resolves the workspace, so the
+// component renders at least twice. Because every hook sits BEFORE the early
+// returns, the loading=true and loading=false renders must call the same number
+// of hooks. A hook accidentally placed AFTER any early return would execute only
+// on the loading=false render, change the hook count between renders, and crash
+// the dashboard with React's "Rendered more hooks than during the previous
+// render." invariant (the exact failure mode Strategy v2 Phase 6b risked when it
+// added `useFeatureFlag('strategy-command-center')` next to the early returns).
+//
+// The other suites in this file mock useFeatureFlag to a no-op plain function,
+// which consumes ZERO React hook slots — so they can never observe a hook-count
+// change and a misplaced hook stays invisible to them. This test instead drives
+// the REAL loading=true → false transition on a single component instance with
+// React's hook-count check active, so any future (real) hook placed after an
+// early return fails here. Keeping useFeatureFlag mocked is fine: the guard
+// protects against the next real hook, whatever it is.
+describe('ClientDashboard — Rules of Hooks (loading→loaded hook count)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    localStorage.clear();
+    mockGetOptional.mockResolvedValue(null);
+  });
+
+  it('runs the full hook list across a real loading→loaded transition without a hook-count error', async () => {
+    // Real bootstrap, driven by the mocked workspace fetch — NOT a mocked
+    // `loading` flag. `loading` starts true; once useClientWorkspaceBootstrap
+    // resolves the workspace it flips to false and the SAME instance re-renders.
+    const ws = makeWorkspace({ requiresPassword: false });
+    mockGet.mockResolvedValue(ws);
+
+    // Render 1: loading=true. Execution stops at `if (loading) return`, so only
+    // the hooks BEFORE that early return have run and the (mocked) ClientHeader
+    // — rendered only past the early returns — is absent.
+    renderDashboard();
+    expect(screen.queryByTestId('client-header')).not.toBeInTheDocument();
+
+    // Render 2: loading=false runs the FULL hook list past every early return.
+    // If a hook were placed after an early return it would run only on this
+    // render, change the hook count, and crash with "Rendered more hooks than
+    // during the previous render." — so the dashboard would never commit and
+    // this assertion would fail. Reaching the committed ClientHeader proves the
+    // loading and loaded renders called the same number of hooks.
+    await waitFor(() => {
+      expect(screen.getByTestId('client-header')).toBeInTheDocument();
+    });
   });
 });

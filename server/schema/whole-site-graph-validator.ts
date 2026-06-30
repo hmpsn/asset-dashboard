@@ -1,4 +1,4 @@
-import type { SchemaPageSuggestion } from '../schema-suggester.js';
+import type { SchemaPageSuggestion } from './suggestion-types.js';
 import type { SchemaSiteTemplate } from '../schema-store.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
 import type {
@@ -6,7 +6,7 @@ import type {
   WholeSiteSchemaGraphNode,
   WholeSiteSchemaGraphValidationResult,
 } from '../../shared/types/schema-validation.js';
-import { normalizePageUrl } from '../helpers.js';
+import { normalizePageUrl } from '../utils/page-address.js';
 
 export interface WholeSiteSchemaGraphInput {
   pages: SchemaPageSuggestion[];

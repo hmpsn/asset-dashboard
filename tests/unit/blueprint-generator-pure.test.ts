@@ -51,6 +51,11 @@ vi.mock('../../server/page-strategy.js', () => ({
 vi.mock('../../server/content-brief.js', () => ({ generateBrief: vi.fn(async () => ({ id: 'brief_1' })) }));
 
 import { getDefaultSectionPlan, parseBlueprintGenerationOutput } from '../../server/blueprint-generator.js';
+import { getPageTypeOutlineContract } from '../../server/page-type-copy-contract.js';
+
+function totalTargetWords(pageType: string): number {
+  return getDefaultSectionPlan(pageType).reduce((sum, item) => sum + item.wordCountTarget, 0);
+}
 
 describe('parseBlueprintGenerationOutput', () => {
   it('accepts valid blueprint JSON before database writes', () => {
@@ -134,12 +139,24 @@ describe('getDefaultSectionPlan — homepage', () => {
   });
 });
 
-describe('getDefaultSectionPlan — service page', () => {
-  it('has more sections than a homepage plan (service is more detailed)', () => {
-    const homePlan = getDefaultSectionPlan('homepage');
+describe('getDefaultSectionPlan — landing page', () => {
+  it('has an explicit compact conversion plan instead of falling back to service', () => {
+    const plan = getDefaultSectionPlan('landing');
     const servicePlan = getDefaultSectionPlan('service');
-    // service template has 7 sections; homepage has 6
-    expect(servicePlan.length).toBeGreaterThanOrEqual(homePlan.length);
+    expect(plan.map(s => s.sectionType)).toEqual(['hero', 'problem', 'solution', 'social-proof', 'cta']);
+    expect(plan.map(s => s.sectionType)).not.toEqual(servicePlan.map(s => s.sectionType));
+  });
+});
+
+describe('getDefaultSectionPlan — service page', () => {
+  it('stays within the service page density contract', () => {
+    const contract = getPageTypeOutlineContract('service')!;
+    const servicePlan = getDefaultSectionPlan('service');
+    const targetWords = totalTargetWords('service');
+    expect(servicePlan.length).toBeGreaterThanOrEqual(contract.minSections);
+    expect(servicePlan.length).toBeLessThanOrEqual(contract.maxSections);
+    expect(targetWords).toBeGreaterThanOrEqual(contract.minWords);
+    expect(targetWords).toBeLessThanOrEqual(contract.maxWords);
   });
 
   it('includes faq section (objection-handling)', () => {
@@ -175,6 +192,12 @@ describe('getDefaultSectionPlan — contact page', () => {
     const plan = getDefaultSectionPlan('contact');
     expect(plan.some(s => s.sectionType === 'location-info')).toBe(true);
   });
+
+  it('does not seed contact copy with SEO operations guidance', () => {
+    const plan = getDefaultSectionPlan('contact');
+    const notes = plan.flatMap(s => [s.brandNote, s.seoNote]).filter(Boolean).join('\n');
+    expect(notes).not.toMatch(/\bNAP\b|schema|Google Business Profile|director(?:y|ies)|structured data/i);
+  });
 });
 
 describe('getDefaultSectionPlan — location page', () => {
@@ -183,9 +206,33 @@ describe('getDefaultSectionPlan — location page', () => {
     expect(plan[0].sectionType).toBe('hero');
   });
 
-  it('includes location-info for NAP consistency', () => {
+  it('stays within the location page density contract', () => {
+    const contract = getPageTypeOutlineContract('location')!;
+    const plan = getDefaultSectionPlan('location');
+    const targetWords = totalTargetWords('location');
+    expect(plan.length).toBeGreaterThanOrEqual(contract.minSections);
+    expect(plan.length).toBeLessThanOrEqual(contract.maxSections);
+    expect(targetWords).toBeGreaterThanOrEqual(contract.minWords);
+    expect(targetWords).toBeLessThanOrEqual(contract.maxWords);
+  });
+
+  it('includes location-info without public-facing local SEO mechanics', () => {
     const plan = getDefaultSectionPlan('location');
     expect(plan.some(s => s.sectionType === 'location-info')).toBe(true);
+    const notes = plan.flatMap(s => [s.brandNote, s.seoNote]).filter(Boolean).join('\n');
+    expect(notes).not.toMatch(/\bNAP\b|schema|Google Business Profile|director(?:y|ies)|structured data/i);
+  });
+});
+
+describe('getDefaultSectionPlan — conversion page density', () => {
+  it.each(['landing', 'service', 'location'] as const)('%s plan matches its outline contract bounds', (pageType) => {
+    const contract = getPageTypeOutlineContract(pageType)!;
+    const plan = getDefaultSectionPlan(pageType);
+    const targetWords = totalTargetWords(pageType);
+    expect(plan.length).toBeGreaterThanOrEqual(contract.minSections);
+    expect(plan.length).toBeLessThanOrEqual(contract.maxSections);
+    expect(targetWords).toBeGreaterThanOrEqual(contract.minWords);
+    expect(targetWords).toBeLessThanOrEqual(contract.maxWords);
   });
 });
 

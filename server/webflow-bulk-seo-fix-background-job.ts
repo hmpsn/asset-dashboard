@@ -2,32 +2,22 @@ import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { callCreativeAI } from './content-posts-ai.js';
 import { isProgrammingError } from './errors.js';
-import {
-  findPageMapEntryForPage,
-  normalizePageUrl,
-  stripHtmlToText,
-  tryResolvePagePath,
-} from './helpers.js';
+import { findPageMapEntryForPage, normalizePageUrl, tryResolvePagePath } from './utils/page-address.js';
+import { stripHtmlToText } from './utils/text.js';
 import { buildSeoPromptBlocks } from './intelligence/generation-context-builders.js';
 import {
-  createJob,
-  updateJob,
-} from './jobs.js';
+  createJob, updateJob, } from './jobs.js';
 import { createLogger } from './logger.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
-import { resolveRecommendationsForPageIds } from './recommendations.js';
+import { resolveRecommendationsForPageIds } from './domains/recommendations/resolution-service.js';
 import { recordSeoChange } from './seo-change-tracker.js';
 import { resolveBaseUrl } from './url-helpers.js';
 import {
-  updatePageSeo,
-} from './webflow.js';
+  updatePageSeo, } from './webflow.js';
 import {
-  updatePageState,
-} from './workspaces.js';
-import {
-  buildWorkspaceIntelligence,
-  invalidateIntelligenceCache,
-} from './workspace-intelligence.js';
+  updatePageState, } from './workspaces.js';
+import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 import { WS_EVENTS } from './ws-events.js';
 

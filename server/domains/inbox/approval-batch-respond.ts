@@ -25,7 +25,7 @@
  */
 import db from '../../db/index.js';
 import { getBatch, updateItem } from '../../approvals.js';
-import { syncApprovalBatchDeliverableStatus } from './approval-batch-dual-write.js';
+import { syncApprovalBatchDeliverableStatus } from './approval-batch-mirror-sync.js';
 import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { notifyTeamActionApproved, notifyTeamChangesRequested } from '../../email.js';

@@ -78,7 +78,9 @@ describe('backfill-deliverables-client-action', () => {
     expect(result.total).toBe(4);
     expect(result.inserted).toBe(4);
     expect(result.skipped).toBe(0);
-    expect(result.byType).toEqual({ redirect: 1, internal_link: 1, aeo_change: 1, content_decay: 1 });
+    // cannibalization is a CLIENT_ACTION_FAMILY_TYPES member (Phase 3b-ii), so the backfill seeds its
+    // byType bucket at 0 even when no cannibalization actions are present.
+    expect(result.byType).toEqual({ redirect: 1, internal_link: 1, aeo_change: 1, content_decay: 1, cannibalization: 0 });
 
     const types = listDeliverables(WS).map((r) => r.type).sort();
     expect(types).toEqual(['aeo_change', 'content_decay', 'internal_link', 'redirect'].sort());

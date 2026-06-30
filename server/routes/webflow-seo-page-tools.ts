@@ -7,7 +7,8 @@ import { Router } from 'express';
 
 import { requireWorkspaceAccessFromBody, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { parseJsonSafe } from '../db/json-validation.js';
-import { normalizePageUrl, sanitizeForPromptInjection, stripCodeFences, stripHtmlToText } from '../helpers.js';
+import { normalizePageUrl } from '../utils/page-address.js';
+import { sanitizeForPromptInjection, stripCodeFences, stripHtmlToText } from '../utils/text.js';
 import { createLogger } from '../logger.js';
 import { callAI } from '../ai.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';

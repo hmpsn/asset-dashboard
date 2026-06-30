@@ -7,11 +7,27 @@ import { getLatestPublishedBriefing, countPublishedBriefingsThrough } from './br
 import { generateIssueSummary } from './briefing-summary.js';
 import { computeOpportunityScore } from './keyword-strategy-generation.js';
 import { listContentGaps } from './content-gaps.js';
+import { getWorkspace } from './workspaces.js';
+import {
+  buildKeywordValueScoringContext,
+  computeKeywordValueScoreWithFallback,
+} from './scoring/keyword-value-context.js';
+import { compareBriefingContentGapDisplayOrder } from '../shared/keyword-opportunity-projection.js';
 import type { BriefingClientView, BriefingRecommendation } from '../shared/types/briefing.js';
+import type { ContentGap } from '../shared/types/workspace.js';
 
 export interface BuildBriefingClientViewOptions {
   /** Max recommendations to return (default 5) */
   limit?: number;
+}
+
+function hasContentGapValueRankingSignal(gap: ContentGap): boolean {
+  return Boolean(
+    (gap.volume != null && gap.volume > 0)
+    || (gap.impressions != null && gap.impressions > 0)
+    || gap.difficulty != null
+    || (gap.cpc != null && gap.cpc > 0),
+  );
 }
 
 /**
@@ -38,49 +54,54 @@ export function buildBriefingClientView(
     : 1;
 
   // Phase 2.5b — recommendations sourced live from current contentGaps.
-  // Score-fallback: when a gap is missing `opportunityScore` we compute it
-  // here using the same formula as keyword-strategy.ts so ranking is stable
-  // across stored vs newly-collected gaps. Top N by score are returned.
+  // Display-fallback: when a gap is missing `opportunityScore` we compute it
+  // here using the same formula as keyword-strategy.ts so the public field
+  // stays stable across stored vs newly-collected gaps. Ranking uses Layer 1
+  // keyword value, with the display score as fallback for legacy rows.
   //
   // Defense-in-depth: explicit field projection rather than spread. ContentGap
   // is workspace-scoped strategy data with no admin-only fields TODAY, but a
   // future field added there must NOT silently leak through `...gap`. Any
   // change to the public projection now requires touching this list.
   const gaps = listContentGaps(workspaceId);
-  type GapMapped = BriefingRecommendation & { volume?: number; impressions?: number; opportunityScore?: number };
+  const workspace = getWorkspace(workspaceId);
+  const valueScoring = workspace ? buildKeywordValueScoringContext(workspace) : undefined;
+  type GapMapped = BriefingRecommendation & { volume?: number; impressions?: number; opportunityScore?: number; sortScore: number };
   const recommendations: BriefingRecommendation[] = gaps
-    .map((gap): GapMapped => ({
-      topic: gap.topic,
-      targetKeyword: gap.targetKeyword,
-      intent: gap.intent,
-      priority: gap.priority,
-      rationale: gap.rationale,
-      suggestedPageType: gap.suggestedPageType,
-      volume: gap.volume,
-      difficulty: gap.difficulty,
-      trendDirection: gap.trendDirection,
-      serpFeatures: gap.serpFeatures,
-      impressions: gap.impressions,
-      competitorProof: gap.competitorProof,
-      questionKeywords: gap.questionKeywords,
-      serpTargeting: gap.serpTargeting,
-      opportunityScore: gap.opportunityScore ?? computeOpportunityScore(gap),
-    }))
-    .sort((a, b) => {
-      // Three-bucket sort (matches keyword-strategy.ts content gap ordering):
-      //   2 = Positive volume OR GSC-proven impressions — confirmed demand
-      //   1 = Unenriched (null/undefined) — not yet checked, potential
-      //   0 = Zero volume with no impressions — confirmed no demand
-      const getBundle = (g: typeof a) => {
-        if (g.volume == null) return { bucket: 1, vol: 0 };
-        if (g.volume > 0) return { bucket: 2, vol: g.volume };
-        if ((g.impressions ?? 0) > 0) return { bucket: 2, vol: g.impressions! };
-        return { bucket: 0, vol: 0 };
+    .map((gap): GapMapped => {
+      const opportunityScore = gap.opportunityScore ?? computeOpportunityScore(gap);
+      const fallbackSortScore = opportunityScore ?? 0;
+      return {
+        topic: gap.topic,
+        targetKeyword: gap.targetKeyword,
+        intent: gap.intent,
+        priority: gap.priority,
+        rationale: gap.rationale,
+        suggestedPageType: gap.suggestedPageType,
+        volume: gap.volume,
+        difficulty: gap.difficulty,
+        trendDirection: gap.trendDirection,
+        serpFeatures: gap.serpFeatures,
+        impressions: gap.impressions,
+        competitorProof: gap.competitorProof,
+        questionKeywords: gap.questionKeywords,
+        serpTargeting: gap.serpTargeting,
+        opportunityScore,
+        sortScore: hasContentGapValueRankingSignal(gap)
+          ? computeKeywordValueScoreWithFallback({
+              keyword: gap.targetKeyword,
+              volume: gap.volume,
+              impressions: gap.impressions,
+              difficulty: gap.difficulty,
+              cpc: gap.cpc,
+              intent: gap.intent,
+            }, valueScoring, fallbackSortScore)
+          : fallbackSortScore,
       };
-      const ab = getBundle(a), bb = getBundle(b);
-      return bb.bucket - ab.bucket || bb.vol - ab.vol || (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0);
     })
-    .slice(0, limit);
+    .sort(compareBriefingContentGapDisplayOrder)
+    .slice(0, limit)
+    .map(({ sortScore: _sortScore, ...gap }) => gap);
 
   // The summary's "N opportunities to consider" reflects the FULL gap pool,
   // not the post-cap render set. If 23 gaps exist, the summary still says

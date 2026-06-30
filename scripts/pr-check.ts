@@ -1,7 +1,10 @@
 /**
  * pr-check.ts — Automated pre-PR checklist
  *
- * Default: only checks files changed in the current branch (git diff vs main/staging).
+ * Default: only checks files changed in the current branch — both tracked
+ * changes (git diff vs main/staging) AND untracked net-new files not yet
+ * `git add`-ed. Untracked files are folded in deliberately: a change made
+ * entirely of new files would otherwise scan clean by default (false green).
  * Use --all to scan the entire codebase.
  *
  * Run:
@@ -21,13 +24,22 @@
  */
 
 import { execSync, execFileSync } from 'child_process';
-import { existsSync, readFileSync, realpathSync } from 'fs';
+import { existsSync, readFileSync, realpathSync, statSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parseCoveredWsEventKeys, parseWsEventValues, parseWsEvents } from './ws-contract-parser.js';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const SCAN_ALL = process.argv.includes('--all');
+
+function cleanGitEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  delete env.GIT_DIR;
+  delete env.GIT_WORK_TREE;
+  delete env.GIT_INDEX_FILE;
+  delete env.GIT_PREFIX;
+  return env;
+}
 
 function getFiles(dir: string, pattern: string): string[] {
   try {
@@ -55,31 +67,60 @@ function getFiles(dir: string, pattern: string): string[] {
 
 // ─── Determine changed files ──────────────────────────────────────────────────
 
-function getChangedFiles(): string[] {
+// Tracked changes vs the appropriate base: the GitHub PR base in CI, then
+// origin/staging|main locally, then the previous commit on a squash-merge push.
+// Returns paths relative to the repo root. NOTE: `git diff` reports only
+// *tracked* changes — untracked new files are handled separately by
+// getUntrackedFiles() and folded in by getChangedFiles().
+function parseGitNameOnlyOutput(out: string): string[] {
+  return out.trim().split('\n').filter(Boolean);
+}
+
+function gitDiffNameOnly(cwd: string, args: string[]): string[] {
+  const out = execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR', ...args], {
+    cwd,
+    env: cleanGitEnv(),
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  return parseGitNameOnlyOutput(out);
+}
+
+function getTrackedWorkingTreeChangedFiles(cwd: string = ROOT): string[] {
+  try {
+    return mergeChangedFiles(
+      gitDiffNameOnly(cwd, ['--cached']),
+      gitDiffNameOnly(cwd, []),
+    );
+  } catch {
+    return [];
+  }
+}
+
+function getTrackedChangedFiles(cwd: string = ROOT): string[] {
   try {
     // In GitHub Actions PR context, GITHUB_BASE_REF is set (e.g., "main")
     const ghBase = process.env.GITHUB_BASE_REF;
     if (ghBase) {
       try {
-        const out = execFileSync('git', ['diff', '--name-only', `origin/${ghBase}...HEAD`], {
-          cwd: ROOT,
-          encoding: 'utf-8',
-          stdio: ['pipe', 'pipe', 'pipe'],
-        }).trim();
-        if (out) return out.split('\n').filter(Boolean);
+        return mergeChangedFiles(
+          gitDiffNameOnly(cwd, [`origin/${ghBase}...HEAD`]),
+          getTrackedWorkingTreeChangedFiles(cwd),
+        );
       } catch {
         // fall through
       }
     }
 
-    // Local dev: diff against staging or main
+    // Local dev: diff against staging or main. An empty diff against an
+    // existing staging ref is authoritative; do not fall through to main and
+    // accidentally report staging-vs-main as this branch's changed files.
     for (const base of ['origin/staging', 'origin/main']) {
       try {
-        const out = execSync(`git diff --name-only ${base} 2>/dev/null`, {
-          cwd: ROOT,
-          encoding: 'utf-8',
-        }).trim();
-        if (out) return out.split('\n').filter(Boolean);
+        return mergeChangedFiles(
+          gitDiffNameOnly(cwd, [`${base}...HEAD`]),
+          getTrackedWorkingTreeChangedFiles(cwd),
+        );
       } catch {
         // try next
       }
@@ -87,11 +128,10 @@ function getChangedFiles(): string[] {
 
     // On a push to main/staging (squash merge): diff against previous commit
     try {
-      const out = execSync(`git diff --name-only HEAD~1 2>/dev/null`, {
-        cwd: ROOT,
-        encoding: 'utf-8',
-      }).trim();
-      if (out) return out.split('\n').filter(Boolean);
+      return mergeChangedFiles(
+        gitDiffNameOnly(cwd, ['HEAD~1', 'HEAD']),
+        getTrackedWorkingTreeChangedFiles(cwd),
+      );
     } catch {
       // no previous commit (initial commit) — fall through to empty
     }
@@ -99,6 +139,43 @@ function getChangedFiles(): string[] {
   } catch {
     return [];
   }
+}
+
+// Untracked, non-ignored files — i.e. net-new files not yet `git add`-ed.
+// `git diff --name-only <base>` EXCLUDES these, so a change composed wholly or
+// partly of new files would otherwise be invisible to the default (diff-only)
+// scan: pr-check would report "0 errors" on files it never opened — a silent
+// false-green. `--exclude-standard` honours .gitignore / .git/info/exclude /
+// global excludes, so build artifacts and node_modules never leak in. Returns
+// paths relative to the repo root, matching the `git diff` output format.
+export function getUntrackedFiles(cwd: string = ROOT): string[] {
+  try {
+    const out = execFileSync('git', ['ls-files', '--others', '--exclude-standard'], {
+      cwd,
+      env: cleanGitEnv(),
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+    return out ? out.split('\n').filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+// Union of tracked changes and untracked new files, de-duplicated with tracked
+// paths first (stable, predictable ordering for downstream filtering/logging).
+// Exported so its set semantics are unit-testable without spawning git.
+export function mergeChangedFiles(tracked: string[], untracked: string[]): string[] {
+  return Array.from(new Set([...tracked, ...untracked]));
+}
+
+// The complete set of files a diff-only pr-check run must scan: everything that
+// differs from the base PLUS every untracked new file. Folding in untracked
+// files closes the net-new-file false-green (see getUntrackedFiles). The `cwd`
+// parameter exists for testing against throwaway temp repos; production callers
+// use the default (repo root).
+export function getChangedFiles(cwd: string = ROOT): string[] {
+  return mergeChangedFiles(getTrackedChangedFiles(cwd), getUntrackedFiles(cwd));
 }
 
 // Lazy-memoised so that `import { CHECKS }` from the test harness does NOT
@@ -336,8 +413,75 @@ function workspaceScopedTables(): Set<string> {
   return _workspaceScopedTablesCache;
 }
 
+type SourceReader = (file: string, encoding: BufferEncoding) => string;
+
+export function createSourceCache(reader: SourceReader = readFileSync): (file: string) => string {
+  const cache = new Map<string, { mtimeMs: number; size: number; source: string }>();
+  return (file: string): string => {
+    const key = path.resolve(file);
+    let stat;
+    try {
+      stat = statSync(file);
+    } catch {
+      cache.delete(key);
+      return '';
+    }
+    const cached = cache.get(key);
+    if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) return cached.source;
+    try {
+      const source = reader(file, 'utf-8');
+      cache.set(key, { mtimeMs: stat.mtimeMs, size: stat.size, source });
+      return source;
+    } catch {
+      return '';
+    }
+  };
+}
+
+const readSource = createSourceCache();
+
 function readFileOrEmpty(file: string): string {
-  try { return readFileSync(file, 'utf-8'); } catch { return ''; }
+  return readSource(file);
+}
+
+function loadJsonArrayColumnBaseline(): Set<string> {
+  try {
+    const raw = readFileSync(JSON_ARRAY_COLUMN_BASELINE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw) as { allowedMigrationFiles?: unknown };
+    if (!Array.isArray(parsed.allowedMigrationFiles)) return new Set();
+    return new Set(
+      parsed.allowedMigrationFiles
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map(entry => entry.split(path.sep).join('/')),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+export function findJsonArrayColumnSites(migrationsDirOverride?: string): CustomCheckMatch[] {
+  const migrationsDir = migrationsDirOverride ?? path.join(ROOT, 'server/db/migrations');
+  const files = getFiles(migrationsDir, '*.sql');
+  const hits: CustomCheckMatch[] = [];
+  const arrayColumnRe = /^\s*(?:"([^"]+)"|(\w+))\s+TEXT\b[^,\n;]*\bDEFAULT\s*(?:\(\s*)?['"]\[\]['"]/i;
+  for (const file of files) {
+    const content = readFileOrEmpty(file);
+    if (!content) continue;
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const match = line.match(arrayColumnRe);
+      if (!match) continue;
+      if (line.includes('json-array-column-ok')) continue;
+      const columnName = match[1] ?? match[2];
+      hits.push({
+        file,
+        line: i + 1,
+        text: `JSON-array TEXT column "${columnName}" uses DEFAULT '[]'`,
+      });
+    }
+  }
+  return hits;
 }
 
 type StyleExceptionEntry = {
@@ -351,6 +495,7 @@ type StyleExceptionEntry = {
 };
 
 const STYLE_EXCEPTIONS_PATH = path.join(ROOT, 'data/style-exceptions.json');
+const JSON_ARRAY_COLUMN_BASELINE_PATH = path.join(ROOT, 'data/json-array-column-baseline.json');
 
 let _styleExceptionsCache: StyleExceptionEntry[] | null = null;
 function loadStyleExceptions(): StyleExceptionEntry[] {
@@ -840,6 +985,188 @@ export const GLOBALLY_APPLIED_LIMITERS: ReadonlySet<string> = new Set([
   'publicWriteLimiter',
 ]);
 
+type RetiredFlagGroup = {
+  label: string;
+  keys: readonly string[];
+  envPattern?: RegExp;
+  migrationException: string;
+  scanTests?: boolean;
+};
+
+const RETIRED_FLAG_GROUPS: readonly RetiredFlagGroup[] = [
+  {
+    label: 'outcome',
+    keys: [
+      'outcome-tracking',
+      'outcome-dashboard',
+      'outcome-playbooks',
+      'outcome-external-detection',
+      'outcome-client-reporting',
+      'outcome-ai-injection',
+      'outcome-predictive',
+    ],
+    envPattern: /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_OUTCOME_(?:TRACKING|DASHBOARD|PLAYBOOKS|EXTERNAL_DETECTION|CLIENT_REPORTING|AI_INJECTION|PREDICTIVE)\b/,
+    migrationException: 'server/db/migrations/122-retire-outcome-feature-flags.sql',
+  },
+  {
+    label: 'bridge/opportunity',
+    keys: [
+      'intelligence-shadow-mode',
+      'opportunity-value-scorer',
+      'opportunity-value-calibration',
+      'opportunity-value-events',
+      'bridge-outcome-reweight',
+      'bridge-decay-suggested-brief',
+      'bridge-strategy-invalidate',
+      'bridge-insight-to-action',
+      'bridge-page-analysis-invalidate',
+      'bridge-action-auto-resolve',
+      'bridge-content-to-insight',
+      'bridge-schema-to-insight',
+      'bridge-anomaly-boost',
+      'bridge-settings-cascade',
+      'bridge-audit-page-health',
+      'bridge-action-annotation',
+      'bridge-annotation-to-insight',
+      'bridge-audit-site-health',
+      'bridge-audit-auto-resolve',
+      'bridge-briefing-candidate-refresh',
+      'bridge-client-signal',
+    ],
+    envPattern: /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:INTELLIGENCE_SHADOW_MODE|OPPORTUNITY_VALUE_(?:SCORER|CALIBRATION|EVENTS)|BRIDGE_(?:OUTCOME_REWEIGHT|DECAY_SUGGESTED_BRIEF|STRATEGY_INVALIDATE|INSIGHT_TO_ACTION|PAGE_ANALYSIS_INVALIDATE|ACTION_AUTO_RESOLVE|CONTENT_TO_INSIGHT|SCHEMA_TO_INSIGHT|ANOMALY_BOOST|SETTINGS_CASCADE|AUDIT_PAGE_HEALTH|ACTION_ANNOTATION|ANNOTATION_TO_INSIGHT|AUDIT_SITE_HEALTH|AUDIT_AUTO_RESOLVE|BRIEFING_CANDIDATE_REFRESH|CLIENT_SIGNAL))\b/,
+    migrationException: 'server/db/migrations/123-retire-bridge-opportunity-feature-flags.sql',
+  },
+  {
+    label: 'unified inbox',
+    keys: [
+      'new-inbox-ia',
+      'unified-deliverables-approval-family',
+      'unified-deliverables-broken-family',
+      'unified-deliverables-rest',
+      'unified-inbox',
+    ],
+    envPattern: /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:NEW_INBOX_IA|UNIFIED_DELIVERABLES_(?:APPROVAL_FAMILY|BROKEN_FAMILY|REST)|UNIFIED_INBOX)\b/,
+    migrationException: 'server/db/migrations/124-retire-unified-inbox-feature-flags.sql',
+  },
+  {
+    label: 'product/UI',
+    keys: [
+      'copy-engine',
+      'copy-engine-voice',
+      'copy-engine-pipeline',
+      'deep-diagnostics',
+      'client-brand-section',
+    ],
+    envPattern: /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:COPY_ENGINE(?:_VOICE|_PIPELINE)?|DEEP_DIAGNOSTICS|CLIENT_BRAND_SECTION)\b/,
+    migrationException: 'server/db/migrations/125-retire-product-ui-feature-flags.sql',
+  },
+  {
+    label: 'SEO/runtime',
+    keys: [
+      'local-seo-visibility',
+      'schema-ai-element-classifier',
+      'seo-generation-quality',
+    ],
+    envPattern: /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:LOCAL_SEO_VISIBILITY|SCHEMA_AI_ELEMENT_CLASSIFIER|SEO_GENERATION_QUALITY)\b/,
+    migrationException: 'server/db/migrations/126-retire-seo-runtime-feature-flags.sql',
+    scanTests: true,
+  },
+  {
+    label: 'Keyword Hub',
+    keys: [
+      'keyword-hub',
+      'keyword-value-scoring',
+    ],
+    envPattern: /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_KEYWORD_HUB\b/,
+    migrationException: 'server/db/migrations/135-retire-keyword-hub-feature-flag.sql',
+    scanTests: true,
+  },
+];
+
+function escapedAlternation(values: readonly string[]): string {
+  return values.map(value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+}
+
+function lineNumberForIndex(content: string, index: number): number {
+  return content.slice(0, index).split('\n').length;
+}
+
+function pushContentMatch(
+  hits: CustomCheckMatch[],
+  file: string,
+  content: string,
+  index: number,
+  fallback: string,
+): void {
+  const line = lineNumberForIndex(content, index);
+  const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
+  hits.push({ file, line, text });
+}
+
+function findRetiredFlagUsage(files: string[]): CustomCheckMatch[] {
+  const hits: CustomCheckMatch[] = [];
+  const filesToScan = SCAN_ALL
+    ? Array.from(new Set([
+      ...files,
+      ...getFiles(path.join(ROOT, 'tests'), '*.ts'),
+      ...getFiles(path.join(ROOT, 'tests'), '*.tsx'),
+    ]))
+    : files;
+
+  for (const file of filesToScan) {
+    if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+    if (file.endsWith('tests/pr-check.test.ts')) continue;
+
+    const content = readFileOrEmpty(file);
+    if (!content) continue;
+    const lines = content.split('\n');
+    const normalizedFile = file.split(path.sep).join('/');
+    const isTestFile = normalizedFile.includes('/tests/') || normalizedFile.startsWith('tests/');
+
+    for (const group of RETIRED_FLAG_GROUPS) {
+      if (isTestFile && !group.scanTests) continue;
+      const keyPattern = escapedAlternation(group.keys);
+      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
+      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
+      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
+      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
+
+      for (const match of content.matchAll(helperRe)) {
+        pushContentMatch(hits, file, content, match.index ?? 0, match[0]);
+      }
+      for (const match of content.matchAll(componentRe)) {
+        pushContentMatch(hits, file, content, match.index ?? 0, match[0]);
+      }
+      for (const match of content.matchAll(indexedRe)) {
+        pushContentMatch(hits, file, content, match.index ?? 0, match[0]);
+      }
+      if (file.endsWith('shared/types/feature-flags.ts')) {
+        for (const match of content.matchAll(featureFlagLiteralRe)) {
+          pushContentMatch(hits, file, content, match.index ?? 0, match[0]);
+        }
+      }
+      if (group.envPattern) {
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (group.envPattern.test(line)) {
+            hits.push({ file, line: i + 1, text: line.trim() });
+          }
+        }
+      }
+    }
+  }
+
+  const deduped: CustomCheckMatch[] = [];
+  const seen = new Set<string>();
+  for (const hit of hits) {
+    const key = `${hit.file}:${hit.line}:${hit.text}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(hit);
+  }
+  return deduped;
+}
+
 // Maximum number of lines to scan forward in a route handler body
 // when looking for a broadcastToWorkspace/broadcast call.
 const ROUTE_BROADCAST_LOOKAHEAD = 120;
@@ -977,443 +1304,17 @@ export const CHECKS: Check[] = [
     severity: 'error',
   },
   {
-    name: 'Retired outcome feature flag key used in flag API',
+    name: 'Retired feature flag key used in flag API',
     pattern: '',
     fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['server/db/migrations/122-retire-outcome-feature-flags.sql'],
+    exclude: RETIRED_FLAG_GROUPS.map(group => group.migrationException),
     message:
-      'Outcome feature flags were retired in PR1; make the enabled behavior unconditional instead of using retired keys.',
+      'Retired feature flag keys must not re-enter runtime/UI/test flag APIs. Make the canonical behavior unconditional instead of using retired keys.',
     severity: 'error',
     rationale:
-      'Retired rollout flags must not re-enter runtime/UI/test flag APIs after their enabled path becomes canonical.',
+      'Retired rollout flags must not re-enter runtime/UI/test flag APIs after their enabled paths become canonical.',
     claudeMdRef: '#code-conventions',
-    customCheck: (files) => {
-      const hits: CustomCheckMatch[] = [];
-      const retired = [
-        'outcome-tracking',
-        'outcome-dashboard',
-        'outcome-playbooks',
-        'outcome-external-detection',
-        'outcome-client-reporting',
-        'outcome-ai-injection',
-        'outcome-predictive',
-      ];
-      const keyPattern = retired.join('|');
-      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`);
-      const componentRe = new RegExp(`<FeatureFlag\\b[^>]*\\bflag=['"](?:${keyPattern})['"]`);
-      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\[['"](?:${keyPattern})['"]\\]`);
-      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_OUTCOME_(?:TRACKING|DASHBOARD|PLAYBOOKS|EXTERNAL_DETECTION|CLIENT_REPORTING|AI_INJECTION|PREDICTIVE)\b/;
-
-      for (const file of files) {
-        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
-        const lines = readFileOrEmpty(file).split('\n');
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (helperRe.test(line) || componentRe.test(line) || indexedRe.test(line) || envRe.test(line)) {
-            hits.push({ file, line: i + 1, text: line.trim() });
-          }
-        }
-      }
-      return hits;
-    },
-  },
-  {
-    name: 'Retired bridge/opportunity feature flag key used in flag API',
-    pattern: '',
-    fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['server/db/migrations/123-retire-bridge-opportunity-feature-flags.sql'],
-    message:
-      'Bridge/opportunity feature flags were retired in PR2; keep bridge source identifiers but do not use retired keys in flag APIs.',
-    severity: 'error',
-    rationale:
-      'Retired bridge/opportunity rollout flags must not re-enter runtime/UI/test flag APIs after their enabled path becomes canonical.',
-    claudeMdRef: '#code-conventions',
-    customCheck: (files) => {
-      const hits: CustomCheckMatch[] = [];
-      const retired = [
-        'intelligence-shadow-mode',
-        'opportunity-value-scorer',
-        'opportunity-value-calibration',
-        'opportunity-value-events',
-        'bridge-outcome-reweight',
-        'bridge-decay-suggested-brief',
-        'bridge-strategy-invalidate',
-        'bridge-insight-to-action',
-        'bridge-page-analysis-invalidate',
-        'bridge-action-auto-resolve',
-        'bridge-content-to-insight',
-        'bridge-schema-to-insight',
-        'bridge-anomaly-boost',
-        'bridge-settings-cascade',
-        'bridge-audit-page-health',
-        'bridge-action-annotation',
-        'bridge-annotation-to-insight',
-        'bridge-audit-site-health',
-        'bridge-audit-auto-resolve',
-        'bridge-briefing-candidate-refresh',
-        'bridge-client-signal',
-      ];
-      const keyPattern = retired.join('|');
-      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
-      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
-      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
-      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
-      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:INTELLIGENCE_SHADOW_MODE|OPPORTUNITY_VALUE_(?:SCORER|CALIBRATION|EVENTS)|BRIDGE_(?:OUTCOME_REWEIGHT|DECAY_SUGGESTED_BRIEF|STRATEGY_INVALIDATE|INSIGHT_TO_ACTION|PAGE_ANALYSIS_INVALIDATE|ACTION_AUTO_RESOLVE|CONTENT_TO_INSIGHT|SCHEMA_TO_INSIGHT|ANOMALY_BOOST|SETTINGS_CASCADE|AUDIT_PAGE_HEALTH|ACTION_ANNOTATION|ANNOTATION_TO_INSIGHT|AUDIT_SITE_HEALTH|AUDIT_AUTO_RESOLVE|BRIEFING_CANDIDATE_REFRESH|CLIENT_SIGNAL))\b/;
-
-      function lineNumberForIndex(content: string, index: number): number {
-        return content.slice(0, index).split('\n').length;
-      }
-
-      function pushMatch(file: string, content: string, index: number, fallback: string): void {
-        const line = lineNumberForIndex(content, index);
-        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
-        hits.push({ file, line, text });
-      }
-
-      for (const file of files) {
-        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
-        const content = readFileOrEmpty(file);
-        const lines = content.split('\n');
-
-        for (const match of content.matchAll(helperRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(componentRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(indexedRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        if (file.endsWith('shared/types/feature-flags.ts')) {
-          for (const match of content.matchAll(featureFlagLiteralRe)) {
-            pushMatch(file, content, match.index ?? 0, match[0]);
-          }
-        }
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (envRe.test(line)) {
-            hits.push({ file, line: i + 1, text: line.trim() });
-          }
-        }
-      }
-      const deduped: CustomCheckMatch[] = [];
-      const seen = new Set<string>();
-      for (const hit of hits) {
-        const key = `${hit.file}:${hit.line}:${hit.text}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        deduped.push(hit);
-      }
-      return deduped;
-    },
-  },
-  {
-    name: 'Retired unified inbox feature flag key used in flag API',
-    pattern: '',
-    fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['server/db/migrations/124-retire-unified-inbox-feature-flags.sql'],
-    message:
-      'Unified inbox / deliverables rollout flags were retired in PR3; make the unified behavior unconditional instead of using retired keys.',
-    severity: 'error',
-    rationale:
-      'Retired inbox/deliverable rollout flags must not re-enter runtime/UI/test flag APIs after the unified path becomes canonical.',
-    claudeMdRef: '#code-conventions',
-    customCheck: (files) => {
-      const hits: CustomCheckMatch[] = [];
-      const retired = [
-        'new-inbox-ia',
-        'unified-deliverables-approval-family',
-        'unified-deliverables-broken-family',
-        'unified-deliverables-rest',
-        'unified-inbox',
-      ];
-      const keyPattern = retired.join('|');
-      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
-      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
-      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
-      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
-      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:NEW_INBOX_IA|UNIFIED_DELIVERABLES_(?:APPROVAL_FAMILY|BROKEN_FAMILY|REST)|UNIFIED_INBOX)\b/;
-
-      function lineNumberForIndex(content: string, index: number): number {
-        return content.slice(0, index).split('\n').length;
-      }
-
-      function pushMatch(file: string, content: string, index: number, fallback: string): void {
-        const line = lineNumberForIndex(content, index);
-        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
-        hits.push({ file, line, text });
-      }
-
-      for (const file of files) {
-        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
-        const content = readFileOrEmpty(file);
-        const lines = content.split('\n');
-
-        for (const match of content.matchAll(helperRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(componentRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(indexedRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        if (file.endsWith('shared/types/feature-flags.ts')) {
-          for (const match of content.matchAll(featureFlagLiteralRe)) {
-            pushMatch(file, content, match.index ?? 0, match[0]);
-          }
-        }
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (envRe.test(line)) {
-            hits.push({ file, line: i + 1, text: line.trim() });
-          }
-        }
-      }
-
-      const deduped: CustomCheckMatch[] = [];
-      const seen = new Set<string>();
-      for (const hit of hits) {
-        const key = `${hit.file}:${hit.line}:${hit.text}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        deduped.push(hit);
-      }
-      return deduped;
-    },
-  },
-  {
-    name: 'Retired product/UI feature flag key used in flag API',
-    pattern: '',
-    fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['server/db/migrations/125-retire-product-ui-feature-flags.sql'],
-    message:
-      'Product/UI rollout flags were retired in PR4; make the enabled behavior unconditional instead of using retired keys.',
-    severity: 'error',
-    rationale:
-      'Retired product/UI rollout flags must not re-enter runtime/UI/test flag APIs after their enabled paths become canonical.',
-    claudeMdRef: '#code-conventions',
-    customCheck: (files) => {
-      const hits: CustomCheckMatch[] = [];
-      const retired = [
-        'copy-engine',
-        'copy-engine-voice',
-        'copy-engine-pipeline',
-        'deep-diagnostics',
-        'client-brand-section',
-      ];
-      const keyPattern = retired.join('|');
-      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
-      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
-      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
-      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
-      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:COPY_ENGINE(?:_VOICE|_PIPELINE)?|DEEP_DIAGNOSTICS|CLIENT_BRAND_SECTION)\b/;
-
-      function lineNumberForIndex(content: string, index: number): number {
-        return content.slice(0, index).split('\n').length;
-      }
-
-      function pushMatch(file: string, content: string, index: number, fallback: string): void {
-        const line = lineNumberForIndex(content, index);
-        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
-        hits.push({ file, line, text });
-      }
-
-      for (const file of files) {
-        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
-        const content = readFileOrEmpty(file);
-        const lines = content.split('\n');
-
-        for (const match of content.matchAll(helperRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(componentRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(indexedRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        if (file.endsWith('shared/types/feature-flags.ts')) {
-          for (const match of content.matchAll(featureFlagLiteralRe)) {
-            pushMatch(file, content, match.index ?? 0, match[0]);
-          }
-        }
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (envRe.test(line)) {
-            hits.push({ file, line: i + 1, text: line.trim() });
-          }
-        }
-      }
-
-      const deduped: CustomCheckMatch[] = [];
-      const seen = new Set<string>();
-      for (const hit of hits) {
-        const key = `${hit.file}:${hit.line}:${hit.text}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        deduped.push(hit);
-      }
-      return deduped;
-    },
-  },
-  {
-    name: 'Retired SEO/runtime feature flag key used in flag API',
-    pattern: '',
-    fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['server/db/migrations/126-retire-seo-runtime-feature-flags.sql'],
-    message:
-      'SEO/runtime rollout flags were retired in PR5; make the canonical behavior unconditional instead of using retired keys.',
-    severity: 'error',
-    rationale:
-      'Retired SEO/runtime rollout flags must not re-enter runtime/UI/test flag APIs after their enabled paths become canonical.',
-    claudeMdRef: '#code-conventions',
-    customCheck: (files) => {
-      const hits: CustomCheckMatch[] = [];
-      const filesToScan = SCAN_ALL
-        ? Array.from(new Set([
-          ...files,
-          ...getFiles(path.join(ROOT, 'tests'), '*.ts'),
-          ...getFiles(path.join(ROOT, 'tests'), '*.tsx'),
-        ]))
-        : files;
-      const retired = [
-        'local-seo-visibility',
-        'schema-ai-element-classifier',
-        'seo-generation-quality',
-      ];
-      const keyPattern = retired.join('|');
-      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
-      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
-      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
-      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
-      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_(?:LOCAL_SEO_VISIBILITY|SCHEMA_AI_ELEMENT_CLASSIFIER|SEO_GENERATION_QUALITY)\b/;
-
-      function lineNumberForIndex(content: string, index: number): number {
-        return content.slice(0, index).split('\n').length;
-      }
-
-      function pushMatch(file: string, content: string, index: number, fallback: string): void {
-        const line = lineNumberForIndex(content, index);
-        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
-        hits.push({ file, line, text });
-      }
-
-      for (const file of filesToScan) {
-        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
-        if (file.endsWith('tests/pr-check.test.ts')) continue;
-        const content = readFileOrEmpty(file);
-        const lines = content.split('\n');
-
-        for (const match of content.matchAll(helperRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(componentRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(indexedRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        if (file.endsWith('shared/types/feature-flags.ts')) {
-          for (const match of content.matchAll(featureFlagLiteralRe)) {
-            pushMatch(file, content, match.index ?? 0, match[0]);
-          }
-        }
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (envRe.test(line)) {
-            hits.push({ file, line: i + 1, text: line.trim() });
-          }
-        }
-      }
-
-      const deduped: CustomCheckMatch[] = [];
-      const seen = new Set<string>();
-      for (const hit of hits) {
-        const key = `${hit.file}:${hit.line}:${hit.text}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        deduped.push(hit);
-      }
-      return deduped;
-    },
-  },
-  {
-    name: 'Retired Keyword Hub feature flag key used in flag API',
-    pattern: '',
-    fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['server/db/migrations/135-retire-keyword-hub-feature-flag.sql'],
-    message:
-      'The keyword-hub umbrella flag was retired at the Phase C cutover (2026-06-11). The Hub is the only keyword surface — make the Hub path unconditional instead of using the retired key.',
-    severity: 'error',
-    rationale:
-      'After the Keyword Hub cutover deleted KCC/Rank Tracker, the keyword-hub flag must not re-enter runtime/UI/test flag APIs; any reintroduced gate would silently dead-code a legacy path that no longer exists.',
-    claudeMdRef: '#code-conventions',
-    customCheck: (files) => {
-      const hits: CustomCheckMatch[] = [];
-      const filesToScan = SCAN_ALL
-        ? Array.from(new Set([
-          ...files,
-          ...getFiles(path.join(ROOT, 'tests'), '*.ts'),
-          ...getFiles(path.join(ROOT, 'tests'), '*.tsx'),
-        ]))
-        : files;
-      const retired = ['keyword-hub'];
-      const keyPattern = retired.join('|');
-      const helperRe = new RegExp(`\\b(?:isFeatureEnabled|useFeatureFlag|setFlagOverride|setWorkspaceFlagOverride)\\(\\s*['"](?:${keyPattern})['"]`, 'gs');
-      const componentRe = new RegExp(`<FeatureFlag\\b[\\s\\S]{0,200}?\\bflag\\s*=\\s*['"](?:${keyPattern})['"]`, 'g');
-      const indexedRe = new RegExp(`\\b(?:FEATURE_FLAGS|FEATURE_FLAG_CATALOG)\\s*\\[\\s*['"](?:${keyPattern})['"]\\s*\\]`, 'gs');
-      const featureFlagLiteralRe = new RegExp(`['"](?:${keyPattern})['"]\\s*:`, 'g');
-      const envRe = /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_KEYWORD_HUB\b/;
-
-      function lineNumberForIndex(content: string, index: number): number {
-        return content.slice(0, index).split('\n').length;
-      }
-
-      function pushMatch(file: string, content: string, index: number, fallback: string): void {
-        const line = lineNumberForIndex(content, index);
-        const text = content.split('\n')[line - 1]?.trim() || fallback.trim();
-        hits.push({ file, line, text });
-      }
-
-      for (const file of filesToScan) {
-        if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
-        if (file.endsWith('tests/pr-check.test.ts')) continue;
-        const content = readFileOrEmpty(file);
-        const lines = content.split('\n');
-
-        for (const match of content.matchAll(helperRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(componentRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        for (const match of content.matchAll(indexedRe)) {
-          pushMatch(file, content, match.index ?? 0, match[0]);
-        }
-        if (file.endsWith('shared/types/feature-flags.ts')) {
-          for (const match of content.matchAll(featureFlagLiteralRe)) {
-            pushMatch(file, content, match.index ?? 0, match[0]);
-          }
-        }
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (envRe.test(line)) {
-            hits.push({ file, line: i + 1, text: line.trim() });
-          }
-        }
-      }
-
-      const deduped: CustomCheckMatch[] = [];
-      const seen = new Set<string>();
-      for (const hit of hits) {
-        const key = `${hit.file}:${hit.line}:${hit.text}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        deduped.push(hit);
-      }
-      return deduped;
-    },
+    customCheck: findRetiredFlagUsage,
   },
   {
     name: 'Retired seo-ranks route literal in src',
@@ -1443,35 +1344,28 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: 'Keyword Command Center summary/detail must not use full model',
+    name: 'Keyword Command Center read paths must not use full model',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    displayScope: 'server/keyword-command-center.ts',
-    message: 'Summary/detail endpoints must stay skinny. Do not call buildKeywordCommandCenterModel() from buildKeywordCommandCenterSummary() or buildKeywordCommandCenterDetail().',
+    displayScope: 'server/keyword-command-center.ts and server/domains/keyword-command-center/*.ts',
+    message: 'Keyword Command Center read paths must stay on skinny source snapshots/local-candidate projections. Do not reintroduce buildKeywordCommandCenterModel() or model-service.ts.',
     severity: 'error',
-    rationale: 'Prevents the OOM-prone full keyword universe builder from being reintroduced into lightweight Command Center endpoints.',
+    rationale: 'Prevents the OOM-prone full keyword universe builder from being reintroduced into Command Center read paths, including the local_candidates advanced filter.',
     claudeMdRef: '#data-flow-rules-mandatory',
     customCheck: (files) => {
       const matches: CustomCheckMatch[] = [];
       for (const file of files) {
-        if (!file.endsWith('server/keyword-command-center.ts')) continue;
+        const normalizedPath = file.split(path.sep).join('/');
+        const isKccFacade = normalizedPath.endsWith('server/keyword-command-center.ts');
+        const isKccDomainService = normalizedPath.includes('/server/domains/keyword-command-center/')
+          && normalizedPath.endsWith('.ts');
+        if (!isKccFacade && !isKccDomainService) continue;
         const lines = readFileOrEmpty(file).split('\n');
-        let current: string | null = null;
-        let depth = 0;
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
-          const fnMatch = line.match(/export\s+async\s+function\s+(buildKeywordCommandCenterSummary|buildKeywordCommandCenterDetail)\b/);
-          if (fnMatch) {
-            current = fnMatch[1];
-            depth = 0;
+          if (line.includes('buildKeywordCommandCenterModel') || line.includes('model-service')) {
+            matches.push({ file, line: i + 1, text: line.trim() });
           }
-          if (!current) continue;
-          if (line.includes('buildKeywordCommandCenterModel(')) {
-            matches.push({ file, line: i + 1, text: `${current} calls buildKeywordCommandCenterModel()` });
-          }
-          depth += (line.match(/\{/g) ?? []).length;
-          depth -= (line.match(/\}/g) ?? []).length;
-          if (depth <= 0 && line.trim() === '}') current = null;
         }
       }
       return matches;
@@ -1481,7 +1375,7 @@ export const CHECKS: Check[] = [
     name: 'Local SEO Evaluated candidates must be explicitly gated',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    displayScope: 'server/keyword-command-center.ts',
+    displayScope: 'server/domains/keyword-command-center/*.ts',
     message: 'buildLocalSeoKeywordCandidatesEvaluated() is the expensive variant (scans pageMap × secondaries, runs evaluator+suppression). Call the cheap buildLocalSeoKeywordCandidates() default or add a documented hatch.',
     severity: 'error',
     rationale: 'After the Tier 2 cheap/Evaluated split, the Evaluated variant is the OOM-prone hot path. The cheap default is correct for KCC row enrichment, intelligence slice, and refresh path.',
@@ -1489,7 +1383,11 @@ export const CHECKS: Check[] = [
     customCheck: (files) => {
       const matches: CustomCheckMatch[] = [];
       for (const file of files) {
-        if (!file.endsWith('server/keyword-command-center.ts')) continue;
+        const normalizedPath = file.split(path.sep).join('/');
+        const isKccFacade = normalizedPath.endsWith('server/keyword-command-center.ts');
+        const isKccDomainService = normalizedPath.includes('/server/domains/keyword-command-center/')
+          && normalizedPath.endsWith('.ts');
+        if (!isKccFacade && !isKccDomainService) continue;
         const lines = readFileOrEmpty(file).split('\n');
         let currentFunction = '';
         let functionDepth = 0;
@@ -1504,8 +1402,6 @@ export const CHECKS: Check[] = [
           if (
             line.includes('buildLocalSeoKeywordCandidatesEvaluated(')
             && !line.includes('import ')
-            && currentFunction !== 'buildKeywordCommandCenterModel'
-            && currentFunction !== 'buildKeywordCommandCenterRowsViaModel'
             && !hasHatch(lines, i, 'local-candidates-evaluated-ok')
           ) {
             matches.push({ file, line: i + 1, text: `ungated Evaluated candidate generation in ${currentFunction || 'module scope'}` });
@@ -1788,6 +1684,56 @@ export const CHECKS: Check[] = [
           hits.push({ file, line: i + 1, text: lines[i].trim() });
         }
       }
+      return hits;
+    },
+  },
+  {
+    name: 'Hand-rolled Set toggle outside useToggleSet',
+    pattern: '',
+    fileGlobs: ['*.tsx', '*.ts'],
+    pathFilter: 'src/',
+    message:
+      'Use useToggleSet() for simple Set-backed toggle state. Keep custom Set transitions only when the state shape or side effects are not a single toggle set.',
+    severity: 'error',
+    rationale:
+      'Duplicated Set clone/has/delete/add callbacks drift across components. Centralizing simple toggle state in useToggleSet keeps min/max behavior, reset support, and future fixes consistent.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const toggleDeclarationRe = /\bfunction\s+toggle[A-Za-z0-9_]*\b|\bconst\s+toggle[A-Za-z0-9_]*\s*=\s*(?:useCallback\s*\(\s*)?(?:async\s*)?(?:\([^;\n]*\)|[A-Za-z_$][\w$]*)\s*=>/;
+      const setterCallRe = /\bset[A-Z][A-Za-z0-9_]*\s*\(/;
+
+      for (const file of files) {
+        if (!/\.(ts|tsx)$/.test(file)) continue;
+        const normalized = file.replace(/\\/g, '/');
+        const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+        const isSourceFile =
+          rel.startsWith('src/components/') ||
+          rel.startsWith('src/hooks/') ||
+          normalized.includes('/src/components/') ||
+          normalized.includes('/src/hooks/');
+        if (!isSourceFile) continue;
+        if (rel === 'src/hooks/useToggleSet.ts' || normalized.endsWith('/src/hooks/useToggleSet.ts')) continue;
+
+        const lines = readFileOrEmpty(file).split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!toggleDeclarationRe.test(lines[i])) continue;
+          if (hasHatch(lines, i, 'use-toggle-set-ok')) continue;
+
+          const windowText = lines.slice(i, Math.min(lines.length, i + 25)).join('\n');
+          const handRolledSetToggle =
+            setterCallRe.test(windowText) &&
+            /new\s+Set\s*\(/.test(windowText) &&
+            /\.has\s*\(/.test(windowText) &&
+            /\.delete\s*\(/.test(windowText) &&
+            /\.add\s*\(/.test(windowText);
+
+          if (handRolledSetToggle) {
+            hits.push({ file, line: i + 1, text: lines[i].trim() });
+          }
+        }
+      }
+
       return hits;
     },
   },
@@ -2179,6 +2125,42 @@ export const CHECKS: Check[] = [
     exclude: ['server/db/json-validation.ts', 'server/db/migrate-json.ts'],
     message: 'Use parseJsonSafe(row.column, schema, fallback) or parseJsonFallback(row.column, fallback). Bare JSON.parse on DB columns crashes on malformed data.',
     severity: 'error',
+  },
+  {
+    name: 'New JSON-array TEXT column without normalization review',
+    pattern: '',
+    fileGlobs: ['*.sql'],
+    pathFilter: 'server/db/migrations/',
+    excludeLines: ['json-array-column-ok'],
+    message: 'New TEXT columns defaulting to [] must be normalized or explicitly hatched with -- json-array-column-ok: <reason>.',
+    severity: 'error',
+    rationale: 'Large/filterable JSON arrays in SQLite columns caused recommendation_sets to rewrite hundreds of items for single-row changes; new array blobs need an intentional normalization review.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const allowedFiles = loadJsonArrayColumnBaseline();
+      const hits: CustomCheckMatch[] = [];
+      const arrayColumnRe = /^\s*(?:"([^"]+)"|(\w+))\s+TEXT\b[^,\n;]*\bDEFAULT\s*(?:\(\s*)?['"]\[\]['"]/i;
+      for (const file of files) {
+        const rel = path.relative(ROOT, file).replaceAll('\\', '/');
+        if (allowedFiles.has(rel)) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const match = line.match(arrayColumnRe);
+          if (!match) continue;
+          if (line.includes('json-array-column-ok')) continue;
+          const columnName = match[1] ?? match[2];
+          hits.push({
+            file,
+            line: i + 1,
+            text: `JSON-array TEXT column "${columnName}" uses DEFAULT '[]'`,
+          });
+        }
+      }
+      return hits;
+    },
   },
   {
     // FM-5: Direct SET status without a validation function.
@@ -4749,7 +4731,7 @@ export const CHECKS: Check[] = [
     // Webflow nested pages have a `publishedPath` like `/services/seo` and a
     // `slug` like `seo` (only the final segment). Using `/${page.slug}` directly
     // as a page path produces wrong URLs for nested pages. The correct helper is
-    // `resolvePagePath(page)` from `server/helpers.ts` (backend) or
+    // `resolvePagePath(page)` from `server/utils/page-address.ts` (backend) or
     // `src/lib/pathUtils.ts` (frontend), which prefers `publishedPath` and
     // falls back to `/${slug}` only when publishedPath is absent.
     //
@@ -4758,7 +4740,7 @@ export const CHECKS: Check[] = [
     //   2. `/${page.slug || ''}` (empty-fallback variant from pagePath assignments)
     //
     // Excluded:
-    //   - server/helpers.ts and src/lib/pathUtils.ts — the canonical implementations
+    //   - server/utils/page-address.ts and src/lib/pathUtils.ts — the canonical implementations
     //     that define the correct fallback logic
     //   - Lines containing `.startsWith('/')` — ternary slug-normalization patterns
     //     (`p.slug.startsWith('/') ? p.slug : \`/${p.slug}\``) that are a safe
@@ -4770,7 +4752,7 @@ export const CHECKS: Check[] = [
     name: 'Bare slug used in pagePath construction — use resolvePagePath(page)',
     pattern: '',
     fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['server/helpers.ts', 'src/lib/pathUtils.ts'],
+    exclude: ['server/utils/page-address.ts', 'src/lib/pathUtils.ts'],
     excludeLines: ['.startsWith(\'/\')', '.startsWith("/")', 'publishedPath', '// slug-path-ok'],
     message:
       'Use resolvePagePath(page) instead of `/${page.slug}` — slug is only the final URL segment ' +
@@ -4790,7 +4772,7 @@ export const CHECKS: Check[] = [
       for (const file of files) {
         if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
         // Skip canonical implementation files
-        if (file.endsWith('server/helpers.ts') || file.endsWith('src/lib/pathUtils.ts')) continue;
+        if (file.endsWith('server/utils/page-address.ts') || file.endsWith('src/lib/pathUtils.ts')) continue;
         const content = readFileOrEmpty(file);
         if (!content) continue;
         const lines = content.split('\n');
@@ -4821,7 +4803,7 @@ export const CHECKS: Check[] = [
     name: 'resolvePagePath(...) with undefined fallback is dead code — use tryResolvePagePath',
     pattern: '',
     fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['server/helpers.ts', 'src/lib/pathUtils.ts'],
+    exclude: ['server/utils/page-address.ts', 'src/lib/pathUtils.ts'],
     excludeLines: ['// slug-path-ok'],
     message:
       'resolvePagePath(page) is always truthy (returns "/" as last resort), so ' +
@@ -4837,7 +4819,7 @@ export const CHECKS: Check[] = [
       const deadCodeRe = /resolvePagePath\([^)]*\)\s*\|\|\s*undefined\b/;
       for (const file of files) {
         if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
-        if (file.endsWith('server/helpers.ts') || file.endsWith('src/lib/pathUtils.ts')) continue;
+        if (file.endsWith('server/utils/page-address.ts') || file.endsWith('src/lib/pathUtils.ts')) continue;
         const content = readFileOrEmpty(file);
         if (!content) continue;
         const lines = content.split('\n');
@@ -4862,7 +4844,7 @@ export const CHECKS: Check[] = [
     name: 'Raw pageSlug prefixed as URL — normalize via Page Address helpers',
     pattern: '',
     fileGlobs: ['*.ts', '*.tsx'],
-    exclude: ['tests/**', 'server/helpers.ts', 'src/lib/pathUtils.ts'],
+    exclude: ['tests/**', 'shared/page-address-utils.ts', 'server/utils/page-address.ts', 'src/lib/pathUtils.ts'],
     excludeLines: ['normalizePageUrl', 'resolvePagePath', 'resolvePageAddress', '// page-slug-url-ok'],
     message:
       'Avoid `/${pageSlug}` URL construction. pageSlug may already be a canonical path or may be only a leaf slug. ' +
@@ -6205,7 +6187,7 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.css'],
     message:
       'public/styleguide.css must only @import url(\'/tokens.css\'); redeclaring tokens creates drift. ' +
-      'Run `npx tsx scripts/verify-styleguide-parity.ts` for details.',
+      'Run `npm run pr-check` and review the styleguide token parity rules for details.',
     rationale:
       'src/tokens.css is the single canonical token source. public/styleguide.css must import ' +
       'from /tokens.css — not redeclare — so styleguide and app always use identical values.',
@@ -7281,7 +7263,7 @@ export const CHECKS: Check[] = [
   {
     // ── No new direct workspace reads in buildSchemaContext outside identity allow-list ──
     //
-    // `buildSchemaContext` in server/helpers.ts is the Trajectory 3 → 1 migration target
+    // `buildSchemaContext` in server/schema/context-builder.ts is the Trajectory 3 → 1 migration target
     // (data/roadmap.json:schema-context-builder-pattern-b-migration). The plan is to move
     // all direct ws.* reads to slice consumption via buildWorkspaceIntelligence({ slices }).
     //
@@ -7299,7 +7281,7 @@ export const CHECKS: Check[] = [
     name: 'schema-context-direct-read-not-on-allowlist',
     pattern: '',
     fileGlobs: ['*.ts'],
-    pathFilter: 'server/helpers.ts',
+    pathFilter: 'server/schema/context-builder.ts',
     message:
       'Net-new direct reads in buildSchemaContext must use buildWorkspaceIntelligence({ slices: [...] }) per docs/superpowers/specs/2026-04-29-schema-yoast-parity-fields-design.md §6. ' +
       'Identity fields (ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl, ws.siteHasSearch, siteId) allowed. ' +
@@ -7326,7 +7308,7 @@ export const CHECKS: Check[] = [
       ]);
       const hits: CustomCheckMatch[] = [];
       for (const file of files) {
-        if (!file.endsWith('server/helpers.ts')) continue;
+        if (!file.endsWith('server/schema/context-builder.ts')) continue;
         const content = readFileOrEmpty(file);
         if (!content) continue;
         const lines = content.split('\n');
@@ -7396,15 +7378,17 @@ export const CHECKS: Check[] = [
         // Scan each line inside the function body.
         for (let i = bodyStart + 1; i < funcEnd; i++) {
           const line = lines[i];
+          const codeLine = line.replace(/\/\*.*?\*\//g, '').split('//')[0];
 
-          // Pattern: assignment to ctx.X or local const that reads ws.Y or
-          // calls a helper that does direct DB/ws reads (getInsights,
-          // listSites, listSitesCached).
-          // ws.\w+ matches the first segment — ws.keywordStrategy?.businessContext
-          // is flagged via ws.keywordStrategy (which is not in the allow-list).
-          const m = line.match(
-            /(?:ctx\.\w+\s*=\s*|const\s+\w+\s*=\s*|if\s*\()(ws\.\w+|getInsights|listSites\b|listSitesCached)\b/,
-          );
+          // Pattern: any direct ws.Y read or helper call inside the schema
+          // context builder. ws.\w+ matches the first segment —
+          // ws.keywordStrategy?.businessContext is flagged via
+          // ws.keywordStrategy (which is not in the allow-list).
+          //
+          // Helper calls (`getInsights`, `listSites`, `listSitesCached`) are
+          // included because they perform direct cross-context reads even when
+          // wrapped in `await` or used as function arguments.
+          const m = codeLine.match(/\b(ws\.\w+|getInsights|listSites\b|listSitesCached)\b/);
           if (!m) continue;
 
           const rhs = m[1];
@@ -7565,6 +7549,42 @@ export const CHECKS: Check[] = [
           // produce a false-negative. Developers must use the hatch instead.
           if (/^\s*\/\//.test(line)) continue;
           if (hasHatch(lines, i, 'inbox-legacy-filter-literal-ok')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
+  },
+	  {
+	    // Flags retired top-level client route aliases in first-party links. Runtime
+	    // still redirects old external links for compatibility, but production code
+	    // should generate canonical Inbox section URLs directly.
+	    name: 'retired-client-inbox-route-alias',
+    pattern: '',
+    fileGlobs: ['*.ts', '*.tsx'],
+    excludeLines: ['retired-client-inbox-route-alias-ok'],
+	    message:
+	      'Retired top-level client route alias — generate /client/:workspaceId/inbox?tab=decisions|reviews|conversations instead, or document an intentional historical fixture with // retired-client-inbox-route-alias-ok.',
+    severity: 'error',
+	    rationale:
+	      'Prevents first-party links from sending clients through legacy /approvals, /requests, /content, or /schema-review compatibility redirects.',
+    claudeMdRef: '#routing',
+    customCheck: (files) => {
+	      const hits: CustomCheckMatch[] = [];
+	      const retiredRouteRe = /\/client(?:\/beta)?\/(?:\$\{[^}]+\}|[^/'"`\s]+)\/(approvals|requests|content|schema-review)(?=[/?'"`]|$)/;
+	      const clientPathAliasRe = /clientPath\s*\([^)]*,\s*['"`](approvals|requests|content|schema-review)['"`]/;
+	      for (const file of files) {
+        if (!/\.(ts|tsx)$/.test(file)) continue;
+        if (!file.includes('/src/') && !file.includes('/server/')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+	        if (!retiredRouteRe.test(content) && !clientPathAliasRe.test(content)) continue;
+	        const lines = content.split('\n');
+	        for (let i = 0; i < lines.length; i++) {
+	          const line = lines[i];
+	          if (!retiredRouteRe.test(line) && !clientPathAliasRe.test(line)) continue;
+          if (/^\s*\/\//.test(line)) continue;
+          if (hasHatch(lines, i, 'retired-client-inbox-route-alias-ok')) continue;
           hits.push({ file, line: i + 1, text: line.trim() });
         }
       }
@@ -7826,52 +7846,35 @@ export const CHECKS: Check[] = [
   {
     // Sprint wave 8: Plan A Task 1 — public endpoint auth lockdown.
     //
-    // Every `/api/public/<resource>/:workspaceId/...` route that serves
-    // workspace-scoped data must apply either `requireClientPortalAuth()` or
+    // Every `/api/public/...` route that serves workspace-scoped or client data
+    // must apply either `requireClientPortalAuth()` or
     // `requireAuthenticatedClientPortalAuth()`. As of E3 (passwordless portal
     // closure) BOTH reject passwordless workspaces — a portal returns 401 until
     // a client credential is configured. `requireAuthenticatedClientPortalAuth`
-    // additionally rejects internal-JWT-only access and is preferred for the
-    // most sensitive mutations.
+    // is preferred for sensitive mutations that require a concrete client/admin
+    // actor.
     //
     // The global app gate at server/app.ts advances passwordless requests to
     // the route (it is an advance-only defense-in-depth layer, not the backstop
     // — see the comment there). This per-route middleware is the real backstop,
     // which is why full per-route coverage is mandatory and enforced here.
     //
-    // The PUBLIC_AUTH_ALLOWLIST below matches the path[3] values explicitly
-    // allowed by the global gate (server/app.ts:258): bootstrap/login flow
-    // endpoints that legitimately must accept unauthenticated callers.
+    // The PUBLIC_AUTH_ALLOWLIST below matches bootstrap/login flow endpoints
+    // that legitimately must accept unauthenticated callers.
     name: 'Public route under /api/public/ missing client-portal auth middleware',
     pattern: '',
     fileGlobs: ['*.ts'],
     pathFilter: 'server/routes/',
     excludeLines: ['// public-no-auth-ok'],
-    // Grandfather the 19 routes already shipped without per-route auth as of
-    // 2026-05-27 (audit-drift-closure Plan A Task 1). Tracked under roadmap
-    // item `audit-drift-public-route-auth-sweep-followup`; each file will be
-    // migrated route-by-route alongside test-fixture updates so existing
-    // integration tests (which create passwordless workspaces and expect 200s)
-    // are not broken in a single PR.
-    exclude: [
-      'server/routes/public-portal.ts',
-      // public-content.ts and public-requests.ts use router.use() file-level
-      // portal auth — Pass 1 detects that, so no exclude needed.
-      'server/routes/reports.ts',
-      // stripe.ts has mixed auth coverage — individual unprotected routes are
-      // hatched with // public-no-auth-ok inline. (recommendations.ts is now
-      // fully gated with requireClientPortalAuth() — no inline hatches remain.)
-    ],
     message:
-      'New /api/public/<resource>/:workspaceId routes must call requireAuthenticatedClientPortalAuth() ' +
-      '(preferred — denies passwordless workspaces) or requireClientPortalAuth() (allows passwordless). ' +
-      'The global app gate alone is insufficient: it short-circuits on workspaces without clientPassword, ' +
-      'leaking data during the pre-setup window. Suppress with // public-no-auth-ok: <reason> if the ' +
-      'route is part of the bootstrap/login flow.',
+      'New /api/public routes must call requireAuthenticatedClientPortalAuth() ' +
+      '(preferred for sensitive mutations) or requireClientPortalAuth(). The global app gate alone ' +
+      'is insufficient. Suppress with // public-no-auth-ok: <reason> only for bootstrap/login or ' +
+      'intentional share-link routes.',
     severity: 'error',
     rationale:
-      'Without per-route portal auth, sensitive client data leaks from workspaces that have not yet ' +
-      'had a clientPassword set (e.g. freshly-created accounts).',
+      'Without per-route portal auth or an explicit documented public hatch, sensitive client data ' +
+      'can be exposed through routes that happen to sit under /api/public/.',
     claudeMdRef: '#auth-conventions',
     customCheck: (files) => {
       // path[3] values the global gate (server/app.ts:258) lets through
@@ -7883,6 +7886,8 @@ export const CHECKS: Check[] = [
         'client-logout',
         'client-me',
         'auth-mode',
+        'tier',
+        'pricing',
         'forgot-password',
         'reset-password',
       ]);
@@ -7899,6 +7904,7 @@ export const CHECKS: Check[] = [
         // Example: router.use('/api/public/:resource/:workspaceId',
         // requireClientPortalAuth('workspaceId')).
         const fileLevelAuthPrefixes: string[] = [];
+        const localAuthMiddlewareAliases = new Set<string>();
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
           if (/^\s*(\/\/|\*)/.test(line)) continue;
@@ -7910,6 +7916,35 @@ export const CHECKS: Check[] = [
           const literalPrefix = useMatch[1].replace(/\/:.*$/, '');
           fileLevelAuthPrefixes.push(literalPrefix);
         }
+
+        // Some route files wrap the canonical portal guards in local middleware aliases so they
+        // can attach extra request context. Treat those aliases as auth only when their same-file
+        // definition directly contains one of the canonical guards.
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (/^\s*(\/\/|\*)/.test(line)) continue;
+          const aliasMatch = line.match(/^\s*const\s+([A-Za-z_$][\w$]*)\s*=\s*(\[|requireClientPortalAuth\s*\(|requireAuthenticatedClientPortalAuth\s*\()/);
+          if (!aliasMatch) continue;
+          const alias = aliasMatch[1];
+          const rhsWindow = lines.slice(i, Math.min(i + 8, lines.length)).join('\n');
+          if (rhsWindow.includes('requireClientPortalAuth(') || rhsWindow.includes('requireAuthenticatedClientPortalAuth(')) {
+            localAuthMiddlewareAliases.add(alias);
+          }
+        }
+
+        const routeSignatureWindow = (start: number): string => {
+          const windowLines: string[] = [];
+          for (let j = start; j < Math.min(start + 8, lines.length); j++) {
+            let wl = lines[j];
+            if (j > start && /\brouter\.\w+\s*\(/.test(wl)) break;
+            if (/^\s*(\/\/|\*)/.test(wl)) continue;
+            const slash = wl.indexOf('//');
+            if (slash >= 0) wl = wl.slice(0, slash);
+            windowLines.push(wl);
+            if (wl.includes('(req, res)') || /=>\s*\{?\s*$/.test(wl)) break;
+          }
+          return windowLines.join('\n');
+        };
 
         // Pass 2: scan individual route handlers.
         for (let i = 0; i < lines.length; i++) {
@@ -7926,9 +7961,10 @@ export const CHECKS: Check[] = [
           if (fileLevelAuthPrefixes.some(prefix => fullPath.startsWith(prefix))) continue;
           // Look forward up to 8 lines (covers multi-line router.METHOD(
           // signatures) for either auth middleware.
-          const window = lines.slice(i, Math.min(i + 8, lines.length)).join('\n');
+          const window = routeSignatureWindow(i);
           if (window.includes('requireClientPortalAuth(')) continue;
           if (window.includes('requireAuthenticatedClientPortalAuth(')) continue;
+          if ([...localAuthMiddlewareAliases].some(alias => new RegExp(`(?:\\.\\.\\.)?\\b${alias}\\b`).test(window))) continue;
           hits.push({ file, line: i + 1, text: line.trim() });
         }
       }
@@ -7939,12 +7975,12 @@ export const CHECKS: Check[] = [
   // ── E1: public-portal.ts GET-specific auth guard (2026-06-10) ───────────
   {
     // Specifically targets server/routes/public-portal.ts GETs (excluded from
-    // the broader "Public route under /api/public/" rule above, which uses a
-    // different exclude strategy). The three intentionally-public bootstrap
-    // GETs (/workspace/:id, /tier/:id, /pricing/:id) are hatched inline with
-    // `// portal-auth-public-ok` since they serve the login screen and must
-    // be accessible before authentication. All other GET routes in this file
-    // must carry either requireClientPortalAuth() or
+    // a different hatch token than the broader "Public route under /api/public/"
+    // rule above). The three intentionally-public bootstrap GETs
+    // (/workspace/:id, /tier/:id, /pricing/:id) are hatched inline with
+    // `// portal-auth-public-ok` since they serve the login screen and must be
+    // accessible before authentication. All other GET routes in this file must
+    // carry either requireClientPortalAuth() or
     // requireAuthenticatedClientPortalAuth() as middleware.
     name: 'public-portal.ts GET missing portal-auth middleware',
     pattern: '',
@@ -8317,12 +8353,14 @@ export const CHECKS: Check[] = [
         'internal_link',
         'aeo_change',
         'content_decay',
+        'cannibalization',
         'content_plan_sample',
         'content_plan_template',
         'work_order',
         'briefing',
         'copy_section',
         'content_request',
+        'recommendation',
       ];
       const adaptersDir = path.join(ROOT, 'server/domains/inbox/deliverable-adapters');
       for (const type of deliverableTypes) {
@@ -8417,7 +8455,7 @@ export const CHECKS: Check[] = [
     pathFilter: 'shared/types/recommendations.ts',
     message:
       'An admin-money field on OpportunityScore (matching emv*/roiPer*/*revenue*/predictedEmv) is ' +
-      'not destructured in stripEmvFromPublicRecs (server/routes/recommendations.ts). It would LEAK ' +
+      'not destructured in stripEmvFromPublicRecs (server/recommendation-public-projection.ts). It would LEAK ' +
       'raw $/wk to clients on the public route. Add it to the strip destructure (and the PATCH ' +
       'response). Add // opportunity-strip-ok on the field line if it is intentionally client-safe.',
     severity: 'error',
@@ -8436,7 +8474,7 @@ export const CHECKS: Check[] = [
       };
       const typesContent = pickFile('shared/types/recommendations.ts', 'shared/types/recommendations.ts');
       if (!typesContent) return hits;
-      const stripContent = pickFile('server/routes/recommendations.ts', 'server/routes/recommendations.ts');
+      const stripContent = pickFile('server/recommendation-public-projection.ts', 'server/recommendation-public-projection.ts');
 
       // Isolate the OpportunityScore interface body.
       const ifaceMatch = typesContent.match(/export interface OpportunityScore\s*\{([\s\S]*?)\n\}/);
@@ -8478,7 +8516,7 @@ export const CHECKS: Check[] = [
     // SEO Generation Quality (forward-looking guardrail). This rule enforces the
     // SOURCE-CATEGORY half of the "new rec types / sources" contract: a recommendation
     // source category must stay in lockstep across the RecSourceCategory union AND the
-    // REC_SOURCE_CATEGORIES array in server/recommendations.ts. A union member missing
+    // REC_SOURCE_CATEGORIES array in server/domains/recommendations/rules.ts. A union member missing
     // from the array makes getRecSourceCategory return null, bypassing the per-category
     // auto-resolve guard (an empty orphan-read would bulk auto-resolve previously-surfaced
     // recs — G2). Today the union and array are identical (6 each), so this returns ZERO
@@ -8492,7 +8530,7 @@ export const CHECKS: Check[] = [
     // See docs/rules/seo-generation-quality.md → "New rec types / sources".
     name: 'new-rec-type-source-needs-category-and-action-type',
     fileGlobs: ['*.ts'],
-    pathFilter: 'server/recommendations.ts',
+    pathFilter: 'server/domains/recommendations/rules.ts',
     message:
       'RecSourceCategory union and REC_SOURCE_CATEGORIES array are out of lockstep. A new rec ' +
       'source category must be in BOTH, or an empty orphan-read bulk auto-resolves live recs (G2). ' +
@@ -8506,8 +8544,9 @@ export const CHECKS: Check[] = [
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      const provided = files.find(f => f.endsWith('server/recommendations.ts'));
-      const content = readFileOrEmpty(provided ?? path.join(ROOT, 'server/recommendations.ts'));
+      const targetPath = 'server/domains/recommendations/rules.ts';
+      const provided = files.find(f => f.endsWith(targetPath));
+      const content = readFileOrEmpty(provided ?? path.join(ROOT, targetPath));
       if (!content) return hits;
 
       const literalsOf = (block: string | undefined): string[] =>
@@ -8528,7 +8567,7 @@ export const CHECKS: Check[] = [
       for (const member of unionMembers) {
         if (!arrayMembers.has(member)) {
           hits.push({
-            file: path.join(ROOT, 'server/recommendations.ts'),
+            file: path.join(ROOT, targetPath),
             line,
             text: `RecSourceCategory '${member}' is in the union but missing from REC_SOURCE_CATEGORIES`,
           });
@@ -8537,7 +8576,7 @@ export const CHECKS: Check[] = [
       for (const member of arrayMembers) {
         if (!unionMembers.has(member)) {
           hits.push({
-            file: path.join(ROOT, 'server/recommendations.ts'),
+            file: path.join(ROOT, targetPath),
             line,
             text: `REC_SOURCE_CATEGORIES '${member}' is not in the RecSourceCategory union`,
           });
@@ -8549,19 +8588,21 @@ export const CHECKS: Check[] = [
   {
     // Post-flip OV cleanup: recommendation ranking now has ONE scoring authority
     // (`computeOpportunityValue()` + deriveCanonicalRecommendationFields()). A new
-    // inline `impactScore` bucket inside server/recommendations.ts silently forks
-    // queue ordering away from the canonical scorer.
+    // inline `impactScore` bucket inside recommendation runtime scoring modules
+    // silently forks queue ordering away from the canonical scorer.
     //
     // This rule intentionally stays narrow: it governs only recommendation runtime
-    // scoring in server/recommendations.ts, not other bounded contexts that have
-    // their own impactScore concepts (e.g. insight enrichment).
+    // scoring modules, not other bounded contexts that have their own impactScore
+    // concepts (e.g. insight enrichment).
     //
     // Escape hatch: // rec-impactscore-ok
     name: 'recommendation impactScore must flow from canonical OV scorer',
     fileGlobs: ['*.ts'],
-    pathFilter: 'server/recommendations.ts',
+    pathFilter: 'server/',
+    displayScope:
+      'server/recommendations.ts; server/domains/recommendations/generation-producers.ts; server/domains/recommendations/generation-service.ts',
     message:
-      'Do not hand-roll recommendation impactScore math in server/recommendations.ts. ' +
+      'Do not hand-roll recommendation impactScore math in recommendation runtime scoring modules. ' +
       'Route scoring through computeOpportunityValue() and write `impactScore` from the ' +
       'canonical OV fields (`scoring.impactScore` / `opportunity.value`). Add ' +
       '`// rec-impactscore-ok` only for a tightly-justified exception.',
@@ -8571,32 +8612,41 @@ export const CHECKS: Check[] = [
     claudeMdRef: '#code-conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      const provided = files.find(f => f.endsWith('server/recommendations.ts'));
-      const content = readFileOrEmpty(provided ?? path.join(ROOT, 'server/recommendations.ts'));
-      if (!content) return hits;
-
-      const lines = content.split('\n');
       const localImpactScoreRe = /\b(?:const|let)\s+(?:adjustedImpactScore|impactScore)\s*=/;
       const objectImpactScoreRe = /\bimpactScore:\s*/;
       const assignmentImpactScoreRe = /\br\.impactScore\s*=/;
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const trimmed = line.trim();
-        if (trimmed.startsWith('//') || trimmed.startsWith('*') || line.includes('rec-impactscore-ok')) continue;
+      const targetPaths = [
+        'server/recommendations.ts',
+        'server/domains/recommendations/generation-producers.ts',
+        'server/domains/recommendations/generation-service.ts',
+      ];
 
-        if (localImpactScoreRe.test(line)) {
-          hits.push({ file: path.join(ROOT, 'server/recommendations.ts'), line: i + 1, text: trimmed });
-          continue;
-        }
+      for (const targetPath of targetPaths) {
+        const provided = files.find(f => f.endsWith(targetPath));
+        const file = provided ?? path.join(ROOT, targetPath);
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
 
-        if (objectImpactScoreRe.test(line) && !/\bimpactScore:\s*(?:scoring\.impactScore|opportunity\.value)\b/.test(line)) {
-          hits.push({ file: path.join(ROOT, 'server/recommendations.ts'), line: i + 1, text: trimmed });
-          continue;
-        }
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const trimmed = line.trim();
+          if (trimmed.startsWith('//') || trimmed.startsWith('*') || line.includes('rec-impactscore-ok')) continue;
 
-        if (assignmentImpactScoreRe.test(line) && !/\br\.impactScore\s*=\s*scoring\.impactScore\b/.test(line)) {
-          hits.push({ file: path.join(ROOT, 'server/recommendations.ts'), line: i + 1, text: trimmed });
+          if (localImpactScoreRe.test(line)) {
+            hits.push({ file, line: i + 1, text: trimmed });
+            continue;
+          }
+
+          if (objectImpactScoreRe.test(line) && !/\bimpactScore:\s*(?:scoring\.impactScore|opportunity\.value)\b/.test(line)) {
+            hits.push({ file, line: i + 1, text: trimmed });
+            continue;
+          }
+
+          if (assignmentImpactScoreRe.test(line) && !/\br\.impactScore\s*=\s*scoring\.impactScore\b/.test(line)) {
+            hits.push({ file, line: i + 1, text: trimmed });
+          }
         }
       }
 
@@ -8742,6 +8792,52 @@ export const CHECKS: Check[] = [
     },
   },
 
+  // ─── Strategy v3 lifecycle rules ────────────────────────────────────────────
+
+  {
+    name: 'Incomplete rec filter (raw status without isActiveRec)',
+    pattern: "status\\s*[!=]==\\s*['\"]dismissed['\"]",
+    fileGlobs: ['*.tsx', '*.ts'],
+    pathFilter: 'src/components/strategy/',
+    excludeLines: ['// incomplete-rec-filter-ok'],
+    message:
+      'Raw `status === \'dismissed\'` / `status !== \'dismissed\'` filtering in a ' +
+      'strategy component bypasses the v3 lifecycle axes (struck/throttled/sent). ' +
+      'Route through `isActiveRec(rec)` as the single active-set predicate instead. ' +
+      'Add // incomplete-rec-filter-ok on the line if this is a genuinely pre-lifecycle ' +
+      'component that cannot yet import isActiveRec (with justification).',
+    severity: 'warn',
+    rationale:
+      'Raw status filtering misses the struck, throttled, and sent axes introduced ' +
+      'in the v3 recommendation lifecycle, causing dismissed recs to re-surface or ' +
+      'active recs to be hidden.',
+    claudeMdRef: '#code-conventions',
+  },
+
+  {
+    name: 'Strategy send must route through lifecycle',
+    pattern: 'clientActions\\.create\\(|ClientActionSourceType',
+    fileGlobs: ['*.tsx', '*.ts'],
+    pathFilter: 'src/components/strategy/',
+    excludeLines: ['// strategy-send-must-route-through-lifecycle-ok'],
+    message:
+      'A `clientActions.create()` call inside a strategy component bypasses the ' +
+      'rec lifecycle (sendRecommendation / REC_POLICY_REGISTRY send channel). ' +
+      'Route sends through `sendRecommendation()` so clientStatus is managed by ' +
+      'the single authoritative lifecycle engine. ' +
+      'The ONLY acceptable exception: a surface that genuinely needs a bespoke ' +
+      'client-side renderer the deliverable spine cannot serve (e.g. the ' +
+      'cannibalization card). In that case add ' +
+      '// strategy-send-must-route-through-lifecycle-ok: <renderer-name> on the ' +
+      'same line with the renderer name as justification.',
+    severity: 'warn',
+    rationale:
+      'Direct clientActions.create() calls in strategy components create sends ' +
+      'that are invisible to isActiveRec / clientStatus tracking, fragmenting ' +
+      'the single-authoritative-queue invariant the v3 lifecycle enforces.',
+    claudeMdRef: '#code-conventions',
+  },
+
   {
     name: 'Hardcoded nav metadata outside the nav registry',
     pattern: '',
@@ -8815,28 +8911,50 @@ function applyExcludeLines(lines: string[], excludeLines?: string[]): string[] {
   return lines.filter(line => !excludeLines.some(ex => line.includes(ex)));
 }
 
+function globToExtension(glob: string): string {
+  return glob.replace('**/', '').replace('*.', '.');
+}
+
+export function resolveRelevantChangedFilesForCheck(changedFiles: string[], check: Check): string[] {
+  const exts = check.fileGlobs.map(globToExtension);
+  return changedFiles.filter(f =>
+    exts.some(ext => f.endsWith(ext)) &&
+    !isExcluded(f, check.exclude) &&
+    (!check.pathFilter || f.startsWith(check.pathFilter)) &&
+    (!EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) ||
+     (!!check.pathFilter && f.startsWith(check.pathFilter))) &&
+    !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef))
+  );
+}
+
+export function checkFiles(files: string[], check: Check): string[] {
+  if (!check.pattern) return [];
+  const filtered = files.filter(file => !isExcluded(file, check.exclude));
+  if (filtered.length === 0) return [];
+  try {
+    const out = execFileSync('grep', ['-Hn', '-E', '-e', check.pattern, '--', ...filtered], {
+      cwd: ROOT,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      maxBuffer: 50 * 1024 * 1024,
+    });
+    const lines = out.trim() ? out.trim().split('\n').filter(Boolean) : [];
+    return applyExcludeLines(lines, check.excludeLines);
+  } catch (err) {
+    const status = typeof err === 'object' && err !== null && 'status' in err
+      ? (err as { status?: number }).status
+      : undefined;
+    // grep returns 1 for "no matches"; retain the historical "no hits" result.
+    if (status === 1) return [];
+    return [];
+  }
+}
+
 // Exported for tests/pr-check.test.ts — regression-test harness for the
 // `-`-prefix-pattern silent-bug class fixed in PR #299. Not part of the public
 // API; do not import from anywhere except the test harness.
 export function checkFile(file: string, check: Check): string[] {
-  if (isExcluded(file, check.exclude)) return [];
-  if (!check.pattern) return [];
-  try {
-    const safePattern = check.pattern.replace(/"/g, '\\"');
-    // Pass the pattern via `-e` so grep does not interpret patterns that
-    // start with `-` (e.g. `--radius-signature-lg`) as command-line flags.
-    // Without `-e`, grep errors with "unrecognized option `--…`", the error
-    // is swallowed by `2>/dev/null || true`, and the rule silently reports
-    // ✓ — the exact silent-false-negative class the audit prevents.
-    const out = execSync(
-      `grep -n -E -e "${safePattern}" "${file}" 2>/dev/null || true`,
-      { cwd: ROOT, encoding: 'utf-8' }
-    );
-    const lines = out.trim() ? out.trim().split('\n').filter(Boolean).map(l => `${file}:${l}`) : [];
-    return applyExcludeLines(lines, check.excludeLines);
-  } catch {
-    return [];
-  }
+  return checkFiles([file], check);
 }
 
 // Directories that should never be scanned (vendor code, test fixtures, build output)
@@ -8913,15 +9031,7 @@ console.log(`\n🔍 Running PR checks (${mode})...\n`);
 // same file set the ripgrep path would have scanned.
 function resolveCheckFileList(check: Check): string[] {
   if (!SCAN_ALL && changedFiles.length > 0) {
-    const exts = check.fileGlobs.map(g => g.replace('*.', '.').replace('**/', ''));
-    return changedFiles.filter(f =>
-      exts.some(ext => f.endsWith(ext)) &&
-      !isExcluded(f, check.exclude) &&
-      (!check.pathFilter || f.startsWith(check.pathFilter)) &&
-      (!EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) ||
-       (!!check.pathFilter && f.startsWith(check.pathFilter))) &&
-      !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef))
-    ).map(f => path.join(ROOT, f));
+    return resolveRelevantChangedFilesForCheck(changedFiles, check).map(f => path.join(ROOT, f));
   }
   // Full scan: walk the pathFilter dir (or project root) for each fileGlob.
   // A rule that opts into a normally-excluded directory via pathFilter (e.g.
@@ -8991,20 +9101,7 @@ for (const check of CHECKS) {
     continue;
   } else if (!SCAN_ALL && changedFiles.length > 0) {
     // Only check changed files that match the glob extensions
-    const exts = check.fileGlobs.map(g => g.replace('*.', '.'));
-    const relevant = changedFiles.filter(f =>
-      exts.some(ext => f.endsWith(ext)) &&
-      !isExcluded(f, check.exclude) &&
-      (!check.pathFilter || f.startsWith(check.pathFilter)) &&
-      // When a check declares an explicit pathFilter, allow files from otherwise-excluded dirs
-      // that match it (e.g. pathFilter:'tests/' targets the excluded 'tests' dir intentionally).
-      (!EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) ||
-       (!!check.pathFilter && f.startsWith(check.pathFilter))) &&
-      !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef))
-    );
-    for (const file of relevant) {
-      matches.push(...checkFile(file, check));
-    }
+    matches.push(...checkFiles(resolveRelevantChangedFilesForCheck(changedFiles, check), check));
   } else {
     // Full scan — scope to pathFilter if set
     matches = checkDirectory(check.pathFilter ?? '.', check);

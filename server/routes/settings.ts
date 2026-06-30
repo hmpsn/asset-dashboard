@@ -7,7 +7,7 @@ import { requireAdminAuth } from '../middleware/admin-auth.js';
 
 const router = Router();
 
-import { readEnvFile, writeEnvFile } from '../helpers.js';
+import { readEnvFile, writeEnvFile } from '../env-file.js';
 
 router.get('/api/settings', (_req, res) => {
   const vars = readEnvFile();

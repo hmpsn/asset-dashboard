@@ -143,7 +143,8 @@ const hardProtectedMutationEndpoints = (wsId: string) => [
   },
 ];
 
-// requireClientPortalAuth — soft gate; passwordless workspaces pass through (workspace ID is the credential).
+// requireClientPortalAuth — portal gate for client-published reads. As of E3, passwordless
+// workspaces are closed until configured; authenticated clients/admins still pass.
 // Use for content explicitly published for the client (audit detail, briefings, copy, orders).
 const softProtectedEndpoints = (wsId: string) => [
   { label: 'audit-detail', path: `/api/public/audit-detail/${wsId}` },
@@ -306,8 +307,8 @@ describe('Public endpoint auth — input validation on authenticated requests', 
 });
 
 // ── Soft-gated routes (requireClientPortalAuth) ──────────────────────────────
-// These are gated for password-set workspaces but allow passwordless workspaces
-// through — the workspace ID in the URL is the credential for passwordless portals.
+// These are client-published read routes. They require a portal credential even on
+// passwordless/unconfigured workspaces after the E3 passwordless-closure change.
 
 describe('Soft-gated endpoint auth — unauthenticated callers on password-set workspace blocked', () => {
   for (const { label, path } of softProtectedEndpoints('PLACEHOLDER')) {

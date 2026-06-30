@@ -21,7 +21,7 @@ import {
 const router = Router();
 const log = createLogger('routes:client-actions');
 
-const sourceTypeSchema = z.enum(['aeo_change', 'internal_link', 'redirect_proposal', 'content_decay']);
+const sourceTypeSchema = z.enum(['aeo_change', 'internal_link', 'redirect_proposal', 'content_decay', 'cannibalization']);
 const statusSchema = z.enum(['pending', 'approved', 'changes_requested', 'completed', 'archived']);
 
 const createActionSchema = z.object({

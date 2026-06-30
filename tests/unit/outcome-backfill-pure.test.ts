@@ -61,6 +61,11 @@ import {
   runBackfill,
 } from '../../server/outcome-backfill.js';
 import { getActionBySource } from '../../server/outcome-tracking.js';
+import {
+  saveRecommendations,
+  updateRecommendationStatus,
+} from '../../server/recommendations.js';
+import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
 
 // ── Test workspace setup ─────────────────────────────────────────────────────
 
@@ -144,12 +149,60 @@ function seedInsight(overrides: {
   return { id, pageId };
 }
 
-function seedRecommendationSet(recommendations: object[]) {
+function makeBackfillRecommendation(overrides: Partial<Recommendation> & { id?: string } = {}): Recommendation {
   const now = new Date().toISOString();
+  return {
+    id: overrides.id ?? randomUUID(),
+    workspaceId: testWsId,
+    priority: 'fix_soon',
+    type: 'technical',
+    title: 'Fix recommendation',
+    description: 'Fix the issue',
+    insight: 'The issue suppresses organic performance',
+    impact: 'medium',
+    effort: 'medium',
+    impactScore: 50,
+    source: 'audit:test',
+    affectedPages: [],
+    trafficAtRisk: 0,
+    impressionsAtRisk: 0,
+    estimatedGain: 'Improves organic performance',
+    actionType: 'manual',
+    status: 'pending',
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function seedRecommendationSet(recommendations: Array<Partial<Recommendation> & { id?: string }>) {
+  const now = new Date().toISOString();
+  const fullRecommendations = recommendations.map(makeBackfillRecommendation);
   db.prepare(
     `INSERT OR REPLACE INTO recommendation_sets (workspace_id, generated_at, recommendations, summary)
      VALUES (?, ?, ?, ?)`,
-  ).run(testWsId, now, JSON.stringify(recommendations), '{}');
+  ).run(testWsId, now, JSON.stringify(fullRecommendations), '{}');
+}
+
+function seedSavedRecommendationSet(recommendations: Recommendation[]): RecommendationSet {
+  const set: RecommendationSet = {
+    workspaceId: testWsId,
+    generatedAt: new Date().toISOString(),
+    recommendations,
+    summary: {
+      fixNow: 0,
+      fixSoon: recommendations.filter(rec => rec.priority === 'fix_soon').length,
+      fixLater: 0,
+      ongoing: 0,
+      totalImpactScore: recommendations.reduce((sum, rec) => sum + rec.impactScore, 0),
+      trafficAtRisk: recommendations.reduce((sum, rec) => sum + rec.trafficAtRisk, 0),
+      totalOpportunityValue: 0,
+      actionableOpportunityValue: 0,
+      topRecommendationId: recommendations.find(rec => rec.status !== 'completed' && rec.status !== 'dismissed')?.id ?? null,
+    },
+  };
+  saveRecommendations(set);
+  return set;
 }
 
 // ── Assertion helpers ────────────────────────────────────────────────────────
@@ -448,6 +501,29 @@ describe('backfillCompletedRecommendations', () => {
     const action = getActionBySource('recommendation', recId);
     expect(action).not.toBeNull();
     expect(action!.pageUrl).toBeNull();
+  });
+
+  it('uses normalized row state over the stale legacy blob after row-only status updates', () => {
+    const recId = randomUUID();
+    const rec = makeBackfillRecommendation({ id: recId, status: 'pending' });
+    seedSavedRecommendationSet([rec]);
+
+    const legacyBefore = (db.prepare(
+      'SELECT recommendations FROM recommendation_sets WHERE workspace_id = ?',
+    ).get(testWsId) as { recommendations: string }).recommendations;
+
+    const updated = updateRecommendationStatus(testWsId, recId, 'completed');
+    expect(updated?.status).toBe('completed');
+    expect((db.prepare(
+      'SELECT recommendations FROM recommendation_sets WHERE workspace_id = ?',
+    ).get(testWsId) as { recommendations: string }).recommendations).toBe(legacyBefore);
+
+    const count = backfillCompletedRecommendations(testWsId);
+
+    expect(count).toBe(1);
+    const action = getActionBySource('recommendation', recId);
+    expect(action).not.toBeNull();
+    expect(action!.sourceFlag).toBe('backfill');
   });
 });
 

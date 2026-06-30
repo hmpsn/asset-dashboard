@@ -10,9 +10,14 @@ const h = vi.hoisted(() => {
     intelligence: vi.fn(async () => ({ content: [{ type: 'text', text: 'intelligence' }] })),
     insight: vi.fn(async () => ({ content: [{ type: 'text', text: 'insight' }] })),
     content: vi.fn(async () => ({ content: [{ type: 'text', text: 'content' }] })),
+    brand: vi.fn(async () => ({ content: [{ type: 'text', text: 'brand' }] })),
     client: vi.fn(async () => ({ content: [{ type: 'text', text: 'client' }] })),
     keywordAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'keyword' }] })),
     contentAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'content-action' }] })),
+    recommendationAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'recommendation-action' }] })),
+    contentGenerationAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'content-generation-action' }] })),
+    schemaAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'schema-action' }] })),
+    analyticsReadAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'analytics-read-action' }] })),
     jobAction: vi.fn(async () => ({ content: [{ type: 'text', text: 'job' }] })),
   };
 
@@ -23,7 +28,7 @@ const h = vi.hoisted(() => {
     });
     close = vi.fn(async () => {});
 
-    constructor(_meta: unknown, _capabilities: unknown) {
+    constructor(public meta: unknown, public options: unknown) {
       serverInstances.push(this);
     }
 
@@ -83,6 +88,11 @@ vi.mock('../../server/mcp/tools/content.js', () => ({
   handleContentTool: h.mockHandlers.content,
 }));
 
+vi.mock('../../server/mcp/tools/brand.js', () => ({
+  brandTools: [{ name: 'brand_tool' }],
+  handleBrandTool: h.mockHandlers.brand,
+}));
+
 vi.mock('../../server/mcp/tools/clients.js', () => ({
   clientTools: [{ name: 'client_tool' }],
   handleClientTool: h.mockHandlers.client,
@@ -98,6 +108,26 @@ vi.mock('../../server/mcp/tools/content-actions.js', () => ({
   handleContentActionTool: h.mockHandlers.contentAction,
 }));
 
+vi.mock('../../server/mcp/tools/recommendation-actions.js', () => ({
+  recommendationActionTools: [{ name: 'recommendation_action_tool' }],
+  handleRecommendationActionTool: h.mockHandlers.recommendationAction,
+}));
+
+vi.mock('../../server/mcp/tools/content-generation-actions.js', () => ({
+  contentGenerationActionTools: [{ name: 'content_generation_action_tool' }],
+  handleContentGenerationActionTool: h.mockHandlers.contentGenerationAction,
+}));
+
+vi.mock('../../server/mcp/tools/schema-actions.js', () => ({
+  schemaActionTools: [{ name: 'schema_action_tool' }],
+  handleSchemaActionTool: h.mockHandlers.schemaAction,
+}));
+
+vi.mock('../../server/mcp/tools/analytics-read-actions.js', () => ({
+  analyticsReadActionTools: [{ name: 'analytics_read_action_tool' }],
+  handleAnalyticsReadActionTool: h.mockHandlers.analyticsReadAction,
+}));
+
 vi.mock('../../server/mcp/tools/job-actions.js', () => ({
   jobActionTools: [{ name: 'job_action_tool' }],
   handleJobActionTool: h.mockHandlers.jobAction,
@@ -105,6 +135,7 @@ vi.mock('../../server/mcp/tools/job-actions.js', () => ({
 
 import { handleMcpRequest } from '../../server/mcp/server.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types';
+import { MCP_SERVER_INSTRUCTIONS } from '../../server/mcp/instructions.js';
 
 describe('mcp server routing', () => {
   beforeEach(() => {
@@ -114,8 +145,20 @@ describe('mcp server routing', () => {
     for (const fn of Object.values(h.mockHandlers)) fn.mockClear();
   });
 
+  it('constructs the Server with the agent instructions string in its options', async () => {
+    await handleMcpRequest({ body: {}, mcpAuth: { scope: 'all' } } as never, {} as never);
+
+    const server = h.serverInstances.at(-1);
+    expect(server).toBeDefined();
+    const options = server.options as { instructions?: string; capabilities?: unknown };
+    expect(options.instructions).toBe(MCP_SERVER_INSTRUCTIONS);
+    expect(options.instructions!.length).toBeGreaterThan(0);
+    // capabilities must still be present (instructions is additive, not a replacement).
+    expect(options.capabilities).toBeDefined();
+  });
+
   it('registers list + call handlers and dispatches each tool family', async () => {
-    await handleMcpRequest({ body: {} } as never, {} as never);
+    await handleMcpRequest({ body: {}, mcpAuth: { scope: 'all' } } as never, {} as never);
 
     const server = h.serverInstances.at(-1);
     expect(server).toBeDefined();
@@ -132,9 +175,14 @@ describe('mcp server routing', () => {
       'intelligence_tool',
       'insight_tool',
       'content_tool',
+      'brand_tool',
       'client_tool',
       'keyword_action_tool',
       'content_action_tool',
+      'recommendation_action_tool',
+      'content_generation_action_tool',
+      'schema_action_tool',
+      'analytics_read_action_tool',
       'job_action_tool',
     ]);
 
@@ -142,18 +190,28 @@ describe('mcp server routing', () => {
     await callHandler({ params: { name: 'intelligence_tool', arguments: { b: 1 } } } as never);
     await callHandler({ params: { name: 'insight_tool', arguments: { c: 1 } } } as never);
     await callHandler({ params: { name: 'content_tool', arguments: { d: 1 } } } as never);
+    await callHandler({ params: { name: 'brand_tool', arguments: { h: 1 } } } as never);
     await callHandler({ params: { name: 'client_tool', arguments: { e: 1 } } } as never);
     await callHandler({ params: { name: 'keyword_action_tool', arguments: { f: 1 } } } as never);
     await callHandler({ params: { name: 'content_action_tool', arguments: { g: 1 } } } as never);
+    await callHandler({ params: { name: 'recommendation_action_tool', arguments: { r: 1 } } } as never);
+    await callHandler({ params: { name: 'content_generation_action_tool', arguments: { i: 1 } } } as never);
+    await callHandler({ params: { name: 'schema_action_tool', arguments: { s: 1 } } } as never);
+    await callHandler({ params: { name: 'analytics_read_action_tool', arguments: { a: 2 } } } as never);
     await callHandler({ params: { name: 'job_action_tool' } } as never);
 
     expect(h.mockHandlers.workspace).toHaveBeenCalledWith('workspace_tool', { a: 1 });
     expect(h.mockHandlers.intelligence).toHaveBeenCalledWith('intelligence_tool', { b: 1 });
     expect(h.mockHandlers.insight).toHaveBeenCalledWith('insight_tool', { c: 1 });
     expect(h.mockHandlers.content).toHaveBeenCalledWith('content_tool', { d: 1 });
+    expect(h.mockHandlers.brand).toHaveBeenCalledWith('brand_tool', { h: 1 });
     expect(h.mockHandlers.client).toHaveBeenCalledWith('client_tool', { e: 1 });
     expect(h.mockHandlers.keywordAction).toHaveBeenCalledWith('keyword_action_tool', { f: 1 });
     expect(h.mockHandlers.contentAction).toHaveBeenCalledWith('content_action_tool', { g: 1 });
+    expect(h.mockHandlers.recommendationAction).toHaveBeenCalledWith('recommendation_action_tool', { r: 1 });
+    expect(h.mockHandlers.contentGenerationAction).toHaveBeenCalledWith('content_generation_action_tool', { i: 1 });
+    expect(h.mockHandlers.schemaAction).toHaveBeenCalledWith('schema_action_tool', { s: 1 });
+    expect(h.mockHandlers.analyticsReadAction).toHaveBeenCalledWith('analytics_read_action_tool', { a: 2 });
     expect(h.mockHandlers.jobAction).toHaveBeenCalledWith('job_action_tool', {});
 
     const unknown = await callHandler({ params: { name: 'unknown_tool', arguments: { z: 1 } } } as never) as {
@@ -165,7 +223,7 @@ describe('mcp server routing', () => {
   });
 
   it('creates stateless transport and closes server after handling request', async () => {
-    const req = { body: { jsonrpc: '2.0', method: 'tools/list' } };
+    const req = { body: { jsonrpc: '2.0', method: 'tools/list' }, mcpAuth: { scope: 'all' } };
     const res = {};
 
     await handleMcpRequest(req as never, res as never);
@@ -182,7 +240,7 @@ describe('mcp server routing', () => {
 
   it('still closes server when request handling throws', async () => {
     h.state.throwOnHandle = true;
-    await expect(handleMcpRequest({ body: {} } as never, {} as never)).rejects.toThrow('transport boom');
+    await expect(handleMcpRequest({ body: {}, mcpAuth: { scope: 'all' } } as never, {} as never)).rejects.toThrow('transport boom');
 
     const server = h.serverInstances.at(-1);
     expect(server?.close).toHaveBeenCalledTimes(1);

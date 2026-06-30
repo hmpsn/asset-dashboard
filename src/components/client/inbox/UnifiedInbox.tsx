@@ -8,6 +8,7 @@ import { PriorityStrip, type PriorityItem } from '../PriorityStrip';
 import { DecisionCard } from '../DecisionCard';
 import { DeliverableDetailModal } from '../DeliverableDetailModal';
 import { InlineApprovalCard } from './InlineApprovalCard';
+import { GbpReviewResponseApprovalCard } from './GbpReviewResponseApprovalCard';
 import { ProjectedReviewModal } from './ProjectedReviewModal';
 import { RequestsTab } from '../RequestsTab';
 import { SubmitRequestChooserModal } from './SubmitRequestChooserModal';
@@ -25,9 +26,9 @@ import type { ClientDeliverable, DeliverableKind, DeliverableType } from '../../
 import type { NormalizedDecision, FlaggedItem } from '../../../../shared/types/decision';
 
 /**
- * The ContentTab pass-through props the unified inbox forwards to the in-shell ProjectedReviewModal
- * (R4). `workspaceId`, `setToast`, the auto-expand seed, AND the solo id are supplied locally, so they
- * are omitted from the bag. Threaded from ClientDashboard → InboxTab → here (flag-ON-only).
+ * The ContentTab pass-through props the unified inbox forwards to the in-shell ProjectedReviewModal.
+ * `workspaceId`, `setToast`, the auto-expand seed, and the solo id are supplied locally, so they
+ * are omitted from the bag. Threaded from ClientDashboard → InboxTab → here.
  * `soloRequestId` (ISSUE 2d) is supplied by the modal locally — it must NOT be a forwarded
  * pass-through prop.
  */
@@ -343,7 +344,7 @@ export function UnifiedInbox({
   ...contentTabProps
 }: UnifiedInboxProps) {
   const queryClient = useQueryClient();
-  // Item 2 — edit-before-approve is gated to the non-free tier (legacy ApprovalsTab parity:
+  // Item 2 — edit-before-approve is gated to the non-free tier (retired approvals UI parity:
   // edit/approve were behind `effectiveTier !== 'free'`). `effectiveTier` rides in the ContentTab
   // pass-through props the inbox already receives.
   const editable = contentTabProps.effectiveTier !== 'free';
@@ -412,7 +413,7 @@ export function UnifiedInbox({
   );
 
   // R3b "Ready to publish": already-approved deliverables that are client-applyable through the
-  // legacy /apply route (the shared predicate mirrors that route's field/targetRef/collectionId
+  // canonical deliverable apply route (the shared predicate mirrors its field/targetRef/collectionId
   // gate — see shared/applyability.ts). `approved` is intentionally NOT in ACTIONABLE_STATUSES (it
   // must not re-show approve/decline verbs), but it IS client-facing, so these rows ARE present in
   // `deliverables`. Non-applyable approved deliverables (schema, content_plan, approved
@@ -490,9 +491,9 @@ export function UnifiedInbox({
   // R3b — open the "Apply to live site?" confirmation (copy mirrors the legacy ApprovalBatchCard).
   const onApply = (d: ClientDeliverable) => setApplyConfirm(d);
 
-  // R3b — run the apply after the client confirms. Reads the legacy batch id off the deliverable's
-  // payload (typeof-guard) and calls the SAME proven legacy /apply route via the typed mutation.
-  // The legacy /apply route returns HTTP 200 even on a total runtime Webflow write failure
+  // R3b — run the apply after the client confirms. Calls the canonical deliverable apply route,
+  // which resolves the legacy approval source server-side before delegating to the apply service.
+  // The apply service returns HTTP 200 even on a total runtime Webflow write failure
   // (`applied:0, failed:N`), so we MUST branch on the result body — never show success
   // unconditionally (FM-2 anti-pattern). Mirrors the proven legacy ApprovalBatchCard guard.
   // Post-apply UX on full success: the deliverable flips to `applied`, which is filtered OUT
@@ -504,13 +505,8 @@ export function UnifiedInbox({
     const d = applyConfirm;
     setApplyConfirm(null);
     if (!d) return;
-    const legacyBatchId = (d.payload as { legacyBatchId?: unknown }).legacyBatchId;
-    if (typeof legacyBatchId !== 'string' || !legacyBatchId) {
-      setToast({ message: 'Could not apply: this item is missing its source reference.', type: 'error' });
-      return;
-    }
     try {
-      const data = await apply.mutateAsync({ legacyBatchId });
+      const data = await apply.mutateAsync({ deliverableId: d.id });
       if (data.applied > 0 && data.failed === 0) {
         setToast({
           message: `${data.applied} change${data.applied !== 1 ? 's' : ''} applied to your website`,
@@ -549,6 +545,20 @@ export function UnifiedInbox({
     const decision: NormalizedDecision = normalizeDeliverable(d);
     const projected = isProjectedDeliverable(d.type);
     const inlineApproval = !projected && d.kind === 'batch' && (d.items?.length ?? 0) > 0;
+    if (d.type === 'gbp_review_response') {
+      return (
+        <div key={d.id} id={`unified-decision-${d.id}`}>
+          <GbpReviewResponseApprovalCard
+            deliverable={d}
+            ageLabel={ageLabel(d.sentAt)}
+            submitting={submittingId === d.id}
+            onApprove={() => void handleRespond(d, 'approved')}
+            onRequestChanges={(note) => void handleRespond(d, 'changes_requested', note || undefined)}
+            onDecline={(note) => void handleRespond(d, 'declined', note || undefined)}
+          />
+        </div>
+      );
+    }
 
     return (
       <div key={d.id} id={`unified-decision-${d.id}`}>
@@ -725,7 +735,7 @@ export function UnifiedInbox({
           apply/review verb (a work order is not a decision). Each card does NOT call
           normalizeDeliverable, does NOT construct a DecisionCard, and wires ZERO decision mutations
           (structural verb-safety). The ONLY interactive element is the verb-free client↔team
-          conversation input (DARK; reachable only when UnifiedInbox renders behind `unified-inbox`).
+          conversation input.
           Page targets are shown count-only — the raw payload.pageIds are raw Webflow ids and are never
           surfaced to the client (CLAUDE.md "never surface raw IDs"). Mirrors the R3b "Ready to publish"
           container (surface-2 + brand signature radius). */}

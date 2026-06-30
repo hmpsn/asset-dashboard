@@ -1,8 +1,8 @@
 /**
  * Pure helper for resolving the active client-portal tab from the URL.
  * Extracted from src/components/ClientDashboard.tsx so the tab fallback logic
- * (legacy aliases + unknown-tab fallback) can be unit-tested
- * without rendering the full dashboard.
+ * (legacy aliases + unknown-tab fallback) can be unit-tested without rendering
+ * the full dashboard.
  */
 import type { ClientTab } from '../routes';
 
@@ -31,13 +31,13 @@ export const KNOWN_CLIENT_TABS: readonly ResolvedClientTab[] = [
   'health',
   'strategy',
   'inbox',
-  'approvals',
-  'requests',
-  'content',
   'plans',
   'roi',
   'content-plan',
   'brand',
+  'deep-dive',
+  'results',
+  'settings',
 ];
 
 /**
@@ -47,11 +47,18 @@ export const KNOWN_CLIENT_TABS: readonly ResolvedClientTab[] = [
  *  - 'search' and 'analytics' are legacy aliases that redirect to 'performance'.
  *  - Anything in KNOWN_CLIENT_TABS passes through unchanged.
  *  - Unknown / undefined / empty values fall back to 'overview'.
+ *
+ * NOTE: 'roi' deliberately resolves to ITSELF (it stays in KNOWN_CLIENT_TABS with its
+ * own panel). It is NOT aliased to 'results' — a pure helper can't read the
+ * client-ia-v2 flag, so an unconditional roi→results alias would silently change the
+ * flag-OFF ROI tab (the legacy nav still surfaces 'roi'; routing it to the evergreen
+ * Results panel drops the month-over-month stat AND breaks the nav highlight). Under
+ * IA v2 the nav surfaces 'results' (evergreen) instead; old `?tab=roi` bookmarks still
+ * render the working non-evergreen roi panel.
  */
 export function resolveClientTab(initialTabId: string | undefined | null): ResolvedClientTab {
   const t = initialTabId;
   if (t === 'search' || t === 'analytics') return 'performance';
-  if (t === 'schema-review') return 'inbox'; // retired — schema plan now lives in Inbox > Reviews
   if (t && (KNOWN_CLIENT_TABS as readonly string[]).includes(t)) return t as ResolvedClientTab;
   return 'overview';
 }

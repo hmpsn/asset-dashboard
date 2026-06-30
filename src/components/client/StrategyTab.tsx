@@ -4,11 +4,15 @@ import {
   Target,
   AlertTriangle,
 } from 'lucide-react';
-import { TierGate, EmptyState, type Tier, Icon, Button } from '../ui';
+import { TierGate, TabBar, EmptyState, type Tier, Icon, Button } from '../ui';
 import type { ClientKeywordStrategy, ClientContentRequest } from './types';
 import { calculateStrategyHealth } from '../../lib/strategy-health-score';
+import { resolveTabSearchParam, clearTabSearchParam } from '../../lib/tab-search-param';
+import { StrategyClientOrientHeader } from './strategy/StrategyClientOrientHeader';
+import { CompetitorGapsSection } from './CompetitorGapsSection';
 import { useBetaMode } from './BetaContext';
 import { useClientIntelligence } from '../../hooks/client';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { STUDIO_NAME } from '../../constants';
 import { StrategyBusinessPrioritiesSection } from './strategy/StrategyBusinessPrioritiesSection';
 import { StrategyContentOpportunitiesSection } from './strategy/StrategyContentOpportunitiesSection';
@@ -52,18 +56,32 @@ interface StrategyTabProps {
   requestedTopics: Set<string>;
   contentRequests?: ClientContentRequest[];
   effectiveTier: Tier;
-  briefPrice: number | null;
-  fullPostPrice: number | null;
-  fmtPrice: (n: number) => string;
-  setPricingModal: (modal: PricingModalState | null) => void;
   contentPlanKeywords?: Map<string, string>;
   onTabChange?: (tab: string) => void;
   workspaceId?: string;
   setToast?: (msg: string) => void;
   onContentRequested?: () => void;
-  /** When true (external billing), hide price chips on request buttons. */
-  hidePrices?: boolean;
 }
+
+// Strategy v2 client interior tabs (command-center layout). Mirrors the admin IA. The literal ids
+// appear here so the ?tab= deep-link contract test recognizes this receiver.
+type ClientStrategyTab = 'overview' | 'content' | 'rankings' | 'competitive';
+const CLIENT_STRATEGY_TABS: { id: ClientStrategyTab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'content', label: 'Content' },
+  { id: 'rankings', label: 'Rankings' },
+  { id: 'competitive', label: 'Competitive' },
+];
+
+// Bridge the legacy section-scroll ?tab= values (STRATEGY_TAB_SECTION_MAP — still used by senders like
+// InsightsBriefingPage's `strategy?tab=content-gaps` deep-link) onto v2 interior tabs, so an incoming
+// legacy deep-link lands on the tab that hosts that section instead of silently falling back to Overview.
+const LEGACY_TAB_ALIASES: Partial<Record<string, ClientStrategyTab>> = {
+  'content-gaps': 'content',
+  'quick-wins': 'content',
+  'page-keyword-map': 'rankings',
+  'business-priorities': 'overview',
+};
 
 const FOCUSABLE_SELECTOR = [
   'a[href]', 'area[href]', 'button:not([disabled])',
@@ -88,22 +106,47 @@ function isStrategyDeepLinkTab(value: string | null): value is StrategyDeepLinkT
   return value != null && Object.prototype.hasOwnProperty.call(STRATEGY_TAB_SECTION_MAP, value);
 }
 
-export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, briefPrice, fullPostPrice, fmtPrice, setPricingModal, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested, hidePrices }: StrategyTabProps) {
+export function StrategyTab({ strategyData, requestedTopics, contentRequests, effectiveTier, contentPlanKeywords, onTabChange, workspaceId, setToast, onContentRequested }: StrategyTabProps) {
   const betaMode = useBetaMode();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: clientIntelligence } = useClientIntelligence(workspaceId ?? '');
   const keywordFeedbackSummary =
     effectiveTier !== 'free' && clientIntelligence?.tier !== 'free'
       ? clientIntelligence?.keywordFeedbackSummary
       : null;
   const initialDeepLinkTab = searchParams.get('tab');
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
+  const [expandedSections, toggleSection, setExpandedSections] = useToggleSet<string>(() => {
     const initial = new Set(['new-content', 'optimize-existing']);
     if (isStrategyDeepLinkTab(initialDeepLinkTab)) {
       initial.add(STRATEGY_TAB_SECTION_MAP[initialDeepLinkTab]);
     }
     return initial;
-  });
+  }, UNBOUNDED_TOGGLE_SET_OPTIONS);
+
+  // Strategy interior tab (?tab= deep-link, two-halves contract — mirrors the admin StrategyTab).
+  // The command-center layout is the baseline, so this tab state is always consumed.
+  const [interiorTab, setInteriorTab] = useState<ClientStrategyTab>(() =>
+    resolveTabSearchParam<ClientStrategyTab>(searchParams.get('tab'), {
+      validValues: CLIENT_STRATEGY_TABS.map((t) => t.id),
+      fallback: 'overview',
+      legacyAliases: LEGACY_TAB_ALIASES,
+    }),
+  );
+  useEffect(() => {
+    const param = searchParams.get('tab');
+    if (!param) return;
+    const resolved = resolveTabSearchParam<ClientStrategyTab>(param, {
+      validValues: CLIENT_STRATEGY_TABS.map((t) => t.id),
+      fallback: interiorTab, // unmappable param → keep the current tab (don't reset to Overview)
+      legacyAliases: LEGACY_TAB_ALIASES,
+    });
+    if (resolved !== interiorTab) setInteriorTab(resolved);
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps -- sync interior tab to external ?tab= changes only
+  const handleInteriorTabChange = (id: string) => {
+    setInteriorTab(id as ClientStrategyTab);
+    const next = clearTabSearchParam(searchParams);
+    if (next) setSearchParams(next, { replace: true });
+  };
 
   const {
     keywordFeedback,
@@ -300,28 +343,6 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   // Refs for keyword drawer focus management
   const drawerRef = useRef<HTMLDivElement>(null);
   const drawerPreviousFocusRef = useRef<HTMLElement | null>(null);
-
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev);
-      if (next.has(section)) next.delete(section);
-      else next.add(section);
-      return next;
-    });
-  };
-
-  const scrollToSection = (section: string, ref: React.RefObject<HTMLDivElement | null>) => {
-    // Ensure section is expanded before scrolling
-    setExpandedSections(prev => {
-      if (prev.has(section)) return prev;
-      const next = new Set(prev);
-      next.add(section);
-      return next;
-    });
-    setTimeout(() => {
-      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
-  };
 
   if (!strategyData) {
     const action = onTabChange ? (
@@ -674,178 +695,187 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     }
   };
 
-  return (
-    <div className="space-y-8">
-      {/* Unvalidated strategy note */}
-      {!strategyData.pageMap.some(p => p.volume && p.volume > 0) && (
-        <div className="bg-amber-500/10 border border-amber-500/30 px-4 py-3 flex items-start gap-2.5" style={{ borderRadius: 'var(--radius-signature)' }}>
-          <Icon as={AlertTriangle} size="md" className="text-accent-warning flex-shrink-0 mt-0.5" />
-          <div className="t-caption text-accent-warning leading-relaxed">
-            Keyword volume and difficulty metrics are currently unavailable for this strategy. The recommendations are based on AI analysis and site content.
-          </div>
-        </div>
-      )}
-
-      <StrategySnapshotSection
-        healthScore={healthScore}
-        generatedAt={strategyData.generatedAt}
-        contentGapsFound={contentGapsFound}
-        totalPageImprovements={totalPageImprovements}
-        pagesRanking={pagesRanking}
-        totalPages={totalPages}
-        strategyKeywordCount={strategyKeywords.length}
-        contentScore={contentScore}
-        quickWinScore={quickWinScore}
-        coverageScore={coverageScore}
-      />
-
-      {strategyData.strategyUx?.refreshSummary && (
-        <StrategyRefreshSummarySection summary={strategyData.strategyUx.refreshSummary} />
-      )}
-
-      <StrategyNextStepsSection
-        contentGapsFound={contentGapsFound}
-        totalPageImprovements={totalPageImprovements}
-        strategyKeywordCount={strategyKeywords.length}
-        showPageImprovements={quickWinsAvailable > 0 || pagesWithGrowthOpps > 0}
-        onReviewIdeas={() => scrollToSection('new-content', newContentRef)}
-        onReviewPages={() => scrollToSection('optimize-existing', optimizeExistingRef)}
-        onManageKeywords={() => priorityKeywordsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-      />
-
-      {keywordFeedbackSummary && (
-        <StrategyKeywordFeedbackSummaryCard summary={keywordFeedbackSummary} />
-      )}
-
-      {/* ── LOAD ERRORS (surfaced at top so errors aren't hidden behind collapsed sections) ── */}
-      {(feedbackLoadError || trackedKeywordsError) && (
-        <div className="space-y-1">
-          {feedbackLoadError && (
-            <p className="t-caption-sm text-accent-danger">
-              Couldn't load your previous keyword feedback - your relevant and not relevant choices may not reflect correctly.{' '}
-              <Button variant="link" className="text-accent-danger hover:text-accent-danger" onClick={loadFeedback}>Retry</Button>
-            </p>
-          )}
-          {trackedKeywordsError && (
-            <p className="t-caption-sm text-accent-danger">
-              Couldn't load your strategy keywords.{' '}
-              <Button variant="link" className="text-accent-danger hover:text-accent-danger" onClick={loadTrackedKeywords}>Retry</Button>
-            </p>
-          )}
-        </div>
-      )}
-
-      <StrategyBusinessPrioritiesSection
-        businessPrioritiesRef={businessPrioritiesRef}
-        workspaceId={workspaceId}
-        prioritiesLoaded={prioritiesLoaded}
-        prioritiesError={prioritiesError}
-        reloadPriorities={() => { void reloadPriorities(); }}
-        priorities={priorities}
-        newPriority={newPriority}
-        setNewPriority={setNewPriority}
-        newPriorityCategory={newPriorityCategory}
-        setNewPriorityCategory={setNewPriorityCategory}
-        savingPriorities={savingPriorities}
-        savePriorities={savePriorities}
-        expandedSections={expandedSections}
-        toggleSection={toggleSection}
-      />
-
-      <StrategyContentOpportunitiesSection
-        newContentRef={newContentRef}
-        effectiveTier={effectiveTier}
-        newContentTopicCount={newContentTopicCount}
-        contentGapsFound={contentGapsFound}
-        keywordGapCount={keywordGapCount}
-        strategyData={strategyData}
-        expandedSections={expandedSections}
-        toggleSection={toggleSection}
-        contentRequests={contentRequests}
-        requestedTopics={requestedTopics}
-        contentPlanKeywords={contentPlanKeywords}
-        workspaceId={workspaceId}
-        getFeedbackStatus={getFeedbackStatus}
-        isLoadingFeedback={isLoadingFeedback}
-        undoFeedback={undoFeedback}
-        submitFeedback={submitFeedback}
-        onDeclineKeyword={(keyword, source) => { setDeclineReason({ keyword, source }); setDeclineReasonText(''); }}
-        betaMode={betaMode}
-        setPricingModal={setPricingModal}
-        briefPrice={briefPrice}
-        fullPostPrice={fullPostPrice}
-        fmtPrice={fmtPrice}
-        hidePrices={hidePrices}
-        onTabChange={onTabChange}
-      />
-
-      <StrategyPageImprovementsSection
-        optimizeExistingRef={optimizeExistingRef}
-        strategyData={strategyData}
-        quickWinsAvailable={quickWinsAvailable}
-        pagesWithGrowthOpps={pagesWithGrowthOpps}
-        expandedSections={expandedSections}
-        toggleSection={toggleSection}
-        workspaceId={workspaceId}
-        setToast={setToast}
-        onContentRequested={onContentRequested}
-      />
-
-      {/* ── STRATEGY KEYWORDS ── */}
-      <div ref={priorityKeywordsRef}>
-        <TierGate tier={effectiveTier} required="growth" feature="Strategy Keywords" teaser={`${strategyKeywords.length} keywords`}>
-          <StrategyKeywordsSection
-            strategyKeywordRows={strategyKeywordRows}
-            keywordIdeaRows={keywordIdeaRows}
-            newTrackedKeyword={newTrackedKeyword}
-            setNewTrackedKeyword={setNewTrackedKeyword}
-            addingKeyword={addingKeyword}
-            removingKeyword={removingKeyword}
-            trackedKeywordsLoading={trackedKeywordsLoading}
-            workspaceId={workspaceId}
-            openKeywordDrawer={openKeywordDrawer}
-            closeDrawer={closeDrawer}
-            openOrSwapDrawer={openOrSwapDrawer}
-            addStrategyKeyword={addStrategyKeyword}
-            removePriorityKeyword={removePriorityKeyword}
-            submitFeedback={submitFeedback}
-            isLoadingFeedback={isLoadingFeedback}
-          />
-        </TierGate>
+  // ── Section elements — defined once, arranged flat (legacy) or into interior tabs (v2) ──
+  const unvalidatedNoteEl = !strategyData.pageMap.some(p => p.volume && p.volume > 0) ? (
+    <div className="bg-amber-500/10 border border-amber-500/30 px-4 py-3 flex items-start gap-2.5" style={{ borderRadius: 'var(--radius-signature)' }}>
+      <Icon as={AlertTriangle} size="md" className="text-accent-warning flex-shrink-0 mt-0.5" />
+      <div className="t-caption text-accent-warning leading-relaxed">
+        Keyword volume and difficulty metrics are currently unavailable for this strategy. The recommendations are based on AI analysis and site content.
       </div>
+    </div>
+  ) : null;
 
-      {/* ── REQUESTED KEYWORD RANK TREND (A4, audit #15) ── */}
-      <StrategyRequestedKeywordTrendSection
-        workspaceId={workspaceId}
-        trackedKeywords={trackedKeywords}
-        effectiveTier={effectiveTier}
-      />
+  const snapshotEl = (
+    <StrategySnapshotSection
+      healthScore={healthScore}
+      generatedAt={strategyData.generatedAt}
+      contentGapsFound={contentGapsFound}
+      totalPageImprovements={totalPageImprovements}
+      pagesRanking={pagesRanking}
+      totalPages={totalPages}
+      strategyKeywordCount={strategyKeywords.length}
+      contentScore={contentScore}
+      quickWinScore={quickWinScore}
+      coverageScore={coverageScore}
+    />
+  );
 
-      <StrategyPageKeywordMapSection
-        effectiveTier={effectiveTier}
-        pageMap={strategyData.pageMap}
-        strategyUx={strategyData.strategyUx}
-        expandedSections={expandedSections}
-        toggleSection={toggleSection}
-        workspaceId={workspaceId}
-        setToast={setToast}
-        onContentRequested={onContentRequested}
-        keywordFeedback={keywordFeedback}
-        submitFeedback={submitFeedback}
-        onDeclineKeyword={(keyword, source) => { setDeclineReason({ keyword, source }); setDeclineReasonText(''); }}
-        undoFeedback={undoFeedback}
-        isLoadingFeedback={isLoadingFeedback}
-      />
+  const refreshSummaryEl = strategyData.strategyUx?.refreshSummary ? (
+    <StrategyRefreshSummarySection summary={strategyData.strategyUx.refreshSummary} />
+  ) : null;
 
-      {/* ── DECLINED KEYWORDS SUMMARY ── */}
-      <StrategyDeclinedKeywordsSection
-        keywordFeedback={keywordFeedback}
-        expandedSections={expandedSections}
-        toggleSection={toggleSection}
-        undoFeedback={undoFeedback}
-        isLoadingFeedback={isLoadingFeedback}
-      />
+  const nextStepsEl = (
+    <StrategyNextStepsSection
+      contentGapsFound={contentGapsFound}
+      totalPageImprovements={totalPageImprovements}
+      strategyKeywordCount={strategyKeywords.length}
+      showPageImprovements={quickWinsAvailable > 0 || pagesWithGrowthOpps > 0}
+      onReviewIdeas={() => handleInteriorTabChange('content')}
+      onReviewPages={() => handleInteriorTabChange('content')}
+      onManageKeywords={() => handleInteriorTabChange('rankings')}
+    />
+  );
 
+  const keywordFeedbackSummaryEl = keywordFeedbackSummary ? (
+    <StrategyKeywordFeedbackSummaryCard summary={keywordFeedbackSummary} />
+  ) : null;
+
+  const loadErrorsEl = (feedbackLoadError || trackedKeywordsError) ? (
+    <div className="space-y-1">
+      {feedbackLoadError && (
+        <p className="t-caption-sm text-accent-danger">
+          Couldn't load your previous keyword feedback - your relevant and not relevant choices may not reflect correctly.{' '}
+          <Button variant="link" className="text-accent-danger hover:text-accent-danger" onClick={loadFeedback}>Retry</Button>
+        </p>
+      )}
+      {trackedKeywordsError && (
+        <p className="t-caption-sm text-accent-danger">
+          Couldn't load your strategy keywords.{' '}
+          <Button variant="link" className="text-accent-danger hover:text-accent-danger" onClick={loadTrackedKeywords}>Retry</Button>
+        </p>
+      )}
+    </div>
+  ) : null;
+
+  const businessPrioritiesEl = (
+    <StrategyBusinessPrioritiesSection
+      businessPrioritiesRef={businessPrioritiesRef}
+      workspaceId={workspaceId}
+      prioritiesLoaded={prioritiesLoaded}
+      prioritiesError={prioritiesError}
+      reloadPriorities={() => { void reloadPriorities(); }}
+      priorities={priorities}
+      newPriority={newPriority}
+      setNewPriority={setNewPriority}
+      newPriorityCategory={newPriorityCategory}
+      setNewPriorityCategory={setNewPriorityCategory}
+      savingPriorities={savingPriorities}
+      savePriorities={savePriorities}
+      expandedSections={expandedSections}
+      toggleSection={toggleSection}
+    />
+  );
+
+  const contentOppsEl = (
+    <StrategyContentOpportunitiesSection
+      newContentRef={newContentRef}
+      effectiveTier={effectiveTier}
+      newContentTopicCount={newContentTopicCount}
+      contentGapsFound={contentGapsFound}
+      keywordGapCount={keywordGapCount}
+      strategyData={strategyData}
+      expandedSections={expandedSections}
+      toggleSection={toggleSection}
+      contentRequests={contentRequests}
+      requestedTopics={requestedTopics}
+      contentPlanKeywords={contentPlanKeywords}
+      workspaceId={workspaceId}
+      getFeedbackStatus={getFeedbackStatus}
+      isLoadingFeedback={isLoadingFeedback}
+      undoFeedback={undoFeedback}
+      submitFeedback={submitFeedback}
+      onDeclineKeyword={(keyword, source) => { setDeclineReason({ keyword, source }); setDeclineReasonText(''); }}
+      betaMode={betaMode}
+      onTabChange={onTabChange}
+    />
+  );
+
+  const pageImprovementsEl = (
+    <StrategyPageImprovementsSection
+      optimizeExistingRef={optimizeExistingRef}
+      strategyData={strategyData}
+      quickWinsAvailable={quickWinsAvailable}
+      pagesWithGrowthOpps={pagesWithGrowthOpps}
+      expandedSections={expandedSections}
+      toggleSection={toggleSection}
+      workspaceId={workspaceId}
+      setToast={setToast}
+      onContentRequested={onContentRequested}
+    />
+  );
+
+  const keywordsSectionEl = (
+    <div ref={priorityKeywordsRef}>
+      <TierGate tier={effectiveTier} required="growth" feature="Strategy Keywords" teaser={`${strategyKeywords.length} keywords`}>
+        <StrategyKeywordsSection
+          strategyKeywordRows={strategyKeywordRows}
+          keywordIdeaRows={keywordIdeaRows}
+          newTrackedKeyword={newTrackedKeyword}
+          setNewTrackedKeyword={setNewTrackedKeyword}
+          addingKeyword={addingKeyword}
+          removingKeyword={removingKeyword}
+          trackedKeywordsLoading={trackedKeywordsLoading}
+          workspaceId={workspaceId}
+          openKeywordDrawer={openKeywordDrawer}
+          closeDrawer={closeDrawer}
+          openOrSwapDrawer={openOrSwapDrawer}
+          addStrategyKeyword={addStrategyKeyword}
+          removePriorityKeyword={removePriorityKeyword}
+          submitFeedback={submitFeedback}
+          isLoadingFeedback={isLoadingFeedback}
+        />
+      </TierGate>
+    </div>
+  );
+
+  const requestedTrendEl = (
+    <StrategyRequestedKeywordTrendSection
+      workspaceId={workspaceId}
+      trackedKeywords={trackedKeywords}
+      effectiveTier={effectiveTier}
+    />
+  );
+
+  const pageKeywordMapEl = (
+    <StrategyPageKeywordMapSection
+      effectiveTier={effectiveTier}
+      pageMap={strategyData.pageMap}
+      strategyUx={strategyData.strategyUx}
+      expandedSections={expandedSections}
+      toggleSection={toggleSection}
+      workspaceId={workspaceId}
+      setToast={setToast}
+      onContentRequested={onContentRequested}
+      keywordFeedback={keywordFeedback}
+      submitFeedback={submitFeedback}
+      onDeclineKeyword={(keyword, source) => { setDeclineReason({ keyword, source }); setDeclineReasonText(''); }}
+      undoFeedback={undoFeedback}
+      isLoadingFeedback={isLoadingFeedback}
+    />
+  );
+
+  const declinedKeywordsEl = (
+    <StrategyDeclinedKeywordsSection
+      keywordFeedback={keywordFeedback}
+      expandedSections={expandedSections}
+      toggleSection={toggleSection}
+      undoFeedback={undoFeedback}
+      isLoadingFeedback={isLoadingFeedback}
+    />
+  );
+
+  const modalsEl = (
+    <>
       {/* Keyword detail drawer */}
       {(openKeywordDrawer || drawerClosing) && (() => {
         const allRows: StrategyKeywordTableRow[] = [...strategyKeywordRows, ...keywordIdeaRows];
@@ -887,6 +917,43 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
           }}
         />
       )}
+    </>
+  );
+
+  // ── Strategy command-center layout (the v2-cutover baseline): Orient header + interior tabs ──
+  return (
+    <div className="space-y-8">
+      {unvalidatedNoteEl}
+      {loadErrorsEl}
+      <StrategyClientOrientHeader orient={strategyData.strategyUx?.orient} />
+      <TabBar tabs={CLIENT_STRATEGY_TABS} active={interiorTab} onChange={handleInteriorTabChange} />
+      {interiorTab === 'overview' && (
+        <div className="space-y-8">
+          {snapshotEl}
+          {refreshSummaryEl}
+          {nextStepsEl}
+          {keywordFeedbackSummaryEl}
+          {businessPrioritiesEl}
+        </div>
+      )}
+      {interiorTab === 'content' && (
+        <div className="space-y-8">
+          {contentOppsEl}
+          {pageImprovementsEl}
+        </div>
+      )}
+      {interiorTab === 'rankings' && (
+        <div className="space-y-8">
+          {pageKeywordMapEl}
+          {requestedTrendEl}
+          {keywordsSectionEl}
+          {declinedKeywordsEl}
+        </div>
+      )}
+      {interiorTab === 'competitive' && (
+        <CompetitorGapsSection workspaceId={workspaceId ?? ''} tier={effectiveTier} />
+      )}
+      {modalsEl}
     </div>
   );
 }

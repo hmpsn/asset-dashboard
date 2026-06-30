@@ -1,85 +1,114 @@
-import { useCallback, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import type { MetricsSource } from '../../shared/types/keywords.js';
-import type { AdminKeywordFeedbackListRow } from '../../shared/types/keyword-feedback';
-import {
-  Loader2, Target, ChevronDown, ChevronRight, RefreshCw,
-  Sparkles, Briefcase,
-  BarChart3, Users, Search, FileText,
-  Eye, MousePointerClick, Trophy, AlertTriangle, Plus, Check, ArrowUpRight, X,
-} from 'lucide-react';
-import { Badge, StatCard, SectionCard, AIContextIndicator, TabBar, ErrorState, ProgressIndicator, NextStepsCard, LoadingState, Icon, PageHeader, Button, ClickableRow, IconButton, FormInput, FormTextarea, positionColor } from './ui';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Target, FileText, HelpCircle, Plus, Search, ArrowRight, AlertTriangle } from 'lucide-react';
+import { AIContextIndicator, TabBar, ErrorState, EmptyState, ProgressIndicator, NextStepsCard, LoadingState, PageHeader, Icon, Tooltip, IconButton, Button, ClickableRow, Badge, type BadgeTone } from './ui';
+import { isCuratedForClient } from '../../shared/recommendation-predicates';
+import { formatDate } from '../utils/formatDates';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
-import { KeywordStrategyGuide } from './strategy/KeywordStrategyGuide';
-import { useKeywordStrategy, useLocalSeoRefresh } from '../hooks/admin';
+import { useKeywordStrategy, useLocalSeo } from '../hooks/admin';
+import { useAdminRecommendationSet } from '../hooks/admin/useAdminRecommendations';
+import { useRecommendationLifecycle } from '../hooks/admin/useRecommendationLifecycle';
+import { useContentDecay } from '../hooks/admin/useContentDecay';
+import { useStrategyKeywordSet } from '../hooks/admin/useStrategyKeywordSet';
+import { useStrategyPov } from '../hooks/admin/useStrategyPov';
+import { useOperatorSteering } from '../hooks/admin/useOperatorSteering';
+import { useRecBulkMutation } from '../hooks/admin/useRecBulkMutation';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
+import { useToggleSet, UNBOUNDED_TOGGLE_SET_OPTIONS } from '../hooks/useToggleSet';
+import { resolveTabSearchParam, clearTabSearchParam } from '../lib/tab-search-param';
 import { RefreshOrderingPrompt } from './keyword-strategy/RefreshOrderingPrompt';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BacklinkProfile } from './strategy/BacklinkProfile';
-import { CompetitiveIntel } from './strategy/CompetitiveIntel';
 import { ContentGaps } from './strategy/ContentGaps';
 import { QuickWins } from './strategy/QuickWins';
 import { KeywordGaps } from './strategy/KeywordGaps';
 import { LowHangingFruit } from './strategy/LowHangingFruit';
 import { TopicClusters } from './strategy/TopicClusters';
 import { CannibalizationAlert } from './ui/CannibalizationAlert';
+import { CannibalizationTriage } from './strategy/CannibalizationTriage';
 import { StrategyDiff } from './strategy/StrategyDiff';
 import { IntelligenceSignals } from './strategy/IntelligenceSignals';
+import { StrategyConfigPanel } from './strategy/StrategyConfigPanel';
+import { IssueHeader } from './strategy/issue/IssueHeader';
+import { StanceBar } from './strategy/issue/StanceBar';
+import { DraftedPovEditor } from './strategy/issue/DraftedPovEditor';
+import { BackingMovesQueue } from './strategy/issue/BackingMovesQueue';
+import { AddRecommendationModal } from './strategy/issue/AddRecommendationModal';
+import { TrustLadderPanel } from './strategy/issue/TrustLadderPanel';
+import { ContentWorkOrderLens } from './strategy/issue/ContentWorkOrderLens';
+import { IssueSetupReadiness } from './strategy/issue/IssueSetupReadiness';
+import { AdminLeadsReadout } from './strategy/issue/AdminLeadsReadout';
+import { useConversionTrackingStatus } from '../hooks/admin/useConversionTrackingStatus';
+import { useAdminLeads } from '../hooks/admin/useAdminLeads';
+import { isThrottledOpen } from './strategy/cockpitRowModel';
 import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
-import { keywords, rankTracking } from '../api/seo';
-import { keywordCommandCenter } from '../api/keywordCommandCenter';
-import { KEYWORD_COMMAND_CENTER_ACTIONS } from '../../shared/types/keyword-command-center';
-import { queryKeys } from '../lib/queryKeys';
-import { keywordTrackingKey } from '../lib/keywordTracking';
-import { buildHubDeepLinkQuery } from '../lib/keywordHubDeepLink';
-import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
-import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
+import { LocalSeoMarketSetupDrawer } from './local-seo/LocalSeoMarketSetupDrawer';
 import { adminPath } from '../routes';
-import { formatDate } from '../utils/formatDates';
+import {
+  useStrategyMetrics,
+  useStrategySettings,
+  useStrategyGeneration,
+  useTrackKeyword,
+  useKeywordFeedback,
+  StrategyHeaderActions,
+  StrategyFeedbackNudge,
+  ClientKeywordFeedback,
+  StrategySettings,
+  StrategyStalenessNudges,
+  StrategyEmptyState,
+  OrientZone,
+  ActQueue,
+  StrategyCockpit,
+  DecayingPagesCard,
+  StrategyRankingsTab,
+  StrategyCompetitiveTab,
+  SiteTargetKeywords,
+  KeywordOpportunities,
+  StrategyHowItWorks,
+} from './strategy';
 
-/** Minimum monthly search volume to display a strategy card. Cards below this are noise. */
-const VOLUME_THRESHOLD = 10;
-const PRIMARY_SEO_PROVIDER_LABEL = 'DataForSEO';
-
-type SeoProviderOption = { name: string; configured: boolean };
-
-function defaultSeoDataProvider(providers: SeoProviderOption[]): string | undefined {
-  const configured = providers.filter(provider => provider.configured);
-  return configured.find(provider => provider.name === 'dataforseo')?.name
-    ?? configured[0]?.name;
-}
-
-interface PageKeywordMap {
-  pagePath: string;
-  pageTitle: string;
-  primaryKeyword: string;
-  secondaryKeywords: string[];
-  searchIntent?: string;
-  currentPosition?: number;
-  impressions?: number;
-  clicks?: number;
-  volume?: number;
-  difficulty?: number;
-  cpc?: number;
-  metricsSource?: MetricsSource;
-  validated?: boolean;
-  secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
-}
+// Strategy v2 interior tabs (command-center layout). Overview = Orient + Act + reference;
+// Content = the content "money page"; Rankings = position distribution + movements;
+// Competitive = share of voice + keyword gaps + backlinks (the "research mode" surface).
+// The literal ids appear here so the ?tab= deep-link contract test recognizes this receiver.
+// NOTE: tab id 'rankings' is intentionally unchanged so ?tab=rankings deep-links keep working.
+// flag-ON renames the label to 'Keywords & Rankings'; flag-OFF keeps 'Rankings'. id never changes.
+type StrategyInteriorTab = 'overview' | 'content' | 'rankings' | 'competitive';
+const makeStrategyInteriorTabs = (commandCenterEnabled: boolean): { id: StrategyInteriorTab; label: string }[] => [
+  { id: 'overview', label: 'Overview' },
+  { id: 'content', label: 'Content' },
+  { id: 'rankings', label: commandCenterEnabled ? 'Keywords & Rankings' : 'Rankings' },
+  { id: 'competitive', label: 'Competitive' },
+];
+// Stable reference used only for id-lookup (deep-link resolution, tab validation) — labels irrelevant here.
+const STRATEGY_INTERIOR_TABS: { id: StrategyInteriorTab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'content', label: 'Content' },
+  { id: 'rankings', label: 'Rankings' },
+  { id: 'competitive', label: 'Competitive' },
+];
 
 interface Props {
   workspaceId: string;
   siteId?: string;
 }
 
+type SupportingDetailBadge = { label: string; tone: BadgeTone };
+
 export function KeywordStrategyPanel({ workspaceId }: Props) {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { jobs, startJob, findActiveJob } = useBackgroundTasks();
-  const [startingStrategyJob, setStartingStrategyJob] = useState(false);
-  const [lastStartedJobId, setLastStartedJobId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [addKeywordError, setAddKeywordError] = useState<string | null>(null);
-  const [trackingPending, setTrackingPending] = useState<Set<string>>(new Set());
-  const [trackingErrors, setTrackingErrors] = useState<Map<string, string>>(new Map());
+  // Strategy v2 interior tab (?tab= deep-link, two-halves contract — mirrors ContentPipeline).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [interiorTab, setInteriorTab] = useState<StrategyInteriorTab>(() =>
+    resolveTabSearchParam<StrategyInteriorTab>(searchParams.get('tab'), {
+      validValues: STRATEGY_INTERIOR_TABS.map((t) => t.id),
+      fallback: 'overview',
+    }),
+  );
+  useEffect(() => {
+    const param = searchParams.get('tab');
+    if (param && STRATEGY_INTERIOR_TABS.some((t) => t.id === param) && param !== interiorTab) {
+      setInteriorTab(param as StrategyInteriorTab);
+    }
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps -- sync interior tab to external ?tab= changes only
 
   // React Query hook replaces manual data fetching
   const { data: keywordData, isLoading: loading, isAuxLoading, isError: strategyFetchError, refetch: refetchStrategy } = useKeywordStrategy(workspaceId);
@@ -89,205 +118,113 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   // when page_keywords rows exist but no strategy blob — that case must render as "no strategy yet"
   // in this component, while still exposing pageMap via Page Intelligence separately.
   const isRealStrategy = strategy?.generatedAt != null;
-  const seoDataAvailableFromHook = keywordData?.seoDataAvailable || false;
-  const savedSeoDataProvider = keywordData?.workspaceData?.seoDataProvider;
-  const [businessContext, setBusinessContext] = useState('');
-  const [contextOpen, setContextOpen] = useState(false);
-  const [seoDataAvailable, setSeoDataAvailable] = useState(seoDataAvailableFromHook);
-  const [seoDataMode, setSeoDataMode] = useState<'none' | 'quick' | 'full'>('none');
-  const [maxPages, setMaxPages] = useState<number>(500);
-  const [competitors, setCompetitors] = useState('');
-  const [discoveringCompetitors, setDiscoveringCompetitors] = useState(false);
-  const [discoverError, setDiscoverError] = useState<string | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(true);
-  const [showNextSteps, setShowNextSteps] = useState(false);
-  const [strategyTab, setStrategyTab] = useState<'analysis' | 'guide'>('analysis');
-  const [refreshOrderingPromptOpen, setRefreshOrderingPromptOpen] = useState(false);
-  const [dismissedRefreshAt, setDismissedRefreshAt] = useState<string | null>(null);
-  const activeStrategyJob = findActiveJob({ type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, workspaceId });
-  const completedStartedJob = lastStartedJobId ? jobs.find(job => job.id === lastStartedJobId) : undefined;
-  const generating = startingStrategyJob || Boolean(activeStrategyJob);
   const displayedSeoDataMode = strategy?.seoDataMode;
-  // Derive providerList before selectedSeoDataProvider so the computed value has access to it
-  const providerList = keywordData?.providers ?? [];
-  const selectedSeoDataProvider = savedSeoDataProvider
-    ?? defaultSeoDataProvider(providerList)
-    ?? 'dataforseo';
 
   // Local ↔ Strategy sync status — present when workspace posture is local or hybrid.
   const localSync = keywordData?.strategy?.strategyUx?.localSync;
-  const refresh = useLocalSeoRefresh(workspaceId);
 
-  // Tracked keywords via React Query — buttons reflect actual server state with keywordTrackingKey normalization.
-  // The `rankTrackingKeywords` cache holds the canonical TrackedKeyword[] array (the shape RankTracker
-  // consumes — both components share this key). `select` derives the normalized Set this component needs
-  // WITHOUT mutating the cached shape, so a tab switch between this panel and RankTracker can't read a Set
-  // where an array is expected (or vice versa).
-  const { data: trackedKeywordsData } = useQuery({
-    queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId),
-    queryFn: () => rankTracking.keywords(workspaceId),
-    select: (rows) => new Set((rows ?? []).map(k => keywordTrackingKey(k.query))),
-    staleTime: 5 * 60 * 1000,
-    enabled: !!workspaceId,
+  // ── Logic hooks (extracted from this orchestrator in Phase 0) ──
+  const settings = useStrategySettings(keywordData, strategy, workspaceId);
+  const generation = useStrategyGeneration({
+    workspaceId,
+    localSync,
+    buildStrategyGenerationParams: settings.buildStrategyGenerationParams,
   });
-  const trackedKeywords = trackedKeywordsData ?? new Set<string>();
+  const tracking = useTrackKeyword(workspaceId);
+  const feedback = useKeywordFeedback(workspaceId);
+  const metrics = useStrategyMetrics(strategy, feedback.rows, isRealStrategy);
+  // Flag gate: flag-ON renders v3 StrategyCockpit; flag-OFF preserves the v2 Act queue exactly.
+  // Called unconditionally here (before all early returns) — Rules of Hooks.
+  const commandCenterEnabled = useFeatureFlag('strategy-command-center');
+  // The Issue (Phase 1) — strict superset of the command-center cockpit. Read UNCONDITIONALLY
+  // here (before all early returns — Rules of Hooks). The flag MUST be read on its own line, never
+  // on the RHS of `commandCenterEnabled && useFeatureFlag(...)` — short-circuit evaluation would
+  // make the hook call conditional (Rules-of-Hooks violation). When ON, the Overview renders a
+  // third composed branch (IssueHeader → StanceBar → DraftedPovEditor → BackingMovesQueue →
+  // supporting surfaces). flag-OFF keeps the command-center / legacy branches byte-identical:
+  // theIssueEnabled gates a NEW branch only; it never alters the existing two.
+  const theIssueFlag = useFeatureFlag('strategy-the-issue');
+  const theIssueEnabled = commandCenterEnabled && theIssueFlag;
+  // P3 Lane D — managed keyword working set. Called unconditionally (Rules of Hooks).
+  // M1 — the managed-set UI is part of the v3 command-center redesign, so it must be gated on
+  // BOTH flags. Without the `commandCenterEnabled &&` composition the managed UI would leak into
+  // the command-center-OFF Overview whenever the child flag is on; gating on both keeps the
+  // flag-OFF Overview display-only / byte-identical. enabled is also re-gated inside the hook on
+  // workspaceId.
+  const managedSetFlag = useFeatureFlag('strategy-keywords-managed-set');
+  const managedSetEnabled = commandCenterEnabled && managedSetFlag;
+  // P4 Lane C — competitor send. Doubly gated: requires both flags ON (same composition rule as
+  // managedSetEnabled above). Called unconditionally (Rules of Hooks).
+  const competitorSendFlag = useFeatureFlag('strategy-competitor-send');
+  const competitorSendEnabled = commandCenterEnabled && competitorSendFlag;
+  // P4 Lane B — local market label + setup drawer. Called unconditionally (Rules of Hooks).
+  // flag-ON: passes localMarketLabel + onOpenLocalSeoSetup to StrategyConfigPanel so the
+  // collapsed summary shows the active market and the config buttons are reachable.
+  // flag-OFF: hook still runs (Rules of Hooks), but localSeoSetupOpen state is never set
+  // and LocalSeoMarketSetupDrawer is not rendered (commandCenterEnabled gate below).
+  const localSeo = useLocalSeo(workspaceId);
+  const [localSeoSetupOpen, setLocalSeoSetupOpen] = useState(false);
+  const primaryMarket = localSeo.data?.markets?.find((m) => m.status === 'active');
+  const {
+    managedKeywordSet,
+    addStrategyKeyword,
+    removeStrategyKeyword,
+    keepStrategyKeyword,
+  } = useStrategyKeywordSet(workspaceId, managedSetEnabled);
+  // The v2 Act queue reads the unified recommendation set (separately generated from the strategy
+  // blob). Read it here too — sharing the React Query cache with ActQueue — to decide whether the
+  // queue actually has content yet; if not, the legacy action sections stay as a fallback.
+  const { data: recommendationSet } = useAdminRecommendationSet(workspaceId);
+  const hasActiveRecommendations = (recommendationSet?.recommendations ?? []).some(
+    (r) => r.status !== 'dismissed' && r.status !== 'completed',
+  );
+  // Strategy v3 — lifecycle actions wired to admin routes; cockpit consumes the full rec set
+  // (it has its own lifecycle/category facets + Fix-now pin, so it filters internally).
+  const lifecycleActions = useRecommendationLifecycle(workspaceId);
+  const cockpitRecs = recommendationSet?.recommendations ?? [];
+  // ── The Issue (Phase 1) hooks/state — all called UNCONDITIONALLY (Rules of Hooks). ──
+  // The drafted POV. `enabled = theIssueEnabled` so flag-OFF makes ZERO network calls.
+  const strategyPov = useStrategyPov(workspaceId, theIssueEnabled);
+  // The atomic bulk-send route (the cockpit's existing send spine) — reused for "Send issue".
+  const issueBulkSend = useRecBulkMutation(workspaceId);
+  // cut→sentence contract: cutting a backing move strikes its POV sentence live.
+  const [struckRecIds, setStruckRecIds] = useState<string[]>([]);
+  // Blocker 5 staging set — the recs the operator has staged for the ONE client commit (the header
+  // "Send issue"). Per-row "Stage for issue" toggles membership; nothing is written to the client
+  // until "Send issue" commits this set. useToggleSet (UNBOUNDED) = the shared toggle-set primitive
+  // (no hand-rolled has?delete:add). Declared with the other hooks (before any early return).
+  const [stagedRecIds, toggleStage, setStagedRecIds] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
+  // Operator steering (§11/§12): wording overrides + client running order + add-a-rec.
+  // `enabled = theIssueEnabled` so flag-OFF makes ZERO network calls (byte-identical OFF).
+  const operatorSteering = useOperatorSteering(workspaceId, theIssueEnabled);
+  const [addRecOpen, setAddRecOpen] = useState(false);
+  // ── The Issue (Client) P1b — admin setup-readiness + named-leads (Lane B). Read UNCONDITIONALLY
+  // (Rules of Hooks). Gated on the-issue-client-measured-capture; flag-OFF → both hooks no-op (no
+  // fetch, no WS subscription) and the panels below are not mounted → byte-identical cockpit. ──
+  const measuredCapture = useFeatureFlag('the-issue-client-measured-capture');
+  const { status: conversionStatus, isLoading: conversionStatusLoading } =
+    useConversionTrackingStatus(workspaceId, measuredCapture);
+  // Captured-leads page size — "Load more" widens the limit (capped server-side at 200) so the readout's
+  // "Showing X of Y" footer is an affordance, not a dead-end. Unconditional state (Rules of Hooks).
+  const LEADS_PAGE = 50;
+  const LEADS_MAX = 200;
+  const [leadsLimit, setLeadsLimit] = useState(LEADS_PAGE);
+  const { leads: capturedLeads, total: capturedLeadsTotal, isLoading: capturedLeadsLoading } =
+    useAdminLeads(workspaceId, { limit: leadsLimit }, measuredCapture);
+  // The readiness rollup rides the status endpoint (A4). It carries the resolved provenance, segment
+  // label, and pre-formatted value line — IssueSetupReadiness reads them straight off `readiness` so the
+  // cockpit never reconstructs the Measured/Estimate pill from an all-time count heuristic (which could
+  // disagree with the period-scoped client number).
+  const setupReadiness = conversionStatus?.readiness ?? null;
+  // Content-tab emptiness (v2) — used to render an action-oriented EmptyState rather than a blank
+  // tab when no content opportunities exist.
+  const { data: contentDecayData } = useContentDecay(workspaceId);
 
-  const { data: keywordFeedbackRows = [] } = useQuery<AdminKeywordFeedbackListRow[]>({
-    queryKey: queryKeys.admin.keywordFeedback(workspaceId),
-    queryFn: () => keywords.feedback(workspaceId),
-    enabled: !!workspaceId,
-    staleTime: 60 * 1000,
-  });
+  // Competitor domains as a clean array — consumed by the Competitive tab (StrategyCompetitiveTab)
+  // so the CSV/newline parse lives in exactly one place.
+  const competitorList = settings.competitors.split(/[,\n]+/).map((c) => c.trim()).filter(Boolean);
 
-  // One-click "Add to Strategy" for client-requested keywords (admin side).
-  // Calls the shared KCC add_to_strategy action which — post B2 fix — writes both
-  // the feedback/tracking rows AND the page_keywords strategy artifact.
-  const addRequestedKeywordMutation = useMutation({
-    mutationFn: (keyword: string) =>
-      keywordCommandCenter.action(workspaceId, {
-        action: KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY,
-        keyword,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordFeedback(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
-    },
-    // M5: surface failures to the admin rather than silently swallowing them.
-    // Use separate addKeywordError so this never pollutes the generation ErrorState.
-    onError: () => {
-      setAddKeywordError('Failed to add keyword to strategy. Please try again.');
-    },
-  });
-
-  // Initialize SEO provider availability from React Query hook
-  useEffect(() => {
-    setSeoDataAvailable(seoDataAvailableFromHook);
-    if (seoDataAvailableFromHook) {
-      // Default to quick mode when an SEO data provider is available
-      setSeoDataMode(prev => prev === 'none' ? 'quick' : prev);
-    } else {
-      setSeoDataMode('none');
-    }
-  }, [seoDataAvailableFromHook]);
-
-  // Load saved competitor domains from React Query hook data
-  useEffect(() => {
-    if (keywordData?.workspaceData?.competitorDomains?.length && !competitors) {
-      setCompetitors(keywordData.workspaceData.competitorDomains.join(', '));
-    }
-  }, [keywordData?.workspaceData?.competitorDomains, competitors]);
-
-  // Sync business context + competitors from loaded strategy
-  useEffect(() => {
-    if (strategy?.businessContext && !businessContext) {
-      setBusinessContext(strategy.businessContext);
-    }
-    const savedSeoDataMode = strategy?.seoDataMode;
-    if (savedSeoDataMode && savedSeoDataMode !== 'none') {
-      setSeoDataMode(savedSeoDataMode);
-    }
-  }, [strategy]);
-
-  const buildStrategyGenerationParams = useCallback(() => {
-    const compList = competitors.trim()
-      ? competitors.split(/[,\n]+/).map(s => s.trim()).filter(Boolean)
-      : undefined;
-    return {
-      businessContext: businessContext.trim() || undefined,
-      seoDataMode: seoDataAvailable ? seoDataMode : 'none',
-      seoDataProvider: selectedSeoDataProvider,
-      competitorDomains: compList,
-      maxPages,
-    };
-  }, [businessContext, competitors, maxPages, selectedSeoDataProvider, seoDataAvailable, seoDataMode]);
-
-  // effect-layout-ok: active background jobs can predate this component mount.
-  useEffect(() => {
-    if (activeStrategyJob && !lastStartedJobId) {
-      setLastStartedJobId(activeStrategyJob.id);
-    }
-  }, [activeStrategyJob, lastStartedJobId]);
-
-  // effect-layout-ok: background job completion arrives asynchronously via WebSocket/job state.
-  useEffect(() => {
-    if (!completedStartedJob) return;
-    if (completedStartedJob.status === 'done') {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
-      setShowNextSteps(true);
-      setLastStartedJobId(null);
-    } else if (completedStartedJob.status === 'error') {
-      setError(completedStartedJob.error || completedStartedJob.message || 'Failed to generate strategy');
-      setLastStartedJobId(null);
-    } else if (completedStartedJob.status === 'cancelled') {
-      setError('Strategy generation was cancelled');
-      setLastStartedJobId(null);
-    }
-  }, [completedStartedJob, queryClient, workspaceId]);
-
-  const runStartJob = async (strategyMode: 'full' | 'incremental' = 'full') => {
-    if (generating) return;
-    setStartingStrategyJob(true);
-    setShowNextSteps(false);
-    setError(null);
-    try {
-      const jobId = await startJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, {
-        mode: strategyMode,
-        workspaceId,
-        ...buildStrategyGenerationParams(),
-      });
-      if (jobId) {
-        setLastStartedJobId(jobId);
-      } else {
-        setError('Failed to start keyword strategy generation');
-      }
-    } catch (err) {
-      console.error('KeywordStrategy operation failed:', err);
-      setError('Failed to generate strategy');
-    } finally {
-      setStartingStrategyJob(false);
-    }
-  };
-
-  const generateStrategy = async (strategyMode: 'full' | 'incremental' = 'full') => {
-    // When local data needs a refresh, open the ordering prompt instead of immediately running.
-    // Incremental runs bypass the prompt (user already chose a mode explicitly).
-    if (strategyMode === 'full' && localSync?.localNeedsRefresh) {
-      setRefreshOrderingPromptOpen(true);
-      return;
-    }
-    await runStartJob(strategyMode);
-  };
-
-  const trackKeyword = useCallback(async (kw: string) => {
-    const key = keywordTrackingKey(kw);
-    if (!key || trackedKeywords.has(key)) return;
-    setTrackingPending(prev => new Set(prev).add(key));
-    setTrackingErrors(prev => { const m = new Map(prev); m.delete(key); return m; });
-    try {
-      await rankTracking.addKeyword(workspaceId, { query: kw });
-      // The rankTrackingKeywords cache holds TrackedKeyword[] (shared with RankTracker). addKeyword
-      // returns `unknown`, so we cannot synthesize a faithful TrackedKeyword (pinned/addedAt/source/etc.)
-      // for an optimistic array append. Invalidate instead — correctness over a micro-optimization; the
-      // refetch is cheap and keeps the canonical array shape intact for both consumers.
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.admin.rankTrackingKeywords(workspaceId),
-      });
-    } catch (err: unknown) {
-      // Duplicate / already-tracked responses are silently fine — the server deduplicates.
-      // Real network/server failures are surfaced as a visible error on the keyword chip.
-      const errMsg = (err as { error?: string })?.error ?? (err instanceof Error ? err.message : '');
-      const isDuplicate = /already|duplicate/i.test(errMsg);
-      if (!isDuplicate) {
-        setTrackingErrors(prev => new Map(prev).set(key, 'Failed to track keyword. Please try again.'));
-      }
-    } finally {
-      setTrackingPending(prev => { const s = new Set(prev); s.delete(key); return s; });
-    }
-  }, [trackedKeywords, workspaceId, queryClient]);
-
-  // Wave 2 T2: difficultyColor was byte-identical to canonical kdColor (30/50/70, tokens).
-  // Removed and replaced with the imported canonical kdColor authority.
-
+  // intentColor is consumed by ContentGaps — kept in the orchestrator and passed down.
   const intentColor = (intent?: string) => {
     switch (intent) {
       case 'commercial': return 'text-accent-info bg-blue-500/10 border-blue-500/20';
@@ -297,48 +234,6 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
       default: return 'text-[var(--brand-text)] bg-zinc-500/10 border-zinc-500/20'; // raw-zinc-ok
     }
   };
-
-  // Computed metrics
-  const pageMap: PageKeywordMap[] = strategy?.pageMap || [];
-  // Filter out pages with known-low search volume to reduce noise in rendered cards.
-  // Pages without volume data (undefined) are kept — they haven't been enriched yet.
-  const filteredPageMap = pageMap.filter(
-    (p: PageKeywordMap) => (p.volume ?? VOLUME_THRESHOLD) >= VOLUME_THRESHOLD
-  );
-  const ranked = filteredPageMap.filter((p: PageKeywordMap) => p.currentPosition);
-  const avgPos = ranked.length > 0 ? ranked.reduce((s: number, p: PageKeywordMap) => s + (p.currentPosition || 0), 0) / ranked.length : 0;
-  const totalImpressions = filteredPageMap.reduce((s: number, p: PageKeywordMap) => s + (p.impressions || 0), 0);
-  const totalClicks = filteredPageMap.reduce((s: number, p: PageKeywordMap) => s + (p.clicks || 0), 0);
-  const top3 = ranked.filter((p: PageKeywordMap) => (p.currentPosition || 99) <= 3);
-  const top10 = ranked.filter((p: PageKeywordMap) => (p.currentPosition || 99) <= 10 && (p.currentPosition || 0) > 3);
-  const top20 = ranked.filter((p: PageKeywordMap) => (p.currentPosition || 99) <= 20 && (p.currentPosition || 0) > 10);
-  const beyond20 = ranked.filter((p: PageKeywordMap) => (p.currentPosition || 0) > 20);
-  const notRankingCount = filteredPageMap.length - ranked.length;
-
-  const lowHangingFruit = ranked
-    .filter((p: PageKeywordMap) => (p.currentPosition || 0) >= 4 && (p.currentPosition || 0) <= 20 && (p.impressions || 0) > 20)
-    .sort((a: PageKeywordMap, b: PageKeywordMap) => (b.impressions || 0) - (a.impressions || 0))
-    .slice(0, 6);
-
-  const intentCounts = filteredPageMap.reduce((acc: Record<string, number>, p: PageKeywordMap) => {
-    const intent = p.searchIntent || 'unknown';
-    acc[intent] = (acc[intent] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-  const declinedFeedback = keywordFeedbackRows.filter(row => row.status === 'declined');
-  const requestedFeedback = keywordFeedbackRows.filter(row => row.status === 'requested');
-  const approvedFeedback = keywordFeedbackRows.filter(row => row.status === 'approved');
-
-  // Nudge: surface when client feedback is newer than the last strategy generation.
-  // M2: Limit to requested/declined rows only — approved rows (from ADD_TO_STRATEGY)
-  // must not trigger the nudge because they've already been acted on by the admin.
-  const feedbackNewerThanStrategy = isRealStrategy && strategy?.generatedAt != null
-    ? keywordFeedbackRows.some(row => {
-        if (row.status !== 'requested' && row.status !== 'declined') return false;
-        const ts = row.updated_at ?? row.created_at;
-        return ts != null && new Date(ts) > new Date(strategy.generatedAt!);
-      })
-    : false;
 
   if (loading) {
     return <LoadingState message="Loading keyword strategy..." />;
@@ -363,701 +258,747 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
     );
   }
 
-  return (
-    <div className="space-y-8">
-      {/* tab-deeplink-ok: KeywordStrategy is not a direct navigation target for ?tab= */}
-      <TabBar
-        tabs={[{ id: 'analysis', label: 'Analysis' }, { id: 'guide', label: 'Guide' }]}
-        active={strategyTab}
-        onChange={(id) => setStrategyTab(id as 'analysis' | 'guide')}
-      />
-      {strategyTab === 'guide' && <KeywordStrategyGuide />}
-      {strategyTab === 'analysis' && <div className="space-y-8">
-      <PageHeader
-        title="Keyword Strategy"
-        subtitle={
-          isRealStrategy
-            ? `Generated ${formatDate(strategy.generatedAt)} · ${strategy.pageMap?.length ?? 0} pages mapped`
-            : 'AI-powered keyword mapping for your entire site'
-        }
-        icon={<Icon as={Target} size="lg" className="text-accent-brand" />}
-        actions={
-          <div className="flex items-center gap-2">
-            {isRealStrategy && (
-              <Button
-                onClick={() => generateStrategy('incremental')}
-                disabled={generating}
-                title="Re-analyzes only pages not updated in the last 7 days. Faster and lower cost than a full regeneration."
-                variant="ghost"
-                size="sm"
-                className="rounded-[var(--radius-lg)] t-caption border border-[var(--brand-border)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] hover:border-[var(--brand-border-hover)]"
-              >
-                Update changed pages
-              </Button>
-            )}
-            {/* Full refresh — shown only for local/hybrid workspaces (applies=true).
-                Amber ring signals the recommended state when local data needs refresh. */}
-            {localSync?.applies && (
-              <Button
-                onClick={() => refresh.mutate({
-                  thenRegenerateStrategy: true,
-                  strategyGeneration: buildStrategyGenerationParams(),
-                })}
-                disabled={generating || refresh.isPending}
-                variant="secondary"
-                size="sm"
-                className={[
-                  'rounded-[var(--radius-lg)] t-caption',
-                  localSync.localNeedsRefresh
-                    ? 'ring-1 ring-amber-500/60'
-                    : '',
-                ].filter(Boolean).join(' ')}
-              >
-                <Icon as={RefreshCw} size="sm" />
-                Full refresh
-              </Button>
-            )}
-            <Button
-              onClick={() => generateStrategy('full')}
-              disabled={generating}
-              size="sm"
-              className="rounded-[var(--radius-lg)] bg-teal-600 hover:bg-teal-500 text-slate-900 t-caption font-medium"
-            >
-              {generating ? (
-                <><Icon as={Loader2} size="sm" className="animate-spin" /> Generating...</>
-              ) : isRealStrategy ? (
-                <><Icon as={RefreshCw} size="sm" /> Regenerate</>
-              ) : (
-                <><Icon as={Sparkles} size="sm" /> Generate Strategy</>
-              )}
-            </Button>
-          </div>
-        }
-      />
+  // Header subtitle: artifact freshness once a real strategy exists.
+  const headerSubtitle = !isRealStrategy
+    ? 'AI-powered keyword mapping for your entire site'
+    : `Generated ${formatDate(strategy?.generatedAt)} · ${strategy?.pageMap?.length ?? 0} pages mapped`;
 
-      {/* Refresh ordering prompt — opens when Generate is clicked and local data needs refresh */}
-      {localSync?.applies && localSync.localNeedsRefresh && (
-        <RefreshOrderingPrompt
-          open={refreshOrderingPromptOpen}
-          reason={localSync.localNeedsRefreshReason ?? 'stale'}
-          lastLocalRefreshAt={localSync.lastLocalRefreshAt}
-          onFullRefresh={() => {
-            refresh.mutate({
-              thenRegenerateStrategy: true,
-              strategyGeneration: buildStrategyGenerationParams(),
-            });
-            setRefreshOrderingPromptOpen(false);
-          }}
-          onGenerateAnyway={() => {
-            setRefreshOrderingPromptOpen(false);
-            void runStartJob('full');
-          }}
-          onCancel={() => setRefreshOrderingPromptOpen(false)}
+  // ── Shared elements (defined once; the two layouts arrange the same elements differently) ──
+  const headerActions = (
+    <StrategyHeaderActions
+      isRealStrategy={isRealStrategy}
+      generating={generation.generating}
+      localSyncApplies={!!localSync?.applies}
+      localNeedsRefresh={!!localSync?.localNeedsRefresh}
+      refreshPending={generation.refresh.isPending}
+      onIncremental={() => generation.generateStrategy('incremental')}
+      onFullRefresh={() => generation.refresh.mutate({
+        thenRegenerateStrategy: true,
+        strategyGeneration: settings.buildStrategyGenerationParams(),
+      })}
+      onGenerate={() => generation.generateStrategy('full')}
+    />
+  );
+
+  // flag-ON: a `?` icon button in the PageHeader actions area shows StrategyHowItWorks content
+  // as a Tooltip (the "About this page" affordance replaces the inline section).
+  // flag-OFF: plain PageHeader with no tooltip — byte-identical to today's render.
+  const howItWorksTooltipContent = commandCenterEnabled && isRealStrategy ? (
+    <StrategyHowItWorks displayedSeoDataMode={displayedSeoDataMode} hasAnyRanking={metrics.hasAnyRanking} />
+  ) : null;
+
+  // The Issue branch renders its own IssueHeader ("The Issue") as page chrome — suppress the base
+  // "Keyword Strategy" PageHeader so the two don't stack. flag-OFF / command-center-only keep the
+  // base header byte-identical. (The StrategyConfigPanel is mounted inside IssueHeader, not here,
+  // so suppressing headerEl does not affect the config panel.)
+  const headerEl = theIssueEnabled ? null : commandCenterEnabled ? (
+    <PageHeader
+      title="Keyword Strategy"
+      subtitle={headerSubtitle}
+      icon={<Icon as={Target} size="lg" className="text-accent-brand" />}
+      actions={
+        <div className="flex items-center gap-2">
+          {howItWorksTooltipContent && (
+            <Tooltip content={howItWorksTooltipContent} placement="bottom" contentClassName="max-w-sm">
+              <IconButton icon={HelpCircle} label="About this page" variant="ghost" size="sm" />
+            </Tooltip>
+          )}
+          {headerActions}
+        </div>
+      }
+    />
+  ) : (
+    <PageHeader
+      title="Keyword Strategy"
+      subtitle={headerSubtitle}
+      icon={<Icon as={Target} size="lg" className="text-accent-brand" />}
+      actions={headerActions}
+    />
+  );
+
+  const refreshPromptEl = localSync?.applies && localSync.localNeedsRefresh ? (
+    <RefreshOrderingPrompt
+      open={generation.refreshOrderingPromptOpen}
+      reason={localSync.localNeedsRefreshReason ?? 'stale'}
+      lastLocalRefreshAt={localSync.lastLocalRefreshAt}
+      onFullRefresh={() => {
+        generation.refresh.mutate({
+          thenRegenerateStrategy: true,
+          strategyGeneration: settings.buildStrategyGenerationParams(),
+        });
+        generation.setRefreshOrderingPromptOpen(false);
+      }}
+      onGenerateAnyway={() => {
+        generation.setRefreshOrderingPromptOpen(false);
+        void generation.runStartJob('full');
+      }}
+      onCancel={() => generation.setRefreshOrderingPromptOpen(false)}
+    />
+  ) : null;
+
+  const aiContextEl = !isRealStrategy && !generation.generating
+    ? <AIContextIndicator workspaceId={workspaceId} feature="strategy" />
+    : null;
+
+  // flag-OFF only: LocalSeoVisibilityPanel (results) rendered outside tabs (today's behaviour,
+  // byte-identical). flag-ON (P4 Lane B): Local SEO results de-dup to KeywordHub (mode='keywords')
+  // and local market config moves into StrategyConfigPanel — so localSeoEl is null here when ON.
+  const localSeoEl = !commandCenterEnabled ? (
+    <LocalSeoVisibilityPanel
+      workspaceId={workspaceId}
+      mode="strategy"
+      onOpenKeywords={() => navigate(adminPath(workspaceId, 'seo-keywords'))}
+    />
+  ) : null;
+
+  const feedbackNudgeEl = metrics.feedbackNewerThanStrategy ? (
+    <StrategyFeedbackNudge
+      requestedCount={metrics.requestedFeedback.length}
+      declinedCount={metrics.declinedFeedback.length}
+    />
+  ) : null;
+
+  // flag-OFF only: settingsEl rendered outside tabs (today's behaviour, byte-identical).
+  // flag-ON: settings are consolidated into StrategyConfigPanel at the bottom of the Overview tab.
+  const settingsEl = !commandCenterEnabled ? (
+    <StrategySettings
+      workspaceId={workspaceId}
+      isAuxLoading={isAuxLoading}
+      settingsOpen={settings.settingsOpen}
+      setSettingsOpen={settings.setSettingsOpen}
+      seoDataAvailable={settings.seoDataAvailable}
+      seoDataMode={settings.seoDataMode}
+      setSeoDataMode={settings.setSeoDataMode}
+      maxPages={settings.maxPages}
+      setMaxPages={settings.setMaxPages}
+      competitors={settings.competitors}
+      setCompetitors={settings.setCompetitors}
+      businessContext={settings.businessContext}
+      setBusinessContext={settings.setBusinessContext}
+      contextOpen={settings.contextOpen}
+      setContextOpen={settings.setContextOpen}
+      discoveringCompetitors={settings.discoveringCompetitors}
+      discoverError={settings.discoverError}
+      onDiscoverCompetitors={settings.discoverCompetitors}
+    />
+  ) : null;
+
+  const intelligenceSignalsEl = <IntelligenceSignals workspaceId={workspaceId} />;
+
+  const progressEl = (
+    <ProgressIndicator
+      status={generation.generating ? 'running' : 'idle'}
+      step={generation.activeStrategyJob?.message || (generation.startingStrategyJob ? 'Starting keyword strategy job...' : undefined)}
+      percent={generation.activeStrategyJob?.total ? Math.round(((generation.activeStrategyJob.progress ?? 0) / generation.activeStrategyJob.total) * 100) : undefined}
+    />
+  );
+
+  const errorEl = generation.error ? (
+    <ErrorState
+      type="general"
+      title="Strategy Generation Failed"
+      message={generation.error}
+      action={{ label: 'Try Again', onClick: () => generation.generateStrategy('full') }}
+    />
+  ) : null;
+
+  const nextStepsEl = generation.showNextSteps && isRealStrategy && !generation.generating ? (
+    <NextStepsCard
+      title="Strategy ready"
+      variant="success"
+      onDismiss={() => generation.setShowNextSteps(false)}
+      staggerIndex={0}
+      steps={[
+        {
+          label: 'Review Quick Wins',
+          onClick: () => { generation.setShowNextSteps(false); setTimeout(() => document.getElementById('quick-wins-section')?.scrollIntoView({ behavior: 'smooth' }), 150); },
+          estimatedTime: '2 min',
+        },
+      ]}
+    />
+  ) : null;
+
+  const emptyStateEl = !isRealStrategy && !generation.generating ? <StrategyEmptyState /> : null;
+
+  // P3 Lane D — client-request approve handler: goes through the existing
+  // feedback.addRequestedKeyword → KCC ADD_TO_STRATEGY path, then additionally
+  // writes to the managed set when managedSetEnabled. Per plan: do NOT create
+  // a parallel promotion handler — use the existing KCC path as the primary.
+  const handleApproveClientKeyword = (keyword: string) => {
+    feedback.addRequestedKeyword(keyword);
+    if (managedSetEnabled) {
+      addStrategyKeyword(keyword, 'client_request');
+    }
+  };
+
+  const clientFeedbackCombinedEl = (
+    <ClientKeywordFeedback
+      rows={feedback.rows}
+      requested={metrics.requestedFeedback}
+      declined={metrics.declinedFeedback}
+      approved={metrics.approvedFeedback}
+      addPending={feedback.addPending}
+      addError={feedback.addError}
+      onAdd={handleApproveClientKeyword}
+      onDismissError={() => feedback.setAddError(null)}
+    />
+  );
+
+  // Real-strategy leaf elements — identical in both layouts; only the grouping/order differs.
+  const realLeaves = isRealStrategy && strategy ? {
+    stalenessNudges: (
+      <StrategyStalenessNudges
+        hasVolumeValidation={metrics.hasVolumeValidation}
+        localSyncApplies={!!localSync?.applies}
+        strategyStaleVsLocal={!!localSync?.strategyStaleVsLocal}
+        lastLocalRefreshAt={localSync?.lastLocalRefreshAt}
+        lastStrategyGeneratedAt={localSync?.lastStrategyGeneratedAt}
+        dismissedRefreshAt={generation.dismissedRefreshAt}
+        onDismiss={() => generation.setDismissedRefreshAt(localSync?.lastLocalRefreshAt ?? null)}
+        onGenerate={() => generation.generateStrategy('full')}
+      />
+    ),
+    quickWins: (
+      <div id="quick-wins-section">
+        <QuickWins quickWins={strategy.quickWins ?? []} />
+      </div>
+    ),
+    lhf: <LowHangingFruit pages={metrics.lowHangingFruit} />,
+    contentGaps: <ContentGaps contentGaps={strategy.contentGaps || []} workspaceId={workspaceId} intentColor={intentColor} />,
+    keywordGaps: (
+      <KeywordGaps
+        keywordGaps={strategy.keywordGaps || []}
+        difficultyColor={kdColor}
+        workspaceId={workspaceId}
+        navigate={navigate}
+      />
+    ),
+    topicClusters: strategy.topicClusters && strategy.topicClusters.length > 0
+      ? <TopicClusters clusters={strategy.topicClusters} workspaceId={workspaceId} />
+      : null,
+    decayingPages: <DecayingPagesCard workspaceId={workspaceId} />,
+    // flag-ON: actionable CannibalizationTriage (send-to-client, mark-resolved, fix-in-editor).
+    // flag-OFF: passive CannibalizationAlert — byte-identical to today's render.
+    cannibalization: strategy.cannibalization && strategy.cannibalization.length > 0
+      ? (commandCenterEnabled
+          ? <CannibalizationTriage entries={strategy.cannibalization} workspaceId={workspaceId} />
+          : <CannibalizationAlert entries={strategy.cannibalization} />)
+      : null,
+    strategyDiff: <StrategyDiff workspaceId={workspaceId} />,
+    siteKeywords: (
+      <SiteTargetKeywords
+        workspaceId={workspaceId}
+        siteKeywords={strategy.siteKeywords}
+        siteKeywordMetrics={strategy.siteKeywordMetrics}
+        trackedKeywords={tracking.trackedKeywords}
+        trackingPending={tracking.trackingPending}
+        trackingErrors={tracking.trackingErrors}
+        onTrack={tracking.trackKeyword}
+        managedKeywordSet={managedSetEnabled ? managedKeywordSet : undefined}
+        managedSetEnabled={managedSetEnabled}
+        onAddToSet={managedSetEnabled ? addStrategyKeyword : undefined}
+        onRemoveFromSet={managedSetEnabled ? removeStrategyKeyword : undefined}
+        onKeepInSet={managedSetEnabled ? keepStrategyKeyword : undefined}
+      />
+    ),
+    opportunities: <KeywordOpportunities opportunities={strategy.opportunities} />,
+    howItWorks: <StrategyHowItWorks displayedSeoDataMode={displayedSeoDataMode} hasAnyRanking={metrics.hasAnyRanking} />,
+  } : null;
+
+  // Strategy command-center Orient zone (the cutover baseline — always rendered for a real strategy).
+  const orientEl = isRealStrategy
+    ? <OrientZone orient={strategy?.strategyUx?.orient} />
+    : null;
+  // Act zone — the unified impact-ranked recommendation queue. It replaces the quick-wins / LHF /
+  // keyword-gaps sections ONLY once the recommendation set actually has content. Until then (fresh
+  // strategy before regen runs, a pre-engine workspace, or a fetch error) those sections stay as a
+  // fallback so no actionable content is hidden behind an empty queue.
+  const useActQueue = isRealStrategy && hasActiveRecommendations;
+  const actQueueEl = useActQueue ? <ActQueue workspaceId={workspaceId} /> : null;
+  // v3 cockpit element — only constructed when the flag is on, reuses the already-fetched rec set.
+  const cockpitEl = (commandCenterEnabled && isRealStrategy)
+    ? <StrategyCockpit workspaceId={workspaceId} recs={cockpitRecs} actions={lifecycleActions} />
+    : null;
+
+  // ── The Issue (Phase 1) overview composition — only built when theIssueEnabled && real strategy. ──
+  // The set "Send issue" ships: active, not-yet-sent recs (the operator's curated candidates).
+  // Sendable = ACTIVE (server isActiveRec semantics) AND clientStatus not in {sent, approved,
+  // declined, discussing}. This mirrors server isActiveRec (struck/completed/dismissed excluded;
+  // throttle auto-resurfaces once EXPIRED, so an expired throttle is sendable — reuse the shared
+  // isThrottledOpen predicate, not a blanket lifecycle==='throttled' exclusion) PLUS the curated
+  // exclusions (isActiveRec already drops sent/approved/declined; 'discussing' is excluded here
+  // because a discussing rec is already in front of the client and must not be re-sent).
+  const sendableRecIds = cockpitRecs
+    .filter(
+      (r) =>
+        r.lifecycle !== 'struck' &&
+        !isThrottledOpen(r) &&
+        r.status !== 'completed' &&
+        r.status !== 'dismissed' &&
+        r.clientStatus !== 'sent' &&
+        r.clientStatus !== 'approved' &&
+        r.clientStatus !== 'declined' &&
+        r.clientStatus !== 'discussing',
+    )
+    .map((r) => r.id);
+  // Blocker 5 staging: a rec is "stageable" iff it is in the staged set AND still sendable. Reconciling
+  // against sendableRecIds keeps the set honest if a staged rec was struck/sent/throttled out from
+  // under it. Per-row/bulk staging never writes to the client — only "Send issue" commits.
+  const sendableSet = new Set(sendableRecIds);
+  const stagedSendableIds = [...stagedRecIds].filter((id) => sendableSet.has(id));
+  // toggleStage comes from useToggleSet (above). Bulk "Stage N" adds the selection (a set UNION, not
+  // a toggle) — the toggle primitive only handles single keys.
+  const stageMany = (recIds: string[]) =>
+    setStagedRecIds((prev) => new Set([...prev, ...recIds]));
+  const handleSendIssue = () => {
+    if (stagedSendableIds.length === 0) return;
+    // The ONE client commit (Blocker 5): send the staged set, then clear it.
+    issueBulkSend.mutate(
+      { recIds: stagedSendableIds, action: 'send' },
+      { onSuccess: () => setStagedRecIds(new Set()) },
+    );
+  };
+  // Blocker 5 live counter — "N staged · M already with client". N (staged) is the staged-and-still-
+  // sendable count; M (already with client) is the curated set via the SHARED isCuratedForClient
+  // predicate (recommendation-predicates.ts — the single source the server projection also uses).
+  // Both derive from the one cockpitRecs set, so numerator and denominator share a source.
+  const stagedCount = stagedSendableIds.length;
+  const curatedCount = cockpitRecs.filter(isCuratedForClient).length;
+  // POV-staleness signal: the drafted POV is stale when backing moves have diverged from it since it
+  // was drafted — either a backing move was CUT (struck this session) or the operator has applied a
+  // wording OVERRIDE to a rec (the override exists only because the operator changed the rec after the
+  // draft, so the POV's prose may now reference outdated wording). We READ pov.generatedAt only to
+  // anchor that a POV exists to be stale; we NEVER reset any draft on generatedAt here — the
+  // lost-keystroke guard (reset keyed on generatedAt) lives wholly inside DraftedPovEditor and is
+  // untouched. A struck backing move always diverges from a POV drafted before the cut.
+  const hasWordingOverride = Object.values(operatorSteering.wording).some(
+    (o) => !!o && (!!o.title || !!o.insight),
+  );
+  const povMayBeStale =
+    !!strategyPov.pov &&
+    !!strategyPov.pov.generatedAt &&
+    (struckRecIds.length > 0 || hasWordingOverride);
+  const issueConfigPanelProps = {
+    workspaceId,
+    isAuxLoading,
+    settingsOpen: settings.settingsOpen,
+    setSettingsOpen: settings.setSettingsOpen,
+    seoDataAvailable: settings.seoDataAvailable,
+    seoDataMode: settings.seoDataMode,
+    setSeoDataMode: settings.setSeoDataMode,
+    maxPages: settings.maxPages,
+    setMaxPages: settings.setMaxPages,
+    competitors: settings.competitors,
+    setCompetitors: settings.setCompetitors,
+    businessContext: settings.businessContext,
+    setBusinessContext: settings.setBusinessContext,
+    contextOpen: settings.contextOpen,
+    setContextOpen: settings.setContextOpen,
+    discoveringCompetitors: settings.discoveringCompetitors,
+    discoverError: settings.discoverError,
+    onDiscoverCompetitors: settings.discoverCompetitors,
+    providerName: settings.selectedSeoDataProvider === 'dataforseo' ? 'DataForSEO' : settings.selectedSeoDataProvider,
+    localMarketLabel: primaryMarket?.label,
+    onOpenLocalSeoSetup: () => setLocalSeoSetupOpen(true),
+  };
+  const supportingDetailBadges: SupportingDetailBadge[] = [
+    measuredCapture && (capturedLeadsTotal ?? 0) > 0
+      ? { label: `${capturedLeadsTotal} lead${capturedLeadsTotal === 1 ? '' : 's'}`, tone: 'blue' }
+      : null,
+    (strategy?.contentGaps?.length ?? 0) > 0
+      ? { label: `${strategy?.contentGaps?.length ?? 0} content gap${(strategy?.contentGaps?.length ?? 0) === 1 ? '' : 's'}`, tone: 'blue' }
+      : null,
+    (strategy?.cannibalization?.length ?? 0) > 0
+      ? { label: `${strategy?.cannibalization?.length ?? 0} cannibalization`, tone: 'amber' }
+      : null,
+    cockpitRecs.length > 0
+      ? { label: `${cockpitRecs.length} backing move${cockpitRecs.length === 1 ? '' : 's'}`, tone: 'zinc' }
+      : null,
+  ].filter((badge): badge is SupportingDetailBadge => badge !== null);
+  const issueOverviewEl = (theIssueEnabled && isRealStrategy && strategy) ? (
+    // Blocker 4 — the 5-beat SPINE above the fold (IssueHeader [config + the canonical Send-issue
+    // button] → StanceBar → DraftedPovEditor → BackingMovesQueue), then everything else collapsed
+    // into ONE "Supporting detail" disclosure (closed by default). KeywordTargetsLens is dropped
+    // for a single deep-link row; ClientRunningOrder is cut from v1. Empty lenses self-null so a
+    // cold workspace shows zero empty SectionCard chrome.
+    <div className="space-y-8">
+      {/* The Issue (Client) P1b — setup-readiness checklist (Lane B). Slot-0, ABOVE IssueHeader:
+          the integrity guard that earns a trustworthy number is the first config chrome the operator
+          sees. Flag-gated on measured-capture; renders NOTHING when OFF → byte-identical cockpit. */}
+      {measuredCapture && setupReadiness && (
+        <IssueSetupReadiness
+          workspaceId={workspaceId}
+          readiness={setupReadiness}
+          status={conversionStatus}
+          loading={conversionStatusLoading}
         />
       )}
-
-      {!isRealStrategy && !generating && (
-        <AIContextIndicator workspaceId={workspaceId} feature="strategy" />
-      )}
-
-      <LocalSeoVisibilityPanel
-        workspaceId={workspaceId}
-        mode="strategy"
-        onOpenKeywords={() => navigate(adminPath(workspaceId, 'seo-keywords'))}
+      <IssueHeader
+        subtitle={headerSubtitle}
+        onSendIssue={handleSendIssue}
+        isSending={issueBulkSend.isPending}
+        canSend={stagedCount > 0}
+        configPanelProps={issueConfigPanelProps}
+        stagedCount={stagedCount}
+        curatedCount={curatedCount}
+        regenerateActions={headerActions}
       />
-
-      {feedbackNewerThanStrategy && (
-        <div className="rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/5 px-4 py-3 flex items-start gap-3">
-          <Icon as={AlertTriangle} size="md" className="text-accent-warning mt-0.5 shrink-0" />
-          <div>
-            <p className="t-caption font-semibold text-[var(--brand-text-bright)]">New client feedback since last strategy generation</p>
-            <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
-              {requestedFeedback.length > 0 && `${requestedFeedback.length} requested keyword${requestedFeedback.length === 1 ? '' : 's'}`}
-              {requestedFeedback.length > 0 && declinedFeedback.length > 0 && ' and '}
-              {declinedFeedback.length > 0 && `${declinedFeedback.length} declined keyword${declinedFeedback.length === 1 ? '' : 's'}`}
-              {' '}arrived after the last generation. Regenerate the strategy to apply this feedback.
-            </p>
-          </div>
+      <StanceBar recs={cockpitRecs} />
+      <DraftedPovEditor
+        pov={strategyPov.pov}
+        onEdit={strategyPov.edit}
+        struckRecIds={struckRecIds}
+        onRegenerate={strategyPov.regenerate}
+        isGenerating={strategyPov.isGenerating}
+      />
+      {/* POV-staleness nudge — directly under the editor. Shows when cut/edited backing moves have
+          diverged from the drafted POV (anchored on pov.generatedAt; never resets on it). Reuses the
+          existing regenerate action. */}
+      {povMayBeStale && (
+        <div className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+          <span className="flex items-center gap-2 t-caption-sm text-amber-400">
+            <Icon as={AlertTriangle} size="sm" className="text-amber-400 shrink-0" />
+            Point of view may be out of date — regenerate?
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => strategyPov.regenerate()}
+            loading={strategyPov.isGenerating}
+            disabled={strategyPov.isGenerating}
+          >
+            Regenerate
+          </Button>
         </div>
       )}
-
-      <SectionCard
-        title="Client Keyword Feedback"
-        titleIcon={<Icon as={Users} size="md" className="text-accent-brand" />}
-        titleExtra={(
-          <span className="t-caption-sm text-[var(--brand-text-muted)]">
-            {declinedFeedback.length} declined · {requestedFeedback.length} requested · {approvedFeedback.length} approved
-          </span>
-        )}
-      >
-        {addKeywordError && (
-          <div role="alert" className="mb-3 rounded-[var(--radius-lg)] border border-red-500/30 bg-red-500/5 px-3 py-2 flex items-center justify-between gap-2">
-            <span className="t-caption-sm text-accent-danger">{addKeywordError}</span>
-            <IconButton
-              icon={X}
-              size="sm"
-              label="Dismiss error"
-              onClick={() => setAddKeywordError(null)}
-              className="shrink-0"
-            />
-          </div>
-        )}
-        {keywordFeedbackRows.length === 0 ? (
-          <p className="t-caption-sm text-[var(--brand-text-muted)]">
-            No client feedback submitted yet. Declined keywords and reasons will appear here.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {requestedFeedback.length > 0 && (
-              <div className="space-y-2">
-                <p className="t-caption-sm font-semibold text-[var(--brand-text)] uppercase tracking-wider">Requested by client</p>
-                {requestedFeedback.map((item) => (
-                  <div
-                    key={`requested-${item.keyword}`}
-                    className="rounded-[var(--radius-md)] border border-teal-500/20 bg-teal-500/5 px-3 py-2 flex items-center justify-between gap-2"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Badge label="Requested" tone="teal" size="sm" />
-                      <span className="t-caption-sm font-medium text-[var(--brand-text-bright)] truncate">{item.keyword}</span>
-                      {item.updated_at && (
-                        <span className="t-caption-sm text-[var(--brand-text-muted)] shrink-0">
-                          {formatDate(item.updated_at)}
-                        </span>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      icon={Plus}
-                      disabled={addRequestedKeywordMutation.isPending}
-                      onClick={() => addRequestedKeywordMutation.mutate(item.keyword)}
-                      className="shrink-0"
-                    >
-                      Add to Strategy
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {declinedFeedback.length > 0 ? (
-              <div className="space-y-2">
-                {requestedFeedback.length > 0 && (
-                  <p className="t-caption-sm font-semibold text-[var(--brand-text)] uppercase tracking-wider">Declined by client</p>
-                )}
-                {declinedFeedback.slice(0, 12).map((item) => (
-                  <div
-                    key={`declined-${item.keyword}`}
-                    className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/5 px-3 py-2"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Badge label="Declined" tone="red" size="sm" />
-                      <span className="t-caption-sm font-medium text-[var(--brand-text-bright)]">{item.keyword}</span>
-                      {item.updated_at && (
-                        <span className="t-caption-sm text-[var(--brand-text-muted)]">
-                          {formatDate(item.updated_at)}
-                        </span>
-                      )}
-                    </div>
-                    {item.reason && (
-                      <p className="mt-1 t-caption-sm text-[var(--brand-text)]">
-                        {item.reason}
-                      </p>
-                    )}
-                  </div>
-                ))}
-                {declinedFeedback.length > 12 && (
-                  <p className="t-caption-sm text-[var(--brand-text-muted)]">
-                    Showing latest 12 declines ({declinedFeedback.length} total).
-                  </p>
-                )}
-              </div>
-            ) : requestedFeedback.length === 0 ? null : (
-              <p className="t-caption-sm text-[var(--brand-text-muted)]">
-                No declined keywords right now.
-              </p>
-            )}
-          </div>
-        )}
-      </SectionCard>
-
-      {/* Settings Panel */}
-      {/* pr-check-disable-next-line -- brand asymmetric signature on KeywordStrategy settings panel; intentional non-SectionCard chrome (collapsible, button-as-first-child) */}
-      <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden rounded-[var(--radius-signature-lg)]">
-        <ClickableRow
-          onClick={() => setSettingsOpen(!settingsOpen)}
-          className="flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20 text-left"
+      {/* Operator steering §12 — add a rec the system missed (mints into the curation queue). */}
+      <div className="flex justify-end">
+        <Button
+          variant="secondary"
+          icon={Plus}
+          onClick={() => setAddRecOpen(true)}
+          disabled={operatorSteering.isPending}
         >
-          <div className="flex items-center gap-2">
-            <Icon as={Briefcase} size="md" className="text-accent-brand" />
-            <span className="t-caption font-semibold text-[var(--brand-text-bright)]">Strategy Settings</span>
-            {!settingsOpen && (
-              <span className="t-caption-sm text-[var(--brand-text-muted)]">
-                {seoDataMode !== 'none' ? `SEO data: ${seoDataMode}` : ''}
-                {maxPages > 0 ? `${seoDataMode !== 'none' ? ' · ' : ''}${maxPages} pages max` : `${seoDataMode !== 'none' ? ' · ' : ''}All pages`}
-                {businessContext ? ` · Context set` : ''}
-                {competitors.trim() ? ` · ${competitors.split(/[,\n]+/).filter(Boolean).length} competitors` : ''}
-              </span>
-            )}
-          </div>
-          <Icon as={settingsOpen ? ChevronDown : ChevronRight} size="md" className="text-[var(--brand-text-muted)]" />
-        </ClickableRow>
-        {settingsOpen && (
-          <div className="px-4 pb-4 space-y-6">
-            {isAuxLoading && (
-              <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)]/30 px-3 py-2">
-                <p className="t-caption-sm text-[var(--brand-text-muted)]">
-                  Loading provider and workspace strategy settings...
-                </p>
-              </div>
-            )}
-            <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <Icon as={BarChart3} size="md" className="text-accent-brand" />
-                <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">SEO Data Provider</span>
-              </div>
-              <div className="px-3 py-2 rounded-[var(--radius-lg)] border border-teal-500/40 bg-teal-500/10">
-                <div className="t-caption font-semibold text-accent-brand">{PRIMARY_SEO_PROVIDER_LABEL}</div>
-                <div className="t-caption-sm mt-0.5 text-[var(--brand-text-muted)]">
-                  Primary runtime provider for keyword, competitor, and backlink intelligence.
-                </div>
-              </div>
-              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
-                Strategy generation now uses DataForSEO whenever SEO provider data is enabled. Stored legacy provider preferences are treated as DataForSEO.
-              </p>
-            </div>
-
-            {/* SEO Data Mode */}
-            {seoDataAvailable && (
-              <div>
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Icon as={BarChart3} size="md" className="text-accent-orange" />
-                  <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">SEO Data Mode</span>
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  {(['none', 'quick', 'full'] as const).map(mode => (
-                    <ClickableRow
-                      key={mode}
-                      onClick={() => setSeoDataMode(mode)}
-                      className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
-                        seoDataMode === mode
-                          ? 'border-orange-500/50 bg-orange-500/10 text-accent-orange'
-                          : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
-                      }`}
-                    >
-                      <div className="font-semibold capitalize">{mode === 'none' ? 'Off' : mode}</div>
-                      <div className="t-caption-sm mt-0.5 opacity-70">
-                        {mode === 'none' && 'AI + GSC only'}
-                        {mode === 'quick' && '~500 credits'}
-                        {mode === 'full' && '~7,500 credits'}
-                      </div>
-                    </ClickableRow>
-                  ))}
-                </div>
-                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
-                  {seoDataMode === 'quick' && 'Enriches keywords with real search volume and difficulty scores from DataForSEO.'}
-                  {seoDataMode === 'full' && 'Full competitive analysis: domain keywords, competitor gaps, related keywords, volume + difficulty.'}
-                  {seoDataMode === 'none' && 'Uses AI and Google Search Console data only. No DataForSEO credits used.'}
-                </p>
-              </div>
-            )}
-
-            {/* Competitor Domains */}
-            {seoDataAvailable && (
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <Icon as={Users} size="md" className="text-accent-orange" />
-                    <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Competitor Domains</span>
-                  </div>
-                  <Button
-                    onClick={async () => {
-                      setDiscoveringCompetitors(true);
-                      setDiscoverError(null);
-                      try {
-                        const result = await keywords.discoverCompetitors(workspaceId);
-                        if (result?.competitors?.length) {
-                          const domains = result.competitors.slice(0, 5).map(c => c.domain);
-                          setCompetitors(domains.join(', '));
-                          await keywords.saveCompetitors(workspaceId, domains);
-                        } else {
-                          setDiscoverError('No organic competitors were found for this domain.');
-                        }
-                      } catch (err: any) {
-                        setDiscoverError(err?.message || 'Failed to discover competitors. Check that your domain is set and DataForSEO is configured.');
-                      } finally {
-                        setDiscoveringCompetitors(false);
-                      }
-                    }}
-                    disabled={discoveringCompetitors}
-                    variant="ghost"
-                    size="sm"
-                    className="px-2 py-0.5 rounded bg-orange-500/10 border border-orange-500/20 t-micro text-accent-orange font-medium hover:bg-orange-500/20"
-                  >
-                    {discoveringCompetitors ? <Icon as={Loader2} size="sm" className="animate-spin" /> : <Icon as={Search} size="sm" className="text-accent-orange" />}
-                    {discoveringCompetitors ? 'Discovering...' : 'Auto-Discover'}
-                  </Button>
-                </div>
-                <FormInput
-                  type="text"
-                  value={competitors}
-                  onChange={setCompetitors}
-                  placeholder="e.g. competitor1.com, competitor2.com"
-                  className="w-full t-caption placeholder:text-[var(--brand-text-muted)]"
-                />
-                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1">Comma-separated (max 5). Auto-discover uses DataForSEO to find organic competitors. These persist between strategy runs.</p>
-                {discoverError && <p className="t-caption-sm text-accent-danger mt-1">{discoverError}</p>}
-              </div>
-            )}
-
-            {/* Page Limit */}
-            <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <Icon as={FileText} size="md" className="text-accent-brand" />
-                <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Page Limit</span>
-              </div>
-              <div className="grid grid-cols-4 gap-3">
-                {([200, 500, 1000, 0] as const).map(cap => (
-                  <ClickableRow
-                    key={cap}
-                    onClick={() => setMaxPages(cap)}
-                    className={`px-3 py-2 rounded-[var(--radius-lg)] border t-caption font-medium transition-all ${
-                      maxPages === cap
-                        ? 'border-teal-500/50 bg-teal-500/10 text-accent-brand'
-                        : 'border-[var(--brand-border-hover)] bg-[var(--surface-3)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
-                    }`}
-                  >
-                    <div className="font-semibold">{cap === 0 ? 'All' : cap}</div>
-                    <div className="t-caption-sm mt-0.5 opacity-70">
-                      {cap === 200 && '~2-3 min'}
-                      {cap === 500 && '~5-7 min'}
-                      {cap === 1000 && '~10-15 min'}
-                      {cap === 0 && 'No limit'}
-                    </div>
-                  </ClickableRow>
-                ))}
-              </div>
-              <p className="t-caption-sm text-[var(--brand-text-muted)] mt-1.5">
-                {maxPages === 0
-                  ? 'Processes every page on the site. May be slow for 500+ page sites.'
-                  : `Prioritizes the top ${maxPages} pages by importance (homepage, key service pages, pages with metadata). Skips utility pages.`}
-              </p>
-            </div>
-
-            {/* Business Context */}
-            <div>
-              <Button
-                onClick={() => setContextOpen(!contextOpen)}
-                variant="ghost"
-                size="sm"
-                className="flex items-center gap-1.5 mb-1 px-0 py-0 h-auto min-h-0"
-              >
-                <Icon as={Briefcase} size="md" className="text-accent-brand" />
-                <span className="t-caption-sm text-[var(--brand-text)] font-semibold uppercase tracking-wider">Business Context</span>
-                <Icon as={contextOpen ? ChevronDown : ChevronRight} size="sm" className="text-[var(--brand-text-muted)]" />
-              </Button>
-              {contextOpen && (
-                <div className="space-y-1.5">
-                  <FormTextarea
-                    value={businessContext}
-                    onChange={setBusinessContext}
-                    placeholder={`Example: We are a dental practice in Austin, TX. We offer general, cosmetic, and pediatric dentistry. Target audience: families 25-55. Competitors: Aspen Dental, local practices.`}
-                    rows={3}
-                    className="w-full t-caption placeholder:text-[var(--brand-text-muted)]"
-                  />
-                  <p className="t-caption-sm text-[var(--brand-text-muted)]">Saved with your strategy. Include: locations, services, audience, differentiators.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+          Add a recommendation
+        </Button>
       </div>
-
-      <IntelligenceSignals workspaceId={workspaceId} />
-
-      {/* Progress Indicator */}
-      <ProgressIndicator
-        status={generating ? 'running' : 'idle'}
-        step={activeStrategyJob?.message || (startingStrategyJob ? 'Starting keyword strategy job...' : undefined)}
-        percent={activeStrategyJob?.total ? Math.round(((activeStrategyJob.progress ?? 0) / activeStrategyJob.total) * 100) : undefined}
+      <BackingMovesQueue
+        workspaceId={workspaceId}
+        recs={cockpitRecs}
+        actions={lifecycleActions}
+        onCut={(id) => setStruckRecIds((s) => [...s, id])}
+        shortlistCap={5}
+        onEditWording={operatorSteering.editWording}
+        stagedCount={stagedCount}
+        curatedCount={curatedCount}
+        stagedRecIds={stagedRecIds}
+        onStage={toggleStage}
+        onStageMany={stageMany}
       />
-
-      {error && (
-        <ErrorState
-          type="general"
-          title="Strategy Generation Failed"
-          message={error}
-          action={{ label: 'Try Again', onClick: () => generateStrategy('full') }}
-        />
-      )}
-
-      {showNextSteps && isRealStrategy && !generating && (
-        <NextStepsCard
-          title="Strategy ready"
-          variant="success"
-          onDismiss={() => setShowNextSteps(false)}
-          staggerIndex={0}
-          steps={[
-            {
-              label: 'Review Quick Wins',
-              onClick: () => { setShowNextSteps(false); setTimeout(() => document.getElementById('quick-wins-section')?.scrollIntoView({ behavior: 'smooth' }), 150); },
-              estimatedTime: '2 min',
-            },
-          ]}
-        />
-      )}
-
-      {!isRealStrategy && !generating && (
-        <SectionCard noPadding>
-          <div className="px-6 py-12 text-center">
-            <Icon as={Target} size="2xl" className="text-[var(--brand-text-muted)] mx-auto mb-3" />
-            <p className="t-body text-[var(--brand-text)] mb-1">No keyword strategy yet</p>
-            <p className="t-caption-sm text-[var(--brand-text-muted)] max-w-md mx-auto">
-              Generate an AI-powered keyword strategy based on your site's pages and Google Search Console data.
-              This will map target keywords to each page and guide all future AI rewrites.
-            </p>
-          </div>
-        </SectionCard>
-      )}
-
-      {isRealStrategy && strategy && (
-        <>
-          {/* ── Unvalidated Strategy Warning ── */}
-          {!(strategy.pageMap ?? []).some((p: PageKeywordMap) => p.volume && p.volume > 0) && (
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-[var(--radius-lg)] px-4 py-3 flex items-start gap-2.5">
-              <Icon as={AlertTriangle} size="md" className="text-accent-warning flex-shrink-0 mt-0.5" />
-              <div className="t-caption text-accent-warning leading-relaxed">
-                <strong className="text-accent-warning">This strategy was generated without keyword volume validation.</strong>{' '}
-                Keywords, volume, and difficulty data may not reflect real search demand. Enable DataForSEO for validated keyword recommendations.
-              </div>
-            </div>
-          )}
-
-          {/* ── Reverse-Staleness Nudge (strategy older than local SEO data) ── */}
-          {localSync?.applies && localSync?.strategyStaleVsLocal && dismissedRefreshAt !== localSync.lastLocalRefreshAt && (
-            <div
-              data-testid="reverse-staleness-nudge"
-              className="bg-amber-500/10 border border-amber-500/30 rounded-[var(--radius-lg)] px-4 py-3 flex items-start gap-2.5"
-            >
-              <Icon as={AlertTriangle} size="md" className="text-accent-warning flex-shrink-0 mt-0.5" />
-              <div className="flex-1 t-caption text-accent-warning leading-relaxed">
-                <strong className="text-accent-warning">Your local SEO data is newer than this strategy.</strong>{' '}
-                {localSync.lastLocalRefreshAt && localSync.lastStrategyGeneratedAt && (
-                  <>Local data was refreshed {formatDate(localSync.lastLocalRefreshAt)}, after this strategy was generated ({formatDate(localSync.lastStrategyGeneratedAt)}). </>
-                )}
-                Regenerate to reflect your current local data.
-                <div className="mt-2">
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() => generateStrategy('full')}
-                  >
-                    Generate Strategy
-                  </Button>
-                </div>
-              </div>
-              <IconButton
-                onClick={() => setDismissedRefreshAt(localSync?.lastLocalRefreshAt ?? null)}
-                title="Dismiss"
-                label="Dismiss"
-                icon={X}
+      {/* ── Supporting detail — collapsed by default. Everything that is NOT the 5-beat spine lives
+          here so the cockpit opens to the decision, not a wall. ── */}
+      <details className="group rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]">
+        <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 t-ui font-medium text-[var(--brand-text)] select-none">
+          <span className="flex min-w-0 flex-wrap items-center gap-2">
+            <span>Supporting detail</span>
+            {supportingDetailBadges.map((badge) => (
+              <Badge
+                key={`${badge.tone}-${badge.label}`}
+                label={badge.label}
+                tone={badge.tone}
+                variant="soft"
                 size="sm"
-                variant="ghost"
-                className="text-accent-warning hover:text-[var(--brand-text-muted)] flex-shrink-0"
+                shape="pill"
               />
-            </div>
-          )}
-
-          {/* ── Summary Dashboard ── */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard size="hero" label="Pages Mapped" value={filteredPageMap.length} sub={filteredPageMap.length < (strategy.pageMap?.length ?? 0) ? `${(strategy.pageMap?.length ?? 0) - filteredPageMap.length} below threshold` : undefined} />
-            <StatCard size="hero" label="Impressions" value={totalImpressions.toLocaleString()} icon={Eye} sub="last 90 days" />
-            <StatCard size="hero" label="Clicks" value={totalClicks.toLocaleString()} icon={MousePointerClick} sub={totalImpressions > 0 ? `${((totalClicks / totalImpressions) * 100).toFixed(1)}% CTR` : undefined} />
-            <StatCard size="hero" label="Avg Position" value={ranked.length > 0 ? `#${avgPos.toFixed(1)}` : '—'} icon={Trophy} valueColor={positionColor(avgPos)} sub={`${ranked.length} pages ranking`} />
-          </div>
-
-          {/* ── Performance Tiers Bar ── */}
-          {ranked.length > 0 && (
-            <SectionCard
-              title="Ranking Distribution"
-              titleExtra={<span className="t-caption-sm text-[var(--brand-text-muted)] ml-2">{ranked.length} of {filteredPageMap.length} pages with ranking data</span>}
-            >
-              <div className="flex h-4 rounded-[var(--radius-pill)] overflow-hidden bg-[var(--surface-3)]">
-                {top3.length > 0 && <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(top3.length / filteredPageMap.length) * 100}%` }} />}
-                {top10.length > 0 && <div className="bg-teal-500 h-full transition-all" style={{ width: `${(top10.length / filteredPageMap.length) * 100}%` }} />}
-                {top20.length > 0 && <div className="bg-amber-500 h-full transition-all" style={{ width: `${(top20.length / filteredPageMap.length) * 100}%` }} />}
-                {beyond20.length > 0 && <div className="bg-red-500/60 h-full transition-all" style={{ width: `${(beyond20.length / filteredPageMap.length) * 100}%` }} />}
-                {notRankingCount > 0 && <div className="bg-[var(--surface-3)] h-full transition-all" style={{ width: `${(notRankingCount / filteredPageMap.length) * 100}%` }} />}
-              </div>
-              <div className="flex items-center gap-4 mt-2 flex-wrap">
-                <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-emerald-500" /> <span className="text-accent-success font-medium">{top3.length}</span> <span className="text-[var(--brand-text-muted)]">Top 3</span></div>
-                <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-teal-500" /> <span className="text-accent-brand font-medium">{top10.length}</span> <span className="text-[var(--brand-text-muted)]">4–10</span></div>
-                <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-amber-500" /> <span className="text-accent-warning font-medium">{top20.length}</span> <span className="text-[var(--brand-text-muted)]">11–20</span></div>
-                <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-red-500/60" /> <span className="text-accent-danger font-medium">{beyond20.length}</span> <span className="text-[var(--brand-text-muted)]">20+</span></div>
-                <div className="flex items-center gap-1.5 t-caption-sm"><div className="w-2.5 h-2.5 rounded-[var(--radius-pill)] bg-[var(--surface-3)]" /> <span className="text-[var(--brand-text-muted)] font-medium">{notRankingCount}</span> <span className="text-[var(--brand-text-muted)]">Not ranking</span></div>
-              </div>
-              {Object.keys(intentCounts).length > 1 && (
-                <div className="mt-3 pt-3 border-t border-[var(--brand-border)]">
-                  <div className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider mb-1.5">Search Intent Mix</div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {Object.entries(intentCounts).sort((a, b) => b[1] - a[1]).map(([intent, count]) => (
-                      <Badge
-                        key={intent}
-                        label={`${intent} (${count})`}
-                        tone={intent === 'commercial' ? 'blue' : intent === 'informational' ? 'emerald' : intent === 'transactional' ? 'amber' : intent === 'navigational' ? 'teal' : 'zinc'}
-                        variant="outline"
-                        shape="pill"
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </SectionCard>
-          )}
-
-          {/* ── Quick Wins ── */}
-          <div id="quick-wins-section">
-            <QuickWins quickWins={strategy.quickWins ?? []} />
-          </div>
-
-          {/* ── Low-Hanging Fruit ── */}
-          <LowHangingFruit pages={lowHangingFruit} />
-
-          {/* ── Content Gaps ── */}
-          <ContentGaps contentGaps={strategy.contentGaps || []} workspaceId={workspaceId} intentColor={intentColor} />
-
-          {/* Keyword Gaps */}
-          <KeywordGaps
-            keywordGaps={strategy.keywordGaps || []}
-            difficultyColor={kdColor}
-            workspaceId={workspaceId}
-            navigate={navigate}
+            ))}
+          </span>
+          <Icon
+            as={ArrowRight}
+            size="sm"
+            className="text-[var(--brand-text-muted)] transition-transform group-open:rotate-90"
           />
-
-          {/* ── Reference & Analysis ── */}
-          <div className="border-t border-[var(--brand-border)] my-6 flex items-center gap-3">
-            <span className="t-caption text-[var(--brand-text-muted)] uppercase tracking-wide">Reference & Analysis</span>
-            <div className="flex-1 border-t border-[var(--brand-border)]" />
-          </div>
-
-          {/* ── Topical Authority ── */}
-          {strategy.topicClusters && strategy.topicClusters.length > 0 && (
-            <TopicClusters clusters={strategy.topicClusters} />
+        </summary>
+        <div className="space-y-6 border-t border-[var(--brand-border)] px-4 py-4">
+          {/* The Issue (Client) P1b — the operator's captured named-leads (Lane B). Progressive
+              disclosure — lives inside the collapsed "Supporting detail" so the cold cockpit stays
+              decision-first. Flag-gated; absent when OFF → byte-identical. */}
+          {measuredCapture && (
+            <AdminLeadsReadout
+              leads={capturedLeads}
+              total={capturedLeadsTotal}
+              loading={capturedLeadsLoading}
+              onConnectCta={() => navigate(adminPath(workspaceId, 'workspace-settings') + '?tab=dashboard')}
+              onLoadMore={leadsLimit < LEADS_MAX ? () => setLeadsLimit((l) => Math.min(l + LEADS_PAGE, LEADS_MAX)) : undefined}
+            />
           )}
-
-          {/* ── Cannibalization Alert ── */}
-          {strategy.cannibalization && strategy.cannibalization.length > 0 && (
-            <CannibalizationAlert entries={strategy.cannibalization} />
-          )}
-
-          {/* ── What Changed (Strategy Diff) ── */}
-          <StrategyDiff workspaceId={workspaceId} />
-
-          {/* Backlink Profile */}
-          <BacklinkProfile workspaceId={workspaceId} />
-
-          {/* Competitive Intelligence Hub */}
-          <CompetitiveIntel
-            workspaceId={workspaceId}
-            competitors={competitors.split(/[,\n]+/).map(c => c.trim()).filter(Boolean)}
-            seoDataAvailable={seoDataAvailable}
-            cachedKeywordGaps={strategy?.keywordGaps}
-          />
-
-          {/* ── Site Keywords ── */}
-          <SectionCard
-            title="Site Target Keywords"
-            titleIcon={<Icon as={Target} size="md" className="text-accent-brand" />}
+          {/* KeywordTargetsLens dropped — one deep-link row into the Keyword Hub instead. */}
+          <ClickableRow
+            onClick={() => navigate(adminPath(workspaceId, 'seo-keywords'))}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/40 border border-[var(--brand-border)]/60"
           >
-            <div className="space-y-1">
-              {strategy.siteKeywords.map((kw: string, i: number) => {
-                const key = keywordTrackingKey(kw);
-                const metrics = strategy.siteKeywordMetrics?.find((m: { keyword: string; volume: number; difficulty: number }) => keywordTrackingKey(m.keyword) === key);
-                const tracked = trackedKeywords.has(key);
-                const isPendingTrack = trackingPending.has(key);
-                const trackError = trackingErrors.get(key);
-                return (
-                  <div key={i} className="flex flex-col gap-0.5">
-                    <div className="inline-flex items-center gap-1.5 t-caption-sm text-accent-brand">
-                      <Badge label={kw} tone="teal" />
-                      {metrics && (metrics.volume > 0 || metrics.difficulty > 0) && (
-                        <>
-                          {metrics.volume > 0 && <span className="t-caption-sm text-[var(--brand-text-muted)] font-mono">{metrics.volume.toLocaleString()}/mo</span>}
-                          {metrics.difficulty > 0 && <span className={`t-caption-sm font-mono ${kdColor(metrics.difficulty)}`}>KD {metrics.difficulty}%</span>}
-                        </>
-                      )}
-                      <IconButton
-                        onClick={() => trackKeyword(kw)}
-                        title={isPendingTrack ? 'Adding...' : tracked ? 'Tracking' : 'Track'}
-                        label={isPendingTrack ? 'Adding...' : tracked ? 'Tracking' : 'Track'}
-                        icon={isPendingTrack ? Loader2 : tracked ? Check : Plus}
-                        size="sm"
-                        variant="ghost"
-                        disabled={isPendingTrack}
-                        className={`ml-0.5 ${isPendingTrack ? 'animate-spin text-[var(--brand-text-muted)]' : tracked ? 'text-accent-success' : 'text-[var(--brand-text-muted)] hover:text-accent-brand'}`}
-                      />
-                      <IconButton
-                        onClick={() => navigate(adminPath(workspaceId, 'seo-keywords') + buildHubDeepLinkQuery({ keyword: kw }))}
-                        title="View in Hub"
-                        label="View in Hub"
-                        icon={ArrowUpRight}
-                        size="sm"
-                        variant="ghost"
-                        className="ml-0.5 text-[var(--brand-text-muted)] hover:text-accent-brand"
-                      />
-                    </div>
-                    {trackError && (
-                      <div role="alert" className="t-caption-sm text-accent-danger">{trackError}</div>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0">
+              <Icon as={Search} size="md" className="text-accent-brand" />
             </div>
-          </SectionCard>
-
-          {/* ── Opportunities ── */}
-          {strategy.opportunities.length > 0 && (
-            <SectionCard
-              title="Keyword Opportunities"
-              titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
-            >
-              <p className="text-[var(--brand-text-muted)] t-caption-sm mb-2">
-                These opportunities are AI-generated suggestions based on your site's content and competitive landscape. Validate with keyword research before acting.
-              </p>
-              <div className="space-y-1.5">
-                {strategy.opportunities.map((opp: string, i: number) => (
-                  <div key={i} className="flex items-start gap-2 t-caption-sm text-[var(--brand-text)]">
-                    <Badge label={`${i + 1}`} tone="teal" variant="outline" shape="pill" className="flex-shrink-0 mt-0.5 font-bold" />
-                    {opp}
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-          )}
-
-          {/* How it works */}
-          <div className="bg-[var(--surface-3)]/30 rounded-[var(--radius-lg)] border border-[var(--brand-border)] px-4 py-3">
-            <div className="flex items-start gap-2">
-              <Icon as={Sparkles} size="md" className="text-accent-brand mt-0.5 flex-shrink-0" />
-              <div className="t-caption-sm text-[var(--brand-text-muted)]">
-                <strong className="text-[var(--brand-text)]">How it works:</strong> This strategy is automatically used when you generate AI rewrites
-                in the Edit SEO and CMS SEO tabs. The AI will incorporate your target keywords naturally into titles and descriptions.
-                Use <strong className="text-accent-brand">Page Intelligence</strong> to analyze individual pages, edit keywords, and generate SEO copy.
-                {displayedSeoDataMode && displayedSeoDataMode !== 'none' && (
-                  <span className="block mt-1 text-accent-orange">
-                    DataForSEO data: Keywords enriched with real search volume and difficulty. Cached for 7 days.
-                  </span>
-                )}
-                {!(strategy.pageMap ?? []).some((p: PageKeywordMap) => p.currentPosition) && (
-                  <span className="block mt-1 text-accent-warning">
-                    Tip: Connect Google Search Console to see ranking positions and get data-driven keyword suggestions.
-                  </span>
-                )}
+            <div className="flex-1 min-w-0">
+              <div className="t-ui font-medium text-[var(--brand-text-bright)]">Curated keyword targets</div>
+              <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">
+                Open the curated keyword &amp; topic targets in the Keyword Hub
               </div>
             </div>
+            <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+          </ClickableRow>
+          {/* Read-projection lenses + supporting surfaces (each self-nulls when empty). */}
+          <ContentWorkOrderLens workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
+          <TrustLadderPanel workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
+          {orientEl}
+          {/* Content gaps — restored here so the SERP-feature / AI-Overview chips (rendered by the
+              shared ContentGapRow) are reachable to the admin in "The Issue" layout. They sit in the
+              collapsed supporting detail (decision-first spine stays untouched); ContentGaps self-nulls
+              when empty so a cold cockpit shows no chrome. */}
+          {realLeaves?.contentGaps}
+          {realLeaves?.cannibalization}
+          {realLeaves?.strategyDiff}
+          <div className="flex justify-end">
+            <Button variant="link" onClick={() => navigate(adminPath(workspaceId, 'competitors'))}>
+              Competitor intelligence →
+            </Button>
           </div>
+        </div>
+      </details>
+      <AddRecommendationModal
+        open={addRecOpen}
+        onClose={() => setAddRecOpen(false)}
+        onCreate={(payload) => {
+          operatorSteering.addManualRec(payload);
+          setAddRecOpen(false);
+        }}
+        isPending={operatorSteering.isPending}
+      />
+    </div>
+  ) : null;
+
+  const handleInteriorTabChange = (id: string) => {
+    setInteriorTab(id as StrategyInteriorTab);
+    const next = clearTabSearchParam(searchParams);
+    if (next) setSearchParams(next, { replace: true });
+  };
+
+  // Content-tab presence — drives the EmptyState when nothing is actionable (a common early state).
+  const hasContentGaps = (strategy?.contentGaps?.length ?? 0) > 0;
+  const hasTopicClusters = (strategy?.topicClusters?.length ?? 0) > 0;
+  const hasDecayingPages = (contentDecayData?.decayingPages?.length ?? 0) > 0;
+  const hasContentTabContent = hasContentGaps || hasTopicClusters || hasDecayingPages;
+
+  // flag-ON: tab labels rendered with 'Keywords & Rankings'; flag-OFF: 'Rankings'.
+  // Tab ids are always from the stable STRATEGY_INTERIOR_TABS constant so deep-link resolution is unaffected.
+  const displayedTabs = makeStrategyInteriorTabs(commandCenterEnabled);
+
+  // ── Strategy command-center layout (the baseline): page chrome + interior tabs (Overview / Content) ──
+  const strategyLayout = (
+    <div className="space-y-8">
+      {headerEl}
+      {refreshPromptEl}
+      {aiContextEl}
+      {localSeoEl}
+      {progressEl}
+      {errorEl}
+      {nextStepsEl}
+      {/* flag-OFF: clientFeedbackCombinedEl rendered unconditionally above tabs (today's behaviour, byte-identical).
+          flag-ON: clientFeedbackCombinedEl moves INTO the Keywords & Rankings tab — not rendered here. */}
+      {!commandCenterEnabled && clientFeedbackCombinedEl}
+      {settingsEl}
+      {emptyStateEl}
+      {realLeaves && (
+        <>
+          <TabBar tabs={displayedTabs} active={interiorTab} onChange={handleInteriorTabChange} />
+          {interiorTab === 'overview' && (
+            theIssueEnabled ? (
+              // ── The Issue (Phase 1): a THIRD composed branch (strict superset of command-center).
+              // Built above as issueOverviewEl. Leaves the existing flag-ON / flag-OFF branches
+              // untouched — this branch only ADDS the issue cockpit, byte-identical OFF. ──
+              issueOverviewEl
+            ) : commandCenterEnabled ? (
+              // ── flag-ON: decision-pipeline IA (graft 3) ──
+              // Order: nudges → Orient → What Changed (promoted) → cockpit → cannibalization → StrategyConfigPanel.
+              // "Reference & Analysis" divider deleted entirely (psychological off-ramp removed).
+              // CannibalizationTriage used (actionable) instead of passive CannibalizationAlert.
+              // SiteTargetKeywords + KeywordOpportunities + clientFeedback moved to the "Keywords & Rankings"
+              // tab (P2 Lane A). IntelligenceSignals removed (P4 Lane A folds signals into cockpit recs).
+              // StrategyHowItWorks demoted to ? tooltip in PageHeader; NOT rendered inline here.
+              // StrategyConfigPanel replaces the outside-tabs settingsEl + localSeoEl (P4 Lane B).
+              <div className="space-y-8">
+                {feedbackNudgeEl}
+                {realLeaves.stalenessNudges}
+                {orientEl}
+                {realLeaves.strategyDiff}
+                {cockpitEl ?? (
+                  <>
+                    {realLeaves.quickWins}
+                    {realLeaves.lhf}
+                    {realLeaves.keywordGaps}
+                  </>
+                )}
+                {realLeaves.cannibalization}
+                <StrategyConfigPanel
+                  workspaceId={workspaceId}
+                  isAuxLoading={isAuxLoading}
+                  settingsOpen={settings.settingsOpen}
+                  setSettingsOpen={settings.setSettingsOpen}
+                  seoDataAvailable={settings.seoDataAvailable}
+                  seoDataMode={settings.seoDataMode}
+                  setSeoDataMode={settings.setSeoDataMode}
+                  maxPages={settings.maxPages}
+                  setMaxPages={settings.setMaxPages}
+                  competitors={settings.competitors}
+                  setCompetitors={settings.setCompetitors}
+                  businessContext={settings.businessContext}
+                  setBusinessContext={settings.setBusinessContext}
+                  contextOpen={settings.contextOpen}
+                  setContextOpen={settings.setContextOpen}
+                  discoveringCompetitors={settings.discoveringCompetitors}
+                  discoverError={settings.discoverError}
+                  onDiscoverCompetitors={settings.discoverCompetitors}
+                  providerName={settings.selectedSeoDataProvider === 'dataforseo' ? 'DataForSEO' : settings.selectedSeoDataProvider}
+                  localMarketLabel={primaryMarket?.label}
+                  onOpenLocalSeoSetup={() => setLocalSeoSetupOpen(true)}
+                />
+              </div>
+            ) : (
+              // ── flag-OFF: today's render order — byte-identical ──
+              <div className="space-y-8">
+                {feedbackNudgeEl}
+                {realLeaves.stalenessNudges}
+                {orientEl}
+                {actQueueEl ?? (
+                  <>
+                    {realLeaves.quickWins}
+                    {realLeaves.lhf}
+                    {realLeaves.keywordGaps}
+                  </>
+                )}
+                {/* ── Reference & Analysis ── */}
+                <div className="border-t border-[var(--brand-border)] my-6 flex items-center gap-3">
+                  <span className="t-caption text-[var(--brand-text-muted)] uppercase tracking-wide">Reference & Analysis</span>
+                  <div className="flex-1 border-t border-[var(--brand-border)]" />
+                </div>
+                {realLeaves.cannibalization}
+                {realLeaves.strategyDiff}
+                {realLeaves.siteKeywords}
+                {realLeaves.opportunities}
+                {intelligenceSignalsEl}
+                {realLeaves.howItWorks}
+              </div>
+            )
+          )}
+          {interiorTab === 'content' && (
+            <div className="space-y-8">
+              {hasContentTabContent ? (
+                <>
+                  <p className="t-caption text-[var(--brand-text-muted)]">Reference view — actionable content items also surface in the Act queue on Overview.</p>
+                  {commandCenterEnabled ? (
+                    // flag-ON: maxVisible={5} caps both scannable leaves.
+                    <>
+                      <ContentGaps contentGaps={strategy?.contentGaps || []} workspaceId={workspaceId} intentColor={intentColor} maxVisible={5} />
+                      {strategy?.topicClusters && strategy.topicClusters.length > 0 && (
+                        <TopicClusters clusters={strategy.topicClusters} workspaceId={workspaceId} maxVisible={5} />
+                      )}
+                      {realLeaves.decayingPages}
+                    </>
+                  ) : (
+                    // flag-OFF: byte-identical to today
+                    <>
+                      {realLeaves.contentGaps}
+                      {realLeaves.topicClusters}
+                      {realLeaves.decayingPages}
+                    </>
+                  )}
+                </>
+              ) : (
+                <EmptyState
+                  icon={FileText}
+                  title="No content opportunities yet"
+                  description="Generate or refresh your strategy to surface content gaps, topic-cluster gaps, and decaying pages to act on."
+                />
+              )}
+            </div>
+          )}
+          {interiorTab === 'rankings' && (
+            commandCenterEnabled && isRealStrategy && strategy ? (
+              // flag-ON: "Keywords & Rankings" tab — Hub deep-link at top, then keyword surfaces,
+              // then existing distribution/movements content from StrategyRankingsTab.
+              <StrategyRankingsTab
+                metrics={metrics}
+                workspaceId={workspaceId}
+                navigate={navigate}
+                keywordSurfaces={{
+                  siteKeywords: (
+                    <SiteTargetKeywords
+                      workspaceId={workspaceId}
+                      siteKeywords={strategy.siteKeywords ?? []}
+                      siteKeywordMetrics={strategy.siteKeywordMetrics}
+                      trackedKeywords={tracking.trackedKeywords}
+                      trackingPending={tracking.trackingPending}
+                      trackingErrors={tracking.trackingErrors}
+                      onTrack={tracking.trackKeyword}
+                      maxVisible={5}
+                      managedKeywordSet={managedSetEnabled ? managedKeywordSet : undefined}
+                      managedSetEnabled={managedSetEnabled}
+                      onAddToSet={managedSetEnabled ? addStrategyKeyword : undefined}
+                      onRemoveFromSet={managedSetEnabled ? removeStrategyKeyword : undefined}
+                      onKeepInSet={managedSetEnabled ? keepStrategyKeyword : undefined}
+                    />
+                  ),
+                  opportunities: (
+                    <KeywordOpportunities
+                      opportunities={strategy.opportunities ?? []}
+                      maxVisible={5}
+                      // C3 — the v3 send spine: passing enableSend + workspaceId + navigate is what
+                      // makes the "Interested?"→send path AND the onAddToStrategySet seam reachable.
+                      // Without these props showSend stays false and the whole send affordance is dead
+                      // code. Gated on commandCenterEnabled (v3-redesign feature); the flag-OFF Overview
+                      // mount keeps enableSend off so it stays byte-identical.
+                      enableSend={commandCenterEnabled}
+                      workspaceId={workspaceId}
+                      navigate={navigate}
+                      onAddToStrategySet={managedSetEnabled
+                        ? (kw: string) => addStrategyKeyword(kw, 'manual_add')
+                        : undefined}
+                    />
+                  ),
+                  clientFeedback: clientFeedbackCombinedEl,
+                }}
+              />
+            ) : (
+              // flag-OFF: today's Rankings tab, byte-identical.
+              <StrategyRankingsTab metrics={metrics} workspaceId={workspaceId} navigate={navigate} />
+            )
+          )}
+          {interiorTab === 'competitive' && (
+            <StrategyCompetitiveTab
+              workspaceId={workspaceId}
+              competitors={competitorList}
+              seoDataAvailable={settings.seoDataAvailable}
+              keywordGaps={strategy?.keywordGaps || []}
+              navigate={navigate}
+              commandCenterEnabled={commandCenterEnabled}
+              competitorSendEnabled={competitorSendEnabled}
+            />
+          )}
         </>
       )}
-      </div>}
+      {/* P4 Lane B — local market setup drawer, only mounted when flag is ON and data is available.
+          Controlled by localSeoSetupOpen; opened via onOpenLocalSeoSetup passed to StrategyConfigPanel. */}
+      {commandCenterEnabled && localSeo.data && (
+        <LocalSeoMarketSetupDrawer
+          workspaceId={workspaceId}
+          data={localSeo.data}
+          open={localSeoSetupOpen}
+          onClose={() => setLocalSeoSetupOpen(false)}
+        />
+      )}
     </div>
   );
+
+  // Command-center layout is the baseline (v2 cutover) — interior ?tab= tabs, no Analysis/Guide TabBar.
+  return strategyLayout;
 }

@@ -2,7 +2,7 @@ import type { EntityCandidate, EntityResolutionSlice, EntitySurface } from '../.
 import type { IntelligenceOptions } from '../../shared/types/intelligence.js';
 import { getWorkspace } from '../workspaces.js';
 import { listPageKeywords } from '../page-keywords.js';
-import { slugify } from '../helpers.js';
+import { slugify } from '../utils/text.js';
 import { resolveCandidateWithWikidata } from './entity-resolution-wikidata.js';
 
 const MAX_ENTITY_CANDIDATES = 20;

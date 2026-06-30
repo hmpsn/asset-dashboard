@@ -15,6 +15,17 @@ export function useLocalSeo(workspaceId: string, options: { includeSnapshots?: b
   });
 }
 
+// SEO Decision Engine P7 (local-gbp): admin GBP/reviews readout (aggregates only). Returns the
+// empty shape when the flag is off (getSafe fallback), so consumers can gate on data presence.
+export function useGbpReviews(workspaceId: string) {
+  return useQuery({
+    queryKey: queryKeys.admin.localGbpReviews(workspaceId),
+    queryFn: () => localSeo.gbpReviews(workspaceId),
+    enabled: !!workspaceId,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
 export function useLocalSeoRefresh(workspaceId: string) {
   const queryClient = useQueryClient();
   const { trackJob } = useBackgroundTasks();
@@ -28,6 +39,22 @@ export function useLocalSeoRefresh(workspaceId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+    },
+  });
+}
+
+// SEO Decision Engine P7 (local-gbp): trigger a GBP + reviews refresh and track the job.
+export function useLocalGbpRefresh(workspaceId: string) {
+  const queryClient = useQueryClient();
+  const { trackJob } = useBackgroundTasks();
+  return useMutation({
+    mutationFn: () => localSeo.refreshGbp(workspaceId),
+    onSuccess: (result) => {
+      if (result.jobId) {
+        trackJob(BACKGROUND_JOB_TYPES.LOCAL_GBP_REFRESH, result.jobId, { workspaceId });
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.localSeo(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.localGbpReviews(workspaceId) });
     },
   });
 }
@@ -46,8 +73,17 @@ export function useLocalSeoUpdate(workspaceId: string) {
 }
 
 export function useSetPrimaryMarket(workspaceId: string) {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (marketId: string) => localSeo.setPrimaryMarket(workspaceId, marketId),
+    onSuccess: () => {
+      // Changing the primary market re-weights local visibility + keyword surfaces;
+      // mirror the invalidation set used by useLocalSeoUpdate so dependents refresh.
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.localSeo(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
+    },
   });
 }
 

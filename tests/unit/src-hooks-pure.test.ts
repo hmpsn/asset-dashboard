@@ -5,7 +5,7 @@
  *
  * Covers:
  *   - src/hooks/admin/seoEditorFilters.ts  — CMS page filter utilities
- *   - src/lib/decision-adapters.ts          — normalizeClientAction, normalizeApprovalBatch, badgeForBatch
+ *   - src/lib/decision-adapters.ts          — badgeForBatch
  *   - src/lib/kdFraming.ts                  — kdFraming, kdTooltip
  *   - src/lib/background-job-helpers.ts     — startAndTrackJob, cancelTrackedJob, attachTrackedJob
  */
@@ -210,7 +210,7 @@ describe('src/hooks/admin/seoEditorFilters — filterPagesNeedingFix', () => {
 // src/lib/decision-adapters.ts
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { badgeForBatch, normalizeClientAction, normalizeApprovalBatch } from '../../src/lib/decision-adapters';
+import { badgeForBatch } from '../../src/lib/decision-adapters';
 
 describe('src/lib/decision-adapters — badgeForBatch', () => {
   it('returns "Schema" for names starting with "schema"', () => {
@@ -241,146 +241,6 @@ describe('src/lib/decision-adapters — badgeForBatch', () => {
   it('is case-insensitive', () => {
     expect(badgeForBatch('SCHEMA — items')).toBe('Schema');
     expect(badgeForBatch('CMS EDITOR')).toBe('CMS');
-  });
-});
-
-describe('src/lib/decision-adapters — normalizeClientAction', () => {
-  const baseAction = {
-    id: 'action-1',
-    workspaceId: 'ws-1',
-    sourceType: 'aeo_change' as const,
-    title: 'Fix AEO issue',
-    summary: 'Your answer engine optimization needs attention',
-    priority: 'high' as const,
-    status: 'pending' as const,
-    payload: { diffs: [{ page: '/a' }, { page: '/b' }, { page: '/c' }] },
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-  };
-
-  it('prefixes id with "ca-"', () => {
-    const result = normalizeClientAction(baseAction);
-    expect(result.id).toBe('ca-action-1');
-  });
-
-  it('sets source to "client_action"', () => {
-    const result = normalizeClientAction(baseAction);
-    expect(result.source).toBe('client_action');
-  });
-
-  it('copies title and summary', () => {
-    const result = normalizeClientAction(baseAction);
-    expect(result.title).toBe('Fix AEO issue');
-    expect(result.summary).toBe('Your answer engine optimization needs attention');
-  });
-
-  it('counts items from payload.diffs array', () => {
-    const result = normalizeClientAction(baseAction);
-    expect(result.itemCount).toBe(3);
-  });
-
-  it('counts items from payload.suggestions array', () => {
-    const action = {
-      ...baseAction,
-      sourceType: 'internal_link' as const,
-      payload: { suggestions: [{ link: 'a' }, { link: 'b' }] },
-    };
-    const result = normalizeClientAction(action);
-    expect(result.itemCount).toBe(2);
-  });
-
-  it('counts items from payload.redirects array', () => {
-    const action = {
-      ...baseAction,
-      sourceType: 'redirect_proposal' as const,
-      payload: { redirects: [{ from: '/a', to: '/b' }] },
-    };
-    const result = normalizeClientAction(action);
-    expect(result.itemCount).toBe(1);
-  });
-
-  it('defaults itemCount to 1 for unknown payload shape', () => {
-    const action = {
-      ...baseAction,
-      sourceType: 'content_decay' as const,
-      payload: { rawData: true },
-    };
-    const result = normalizeClientAction(action);
-    expect(result.itemCount).toBe(1);
-  });
-
-  it('isSingleAction is true only for content_decay', () => {
-    const decayAction = { ...baseAction, sourceType: 'content_decay' as const };
-    expect(normalizeClientAction(decayAction).isSingleAction).toBe(true);
-    expect(normalizeClientAction(baseAction).isSingleAction).toBe(false);
-  });
-
-  it('uses badge from CLIENT_ACTION_BADGES lookup', () => {
-    const result = normalizeClientAction(baseAction);
-    expect(result.badge).toBe('AEO');
-  });
-
-  it('falls back to generic SEO Update label for unknown type', () => {
-    const action = { ...baseAction, sourceType: 'custom_type' as never };
-    const result = normalizeClientAction(action);
-    expect(result.badge).toBe('SEO Update');
-  });
-});
-
-describe('src/lib/decision-adapters — normalizeApprovalBatch', () => {
-  const baseBatch = {
-    id: 'batch-1',
-    workspaceId: 'ws-1',
-    name: 'SEO Editor — 5 pages',
-    status: 'pending' as const,
-    items: [
-      { id: 'i1', pageId: 'p1', field: 'title', before: 'Old', after: 'New' },
-      { id: 'i2', pageId: 'p2', field: 'title', before: 'Old2', after: 'New2' },
-    ],
-    note: null,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-  } as never;
-
-  it('prefixes id with "ab-"', () => {
-    const result = normalizeApprovalBatch(baseBatch);
-    expect(result.id).toBe('ab-batch-1');
-  });
-
-  it('sets source to "approval_batch"', () => {
-    expect(normalizeApprovalBatch(baseBatch).source).toBe('approval_batch');
-  });
-
-  it('uses batch name as title', () => {
-    expect(normalizeApprovalBatch(baseBatch).title).toBe('SEO Editor — 5 pages');
-  });
-
-  it('formats summary with plural "changes" for multiple items', () => {
-    const result = normalizeApprovalBatch(baseBatch);
-    expect(result.summary).toContain('2 changes');
-  });
-
-  it('formats summary with singular "change" for single item', () => {
-    const singleItemBatch = { ...baseBatch, items: [{ id: 'i1' }] };
-    const result = normalizeApprovalBatch(singleItemBatch);
-    expect(result.summary).toContain('1 change');
-    expect(result.summary).not.toContain('1 changes');
-  });
-
-  it('itemCount matches items.length', () => {
-    expect(normalizeApprovalBatch(baseBatch).itemCount).toBe(2);
-  });
-
-  it('isSingleAction is always false', () => {
-    expect(normalizeApprovalBatch(baseBatch).isSingleAction).toBe(false);
-  });
-
-  it('badge derived from batch name', () => {
-    expect(normalizeApprovalBatch(baseBatch).badge).toBe('SEO Editor');
-  });
-
-  it('priority is undefined (batches carry no priority)', () => {
-    expect(normalizeApprovalBatch(baseBatch).priority).toBeUndefined();
   });
 });
 

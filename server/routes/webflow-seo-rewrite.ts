@@ -12,20 +12,15 @@ import { parseJsonFallback } from '../db/json-validation.js';
 import { getLatestSnapshot } from '../reports.js';
 import { getQueryPageData } from '../search-console.js';
 import { isProgrammingError } from '../errors.js';
-import {
-  matchGscUrlToPath,
-  normalizePageUrl,
-  sanitizeForPromptInjection,
-  sanitizeQueryForPrompt,
-  stripCodeFences,
-  stripHtmlToText,
-} from '../helpers.js';
+import { matchGscUrlToPath, normalizePageUrl } from '../utils/page-address.js';
+import { sanitizeForPromptInjection, sanitizeQueryForPrompt, stripCodeFences, stripHtmlToText } from '../utils/text.js';
 import { createLogger } from '../logger.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { getBrandName, getTokenForSite, getWorkspace } from '../workspaces.js';
 import { buildPageAssistContext } from '../intelligence/page-assist-context-builder.js';
 import {
+  ctrUnderperformanceFlag,
   normalizeSeoRewritePairs,
   normalizeSeoRewriteVariations,
 } from '../webflow-seo-rewrite-utils.js';
@@ -68,19 +63,7 @@ router.post('/api/webflow/seo-rewrite', requireWorkspaceAccessFromBody(), async 
         if (pageQueries.length > 0) {
           gscBlock = `\n\nREAL SEARCH QUERIES people use to find this page (from Google Search Console — use these exact phrases for relevance):\n${pageQueries.map(q => `- "${sanitizeQueryForPrompt(q.query)}" (${q.impressions} impr, ${q.clicks} clicks, pos ${q.position}, CTR ${q.ctr}%)`).join('\n')}`;
 
-          // CTR performance flag
-          const totalImpr = pageQueries.reduce((sum, q) => sum + q.impressions, 0);
-          const totalClicks = pageQueries.reduce((sum, q) => sum + q.clicks, 0);
-          const avgCtr = totalImpr > 0 ? (totalClicks / totalImpr) * 100 : 0;
-          const avgPos = pageQueries.reduce((sum, q) => sum + q.position * q.impressions, 0) / (totalImpr || 1);
-          if (totalImpr >= 50) {
-            const expectedCtr = avgPos <= 3 ? 8 : avgPos <= 5 ? 5 : avgPos <= 10 ? 2.5 : 1;
-            if (avgCtr < expectedCtr * 0.7) {
-              gscBlock += `\n\n⚠️ CTR UNDERPERFORMANCE: This page gets ${totalImpr} impressions/month but only ${avgCtr.toFixed(1)}% CTR (expected ~${expectedCtr}% for position ${avgPos.toFixed(0)}). The current ${field} is failing to convert searchers into clicks — make it significantly more compelling.`;
-            } else if (avgCtr >= expectedCtr * 1.3) {
-              gscBlock += `\n\n✅ CTR OUTPERFORMER: This page has ${avgCtr.toFixed(1)}% CTR (above average for position ${avgPos.toFixed(0)}). Preserve the elements that are working — focus on keyword optimization while keeping the compelling angle.`;
-            }
-          }
+          gscBlock += ctrUnderperformanceFlag(pageQueries, { field, includeOutperformer: true });
         }
       }
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* non-critical — continue without GSC data */ }

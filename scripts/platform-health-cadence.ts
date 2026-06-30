@@ -79,6 +79,25 @@ interface CliOptions {
   help: boolean;
 }
 
+type TextFileMap = Record<string, string>;
+
+const RULE_DOCS_ROOT = 'docs/rules';
+const RULE_DOCS_ARCHIVE_ROOT = `${RULE_DOCS_ROOT}/archive`;
+
+const POINT_IN_TIME_RULE_DOC_PATTERNS = [
+  /pre-plan-audit/i,
+  /migration-map/i,
+  /pattern-review/i,
+];
+
+const NODE24_ACTION_MINIMUMS: Record<string, number> = {
+  'actions/cache': 5,
+  'actions/download-artifact': 8,
+  'actions/upload-artifact': 7,
+  'actions/checkout': 5,
+  'actions/setup-node': 5,
+};
+
 function parseIsoDateUtc(value: string): Date | null {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
@@ -118,6 +137,97 @@ function loadJson<T>(filePath: string): T {
   return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
 }
 
+function walkFiles(rootDir: string, relativeDir: string): string[] {
+  const absoluteDir = path.resolve(rootDir, relativeDir);
+  if (!fs.existsSync(absoluteDir)) return [];
+
+  const files: string[] = [];
+  for (const entry of fs.readdirSync(absoluteDir, { withFileTypes: true })) {
+    const relativePath = path.posix.join(relativeDir, entry.name);
+    const absolutePath = path.resolve(rootDir, relativePath);
+    if (entry.isDirectory()) {
+      files.push(...walkFiles(rootDir, relativePath));
+    } else if (entry.isFile()) {
+      files.push(relativePath);
+    } else if (fs.existsSync(absolutePath)) {
+      // Ignore symlinks and special files; docs/workflow contracts are regular files.
+    }
+  }
+  return files.sort((a, b) => a.localeCompare(b));
+}
+
+function readTextFilesFromDisk(rootDir: string, relativeRoot: string): TextFileMap {
+  const files: TextFileMap = {};
+  for (const relativePath of walkFiles(rootDir, relativeRoot)) {
+    files[relativePath] = fs.readFileSync(path.resolve(rootDir, relativePath), 'utf8');
+  }
+  return files;
+}
+
+function startsWithArchivedFrontmatter(content: string): boolean {
+  const match = content.match(/^---\n([\s\S]*?)\n---\n?/);
+  if (!match) return false;
+  return /^status:\s*archived\s*$/m.test(match[1]);
+}
+
+function looksLikePointInTimeRuleDoc(relativePath: string, content: string): boolean {
+  const basename = path.posix.basename(relativePath, '.md');
+  if (POINT_IN_TIME_RULE_DOC_PATTERNS.some(pattern => pattern.test(basename))) return true;
+
+  const firstHeading = content.match(/^#\s+(.+)$/m)?.[1] ?? '';
+  return POINT_IN_TIME_RULE_DOC_PATTERNS.some(pattern => pattern.test(firstHeading));
+}
+
+export function findRuleDocLifecycleGaps(files?: TextFileMap): string[] {
+  const docs = files ?? readTextFilesFromDisk(ROOT, RULE_DOCS_ROOT);
+  const issues: string[] = [];
+
+  for (const [relativePath, content] of Object.entries(docs).sort(([a], [b]) => a.localeCompare(b))) {
+    if (!relativePath.startsWith(`${RULE_DOCS_ROOT}/`) || !relativePath.endsWith('.md')) continue;
+
+    const isArchived = relativePath.startsWith(`${RULE_DOCS_ARCHIVE_ROOT}/`);
+    if (isArchived) {
+      if (!startsWithArchivedFrontmatter(content)) {
+        issues.push(`${relativePath}: archived docs/rules files must start with frontmatter containing status: archived`);
+      }
+      continue;
+    }
+
+    if (startsWithArchivedFrontmatter(content)) {
+      issues.push(`${relativePath}: archived rule docs belong under ${RULE_DOCS_ARCHIVE_ROOT}/`);
+    }
+    if (looksLikePointInTimeRuleDoc(relativePath, content)) {
+      issues.push(`${relativePath}: point-in-time audits, migration maps, and pattern reviews belong under ${RULE_DOCS_ARCHIVE_ROOT}/`);
+    }
+  }
+
+  return issues;
+}
+
+export function findGithubActionRuntimeGaps(files?: TextFileMap): string[] {
+  const workflows = files ?? readTextFilesFromDisk(ROOT, '.github/workflows');
+  const issues: string[] = [];
+  const usesPattern = /uses:\s*(actions\/[a-z-]+)@v(\d+)\b/g;
+
+  for (const [relativePath, content] of Object.entries(workflows).sort(([a], [b]) => a.localeCompare(b))) {
+    if (
+      !relativePath.startsWith('.github/workflows/')
+      || (!relativePath.endsWith('.yml') && !relativePath.endsWith('.yaml'))
+    ) {
+      continue;
+    }
+    for (const match of content.matchAll(usesPattern)) {
+      const action = match[1];
+      const version = Number(match[2]);
+      const minimum = NODE24_ACTION_MINIMUMS[action];
+      if (minimum == null || version >= minimum) continue;
+      issues.push(`${relativePath}: ${action}@v${version} must be >= v${minimum} for Node 24 runtime support`);
+    }
+  }
+
+  return issues;
+}
+
 function mergeRoadmaps(active: RoadmapData, archived: RoadmapData | null): RoadmapData {
   if (!archived) return active;
   return {
@@ -152,6 +262,9 @@ export function findCadencePolicyGaps(
     issues.push('cadence.sprintIntervalMax must be >= cadence.sprintIntervalMin');
   }
   if (cadence.defaultSprintLengthDays < 1) issues.push('cadence.defaultSprintLengthDays must be >= 1');
+
+  issues.push(...findRuleDocLifecycleGaps());
+  issues.push(...findGithubActionRuntimeGaps());
 
   const seenCheckpointIds = new Set<string>();
   for (const checkpoint of cadenceData.checkpoints) {

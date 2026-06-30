@@ -58,6 +58,35 @@ function seedOutcome(actionId: string, primaryMetric: string, score: 'neutral' |
   return outcome.id;
 }
 
+function makeRecommendation(overrides: {
+  id: string;
+  type: 'content' | 'technical';
+  source: string;
+}) {
+  const now = new Date().toISOString();
+  return {
+    id: overrides.id,
+    workspaceId: WS_ID,
+    priority: 'fix_soon',
+    type: overrides.type,
+    title: 'Recommendation',
+    description: 'Recommendation description',
+    insight: 'Recommendation insight',
+    impact: 'medium',
+    effort: 'medium',
+    impactScore: 50,
+    source: overrides.source,
+    affectedPages: ['/p'],
+    trafficAtRisk: 0,
+    impressionsAtRisk: 0,
+    estimatedGain: 'Improves organic performance',
+    actionType: 'manual',
+    status: 'completed',
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 describe('I2 outcome remediation', () => {
   beforeEach(() => {
     db.prepare('DELETE FROM action_outcomes WHERE action_id IN (SELECT id FROM tracked_actions WHERE workspace_id = ?)').run(WS_ID);
@@ -70,8 +99,8 @@ describe('I2 outcome remediation', () => {
       WS_ID,
       new Date().toISOString(),
       JSON.stringify([
-        { id: 'rec-content', type: 'content', source: 'audit:content', status: 'completed' },
-        { id: 'rec-tech', type: 'technical', source: 'audit:speed', status: 'completed' },
+        makeRecommendation({ id: 'rec-content', type: 'content', source: 'audit:content' }),
+        makeRecommendation({ id: 'rec-tech', type: 'technical', source: 'audit:speed' }),
       ]),
     );
   });

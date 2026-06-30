@@ -4,39 +4,14 @@ import {
   Clock, FileText, Loader2, ChevronDown, ChevronRight, Users, Layers, TrendingUp, Search,
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
-import { Button, ClickableRow, PageHeader, SectionCard, EmptyState, Badge, Icon, StatCard } from './ui';
+import { Button, ClickableRow, PageHeader, SectionCard, EmptyState, Badge, Icon, StatCard, InlineBanner, type BadgeTone } from './ui';
 import { CHART_SERIES_COLORS, positionColor } from './ui/constants';
 import { contentPerformance } from '../api/seo';
+import { extractErrorMessage } from '../lib/extractErrorMessage';
 import { capitalize } from '../utils/strings';
+import type { ContentPerformanceItem, ContentTermCoverageStatus } from '../../shared/types/content';
 
-interface GscMetrics {
-  clicks: number;
-  impressions: number;
-  ctr: number;
-  position: number;
-}
-
-interface GA4Metrics {
-  sessions: number;
-  users: number;
-  bounceRate: number;
-  avgEngagementTime: number;
-  conversions: number;
-}
-
-interface ContentItem {
-  requestId: string;
-  topic: string;
-  targetKeyword: string;
-  targetPageSlug?: string;
-  pageType?: string;
-  status: string;
-  publishedAt?: string;
-  daysSincePublish: number;
-  gsc: GscMetrics | null;
-  ga4: GA4Metrics | null;
-  source?: 'request' | 'matrix';
-}
+type ContentItem = ContentPerformanceItem;
 
 interface TrendPoint {
   date: string;
@@ -108,6 +83,24 @@ function formatEngagement(seconds: number): string {
   return `${(seconds / 60).toFixed(1)}m`;
 }
 
+function coverageTone(status: ContentTermCoverageStatus): BadgeTone {
+  switch (status) {
+    case 'strong':
+      return 'emerald';
+    case 'partial':
+      return 'amber';
+    case 'weak':
+      return 'red';
+    case 'unavailable':
+      return 'zinc';
+  }
+}
+
+function coverageLabel(item: ContentItem): string {
+  if (item.coverage.status === 'unavailable' || item.coverage.coveragePct === null) return 'Coverage n/a';
+  return `${item.coverage.coveragePct}% covered`;
+}
+
 const PAGE_TYPE_COLORS: Record<string, string> = {
   blog: 'bg-blue-500/10 text-accent-info border-blue-500/20',
   landing: 'bg-blue-500/10 text-accent-info border-blue-500/20',
@@ -131,7 +124,7 @@ export function ContentPerformance({ workspaceId }: Props) {
     let cancelled = false;
     contentPerformance.get(workspaceId)
       .then(data => { if (!cancelled) { setItems((data as { items?: ContentItem[] }).items || []); setError(null); } })
-      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load'); })
+      .catch(e => { if (!cancelled) setError(extractErrorMessage(e, 'Failed to load')); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [workspaceId]);
@@ -184,7 +177,7 @@ export function ContentPerformance({ workspaceId }: Props) {
       />
 
       {error && (
-        <div className="t-caption-sm text-accent-danger bg-red-500/10 border border-red-500/20 rounded-[var(--radius-lg)] px-4 py-3">{error}</div>
+        <InlineBanner>{error}</InlineBanner>
       )}
 
       {items.length === 0 && !error ? (
@@ -271,6 +264,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                           </span>
                         )}
                         <Badge label={item.status} tone={item.status === 'published' ? 'emerald' : 'blue'} />
+                        <Badge label={coverageLabel(item)} tone={coverageTone(item.coverage.status)} />
                         {item.source === 'matrix' && (
                           <span className="flex items-center gap-0.5 t-micro px-1.5 py-0.5 rounded-[var(--radius-pill)] badge-span-ok bg-teal-500/10 text-accent-brand border border-teal-500/20">
                             <Icon as={Layers} size="sm" /> Content Plan
@@ -389,6 +383,40 @@ export function ContentPerformance({ workspaceId }: Props) {
                             <EmptyState icon={BarChart3} title="No analytics data" description="No Google Analytics data available for this page." className="py-2" />
                           )}
                         </div>
+                      </div>
+
+                      <div className="mt-4 bg-[var(--surface-3)]/30 rounded-[var(--radius-lg)] p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h4 className="t-label text-[var(--brand-text)] mb-1 flex items-center gap-1.5">
+                              <Icon as={FileText} size="sm" /> Brief execution
+                            </h4>
+                            <div className="flex flex-wrap items-center gap-2 t-caption-sm text-[var(--brand-text-muted)]">
+                              {item.joinback?.briefTitle && <span>Brief: {item.joinback.briefTitle}</span>}
+                              {item.joinback?.postTitle && <span>Post: {item.joinback.postTitle}</span>}
+                              {item.joinback?.hasSourceEvidence && <span>Source evidence attached</span>}
+                              {!item.joinback && <span>No linked brief or post</span>}
+                            </div>
+                          </div>
+                          <Badge label={coverageLabel(item)} tone={coverageTone(item.coverage.status)} />
+                        </div>
+                        {item.coverage.status === 'unavailable' ? (
+                          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">{item.coverage.reason || 'Coverage grading is unavailable for this item.'}</p>
+                        ) : (
+                          <div className="mt-3 space-y-2">
+                            <div className="flex flex-wrap items-center gap-3 t-caption-sm text-[var(--brand-text-muted)]">
+                              <span>{item.coverage.matchedCount}/{item.coverage.requiredCount} prescribed terms covered</span>
+                              <span>{item.coverage.missingCount} missing</span>
+                            </div>
+                            {item.coverage.missingTerms.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {item.coverage.missingTerms.map(term => (
+                                  <Badge key={term} label={term} tone="amber" variant="outline" />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Trend chart */}

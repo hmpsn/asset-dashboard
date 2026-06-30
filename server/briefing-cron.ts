@@ -42,14 +42,20 @@ import {
 } from './briefing-store.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { addActivity } from './activity-log.js';
 import { notifyClientBriefingReady } from './email.js';
 import { computeROI } from './roi.js';
-import { normalizePageUrl } from './helpers.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import { listContentGaps } from './content-gaps.js';
 import { recordWeeklyBriefingSnapshot } from './workspace-metrics-snapshots.js';
 import { punchHeroHeadline, writeWeeklyOpener } from './briefing-prompt.js';
+import {
+  createIntervalCron,
+  currentWeekOfUTC,
+  isPastWeeklyTarget,
+  runAsyncWithWorkspaceSingleFlight,
+} from './weekly-workspace-cron.js';
 import {
   buildStoryFromInsight,
   buildStoryFromContentGap,
@@ -80,27 +86,9 @@ const briefingCronStmts = createStmtCache(() => ({
   ),
 }));
 
-// ── Time helpers ─────────────────────────────────────────────────────────────
-
-/** ISO date (YYYY-MM-DD) of the Monday that anchors the week containing `d`. */
-function currentWeekOfUTC(d = new Date()): string {
-  const day = d.getUTCDay();
-  // Treat Sunday (0) as the *end* of last week so its Monday is 6 days back.
-  const diffToMonday = (day + 6) % 7;
-  const monday = new Date(Date.UTC(
-    d.getUTCFullYear(),
-    d.getUTCMonth(),
-    d.getUTCDate() - diffToMonday,
-  ));
-  return monday.toISOString().slice(0, 10);
-}
-
 /** Has this week's Monday 14:00 UTC already passed? */
 function isPastTargetThisWeek(now = new Date()): boolean {
-  const day = now.getUTCDay();
-  if (day === 0) return false; // Sunday — Monday hasn't arrived yet this week
-  if (day === TARGET_DAY && now.getUTCHours() < TARGET_HOUR_UTC) return false;
-  return true;
+  return isPastWeeklyTarget(now, { day: TARGET_DAY, hourUtc: TARGET_HOUR_UTC });
 }
 
 // ── Freshness checks ─────────────────────────────────────────────────────────
@@ -171,16 +159,12 @@ export async function runBriefingForWorkspace(
   workspaceId: string,
   opts: RunBriefingOptions = {},
 ): Promise<RunBriefingResult> {
-  // Mutex: refuse concurrent runs for the same workspace
-  if (runningBriefings.has(workspaceId)) {
-    return { status: 'duplicate', weekOf: '', reason: 'already running' };
-  }
-  runningBriefings.add(workspaceId);
-  try {
-    return await runBriefingForWorkspaceInner(workspaceId, opts);
-  } finally {
-    runningBriefings.delete(workspaceId);
-  }
+  return runAsyncWithWorkspaceSingleFlight(
+    runningBriefings,
+    workspaceId,
+    () => ({ status: 'duplicate', weekOf: '', reason: 'already running' }),
+    () => runBriefingForWorkspaceInner(workspaceId, opts),
+  );
 }
 
 async function runBriefingForWorkspaceInner(
@@ -625,33 +609,23 @@ async function tick(now = new Date()): Promise<void> {
   }
 }
 
-let startupTimeout: ReturnType<typeof setTimeout> | null = null;
-let tickInterval: ReturnType<typeof setInterval> | null = null;
+const briefingCronLifecycle = createIntervalCron({
+  startupDelayMs: 60_000,
+  intervalMs: CHECK_INTERVAL_MS,
+  runStartup: () => {
+    tick().catch((err) => log.error({ err }, 'first briefing tick failed'));
+  },
+  runInterval: () => {
+    tick().catch((err) => log.error({ err }, 'briefing tick failed'));
+  },
+  onStart: () => log.info('briefing cron started — checks hourly, target Monday 14:00 UTC'),
+});
 
 /** Idempotent — calling twice is a no-op. */
 export function startBriefingCron(): void {
-  if (tickInterval) return;
-
-  startupTimeout = setTimeout(() => {
-    tick().catch((err) => log.error({ err }, 'first briefing tick failed'));
-  }, 60_000);
-  startupTimeout.unref?.();
-
-  tickInterval = setInterval(() => {
-    tick().catch((err) => log.error({ err }, 'briefing tick failed'));
-  }, CHECK_INTERVAL_MS);
-  tickInterval.unref?.();
-
-  log.info('briefing cron started — checks hourly, target Monday 14:00 UTC');
+  briefingCronLifecycle.start();
 }
 
 export function stopBriefingCron(): void {
-  if (startupTimeout) {
-    clearTimeout(startupTimeout);
-    startupTimeout = null;
-  }
-  if (tickInterval) {
-    clearInterval(tickInterval);
-    tickInterval = null;
-  }
+  briefingCronLifecycle.stop();
 }

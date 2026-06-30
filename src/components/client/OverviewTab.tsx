@@ -8,7 +8,7 @@ import { HealthScoreCard } from './HealthScoreCard';
 import { PredictionShowcaseCard } from './PredictionShowcaseCard';
 import OutcomeSummary from './OutcomeSummary';
 import { WinsSurface } from './Briefing/WinsSurface';
-import { useClientIntelligence } from '../../hooks/client';
+import { useClientDiagnostics, useClientIntelligence } from '../../hooks/client';
 import { useRecommendationSet } from '../../hooks/useRecommendations';
 import type { Tier } from '../ui/TierGate';
 import { useNavigate } from 'react-router-dom';
@@ -20,13 +20,18 @@ import { ErrorBoundary } from '../ErrorBoundary';
 import { QUICK_QUESTIONS, LEARN_SEO_QUESTIONS } from './types';
 import { clientPath } from '../../routes';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
-import { InsightsBriefingPage } from './Briefing/InsightsBriefingPage';
+import { TheIssueClientPage } from './the-issue/TheIssueClientPage';
+import { pinnedOutcomeNouns } from './the-issue/outcomeNoun';
 import { AgencyWorkFeed } from './AgencyWorkFeed';
+import { DiagnosticRootCauseCards } from './DiagnosticRootCauseCards';
 import { themeColor } from '../ui/constants';
+import type { ClientGA4Data } from '../../hooks/client/useClientGA4';
+import type { IssueOutcomeCount, OutcomeType, OutcomeTypeBreakdown } from '../../../shared/types/the-issue';
 import type {
   SearchOverview, PerformanceTrend, WorkspaceInfo, AuditSummary, AuditDetail,
-  GA4Overview, GA4DailyTrend, GA4ConversionSummary, GA4NewVsReturning,
-  GA4OrganicOverview, GA4Comparison, SearchComparison,
+  GA4Overview, GA4ConversionSummary, GA4NewVsReturning,
+  GA4OrganicOverview, GA4Comparison,
+  SearchComparison,
   ClientContentRequest, ClientKeywordStrategy, ClientRequest, ApprovalBatch,
   ClientTab,
 } from './types';
@@ -46,14 +51,14 @@ interface OverviewTabProps {
   overview: SearchOverview | null;
   searchComparison: SearchComparison | null;
   trend: PerformanceTrend[];
-  ga4Overview: GA4Overview | null;
-  ga4Trend: GA4DailyTrend[];
-  ga4Comparison: GA4Comparison | null;
-  ga4Organic: GA4OrganicOverview | null;
-  ga4Conversions: GA4ConversionSummary[];
-  ga4NewVsReturning: GA4NewVsReturning[];
-  searchDataUpdatedAt?: number | null;
+  ga4Data?: ClientGA4Data;
+  ga4Overview?: GA4Overview | null;
+  ga4Comparison?: GA4Comparison | null;
+  ga4Organic?: GA4OrganicOverview | null;
+  ga4Conversions?: GA4ConversionSummary[];
+  ga4NewVsReturning?: GA4NewVsReturning[];
   ga4DataUpdatedAt?: number | null;
+  searchDataUpdatedAt?: number | null;
   audit: AuditSummary | null;
   auditDetail: AuditDetail | null;
   strategyData: ClientKeywordStrategy | null;
@@ -77,23 +82,41 @@ interface OverviewTabProps {
   clientUser: { id: string; name: string; email: string; role: string } | null;
   // Content Plan
   contentPlanSummary?: { totalCells: number; publishedCells: number; reviewCells: number; approvedCells: number; inProgressCells: number; matrixCount: number } | null;
+  /** Optional toast sink — consumed only by the strategy-the-issue surface (act-on / feedback).
+   *  Absent on the flag-OFF path, so the legacy render is byte-identical. */
+  setToast?: (msg: string) => void;
 }
 
 export function OverviewTab({
   ws,
   overview, searchComparison,
-  ga4Overview, ga4Comparison, ga4Organic, ga4Conversions, ga4NewVsReturning,
-  searchDataUpdatedAt, ga4DataUpdatedAt,
+  ga4Data,
+  ga4Overview: legacyGa4Overview = null,
+  ga4Comparison: legacyGa4Comparison = null,
+  ga4Organic: legacyGa4Organic = null,
+  ga4Conversions: legacyGa4Conversions = [],
+  ga4NewVsReturning: legacyGa4NewVsReturning = [],
+  ga4DataUpdatedAt: legacyGa4DataUpdatedAt = null,
+  searchDataUpdatedAt,
   audit, auditDetail, strategyData, insights,
   contentRequests, activityLog,
   pendingApprovals, unreadTeamNotes,
   eventDisplayName, isEventPinned,
   workspaceId, onAskAi, onOpenChat,
-  clientUser, contentPlanSummary,
+  clientUser, contentPlanSummary, setToast,
 }: OverviewTabProps) {
+  const {
+    ga4Overview = legacyGa4Overview,
+    ga4Comparison = legacyGa4Comparison,
+    ga4Organic = legacyGa4Organic,
+    ga4Conversions = legacyGa4Conversions,
+    ga4NewVsReturning = legacyGa4NewVsReturning,
+    dataUpdatedAt: ga4DataUpdatedAt = legacyGa4DataUpdatedAt,
+  } = ga4Data ?? {};
   const navigate = useNavigate();
   const betaMode = useBetaMode();
   const { data: clientIntel } = useClientIntelligence(workspaceId);
+  const { data: diagnosticReports = [] } = useClientDiagnostics(workspaceId, Boolean(workspaceId));
   // useRecommendationSet shares the same React Query cache key as InsightsEngine
   // so loading the Health tab first means this is already warm — no extra fetch.
   const { data: recSet } = useRecommendationSet(workspaceId);
@@ -109,22 +132,93 @@ export function OverviewTab({
     ? (recSet?.recommendations.find(r => r.id === topRecId && r.status !== 'completed' && r.status !== 'dismissed') ?? null)
     : null;
 
-  // ── client-briefing-v2 magazine layout (Phase 2) ─────────────────────────
-  // When the flag is on, replace the entire overview body with the
-  // <InsightsBriefingPage> composer. Routes / props remain identical so the
-  // flag can be flipped per-workspace without touching anything below this
-  // block. When OFF (default), the original overview body renders unchanged.
-  const briefingV2Enabled = useFeatureFlag('client-briefing-v2');
+  const theIssueEnabled = useFeatureFlag('strategy-the-issue');
   const workFeedEnabled = useFeatureFlag('client-work-feed');
-  if (briefingV2Enabled) {
+  // P1a measured-capture flag — MUST be read here at the top level, NOT inside the `if (theIssueEnabled)`
+  // block below. useFeatureFlag is a hook; placing it inside the conditional changes the hook count when
+  // the strategy-the-issue flag query resolves (loading→loaded flips theIssueEnabled false→true), which
+  // throws "Rendered more hooks than during the previous render" and crashes the client dashboard. (A
+  // mocked useFeatureFlag in component tests consumes zero hook slots, so it hid this — caught only in a
+  // real loading→loaded browser render.) Flag-OFF this gates every per-unit outcomeType back to undefined
+  // so the typed render (type icons, [data-outcome-type] tags, byType rollup) vanishes byte-identically to
+  // P0 — the rollback must never leak typed-outcome UI just because eventConfig still carries types.
+  const measuredCapture = useFeatureFlag('the-issue-client-measured-capture');
+  // P1 (IA v2) flags — MUST be read here at the top level, NOT inside the `if (theIssueEnabled)`
+  // block below (same Rules-of-Hooks trap as measuredCapture above: a hook gated on theIssueEnabled
+  // changes the hook count when its flag query resolves loading→loaded and crashes the dashboard).
+  // Together they drive whether the named-lead list is actually surfaced below the count, so
+  // namedRecordsAvailable can be set truthfully (see the outcomeCount assembly).
+  const iaV2 = useFeatureFlag('client-ia-v2');
+  const returnHookEnabled = useFeatureFlag('the-issue-client-return-hook');
+
+  // ── strategy-the-issue evergreen money surface (Phase 2) ─────────────────
+  // The Issue is the reimagined overview that supersedes the legacy body. All flags read
+  // unconditionally above (Rules of Hooks); flag-OFF this branch never mounts so the legacy
+  // overview body below is byte-identical.
+  if (theIssueEnabled) {
     const briefReviews = contentRequests.filter(r => r.status === 'client_review').length;
     const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
-    const effectiveTier: Tier = (betaMode ? 'premium' : (ws.tier as Tier)) || 'free';
+    // ── The Issue (Client) P0 spine props (additive; unread on the spine-flag-OFF path) ──
+    // Outcome count in human units: one unit per pinned eventConfig event, current count from
+    // GA4 conversions. Baseline/prior-period are server substrate (not surfaced client-side here),
+    // so they stay null — OutcomeCountBand degrades honestly. Falls back to all key-events when
+    // none pinned. namedRecordsAvailable is false at P0.
+    const pinned = pinnedOutcomeNouns(ws.eventConfig);
+    // P1a: each pinned event carries an admin-assigned outcomeType on ws.eventConfig (Lane A/C).
+    // Attach it per-unit so OutcomeCountBand can render typed, type-ordered StatCards. The fallback
+    // (no events pinned) carries no eventConfig entry → outcomeType stays undefined → the unit
+    // degrades byte-identically to the P0 estimate render.
+    // Gate on the measured-capture flag: OFF → every unit's outcomeType is undefined, so the byType
+    // rollup is empty and OutcomeCountBand's `!u.outcomeType` short-circuit makes the typed render
+    // (icons + [data-outcome-type] tags) vanish byte-identically to P0.
+    const outcomeTypeFor = (eventName: string): OutcomeType | undefined =>
+      measuredCapture ? ws.eventConfig?.find(c => c.eventName === eventName)?.outcomeType : undefined;
+    const outcomeUnits = (pinned.length > 0
+      ? pinned.map(p => ({ eventName: p.eventName, label: p.label }))
+      : ga4Conversions.map(c => ({ eventName: c.eventName, label: c.eventName.replace(/_/g, ' ') })))
+      .map(u => ({
+        label: u.label,
+        eventName: u.eventName,
+        current: ga4Conversions.find(c => c.eventName === u.eventName)?.conversions ?? 0,
+        baseline: null,
+        priorPeriod: null,
+        outcomeType: outcomeTypeFor(u.eventName),
+      }));
+    // P1a typed rollup ("23 form fills + 41 calls"): group the typed units by outcomeType and sum
+    // their current counts. Empty when no unit carries an outcomeType (byte-identical estimate path —
+    // OutcomeCountBand/IssueVerdictHeadline only read byType on the measured branch). Baseline/prior
+    // are server substrate (not surfaced here), so they stay null and degrade honestly.
+    const byTypeMap = new Map<OutcomeType, OutcomeTypeBreakdown>();
+    for (const u of outcomeUnits) {
+      if (!u.outcomeType) continue;
+      const existing = byTypeMap.get(u.outcomeType);
+      if (existing) {
+        existing.current += u.current;
+      } else {
+        byTypeMap.set(u.outcomeType, {
+          outcomeType: u.outcomeType, label: u.label, current: u.current, baseline: null, priorPeriod: null,
+        });
+      }
+    }
+    const outcomeCount: IssueOutcomeCount = {
+      units: outcomeUnits,
+      byType: Array.from(byTypeMap.values()),
+      // P0 client construction is always an estimate — measured_action graduation is the server's
+      // computeROI seam (Lane A), driven by confirmed conversion-tracking setup. This client-built
+      // count feeds the count-band only; the dollar verdict's provenance rides ROIData.outcomeVerdict.
+      provenance: 'estimate_ga4',
+      // Names ARE available below when IA v2 surfaces the leads section + the return-hook is on.
+      // Flag-OFF this stays false so the honest "names available with tracking" upsell is unchanged.
+      namedRecordsAvailable: iaV2 && returnHookEnabled,
+    };
+    // The public workspace view carries the flag-gated, pre-resolved segment profile (authority-
+    // layered, typed on WorkspaceInfo). Absent → null → default-visible inserts.
+    const segmentProfile = ws.segmentProfile ?? null;
     return (
       <ErrorBoundary>
-        <InsightsBriefingPage
+        <TheIssueClientPage
           workspaceId={workspaceId}
-          effectiveTier={effectiveTier}
+          effectiveTier={(betaMode ? 'premium' : (ws.tier as Tier)) || 'free'}
           betaMode={betaMode}
           actionCounts={{
             approvals: pendingApprovals,
@@ -133,10 +227,22 @@ export function OverviewTab({
             replies: unreadTeamNotes,
             contentPlan: contentPlanSummary?.reviewCells ?? 0,
           }}
+          overview={overview}
+          ga4Overview={ga4Overview}
+          ga4Conversions={ga4Conversions}
+          audit={audit}
+          strategyData={strategyData}
+          onAskAi={onAskAi}
+          onOpenChat={onOpenChat}
+          setToast={setToast}
+          outcomeCount={outcomeCount}
+          segmentProfile={segmentProfile}
+          diagnosticReports={diagnosticReports}
         />
       </ErrorBoundary>
     );
   }
+
   // ─────────────────────────────────────────────────────────────────────────
 
   // Derive a dynamic subtitle from the most significant data signal
@@ -243,6 +349,8 @@ export function OverviewTab({
         </div>
       );
     })()}
+
+    <DiagnosticRootCauseCards workspaceId={workspaceId} reports={diagnosticReports} />
 
     {/* Action-needed banner — full-width, above content grid */}
     {(() => {

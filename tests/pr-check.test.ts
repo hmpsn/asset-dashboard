@@ -30,12 +30,19 @@ import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import {
   CHECKS,
+  checkFiles,
   checkDirectory,
   checkFile,
   buildWorkspaceScopedTables,
+  createSourceCache,
+  findJsonArrayColumnSites,
   extractDbPrepareArg,
   findUnrenderedSliceFields,
   compareStudioConstants,
+  getChangedFiles,
+  getUntrackedFiles,
+  mergeChangedFiles,
+  resolveRelevantChangedFilesForCheck,
   BRAND_ENGINE_ROUTE_BASENAMES,
   REQUIRE_AUTH_ALLOWED_BASENAMES,
   GLOBALLY_APPLIED_LIMITERS,
@@ -108,133 +115,114 @@ function expectRuleCases(ruleName: string, ruleId: string, cases: RuleFixtureCas
   }
 }
 
-describe('Rule: Retired outcome feature flag key used in flag API', () => {
-  const RULE = 'Retired outcome feature flag key used in flag API';
+describe('Rule: Retired feature flag key used in flag API', () => {
+  const RULE = 'Retired feature flag key used in flag API';
+  const cases = [
+    {
+      id: 'outcome',
+      helper: ['outcome', 'tracking'].join('-'),
+      component: ['outcome', 'dashboard'].join('-'),
+      catalog: ['outcome', 'client-reporting'].join('-'),
+      env: ['FEATURE', 'OUTCOME', 'TRACKING'].join('_'),
+    },
+    {
+      id: 'bridge-opportunity',
+      helper: ['opportunity', 'value', 'scorer'].join('-'),
+      component: ['bridge', 'anomaly', 'boost'].join('-'),
+      catalog: ['opportunity', 'value', 'events'].join('-'),
+      env: ['FEATURE', 'OPPORTUNITY', 'VALUE', 'EVENTS'].join('_'),
+    },
+    {
+      id: 'unified-inbox',
+      helper: ['unified', 'inbox'].join('-'),
+      component: ['new', 'inbox', 'ia'].join('-'),
+      catalog: ['unified', 'deliverables', 'approval', 'family'].join('-'),
+      env: ['FEATURE', 'UNIFIED', 'DELIVERABLES', 'REST'].join('_'),
+    },
+    {
+      id: 'product-ui',
+      helper: ['copy', 'engine'].join('-'),
+      component: ['client', 'brand', 'section'].join('-'),
+      catalog: ['deep', 'diagnostics'].join('-'),
+      env: ['FEATURE', 'COPY', 'ENGINE', 'PIPELINE'].join('_'),
+    },
+    {
+      id: 'seo-runtime',
+      helper: ['seo', 'generation', 'quality'].join('-'),
+      component: ['local', 'seo', 'visibility'].join('-'),
+      catalog: ['schema', 'ai', 'element', 'classifier'].join('-'),
+      env: ['FEATURE', 'SCHEMA', 'AI', 'ELEMENT', 'CLASSIFIER'].join('_'),
+    },
+    {
+      id: 'keyword-hub',
+      helper: ['keyword', 'hub'].join('-'),
+      component: ['keyword', 'hub'].join('-'),
+      catalog: ['keyword', 'value', 'scoring'].join('-'),
+      env: ['FEATURE', 'KEYWORD', 'HUB'].join('_'),
+    },
+  ];
 
-  it('flags retired keys passed to feature flag helpers', () => {
-    const retiredKey = ['outcome', 'tracking'].join('-');
-    const file = write(
-      uniqPath('rule-retired-outcome-flags', 'helper.ts'),
-      lines(
-        'import { isFeatureEnabled } from "./feature-flags";',
-        `const enabled = isFeatureEnabled('${retiredKey}');`,
-      ),
-    );
+  for (const testCase of cases) {
+    it(`flags ${testCase.id} retired keys passed to feature flag helpers`, () => {
+      const file = write(
+        uniqPath(`rule-retired-feature-flags-${testCase.id}`, 'helper.ts'),
+        lines(
+          'import { isFeatureEnabled } from "./feature-flags";',
+          `const enabled = isFeatureEnabled('${testCase.helper}');`,
+        ),
+      );
 
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
+      const hits = runRule(RULE, [file]);
+      expect(hits).toHaveLength(1);
+      expect(hits[0].line).toBe(2);
+    });
 
-  it('flags retired keys passed to FeatureFlag components', () => {
-    const retiredKey = ['outcome', 'dashboard'].join('-');
-    const file = write(
-      uniqPath('rule-retired-outcome-flags', 'component.tsx'),
-      lines(
-        'import { FeatureFlag } from "./FeatureFlag";',
-        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
-      ),
-    );
+    it(`flags ${testCase.id} retired keys passed to FeatureFlag components`, () => {
+      const file = write(
+        uniqPath(`rule-retired-feature-flags-${testCase.id}`, 'component.tsx'),
+        lines(
+          'import { FeatureFlag } from "./FeatureFlag";',
+          `export const Demo = () => <FeatureFlag flag="${testCase.component}">demo</FeatureFlag>;`,
+        ),
+      );
 
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
+      const hits = runRule(RULE, [file]);
+      expect(hits).toHaveLength(1);
+      expect(hits[0].line).toBe(2);
+    });
 
-  it('flags retired keys indexed from feature flag catalog objects', () => {
-    const retiredKey = ['outcome', 'client-reporting'].join('-');
-    const file = write(
-      uniqPath('rule-retired-outcome-flags', 'catalog.ts'),
-      lines(
-        'import { FEATURE_FLAG_CATALOG } from "./feature-flags";',
-        `const entry = FEATURE_FLAG_CATALOG['${retiredKey}'];`,
-      ),
-    );
+    it(`flags ${testCase.id} retired keys indexed from feature flag catalog objects`, () => {
+      const file = write(
+        uniqPath(`rule-retired-feature-flags-${testCase.id}`, 'catalog.ts'),
+        lines(
+          'import { FEATURE_FLAG_CATALOG } from "./feature-flags";',
+          `const entry = FEATURE_FLAG_CATALOG['${testCase.catalog}'];`,
+        ),
+      );
 
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
+      const hits = runRule(RULE, [file]);
+      expect(hits).toHaveLength(1);
+      expect(hits[0].line).toBe(2);
+    });
 
-  it('flags retired outcome feature env vars', () => {
-    const retiredEnv = ['FEATURE', 'OUTCOME', 'TRACKING'].join('_');
-    const file = write(
-      uniqPath('rule-retired-outcome-flags', 'env.ts'),
-      lines(
-        `process.env.${retiredEnv} = 'true';`,
-      ),
-    );
+    it(`flags ${testCase.id} retired feature env vars`, () => {
+      const file = write(
+        uniqPath(`rule-retired-feature-flags-${testCase.id}`, 'env.ts'),
+        lines(
+          `process.env.${testCase.env} = 'true';`,
+        ),
+      );
 
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(1);
-  });
-
-  it('allows active feature flags and non-flag historical strings', () => {
-    const retiredKey = ['outcome', 'ai-injection'].join('-');
-    const file = write(
-      uniqPath('rule-retired-outcome-flags', 'negative.tsx'),
-      lines(
-        "const active = isFeatureEnabled('keyword-universe-full');",
-        `const historicalNote = '${retiredKey} was retired';`,
-      ),
-    );
-
-    expect(runRule(RULE, [file])).toHaveLength(0);
-  });
-});
-
-describe('Rule: Retired bridge/opportunity feature flag key used in flag API', () => {
-  const RULE = 'Retired bridge/opportunity feature flag key used in flag API';
-
-  it('flags retired opportunity keys passed to feature flag helpers', () => {
-    const retiredKey = ['opportunity', 'value', 'scorer'].join('-');
-    const file = write(
-      uniqPath('rule-retired-bridge-opportunity-flags', 'helper.ts'),
-      lines(
-        'import { isFeatureEnabled } from "./feature-flags";',
-        `const enabled = isFeatureEnabled('${retiredKey}');`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired bridge keys passed to FeatureFlag components', () => {
-    const retiredKey = ['bridge', 'anomaly', 'boost'].join('-');
-    const file = write(
-      uniqPath('rule-retired-bridge-opportunity-flags', 'component.tsx'),
-      lines(
-        'import { FeatureFlag } from "./FeatureFlag";',
-        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired bridge/opportunity env vars', () => {
-    const retiredEnv = ['FEATURE', 'OPPORTUNITY', 'VALUE', 'EVENTS'].join('_');
-    const file = write(
-      uniqPath('rule-retired-bridge-opportunity-flags', 'env.ts'),
-      lines(
-        `process.env.${retiredEnv} = 'true';`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(1);
-  });
+      const hits = runRule(RULE, [file]);
+      expect(hits).toHaveLength(1);
+      expect(hits[0].line).toBe(1);
+    });
+  }
 
   it('flags multiline retired helper calls', () => {
     const retiredKey = ['bridge', 'anomaly', 'boost'].join('-');
     const file = write(
-      uniqPath('rule-retired-bridge-opportunity-flags', 'multiline-helper.ts'),
+      uniqPath('rule-retired-feature-flags', 'multiline-helper.ts'),
       lines(
         'import { isFeatureEnabled } from "./feature-flags";',
         'const enabled = isFeatureEnabled(',
@@ -246,83 +234,6 @@ describe('Rule: Retired bridge/opportunity feature flag key used in flag API', (
     const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(1);
     expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired keys re-added to the shared feature flag registry', () => {
-    const retiredKey = ['opportunity', 'value', 'events'].join('-');
-    const file = write(
-      'shared/types/feature-flags.ts',
-      lines(
-        'export const FEATURE_FLAGS = {',
-        `  '${retiredKey}': false,`,
-        '};',
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('allows bridge source identifiers outside feature flag APIs', () => {
-    const bridgeSource = ['bridge', 'audit', 'page', 'health'].join('-');
-    const file = write(
-      uniqPath('rule-retired-bridge-opportunity-flags', 'negative.ts'),
-      lines(
-        `fireBridge('${bridgeSource}', workspaceId, fn);`,
-        `const historicalNote = '${bridgeSource} is a bridge source';`,
-      ),
-    );
-
-    expect(runRule(RULE, [file])).toHaveLength(0);
-  });
-});
-
-describe('Rule: Retired unified inbox feature flag key used in flag API', () => {
-  const RULE = 'Retired unified inbox feature flag key used in flag API';
-
-  it('flags retired unified inbox keys passed to feature flag helpers', () => {
-    const retiredKey = ['unified', 'inbox'].join('-');
-    const file = write(
-      uniqPath('rule-retired-unified-inbox-flags', 'helper.ts'),
-      lines(
-        'import { useFeatureFlag } from "./feature-flags";',
-        `const enabled = useFeatureFlag('${retiredKey}');`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired unified inbox keys passed to FeatureFlag components', () => {
-    const retiredKey = ['new', 'inbox', 'ia'].join('-');
-    const file = write(
-      uniqPath('rule-retired-unified-inbox-flags', 'component.tsx'),
-      lines(
-        'import { FeatureFlag } from "./FeatureFlag";',
-        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired unified inbox env vars', () => {
-    const retiredEnv = ['FEATURE', 'UNIFIED', 'DELIVERABLES', 'REST'].join('_');
-    const file = write(
-      uniqPath('rule-retired-unified-inbox-flags', 'env.ts'),
-      lines(
-        `process.env.${retiredEnv} = 'true';`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(1);
   });
 
   it('flags retired keys re-added to the shared feature flag registry', () => {
@@ -341,147 +252,9 @@ describe('Rule: Retired unified inbox feature flag key used in flag API', () => 
     expect(hits[0].line).toBe(2);
   });
 
-  it('allows active feature flags and historical unified-inbox strings', () => {
-    const retiredKey = ['unified', 'inbox'].join('-');
+  it('flags retired env vars inside tests when scanned by the shared rule', () => {
     const file = write(
-      uniqPath('rule-retired-unified-inbox-flags', 'negative.tsx'),
-      lines(
-        "const active = useFeatureFlag('keyword-universe-full');",
-        `const note = '${retiredKey} was retired after cutover';`,
-      ),
-    );
-
-    expect(runRule(RULE, [file])).toHaveLength(0);
-  });
-});
-
-describe('Rule: Retired product/UI feature flag key used in flag API', () => {
-  const RULE = 'Retired product/UI feature flag key used in flag API';
-
-  it('flags retired product keys passed to feature flag helpers', () => {
-    const retiredKey = ['copy', 'engine'].join('-');
-    const file = write(
-      uniqPath('rule-retired-product-ui-flags', 'helper.ts'),
-      lines(
-        'import { isFeatureEnabled } from "./feature-flags";',
-        `const enabled = isFeatureEnabled('${retiredKey}');`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired product keys passed to FeatureFlag components', () => {
-    const retiredKey = ['client', 'brand', 'section'].join('-');
-    const file = write(
-      uniqPath('rule-retired-product-ui-flags', 'component.tsx'),
-      lines(
-        'import { FeatureFlag } from "./FeatureFlag";',
-        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired product env vars', () => {
-    const retiredEnv = ['FEATURE', 'COPY', 'ENGINE', 'PIPELINE'].join('_');
-    const file = write(
-      uniqPath('rule-retired-product-ui-flags', 'env.ts'),
-      lines(
-        `process.env.${retiredEnv} = 'true';`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(1);
-  });
-
-  it('flags retired keys re-added to the shared feature flag registry', () => {
-    const retiredKey = ['deep', 'diagnostics'].join('-');
-    const file = write(
-      'shared/types/feature-flags.ts',
-      lines(
-        'export const FEATURE_FLAGS = {',
-        `  '${retiredKey}': false,`,
-        '};',
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('allows active feature flags and historical product strings', () => {
-    const retiredKey = ['copy', 'engine', 'pipeline'].join('-');
-    const file = write(
-      uniqPath('rule-retired-product-ui-flags', 'negative.tsx'),
-      lines(
-        "const active = useFeatureFlag('keyword-universe-full');",
-        `const note = '${retiredKey} was retired after rollout';`,
-      ),
-    );
-
-    expect(runRule(RULE, [file])).toHaveLength(0);
-  });
-});
-
-describe('Rule: Retired SEO/runtime feature flag key used in flag API', () => {
-  const RULE = 'Retired SEO/runtime feature flag key used in flag API';
-
-  it('flags retired SEO/runtime keys passed to feature flag helpers', () => {
-    const retiredKey = ['seo', 'generation', 'quality'].join('-');
-    const file = write(
-      uniqPath('rule-retired-seo-runtime-flags', 'helper.ts'),
-      lines(
-        'import { isFeatureEnabled } from "./feature-flags";',
-        `const enabled = isFeatureEnabled('${retiredKey}');`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired SEO/runtime keys passed to FeatureFlag components', () => {
-    const retiredKey = ['local', 'seo', 'visibility'].join('-');
-    const file = write(
-      uniqPath('rule-retired-seo-runtime-flags', 'component.tsx'),
-      lines(
-        'import { FeatureFlag } from "./FeatureFlag";',
-        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags retired SEO/runtime env vars', () => {
-    const retiredEnv = ['FEATURE', 'SCHEMA', 'AI', 'ELEMENT', 'CLASSIFIER'].join('_');
-    const file = write(
-      uniqPath('rule-retired-seo-runtime-flags', 'env.ts'),
-      lines(
-        `process.env.${retiredEnv} = 'true';`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(1);
-  });
-
-  it('flags retired SEO/runtime env vars inside tests', () => {
-    const file = write(
-      'tests/integration/rule-retired-seo-runtime-flags-env.test.ts',
+      'tests/integration/rule-retired-feature-flags-env.test.ts',
       lines(
         "process.env.FEATURE_LOCAL_SEO_VISIBILITY = 'true';",
       ),
@@ -492,105 +265,15 @@ describe('Rule: Retired SEO/runtime feature flag key used in flag API', () => {
     expect(hits[0].line).toBe(1);
   });
 
-  it('flags retired keys re-added to the shared feature flag registry', () => {
-    const retiredKey = ['local', 'seo', 'visibility'].join('-');
+  it('allows active feature flags and non-flag historical strings', () => {
+    const retiredKey = ['outcome', 'ai-injection'].join('-');
+    const bridgeSource = ['bridge', 'audit', 'page', 'health'].join('-');
     const file = write(
-      'shared/types/feature-flags.ts',
-      lines(
-        'export const FEATURE_FLAGS = {',
-        `  '${retiredKey}': false,`,
-        '};',
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('allows active feature flags and historical non-flag strings', () => {
-    const retiredKey = ['seo', 'generation', 'quality'].join('-');
-    const file = write(
-      uniqPath('rule-retired-seo-runtime-flags', 'negative.ts'),
+      uniqPath('rule-retired-feature-flags', 'negative.tsx'),
       lines(
         "const active = isFeatureEnabled('keyword-universe-full');",
         `const historicalNote = '${retiredKey} was retired';`,
-      ),
-    );
-
-    expect(runRule(RULE, [file])).toHaveLength(0);
-  });
-});
-
-describe('Rule: Retired Keyword Hub feature flag key used in flag API', () => {
-  const RULE = 'Retired Keyword Hub feature flag key used in flag API';
-
-  it('flags keyword-hub passed to feature flag helpers', () => {
-    const retiredKey = ['keyword', 'hub'].join('-');
-    const file = write(
-      uniqPath('rule-retired-keyword-hub-flag', 'helper.ts'),
-      lines(
-        'import { isFeatureEnabled } from "./feature-flags";',
-        `const enabled = isFeatureEnabled('${retiredKey}');`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags keyword-hub passed to a FeatureFlag component', () => {
-    const retiredKey = ['keyword', 'hub'].join('-');
-    const file = write(
-      uniqPath('rule-retired-keyword-hub-flag', 'component.tsx'),
-      lines(
-        'import { FeatureFlag } from "./FeatureFlag";',
-        `export const Demo = () => <FeatureFlag flag="${retiredKey}">demo</FeatureFlag>;`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('flags the FEATURE_KEYWORD_HUB env var', () => {
-    const retiredEnv = ['FEATURE', 'KEYWORD', 'HUB'].join('_');
-    const file = write(
-      uniqPath('rule-retired-keyword-hub-flag', 'env.ts'),
-      lines(
-        `process.env.${retiredEnv} = 'true';`,
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(1);
-  });
-
-  it('flags keyword-hub re-added to the shared feature flag registry', () => {
-    const retiredKey = ['keyword', 'hub'].join('-');
-    const file = write(
-      'shared/types/feature-flags.ts',
-      lines(
-        'export const FEATURE_FLAGS = {',
-        `  '${retiredKey}': true,`,
-        '};',
-      ),
-    );
-
-    const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(2);
-  });
-
-  it('allows the surviving Keyword Hub sub-flags', () => {
-    const file = write(
-      uniqPath('rule-retired-keyword-hub-flag', 'negative.ts'),
-      lines(
-        "const a = isFeatureEnabled('keyword-universe-full');",
-        "const b = isFeatureEnabled('keyword-value-scoring');",
+        `fireBridge('${bridgeSource}', workspaceId, fn);`,
       ),
     );
 
@@ -1879,6 +1562,135 @@ describe('Rule: Raw fetch() in components', () => {
       )
     );
     expect(runRule(RULE, [above])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Hand-rolled Set toggle outside useToggleSet
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Hand-rolled Set toggle outside useToggleSet', () => {
+  const RULE = 'Hand-rolled Set toggle outside useToggleSet';
+
+  it('flags a simple toggle* function that clones/adds/deletes Set state', () => {
+    const file = write(
+      uniqPath('rule-toggle-set', 'src/components/Trigger.tsx'),
+      lines(
+        "import { useState } from 'react';",                 // 1
+        "export function Trigger() {",                       // 2
+        "  const [expanded, setExpanded] = useState(new Set<string>());", // 3
+        "  const toggleExpanded = (id: string) => {",        // 4
+        "    setExpanded(prev => {",                         // 5
+        "      const next = new Set(prev);",                 // 6
+        "      if (next.has(id)) next.delete(id);",          // 7
+        "      else next.add(id);",                          // 8
+        "      return next;",                                // 9
+        "    });",                                           // 10
+        "  };",                                              // 11
+        "  return null;",                                    // 12
+        "}",                                                 // 13
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(4);
+  });
+
+  it('respects // use-toggle-set-ok on the preceding line', () => {
+    const file = write(
+      uniqPath('rule-toggle-set', 'src/components/HatchAbove.tsx'),
+      lines(
+        "import { useState } from 'react';",                 // 1
+        "export function Trigger() {",                       // 2
+        "  const [expandedByPost, setExpandedByPost] = useState<Record<string, Set<number>>>({});", // 3
+        "  // use-toggle-set-ok -- map of Sets, not one Set state", // 4
+        "  const toggleSection = (postId: string, index: number) => {", // 5
+        "    setExpandedByPost(prev => {",                   // 6
+        "      const next = new Set(prev[postId] ?? []);",   // 7
+        "      if (next.has(index)) next.delete(index);",    // 8
+        "      else next.add(index);",                       // 9
+        "      return { ...prev, [postId]: next };",         // 10
+        "    });",                                           // 11
+        "  };",                                              // 12
+        "  return null;",                                    // 13
+        "}",                                                 // 14
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag callers that use useToggleSet()', () => {
+    const file = write(
+      uniqPath('rule-toggle-set', 'src/components/SharedHook.tsx'),
+      lines(
+        "import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';",
+        "export function Trigger() {",
+        "  const [expanded, toggleExpanded] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);",
+        "  return <button onClick={() => toggleExpanded('a')}>{expanded.size}</button>;",
+        "}",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag async operation Set state that is not a toggle* function', () => {
+    const file = write(
+      uniqPath('rule-toggle-set', 'src/components/OperationSet.tsx'),
+      lines(
+        "import { useState } from 'react';",
+        "export function Trigger() {",
+        "  const [saving, setSaving] = useState(new Set<string>());",
+        "  async function save(id: string) {",
+        "    setSaving(prev => new Set(prev).add(id));",
+        "    setSaving(prev => {",
+        "      const next = new Set(prev);",
+        "      next.delete(id);",
+        "      return next;",
+        "    });",
+        "  }",
+        "  return null;",
+        "}",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not confuse toggleMutation variables with toggle handlers', () => {
+    const file = write(
+      uniqPath('rule-toggle-set', 'src/components/MutationName.tsx'),
+      lines(
+        "import { useState } from 'react';",
+        "export function Trigger() {",
+        "  const [expanded, setExpanded] = useState(new Set<string>());",
+        "  const toggleMutation = useMutation({ mutationFn: async () => undefined });",
+        "  setExpanded(prev => {",
+        "    const next = new Set(prev);",
+        "    if (next.has('x')) next.delete('x');",
+        "    else next.add('x');",
+        "    return next;",
+        "  });",
+        "  return null;",
+        "}",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('ignores files outside src/components and src/hooks', () => {
+    const file = write(
+      uniqPath('rule-toggle-set', 'server/Trigger.ts'),
+      lines(
+        "const toggleExpanded = (id: string) => {",
+        "  setExpanded(prev => {",
+        "    const next = new Set(prev);",
+        "    if (next.has(id)) next.delete(id);",
+        "    else next.add(id);",
+        "    return next;",
+        "  });",
+        "};",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });
 
@@ -3181,6 +2993,88 @@ describe('buildWorkspaceScopedTables ALTER TABLE workspace_id detection', () => 
     );
     const tables = buildWorkspaceScopedTables(dir);
     expect(tables.has('assets')).toBe(true);
+  });
+});
+
+describe('Rule: New JSON-array TEXT column without normalization review', () => {
+  const RULE = 'New JSON-array TEXT column without normalization review';
+
+  it('raw scanner finds TEXT columns that default to []', () => {
+    const dir = path.join(TMPDIR, 'json-array-scanner', 'migrations');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, '999-fixture.sql'), [
+      'CREATE TABLE IF NOT EXISTS sample_rows (',
+      '  id TEXT PRIMARY KEY,',
+      "  items TEXT NOT NULL DEFAULT '[]'",
+      ');',
+    ].join('\n'), 'utf-8');
+
+    const hits = findJsonArrayColumnSites(dir);
+
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('"items"');
+  });
+
+  it('flags an unbaselined migration array column', () => {
+    const file = write(
+      uniqPath('rule-json-array-column', 'server/db/migrations/999-new-array.sql'),
+      [
+        'CREATE TABLE IF NOT EXISTS new_array_table (',
+        '  id TEXT PRIMARY KEY,',
+        "  items TEXT NOT NULL DEFAULT '[]'",
+        ');',
+      ].join('\n'),
+    );
+
+    const hits = runRule(RULE, [file]);
+
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('"items"');
+  });
+
+  it('flags quoted identifiers and parenthesized array defaults', () => {
+    const file = write(
+      uniqPath('rule-json-array-column-quoted', 'server/db/migrations/999-quoted-array.sql'),
+      [
+        'CREATE TABLE IF NOT EXISTS quoted_array_table (',
+        '  id TEXT PRIMARY KEY,',
+        '  "items" TEXT NOT NULL DEFAULT (\'[]\')',
+        ');',
+      ].join('\n'),
+    );
+
+    const hits = runRule(RULE, [file]);
+
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('"items"');
+  });
+
+  it('allows an explicitly hatched array column', () => {
+    const file = write(
+      uniqPath('rule-json-array-column-hatch', 'server/db/migrations/999-hatched-array.sql'),
+      [
+        'CREATE TABLE IF NOT EXISTS new_array_table (',
+        '  id TEXT PRIMARY KEY,',
+        "  items TEXT NOT NULL DEFAULT '[]' -- json-array-column-ok: bounded small append-only metadata",
+        ');',
+      ].join('\n'),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('ignores non-array TEXT defaults', () => {
+    const file = write(
+      uniqPath('rule-json-array-column-negative', 'server/db/migrations/999-negative.sql'),
+      [
+        'CREATE TABLE IF NOT EXISTS scalar_table (',
+        '  id TEXT PRIMARY KEY,',
+        "  label TEXT NOT NULL DEFAULT ''",
+        ');',
+      ].join('\n'),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });
 
@@ -5124,9 +5018,9 @@ describe('Rule: Bare slug used in pagePath construction — use resolvePagePath(
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('does NOT flag server/helpers.ts (canonical implementation)', () => {
+  it('does NOT flag server/utils/page-address.ts (canonical implementation)', () => {
     const file = write(
-      uniqPath('rule-bare-slug', 'server/helpers.ts'),
+      uniqPath('rule-bare-slug', 'server/utils/page-address.ts'),
       lines(
         'export function resolvePagePath(page: { publishedPath?: string | null; slug?: string }): string {',
         '  return page.publishedPath || (page.slug ? `/${page.slug}` : \'/\');',
@@ -5215,9 +5109,9 @@ describe('Rule: resolvePagePath(...) with undefined fallback is dead code — us
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('does NOT flag server/helpers.ts (excluded — canonical implementation)', () => {
+  it('does NOT flag server/utils/page-address.ts (excluded — canonical implementation)', () => {
     const file = write(
-      uniqPath('rule-resolve-dead-code', 'server/helpers.ts'),
+      uniqPath('rule-resolve-dead-code', 'server/utils/page-address.ts'),
       lines(
         'const basePath = resolvePagePath(page) || undefined;',
       )
@@ -5736,6 +5630,7 @@ describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
     'Global keydown missing isContentEditable guard',
     'Multi-step DB writes outside db.transaction()',
+    'New JSON-array TEXT column without normalization review',
     'AI call before db.prepare without transaction guard',
     'Ad hoc domain normalization helper outside canonical authority',
     'Ad hoc HTML extraction helper outside canonical authority',
@@ -5751,6 +5646,7 @@ describe('Meta: customCheck rule name registry', () => {
     'Raw string literal in broadcastToWorkspace() event arg',
     'Raw string literal in broadcast() event arg',
     'Raw fetch() in components',
+    'Hand-rolled Set toggle outside useToggleSet',
     // Migrated from inline blocks (PR #168 scaled-review I17)
     'Assembled-but-never-rendered slice fields',
     'callCreativeAI without json: flag in files that use parseJsonFallback',
@@ -5774,7 +5670,7 @@ describe('Meta: customCheck rule name registry', () => {
     'Inline React Query string key (use queryKeys.*)',
     'Missing broadcastToWorkspace after DB write in route handler',
     // Keyword Command Center crash-hardening follow-up
-    'Keyword Command Center summary/detail must not use full model',
+    'Keyword Command Center read paths must not use full model',
     'Local SEO Evaluated candidates must be explicitly gated',
     'Retired normalizePath usage in production code',
     'Local page/path normalizer helper outside tests',
@@ -5861,6 +5757,8 @@ describe('Meta: customCheck rule name registry', () => {
     'Wikidata disambiguation outside entity-resolution intelligence modules',
     // 2026-05-08 inbox redesign — retired InboxFilter literals
     'inbox-legacy-filter-literal',
+    // 2026-06-14 inbox alias sunset — top-level client route aliases are removed
+    'retired-client-inbox-route-alias',
     // PR 1.5 Phase 1 IA prevention rules (2026-05-10)
     'feedback-module-reintroduction',
     'prediction-showcase-ungated',
@@ -5897,21 +5795,9 @@ describe('Meta: customCheck rule name registry', () => {
     // the multi-phase generation-quality plan (no false positives on current code).
     'opportunity-money-field-must-be-stripped',
     'new-rec-type-source-needs-category-and-action-type',
-    // Outcome feature flag retirement PR1 (2026-06-04) — retired outcome
-    // rollout keys must not re-enter runtime/UI/test flag APIs.
-    'Retired outcome feature flag key used in flag API',
-    // Feature flag retirement PR2 (2026-06-04) — bridge/opportunity source
-    // identifiers remain valid, but retired keys cannot be used as flags.
-    'Retired bridge/opportunity feature flag key used in flag API',
-    // Feature flag retirement PR3 (2026-06-04) — unified inbox / deliverables
-    // cutover removed the rollout keys, so they cannot re-enter flag APIs.
-    'Retired unified inbox feature flag key used in flag API',
-    // Feature flag retirement PR4 (2026-06-04) — product/UI rollout keys
-    // became canonical and cannot re-enter runtime/UI/test flag APIs.
-    'Retired product/UI feature flag key used in flag API',
-    // Feature flag retirement PR5 (2026-06-05) — SEO/runtime rollout keys
-    // became canonical and cannot re-enter runtime/UI/test flag APIs.
-    'Retired SEO/runtime feature flag key used in flag API',
+    // Feature flag retirement waves — retired rollout keys must not re-enter
+    // runtime/UI/test flag APIs after their enabled paths become canonical.
+    'Retired feature flag key used in flag API',
     // OV cleanup PR2 (2026-06-05) — recommendation runtime scoring must flow
     // from the canonical Opportunity Value scorer, not local impact buckets.
     'recommendation impactScore must flow from canonical OV scorer',
@@ -5936,9 +5822,6 @@ describe('Meta: customCheck rule name registry', () => {
     // Sidebar/CommandPalette/Breadcrumbs and drifted; the nav registry is now
     // the single source of truth. Bans re-inlining label/needsSite in consumers.
     'Hardcoded nav metadata outside the nav registry',
-    // Keyword Hub cutover Phase C (2026-06-11) — the keyword-hub umbrella flag was
-    // retired once the Hub became the only keyword surface; it must not re-enter flag APIs.
-    'Retired Keyword Hub feature flag key used in flag API',
     // Keyword Hub cutover Phase C (2026-06-11) — the standalone Rank Tracker (seo-ranks)
     // was folded into the Hub; the 'seo-ranks' Page literal must not return to src/.
     'Retired seo-ranks route literal in src',
@@ -6351,27 +6234,28 @@ describe('Rule: useWorkspaceEvents handler for centralized event', () => {
   });
 });
 
-describe('Rule: Keyword Command Center summary/detail must not use full model', () => {
-  it('flags summary/detail calling the full model builder', () => {
+describe('Rule: Keyword Command Center read paths must not use full model', () => {
+  const RULE = 'Keyword Command Center read paths must not use full model';
+
+  it('flags KCC read paths importing or calling the retired full model builder', () => {
     const file = write(
-      uniqPath('rule-kcc-skinny', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-skinny', 'server/domains/keyword-command-center/rows-service.ts'),
       lines(
-        'export async function buildKeywordCommandCenterSummary(workspaceId: string) {',
+        "import { buildKeywordCommandCenterModel } from './model-service.js';",
+        'export async function buildKeywordCommandCenterRows(workspaceId: string) {',
         '  return buildKeywordCommandCenterModel(workspaceId);',
-        '}',
-        'export async function buildKeywordCommandCenterDetail(workspaceId: string) {',
-        '  return { ok: true };',
         '}',
       ),
     );
-    const hits = runRule('Keyword Command Center summary/detail must not use full model', [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].text).toContain('buildKeywordCommandCenterSummary');
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
+    expect(hits[0].text).toContain('model-service');
+    expect(hits[1].text).toContain('buildKeywordCommandCenterModel');
   });
 
-  it('accepts skinny summary/detail implementations', () => {
+  it('accepts skinny read implementations and cheap local-candidate projection', () => {
     const file = write(
-      uniqPath('rule-kcc-skinny', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-skinny', 'server/domains/keyword-command-center/rows-service.ts'),
       lines(
         'export async function buildKeywordCommandCenterSummary(workspaceId: string) {',
         '  return buildSummaryCounts(workspaceId);',
@@ -6379,9 +6263,15 @@ describe('Rule: Keyword Command Center summary/detail must not use full model', 
         'export async function buildKeywordCommandCenterDetail(workspaceId: string) {',
         '  return buildSingleKeyword(workspaceId);',
         '}',
+        'export async function buildKeywordCommandCenterInitialView(workspaceId: string) {',
+        '  return { summary: buildSummaryCounts(workspaceId), rows: buildRows(workspaceId) };',
+        '}',
+        'export async function buildKeywordCommandCenterLocalCandidateRows(workspaceId: string) {',
+        '  return buildLocalSeoKeywordCandidates(workspaceId);',
+        '}',
       ),
     );
-    expect(runRule('Keyword Command Center summary/detail must not use full model', [file])).toHaveLength(0);
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
 });
@@ -6391,7 +6281,7 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
 
   it('flags ungated Evaluated candidate generation in command center read paths', () => {
     const file = write(
-      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/rows-service.ts'),
       lines(
         'export async function buildKeywordCommandCenterRowsSkinny(workspaceId: string) {',
         '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
@@ -6405,7 +6295,7 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
 
   it('does NOT flag the cheap default buildLocalSeoKeywordCandidates', () => {
     const file = write(
-      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/rows-service.ts'),
       lines(
         'export async function buildKeywordCommandCenterRowsSkinny(workspaceId: string) {',
         '  return buildLocalSeoKeywordCandidates(workspaceId);',
@@ -6415,21 +6305,23 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('accepts Evaluated generation in the explicit local-candidate path', () => {
+  it('flags Evaluated generation in the retired full-model local-candidate path', () => {
     const file = write(
-      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/model-service.ts'),
       lines(
-        'async function buildKeywordCommandCenterRowsViaModel(workspaceId: string) {',
+        'export async function buildKeywordCommandCenterModel(workspaceId: string) {',
         '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
         '}',
       ),
     );
-    expect(runRule(RULE, [file])).toHaveLength(0);
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('buildKeywordCommandCenterModel');
   });
 
   it('accepts an explicit temporary hatch for selected-keyword detail fallback', () => {
     const file = write(
-      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/detail-service.ts'),
       lines(
         'export async function buildKeywordCommandCenterDetail(workspaceId: string) {',
         '  // local-candidates-evaluated-ok: explicit selected keyword fallback',
@@ -6440,9 +6332,9 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('does not let an allowlisted function name leak into later helpers', () => {
+  it('does not let a deleted full-model helper name bypass the Evaluated guard', () => {
     const file = write(
-      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/rows-service.ts'),
       lines(
         'async function buildKeywordCommandCenterRowsViaModel(workspaceId: string) {',
         '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
@@ -6453,13 +6345,14 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
       ),
     );
     const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].text).toContain('buildKeywordCommandCenterRowsSkinny');
+    expect(hits).toHaveLength(2);
+    expect(hits[0].text).toContain('buildKeywordCommandCenterRowsViaModel');
+    expect(hits[1].text).toContain('buildKeywordCommandCenterRowsSkinny');
   });
 
   it('flags ungated arrow-function Evaluated generation', () => {
     const file = write(
-      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/rows-service.ts'),
       lines(
         'const buildKeywordCommandCenterRowsSkinny = async (workspaceId: string) => {',
         '  return buildLocalSeoKeywordCandidatesEvaluated(workspaceId);',
@@ -6471,9 +6364,9 @@ describe('Rule: Local SEO Evaluated candidates must be explicitly gated', () => 
     expect(hits[0].text).toContain('buildKeywordCommandCenterRowsSkinny');
   });
 
-  it('does not let a one-line allowlisted arrow declaration leak scope', () => {
+  it('does not let a deleted one-line full-model helper name leak into later helpers', () => {
     const file = write(
-      uniqPath('rule-kcc-local-candidates', 'server/keyword-command-center.ts'),
+      uniqPath('rule-kcc-local-candidates', 'server/domains/keyword-command-center/rows-service.ts'),
       lines(
         'const buildKeywordCommandCenterRowsViaModel = () => 1;',
         'function buildKeywordCommandCenterRowsSkinny(workspaceId: string) {',
@@ -9003,25 +8896,25 @@ describe('Rule: stat-primitive-bypass-signal', () => {
 // Rule: schema-context-direct-read-not-on-allowlist
 // ════════════════════════════════════════════════════════════════════════════
 //
-// Brace-walks buildSchemaContext in server/helpers.ts, skipping identity
+// Brace-walks buildSchemaContext in server/schema/context-builder.ts, skipping identity
 // fields (ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl, ws.siteHasSearch,
 // siteId), and supporting legacy hatches for non-identity reads except migrated
 // forbidden fields (`ws.brandVoice`, `ws.keywordStrategy`, `ws.businessProfile`).
 //
-// The fixture files are placed at a path ending in `server/helpers.ts` so
-// the rule's `file.endsWith('server/helpers.ts')` guard accepts them.
+// The fixture files are placed at a path ending in `server/schema/context-builder.ts` so
+// the rule's `file.endsWith('server/schema/context-builder.ts')` guard accepts them.
 //
 // ════════════════════════════════════════════════════════════════════════════
 
 describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
   const RULE = 'schema-context-direct-read-not-on-allowlist';
 
-  // Write a minimal helpers.ts fixture at a path ending in server/helpers.ts.
+  // Write a minimal schema context fixture at a path ending in server/schema/context-builder.ts.
   // The function signature spans 3 lines (matching the real file's multi-line
   // return type) so the paren+angle body-opener logic is exercised.
-  function writeHelpers(subdir: string, bodyLines: string): string {
+  function writeSchemaContext(subdir: string, bodyLines: string): string {
     return write(
-      `${subdir}/server/helpers.ts`,
+      `${subdir}/server/schema/context-builder.ts`,
       lines(
         'export async function buildSchemaContext(',
         '  siteId: string,',
@@ -9035,7 +8928,7 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
   }
 
   it('flags a non-allowlist ws.* read with no hatch', () => {
-    const file = writeHelpers(
+    const file = writeSchemaContext(
       uniqPath('rule-schema-ctx', 'trigger'),
       '  ctx.foo = ws.gscPropertyUrl;',
     );
@@ -9045,7 +8938,7 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
   });
 
   it('does NOT flag allowlisted identity reads (ws.name, ws.id, ws.liveDomain, ws.brandLogoUrl, ws.siteHasSearch, siteId)', () => {
-    const file = writeHelpers(
+    const file = writeSchemaContext(
       uniqPath('rule-schema-ctx', 'allowlist-neg'),
       lines(
         '  ctx.companyName = ws.name;',
@@ -9061,7 +8954,7 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
   });
 
   it('respects inline // schema-context-direct-read-ok hatch on the same line', () => {
-    const file = writeHelpers(
+    const file = writeSchemaContext(
       uniqPath('rule-schema-ctx', 'hatch-inline'),
       '  ctx.foo = ws.gscPropertyUrl; // schema-context-direct-read-ok: legacy',
     );
@@ -9070,7 +8963,7 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
   });
 
   it('respects // schema-context-direct-read-ok hatch on the line immediately above', () => {
-    const file = writeHelpers(
+    const file = writeSchemaContext(
       uniqPath('rule-schema-ctx', 'hatch-above'),
       lines(
         '  // schema-context-direct-read-ok: legacy; tracked in roadmap',
@@ -9081,7 +8974,29 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
     expect(hits).toHaveLength(0);
   });
 
-  it('does NOT scan files that do not end in server/helpers.ts', () => {
+  it('flags awaited listSitesCached and ws.* argument reads without hatch', () => {
+    const file = writeSchemaContext(
+      uniqPath('rule-schema-ctx', 'await-helper-trigger'),
+      '  const sites = await listSitesCached(ws.webflowToken || undefined);',
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(hits[0].text).toContain('listSitesCached');
+  });
+
+  it('allows documented Webflow locale token reads with schema-context hatch', () => {
+    const file = writeSchemaContext(
+      uniqPath('rule-schema-ctx', 'await-helper-hatch'),
+      lines(
+        '  // schema-context-direct-read-ok: Webflow token selects workspace-scoped locale source',
+        '  const sites = await listSitesCached(ws.webflowToken || undefined);',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('does NOT scan files that do not end in server/schema/context-builder.ts', () => {
     const file = write(
       uniqPath('rule-schema-ctx', 'wrong-file.ts'),
       lines(
@@ -9095,7 +9010,7 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
   });
 
   it('flags migrated-forbidden ws.brandVoice even with hatch', () => {
-    const file = writeHelpers(
+    const file = writeSchemaContext(
       uniqPath('rule-schema-ctx', 'forbidden-brandvoice'),
       '  ctx.brandVoice = ws.brandVoice; // schema-context-direct-read-ok: legacy',
     );
@@ -9105,7 +9020,7 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
   });
 
   it('flags migrated-forbidden ws.keywordStrategy path even with hatch', () => {
-    const file = writeHelpers(
+    const file = writeSchemaContext(
       uniqPath('rule-schema-ctx', 'forbidden-keywordstrategy'),
       '  ctx.businessContext = ws.keywordStrategy?.businessContext; // schema-context-direct-read-ok: legacy',
     );
@@ -9115,7 +9030,7 @@ describe('Rule: schema-context-direct-read-not-on-allowlist', () => {
   });
 
   it('flags migrated-forbidden ws.businessProfile even with hatch', () => {
-    const file = writeHelpers(
+    const file = writeSchemaContext(
       uniqPath('rule-schema-ctx', 'forbidden-businessprofile'),
       '  ctx._businessProfile = ws.businessProfile; // schema-context-direct-read-ok: legacy',
     );
@@ -9351,6 +9266,95 @@ describe('Rule: inbox-legacy-filter-literal', () => {
         '  return <a href={`/inbox?tab=approvals`}>x</a>;',
         '}',
       )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: retired-client-inbox-route-alias
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: retired-client-inbox-route-alias', () => {
+  const RULE = 'retired-client-inbox-route-alias';
+
+  it('flags server-built /client/:workspaceId/content links', () => {
+    const file = write(
+      uniqPath('rule-retired-client-route', 'server/routes/content-requests.ts'),
+      lines(
+        'export function buildUrl(origin: string, workspaceId: string) {',
+        '  return `${origin}/client/${workspaceId}/content`;',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+	  it('flags beta client retired route aliases in src', () => {
+	    const file = write(
+	      uniqPath('rule-retired-client-route', 'src/components/BadRoute.tsx'),
+      lines(
+        'export function BadRoute({ workspaceId }: { workspaceId: string }) {',
+        '  return <a href={`/client/beta/${workspaceId}/schema-review`}>Review</a>;',
+        '}',
+      ),
+    );
+	    expect(runRule(RULE, [file])).toHaveLength(1);
+	  });
+
+	  it('flags production clientPath calls with retired aliases', () => {
+	    const file = write(
+	      uniqPath('rule-retired-client-route', 'src/components/BadClientPath.tsx'),
+	      lines(
+	        "import { clientPath } from '../../routes';",
+	        'export function BadClientPath({ workspaceId }: { workspaceId: string }) {',
+	        "  return clientPath(workspaceId, 'content');",
+	        '}',
+	      ),
+	    );
+	    expect(runRule(RULE, [file])).toHaveLength(1);
+	  });
+
+	  it('allows canonical Inbox Reviews links', () => {
+    const file = write(
+      uniqPath('rule-retired-client-route', 'server/routes/content-requests.ts'),
+      lines(
+        'export function buildUrl(origin: string, workspaceId: string) {',
+        '  return `${origin}/client/${workspaceId}/inbox?tab=reviews`;',
+        '}',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('ignores tests and comment-only historical references', () => {
+    const testFile = write(
+      uniqPath('rule-retired-client-route', 'tests/unit/client-routes.test.ts'),
+      lines(
+        "expect(clientPath('ws', 'content')).toBe('/client/ws/content');",
+      ),
+    );
+    const srcFile = write(
+      uniqPath('rule-retired-client-route', 'src/routes.ts'),
+      lines(
+        '// Historical note: old links looked like /client/ws/content.',
+        'export const route = "/client/ws/inbox?tab=reviews";',
+      ),
+    );
+    expect(runRule(RULE, [testFile, srcFile])).toHaveLength(0);
+  });
+
+  it('suppresses with retired-client-inbox-route-alias-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-retired-client-route', 'server/routes/legacy-fixture.ts'),
+      lines(
+        'export function legacyFixture(origin: string, workspaceId: string) {',
+        '  // retired-client-inbox-route-alias-ok: intentional external compatibility fixture',
+        '  return `${origin}/client/${workspaceId}/requests`;',
+        '}',
+      ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
@@ -9949,6 +9953,65 @@ describe('Rule: Public route under /api/public/ missing client-portal auth middl
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
+  it('does not flag routes covered by a local auth middleware alias', () => {
+    const file = writeRoute(
+      uniqPath('rule-public-auth', 'local-alias'),
+      lines(
+        "import { router } from './router.js';",
+        "const requireClientStrategyMutationAuth = [",
+        "  requireAuthenticatedClientPortalAuth('workspaceId'),",
+        "  attachClientEmail,",
+        "];",
+        "router.post('/api/public/keyword-feedback/:workspaceId', ...requireClientStrategyMutationAuth, validate(schema), (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag routes covered by a direct local auth middleware alias', () => {
+    const file = writeRoute(
+      uniqPath('rule-public-auth', 'direct-alias'),
+      lines(
+        "import { router } from './router.js';",
+        "const requireClientCopyReviewAuth = requireAuthenticatedClientPortalAuth('workspaceId');",
+        "router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', requireClientCopyReviewAuth, (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags an unguarded public route even when it does not use a workspaceId param', () => {
+    const file = writeRoute(
+      uniqPath('rule-public-auth', 'non-workspace-public'),
+      lines(
+        "import { router } from './router.js';",
+        "router.get('/api/public/report/:id', (req, res) => {",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does not flag intentional public share-link routes with an inline hatch', () => {
+    const file = writeRoute(
+      uniqPath('rule-public-auth', 'share-link-hatch'),
+      lines(
+        "import { router } from './router.js';",
+        "router.get('/api/public/report/:id', (req, res) => { // public-no-auth-ok: signed share-link",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
   it('does not flag bootstrap/login allow-list resources', () => {
     const file = writeRoute(
       uniqPath('rule-public-auth', 'allowlist'),
@@ -9956,10 +10019,28 @@ describe('Rule: Public route under /api/public/ missing client-portal auth middl
         "import { router } from './router.js';",
         "router.post('/api/public/auth/:id', (req, res) => res.json({ ok: true }));",
         "router.get('/api/public/auth-mode/:id', (req, res) => res.json({}));",
+        "router.get('/api/public/tier/:id', (req, res) => res.json({}));",
+        "router.get('/api/public/pricing/:id', (req, res) => res.json({}));",
         "router.post('/api/public/forgot-password/:id', (req, res) => res.json({ ok: true }));",
       ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags an unguarded route whose body has a TODO comment naming the middleware', () => {
+    const file = writeRoute(
+      uniqPath('rule-public-auth', 'todo-comment'),
+      lines(
+        "import { router } from './router.js';",
+        "router.get('/api/public/widget/:workspaceId', (req, res) => {",
+        "  // TODO: add requireClientPortalAuth() later",
+        "  res.json({ ok: true });",
+        "});",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
   });
 
   it('respects // public-no-auth-ok inline hatch', () => {
@@ -9974,13 +10055,6 @@ describe('Rule: Public route under /api/public/ missing client-portal auth middl
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
-
-  // Note: the rule's `exclude` list (file-level grandfathering) is enforced
-  // by the pr-check runner outside the customCheck function, so it cannot be
-  // exercised via the unit-level runRule() helper used here. The grandfather
-  // exemption is verified end-to-end by running `npx tsx scripts/pr-check.ts`
-  // against the committed routes (the seven listed files contain unprotected
-  // public routes but pr-check passes because they sit in the exclude list).
 });
 
 // ── Plan A Task 2: trial-state centralization ─────────────────────────────
@@ -10623,7 +10697,7 @@ describe('Rule: opportunity-money-field-must-be-stripped', () => {
         '}',
       ),
     );
-    const strip = write(uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'), STRIP_OK);
+    const strip = write(uniqPath('rule-opp-strip', 'server/recommendation-public-projection.ts'), STRIP_OK);
     expect(runRule(RULE, [types, strip])).toHaveLength(0);
   });
 
@@ -10640,7 +10714,7 @@ describe('Rule: opportunity-money-field-must-be-stripped', () => {
         '}',                                   // 7
       ),
     );
-    const strip = write(uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'), STRIP_OK);
+    const strip = write(uniqPath('rule-opp-strip', 'server/recommendation-public-projection.ts'), STRIP_OK);
     const hits = runRule(RULE, [types, strip]);
     expect(hits).toHaveLength(1);
     expect(hits[0].line).toBe(5);
@@ -10659,7 +10733,7 @@ describe('Rule: opportunity-money-field-must-be-stripped', () => {
       ),
     );
     const strip = write(
-      uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'),
+      uniqPath('rule-opp-strip', 'server/recommendation-public-projection.ts'),
       'function stripEmvFromPublicRecs(recs) {\n' +
         '  const { emvPerWeek: _e, roiPerEffortDay: _r, predictedEmv: _p, ...rest } = r.opportunity;\n' +
         '}\n',
@@ -10680,7 +10754,7 @@ describe('Rule: opportunity-money-field-must-be-stripped', () => {
     );
     // predictedEmv is mentioned only in a doc-comment, never destructured → must still flag.
     const strip = write(
-      uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'),
+      uniqPath('rule-opp-strip', 'server/recommendation-public-projection.ts'),
       '// NOTE: predictedEmv: is admin-only and handled elsewhere (this is just prose).\n' +
         'function stripEmvFromPublicRecs(recs) {\n' +
         '  const { emvPerWeek: _e, roiPerEffortDay: _r, ...rest } = r.opportunity;\n' +
@@ -10702,7 +10776,7 @@ describe('Rule: opportunity-money-field-must-be-stripped', () => {
         '}',
       ),
     );
-    const strip = write(uniqPath('rule-opp-strip', 'server/routes/recommendations.ts'), STRIP_OK);
+    const strip = write(uniqPath('rule-opp-strip', 'server/recommendation-public-projection.ts'), STRIP_OK);
     expect(runRule(RULE, [types, strip])).toHaveLength(0);
   });
 
@@ -10730,6 +10804,7 @@ describe('Rule: opportunity-money-field-must-be-stripped', () => {
 
 describe('Rule: new-rec-type-source-needs-category-and-action-type', () => {
   const RULE = 'new-rec-type-source-needs-category-and-action-type';
+  const TARGET = 'server/domains/recommendations/rules.ts';
 
   const UNION = (...members: string[]): string =>
     'export type RecSourceCategory =\n' + members.map(m => `  | '${m}'`).join('\n') + ';';
@@ -10740,7 +10815,7 @@ describe('Rule: new-rec-type-source-needs-category-and-action-type', () => {
 
   it('does NOT flag when the union and array are in lockstep', () => {
     const file = write(
-      uniqPath('rule-rec-source', 'server/recommendations.ts'),
+      uniqPath('rule-rec-source', TARGET),
       lines(UNION('audit', 'strategy', 'decay'), ARRAY('audit', 'strategy', 'decay')),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
@@ -10748,7 +10823,7 @@ describe('Rule: new-rec-type-source-needs-category-and-action-type', () => {
 
   it('flags a union member missing from REC_SOURCE_CATEGORIES (G2 false auto-resolve)', () => {
     const file = write(
-      uniqPath('rule-rec-source', 'server/recommendations.ts'),
+      uniqPath('rule-rec-source', TARGET),
       lines(
         UNION('audit', 'strategy', 'decay', 'keyword_gap'),
         ARRAY('audit', 'strategy', 'decay'), // keyword_gap NOT added — the bug
@@ -10762,7 +10837,7 @@ describe('Rule: new-rec-type-source-needs-category-and-action-type', () => {
 
   it('flags an array member missing from the union', () => {
     const file = write(
-      uniqPath('rule-rec-source', 'server/recommendations.ts'),
+      uniqPath('rule-rec-source', TARGET),
       lines(
         UNION('audit', 'strategy'),
         ARRAY('audit', 'strategy', 'topic_cluster'), // topic_cluster not in union
@@ -10776,7 +10851,7 @@ describe('Rule: new-rec-type-source-needs-category-and-action-type', () => {
 
   it('respects the // rec-source-lockstep-ok hatch on the array opener line', () => {
     const file = write(
-      uniqPath('rule-rec-source', 'server/recommendations.ts'),
+      uniqPath('rule-rec-source', TARGET),
       lines(
         UNION('audit', 'strategy', 'keyword_gap'),
         "const REC_SOURCE_CATEGORIES: RecSourceCategory[] = [ // rec-source-lockstep-ok",
@@ -10816,6 +10891,21 @@ describe('Rule: recommendation impactScore must flow from canonical OV scorer', 
   it('flags local legacy impactScore math in recommendations runtime', () => {
     const file = write(
       uniqPath('rule-rec-impactscore', 'server/recommendations.ts'),
+      lines(
+        'function bad() {',
+        '  const impactScore = 75;',
+        '  return { impactScore: 75 };',
+        '}',
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags local legacy impactScore math in extracted recommendation producers', () => {
+    const file = write(
+      uniqPath('rule-rec-impactscore', 'server/domains/recommendations/generation-producers.ts'),
       lines(
         'function bad() {',
         '  const impactScore = 75;',
@@ -11314,5 +11404,228 @@ describe('Rule: Hardcoded nav metadata outside the nav registry', () => {
       lines("  { id: 'analytics-hub', label: 'Search & Traffic', icon: X, needsSite: true },")
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getChangedFiles() must fold untracked (net-new, not-yet-`git add`-ed) files
+// into the default diff-only scan. `git diff --name-only <base>` EXCLUDES
+// untracked files, so a PR/change composed wholly or partly of new files would
+// otherwise report "0 errors" by default — a silent false-green. (Caught during
+// Strategy v3 Phase 2: 10 new cockpit-UI files scanned clean by default while
+// `--all` revealed 5 real error-severity violations.)
+//
+// These run against throwaway temp git repos OUTSIDE the project tree so they
+// exercise the real `git` invocations without touching this repo's state.
+describe('getChangedFiles: untracked-file coverage (net-new-file false-green)', () => {
+  const ORIGINAL_GH_BASE = process.env.GITHUB_BASE_REF;
+  const repos: string[] = [];
+
+  beforeAll(() => {
+    // getChangedFiles consults GITHUB_BASE_REF first. Our temp repos have no
+    // `origin` remote, so a set value would just make that branch throw and
+    // fall through — harmless, but we clear it so the tests are deterministic
+    // regardless of whether they run under GitHub Actions.
+    delete process.env.GITHUB_BASE_REF;
+  });
+
+  afterAll(() => {
+    if (ORIGINAL_GH_BASE === undefined) delete process.env.GITHUB_BASE_REF;
+    else process.env.GITHUB_BASE_REF = ORIGINAL_GH_BASE;
+    for (const repo of repos) rmSync(repo, { recursive: true, force: true });
+  });
+
+  function git(cwd: string, ...args: string[]): string {
+    const env = { ...process.env };
+    delete env.GIT_DIR;
+    delete env.GIT_WORK_TREE;
+    delete env.GIT_INDEX_FILE;
+    delete env.GIT_PREFIX;
+    return execFileSync('git', args, {
+      cwd,
+      env,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  }
+
+  // Isolated temp git repo (in the OS tmpdir, outside this project) with one
+  // initial commit so HEAD exists. Returns its absolute path.
+  function makeTempRepo(): string {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pr-check-gitrepo-'));
+    repos.push(dir);
+    git(dir, 'init');
+    git(dir, 'config', 'user.email', 'test@example.com');
+    git(dir, 'config', 'user.name', 'pr-check test');
+    git(dir, 'config', 'commit.gpgsign', 'false');
+    writeFileSync(path.join(dir, 'baseline.ts'), 'export const baseline = 1;\n', 'utf-8');
+    git(dir, 'add', 'baseline.ts');
+    git(dir, 'commit', '-m', 'initial');
+    return dir;
+  }
+
+  function commitFile(repo: string, fileName: string, source: string, message: string): string {
+    writeFileSync(path.join(repo, fileName), source, 'utf-8');
+    git(repo, 'add', fileName);
+    git(repo, 'commit', '-m', message);
+    return git(repo, 'rev-parse', 'HEAD');
+  }
+
+  it('mergeChangedFiles unions tracked + untracked, tracked-first, de-duplicated', () => {
+    expect(mergeChangedFiles(['a.ts', 'b.ts'], ['b.ts', 'c.ts'])).toEqual(['a.ts', 'b.ts', 'c.ts']);
+    expect(mergeChangedFiles([], ['x.ts'])).toEqual(['x.ts']);
+    expect(mergeChangedFiles(['x.ts'], [])).toEqual(['x.ts']);
+  });
+
+  it('getUntrackedFiles returns new files not yet git-added, and excludes committed files', () => {
+    const repo = makeTempRepo();
+    writeFileSync(path.join(repo, 'brand-new.ts'), 'export const x = 1;\n', 'utf-8');
+    const untracked = getUntrackedFiles(repo);
+    expect(untracked).toContain('brand-new.ts');
+    expect(untracked).not.toContain('baseline.ts'); // committed → tracked, not untracked
+  });
+
+  it('getUntrackedFiles honours .gitignore (no build-artifact flood)', () => {
+    const repo = makeTempRepo();
+    writeFileSync(path.join(repo, '.gitignore'), 'ignored.ts\n', 'utf-8');
+    writeFileSync(path.join(repo, 'ignored.ts'), 'export const x = 1;\n', 'utf-8');
+    writeFileSync(path.join(repo, 'kept.ts'), 'export const y = 1;\n', 'utf-8');
+    const untracked = getUntrackedFiles(repo);
+    expect(untracked).toContain('kept.ts');
+    expect(untracked).not.toContain('ignored.ts');
+  });
+
+  it('getChangedFiles includes an untracked new file even with no tracked diff (the false-green bug)', () => {
+    const repo = makeTempRepo();
+    // The sole change is a net-new file; nothing is git-added or committed.
+    writeFileSync(path.join(repo, 'cockpit-ui.tsx'), 'export const C = () => null;\n', 'utf-8');
+    expect(getChangedFiles(repo)).toContain('cockpit-ui.tsx');
+  });
+
+  it('getChangedFiles unions a tracked modification with an untracked new file', () => {
+    const repo = makeTempRepo();
+    // Tracked modification, committed → a second commit so the HEAD~1 diff path
+    // (used when no origin/staging|main exists) reports baseline.ts.
+    writeFileSync(path.join(repo, 'baseline.ts'), 'export const baseline = 2;\n', 'utf-8');
+    git(repo, 'commit', '-am', 'modify baseline');
+    // Untracked new file created after the commit.
+    writeFileSync(path.join(repo, 'added.ts'), 'export const a = 1;\n', 'utf-8');
+    const changed = getChangedFiles(repo);
+    expect(changed).toContain('baseline.ts'); // tracked (HEAD~1 diff)
+    expect(changed).toContain('added.ts'); // untracked
+  });
+
+  it('uses origin/staging three-dot diff and does not fall through to origin/main when staging has no changes', () => {
+    const repo = makeTempRepo();
+    const stagingHead = commitFile(repo, 'staging-only.ts', 'export const staging = true;\n', 'staging work');
+    git(repo, 'update-ref', 'refs/remotes/origin/staging', stagingHead);
+
+    git(repo, 'checkout', '-b', 'main-sim', stagingHead);
+    const mainHead = commitFile(repo, 'main-only.ts', 'export const main = true;\n', 'main work');
+    git(repo, 'update-ref', 'refs/remotes/origin/main', mainHead);
+    git(repo, 'checkout', '-B', 'work', stagingHead);
+
+    expect(getChangedFiles(repo)).toEqual([]);
+  });
+
+  it('includes uncommitted tracked working-tree changes when the base diff is empty', () => {
+    const repo = makeTempRepo();
+    const stagingHead = git(repo, 'rev-parse', 'HEAD');
+    git(repo, 'update-ref', 'refs/remotes/origin/staging', stagingHead);
+    writeFileSync(path.join(repo, 'baseline.ts'), 'export const baseline = 2;\n', 'utf-8');
+
+    expect(getChangedFiles(repo)).toEqual(['baseline.ts']);
+  });
+
+  it('uses GITHUB_BASE_REF as the PR base when present', () => {
+    const repo = makeTempRepo();
+    const baseHead = git(repo, 'rev-parse', 'HEAD');
+    git(repo, 'update-ref', 'refs/remotes/origin/main', baseHead);
+    commitFile(repo, 'branch-change.ts', 'export const branch = true;\n', 'branch work');
+
+    process.env.GITHUB_BASE_REF = 'main';
+    try {
+      expect(getChangedFiles(repo)).toEqual(['branch-change.ts']);
+    } finally {
+      delete process.env.GITHUB_BASE_REF;
+    }
+  });
+
+  it('excludes deleted-only tracked files from the diff scan', () => {
+    const repo = makeTempRepo();
+    writeFileSync(path.join(repo, 'delete-me.ts'), 'export const doomed = true;\n', 'utf-8');
+    git(repo, 'add', 'delete-me.ts');
+    git(repo, 'commit', '-m', 'add delete-me');
+    rmSync(path.join(repo, 'delete-me.ts'));
+    git(repo, 'add', 'delete-me.ts');
+    git(repo, 'commit', '-m', 'delete delete-me');
+
+    expect(getChangedFiles(repo)).not.toContain('delete-me.ts');
+  });
+});
+
+describe('pr-check runner file resolution and source caching', () => {
+  it('uses one diff-slice resolver for pattern and custom checks', () => {
+    const check: Check = {
+      name: 'fixture',
+      fileGlobs: ['**/*.ts'],
+      pathFilter: 'tests/',
+      pattern: 'forbidden',
+      message: 'fixture',
+      severity: 'error',
+    };
+
+    expect(resolveRelevantChangedFilesForCheck([
+      'tests/allowed.ts',
+      'tests/ignored.tsx',
+      'server/not-in-path.ts',
+      'tests/ignored.md',
+    ], check)).toEqual(['tests/allowed.ts']);
+  });
+
+  it('pattern scanning handles multiple changed files in one call', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pr-check-batched-grep-'));
+    const first = path.join(dir, 'first.ts');
+    const second = path.join(dir, 'second.ts');
+    try {
+      writeFileSync(first, 'const ok = true;\nconst bad = "forbidden";\n', 'utf-8');
+      writeFileSync(second, 'const bad = "forbidden";\n', 'utf-8');
+      const check: Check = {
+        name: 'fixture',
+        fileGlobs: ['*.ts'],
+        pattern: 'forbidden',
+        message: 'fixture',
+        severity: 'error',
+      };
+
+      expect(checkFiles([first, second], check)).toEqual([
+        `${first}:2:const bad = "forbidden";`,
+        `${second}:1:const bad = "forbidden";`,
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('source cache returns stable content and avoids duplicate physical reads', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pr-check-source-cache-'));
+    const first = path.join(dir, 'example.ts');
+    const second = path.join(dir, 'other.ts');
+    let reads = 0;
+    try {
+      writeFileSync(first, 'first', 'utf-8');
+      writeFileSync(second, 'second', 'utf-8');
+      const cache = createSourceCache((file, encoding) => {
+        reads += 1;
+        return readFileSync(file, encoding);
+      });
+
+      expect(cache(first)).toBe('first');
+      expect(cache(first)).toBe('first');
+      expect(cache(second)).toBe('second');
+      expect(reads).toBe(2);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

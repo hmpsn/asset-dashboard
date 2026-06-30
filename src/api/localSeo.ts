@@ -1,4 +1,4 @@
-import { del, get, post, put } from './client';
+import { del, get, getSafe, post, put } from './client';
 import type {
   ClientLocation,
   LocalSeoLocationLookupRequest,
@@ -31,6 +31,32 @@ interface LocationMutationResponse {
   jobId?: string;
 }
 
+// SEO Decision Engine P7 (local-gbp): admin GBP/reviews readout. Aggregates only — the server
+// never returns per-review/author data. Kept local to this api module (no shared-types churn);
+// `owned`/`competitors` mirror the relevant fields of the server's BusinessListingSnapshot.
+export interface GbpListingAggregate {
+  placeId: string;
+  title?: string;
+  isOwned?: boolean;
+  /** Star rating; undefined = no reviews (never 0). */
+  rating?: number;
+  /** Review count; undefined = no reviews (never 0). */
+  reviewCount?: number;
+  category?: string;
+  attributes: string[];
+  totalPhotos?: number;
+  claimed?: boolean;
+}
+
+export interface GbpReviewsReadResponse {
+  owned: GbpListingAggregate | null;
+  competitors: GbpListingAggregate[];
+  /** 0..100 GBP completeness; null when there is no owned listing or the flag is off. */
+  completenessScore: number | null;
+}
+
+const EMPTY_GBP_REVIEWS: GbpReviewsReadResponse = { owned: null, competitors: [], completenessScore: null };
+
 export const localSeo = {
   get: (workspaceId: string, options: { includeSnapshots?: boolean } = {}) => {
     const params = new URLSearchParams();
@@ -59,6 +85,16 @@ export const localSeo = {
 
   refresh: (workspaceId: string, body: LocalSeoRefreshRequest = {}) =>
     post<LocalSeoRefreshStartResponse>(`/api/local-seo/${workspaceId}/refresh`, body),
+
+  // SEO Decision Engine P7 (local-gbp): admin GBP/reviews readout (aggregates only). getSafe with
+  // an empty fallback so a missing/disabled-flag response degrades to "nothing to show", not an error.
+  gbpReviews: (workspaceId: string) =>
+    getSafe<GbpReviewsReadResponse>(`/api/local-seo/${workspaceId}/gbp-reviews`, EMPTY_GBP_REVIEWS),
+
+  // SEO Decision Engine P7 (local-gbp): trigger a GBP + reviews refresh. Returns a job id;
+  // progress surfaces through useBackgroundTasks + the LOCAL_GBP_SNAPSHOTS_REFRESHED broadcast.
+  refreshGbp: (workspaceId: string) =>
+    post<{ jobId: string }>(`/api/local-seo/${workspaceId}/refresh-gbp`),
 
   setPrimaryMarket: (workspaceId: string, marketId: string) =>
     put<{ ok: boolean }>(`/api/local-seo/${workspaceId}/markets/${marketId}/set-primary`, {}),

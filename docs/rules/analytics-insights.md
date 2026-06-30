@@ -290,7 +290,6 @@ Before marking Phase 3 complete, verify ALL of the following:
 - [ ] `resolveInsight()` updates `resolution_status` in `analytics_insights` — confirm with a DB query after calling it
 - [ ] `getUnresolvedInsights()` excludes resolved items — confirm it doesn't return rows where `resolution_status = 'resolved'`
 - [ ] `PUT /api/admin/insights/:insightId/resolve` broadcasts `insight_resolved` event via `broadcastToWorkspace`
-- [ ] Frontend `useWorkspaceEvents` handler for `insight_resolved` invalidates `actionQueue` React Query key
 
 **Process Guardrails:**
 - [ ] All new DB statements in `roi-attribution.ts` and `analytics-insights-store.ts` use `stmts()` cache, not bare `db.prepare()` (Section 7.1)

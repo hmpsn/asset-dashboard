@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, X } from 'lucide-react';
-import { IconButton } from '../ui';
+import { InlineBanner } from '../ui';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../../lib/wsEvents';
 import { jobs as jobsApi } from '../../api/platform';
 import { seoBulkJobs } from '../../api/seo';
 import { queryKeys } from '../../lib/queryKeys';
+import { extractErrorMessage } from '../../lib/extractErrorMessage';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
 import type { SeoAuditResult } from './types';
 import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
@@ -147,6 +147,7 @@ export function BulkAcceptPanel({
       console.error('Failed to start bulk accept:', err);
       setBulkApplying(false);
       setBulkProgress(null);
+      setBulkError(extractErrorMessage(err, 'Failed to start bulk accept.'));
     }
   };
 
@@ -169,18 +170,8 @@ export function BulkAcceptPanel({
   if (!bulkError) return null;
 
   return (
-    <div className="flex items-center gap-2 px-4 py-3 rounded-[var(--radius-lg)] bg-red-500/10 border border-red-500/20 t-body text-red-400">
-      <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-      <span>{bulkError}</span>
-      <IconButton
-        type="button"
-        icon={X}
-        label="Dismiss bulk error"
-        size="sm"
-        variant="ghost"
-        onClick={() => setBulkError(null)}
-        className="ml-auto p-0.5 rounded hover:bg-white/10"
-      />
-    </div>
+    <InlineBanner onDismiss={() => setBulkError(null)} dismissLabel="Dismiss bulk error">
+      {bulkError}
+    </InlineBanner>
   );
 }

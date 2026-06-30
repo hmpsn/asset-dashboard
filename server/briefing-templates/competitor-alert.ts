@@ -27,7 +27,7 @@
 import type { AnalyticsInsight, CompetitorAlertData } from '../../shared/types/analytics.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
 import { fmtNum } from './_helpers.js';
-import type { TemplateContext } from './index.js';
+import type { TemplateContext } from './context.js';
 
 /* TemplateContext imported from ./index.js — see Phase 2.5a review */
 

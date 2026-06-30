@@ -35,6 +35,7 @@ const localRefreshMutate = vi.fn();
 const navigateMock = vi.fn();
 
 vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
+  useKeywordCommandCenterInitialView: () => ({ data: undefined, isLoading: false, isError: true, error: new Error('initial disabled in test') }),
   useKeywordCommandCenterSummary: (...a: unknown[]) => summaryHookMock(...a),
   useKeywordCommandCenterRows: (...a: unknown[]) => rowsHookMock(...a),
   useKeywordCommandCenterDetail: (...a: unknown[]) => detailHookMock(...a),
@@ -43,6 +44,7 @@ vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
   useKeywordHardDelete: () => ({ mutate: hardDeleteMutate, isPending: false, error: null }),
   useRankTrackingAddKeyword: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, error: null }),
   useRankTrackingTogglePin: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  useNationalSerpRefresh: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
 
 vi.mock('../../src/hooks/admin/useLocalSeo', () => ({

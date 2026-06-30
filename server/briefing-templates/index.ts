@@ -22,43 +22,14 @@ import {
   buildBriefingInsightStory,
   SUPPORTED_BRIEFING_INSIGHT_TYPES,
 } from '../signal-story-registry.js';
+import type { TemplateContext } from './context.js';
+
+export type { TemplateContext } from './context.js';
 
 // Phase 2.5c — weCalledIt is still dispatched separately because its input is
 // a TrackedAction + ActionOutcome, not an AnalyticsInsight row. Re-exported
 // here so the cron can dispatch wci-prefixed candidates from a single entrypoint.
 export { buildStoryFromWeCalledIt, type WeCalledItInput } from './we-called-it.js';
-
-/**
- * Unified context passed to every template. `tier` enables tier-aware
- * variants (e.g., the Free-tier upgrade hint inside content-gap stories);
- * `avgCPC` is sourced from the ROI engine for the gap dollar-equivalent
- * footnote. Templates MUST gracefully degrade when optional context
- * fields are missing.
- */
-export interface TemplateContext {
-  workspaceId: string;
-  tier: 'free' | 'growth' | 'premium';
-  /**
-   * Workspace's weighted-avg CPC from `computeROI()`. Used by the
-   * content-gap template's data receipt to render a dollar-equivalent
-   * footnote. Optional — absent when ROI hasn't been computed for the
-   * workspace yet (no keyword strategy).
-   */
-  avgCPC?: number;
-  /**
-   * Phase 2.5c — pre-computed pulse data the cron has on hand. Templates
-   * use these to query `findBestWeekSince` and append "best week since X"
-   * anchor phrases to their `dataReceipt`. Optional — when missing the
-   * anchor block degrades silently (no anchor appended).
-   */
-  pulseMetrics?: {
-    totalClicks?: number;
-    totalImpressions?: number;
-    avgPosition?: number;
-    auditScore?: number;
-    organicTrafficValue?: number;
-  };
-}
 
 /**
  * Project an `AnalyticsInsight` to a `BriefingStory`. Returns `null` when:

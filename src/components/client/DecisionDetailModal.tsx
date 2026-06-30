@@ -4,12 +4,13 @@ import { X } from 'lucide-react';
 import { Button, IconButton } from '../ui';
 import type { NormalizedDecision, FlaggedItem } from '../../../shared/types/decision';
 import type { ApprovalBatch } from '../../../shared/types/approvals';
-import type { ClientAction, AeoChangePayload, InternalLinkPayload, RedirectProposalPayload } from '../../../shared/types/client-actions';
+import type { ClientAction, AeoChangePayload, CannibalizationPayload, InternalLinkPayload, RedirectProposalPayload } from '../../../shared/types/client-actions';
 import {
   ApprovalItemRow,
   AeoRenderer,
   InternalLinkRenderer,
   RedirectRenderer,
+  CannibalizationRenderer,
 } from './decision-renderers';
 
 // ── Main component ─────────────────────────────────────────────────────────
@@ -98,6 +99,8 @@ export function DecisionDetailModal({
       body = <InternalLinkRenderer payload={p as InternalLinkPayload} />;
     } else if (action.sourceType === 'redirect_proposal') {
       body = <RedirectRenderer payload={p as RedirectProposalPayload} />;
+    } else if (action.sourceType === 'cannibalization') {
+      body = <CannibalizationRenderer payload={p as CannibalizationPayload} />;
     } else {
       body = (
         <pre className="t-caption text-[var(--brand-text-muted)] overflow-auto">

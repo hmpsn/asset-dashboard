@@ -396,6 +396,7 @@ const INSIGHT_TYPE_ICONS: Record<InsightType, LucideIcon> = {
   milestone_attribution: Trophy, // Phase 2.5c: brief crossed a traffic threshold
   lost_visibility: TrendingDown, // G1: queries that dropped off GSC
   local_visibility_shift: MapPin, // W5.3: local pack visibility transition / new competitor
+  serp_feature_opportunity: Sparkles, // P6: AI Overview / featured-snippet capture opportunity
 };
 
 const SEVERITY_TO_SENTIMENT: Record<string, DigestInsight['sentiment']> = {
@@ -433,6 +434,7 @@ const INSIGHT_TYPE_ACTIONS: Partial<Record<InsightType, { label: string; tab: Cl
   audit_finding: { label: 'View site health', tab: 'health' },
   milestone_attribution: { label: 'View performance', tab: 'performance' },
   local_visibility_shift: { label: 'View search data', tab: 'performance' },
+  serp_feature_opportunity: { label: 'View search data', tab: 'performance' },
 };
 
 function mapServerInsights(insights: ClientInsight[]): DigestInsight[] {

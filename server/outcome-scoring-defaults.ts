@@ -75,6 +75,20 @@ export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
     primary_metric: 'position',
     thresholds: { strong_win: 10, win: 5, neutral_band: 3 },
   },
+  // ── Strategy redesign P2/P3 — managed-set keep markers ──
+  // topic_cluster_keep / content_gap_keep are curation decisions (operator kept the item in
+  // the managed set). They ARE recorded as tracked actions by Lane E (ContentGaps +
+  // TopicClusters Keep buttons) via POST /api/outcomes/:ws/actions. They are not scored as
+  // measurable SEO outcomes. These entries keep ScoringConfig (Record<ActionType, …>)
+  // exhaustive and mirror the non-metric `brief_created` shape.
+  topic_cluster_keep: {
+    primary_metric: 'content_produced',
+    thresholds: { strong_win: 1, win: 1, neutral_band: 0 },
+  },
+  content_gap_keep: {
+    primary_metric: 'content_produced',
+    thresholds: { strong_win: 1, win: 1, neutral_band: 0 },
+  },
 };
 
 export function resolveScoringConfig(

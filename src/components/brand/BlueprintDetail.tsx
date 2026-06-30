@@ -27,6 +27,7 @@ import { useBlueprint } from '../../hooks/admin/useBlueprints';
 import { queryKeys } from '../../lib/queryKeys';
 import { TabBar, Icon, Button, IconButton, cn, ConfirmDialog, FormInput, FormSelect } from '../ui/index';
 import { useCopyStatus, useGenerateCopy } from '../../hooks/admin/useCopyPipeline';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { CopyReviewPanel } from './CopyReviewPanel';
 import { BatchGenerationPanel } from './BatchGenerationPanel';
 import { CopyExportPanel } from './CopyExportPanel';
@@ -362,7 +363,7 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [expandedIds, toggleExpanded] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newEntryName, setNewEntryName] = useState('');
   const [newEntryType, setNewEntryType] = useState<BlueprintPageType>('service');
@@ -454,18 +455,6 @@ export function BlueprintDetail({ workspaceId, blueprintId, onBack }: Props) {
   const recommended = entries.filter(e => e.scope === 'recommended');
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-
-  function toggleExpanded(id: string) {
-    setExpandedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }
 
   function handleScopeToggle(entry: BlueprintEntry) {
     const newScope: BlueprintEntry['scope'] =

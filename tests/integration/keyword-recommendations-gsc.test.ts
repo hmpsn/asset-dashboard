@@ -11,6 +11,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { getKeywordRecommendations, shouldIncludeKeywordCandidate } from '../../server/keyword-recommendations.js';
 import { getQueryPageData } from '../../server/search-console.js';
+import { getConfiguredProvider } from '../../server/seo-data-provider.js';
 
 // ── Mock search-console (hoisted by Vitest before any imports run) ────────────
 vi.mock('../../server/search-console.js', async (importOriginal) => {
@@ -80,5 +81,29 @@ describe('getKeywordRecommendations — GSC candidate enrichment', () => {
     expect(result).toBeDefined();
     const gsc = result.candidates.filter(c => c.source === 'gsc');
     expect(gsc.length).toBe(0);
+  });
+
+  it('uses keyword value score as the deterministic base ranking for content-plan recommendations', async () => {
+    const seeded = seedWorkspace({ seoDataProvider: 'dataforseo' });
+    try {
+      vi.mocked(getConfiguredProvider).mockReturnValueOnce({
+        getKeywordMetrics: vi.fn().mockResolvedValue([
+          { keyword: 'plumber', volume: 10, difficulty: 90, cpc: 0 },
+        ]),
+        getRelatedKeywords: vi.fn().mockResolvedValue([
+          { keyword: 'plumber guide', volume: 50000, difficulty: 10, cpc: 0 },
+          { keyword: 'plumber quote', volume: 40, difficulty: 45, cpc: 18 },
+        ]),
+      } as unknown as ReturnType<typeof getConfiguredProvider>);
+
+      const result = await getKeywordRecommendations(seeded.workspaceId, 'plumber', {
+        maxCandidates: 3,
+      });
+
+      expect(result.recommended).toBe('plumber quote');
+      expect(result.candidates[0]?.keyword).toBe('plumber quote');
+    } finally {
+      seeded.cleanup();
+    }
   });
 });

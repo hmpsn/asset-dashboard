@@ -9,6 +9,7 @@ const SERVER_DIR = resolve(ROOT_DIR, 'server');
 const AUDIT_DOC = resolve(ROOT_DIR, 'docs/superpowers/audits/2026-05-18-intelligence-consumer-consolidation-audit.md');
 const MANUAL_CONSUMERS = new Set([
   'server/admin-chat-context.ts',
+  'server/keyword-strategy-synthesis/context.ts',
 ]);
 const FALSE_POSITIVE_FILES = new Set([
   'server/anomaly-detection.ts',
@@ -33,8 +34,9 @@ const INVENTORY: Array<{
   { file: 'server/discovery-ingestion.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/internal-links.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/keyword-recommendations.ts', classification: 'native', targetPath: 'recommendation-builder' },
-  { file: 'server/keyword-strategy-ai-synthesis.ts', classification: 'native', targetPath: 'low-level' },
+  { file: 'server/keyword-strategy-synthesis/context.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/meeting-brief-generator.ts', classification: 'native', targetPath: 'low-level' },
+  { file: 'server/strategy-pov-generator.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/monthly-digest.ts', classification: 'native', targetPath: 'future-briefing-builder' },
   { file: 'server/page-analysis-job.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/google.ts', classification: 'native', targetPath: 'low-level' },
@@ -72,7 +74,7 @@ function listTypeScriptFiles(dir: string): string[] {
 
 function isGenerationConsumer(relPath: string, source: string): boolean {
   const hasIntelligenceAccess = /buildWorkspaceIntelligence\(|buildIntelPrompt\(|formatForPrompt\(|buildContentGenerationContext\(|buildRecommendationGenerationContext\(|buildSeoPromptContext\(|buildAdminChatIntelligenceContext\(|buildDiagnosticIntelligenceContext\(|resolveDiagnosticAnomalyInsight\(|buildPageAssistContext\(|getWorkspaceLearnings\(|formatLearningsForPrompt\(|getInsights\(/.test(source);
-  const hasAiCall = /callAI\(|callCreativeAI\(|callAnthropic\(|callOpenAI\(|generateAltText\(/.test(source);
+  const hasAiCall = /callAI\(|callCreativeAI\(|callAnthropic\(|callOpenAI\(|callKeywordStrategyAI\(|callNarrativeAI\(|generateAltText\(/.test(source);
   return hasIntelligenceAccess && (hasAiCall || MANUAL_CONSUMERS.has(relPath));
 }
 

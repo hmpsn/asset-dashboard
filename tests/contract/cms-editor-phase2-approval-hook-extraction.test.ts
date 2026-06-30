@@ -29,7 +29,8 @@ describe('CmsEditor phase-2 approval hook extraction contract', () => {
     const hookSource = readFileSync(CMS_EDITOR_APPROVAL_HOOK_PATH, 'utf-8'); // readFile-ok - migration guard: approval state/select-all/send logic belongs in extracted hook after phase 2.
 
     expect(hookSource).toContain('export function useCmsEditorApprovalWorkflow');
-    expect(hookSource).toContain('const [approvalSelected, setApprovalSelected]');
+    expect(hookSource).toContain("from '../../hooks/useToggleSet'");
+    expect(hookSource).toContain('const [approvalSelected, toggleApprovalItem, setApprovalSelected]');
     expect(hookSource).toContain('const [sendingApproval, setSendingApproval]');
     expect(hookSource).toContain('buildApprovalPayloadItems(approvalSelected, edits, collections)');
     expect(hookSource).toContain('const sendForApproval = useCallback(async (note?: string) => {');

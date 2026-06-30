@@ -50,6 +50,22 @@ function schemaPlanDeliverableStatus(
   }
 }
 
+function safeBroadcastDeliverable(
+  workspaceId: string,
+  event: typeof WS_EVENTS.DELIVERABLE_UPDATED,
+  deliverable: ClientDeliverable,
+): void {
+  try {
+    broadcastToWorkspace(workspaceId, event, {
+      deliverableId: deliverable.id,
+      type: deliverable.type,
+      status: deliverable.status,
+    });
+  } catch (err) {
+    log.warn({ err, workspaceId, deliverableId: deliverable.id, event }, 'schema-plan deliverable broadcast failed (swallowed)');
+  }
+}
+
 /**
  * Mirror a freshly-sent schema plan into `client_deliverable`. Returns the mirrored deliverable, or
  * null when the mirror was skipped/failed. Never throws — the live legacy send must not be affected.
@@ -77,6 +93,10 @@ export function mirrorSchemaPlanToDeliverable(
 
     const built = adapter.buildPayload(input);
     const sourceRef = adapter.sourceRef(input);
+    if (!sourceRef) {
+      log.warn({ workspaceId, siteId: plan.siteId, planId: plan.id }, 'schema-plan mirror skipped: adapter returned no sourceRef');
+      return null;
+    }
     const nowIso = new Date().toISOString();
 
     const deliverable = upsertDeliverable({
@@ -147,11 +167,7 @@ export function syncSchemaPlanDeliverable(plan: SchemaSitePlan): ClientDeliverab
       source: existing?.source ?? 'schema-plan-sync',
       sourceRef,
     });
-    broadcastToWorkspace(plan.workspaceId, WS_EVENTS.DELIVERABLE_UPDATED, {
-      deliverableId: deliverable.id,
-      type: deliverable.type,
-      status: deliverable.status,
-    });
+    safeBroadcastDeliverable(plan.workspaceId, WS_EVENTS.DELIVERABLE_UPDATED, deliverable);
     return deliverable;
   } catch (err) {
     log.error({ err, workspaceId: plan.workspaceId, siteId: plan.siteId }, 'schema-plan deliverable sync failed');
@@ -186,11 +202,7 @@ export function cancelSchemaPlanDeliverable(workspaceId: string, siteId: string)
       source: existing.source,
       sourceRef: existing.sourceRef,
     });
-    broadcastToWorkspace(workspaceId, WS_EVENTS.DELIVERABLE_UPDATED, {
-      deliverableId: deliverable.id,
-      type: deliverable.type,
-      status: deliverable.status,
-    });
+    safeBroadcastDeliverable(workspaceId, WS_EVENTS.DELIVERABLE_UPDATED, deliverable);
     return deliverable;
   } catch (err) {
     log.error({ err, workspaceId, siteId }, 'schema-plan deliverable cancel sync failed');

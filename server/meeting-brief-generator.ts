@@ -2,14 +2,13 @@ import { createHash } from 'crypto';
 import { z } from 'zod';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import { withActiveLocalSeoSlice } from './intelligence/generation-context-builders.js';
-import { callAI } from './ai.js';
-import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structured-output.js';
 import { buildSystemPrompt, getCustomPromptNotes } from './prompt-assembly.js';
 import { getMeetingBriefHash, upsertMeetingBrief } from './meeting-brief-store.js';
 import { loadRecommendations } from './recommendations.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { createLogger } from './logger.js';
+import { callNarrativeAI, withContentHashCache } from './narrative-ai.js';
 import type { WorkspaceIntelligence, IntelligenceSlice } from '../shared/types/intelligence.js';
 import type { MeetingBrief, MeetingBriefAIOutput, MeetingBriefMetrics } from '../shared/types/meeting-brief.js';
 
@@ -198,15 +197,16 @@ export async function generateMeetingBrief(workspaceId: string): Promise<Meeting
   const hash = buildPromptHash(intel, customPromptNotes, recSignal);
   const cachedHash = getMeetingBriefHash(workspaceId);
 
-  if (hash === cachedHash) {
-    log.debug({ workspaceId }, 'Meeting brief data unchanged — returning cached brief');
-    // Intentional control flow: the route handler catches BRIEF_UNCHANGED and returns
-    // the stored brief as a 200 { brief, unchanged: true }. This never reaches Sentry.
-    throw new Error('BRIEF_UNCHANGED');
-  }
-
-  // Pass pre-fetched customPromptNotes to buildSystemPrompt to avoid a second DB round-trip.
-  const systemPrompt = buildSystemPrompt(workspaceId, `
+  return withContentHashCache({
+    workspaceId,
+    hash,
+    cachedHash,
+    unchangedSignal: 'BRIEF_UNCHANGED',
+    unchangedLogMessage: 'Meeting brief data unchanged — returning cached brief',
+    logger: log,
+    run: async () => {
+      // Pass pre-fetched customPromptNotes to buildSystemPrompt to avoid a second DB round-trip.
+      const systemPrompt = buildSystemPrompt(workspaceId, `
 You are a strategic analyst preparing a client-facing meeting brief. Your output must be valid JSON matching the MeetingBriefAIOutput interface exactly.
 
 Write for the client — no admin jargon, no internal scoring language. Be specific: name pages, queries, and numbers when the data supports it. Narrative tone, not bullet-point data dumps. Lead with wins before challenges.
@@ -217,72 +217,45 @@ Example of a strong situation summary:
 Avoid: "Your site health score is 78. You have 12 open insights."
 `.trim(), customPromptNotes);
 
-  const prompt = buildBriefPrompt(intel);
-  const messages: { role: 'user' | 'assistant'; content: string }[] = [
-    { role: 'user', content: prompt },
-  ];
+      const prompt = buildBriefPrompt(intel);
+      const parsed = await callNarrativeAI({
+        workspaceId,
+        operation: 'meeting-brief',
+        systemPrompt,
+        prompt,
+        schema: meetingBriefAiOutputSchema,
+        parserContext: 'meeting-brief',
+        maxTokens: 2000,
+        logger: log,
+        normalize: normalizeMeetingBriefAiOutput,
+        retryDebugMessage: 'meeting-brief-generator: AI returned invalid structured output — retrying',
+        retryFailureLogMessage: 'Meeting brief AI returned invalid structured output after retry',
+        retryFailureMessage: 'Meeting brief AI returned invalid structured output after retry',
+      });
 
-  const result = await callAI({
-    operation: 'meeting-brief',
-    system: systemPrompt,
-    messages,
-    maxTokens: 2000,
-    temperature: 0.3,
-    workspaceId,
+      const metrics = assembleMeetingBriefMetrics(intel);
+
+      const brief: MeetingBrief = {
+        workspaceId,
+        generatedAt: new Date().toISOString(),
+        situationSummary: parsed.situationSummary ?? '',
+        wins: Array.isArray(parsed.wins) ? parsed.wins.filter((x): x is string => typeof x === 'string') : [],
+        attention: Array.isArray(parsed.attention) ? parsed.attention.filter((x): x is string => typeof x === 'string') : [],
+        recommendations: Array.isArray(parsed.recommendations)
+          ? parsed.recommendations.filter(
+              (r): r is { action: string; rationale: string } =>
+                typeof r?.action === 'string' && typeof r?.rationale === 'string',
+            )
+          : [],
+        blueprintProgress: null,
+        metrics,
+      };
+
+      upsertMeetingBrief(brief, hash);
+      broadcastToWorkspace(workspaceId, WS_EVENTS.MEETING_BRIEF_GENERATED, {});
+
+      log.info({ workspaceId }, 'Meeting brief generated and stored');
+      return brief;
+    },
   });
-
-  let parsed: MeetingBriefAIOutput;
-  try {
-    parsed = normalizeMeetingBriefAiOutput(
-      parseStructuredAIOutput(result.text, meetingBriefAiOutputSchema, 'meeting-brief'),
-    );
-  } catch (err) {
-    log.debug({ err, issues: err instanceof StructuredAIOutputError ? err.issues : undefined }, 'meeting-brief-generator: AI returned invalid structured output — retrying');
-    // Retry once — ask the model to fix its own JSON
-    const retryMessages: typeof messages = [
-      ...messages,
-      { role: 'assistant', content: result.text },
-      { role: 'user', content: 'Your response was not valid JSON. Return only the JSON object, no explanation.' },
-    ];
-    const retryResult = await callAI({
-      operation: 'meeting-brief',
-      system: systemPrompt,
-      messages: retryMessages,
-      maxTokens: 2000,
-      temperature: 0.1,
-      workspaceId,
-    });
-    try {
-      parsed = normalizeMeetingBriefAiOutput(
-        parseStructuredAIOutput(retryResult.text, meetingBriefAiOutputSchema, 'meeting-brief'),
-      );
-    } catch (err) {
-      log.error({ err, issues: err instanceof StructuredAIOutputError ? err.issues : undefined, workspaceId, rawRetry: retryResult.text.slice(0, 500) }, 'Meeting brief AI returned invalid structured output after retry');
-      throw new Error('Meeting brief AI returned invalid structured output after retry');
-    }
-  }
-
-  const metrics = assembleMeetingBriefMetrics(intel);
-
-  const brief: MeetingBrief = {
-    workspaceId,
-    generatedAt: new Date().toISOString(),
-    situationSummary: parsed.situationSummary ?? '',
-    wins: Array.isArray(parsed.wins) ? parsed.wins.filter((x): x is string => typeof x === 'string') : [],
-    attention: Array.isArray(parsed.attention) ? parsed.attention.filter((x): x is string => typeof x === 'string') : [],
-    recommendations: Array.isArray(parsed.recommendations)
-      ? parsed.recommendations.filter(
-          (r): r is { action: string; rationale: string } =>
-            typeof r?.action === 'string' && typeof r?.rationale === 'string',
-        )
-      : [],
-    blueprintProgress: null,
-    metrics,
-  };
-
-  upsertMeetingBrief(brief, hash);
-  broadcastToWorkspace(workspaceId, WS_EVENTS.MEETING_BRIEF_GENERATED, {});
-
-  log.info({ workspaceId }, 'Meeting brief generated and stored');
-  return brief;
 }

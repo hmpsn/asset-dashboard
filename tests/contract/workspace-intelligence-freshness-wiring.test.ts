@@ -39,15 +39,17 @@ describe('workspace intelligence freshness wiring', () => {
 
   it('non-content intelligence mutation surfaces clear workspace intelligence before domain broadcasts', () => {
     for (const path of [
-      'server/local-seo.ts',
+      'server/domains/local-seo/events.ts',
       'server/routes/local-seo.ts',
-      'server/recommendations.ts',
+      'server/domains/recommendations/generation-service.ts',
       'server/routes/recommendations.ts',
       'server/routes/briefing.ts',
       'server/briefing-cron.ts',
     ]) {
       expect(source(path), path).toContain('invalidateIntelligenceCache');
     }
+    expect(source('server/local-seo.ts')).toContain("from './domains/local-seo/configuration-actions.js'");
+    expect(source('server/local-seo.ts')).toContain("from './domains/local-seo/refresh-runner.js'");
   });
 
   it('content decay invalidates when analysis and refresh recommendations mutate cached slice inputs', () => {
@@ -65,13 +67,14 @@ describe('workspace intelligence freshness wiring', () => {
 
   it('recommendation page-state writes broadcast page-state freshness', () => {
     const route = source('server/routes/recommendations.ts');
-    const generator = source('server/recommendations.ts');
+    const generator = source('server/domains/recommendations/generation-service.ts');
+    const finalization = source('server/domains/recommendations/finalization.ts');
     const adminKeys = getWorkspaceInvalidationKeys(WS_EVENTS.PAGE_STATE_UPDATED, 'ws-fresh', undefined, 'admin');
     const clientKeys = getWorkspaceInvalidationKeys(WS_EVENTS.PAGE_STATE_UPDATED, 'ws-fresh', undefined, 'client-dashboard');
 
     expect(route).toContain('updatedPageStateIds.push(resolvedPageId)');
     expect(route).toContain('WS_EVENTS.PAGE_STATE_UPDATED');
-    expect(generator).toContain('autoResolvedPageStateIds.push(resolvedPageId)');
+    expect(finalization).toContain('autoResolvedPageStateIds.push(resolvedPageId)');
     expect(generator).toContain('WS_EVENTS.PAGE_STATE_UPDATED');
     expect(adminKeys).toContainEqual(queryKeys.shared.pageEditStates('ws-fresh', false));
     expect(adminKeys).toContainEqual(queryKeys.shared.pageEditStates('ws-fresh', true));

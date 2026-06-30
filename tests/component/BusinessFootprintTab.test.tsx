@@ -11,6 +11,13 @@ vi.mock('../../src/components/settings/LocationsTab', () => ({
   LocationsTab: () => <div data-testid="locations-tab">LocationsTabStub</div>,
 }));
 
+// The flag-gated <FeatureFlag flag="geo-targeting"> wrapper calls useFeatureFlag →
+// useQuery; mock it OFF so these structure tests don't need a QueryClientProvider and
+// the geo editor (covered by TargetGeoEditor.test.tsx) stays hidden.
+vi.mock('../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: () => false,
+}));
+
 describe('BusinessFootprintTab', () => {
   afterEach(() => {
     vi.useRealTimers();

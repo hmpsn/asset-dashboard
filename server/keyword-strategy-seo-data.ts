@@ -5,6 +5,7 @@ import { MAX_COMPETITORS } from './constants.js';
 import { listKeywordGaps } from './keyword-gaps.js';
 import { createLogger } from './logger.js';
 import { listProviders } from './seo-data-provider.js';
+import { workspaceProviderGeo } from './seo-target-geo.js';
 import type { DomainKeyword, KeywordGapEntry, RelatedKeyword, SeoDataProvider } from './seo-data-provider.js';
 import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type { SeoDataStatus, Workspace } from '../shared/types/workspace.js';
@@ -134,9 +135,15 @@ export async function fetchAndCacheKeywordStrategySeoData({
     return { seoContext, domainKeywords, keywordGaps, discoveryKeywords, relatedKeywords, questionKeywords, competitorKeywords, seoDataStatus };
   }
 
+  // Geo for this CLIENT workspace's domain/competitor/gap SERP queries. `{}` when
+  // the geo-targeting flag is OFF (byte-identical to pre-P4); resolved
+  // { locationCode, languageCode } when ON. Competitor-domain calls below also use
+  // the CLIENT geo — we want the client's target SERP, not the competitor's. (P4)
+  const geo = workspaceProviderGeo(ws.id);
+
   try {
     log.info(`Fetching domain organic keywords for ${siteDomain}...`);
-    domainKeywords = await provider.getDomainKeywords(siteDomain, ws.id, 200);
+    domainKeywords = await provider.getDomainKeywords(siteDomain, ws.id, 200, undefined, geo.locationCode, geo.languageCode);
     log.info(`Got ${domainKeywords.length} domain keywords`);
 
     if (domainKeywords.length > 0) {
@@ -153,7 +160,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
   if (fetchCompetitors && competitorDomains.length === 0) {
     try {
       sendProgress('seo-data', 'Auto-discovering organic competitors...', 0.57);
-      const discovered = await provider.getCompetitors(siteDomain, ws.id, 5);
+      const discovered = await provider.getCompetitors(siteDomain, ws.id, 5, undefined, geo.locationCode, geo.languageCode);
       const autoCompetitors = filterDiscoveredCompetitors(discovered, siteDomain)
         .slice(0, MAX_COMPETITORS)
         .map(c => c.domain);
@@ -178,7 +185,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
       for (const comp of cappedCompetitorDomains) {
         const cleanComp = comp.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
         try {
-          const rawKws = await provider.getDomainKeywords(cleanComp, ws.id, fetchLimit);
+          const rawKws = await provider.getDomainKeywords(cleanComp, ws.id, fetchLimit, undefined, geo.locationCode, geo.languageCode);
           const compKws = [...rawKws]
             .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
             .slice(0, compLimit);
@@ -219,7 +226,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
     try {
       sendProgress('seo-data', `Running keyword gap analysis vs ${competitorDomains.length} competitors...`, 0.60);
       log.info(`Running keyword gap analysis vs ${competitorDomains.join(', ')}...`);
-      keywordGaps = await provider.getKeywordGap(siteDomain, competitorDomains, ws.id, 50);
+      keywordGaps = await provider.getKeywordGap(siteDomain, competitorDomains, ws.id, 50, undefined, geo.locationCode, geo.languageCode);
       log.info(`Found ${keywordGaps.length} keyword gaps`);
 
       if (keywordGaps.length > 0) {
@@ -241,113 +248,14 @@ export async function fetchAndCacheKeywordStrategySeoData({
     });
   }
 
-  // On the flag-ON path the keyword-universe assembler is the SOLE owner of the
-  // discovery/related/question provider fetches (geo + resolved-language threaded).
-  // Running the legacy 'en'-only prefetch here too would (a) double provider credits
-  // for non-en workspaces (different language/limits → cache miss) and (b) seed the
-  // prompt's seoContext discovery block with en keywords while the pool carries
-  // resolved-language ones. On flag-ON we skip it; the prompt still gets discovery
-  // context through the universe-built KEYWORD POOL block. Flag-OFF is unchanged. (I2)
-  const universeOwnsDiscovery = true;
-  if (seoDataMode === 'full' && !universeOwnsDiscovery) {
-    try {
-      sendProgress('seo-data', 'Expanding keyword discovery sources...', 0.63);
-      const discoverySeedKeywords = [
-        ...domainKeywords.filter(k => k.keyword?.trim()).slice(0, 5).map(k => k.keyword),
-        ...(ws.keywordStrategy?.siteKeywords ?? []).slice(0, 5),
-      ];
-      const discoveryCalls: Array<() => Promise<KeywordSourceEvidence[]>> = [];
-      if (provider.getKeywordsForSite) {
-        discoveryCalls.push(() => provider.getKeywordsForSite!(siteDomain, ws.id, 50));
-      }
-      if (provider.getKeywordIdeas && discoverySeedKeywords.length > 0) {
-        discoveryCalls.push(() => provider.getKeywordIdeas!(discoverySeedKeywords, ws.id, 50));
-      }
-      if (provider.getKeywordSuggestions) {
-        for (const seed of discoverySeedKeywords.slice(0, 3)) {
-          discoveryCalls.push(() => provider.getKeywordSuggestions!(seed, ws.id, 20));
-        }
-      }
-      // Keep Google Ads keywords_for_keywords available at the provider layer,
-      // but do not feed it into strategy generation by default yet. Google Ads
-      // volume is grouped for planner-style forecasting, which can inflate
-      // granular page-assignment candidates until PR12's shared quality engine
-      // can score and explain those source differences.
-
-      const batches: KeywordSourceEvidence[][] = [];
-      for (const discoveryCall of discoveryCalls) {
-        try {
-          batches.push(await discoveryCall());
-        } catch (err) {
-          log.warn({ err }, 'Keyword discovery source failed');
-          providerReasons.add('keyword_discovery_partial_error');
-          batches.push([]);
-        }
-      }
-      const seenDiscovery = new Set<string>();
-      for (const keyword of batches.flat()) {
-        const normalized = keywordComparisonKey(keyword.keyword);
-        if (!normalized || seenDiscovery.has(normalized)) continue;
-        seenDiscovery.add(normalized);
-        discoveryKeywords.push(keyword);
-      }
-
-      if (discoveryKeywords.length > 0) {
-        seoContext += `\n\nSEO PROVIDER DISCOVERY KEYWORDS (source-expanded ideas with provider evidence):\n`;
-        seoContext += discoveryKeywords
-          .sort((a, b) => b.volume - a.volume)
-          .slice(0, 40)
-          .map(k => `- "${k.keyword}" (source: ${k.sourceKind}, vol: ${k.volume}/mo, KD: ${k.difficulty}%)`)
-          .join('\n');
-      }
-    } catch (err) {
-      log.error({ err }, 'Keyword discovery expansion error');
-      providerReasons.add('keyword_discovery_error');
-    }
-
-    try {
-      sendProgress('seo-data', 'Fetching related keyword ideas...', 0.65);
-      const seedKeywords = domainKeywords.filter(k => k.keyword?.trim()).slice(0, 5).map(k => k.keyword);
-      for (const seed of seedKeywords) {
-        const related = await provider.getRelatedKeywords(seed, ws.id, 10);
-        relatedKeywords.push(...related);
-      }
-      if (relatedKeywords.length > 0) {
-        const unique = relatedKeywords.filter((k, i, arr) => arr.findIndex(x => x.keyword === k.keyword) === i);
-        seoContext += `\n\nSEO PROVIDER RELATED KEYWORDS (expansion ideas with real volume):\n`;
-        seoContext += unique.slice(0, 30).map(k =>
-          `- "${k.keyword}" (vol: ${k.volume}/mo, KD: ${k.difficulty}%)`
-        ).join('\n');
-      }
-    } catch (err) {
-      log.error({ err }, 'Related keywords error');
-      providerReasons.add('related_keywords_error');
-    }
-
-    try {
-      sendProgress('seo-data', 'Fetching question-based keywords for FAQ/AEO...', 0.67);
-      const qSeeds = domainKeywords.filter(k => k.keyword?.trim() && k.volume > 100).slice(0, 5).map(k => k.keyword);
-      for (const seed of qSeeds) {
-        const questions = await provider.getQuestionKeywords(seed, ws.id, 10);
-        if (questions.length > 0) {
-          questionKeywords.push({ seed, questions: questions.map(q => ({ keyword: q.keyword, volume: q.volume })) });
-        }
-      }
-      const allQs = questionKeywords.flatMap(q => q.questions);
-      if (allQs.length > 0) {
-        const uniqueQs = allQs.filter((q, i, arr) => arr.findIndex(x => x.keyword === q.keyword) === i)
-          .sort((a, b) => b.volume - a.volume);
-        seoContext += `\n\nQUESTION KEYWORDS (real questions people search — use for FAQ sections, AEO, featured snippets):\n`;
-        seoContext += uniqueQs.slice(0, 20).map(q =>
-          `- "${q.keyword}" (${q.volume}/mo)`
-        ).join('\n');
-        log.info(`Found ${uniqueQs.length} unique question keywords from ${qSeeds.length} seeds`);
-      }
-    } catch (err) {
-      log.error({ err }, 'Question keywords error');
-      providerReasons.add('question_keywords_error');
-    }
-  }
+  // The keyword-universe assembler is the SOLE owner of the discovery/related/question
+  // provider fetches (geo + resolved-language threaded). A legacy en-only prefetch here
+  // would double provider credits for non-en workspaces and seed the prompt with en
+  // keywords while the pool carries resolved-language ones, so it is intentionally NOT
+  // run on this path — discoveryKeywords/relatedKeywords/questionKeywords stay empty and
+  // the prompt gets discovery context through the universe-built KEYWORD POOL block.
+  // (The retired keyword-universe-full flag previously gated this; the unreachable
+  // en-only prefetch branch was removed in the 2026-06-24 simplification audit.)
 
   if (
     providerRequested

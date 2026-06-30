@@ -22,6 +22,7 @@ import './redirect.js';
 import './internal-link.js';
 import './aeo-change.js';
 import './content-decay.js';
+import './cannibalization.js';
 // schema_plan (the per-site schema STRATEGY review artifact — distinct from the PR-1a
 // schema_item per-page batches).
 import './schema-plan.js';
@@ -38,6 +39,14 @@ import './content-request.js';
 // publish seams (manual + auto).
 import './work-order.js';
 import './briefing.js';
+// recommendation — the Strategy "The Issue" close-the-loop type. Minted by
+// mirrorRecommendationToDeliverable at the rec /send (per-row + bulk) seam; respond-only
+// (D-apply). The canonical client decision flows through the public act-on route, not the
+// deliverable respond path.
+import './recommendation.js';
+// Google Business Profile review response approval artifact. Source of truth remains
+// google_business_review_responses; this adapter only mirrors client decisions back to it.
+import './gbp-review-response.js';
 
 export {
   registerAdapter,

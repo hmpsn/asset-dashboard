@@ -1,5 +1,5 @@
 import { createLogger } from './logger.js';
-import { decodeEntities } from './helpers.js';
+import { decodeEntities } from './utils/text.js';
 import { fetchPublicWeb, fetchPublicWebText, isExternalFetchError } from './external-fetch.js';
 import {
   extractTag as extractHtmlTag,

@@ -45,7 +45,7 @@ import type {
 } from '../../shared/types/outcome-tracking.js';
 import type { RecommendationSet } from '../../shared/types/recommendations.js';
 import { actionTypeEnum, attributionEnum, outcomeScoreEnum } from '../schemas/outcome-schemas.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 
 const log = createLogger('outcomes');
 
@@ -428,6 +428,10 @@ const WIN_FALLBACK_LABELS: Record<ActionType, string> = {
   cannibalization_resolved: 'Resolved keyword cannibalization',
   local_visibility_won: 'Won local pack visibility',
   local_service_added: 'Started targeting a local service',
+  // Strategy redesign P2 pre-commit — managed-set keep markers (internal curation, never a
+  // scored win; present only to keep this Record<ActionType,…> exhaustive).
+  topic_cluster_keep: 'Prioritized a topic cluster',
+  content_gap_keep: 'Prioritized a content opportunity',
 };
 
 /**

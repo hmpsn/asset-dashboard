@@ -16,12 +16,14 @@ import { get, patch } from '../../api/client.js';
 import { queryKeys } from '../../lib/queryKeys.js';
 import type { RecommendationSet, Recommendation } from '../../../shared/types/recommendations.js';
 
-export function useAdminRecommendationSet(workspaceId: string | undefined) {
+export function useAdminRecommendationSet(workspaceId: string | undefined, opts?: { enabled?: boolean }) {
   return useQuery<RecommendationSet>({
     queryKey: queryKeys.admin.recommendations(workspaceId!),
     queryFn: (): Promise<RecommendationSet> =>
       get<RecommendationSet>(`/api/recommendations/${workspaceId}`),
-    enabled: !!workspaceId,
+    // `enabled` lets a caller suppress the fetch entirely (e.g. a flag-gated consumer that must not
+    // add a network request when the flag is off). Defaults to true — existing callers are unaffected.
+    enabled: !!workspaceId && (opts?.enabled ?? true),
     staleTime: 30_000,
   });
 }
@@ -36,4 +38,16 @@ export function useAdminUndismissRecommendation(workspaceId: string) {
       qc.invalidateQueries({ queryKey: queryKeys.shared.recommendations(workspaceId) });
     },
   });
+}
+
+/**
+ * Derives the ordered id list of a workspace's recommendations for predicate selection
+ * (Strategy v3 P3 — feeds useCurationSelection). Returns [] while loading. The cockpit
+ * narrows this to the active filter before passing it to the selection hook; this hook is
+ * intentionally filter-agnostic (it returns ALL rec ids in set order) so the cockpit owns
+ * the filter predicate in one place.
+ */
+export function useAdminRecommendationIds(workspaceId: string | undefined): string[] {
+  const { data } = useAdminRecommendationSet(workspaceId, { enabled: !!workspaceId });
+  return (data?.recommendations ?? []).map(r => r.id);
 }

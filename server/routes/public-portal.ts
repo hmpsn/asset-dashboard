@@ -19,13 +19,13 @@ import { getEffectiveAudit, getLatestEffectiveSnapshot, listEffectiveSnapshotSum
 import { getAuditTrafficForWorkspace } from '../audit-traffic.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
 import { updateWorkspace, getWorkspace, computeEffectiveTier } from '../workspaces.js';
-import { buildBriefingClientView } from '../briefing-client-projection.js';
+import { buildClientBriefingView } from '../client-insight-briefing-view-model.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
 import { parseJsonSafeArray } from '../db/json-validation.js';
 import { addActivity } from '../activity-log.js';
 import { debouncedStrategyInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { getBookingUrl } from '../studio-config.js';
 import { listBlueprints } from '../page-strategy.js';
 import {
@@ -58,6 +58,7 @@ import { isProgrammingError } from '../errors.js';
 import { normalizeSocialProfiles } from '../social-profiles.js';
 import { computeTrialState } from '../billing/trial-state.js';
 import { toPublicWorkspaceView } from '../serializers/client-safe.js';
+import { isFeatureEnabled } from '../feature-flags.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { getVoiceProfile } from '../voice-calibration.js';
 import { sendSanitizedProviderError } from '../provider-error-sanitizer.js';
@@ -91,6 +92,8 @@ router.get('/api/public/workspace/:id', (req, res) => { // portal-auth-public-ok
     stripeEnabled: isStripeConfigured(),
     hasClientUsers: hasClientUsers(req.params.id),
     bookingUrl: getBookingUrl() ?? null,
+    // The Issue (Client) P0 — flag-gated: attach segmentProfile only when the spine is ON.
+    theIssueClientSpine: isFeatureEnabled('the-issue-client-spine', ws.id),
   }));
 });
 
@@ -800,7 +803,7 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', requireC
 //
 // admin-only fields (sourceMetadata, adminNote) are intentionally stripped —
 // only weekOf, publishedAt, and the BriefingStory[] array reach the client.
-// Enrichment logic lives in server/briefing-client-projection.ts.
+// Enrichment logic lives behind server/client-insight-view-model.ts.
 router.get('/api/public/briefing/:workspaceId', requireClientPortalAuth(), (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -813,7 +816,7 @@ router.get('/api/public/briefing/:workspaceId', requireClientPortalAuth(), (req,
     return res.status(402).json({ error: 'Briefing requires Growth or Premium tier' });
   }
 
-  const briefing = buildBriefingClientView(ws.id);
+  const briefing = buildClientBriefingView(ws.id);
   res.json({ briefing });
 });
 

@@ -23,13 +23,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Archive, Eye, MapPin, Target, TrendingUp } from 'lucide-react'; // trend-icon-ok — TrendingUp is a summary-metric icon here, not a trend badge
+import { Archive, Eye, MapPin, RefreshCw, Target, TrendingUp } from 'lucide-react'; // trend-icon-ok — TrendingUp is a summary-metric icon here, not a trend badge
 
-import { Button, ConfirmDialog, FormInput, PageHeader, SectionCard } from './ui';
+import { Badge, Button, ConfirmDialog, FormInput, PageHeader, SectionCard } from './ui';
 import { KeywordBulkConfirmDialog } from './keyword-command-center/KeywordBulkConfirmDialog';
 import { KeywordDetailDrawer } from './keyword-command-center/KeywordDetailDrawer';
 import { SummaryMetric } from './keyword-command-center/SummaryMetric';
-import { LocalSeoVisibilityPanel } from './local-seo/LocalSeoVisibilityPanel';
+import { LocalPresenceHandoff } from './local-seo/LocalPresenceHandoff';
+import { AiVisibilityPanel } from './strategy/AiVisibilityPanel';
 import { summarizeBulkAction, type KeywordBulkActionSummary } from './keyword-command-center/kccActionHelpers';
 import { isServerAction } from './keyword-command-center/kccDisplayHelpers';
 import { queryKeys } from '../lib/queryKeys';
@@ -39,13 +40,16 @@ import { adminPath } from '../routes';
 import { GSC_METRIC_WINDOW_DAYS } from '../../shared/keyword-window';
 import { useWorkspaceEvents } from '../hooks/useWorkspaceEvents';
 import { useLocalSeoRefresh } from '../hooks/admin/useLocalSeo';
+import { FeatureFlag } from './ui/FeatureFlag';
 import {
   useKeywordCommandCenterAction,
   useKeywordCommandCenterBulkAction,
   useKeywordCommandCenterDetail,
+  useKeywordCommandCenterInitialView,
   useKeywordCommandCenterRows,
   useKeywordCommandCenterSummary,
   useKeywordHardDelete,
+  useNationalSerpRefresh,
   useRankTrackingAddKeyword,
 } from '../hooks/admin/useKeywordCommandCenter';
 import { useKeywordHubState } from '../hooks/admin/useKeywordHubState';
@@ -104,6 +108,44 @@ function hubSortToKccSort(key: HubSortKey): KeywordCommandCenterSort {
     default:
       return 'priority';
   }
+}
+
+const SORT_LABELS: Record<HubSortKey, string> = {
+  opportunity: 'opportunity value',
+  keyword: 'keyword',
+  position: 'rank',
+  change: 'change',
+  clicks: 'clicks',
+  volume: 'volume',
+  difficulty: 'difficulty',
+  date: 'date',
+};
+
+function sortSummary(key: HubSortKey, direction: 'asc' | 'desc'): string {
+  if (key === 'opportunity') {
+    return direction === 'desc'
+      ? 'Sorted by opportunity value'
+      : 'Sorted by lowest opportunity';
+  }
+  return `Sorted by ${SORT_LABELS[key]} ${direction === 'desc' ? 'descending' : 'ascending'}`;
+}
+
+function rowsQuerySignature(query: {
+  filter?: string;
+  search?: string;
+  sort?: string;
+  direction?: string;
+  page?: number;
+  pageSize?: number;
+}): string {
+  return [
+    query.filter ?? '',
+    query.search ?? '',
+    query.sort ?? '',
+    query.direction ?? '',
+    query.page ?? '',
+    query.pageSize ?? '',
+  ].join('|');
 }
 
 // ---------------------------------------------------------------------------
@@ -165,29 +207,6 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const detail = useKeywordCommandCenterDetail(workspaceId, selectedKey);
 
-  // Data --------------------------------------------------------------------
-  const summary = useKeywordCommandCenterSummary(workspaceId);
-  const counts = summary.data?.counts;
-  const filterMetas = summary.data?.filters ?? [];
-
-  // Trust signals (Task 4) --------------------------------------------------
-  // The universe is truncated by the display cap whenever the true post-gate
-  // total exceeds the returned/displayed count. We disclose the hidden tail
-  // honestly rather than silently dropping it. (Under keyword-universe-full the
-  // total can include rank-evidence beyond the value-ceiling, so the copy is a
-  // generic "N more keywords below the cap" — accurate for both cases.)
-  const rawEvidenceTotal = summary.data?.rawEvidenceTotal ?? 0;
-  const rawEvidenceReturned = summary.data?.rawEvidenceReturned ?? 0;
-  const hiddenByCap = Math.max(0, rawEvidenceTotal - rawEvidenceReturned);
-  const isTruncated = rawEvidenceTotal > rawEvidenceReturned;
-
-  // Summary error band (KCC :461-468 parity) — non-null when the summary fetch fails.
-  const summaryErrorMessage = summary.error instanceof Error
-    ? summary.error.message
-    : summary.error
-      ? 'Keyword summary metrics could not load. Row data remains available.'
-      : null;
-
   const rowsQuery = useMemo(
     () => ({
       filter: hub.activeKccFilter,
@@ -200,18 +219,55 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
     [hub.activeKccFilter, hub.debouncedSearch, hub.sort.key, hub.sort.direction, hub.page],
   );
 
-  const rowsResult = useKeywordCommandCenterRows(workspaceId, rowsQuery);
-  const rows = rowsResult.data?.rows ?? [];
-  const pageInfo = rowsResult.data?.pageInfo;
+  const initialRowsQueryRef = useRef(rowsQuery);
+  const initialView = useKeywordCommandCenterInitialView(workspaceId, initialRowsQueryRef.current);
+  const viewingInitialRows = rowsQuerySignature(rowsQuery) === rowsQuerySignature(initialRowsQueryRef.current);
+  const summary = useKeywordCommandCenterSummary(workspaceId, {
+    enabled: initialView.isError,
+  });
+  const rowsResult = useKeywordCommandCenterRows(workspaceId, rowsQuery, {
+    enabled: !viewingInitialRows || initialView.isError,
+  });
+  const summaryData = initialView.data?.summary ?? summary.data;
+  const rowsData = viewingInitialRows ? initialView.data?.rows ?? rowsResult.data : rowsResult.data;
+  const rowsError = rowsData || rowsResult.isLoading
+    ? null
+    : viewingInitialRows ? rowsResult.error ?? initialView.error : rowsResult.error;
+  const counts = summaryData?.counts;
+  const filterMetas = summaryData?.filters ?? [];
+  const summaryLoading = initialView.isLoading || summary.isLoading;
+  const rowsLoading = viewingInitialRows ? initialView.isLoading || rowsResult.isLoading : rowsResult.isLoading;
+  const rows = rowsData?.rows ?? [];
+  const pageInfo = rowsData?.pageInfo;
+
+  // Trust signals (Task 4) --------------------------------------------------
+  // The universe is truncated by the display cap whenever the true post-gate
+  // total exceeds the returned/displayed count. We disclose the hidden tail
+  // honestly rather than silently dropping it. (Under keyword-universe-full the
+  // total can include rank-evidence beyond the value-ceiling, so the copy is a
+  // generic "N more keywords below the cap" — accurate for both cases.)
+  const rawEvidenceTotal = summaryData?.rawEvidenceTotal ?? 0;
+  const rawEvidenceReturned = summaryData?.rawEvidenceReturned ?? 0;
+  const hiddenByCap = Math.max(0, rawEvidenceTotal - rawEvidenceReturned);
+  const isTruncated = rawEvidenceTotal > rawEvidenceReturned;
+
+  // Summary error band (KCC :461-468 parity) — non-null when the summary fetch fails.
+  const summaryErrorMessage = summary.error instanceof Error
+    ? summary.error.message
+    : summary.error
+      ? 'Keyword summary metrics could not load. Row data remains available.'
+      : null;
 
   const bulkAction = useKeywordCommandCenterBulkAction(workspaceId);
   const rowAction = useKeywordCommandCenterAction(workspaceId);
   const hardDelete = useKeywordHardDelete(workspaceId);
   const localRefresh = useLocalSeoRefresh(workspaceId);
+  const nationalRefresh = useNationalSerpRefresh(workspaceId);
   const addKeywordMutation = useRankTrackingAddKeyword(workspaceId);
 
   // Add-keyword input state (local — not a filter, not hub state).
   const [addKeywordValue, setAddKeywordValue] = useState('');
+  const addKeywordInputRef = useRef<HTMLInputElement>(null);
 
   // The selected row for the drawer: the freshly-fetched detail row when it
   // arrives, otherwise the list row as an instant preview (mirrors KCC).
@@ -246,7 +302,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   // Deferred local panel mount: fires after the first rows response arrives.
   // Falls back to setTimeout(0) when requestIdleCallback is absent (jsdom/test).
   useEffect(() => {
-    if (!rowsResult.data) return;
+    if (!rowsData) return;
     if (localPanelEnabled) return;
     const idle = 'requestIdleCallback' in window
       ? (window as Window & {
@@ -260,12 +316,18 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
     }
     const timer = window.setTimeout(() => setLocalPanelEnabled(true), 0);
     return () => window.clearTimeout(timer);
-  }, [localPanelEnabled, rowsResult.data]);
+  }, [localPanelEnabled, rowsData]);
 
   // WebSocket: invalidate on rank/strategy mutations (both-halves contract).
   const wsHandlers = useMemo(
     () => ({
       [WS_EVENTS.RANK_TRACKING_UPDATED]: () =>
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.admin.keywordCommandCenter(workspaceId),
+        }),
+      // P6 national-serp-tracking: a national SERP refresh upserted fresh serp_snapshots →
+      // re-pull the command center so the drawer's Live SERP / AI-Overview detail updates.
+      [WS_EVENTS.SERP_SNAPSHOTS_REFRESHED]: () =>
         queryClient.invalidateQueries({
           queryKey: queryKeys.admin.keywordCommandCenter(workspaceId),
         }),
@@ -412,6 +474,14 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
     hub.setAdvancedFilter(null);
   };
 
+  const handleRetryRows = () => {
+    void (viewingInitialRows ? initialView.refetch() : rowsResult.refetch());
+  };
+
+  const handleFocusAddKeyword = () => {
+    addKeywordInputRef.current?.focus();
+  };
+
   const visibleKeys = useMemo(
     () => rows.map((r) => r.normalizedKeyword),
     [rows],
@@ -441,7 +511,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   // Surface a failed row/drawer/local action (mirrors KCC's actionErrorMessage).
   // Without this a thrown mutation — e.g. a server-rejected lifecycle move — would
   // fail silently in the Hub.
-  const firstError = rowAction.error ?? hardDelete.error ?? localRefresh.error ?? bulkAction.error ?? addKeywordMutation.error;
+  const firstError = rowAction.error ?? hardDelete.error ?? localRefresh.error ?? nationalRefresh.error ?? bulkAction.error ?? addKeywordMutation.error;
   const actionErrorMessage = firstError instanceof Error
     ? firstError.message
     : firstError
@@ -449,7 +519,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
       : null;
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4${hub.someSelected ? ' pb-40 sm:pb-24' : ''}`}>
       <PageHeader
         title="Keyword Hub"
         subtitle="One surface for every keyword — strategy, tracking, rank, and local visibility."
@@ -459,6 +529,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
             {/* Add-keyword input (B1): writes through the existing rank-tracking add path. */}
             <div className="flex items-center gap-1.5">
               <FormInput
+                ref={addKeywordInputRef}
                 value={addKeywordValue}
                 onChange={setAddKeywordValue}
                 placeholder="Add keyword..."
@@ -487,6 +558,21 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
                 aria-label="Search keywords"
               />
             </div>
+
+            {/* P6 national-serp-tracking — flag-gated trigger for the national advanced-SERP
+                rank refresh. The route enforces Growth+ tier; a Free workspace gets a 403
+                surfaced via the shared error band. Progress shows in the NotificationBell. */}
+            <FeatureFlag flag="national-serp-tracking">
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={RefreshCw}
+                disabled={nationalRefresh.isPending}
+                onClick={() => nationalRefresh.mutate()}
+              >
+                {nationalRefresh.isPending ? 'Refreshing ranks…' : 'Refresh national ranks'}
+              </Button>
+            </FeatureFlag>
           </div>
         }
       />
@@ -533,25 +619,22 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
         </div>
       )}
 
-      {/* Local SEO visibility panel — deferred via requestIdleCallback after first rows
-          render (same pattern as KCC :224-240). onOpenKeywords wires to Hub's local segment. */}
+      {/* Local Presence handoff — deferred via requestIdleCallback after first rows
+          render (same pattern as KCC :224-240). Keyword-level local evidence remains in Hub. */}
       {localPanelEnabled ? (
-        <LocalSeoVisibilityPanel
-          workspaceId={workspaceId}
-          mode="keywords"
-          onOpenKeywords={() => {
-            hub.setSegment('local');
-            hub.setPage(1);
-          }}
-        />
+        <LocalPresenceHandoff workspaceId={workspaceId} />
       ) : (
-        <SectionCard title="Local Keyword Visibility" variant="subtle">
+        <SectionCard title="Local Presence" variant="subtle">
           <div className="flex items-center gap-2 text-[var(--brand-text-muted)] t-caption">
             <span className="inline-block h-2 w-2 rounded-[var(--radius-sm)] bg-blue-400 animate-pulse" />
-            Local visibility summary will load after the keyword rows are ready.
+            Local presence summary will load after the keyword rows are ready.
           </div>
         </SectionCard>
       )}
+
+      {/* AI-visibility (LLM-mention) KPI panel — P8 / ai-visibility. Self-gating: renders nothing
+          when the `ai-visibility` flag is off (the read endpoint returns latest: null). */}
+      <AiVisibilityPanel workspaceId={workspaceId} />
 
       <SectionCard noPadding variant="subtle">
         <div className="px-3 py-3 border-b border-[var(--brand-border)] flex flex-wrap items-center gap-2">
@@ -559,7 +642,15 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
             segments={segments}
             active={hub.segment}
             onChange={hub.setSegment}
-            isLoading={summary.isLoading}
+            isLoading={summaryLoading}
+          />
+          <Badge
+            label={sortSummary(hub.sort.key, hub.sort.direction)}
+            ariaLabel={sortSummary(hub.sort.key, hub.sort.direction)}
+            tone="blue"
+            variant="soft"
+            size="sm"
+            shape="pill"
           />
           <div className="ml-auto">
             <HubAdvancedFilters
@@ -598,8 +689,8 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
           workspaceId={workspaceId}
           rows={rows}
           pageInfo={pageInfo}
-          isLoading={rowsResult.isLoading}
-          isError={rowsResult.isError}
+          isLoading={rowsLoading}
+          isError={Boolean(rowsError)}
           sort={hub.sort}
           onSort={hub.setSort}
           selectedKeys={hub.selectedKeys}
@@ -616,6 +707,8 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
           isRowActionPending={rowAction.isPending || hardDelete.isPending}
           onClearSelection={hub.clearSelection}
           onResetFilters={handleResetFilters}
+          onRetry={handleRetryRows}
+          onFocusAddKeyword={handleFocusAddKeyword}
           onRowClick={(row) => setSelectedKey(row.normalizedKeyword)}
           activeKeyword={selectedKey}
           showLocalSeo={showLocalSeo}

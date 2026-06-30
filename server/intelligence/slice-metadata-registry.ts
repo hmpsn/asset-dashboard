@@ -1,22 +1,10 @@
 import type {
   IntelligenceOptions,
   IntelligenceSlice,
+  SiteHealthSlice,
   WorkspaceIntelligence,
 } from '../../shared/types/intelligence.js';
 import { createLogger } from '../logger.js';
-import { assembleClientSignals } from './client-signals-slice.js';
-import { assembleContentPipeline } from './content-pipeline-slice.js';
-import { assembleEeatAssets } from './eeat-assets-slice.js';
-import { assembleEntityResolution } from './entity-resolution-slice.js';
-import { assembleInsights } from './insights-slice.js';
-import { assembleLearnings } from './learnings-slice.js';
-import { assembleLocalSeo } from './local-seo-slice.js';
-import { assembleOperational } from './operational-slice.js';
-import { assemblePageElements } from './page-elements-slice.js';
-import { assemblePageProfile } from './page-profile-slice.js';
-import { assembleSeoContext } from './seo-context-slice.js';
-import { assembleSiteHealth } from './site-health-slice.js';
-import { assembleSiteInventory } from './site-inventory-slice.js';
 
 const log = createLogger('workspace-intelligence');
 
@@ -28,12 +16,11 @@ export interface IntelligenceSliceMetadataEntry {
   requiredOptions?: Partial<Record<'pagePath' | 'siteId' | 'siteBaseUrl', true>>;
 }
 
-async function assembleWithTimeout<T>(
-  slice: IntelligenceSlice,
+async function assembleSiteHealthWithTimeout(
   workspaceId: string,
   timeoutMs: number,
-  factory: () => Promise<T>,
-): Promise<T | undefined> {
+  factory: () => Promise<SiteHealthSlice>,
+): Promise<SiteHealthSlice | undefined> {
   let timedOut = false;
   const pending = factory().catch((err) => {
     if (timedOut) return undefined;
@@ -41,7 +28,7 @@ async function assembleWithTimeout<T>(
   });
 
   try {
-    const result = await Promise.race<T | undefined>([
+    const result = await Promise.race<SiteHealthSlice | undefined>([
       pending,
       new Promise<undefined>((resolve) => {
         setTimeout(() => {
@@ -51,46 +38,51 @@ async function assembleWithTimeout<T>(
       }),
     ]);
     if (timedOut) {
-      log.warn({ workspaceId, slice, timeoutMs }, `${slice} slice assembly failed — skipping`);
+      log.warn({ workspaceId, slice: 'siteHealth', timeoutMs }, 'siteHealth slice assembly failed — skipping');
     }
     return result;
   } catch (err) {
-    log.warn({ workspaceId, slice, err }, `${slice} slice assembly failed — skipping`);
+    log.warn({ workspaceId, slice: 'siteHealth', err }, 'siteHealth slice assembly failed — skipping');
     return undefined;
   }
 }
 
 export const INTELLIGENCE_SLICE_METADATA_REGISTRY = {
   seoContext: {
-    assemble: async (workspaceId, opts) => ({
-      seoContext: await assembleSeoContext(workspaceId, opts),
-    }),
+    assemble: async (workspaceId, opts) => {
+      const { assembleSeoContext } = await import('./seo-context-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
+      return { seoContext: await assembleSeoContext(workspaceId, opts) };
+    },
   },
   insights: {
-    assemble: async (workspaceId, opts) => ({
-      insights: await assembleInsights(workspaceId, opts),
-    }),
+    assemble: async (workspaceId, opts) => {
+      const { assembleInsights } = await import('./insights-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
+      return { insights: await assembleInsights(workspaceId, opts) };
+    },
   },
   learnings: {
-    assemble: async (workspaceId, opts) => ({
-      learnings: await assembleLearnings(workspaceId, opts),
-    }),
+    assemble: async (workspaceId, opts) => {
+      const { assembleLearnings } = await import('./learnings-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
+      return { learnings: await assembleLearnings(workspaceId, opts) };
+    },
   },
   pageProfile: {
     requiredOptions: { pagePath: true },
-    assemble: async (workspaceId, opts) => ({
-      pageProfile: await assemblePageProfile(workspaceId, opts!.pagePath!, opts),
-    }),
+    assemble: async (workspaceId, opts) => {
+      const { assemblePageProfile } = await import('./page-profile-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
+      return { pageProfile: await assemblePageProfile(workspaceId, opts!.pagePath!, opts) };
+    },
   },
   contentPipeline: {
-    assemble: async (workspaceId) => ({
-      contentPipeline: await assembleContentPipeline(workspaceId),
-    }),
+    assemble: async (workspaceId) => {
+      const { assembleContentPipeline } = await import('./content-pipeline-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
+      return { contentPipeline: await assembleContentPipeline(workspaceId) };
+    },
   },
   siteHealth: {
     assemble: async (workspaceId, opts) => {
-      const siteHealth = await assembleWithTimeout(
-        'siteHealth',
+      const { assembleSiteHealth } = await import('./site-health-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
+      const siteHealth = await assembleSiteHealthWithTimeout(
         workspaceId,
         5000,
         () => assembleSiteHealth(workspaceId, opts),
@@ -99,46 +91,67 @@ export const INTELLIGENCE_SLICE_METADATA_REGISTRY = {
     }
   },
   clientSignals: {
-    assemble: async (workspaceId, opts) => ({
-      clientSignals: await assembleClientSignals(workspaceId, opts),
-    }),
+    assemble: async (workspaceId, opts) => {
+      const { assembleClientSignals } = await import('./client-signals-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
+      return { clientSignals: await assembleClientSignals(workspaceId, opts) };
+    },
   },
   operational: {
-    assemble: async (workspaceId, opts) => ({
-      operational: await assembleOperational(workspaceId, opts),
-    }),
+    assemble: async (workspaceId, opts) => {
+      const { assembleOperational } = await import('./operational-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
+      return { operational: await assembleOperational(workspaceId, opts) };
+    },
   },
   pageElements: {
     requiredOptions: { pagePath: true },
-    assemble: async (workspaceId, opts) => ({
-      pageElements: await assemblePageElements(workspaceId, opts!.pagePath!),
-    }),
+    assemble: async (workspaceId, opts) => {
+      const { assemblePageElements } = await import('./page-elements-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
+      return { pageElements: await assemblePageElements(workspaceId, opts!.pagePath!) };
+    },
   },
   siteInventory: {
     requiredOptions: { siteId: true, siteBaseUrl: true },
-    assemble: async (workspaceId, opts) => ({
-      siteInventory: await assembleSiteInventory(
+    assemble: async (workspaceId, opts) => {
+      const { assembleSiteInventory } = await import('./site-inventory-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
+      return {
+        siteInventory: await assembleSiteInventory(
         workspaceId,
         opts!.siteId!,
         opts!.siteBaseUrl!,
         opts?.webflowToken,
-      ),
-    }),
+        ),
+      };
+    },
   },
   localSeo: {
-    assemble: async (workspaceId) => ({
-      localSeo: await assembleLocalSeo(workspaceId),
-    }),
+    assemble: async (workspaceId) => {
+      const { assembleLocalSeo } = await import('./local-seo-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
+      return { localSeo: await assembleLocalSeo(workspaceId) };
+    },
   },
   entityResolution: {
-    assemble: async (workspaceId, opts) => ({
-      entityResolution: await assembleEntityResolution(workspaceId, opts),
-    }),
+    assemble: async (workspaceId, opts) => {
+      const { assembleEntityResolution } = await import('./entity-resolution-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
+      return { entityResolution: await assembleEntityResolution(workspaceId, opts) };
+    },
   },
   eeatAssets: {
-    assemble: async (workspaceId) => ({
-      eeatAssets: await assembleEeatAssets(workspaceId),
-    }),
+    assemble: async (workspaceId) => {
+      const { assembleEeatAssets } = await import('./eeat-assets-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
+      return { eeatAssets: await assembleEeatAssets(workspaceId) };
+    },
+  },
+  generationQuality: {
+    assemble: async (workspaceId) => {
+      const { assembleGenerationQuality } = await import('./generation-quality-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
+      return { generationQuality: await assembleGenerationQuality(workspaceId) };
+    },
+  },
+  brand: {
+    assemble: async (workspaceId) => {
+      const { assembleBrand } = await import('./brand-slice.js'); // dynamic-import-ok — slice registry intentionally lazy-loads typed module exports to avoid facade cycles.
+      return { brand: await assembleBrand(workspaceId) };
+    },
   },
 } as const satisfies Record<IntelligenceSlice, IntelligenceSliceMetadataEntry>;
 

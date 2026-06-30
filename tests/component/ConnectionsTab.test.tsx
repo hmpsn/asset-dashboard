@@ -16,6 +16,18 @@ const mocks = vi.hoisted(() => ({
   flowTokenError: '',
   flowFetchSites: vi.fn(),
   flowReset: vi.fn(),
+  featureFlags: {} as Record<string, boolean>,
+  gbpAuthMutateAsync: vi.fn(),
+  gbpAuthIsError: false,
+  gbpAuthError: null as Error | null,
+  gbpSyncMutate: vi.fn(),
+  gbpSyncIsError: false,
+  gbpSyncError: null as Error | null,
+  gbpDisconnectMutate: vi.fn(),
+  gbpDisconnectIsError: false,
+  gbpDisconnectError: null as Error | null,
+  gbpStatusIsError: false,
+  gbpStatusError: null as Error | null,
 }));
 
 vi.mock('../../src/hooks/admin/useWorkspaces', () => ({
@@ -42,6 +54,46 @@ vi.mock('../../src/hooks/useLinkSiteFlow', () => ({
 
 vi.mock('../../src/hooks/admin/useIntegrationHealth', () => ({
   useIntegrationHealth: () => ({ data: undefined, isLoading: false }),
+}));
+
+vi.mock('../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: (flag: string) => mocks.featureFlags[flag] ?? false,
+}));
+
+vi.mock('../../src/hooks/admin/useGoogleBusinessProfile', () => ({
+  useGbpConnectionStatus: () => ({
+    data: {
+      configured: true,
+      connected: true,
+      status: 'connected',
+      scopes: ['https://www.googleapis.com/auth/business.manage'],
+      accountCount: 1,
+      locationCount: 2,
+      mappedLocationCount: 1,
+      needsReconnect: false,
+    },
+    isLoading: false,
+    isError: mocks.gbpStatusIsError,
+    error: mocks.gbpStatusError,
+  }),
+  useGbpAuthUrl: () => ({
+    mutateAsync: mocks.gbpAuthMutateAsync,
+    isPending: false,
+    isError: mocks.gbpAuthIsError,
+    error: mocks.gbpAuthError,
+  }),
+  useGbpSync: () => ({
+    mutate: mocks.gbpSyncMutate,
+    isPending: false,
+    isError: mocks.gbpSyncIsError,
+    error: mocks.gbpSyncError,
+  }),
+  useGbpDisconnect: () => ({
+    mutate: mocks.gbpDisconnectMutate,
+    isPending: false,
+    isError: mocks.gbpDisconnectIsError,
+    error: mocks.gbpDisconnectError,
+  }),
 }));
 
 const defaultProps = {
@@ -78,11 +130,40 @@ describe('ConnectionsTab — site linking', () => {
     mocks.flowTokenError = '';
     mocks.flowShowToken = false;
     mocks.linkSiteIsPending = false;
+    mocks.featureFlags = {};
+    mocks.gbpAuthIsError = false;
+    mocks.gbpAuthError = null;
+    mocks.gbpSyncIsError = false;
+    mocks.gbpSyncError = null;
+    mocks.gbpDisconnectIsError = false;
+    mocks.gbpDisconnectError = null;
+    mocks.gbpStatusIsError = false;
+    mocks.gbpStatusError = null;
   });
 
   it('shows the token input when no site is linked', () => {
     renderTab({ webflowSiteId: undefined });
     expect(screen.getByPlaceholderText(/paste webflow api token/i)).toBeInTheDocument();
+  });
+
+  it('shows Google Business Profile connection only when the feature flag is enabled', () => {
+    renderTab();
+    expect(screen.queryByText('Google Business Profile')).not.toBeInTheDocument();
+
+    mocks.featureFlags = { 'gbp-auth-connection': true };
+    renderTab();
+    expect(screen.getByText('Google Business Profile')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+  });
+
+  it('surfaces the safe Google Business Profile sync error returned by the API', () => {
+    mocks.featureFlags = { 'gbp-auth-connection': true };
+    mocks.gbpSyncIsError = true;
+    mocks.gbpSyncError = new Error('Google says a required My Business API is disabled for this OAuth project.');
+
+    renderTab();
+
+    expect(screen.getByText(/required My Business API is disabled/i)).toBeInTheDocument();
   });
 
   it('does NOT show the token input when a site is already linked', () => {

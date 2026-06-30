@@ -54,7 +54,6 @@ const SYNTHETIC_FILES = [
   'src/api/index.ts',
   'src/api/outcomes.ts',
   'src/api/seo.ts',
-  'src/hooks/admin/useActionQueue.ts',
   'src/hooks/admin/useAdminROI.ts',
   'src/hooks/admin/useAdminSeo.ts',
   'src/hooks/admin/useAnalyticsOverview.ts',

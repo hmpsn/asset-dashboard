@@ -33,6 +33,7 @@ import { parseCoveredWsEventKeys, parseWsEventKeys } from '../../scripts/ws-cont
 const ROOT = join(__dirname, '../..');
 const WS_EVENTS_FILE = join(ROOT, 'src/lib/wsEvents.ts');
 const USE_WS_INVALIDATION_FILE = join(ROOT, 'src/hooks/useWsInvalidation.ts');
+const THE_ISSUE_CONVERSION_ROUTE_FILE = join(ROOT, 'server/routes/the-issue-conversion-tracking.ts');
 
 // ---------------------------------------------------------------------------
 // LOCAL_ONLY_EVENTS — events intentionally excluded from useWsInvalidation.ts
@@ -62,6 +63,29 @@ const LOCAL_ONLY_EVENTS = new Set<string>([
   // but ClientDashboard owns that client-side subscription because the admin
   // useWsInvalidation hook is not mounted on /client routes.
   'SCHEMA_PLAN_SENT',
+
+  // FORM_SUBMISSION_CAPTURED (The Issue P1a) is handled locally by useConversionTrackingStatus
+  // (useWorkspaceEvents) on the admin conversion-tracking surface — it invalidates the
+  // conversion-tracking-status query directly, not via the centralized useWsInvalidation hook.
+  'FORM_SUBMISSION_CAPTURED',
+
+  // STRATEGY_KEYWORD_SET_UPDATED: forward-declared in P2 pre-commit; the
+  // centralized useWsInvalidation.ts handler (invalidating
+  // queryKeys.admin.strategyKeywordSet) lands in P3 — REMOVE this exemption
+  // in P3 when the handler ships.
+  'STRATEGY_KEYWORD_SET_UPDATED',
+
+  // STRATEGY_POV_GENERATED (The Issue): handled locally by src/hooks/admin/useStrategyPov.ts via
+  // useWorkspaceEvents (invalidates queryKeys.admin.strategyPov). Only the cockpit's POV query
+  // consumes it, so a centralized useWsInvalidation.ts handler would invalidate nothing else.
+  'STRATEGY_POV_GENERATED',
+
+  // STRATEGY_AUTOSEND_POLICY_UPDATED (The Issue, Phase 4 trust ladder): handled locally by
+  // src/hooks/admin/useAutoSendPolicy.ts via useWorkspaceEvents (invalidates
+  // queryKeys.admin.autoSendPolicy(workspaceId)). Only that hook's query — the TrustLadderPanel's
+  // per-workspace policy fetch — consumes it, so a centralized useWsInvalidation.ts handler would
+  // invalidate nothing else. Mirrors the STRATEGY_POV_GENERATED local-handler pattern above.
+  'STRATEGY_AUTOSEND_POLICY_UPDATED',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -94,6 +118,7 @@ function extractCoveredEventKeys(source: string): Set<string> {
 
 const wsEventsSource = readFileSync(WS_EVENTS_FILE, 'utf8'); // readFile-ok — intentional static analysis of event registry
 const useWsInvalidationSource = readFileSync(USE_WS_INVALIDATION_FILE, 'utf8'); // readFile-ok — intentional static analysis of handler registry
+const theIssueConversionRouteSource = readFileSync(THE_ISSUE_CONVERSION_ROUTE_FILE, 'utf8'); // readFile-ok — intentional static analysis of broadcast producer
 
 const expectedEvents = extractWsEventKeys(wsEventsSource);
 const coveredEvents = extractCoveredEventKeys(useWsInvalidationSource);
@@ -166,5 +191,11 @@ describe('WS_EVENTS invalidation coverage contract', () => {
     }
 
     expect(phantom).toHaveLength(0);
+  });
+
+  it('form-source saves broadcast the config-update event that invalidates measured provenance', () => {
+    expect(expectedEvents.has('FORM_CAPTURE_CONFIG_UPDATED')).toBe(true);
+    expect(coveredEvents.has('FORM_CAPTURE_CONFIG_UPDATED')).toBe(true);
+    expect(theIssueConversionRouteSource).toContain('broadcastToWorkspace(ws.id, WS_EVENTS.FORM_CAPTURE_CONFIG_UPDATED');
   });
 });

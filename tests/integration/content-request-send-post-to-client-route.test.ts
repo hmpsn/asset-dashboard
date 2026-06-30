@@ -56,6 +56,7 @@ let server: http.Server | undefined;
 let wsAId = '';
 let wsBId = '';
 const originalAppPassword = process.env.APP_PASSWORD;
+const originalAppUrl = process.env.APP_URL;
 
 async function startTestServer(): Promise<void> {
   delete process.env.APP_PASSWORD;
@@ -118,6 +119,7 @@ function activityCount(workspaceId: string, type: string): number {
 }
 
 beforeAll(async () => {
+  process.env.APP_URL = 'https://dashboard.example.test';
   await startTestServer();
   wsAId = createWorkspace('Send Post Route A').id;
   wsBId = createWorkspace('Send Post Route B').id;
@@ -141,6 +143,8 @@ afterAll(async () => {
   await stopTestServer();
   if (originalAppPassword === undefined) delete process.env.APP_PASSWORD;
   else process.env.APP_PASSWORD = originalAppPassword;
+  if (originalAppUrl === undefined) delete process.env.APP_URL;
+  else process.env.APP_URL = originalAppUrl;
 });
 
 describe('POST /api/content-requests/:workspaceId/posts/:postId/send-to-client', () => {
@@ -175,6 +179,7 @@ describe('POST /api/content-requests/:workspaceId/posts/:postId/send-to-client',
 
     expect(emailState.clientPostReady).toHaveLength(1);
     expect(emailState.clientPostReady[0]).toMatchObject({ clientEmail: 'client-a@example.com', topic: post.title });
+    expect(emailState.clientPostReady[0].dashboardUrl).toBe(`https://dashboard.example.test/client/${wsAId}/inbox?tab=reviews`);
     expect(broadcastState.calls.some((c) => c.event === WS_EVENTS.CONTENT_REQUEST_CREATED)).toBe(true);
     expect(activityCount(wsAId, 'post_sent_for_review')).toBe(1);
   });

@@ -1,17 +1,16 @@
 // SHARED PRIMITIVE — Wave 2 T4 (#5)
 //
 // ONE audience-parameterized content-gap / recommendation row, subsuming the
-// metric-and-badge body previously hand-rolled three times:
+// metric-and-badge body previously hand-rolled multiple times:
 //   - admin       → src/components/strategy/ContentGaps.tsx
 //   - strategy-tab → src/components/client/strategy/StrategyContentOpportunitiesSection.tsx (ContentGapCard)
-//   - briefing     → src/components/client/Briefing/RecommendedForYou.tsx
 //
 // The component is parameterized by SIX axes (audit §ContentGapRow):
 //   (a) KD prefix          — 'KD' | 'Difficulty'
 //   (b) SERP label set     — 'plain' | 'descriptive' | 'emoji'
 //   (c) intentTone map     — supplied per surface (admin and client diverge)
 //   (d) est-clicks mode    — 'always' | 'conditional' | 'never'
-//   (e) ovGainActive       — briefing-only compatibility boolean; default false
+//   (e) ovGainActive       — compatibility boolean; default false
 //   (f) backfilled slot    — field-presence-driven 'Expanded pick' affordance
 //
 // Each surface keeps its own card chrome (SectionCard / signature card) and its own
@@ -33,8 +32,9 @@ import { Badge, Icon, TrendBadge, type BadgeTone } from '../ui';
 import { fmtNum } from '../../utils/formatNumbers';
 import { kdColor } from '../page-intelligence/pageIntelligenceDisplay';
 import { kdFraming, kdTooltip } from '../../lib/kdFraming';
+import { serpBadges } from './serpFeatureBadges';
 
-export type ContentGapAudience = 'admin' | 'strategy-tab' | 'briefing';
+export type ContentGapAudience = 'admin' | 'strategy-tab' | 'briefing' | 'issue';
 
 /** Minimal data shape shared by the 3 surfaces' gap/recommendation rows. */
 export interface ContentGapRowData {
@@ -171,55 +171,34 @@ const CHROME: Record<ContentGapAudience, AudienceChrome> = {
     questionTextClass: '',
     rationaleClass: 't-caption-sm text-[var(--brand-text-muted)] leading-snug mb-2',
   },
+  // ── Issue (Phase 2 client money surface) ─────────────────────────────────────
+  // Client-facing evergreen content plan cards. No $ / pricing copy. Uses teal
+  // for the target keyword (action) and blue for data metrics per the Four Laws.
+  // estClicks shown always (volume-based entry point for “Act on this” decision).
+  // CTA copy (“Act on this” / “See the details”) lives in the card chrome, not here.
+  issue: {
+    topicClass: 't-ui font-semibold text-[var(--brand-text-bright)]',
+    targetKeyword: (kw) => `Target: “${kw}”`,
+    targetKeywordClass: 't-caption-sm text-teal-400',
+    volumeClass: 't-caption-sm text-blue-400 flex items-center gap-0.5',
+    kdPrefix: 'Difficulty',
+    impressionsClass: 't-caption-sm text-blue-400 flex items-center gap-0.5',
+    impressionsSuffix: 'impr',
+    competitorClass: 'flex items-center gap-0.5 t-caption-sm text-orange-400 font-medium',
+    trendRisingClass: 'flex items-center gap-0.5 t-caption-sm text-emerald-400 font-medium',
+    trendDecliningClass: 'flex items-center gap-0.5 t-caption-sm text-red-400 font-medium',
+    trendStableClass: 'flex items-center gap-0.5 t-caption-sm text-[var(--brand-text)] font-medium',
+    serpLabels: 'descriptive',
+    estClicks: 'always',
+    estClicksClass: 't-caption-sm text-blue-400/70 flex items-center gap-0.5',
+    serpTargetingBorder: 'mt-1.5 pl-2 border-l-2 border-yellow-500/20',
+    serpTargetingText: 't-caption-sm text-yellow-400/80 leading-relaxed',
+    questionIconClass: 'text-[var(--brand-text-muted)] flex-shrink-0',
+    questionTextClass: 't-caption-sm text-[var(--brand-text-muted)] italic',
+    rationaleClass: 't-caption-sm text-[var(--brand-text-muted)] mt-0.5',
+  },
 };
 
-const SERP_DESCRIPTIVE: Record<string, string> = {
-  featured_snippet: 'Featured snippet',
-  people_also_ask: 'People also ask',
-  video: 'Video results',
-  local_pack: 'Local results',
-};
-
-const SERP_EMOJI: Record<string, string> = {
-  featured_snippet: '⬜ Snippet',
-  people_also_ask: '❓ PAA',
-  video: '▶ Video',
-  local_pack: '📍 Local',
-};
-
-const SERP_PLAIN: Record<string, string> = {
-  featured_snippet: 'Snippet',
-  people_also_ask: 'PAA',
-  video: 'Video',
-  local_pack: 'Local',
-};
-
-/** Render the SERP-feature badges for the active label set, preserving order. */
-function serpBadges(serpFeatures: string[] | undefined, set: 'plain' | 'descriptive' | 'emoji'): ReactNode {
-  if (!Array.isArray(serpFeatures) || serpFeatures.length === 0) return null;
-  if (set === 'descriptive') {
-    // Strategy-tab: maps every feature key (unknown keys fall through to the raw key).
-    return (
-      <>
-        {serpFeatures.map((feat) => (
-          <Badge key={feat} label={SERP_DESCRIPTIVE[feat] ?? feat} tone="blue" variant="outline" />
-        ))}
-      </>
-    );
-  }
-  // admin (plain) + briefing (emoji): fixed ordered set, only the four known keys.
-  const labels = set === 'emoji' ? SERP_EMOJI : SERP_PLAIN;
-  const order = ['featured_snippet', 'people_also_ask', 'video', 'local_pack'];
-  return (
-    <div className="flex flex-wrap gap-1">
-      {order.map((key) =>
-        serpFeatures.includes(key) ? (
-          <Badge key={key} label={labels[key]} tone="blue" variant="outline" />
-        ) : null,
-      )}
-    </div>
-  );
-}
 
 export function ContentGapRow({
   data,

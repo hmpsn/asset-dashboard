@@ -108,3 +108,20 @@ export function useAddOutcomeNote(wsId: string) {
     },
   });
 }
+
+// ── Record action mutation ─────────────────────────────────────────────────
+// Records a tracked action (e.g. cannibalization_resolved) via the generic outcomes route, which
+// also broadcasts OUTCOME_ACTION_RECORDED. The onSuccess invalidate is immediate/belt-and-suspenders
+// alongside the global useWsInvalidation handler.
+
+export function useRecordOutcomeAction(wsId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: Parameters<typeof outcomesApi.recordAction>[1]) =>
+      outcomesApi.recordAction(wsId, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.outcomeActions(wsId) });
+    },
+  });
+}

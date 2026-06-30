@@ -9,6 +9,7 @@ export const INBOX_FILTER_VALUES: readonly InboxFilter[] =
 export const LEGACY_FILTER_MAP: Record<string, InboxFilter> = {
   approvals: 'decisions',
   requests: 'conversations',
+  content: 'reviews',
   copy: 'reviews',
   'content-plan': 'decisions',
   completed: 'all',
@@ -20,16 +21,12 @@ export function isInboxFilter(value: string | null): value is InboxFilter {
 
 export function resolveInboxFilter(
   param: string | null,
-  betaMode: boolean,
   initialFilter?: InboxFilter,
 ): InboxFilter {
-  const fallback = initialFilter === 'reviews' && betaMode
-    ? 'decisions'
-    : (initialFilter ?? 'decisions');
+  const fallback = initialFilter ?? 'decisions';
   return resolveTabSearchParam<InboxFilter>(param, {
     validValues: INBOX_FILTER_VALUES,
     fallback,
     legacyAliases: LEGACY_FILTER_MAP,
-    normalizeResolved: (value) => (value === 'reviews' && betaMode ? fallback : value),
   });
 }

@@ -122,25 +122,32 @@ describe('keyword-command-center sort — difficulty', () => {
   });
 });
 
-describe('keyword-command-center sort — opportunity (the Hub default)', () => {
-  // opportunity = volume-weighted × ease(1 − difficulty). alpha (demand 100, KD 10)
-  // is the most winnable; bravo (demand 400, KD 80) is high-volume but hard, so it
-  // scores LOW — opportunity must NOT collapse to volume.
-  it('leads with the most winnable keyword (high value × low difficulty), not the highest volume', () => {
-    const desc = rowOrder('opportunity');
-    expect(desc[0]).toBe('alpha');            // best opportunity, despite low volume
-    expect(desc[desc.length - 1]).toBe('bravo'); // worst opportunity, despite high volume
+describe('keyword-command-center sort — opportunity (the Hub default, value-first)', () => {
+  // The `opportunity` accessor is now a FIELD READ of the precomputed value score
+  // (candidate.valueScore / the row WeakMap set in finalizeDraftRow) — value-first
+  // scoring is unconditional after the keyword-value-scoring flag retirement.
+  // Candidate↔row parity of that score is covered by the value-score parity test
+  // below (via the real scoring probe); here we pin the comparator: highest score
+  // first, missing last. We drive the candidate side directly (valueScore is a
+  // candidate field; the row score lives on a module-private WeakMap).
+  const scored: RowCandidateKey[] = [
+    { key: 'alpha', keyword: 'alpha', sourcePriority: 2, demand: 100, valueScore: 90 },
+    { key: 'bravo', keyword: 'bravo', sourcePriority: 2, demand: 400, valueScore: 20 },
+    { key: 'charlie', keyword: 'charlie', sourcePriority: 2, demand: 50, valueScore: 55 },
+    // delta: NO valueScore (the "missing always last" case)
+    { key: 'delta', keyword: 'delta', sourcePriority: 2, demand: 250 },
+  ];
+  const order = (direction?: 'asc' | 'desc'): string[] =>
+    [...scored].sort(candidateSortForQuery('opportunity', direction)).map((c) => c.key);
+
+  it('leads with the highest value score, NOT the highest volume', () => {
+    // alpha 90 > charlie 55 > bravo 20, delta missing → last. bravo has the highest
+    // demand (400) but the lowest score — opportunity must NOT collapse to volume.
+    expect(order()).toEqual(['alpha', 'charlie', 'bravo', 'delta']);
   });
 
-  it("direction:'asc' reverses the opportunity order", () => {
-    const asc = rowOrder('opportunity', 'asc');
-    expect(asc[0]).toBe('bravo');
-    expect(asc[asc.length - 1]).toBe('alpha');
-  });
-
-  it('candidate order === row order for opportunity (drift guard, both directions)', () => {
-    expect(candidateOrder('opportunity')).toEqual(rowOrder('opportunity'));
-    expect(candidateOrder('opportunity', 'asc')).toEqual(rowOrder('opportunity', 'asc'));
+  it("direction:'asc' reverses the value-score order but keeps missing LAST", () => {
+    expect(order('asc')).toEqual(['bravo', 'charlie', 'alpha', 'delta']);
   });
 });
 

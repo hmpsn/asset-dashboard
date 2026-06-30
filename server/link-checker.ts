@@ -1,10 +1,10 @@
 import { discoverCmsUrls, buildStaticPathSet } from './webflow.js';
-import { resolvePagePath } from './helpers.js';
+import { resolvePagePath } from './utils/page-address.js';
 import { createLogger } from './logger.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { getWorkspace, getWorkspaceBySiteId } from './workspaces.js';
-import { webflowFetch } from './webflow-client.js';
-import { fetchPublishedHtml } from './helpers.js';
+import { getWebflowSiteDomainInfo, type WebflowSiteDomainInfo } from './webflow-domains.js';
+import { fetchPublishedHtml } from './published-html.js';
 import { extractLinks as extractHtmlLinks } from './html-analysis-utils.js';
 
 const log = createLogger('link-checker');
@@ -28,32 +28,11 @@ export interface LinkCheckResult {
   crawledDomain?: string;
 }
 
-export interface SiteDomainInfo {
-  staging: string;           // e.g. https://mysite.webflow.io
-  customDomains: string[];   // e.g. ["https://example.com", "https://www.example.com"]
-  defaultDomain: string;     // custom domain if available, otherwise staging
-}
+export type SiteDomainInfo = WebflowSiteDomainInfo;
 
 export async function getSiteDomains(siteId: string, token: string): Promise<SiteDomainInfo | null> {
   if (!token) return null;
-  const res = await webflowFetch(`/sites/${siteId}`, {}, token);
-  if (!res.ok) return null;
-  const data = await res.json() as {
-    shortName?: string;
-    customDomains?: Array<{ url?: string }>;
-  };
-  if (!data.shortName) return null;
-
-  const staging = `https://${data.shortName}.webflow.io`;
-  const customDomains = (data.customDomains || [])
-    .map(d => d.url ? (d.url.startsWith('http') ? d.url : `https://${d.url}`) : '')
-    .filter(Boolean);
-
-  return {
-    staging,
-    customDomains,
-    defaultDomain: customDomains[0] || staging,
-  };
+  return getWebflowSiteDomainInfo(siteId, token);
 }
 
 export function isCheckableUrl(href: string): boolean {

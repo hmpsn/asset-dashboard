@@ -5,37 +5,20 @@ import type { DeadLink } from './link-checker.js';
 import { getWorkspaceBySiteId } from './workspaces.js';
 import { extractMetaContent } from './seo-audit-html.js';
 import { auditPage, isExcludedPage } from './audit-page.js';
-import { resolvePagePath, fetchPublishedHtml } from './helpers.js';
+import { resolvePagePath } from './utils/page-address.js';
+import { fetchPublishedHtml } from './published-html.js';
 export type { Severity, CheckCategory, SeoIssue, PageSeoResult } from './audit-page.js';
 import type { SeoIssue, PageSeoResult } from './audit-page.js';
 import { createLogger } from './logger.js';
 import { getToken, webflowFetch } from './webflow-client.js';
+import { getWebflowSiteDomainInfo } from './webflow-domains.js';
 import { runSiteWideChecks } from './seo-audit-site-checks.js';
 import { generateAiRecommendations } from './seo-audit-ai-recs.js';
+import type { SchemaSourcePageMeta } from '../shared/types/schema-generation.js';
+import type { CwvSummary } from './seo-audit-cwv-types.js';
+export type { CwvMetricSummary, CwvStrategyResult, CwvSummary } from './seo-audit-cwv-types.js';
 
 const log = createLogger('seo-audit');
-
-
-export interface CwvMetricSummary {
-  value: number | null;
-  rating: 'good' | 'needs-improvement' | 'poor' | null;
-}
-
-export interface CwvStrategyResult {
-  assessment: 'good' | 'needs-improvement' | 'poor' | 'no-data';
-  fieldDataAvailable: boolean;
-  lighthouseScore: number;
-  metrics: {
-    LCP: CwvMetricSummary;
-    INP: CwvMetricSummary;
-    CLS: CwvMetricSummary;
-  };
-}
-
-export interface CwvSummary {
-  mobile?: CwvStrategyResult;
-  desktop?: CwvStrategyResult;
-}
 
 export interface SeoAuditResult {
   siteScore: number;
@@ -50,21 +33,13 @@ export interface SeoAuditResult {
   deadLinkDetails?: DeadLink[];
 }
 
-interface PageMeta {
-  id: string;
-  title: string;
-  slug: string;
-  seo?: { title?: string; description?: string };
-  openGraph?: { title?: string; description?: string; titleCopied?: boolean; descriptionCopied?: boolean };
-}
-
 function pageListMetaFallback(page: {
   id: string;
   title?: string;
   slug?: string;
   seo?: { title?: string | null; description?: string | null };
   openGraph?: { title?: string | null; description?: string | null; titleCopied?: boolean; descriptionCopied?: boolean };
-}): PageMeta {
+}): SchemaSourcePageMeta {
   return {
     id: page.id,
     title: page.title || '',
@@ -82,12 +57,12 @@ function pageListMetaFallback(page: {
   };
 }
 
-export async function fetchPageMeta(pageId: string, tokenOverride?: string): Promise<PageMeta | null> {
+export async function fetchPageMeta(pageId: string, tokenOverride?: string): Promise<SchemaSourcePageMeta | null> {
   if (!tokenOverride && !getToken()) return null;
   try {
     const res = await webflowFetch(`/pages/${pageId}`, {}, tokenOverride);
     if (!res.ok) return null;
-    return await res.json() as PageMeta;
+    return await res.json() as SchemaSourcePageMeta;
   } catch (err) {
     log.debug({ err }, 'seo-audit/fetchPageMeta: network failure — degrading gracefully');
     return null;
@@ -103,30 +78,9 @@ interface SiteInfo {
 async function getSiteInfo(siteId: string, tokenOverride?: string): Promise<SiteInfo> {
   if (!tokenOverride && !getToken()) return { subdomain: null, customDomain: null };
   try {
-    // Fetch site info for subdomain
-    const siteRes = await webflowFetch(`/sites/${siteId}`, { signal: AbortSignal.timeout(5000) }, tokenOverride);
-    let subdomain: string | null = null;
-    if (siteRes.ok) {
-      const siteData = await siteRes.json() as { shortName?: string };
-      subdomain = siteData.shortName || null;
-    }
-
-    // Fetch custom domains from dedicated endpoint
-    let customDomain: string | null = null;
-    try {
-      const domainRes = await webflowFetch(`/sites/${siteId}/custom_domains`, { signal: AbortSignal.timeout(5000) }, tokenOverride);
-      if (domainRes.ok) {
-        const domainData = await domainRes.json() as { customDomains?: { url?: string }[] };
-        const domains = domainData.customDomains || [];
-        if (domains.length > 0 && domains[0].url) {
-          customDomain = domains[0].url;
-        }
-      }
-    } catch (err) {
-      log.debug({ err }, 'seo-audit/getSiteInfo: custom domains fetch failed — degrading gracefully');
-    }
-
-    return { subdomain, customDomain };
+    const domainInfo = await getWebflowSiteDomainInfo(siteId, tokenOverride);
+    const subdomain = domainInfo?.staging.match(/^https:\/\/([^.]+)\.webflow\.io$/i)?.[1] ?? null;
+    return { subdomain, customDomain: domainInfo?.customDomains[0] ?? null };
   } catch (err) {
     log.debug({ err }, 'seo-audit/getSiteInfo: network failure — degrading gracefully');
     return { subdomain: null, customDomain: null };

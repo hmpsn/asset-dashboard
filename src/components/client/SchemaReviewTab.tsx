@@ -14,6 +14,7 @@ import {
 import type { SchemaSitePlan, SchemaPageRole } from '../../../shared/types/schema-plan';
 import { SCHEMA_ROLE_LABELS, SCHEMA_ROLE_CLIENT_DESC } from '../../../shared/types/schema-plan';
 import { queryKeys } from '../../lib/queryKeys';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 
 interface SchemaSnapshotPage {
   pageId: string;
@@ -60,7 +61,7 @@ export function SchemaReviewTab({ workspaceId, setToast, showHeader = true }: Pr
   const [submitting, setSubmitting] = useState(false);
   const [feedbackNote, setFeedbackNote] = useState('');
   const [showFeedback, setShowFeedback] = useState(false);
-  const [expandedRoles, setExpandedRoles] = useState<Set<string>>(new Set());
+  const [expandedRoles, toggleRole] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
 
   const planQuery = useQuery({
     queryKey: queryKeys.client.schemaPlan(workspaceId),
@@ -98,14 +99,6 @@ export function SchemaReviewTab({ workspaceId, setToast, showHeader = true }: Pr
       setToast({ message: err instanceof Error ? err.message : 'Failed to submit feedback', type: 'error' });
     }
     setSubmitting(false);
-  };
-
-  const toggleRole = (role: string) => {
-    setExpandedRoles(prev => {
-      const n = new Set(prev);
-      if (n.has(role)) n.delete(role); else n.add(role);
-      return n;
-    });
   };
 
   if (loading) {

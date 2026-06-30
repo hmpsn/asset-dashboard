@@ -81,6 +81,7 @@ export const RICH_SEO_CONTEXT: SeoContextSlice = {
     peopleAlsoAsk: 5,
     localPack: false,
     videoCarousel: 2,
+    aiOverview: 1,
   },
 };
 

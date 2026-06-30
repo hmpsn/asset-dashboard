@@ -4,7 +4,7 @@ export type Page =
   | 'media'
   | 'seo-audit' | 'seo-editor'
   | 'links'
-  | 'seo-strategy' | 'seo-keywords' | 'page-intelligence' | 'seo-schema' | 'seo-briefs'
+  | 'seo-strategy' | 'seo-keywords' | 'page-intelligence' | 'local-seo' | 'seo-schema' | 'seo-briefs' | 'competitors'
   | 'content' | 'calendar' | 'brand' | 'subscriptions' | 'content-pipeline'
   | 'analytics-hub'
   | 'performance'
@@ -22,18 +22,16 @@ export type Page =
   | 'outcomes-overview'
   | 'diagnostics';
 
-export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'approvals' | 'requests' | 'content' | 'plans' | 'roi' | 'content-plan' | 'brand';
-export type ClientInboxAlias = 'approvals' | 'requests' | 'content';
+export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'strategy' | 'analytics' | 'inbox' | 'plans' | 'roi' | 'content-plan' | 'brand' | 'deep-dive' | 'results' | 'settings';
+export type ClientInboxFilter = 'decisions' | 'reviews' | 'conversations';
+export type ClientInboxRouteAlias = 'approvals' | 'requests' | 'content' | 'schema-review';
 
-export const CLIENT_INBOX_ALIASES: Record<ClientInboxAlias, string> = {
-  approvals: 'decisions',     // legacy /approvals → Decisions section (PR 1.2)
-  requests: 'conversations',  // legacy /requests → Conversations section (PR 1.2)
-  content: 'reviews',         // legacy /content → Reviews section (PR 1.2)
+const CLIENT_INBOX_ROUTE_ALIASES: Record<ClientInboxRouteAlias, ClientInboxFilter> = {
+  approvals: 'decisions',
+  requests: 'conversations',
+  content: 'reviews',
+  'schema-review': 'reviews',
 };
-
-export function isClientInboxAlias(tab: string | undefined): tab is ClientInboxAlias {
-  return !!tab && Object.prototype.hasOwnProperty.call(CLIENT_INBOX_ALIASES, tab);
-}
 
 /** Global tabs that don't belong to a specific workspace */
 export const GLOBAL_TABS = new Set<string>(['settings', 'roadmap', 'prospect', 'ai-usage', 'revenue', 'features', 'outcomes-overview']);
@@ -49,7 +47,12 @@ export function adminPath(workspaceId: string, tab: Page = 'home'): string {
 export function clientPath(workspaceId: string, tab?: string, betaMode?: boolean): string {
   const prefix = betaMode ? '/client/beta' : '/client';
   if (!tab || tab === 'overview') return `${prefix}/${workspaceId}`;
-  if (tab === 'schema-review') return `${prefix}/${workspaceId}/inbox?tab=reviews`;
-  if (isClientInboxAlias(tab)) return `${prefix}/${workspaceId}/inbox?tab=${CLIENT_INBOX_ALIASES[tab]}`;
+  const inboxFilter = resolveClientInboxRouteAlias(tab);
+  if (inboxFilter) return `${prefix}/${workspaceId}/inbox?tab=${inboxFilter}`;
   return `${prefix}/${workspaceId}/${tab}`;
+}
+
+export function resolveClientInboxRouteAlias(tab: string | undefined | null): ClientInboxFilter | null {
+  if (!tab) return null;
+  return CLIENT_INBOX_ROUTE_ALIASES[tab as ClientInboxRouteAlias] ?? null;
 }

@@ -26,7 +26,7 @@ vi.mock('../../server/recommendations.js', () => ({
   generateRecommendations: state.generateRecommendations,
 }));
 
-vi.mock('../../server/workspace-intelligence.js', () => ({
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
   invalidateIntelligenceCache: state.invalidateIntelligenceCache,
 }));
 

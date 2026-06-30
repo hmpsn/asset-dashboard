@@ -5,11 +5,19 @@
 
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
+import { listClientDiagnosticSummaries } from '../diagnostic-client-projection.js';
 import { listDiagnosticReports, getDiagnosticReport, getReportForInsight } from '../diagnostic-store.js';
 import { createLogger } from '../logger.js';
+import { requireClientPortalAuth } from '../middleware.js';
 
 const log = createLogger('routes:diagnostics');
 const router = Router();
+
+// Client-safe diagnostics summary cards for the client portal.
+router.get('/api/public/diagnostics/:workspaceId', requireClientPortalAuth('workspaceId'), (req, res) => {
+  const reports = listClientDiagnosticSummaries(req.params.workspaceId);
+  res.json({ reports });
+});
 
 // List diagnostic reports for a workspace
 router.get('/api/workspaces/:workspaceId/diagnostics', requireWorkspaceAccess('workspaceId'), (req, res) => {

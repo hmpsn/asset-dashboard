@@ -106,14 +106,23 @@ vi.mock('../../server/workspace-intelligence.js', async importOriginal => {
       learnings: {},
       pageProfile: null,
     })),
+  };
+});
+
+vi.mock('../../server/intelligence/formatters.js', () => ({
     formatForPrompt: vi.fn(() => '\nFULL CONTEXT'),
     formatKeywordsForPrompt: vi.fn(() => '\nKEYWORDS'),
     formatKnowledgeBaseForPrompt: vi.fn(() => '\nKNOWLEDGE'),
-    formatPersonasForPrompt: vi.fn(() => '\nPERSONAS'),
     formatPageMapForPrompt: vi.fn(() => '\nPAGE MAP'),
-    invalidateIntelligenceCache: vi.fn(),
-  };
-});
+}));
+
+vi.mock('../../server/intelligence/persona-format.js', () => ({
+  formatPersonasForPrompt: vi.fn(() => '\nPERSONAS'),
+}));
+
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
+  invalidateIntelligenceCache: vi.fn(),
+}));
 
 vi.mock('../../server/webflow.js', async importOriginal => {
   const original = await importOriginal<typeof import('../../server/webflow.js')>();

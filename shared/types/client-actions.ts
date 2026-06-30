@@ -4,7 +4,8 @@ export type ClientActionSourceType =
   | 'aeo_change'
   | 'internal_link'
   | 'redirect_proposal'
-  | 'content_decay';
+  | 'content_decay'
+  | 'cannibalization';
 
 export type ClientActionStatus =
   | 'pending'
@@ -114,4 +115,18 @@ export function mapAeoEffortToClientEffort(e: AeoEffort): 'low' | 'medium' | 'hi
 
 export interface AeoChangePayload {
   diffs: AeoChangeDiff[];
+}
+
+/** One competing page in a keyword-cannibalization issue (client-facing, read-only). */
+export interface CannibalizationActionItem {
+  path: string;
+  position?: number;
+}
+/** Payload for a `cannibalization` client action — one keyword's competing pages + the fix. */
+export interface CannibalizationPayload {
+  keyword: string;
+  pages: CannibalizationActionItem[];
+  recommendation: string;
+  /** The page we recommend keeping (the others are consolidated into it). */
+  canonicalPath?: string;
 }

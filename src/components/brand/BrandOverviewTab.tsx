@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { BrainCircuit, Building2, MapPin, Sparkles } from 'lucide-react';
 import { useLocalSeoLocations } from '../../hooks/admin/useLocalSeoLocations';
 import { adminPath } from '../../routes';
-import { Badge, Button, Icon, SectionCard } from '../ui';
+import { Badge, Icon, SectionCard } from '../ui';
 
 interface IntelligenceProfile {
   industry?: string;
@@ -34,27 +34,17 @@ interface SnapshotCardProps {
   notes: string[];
   badge?: string;
   actionLabel: string;
-  to?: string;
-  onClick?: () => void;
+  to: string;
 }
 
-function SnapshotCard({ title, icon, summary, notes, badge, actionLabel, to, onClick }: SnapshotCardProps) {
-  const action = to ? (
+function SnapshotCard({ title, icon, summary, notes, badge, actionLabel, to }: SnapshotCardProps) {
+  const action = (
     <Link
       to={to}
       className="t-caption-sm font-medium text-teal-400 hover:text-teal-300 transition-colors"
     >
       {actionLabel}
     </Link>
-  ) : (
-    <Button
-      variant="link"
-      size="sm"
-      onClick={onClick}
-      className="font-medium text-teal-400 hover:text-teal-300"
-    >
-      {actionLabel}
-    </Button>
   );
 
   return (
@@ -131,10 +121,8 @@ export function BrandOverviewTab({
           knowledgeBase?.trim() ? 'Knowledge base saved' : 'Knowledge base still empty',
           personasCount > 0 ? `${personasCount} persona${personasCount === 1 ? '' : 's'} available` : 'No personas saved yet',
         ]}
-        actionLabel="Review below"
-        onClick={() => {
-          document.getElementById('brand-hub-current-context')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }}
+        actionLabel="Open context"
+        to={`${adminPath(workspaceId, 'brand')}?tab=context`}
       />
 
       <SnapshotCard

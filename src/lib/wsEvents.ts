@@ -43,6 +43,13 @@ export const WS_EVENTS = {
   OUTCOME_EXTERNAL_DETECTED: 'outcome:external',
   OUTCOME_LEARNINGS_UPDATED: 'outcome:learnings_updated',
   OUTCOME_PLAYBOOK_DISCOVERED: 'outcome:playbook',
+  // The Issue (Client) P1a — Webflow named-lead captured via the forms Data API poller. Handled by
+  // src/hooks/admin/useConversionTrackingStatus.ts (useWorkspaceEvents → invalidate the
+  // conversion-tracking-status query) so the admin verification readout refreshes live.
+  FORM_SUBMISSION_CAPTURED: 'outcome:form_captured',
+  // The Issue (Client) P1a — tracked Webflow form-source mapping saved. This can flip measured
+  // provenance immediately, so admin status and client ROI/provenance caches refresh live.
+  FORM_CAPTURE_CONFIG_UPDATED: 'outcome:form_capture_config_updated',
   SUGGESTED_BRIEF_UPDATED: 'suggested-brief:updated',
   INSIGHT_BRIDGE_UPDATED: 'insight:bridge_updated',
   ANNOTATION_BRIDGE_CREATED: 'annotation:bridge_created',
@@ -57,6 +64,13 @@ export const WS_EVENTS = {
   DELIVERABLE_UPDATED: 'deliverable:updated',
 
   MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
+
+  // The Issue — strategy POV (Lane B). Broadcast on generate/regenerate/operator-edit; handled by
+  // src/hooks/admin/useStrategyPov.ts (useWorkspaceEvents → invalidate queryKeys.admin.strategyPov).
+  STRATEGY_POV_GENERATED: 'strategy:pov-generated',
+  // The Issue — trust ladder (Phase 4). Operator toggled a per-archetype auto-send policy; handled
+  // locally by src/hooks/admin/useAutoSendPolicy.ts (useWorkspaceEvents → invalidate admin.autoSendPolicy).
+  STRATEGY_AUTOSEND_POLICY_UPDATED: 'strategy:autosend-policy-updated',
 
   // Brand Engine (Phase 1 — brandscript, discovery, voice, identity)
   BRANDSCRIPT_UPDATED: 'brandscript:updated',
@@ -87,13 +101,32 @@ export const WS_EVENTS = {
 
   // Recommendations
   RECOMMENDATIONS_UPDATED: 'recommendations:updated',
+  RECOMMENDATIONS_DISCUSSION_UPDATED: 'recommendations:discussion_updated',
 
   // Keyword Strategy
   STRATEGY_UPDATED: 'strategy:updated',
+  // Forward-declared in the Strategy-redesign P2 pre-commit; the broadcast producer
+  // (managed-keyword-set mutations) + the useWorkspaceEvents handler land in P3.
+  STRATEGY_KEYWORD_SET_UPDATED: 'strategy:keyword-set-updated',
   RANK_TRACKING_UPDATED: 'rank-tracking:updated',
+  // National SERP rank tracking (P6 / national-serp-tracking) — fired after a
+  // national_serp_refresh job upserts serp_snapshots; invalidates the command center.
+  SERP_SNAPSHOTS_REFRESHED: 'serp:snapshots_refreshed',
 
   // Local SEO
   LOCAL_SEO_UPDATED: 'local-seo:updated',
+  // GBP + reviews (P7 / local-gbp) — fired after a local-gbp-refresh job upserts
+  // business_listing_snapshots; invalidates the local-SEO panel + command center.
+  LOCAL_GBP_SNAPSHOTS_REFRESHED: 'local-gbp:snapshots_refreshed',
+  // Authenticated Google Business Profile connection + workspace-location mapping.
+  GBP_CONNECTION_UPDATED: 'gbp:connection_updated',
+  // Authenticated Google Business Profile review sync + read model.
+  GBP_REVIEWS_UPDATED: 'gbp:reviews_updated',
+  // Authenticated Google Business Profile review response draft/approval/publish workflow.
+  GBP_REVIEW_RESPONSES_UPDATED: 'gbp:review_responses_updated',
+  // AI visibility (P8 / ai-visibility) — fired after a llm-mentions-refresh job upserts a
+  // llm_mention_snapshots row; invalidates the AI-visibility KPI + strategy/intelligence.
+  LLM_MENTIONS_SNAPSHOTS_REFRESHED: 'llm-mentions:snapshots_refreshed',
 
   // E-E-A-T assets
   EEAT_ASSETS_UPDATED: 'eeat-assets:updated',

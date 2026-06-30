@@ -1,14 +1,14 @@
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { isProgrammingError } from './errors.js';
-import { buildSchemaContext } from './helpers.js';
+import { buildSchemaContext } from './schema/context-builder.js';
 import { buildSchemaIntelligence } from './schema-intelligence.js';
 import { getSchemaSnapshot } from './schema-store.js';
 import { generateSchemaPlan } from './schema-plan.js';
 import { getCachedArchitecture } from './site-architecture.js';
 import { createJob, getJob, hasActiveJob, updateJob } from './jobs.js';
 import { createLogger } from './logger.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { getWorkspace, getWorkspaceBySiteId } from './workspaces.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 import { WS_EVENTS } from './ws-events.js';
@@ -185,7 +185,7 @@ export async function runSchemaPlanGenerationJob(
       workspaceId: workspace.id,
       siteUrl: schemaIntel?.baseUrl ?? (ctx.liveDomain ? `https://${ctx.liveDomain}` : ''),
       companyName: ctx.companyName,
-      businessContext: ctx.businessContext,
+      businessContext: schemaIntel?.seoContext?.businessContext,
       strategy: schemaIntel?.seoContext?.strategy,
       architectureResult,
       competitorDomains: workspace.competitorDomains,

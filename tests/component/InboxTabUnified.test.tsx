@@ -1,22 +1,15 @@
 /**
- * Component tests for the PR-2a unified client inbox (DARK behind `unified-inbox`).
+ * Component tests for the canonical unified client inbox.
  *
  * Asserts:
- *  1. Flag OFF → the unified view does NOT render (the existing layout shows); the unified
- *     inbox fetch hook is not the active path.
- *  2. Flag ON  → the unified PriorityStrip + DecisionCards render with the three uniform verbs
- *     (Approve / Request changes / Decline), and the verbs call the respond mutation.
+ *  1. The unified PriorityStrip + DecisionCards render with the three uniform verbs.
+ *  2. The verbs call the canonical deliverable respond/apply mutations.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable';
 
 // ── Mocks ──
-const mockUseFeatureFlag = vi.fn<(flag: string) => boolean>();
-vi.mock('../../src/hooks/useFeatureFlag', () => ({
-  useFeatureFlag: (flag: string) => mockUseFeatureFlag(flag),
-}));
-
 vi.mock('../../src/hooks/useWorkspaceEvents', () => ({
   useWorkspaceEvents: () => {},
 }));
@@ -30,7 +23,7 @@ vi.mock('../../src/hooks/client/useUnifiedInbox', () => ({
   useApplyDeliverable: () => ({ mutateAsync: mockApplyMutateAsync, isPending: false }),
 }));
 
-// Work-order conversation hooks (DARK). Mocked so the track-lane tests don't need a real
+// Work-order conversation hooks. Mocked so the track-lane tests don't need a real
 // QueryClient (the @tanstack mock below stubs useQueryClient/useQuery but not useMutation).
 const mockUseClientWorkOrderComments = vi.fn();
 const mockPostCommentMutate = vi.fn();
@@ -91,11 +84,6 @@ function makeDeliverable(overrides: Partial<ClientDeliverable> = {}): ClientDeli
 const baseProps = {
   workspaceId: 'ws-1',
   effectiveTier: 'growth' as const,
-  approvalBatches: [],
-  approvalsLoading: false,
-  pendingApprovals: 0,
-  setApprovalBatches: vi.fn(),
-  loadApprovals: vi.fn(),
   requests: [],
   requestsLoading: false,
   clientUser: null,
@@ -108,7 +96,6 @@ const baseProps = {
   setPricingModal: vi.fn(),
   pricingConfirming: false,
   setToast: vi.fn(),
-  clientActions: [],
 };
 
 beforeEach(() => {
@@ -191,7 +178,6 @@ function makeWorkOrderDeliverable(overrides: Partial<ClientDeliverable> = {}): C
 
 describe('InboxTab unified inbox', () => {
   it('renders the unified PriorityStrip + DecisionCards with the three verbs', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
     mockUseUnifiedInbox.mockReturnValue({
       deliverables: [makeDeliverable()],
       isLoading: false,
@@ -200,7 +186,8 @@ describe('InboxTab unified inbox', () => {
     render(<InboxTab {...baseProps} />);
 
     // PriorityStrip header is shown (it's finally mounted).
-    expect(screen.getByText('Needs your attention')).toBeInTheDocument();
+    const attentionLabels = screen.getAllByText('Needs your attention');
+    expect(attentionLabels.some((node) => node.tagName === 'P')).toBe(true);
 
     // The title appears in both the PriorityStrip item and the DecisionCard.
     expect(screen.getAllByText('Redirect plan for /old').length).toBeGreaterThanOrEqual(1);
@@ -214,7 +201,6 @@ describe('InboxTab unified inbox', () => {
   });
 
   it('routes review and conversation deliverables into their canonical sections', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
     mockUseUnifiedInbox.mockReturnValue({
       deliverables: [
         makeDeliverable({
@@ -247,7 +233,6 @@ describe('InboxTab unified inbox', () => {
   });
 
   it('renders client request threads inside the Conversations section', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
     mockUseUnifiedInbox.mockReturnValue({ deliverables: [], isLoading: false });
 
     render(
@@ -287,7 +272,6 @@ describe('InboxTab unified inbox', () => {
   });
 
   it('Approve calls the respond mutation with decision=approved and shows the next-step toast', async () => {
-    mockUseFeatureFlag.mockReturnValue(false);
     mockUseUnifiedInbox.mockReturnValue({
       deliverables: [makeDeliverable()],
       isLoading: false,
@@ -311,7 +295,6 @@ describe('InboxTab unified inbox', () => {
   });
 
   it('inline approval success also shows the next-step toast', async () => {
-    mockUseFeatureFlag.mockReturnValue(false);
     mockUseUnifiedInbox.mockReturnValue({
       deliverables: [makeInlineApprovalDeliverable()],
       isLoading: false,
@@ -335,7 +318,6 @@ describe('InboxTab unified inbox', () => {
   });
 
   it('empty list shows the all-caught-up state', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
     mockUseUnifiedInbox.mockReturnValue({ deliverables: [], isLoading: false });
 
     render(<InboxTab {...baseProps} />);
@@ -345,7 +327,6 @@ describe('InboxTab unified inbox', () => {
   // ── Item 1 — Submit-a-request chooser ──
 
   it('the "Submit a request" button is present even when the queue is empty', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
     mockUseUnifiedInbox.mockReturnValue({ deliverables: [], isLoading: false });
 
     render(<InboxTab {...baseProps} />);
@@ -354,7 +335,6 @@ describe('InboxTab unified inbox', () => {
   });
 
   it('clicking "Submit a request" opens the chooser with both options', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
     mockUseUnifiedInbox.mockReturnValue({ deliverables: [], isLoading: false });
 
     render(<InboxTab {...baseProps} />);
@@ -366,8 +346,7 @@ describe('InboxTab unified inbox', () => {
     expect(screen.getByRole('button', { name: /Send a request/ })).toBeInTheDocument();
   });
 
-  it('flag ON → chooser → "Send a request" mounts the extracted SubmitRequestForm (pre-filled categories)', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → chooser → "Send a request" mounts the extracted SubmitRequestForm (pre-filled categories)', () => {
     mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: true, deliverables: [], isLoading: false });
 
     render(<InboxTab {...baseProps} />);
@@ -381,8 +360,7 @@ describe('InboxTab unified inbox', () => {
     expect(labels).toEqual(['Content Update', 'Design Change', 'Bug Report', 'SEO', 'New Feature', 'Other']);
   });
 
-  it('flag ON → chooser → "Ask for content" → Continue reuses the pricing flow (setPricingModal, source:client)', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → chooser → "Ask for content" → Continue reuses the pricing flow (setPricingModal, source:client)', () => {
     mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: true, deliverables: [], isLoading: false });
 
     render(<InboxTab {...baseProps} />);
@@ -406,8 +384,7 @@ describe('InboxTab unified inbox', () => {
     expect(screen.queryByRole('dialog', { name: 'Ask for content' })).not.toBeInTheDocument();
   });
 
-  it('flag ON → chooser shows content service prices before the pricing modal opens', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → chooser shows content service prices before the pricing modal opens', () => {
     mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: true, deliverables: [], isLoading: false });
 
     render(<InboxTab {...baseProps} briefPrice={125} fullPostPrice={500} />);
@@ -422,8 +399,7 @@ describe('InboxTab unified inbox', () => {
     expect(screen.getByRole('button', { name: /Continue - \$500/i })).toBeInTheDocument();
   });
 
-  it('flag ON → chooser hides content service prices for external billing', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → chooser hides content service prices for external billing', () => {
     mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: true, deliverables: [], isLoading: false });
 
     render(<InboxTab {...baseProps} briefPrice={125} fullPostPrice={500} hidePrices />);
@@ -439,8 +415,7 @@ describe('InboxTab unified inbox', () => {
 
   // ── Item 5 — section headings + vocab reconcile ──
 
-  it('flag ON → the actionable section has a visible "Decisions" heading + subtitle (was aria-only)', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → the actionable section has a visible "Decisions" heading + subtitle (was aria-only)', () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [makeDeliverable()],
@@ -455,16 +430,15 @@ describe('InboxTab unified inbox', () => {
     expect(heading.tagName).toBe('H3');
     // The one-line "what is this" subtitle.
     expect(screen.getByText('Items waiting on your decision')).toBeInTheDocument();
-    // Vocab reconcile: "Decisions" appears BOTH as the PriorityStrip chip (span) AND as the section
-    // heading (h3) — the chip and the section it scrolls to now use the same canonical noun.
-    const decisionsNodes = screen.getAllByText('Decisions');
-    expect(decisionsNodes.length).toBeGreaterThanOrEqual(2);
-    expect(decisionsNodes.some((n) => n.tagName === 'H3')).toBe(true);
-    expect(decisionsNodes.some((n) => n.tagName === 'SPAN')).toBe(true);
+    // Vocab reconcile: decision items in the strip now point at the attention section, while
+    // the destination card lane keeps the specific Decisions heading.
+    const attentionLabels = screen.getAllByText('Needs your attention');
+    expect(attentionLabels.some((node) => node.tagName === 'SPAN')).toBe(true);
+    const decisionsHeading = screen.getByRole('heading', { name: 'Decisions' });
+    expect(decisionsHeading.tagName).toBe('H3');
   });
 
-  it('flag ON → Ready to publish + Work in progress sections render their subtitles', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → Ready to publish + Work in progress sections render their subtitles', () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [makeReadyToPublishDeliverable(), makeWorkOrderDeliverable()],
@@ -479,11 +453,10 @@ describe('InboxTab unified inbox', () => {
     expect(screen.getByText('Work your team is doing for you')).toBeInTheDocument();
   });
 
-  it('flag ON → PROJECTED item (content_request) "Review →" opens the in-shell review modal, NOT navigation', () => {
+  it('canonical inbox → PROJECTED item (content_request) "Review →" opens the in-shell review modal, NOT navigation', () => {
     // R4: a projected deliverable has no physical row; its /respond verbs would 404. The card shows
     // a "Review →" CTA instead of Approve / Request changes / Decline — and clicking it now opens the
     // bespoke ContentTab review surface IN-SHELL (ProjectedReviewModal), it does NOT navigate out.
-    mockUseFeatureFlag.mockReturnValue(false);
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [
@@ -538,8 +511,7 @@ describe('InboxTab unified inbox', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('flag ON → PROJECTED copy_section item "Review →" opens the in-shell copy review modal (no navigation)', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → PROJECTED copy_section item "Review →" opens the in-shell copy review modal (no navigation)', () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [
@@ -568,8 +540,7 @@ describe('InboxTab unified inbox', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('flag ON → approved applyable seo_edit renders the "Ready to publish" section + Apply button', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → approved applyable seo_edit renders the "Ready to publish" section + Apply button', () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [makeReadyToPublishDeliverable()],
@@ -586,8 +557,7 @@ describe('InboxTab unified inbox', () => {
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
   });
 
-  it('flag ON → Apply to Website → confirm → fires the apply mutation and shows the success toast', async () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → Apply to Website → confirm → fires the apply mutation and shows the success toast', async () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [makeReadyToPublishDeliverable()],
@@ -602,12 +572,12 @@ describe('InboxTab unified inbox', () => {
     expect(mockApplyMutateAsync).not.toHaveBeenCalled();
 
     // Confirm — the dialog's own "Apply to Website" confirm button is the 2nd match (rendered after
-    // the card button). Clicking it fires the apply mutation with the deliverable's legacyBatchId.
+    // the card button). Clicking it fires the apply mutation with the canonical deliverable id.
     const applyButtons = screen.getAllByRole('button', { name: 'Apply to Website' });
     fireEvent.click(applyButtons[applyButtons.length - 1]);
 
     await vi.waitFor(() => {
-      expect(mockApplyMutateAsync).toHaveBeenCalledWith({ legacyBatchId: 'batch-xyz' });
+      expect(mockApplyMutateAsync).toHaveBeenCalledWith({ deliverableId: 'cd_apply' });
     });
     // FIX 1: applied:1/failed:0 → success toast.
     await vi.waitFor(() => {
@@ -617,14 +587,13 @@ describe('InboxTab unified inbox', () => {
     });
   });
 
-  it('flag ON → apply returns applied:0/failed:1 → error toast (FIX 1 false-success guard)', async () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → apply returns applied:0/failed:1 → error toast (FIX 1 false-success guard)', async () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [makeReadyToPublishDeliverable()],
       isLoading: false,
     });
-    // The legacy /apply route returns HTTP 200 with applied:0/failed:N on a total write failure — the
+    // The apply service returns HTTP 200 with applied:0/failed:N on a total write failure — the
     // mutation RESOLVES (no throw), so the toast branching is the only thing preventing a false-success.
     mockApplyMutateAsync.mockResolvedValue({ applied: 0, failed: 1, results: [] });
 
@@ -644,9 +613,8 @@ describe('InboxTab unified inbox', () => {
     );
   });
 
-  it('flag ON → PHYSICAL item renders the write verbs, NOT a "Review →" link', () => {
+  it('canonical inbox → PHYSICAL item renders the write verbs, NOT a "Review →" link', () => {
     // A physical deliverable (redirect) has a real row; the uniform /respond verbs work.
-    mockUseFeatureFlag.mockReturnValue(false);
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [makeDeliverable()], // default type 'redirect' = physical
@@ -662,8 +630,7 @@ describe('InboxTab unified inbox', () => {
 
   // ── R5 — work-order read-only TRACK lane ──
 
-  it('flag ON → work order renders the "Work in progress" track section (title/summary/chip/stepper)', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → work order renders the "Work in progress" track section (title/summary/chip/stepper)', () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [makeWorkOrderDeliverable()],
@@ -689,8 +656,7 @@ describe('InboxTab unified inbox', () => {
     expect(screen.getByText('Completed')).toBeInTheDocument();
   });
 
-  it('flag ON → track card wires ZERO verbs (no Approve/Request changes/Decline/Apply/Review) and never calls the mutations', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → track card wires ZERO verbs (no Approve/Request changes/Decline/Apply/Review) and never calls the mutations', () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [makeWorkOrderDeliverable()],
@@ -712,8 +678,7 @@ describe('InboxTab unified inbox', () => {
     expect(mockApplyMutateAsync).not.toHaveBeenCalled();
   });
 
-  it('flag ON → a work order does NOT appear in the PriorityStrip "Needs your attention" list', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → a work order does NOT appear in the PriorityStrip "Needs your attention" list', () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [makeWorkOrderDeliverable()],
@@ -733,8 +698,7 @@ describe('InboxTab unified inbox', () => {
     expect(screen.getByText('Work in progress')).toBeInTheDocument();
   });
 
-  it('flag ON → a COMPLETED order renders the chip but NOT the stepper', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → a COMPLETED order renders the chip but NOT the stepper', () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [makeWorkOrderDeliverable({ id: 'cd_order_done', status: 'completed', title: 'Order: schema (done)' })],
@@ -753,8 +717,7 @@ describe('InboxTab unified inbox', () => {
     expect(screen.queryByText('In Progress')).not.toBeInTheDocument();
   });
 
-  it('flag ON → orders-only (no actionable) → the "Nothing needs your attention" message does NOT render', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → orders-only (no actionable) → the "Nothing needs your attention" message does NOT render', () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [makeWorkOrderDeliverable()],
@@ -771,10 +734,9 @@ describe('InboxTab unified inbox', () => {
     expect(screen.getByText('Work in progress')).toBeInTheDocument();
   });
 
-  // ── DARK work-order conversation (client↔team) inside the track card ──
+  // ── client-facing work-order conversation (client↔team) inside the track card ──
 
-  it('flag ON → a non-closed order with a sourceRef renders the conversation thread + the comment input', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → a non-closed order with a sourceRef renders the conversation thread + the comment input', () => {
     mockUseClientWorkOrderComments.mockReturnValue({
       data: [
         { id: 'c1', workOrderId: 'wo-1', author: 'team', content: 'On it!', createdAt: new Date().toISOString() },
@@ -801,8 +763,7 @@ describe('InboxTab unified inbox', () => {
     expect(screen.queryByRole('button', { name: 'Apply to Website' })).not.toBeInTheDocument();
   });
 
-  it('flag ON → posting a comment calls the client comment mutation with the order id', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → posting a comment calls the client comment mutation with the order id', () => {
     mockUseClientWorkOrderComments.mockReturnValue({ data: [] });
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
@@ -820,8 +781,7 @@ describe('InboxTab unified inbox', () => {
     );
   });
 
-  it('flag ON → work-order comment-count badge handles singular and plural labels', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → work-order comment-count badge handles singular and plural labels', () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [
@@ -847,8 +807,7 @@ describe('InboxTab unified inbox', () => {
     expect(screen.getByText('2 comments')).toBeInTheDocument();
   });
 
-  it('flag ON → a CLOSED order hides the comment input (closed-gated)', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → a CLOSED order hides the comment input (closed-gated)', () => {
     mockUseClientWorkOrderComments.mockReturnValue({ data: [] });
     // A closed order normally leaves the lane (mirror → cancelled), but if one reaches the card the
     // input is gated on workOrderStatus !== 'closed'.
@@ -871,8 +830,7 @@ describe('InboxTab unified inbox', () => {
 
   // ── ISSUE 1 — inline approval-review card (approval family renders inline, not a modal CTA) ──
 
-  it('flag ON → approval-family deliverable (batch + non-empty items, non-projected) renders InlineApprovalCard inline (no modal-opening "View")', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → approval-family deliverable (batch + non-empty items, non-projected) renders InlineApprovalCard inline (no modal-opening "View")', () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [
@@ -922,8 +880,7 @@ describe('InboxTab unified inbox', () => {
       ],
     });
 
-  it('flag ON + GROWTH tier → seoTitle row shows Edit; the edit flows into the respond editedItems', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox + GROWTH tier → seoTitle row shows Edit; the edit flows into the respond editedItems', () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [seoEditDeliverable()],
@@ -947,8 +904,7 @@ describe('InboxTab unified inbox', () => {
     );
   });
 
-  it('flag ON + FREE tier → the seoTitle row shows NO Edit affordance (legacy free-tier gate)', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox + FREE tier → the seoTitle row shows NO Edit affordance (legacy free-tier gate)', () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [seoEditDeliverable()],
@@ -961,8 +917,7 @@ describe('InboxTab unified inbox', () => {
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
   });
 
-  it('flag ON → client_action batch with EMPTY items keeps the DecisionCard write verbs (not InlineApprovalCard)', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → client_action batch with EMPTY items keeps the DecisionCard write verbs (not InlineApprovalCard)', () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       // redirect is a client_action-family batch — its sub-items ride in payload.items, so d.items
@@ -993,8 +948,7 @@ describe('InboxTab unified inbox', () => {
     expect(screen.getByRole('button', { name: 'View 3 →' })).toBeInTheDocument();
   });
 
-  it('flag ON → content_decay (kind:decision) keeps the DecisionCard (not InlineApprovalCard)', () => {
-    mockUseFeatureFlag.mockReturnValue(false);
+  it('canonical inbox → content_decay (kind:decision) keeps the DecisionCard (not InlineApprovalCard)', () => {
     mockUseUnifiedInbox.mockReturnValue({
       unifiedInbox: true,
       deliverables: [

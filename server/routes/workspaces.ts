@@ -29,11 +29,16 @@ import { parseAIJson } from '../openai-helpers.js';
 import { listRequests } from '../requests.js';
 import { invalidatePageCache } from '../workspace-data.js';
 import { debouncedSettingsCascade, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
+import { getPrimaryCustomDomainUrl } from '../webflow-domains.js';
 import { listWorkOrders } from '../work-orders.js';
 import { listMatrices } from '../content-matrices.js';
 import { listChurnSignals } from '../churn-signals.js';
 import { listClientSignals } from '../client-signals-store.js';
 import { summarizeClientActions } from '../client-actions.js';
+import { loadRecommendations, isActiveRec } from '../recommendations.js';
+import { isFeatureEnabled } from '../feature-flags.js';
+import { currentWeekOfUTC } from '../strategy-issue-cron.js';
+import { getStrategyPov } from '../strategy-pov-store.js';
 import {
   listWorkspaces,
   createWorkspace,
@@ -47,7 +52,8 @@ import {
   clearPageState,
   clearPageStatesByStatus,
 } from '../workspaces.js';
-import { invalidateIntelligenceCache, buildWorkspaceIntelligence, formatKeywordsForPrompt } from '../workspace-intelligence.js';
+import { buildWorkspaceIntelligence, formatKeywordsForPrompt } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { normalizeSocialProfiles } from '../social-profiles.js';
 import type { Workspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
@@ -60,6 +66,7 @@ import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { computeTrialState } from '../billing/trial-state.js';
 import { toAdminWorkspaceView } from '../serializers/admin-workspace-view.js';
 import { addActivity } from '../activity-log.js';
+import { outcomeValueSchema, segmentConfigSchema, targetGeoSchema } from '../schemas/workspace-schemas.js';
 import { getLatestEffectiveSnapshot } from '../audit-snapshot-views.js';
 
 const log = createLogger('workspaces');
@@ -180,6 +187,61 @@ router.get('/api/workspace-overview', (req, res) => {
       clientActionChangesRequested = actionSummary.changesRequested;
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* non-critical */ }
 
+    // Strategy v3 P3 — client responses to sent recs (counts for the NotificationBell entry).
+    let recApproved = 0;
+    let recDeclined = 0;
+    let recDiscussing = 0;
+    // The Issue (Phase 3) — operator doorbell (scaled-review fix #2). The bell lights ONLY when
+    // THIS WEEK's Issue is both fresh and unacted:
+    //   - flag ON AND ≥1 active rec (there IS an Issue — same ACTIVE-set signal the cron's
+    //     isEligible uses, so cron + bell agree on "there is something to curate"), AND
+    //   - `pushedWeekOf === currentWeekOfUTC()` (this week's Issue was pushed — `isCurrentWeek`), AND
+    //   - the operator has NOT acted on it this week. "Acted" = the strategy POV was edited within
+    //     the current ISO week (editedAt >= this week's Monday anchor). Without the act-check the
+    //     bell would ring forever: ≥1-active-rec is permanently true and pushedWeekOf never reverts.
+    // `useNotifications` surfaces the bell entry from `issue.ready`, deep-linking to the Strategy page.
+    let issueReady = false;
+    let issueIsCurrentWeek = false;
+    // The Issue (Phase 4) — trust-ladder doorbell. Count of recs auto-sent THIS ISO week
+    // (autoSent && sentAt in the current week). Drives the "N moves auto-sent this cycle" bell;
+    // clears next week naturally (mirror of the Phase 3 doorbell). Cheap (in-memory filter).
+    let issueAutoSentCount = 0;
+    const issueAutoSentWeekOf = currentWeekOfUTC();
+    try {
+      const recSet = loadRecommendations(ws.id);
+      const recs = recSet?.recommendations ?? [];
+      for (const r of recs) {
+        if (r.clientStatus === 'approved') recApproved++;
+        else if (r.clientStatus === 'declined') recDeclined++;
+        else if (r.clientStatus === 'discussing') recDiscussing++;
+      }
+      const flagOn = isFeatureEnabled('strategy-the-issue', ws.id);
+      const hasActiveIssue = flagOn && recs.some((r) => isActiveRec(r));
+      const weekOf = currentWeekOfUTC();
+      // autoSent count is meaningful only when the flag is on (the cron is the only writer of
+      // autoSent=true, and it is flag-gated) — keep it 0 otherwise so the bell stays dark.
+      if (flagOn) {
+        issueAutoSentCount = recs.filter((r) => {
+          if (!r.autoSent || !r.sentAt) return false;
+          // Guard a malformed sentAt: new Date('garbage').toISOString() throws (RangeError), which
+          // the outer catch would swallow — zeroing issueReady + the count for the WHOLE workspace.
+          const sentDate = new Date(r.sentAt);
+          if (Number.isNaN(sentDate.getTime())) return false;
+          return currentWeekOfUTC(sentDate) === weekOf;
+        }).length;
+      }
+      issueIsCurrentWeek = ws.lastIssuePushedWeekOf === weekOf;
+      // "Acted on" signal: the POV was edited within the current ISO week (editedAt on/after the
+      // Monday anchor of `weekOf`). currentWeekOfUTC returns the YYYY-MM-DD Monday; comparing the
+      // editedAt date-prefix string lexicographically against it is correct for ISO dates.
+      let actedThisWeek = false;
+      const pov = getStrategyPov(ws.id);
+      if (pov?.editedAt) {
+        actedThisWeek = pov.editedAt.slice(0, 10) >= weekOf;
+      }
+      issueReady = hasActiveIssue && issueIsCurrentWeek && !actedThisWeek;
+    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* non-critical */ }
+
     const { isTrial, trialDaysRemaining } = computeTrialState(ws);
 
     return {
@@ -216,6 +278,17 @@ router.get('/api/workspace-overview', (req, res) => {
       clientActions: {
         approved: clientActionApproved,
         changesRequested: clientActionChangesRequested,
+      },
+      recResponses: {
+        approved: recApproved,
+        declined: recDeclined,
+        discussing: recDiscussing,
+      },
+      issue: {
+        ready: issueReady,
+        pushedWeekOf: ws.lastIssuePushedWeekOf ?? null,
+        isCurrentWeek: issueIsCurrentWeek,
+        autoSent: { weekOf: issueAutoSentWeekOf, count: issueAutoSentCount },
       },
       pageStates,
     };
@@ -257,6 +330,24 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
   if ('billingMode' in updates && updates.billingMode !== 'platform' && updates.billingMode !== 'external') {
     return res.status(400).json({ error: "billingMode must be 'platform' or 'external'" });
   }
+  // The Issue (Client) P0 — validate outcomeValue / segmentConfig at the boundary so a garbage
+  // basis/segment is a 400, not a silent drop (parseJsonSafe would otherwise swallow it at read).
+  // null is allowed (clears the field); validate only when a non-null object is present.
+  if ('outcomeValue' in updates && updates.outcomeValue !== null) {
+    const parsed = outcomeValueSchema.safeParse(updates.outcomeValue);
+    if (!parsed.success) return res.status(400).json({ error: 'Invalid outcomeValue' });
+    updates.outcomeValue = parsed.data;
+  }
+  if ('segmentConfig' in updates && updates.segmentConfig !== null) {
+    const parsed = segmentConfigSchema.safeParse(updates.segmentConfig);
+    if (!parsed.success) return res.status(400).json({ error: 'Invalid segmentConfig' });
+    updates.segmentConfig = parsed.data;
+  }
+  if ('targetGeo' in updates && updates.targetGeo !== null) {
+    const parsed = targetGeoSchema.safeParse(updates.targetGeo);
+    if (!parsed.success) return res.status(400).json({ error: 'Invalid targetGeo' });
+    updates.targetGeo = parsed.data;
+  }
   // Hash clientPassword with bcrypt before saving (empty string = remove password)
   if (typeof updates.clientPassword === 'string') {
     updates.clientPassword = updates.clientPassword
@@ -268,17 +359,7 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
     try {
       const token = updates.webflowToken || getTokenForSite(updates.webflowSiteId) || process.env.WEBFLOW_API_TOKEN || '';
       if (token) {
-        const domRes = await fetch(`https://api.webflow.com/v2/sites/${updates.webflowSiteId}/custom_domains`, {
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        });
-        if (domRes.ok) {
-          const domData = await domRes.json() as { customDomains?: { url?: string }[] };
-          const domains = domData.customDomains || [];
-          if (domains.length > 0 && domains[0].url) {
-            const d = domains[0].url;
-            updates.liveDomain = d.startsWith('http') ? d : `https://${d}`;
-          }
-        }
+        updates.liveDomain = await getPrimaryCustomDomainUrl(updates.webflowSiteId, token) ?? updates.liveDomain;
       }
     } catch (err) {
       // url-fetch-ok: best-effort live domain resolution

@@ -21,7 +21,7 @@
 
 import type { TrackedAction, ActionOutcome } from '../../shared/types/outcome-tracking.js';
 import type { BriefingStory } from '../../shared/types/briefing.js';
-import type { TemplateContext } from './index.js';
+import type { TemplateContext } from './context.js';
 import { fmtShortDateUTC } from './_helpers.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;

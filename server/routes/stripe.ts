@@ -5,7 +5,7 @@ import { Router, type Request, type Response } from 'express';
 
 const router = Router();
 
-import { sanitizeString } from '../helpers.js';
+import { sanitizeString } from '../utils/text.js';
 import { checkoutLimiter, requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
 import { requireWorkspaceAccess, requireWorkspaceAccessFromBody } from '../auth.js';
 import { requireAdminAuth } from '../middleware/admin-auth.js';
@@ -50,10 +50,14 @@ interface CheckoutPreflightContext {
 
 export function buildCheckoutRedirectUrls(req: Pick<Request, 'protocol' | 'get'>, workspaceId: string, returnTab: CheckoutReturnTab): { baseUrl: string; successUrl: string; cancelUrl: string } {
   const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const returnPath = returnTab === 'content'
+    ? `/client/${workspaceId}/inbox?tab=reviews`
+    : `/client/${workspaceId}/${returnTab}`;
+  const separator = returnPath.includes('?') ? '&' : '?';
   return {
     baseUrl,
-    successUrl: `${baseUrl}/client/${workspaceId}/${returnTab}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancelUrl: `${baseUrl}/client/${workspaceId}/${returnTab}?payment=cancelled`,
+    successUrl: `${baseUrl}${returnPath}${separator}payment=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl: `${baseUrl}${returnPath}${separator}payment=cancelled`,
   };
 }
 
@@ -323,6 +327,8 @@ router.get('/api/stripe/payments/:workspaceId/:paymentId', requireWorkspaceAcces
 
 // --- ROI Dashboard ---
 router.get('/api/public/roi/:workspaceId', requireAuthenticatedClientPortalAuth(), (req, res) => {
+  // the-issue-client P0: outcomeVerdict rides this payload additively via computeROI() (flag-gated
+  // inside computeROI); no serializer change needed here.
   const roi = computeROI(req.params.workspaceId);
   if (!roi) return res.status(404).json({ error: 'ROI data not available — requires keyword strategy with CPC data' });
   res.json(roi);

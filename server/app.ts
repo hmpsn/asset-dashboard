@@ -14,6 +14,7 @@ import {
   publicApiLimiter,
   publicWriteLimiter,
   globalPublicLimiter,
+  mcpLimiter,
   verifyAdminToken,
   verifyClientSession,
   internalJwtCanAccessWorkspace,
@@ -24,7 +25,8 @@ import { getPresence } from './websocket.js';
 import { setupSentryErrorHandler } from './sentry.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { createLogger } from './logger.js';
-import { sanitizeErrorMessage } from './helpers.js';
+import { sanitizeErrorMessage } from './utils/text.js';
+import { assertIntegrationEncryptionConfigured } from './integration-encryption.js';
 
 const log = createLogger('app');
 
@@ -36,6 +38,7 @@ import workspacesRoutes from './routes/workspaces.js';
 import settingsRoutes from './routes/settings.js';
 import reportsRoutes from './routes/reports.js';
 import googleRoutes from './routes/google.js';
+import googleBusinessProfileRoutes from './routes/google-business-profile.js';
 import aiRoutes from './routes/ai.js';
 import keywordStrategyRoutes from './routes/keyword-strategy.js';
 import keywordCommandCenterRoutes from './routes/keyword-command-center.js';
@@ -53,6 +56,7 @@ import auditSchedulesRoutes from './routes/audit-schedules.js';
 import stripeRoutes from './routes/stripe.js';
 import workOrdersRoutes from './routes/work-orders.js';
 import recommendationsRoutes from './routes/recommendations.js';
+import cannibalizationKeeperRouter from './routes/cannibalization-keeper.js';
 import churnSignalsRoutes from './routes/churn-signals.js';
 import anomaliesRoutes from './routes/anomalies.js';
 import insightsRoutes from './routes/insights.js';
@@ -80,6 +84,13 @@ import clientSignalsRouter from './routes/client-signals.js';
 import clientActionsRouter from './routes/client-actions.js';
 import deliverablesRoutes from './routes/deliverables.js';
 import meetingBriefRouter from './routes/meeting-brief.js';
+import { theIssueAdminRouter } from './routes/the-issue-admin.js';
+import { theIssueConversionTrackingRouter } from './routes/the-issue-conversion-tracking.js';
+import { theIssueExportRouter } from './routes/the-issue-export.js';
+import strategyPovRouter from './routes/strategy-pov.js';
+import strategyIssueLensesRouter from './routes/strategy-issue-lenses.js';
+import competitorAlertsRouter from './routes/competitor-alerts.js';
+import autoSendPolicyRouter from './routes/auto-send-policy.js';
 import brandscriptRoutes from './routes/brandscript.js';
 import voiceCalibrationRoutes from './routes/voice-calibration.js';
 import discoveryIngestionRoutes from './routes/discovery-ingestion.js';
@@ -115,6 +126,10 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 /** Create and configure the Express application with all middleware and routes. */
 export function createApp(): express.Express {
   const app = express();
+
+  if (IS_PROD) {
+    assertIntegrationEncryptionConfigured();
+  }
 
   // Ensure data directories exist
   for (const dir of [getUploadRoot(), getOptRoot()]) {
@@ -204,6 +219,21 @@ export function createApp(): express.Express {
   });
 
   // ─── MCP server (own Bearer-token auth, not behind APP_PASSWORD gate) ───
+  // Per-IP rate limit in front of the router — /mcp is otherwise unthrottled
+  // (the three public limiters above only cover /api/public/). Applied as a
+  // top-level path check (not `app.use('/mcp', mcpLimiter, ...)`) so req.path stays
+  // the full '/mcp' and the limiter keys a dedicated `${ip}:/mcp` bucket — a mount
+  // would strip the prefix and risk a bucket collision. Mirrors publicWriteLimiter.
+  // Skipped under NODE_ENV=test: high-volume MCP integration tests hit one server from
+  // one IP and legitimately exceed the cap (the limiter itself is unit-tested directly).
+  if (process.env.NODE_ENV !== 'test') {
+    app.use((req, res, next) => {
+      if (req.path === '/mcp' || req.path.startsWith('/mcp/')) {
+        return mcpLimiter(req, res, next);
+      }
+      next();
+    });
+  }
   app.use('/mcp', mcpRouter);
 
   // --- Populate req.user from JWT when present (non-blocking) ---
@@ -245,6 +275,7 @@ export function createApp(): express.Express {
       if (req.path === '/api/feature-flags' && req.method === 'GET') return next();
       // Allow Google OAuth callback (Google redirects here without our auth token)
       if (req.path === '/api/google/callback') return next();
+      if (req.path === '/api/google-business-profile/callback') return next();
       // Allow public report and client routes
       if (req.path.startsWith('/report/') || req.path.startsWith('/client/')) return next();
       if (req.path.startsWith('/api/public/')) return next();
@@ -262,7 +293,7 @@ export function createApp(): express.Express {
   app.use((req, res, next) => {
     if (!req.path.startsWith('/api/public/')) return next();
     const parts = req.path.split('/');
-    if (parts[3] === 'auth' || parts[3] === 'workspace' || parts[3] === 'client-login' || parts[3] === 'client-logout' || parts[3] === 'client-me' || parts[3] === 'auth-mode' || parts[3] === 'forgot-password' || parts[3] === 'reset-password') return next();
+    if (parts[3] === 'auth' || parts[3] === 'workspace' || parts[3] === 'client-login' || parts[3] === 'client-refresh' || parts[3] === 'client-logout' || parts[3] === 'client-me' || parts[3] === 'auth-mode' || parts[3] === 'forgot-password' || parts[3] === 'reset-password') return next();
     const workspaceId = parts[4];
     if (!workspaceId) return next();
     const ws = getWorkspace(workspaceId);
@@ -304,6 +335,7 @@ export function createApp(): express.Express {
   registerWebflowRoutes(app);
   app.use(reportsRoutes);
   app.use(googleRoutes);
+  app.use(googleBusinessProfileRoutes);
   app.use(aiRoutes);
   app.use(keywordStrategyRoutes);
   app.use(keywordCommandCenterRoutes);
@@ -322,6 +354,7 @@ export function createApp(): express.Express {
   app.use(stripeRoutes);
   app.use(workOrdersRoutes);
   app.use(recommendationsRoutes);
+  app.use(cannibalizationKeeperRouter);
   app.use(churnSignalsRoutes);
   app.use(anomaliesRoutes);
   app.use(insightsRoutes);
@@ -354,6 +387,13 @@ export function createApp(): express.Express {
   app.use(clientActionsRouter);
   app.use(deliverablesRoutes);
   app.use(meetingBriefRouter);
+  app.use(theIssueAdminRouter);
+  app.use(theIssueConversionTrackingRouter);
+  app.use(theIssueExportRouter);
+  app.use(strategyPovRouter);
+  app.use(strategyIssueLensesRouter);
+  app.use(competitorAlertsRouter);
+  app.use(autoSendPolicyRouter);
   app.use(brandscriptRoutes);
   app.use(voiceCalibrationRoutes);
   app.use(discoveryIngestionRoutes);

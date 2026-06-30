@@ -45,11 +45,11 @@ vi.mock('../../server/domains/inbox/deliverable-adapters/approval-batch-classifi
   classifyApprovalBatch: mockClassifyApprovalBatch,
 }));
 
-vi.mock('../../server/domains/inbox/send-to-client.js', () => ({
+vi.mock('../../server/domains/inbox/deliverable-apply-state.js', () => ({
   markDeliverableApplied: mockMarkDeliverableApplied,
 }));
 
-vi.mock('../../server/helpers.js', () => ({
+vi.mock('../../server/utils/page-address.js', () => ({
   normalizePageUrl: mockNormalizePageUrl,
 }));
 
@@ -68,7 +68,7 @@ vi.mock('../../server/outcome-tracking.js', () => ({
   recordAction: mockRecordAction,
 }));
 
-vi.mock('../../server/recommendations.js', () => ({
+vi.mock('../../server/domains/recommendations/resolution-service.js', () => ({
   resolveRecommendationsForChange: mockResolveRecommendationsForChange,
 }));
 

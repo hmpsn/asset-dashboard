@@ -1,10 +1,11 @@
 import type { ApprovalBatch, ApprovalItem } from '../../shared/types/approvals.js';
 import type { ClientAction } from '../../shared/types/client-actions.js';
 import type { SchemaSitePlan } from '../../shared/types/schema-plan.js';
-import type { SchemaPageSuggestion } from '../schema-suggester.js';
+import type { SchemaPageSuggestion } from '../schema/suggestion-types.js';
 import type { SchemaSnapshot } from '../schema-store.js';
 import type { Workspace } from '../workspaces.js';
-import { computeEffectiveTier } from '../workspaces.js';
+import type { ResolvedSegmentProfile } from '../../shared/types/workspace.js';
+import { computeEffectiveTier, resolveSegmentProfile } from '../workspaces.js';
 import { computeTrialState } from '../billing/trial-state.js';
 
 export interface PublicWorkspaceView {
@@ -38,6 +39,18 @@ export interface PublicWorkspaceView {
   onboardingCompleted: boolean;
   hasClientUsers: boolean;
   bookingUrl: string | null;
+  /**
+   * The Issue (Client) P0 — pre-resolved segment profile. Present ONLY when the spine flag is ON
+   * for this workspace (opts.theIssueClientSpine); optional → flag-OFF byte-identical.
+   * Pre-resolved (authority-layered-fields rule): the client reads the boolean flags, never raw industry.
+   */
+  segmentProfile?: ResolvedSegmentProfile;
+  /**
+   * The Issue (Client) P1a — whether website-native conversion capture is wired (setup confirmed OR a
+   * webhook secret exists). A BOOLEAN ONLY — never the secret, never any PII (D7). Present ONLY when the
+   * spine flag is ON (opts.theIssueClientSpine); optional → flag-OFF byte-identical.
+   */
+  formCaptureConnected?: boolean;
 }
 
 export function toPublicWorkspaceView(
@@ -47,6 +60,8 @@ export function toPublicWorkspaceView(
     hasClientUsers: boolean;
     bookingUrl: string | null;
     nowMs?: number;
+    /** The Issue (Client) P0 — when true, attach the pre-resolved segmentProfile. */
+    theIssueClientSpine?: boolean;
   },
 ): PublicWorkspaceView {
   const nowMs = opts.nowMs ?? Date.now();
@@ -83,6 +98,15 @@ export function toPublicWorkspaceView(
     onboardingCompleted: ws.onboardingCompleted ?? false,
     hasClientUsers: opts.hasClientUsers,
     bookingUrl: opts.bookingUrl ?? null,
+    // The Issue (Client) P0 — flag-gated: attach the pre-resolved segment profile only when ON,
+    // so the OFF path is byte-identical (field absent from the payload entirely).
+    ...(opts.theIssueClientSpine ? { segmentProfile: resolveSegmentProfile(ws) } : {}),
+    // The Issue (Client) P1a — flag-gated boolean only (never sources, never PII, D7). Attached on
+    // the same spine-flag gate so the OFF path stays byte-identical. Connected = confirmed setup OR
+    // ≥1 selected Webflow form to poll (capture is via Data-API polling, no webhook secret).
+    ...(opts.theIssueClientSpine
+      ? { formCaptureConnected: !!ws.conversionTrackingConfirmedAt || (ws.webflowFormSources?.length ?? 0) > 0 }
+      : {}),
   };
 }
 

@@ -1,0 +1,57 @@
+{
+  "date": "2026-06-21",
+  "topic": "client-dashboard-ia",
+  "method": "resolution-tournament + persona-gut-check",
+  "advisory": true,
+  "tournament": {
+    "winner": "RUTHLESS (Two-Speed Simplifier)",
+    "grafts_from": "PROOF",
+    "judge_lenses": ["client-goal", "anti-bloat", "progressive-depth", "feasibility", "trust"],
+    "scores": {
+      "RUTHLESS": { "client_goal": 7, "anti_bloat": 9, "progressive_depth": 9, "feasibility": 9, "trust": 8, "total": 42 },
+      "PROOF": { "client_goal": 9, "anti_bloat": 6, "progressive_depth": 7, "feasibility": 7, "trust": 9, "total": 38 },
+      "ADAPTIVE": { "client_goal": 8, "anti_bloat": 3, "progressive_depth": 6, "feasibility": 4, "trust": 6, "total": 27 }
+    },
+    "grafts": [
+      "A: embedded Share/Export on Overview",
+      "B: per-piece outcome attribution in Results (bestIdeaToGraft x2)",
+      "C: rename Explore -> Deep Dive, named Analytics/Rankings sub-tabs",
+      "D: provenance + banded ~$ must travel with export (release gate)"
+    ]
+  },
+  "locked_ia": {
+    "weekly_tabs": ["Overview", "Inbox", "Results", "Deep Dive"],
+    "conditional": ["Locations (>1 location only)"],
+    "to_settings": ["brand", "plans"],
+    "tab_count_before": 11,
+    "tab_count_after": 4
+  },
+  "gut_check": {
+    "panel_size": 7,
+    "tally": { "serves_me": 5, "mostly": 2, "dropped_something": 0, "blockers": 0 },
+    "verdicts": [
+      { "persona": "smb-founder-checksigner", "verdict": "mostly", "dropped": "hero outcome count not clickable to the actual lead list (receipts)", "folded_into": "P1 refinement #2 (reuse P1b named-leads)" },
+      { "persona": "local-dentist", "verdict": "mostly", "dropped": "outcome shown as blended 'leads' not typed (calls vs new-patient bookings) with delta on the key one", "folded_into": "P1 refinement #1 (reuse P1a OutcomeTypeBreakdown)" },
+      { "persona": "churned-skeptic", "verdict": "serves_me", "dropped": "none", "note": "read real code; praised dollar-banding-on-measured-count honesty; provenance inline, kill-move in Inbox, math in Results" },
+      { "persona": "vc-board", "verdict": "serves_me", "dropped": "none", "note": "money frame gets two homes (hero + Results); Share/Export closes shareability gap" },
+      { "persona": "busy-saas-marketer", "verdict": "serves_me", "dropped": "none", "note": "lever lists intact + one click deep in Deep Dive>Analytics, not Premium-gated; Results standalone; health pinned alongside tables" },
+      { "persona": "consulting-marketing", "verdict": "serves_me", "dropped": "none", "note": "approve-before-publish editor preserved in Inbox; roadmap-as-collapsed-subsection fine; authority signal real not teaser" },
+      { "persona": "multi-location", "verdict": "serves_me", "dropped": "none", "note": "leaderboard+drill-down is exact ask; prefers deliberate second phase over half-baked bolt-on; read-only roll-up fine for now" }
+    ],
+    "full_evaluative_review_deferred_to": "built surface (flag-ON, real data)"
+  },
+  "phased_plan": {
+    "P1": "Overview reframe + real MoM delta (SHIP FIRST) + typed-breakout hero + clickable count->lead list",
+    "P2": "Collapse to 4-tab shell (Deep Dive merge, roi->Results, health fold, brand/plans->settings)",
+    "P3": "Content + roadmap into Inbox / Deep Dive; cut content + content-plan tabs",
+    "P4": "Overview Share/Export + per-piece attribution; gate D (provenance+banded $ in export)",
+    "P5": "Multi-location track (separate, non-blocking)"
+  },
+  "open_owner_decisions": [
+    "Deep Dive label (vs Details/The Numbers/Insights)",
+    "Consulting Content tab fast-follow or never",
+    "Settings/account home exists (blocks P2)",
+    "Multi-location priority/sequencing",
+    "Banded-$ export wording (blocks P4)"
+  ]
+}

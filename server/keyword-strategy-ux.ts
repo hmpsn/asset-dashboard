@@ -3,12 +3,11 @@ import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { strategyHistoryStrategySchema, strategyHistoryPageMapSchema, type StrategyHistoryStrategy } from './schemas/workspace-schemas.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
 import { buildStrategyKeywordEvaluationContext } from './keyword-strategy-context.js';
 import { evaluateKeywordCandidate, normalizeKeyword } from './keyword-intelligence/rules.js';
 import { getTrackedKeywords } from './rank-tracking.js';
-import { compactStrings } from './utils/collections.js';
+import { compactStrings, uniqStrings } from './utils/collections.js';
 import { buildWorkspaceIntelligence } from './workspace-intelligence.js';
 import {
   computeKeywordValueComponents,
@@ -99,10 +98,6 @@ interface BuildSummaryOptions {
   currentPageMap?: Array<{ pagePath: string; primaryKeyword: string }>;
   trackedKeywords?: TrackedKeyword[];
   skipped?: number;
-}
-
-function uniq(values: string[]): string[] {
-  return [...new Set(values.filter(Boolean))];
 }
 
 function feedbackMap(workspaceId: string): Map<string, KeywordStrategyExplanation['feedbackStatus']> {
@@ -242,7 +237,7 @@ function buildExplanation(input: {
         ? 'Identified as a content opportunity with enough context to review safely.'
         : 'Included in the strategy set that guides tracking and recommendations.';
 
-  const reasons = uniq([...input.businessReasons, fallbackReason]).slice(0, 4);
+  const reasons = uniqStrings([...input.businessReasons, fallbackReason].filter(Boolean)).slice(0, 4);
 
   // Task 3.3: per-keyword realized $ via the single keywordDollarValue helper (the
   // ONE $ definition — currentMonthly == roi.ts trafficValue). Only the page_keyword
@@ -269,9 +264,9 @@ function buildExplanation(input: {
     normalizedKeyword,
     role: input.role,
     surfaceLabel: surfaceLabel(input.role, input.surface),
-    sourceEvidence: uniq(input.sourceEvidence).slice(0, 5),
+    sourceEvidence: uniqStrings(input.sourceEvidence.filter(Boolean)).slice(0, 5),
     reasons,
-    fitSignals: uniq(input.fitSignals).slice(0, 5),
+    fitSignals: uniqStrings(input.fitSignals.filter(Boolean)).slice(0, 5),
     feedbackStatus: input.feedbackStatus,
     authorityPosture: input.tracked?.authorityPosture,
     tracking: input.tracked ? {
@@ -419,29 +414,25 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
     cpc: 0,
   }, evaluationContext);
 
-  // Task 2.3: build value reasons server-side when the flag is ON.
-  // One ScoringContext per payload build (flag-gated), reused across all keywords.
-  const KEYWORD_VALUE_SCORING_FLAG = 'keyword-value-scoring' as const;
-  const valueScoringOn = isFeatureEnabled(KEYWORD_VALUE_SCORING_FLAG, options.workspaceId);
+  // Build value reasons server-side. One ScoringContext per payload build, reused
+  // across all keywords.
   let valueScoringCtx: ScoringContext | null = null;
-  if (valueScoringOn) {
-    try {
-      const posture = getLocalSeoPosture(options.workspaceId);
-      const markets = listLocalSeoMarkets(options.workspaceId);
-      // Capture business-profile city/state (lowercased) — MUST match buildValueScoringConfig
-      // in keyword-command-center.ts, or isLocalKeyword (hence "Local boost") drifts between
-      // the admin Hub drawer and this client strategy path for the same keyword.
-      const ws = getWorkspace(options.workspaceId);
-      valueScoringCtx = {
-        posture: posture ?? 'unknown',
-        markets,
-        city: ws?.businessProfile?.address?.city?.toLowerCase(),
-        state: ws?.businessProfile?.address?.state?.toLowerCase(),
-      };
-    } catch (err) {
-      // catch-ok: value reasons are informational; degrade gracefully on posture/market read failure.
-      log.debug({ err, workspaceId: options.workspaceId }, 'Value scoring context unavailable — skipping valueReasons');
-    }
+  try {
+    const posture = getLocalSeoPosture(options.workspaceId);
+    const markets = listLocalSeoMarkets(options.workspaceId);
+    // Capture business-profile city/state (lowercased) — MUST match buildValueScoringConfig
+    // in keyword-command-center.ts, or isLocalKeyword (hence "Local boost") drifts between
+    // the admin Hub drawer and this client strategy path for the same keyword.
+    const ws = getWorkspace(options.workspaceId);
+    valueScoringCtx = {
+      posture: posture ?? 'unknown',
+      markets,
+      city: ws?.businessProfile?.address?.city?.toLowerCase(),
+      state: ws?.businessProfile?.address?.state?.toLowerCase(),
+    };
+  } catch (err) {
+    // catch-ok: value reasons are informational; degrade gracefully on posture/market read failure.
+    log.debug({ err, workspaceId: options.workspaceId }, 'Value scoring context unavailable — skipping valueReasons');
   }
 
   const computeValueReasons = (
@@ -512,7 +503,16 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
       feedbackStatus: feedbackByKeyword.get(normalized),
       businessReasons: result.reasons.map(reason => reason.message),
       fitSignals: result.fitSignals,
-      valueReasons: computeValueReasons(keyword, { volume: page.volume, difficulty: page.difficulty, cpc: page.cpc, intent: page.searchIntent }),
+      // Page-keyword cpc is admin/scoring-internal only, same as content gaps (#1103):
+      // the score stays cpc-aware, but only the admin surface may show the raw "$X CPC"
+      // in text — the client surface feeds the public payload, so suppress it there.
+      // (The raw pageMap.cpc field is separately tier-gated in public-content.ts; this
+      // closes the parallel raw-cpc-as-text path through valueReasons.)
+      valueReasons: computeValueReasons(
+        keyword,
+        { volume: page.volume, difficulty: page.difficulty, cpc: page.cpc, intent: page.searchIntent },
+        { exposeCpc: surface === 'admin' },
+      ),
     }));
   }
 

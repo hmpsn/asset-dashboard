@@ -21,7 +21,10 @@ vi.mock('react-router-dom', async () => {
 
 vi.mock('../../../src/components/client/BetaContext', () => ({ useBetaMode: () => false }));
 vi.mock('../../../src/hooks/useFeatureFlag', () => ({ useFeatureFlag: () => false }));
-vi.mock('../../../src/hooks/client', () => ({ useClientIntelligence: () => ({ data: undefined }) }));
+vi.mock('../../../src/hooks/client', () => ({
+  useClientIntelligence: () => ({ data: undefined }),
+  useClientDiagnostics: () => ({ data: [] }),
+}));
 
 // This test owns the recommendations hook mock — a single hoisted holder lets each
 // test swap the returned set before rendering.
@@ -35,7 +38,6 @@ vi.mock('../../../src/components/client/IntelligenceSummaryCard', () => ({ Intel
 vi.mock('../../../src/components/client/HealthScoreCard', () => ({ HealthScoreCard: () => <div /> }));
 vi.mock('../../../src/components/client/PredictionShowcaseCard', () => ({ PredictionShowcaseCard: () => <div /> }));
 vi.mock('../../../src/components/client/InsightsDigest', () => ({ InsightsDigest: () => <div /> }));
-vi.mock('../../../src/components/client/Briefing/InsightsBriefingPage', () => ({ InsightsBriefingPage: () => <div /> }));
 
 import { OverviewTab } from '../../../src/components/client/OverviewTab';
 

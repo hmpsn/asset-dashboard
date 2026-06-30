@@ -1,7 +1,45 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { randomUUID } from 'crypto';
 import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { getPost, snapshotPostVersion } from '../../server/content-posts-db.js';
+import db from '../../server/db/index.js';
+
+/**
+ * Seeds a calibrated voice profile (with Layer-2 DNA + guardrails) and an
+ * approved identity deliverable so prepare_*_context exercises the real brand
+ * slice read path — proving the P2 regression (brand voice + identity reach the
+ * MCP agent path) end to end.
+ */
+function seedCalibratedBrand(workspaceId: string) {
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO voice_profiles (id, workspace_id, status, voice_dna_json, guardrails_json, created_at, updated_at)
+    VALUES (?, ?, 'calibrated', ?, ?, ?, ?)
+  `).run(
+    `vp_${randomUUID().slice(0, 8)}`,
+    workspaceId,
+    JSON.stringify({
+      personalityTraits: ['Witty', 'Direct'],
+      toneSpectrum: { formal_casual: 8, serious_playful: 8, technical_accessible: 8 },
+      sentenceStyle: 'Short punchy lines',
+      vocabularyLevel: 'Conversational',
+      humorStyle: 'Dry',
+    }),
+    JSON.stringify({
+      forbiddenWords: ['synergy'],
+      requiredTerminology: [],
+      toneBoundaries: ['Never condescending'],
+      antiPatterns: [],
+    }),
+    now,
+    now,
+  );
+  db.prepare(`
+    INSERT INTO brand_identity_deliverables (id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at)
+    VALUES (?, ?, 'mission', ?, 'approved', 1, 'professional', ?, ?)
+  `).run(`bid_${randomUUID().slice(0, 8)}`, workspaceId, 'Help solo founders win their market.', now, now);
+}
 
 const MCP_TEST_KEY = 'test-mcp-key-content';
 const ctx = createEphemeralTestContext(import.meta.url, {
@@ -145,7 +183,98 @@ describe('MCP content tools (integration)', () => {
     expect(payload.prompt_context).toBeDefined();
     expect(payload.layout_schema).toBeDefined();
     expect(payload.brief_schema).toBeDefined();
+    // Brand keys are always present; for a bare workspace identity is null + voice none.
+    expect(payload.brand_identity).toBeNull();
+    expect(payload.voice_status).toBe('none');
     expect(String(payload.dashboard_url)).toContain(`/ws/${ws.workspaceId}/content`);
+  });
+
+  it('prepare_brief_context surfaces brand identity + calibrated voice without doubling the voice block', async () => {
+    seedCalibratedBrand(ws.workspaceId);
+    try {
+      const result = await callMcpTool('prepare_brief_context', {
+        workspace_id: ws.workspaceId,
+        topic: 'best CRMs for solopreneurs',
+        layout: buildLayout(),
+      });
+      expect(result.isError).toBeFalsy();
+
+      const payload = JSON.parse(result.content[0].text) as {
+        brand_identity: { mission?: string } | null;
+        voice_status: string;
+        prompt_context: string;
+      };
+      // Structured identity reaches the agent for per-page-type emphasis.
+      expect(payload.brand_identity).not.toBeNull();
+      expect(payload.brand_identity?.mission).toBe('Help solo founders win their market.');
+      expect(payload.voice_status).toBe('calibrated');
+      // Layer-2 DNA + identity blocks are injected into the prompt context.
+      expect(payload.prompt_context).toContain('BRAND VOICE RULES');
+      expect(payload.prompt_context).toContain('synergy'); // forbidden-word guardrail token
+      expect(payload.prompt_context.match(/synergy/g)?.length).toBe(1); // DNA token appears exactly once — no double-inject
+      expect(payload.prompt_context).toContain('Help solo founders win their market.');
+      // NO double-voice: the Layer-2 block header appears exactly once.
+      expect(payload.prompt_context.match(/BRAND VOICE RULES/g)?.length).toBe(1);
+    } finally {
+      db.prepare('DELETE FROM voice_profiles WHERE workspace_id = ?').run(ws.workspaceId);
+      db.prepare('DELETE FROM brand_identity_deliverables WHERE workspace_id = ?').run(ws.workspaceId);
+    }
+  });
+
+  it('prepare_post_context surfaces brand identity + calibrated voice without doubling the voice block', async () => {
+    seedCalibratedBrand(ws.workspaceId);
+    try {
+      const preparedBrief = await callMcpTool('prepare_brief_context', {
+        workspace_id: ws.workspaceId,
+        topic: 'best CRMs for solopreneurs',
+        layout: buildLayout(),
+      });
+      const briefHandle = JSON.parse(preparedBrief.content[0].text).brief_request_handle as string;
+      const saved = await callMcpTool('save_brief', {
+        workspace_id: ws.workspaceId,
+        brief_request_handle: briefHandle,
+        content: buildBriefContent(),
+      });
+      const briefId = JSON.parse(saved.content[0].text).brief_id as string;
+
+      const result = await callMcpTool('prepare_post_context', {
+        workspace_id: ws.workspaceId,
+        brief_id: briefId,
+      });
+      expect(result.isError).toBeFalsy();
+
+      const payload = JSON.parse(result.content[0].text) as {
+        brand_identity: { mission?: string } | null;
+        voice_status: string;
+        prompt_context: string;
+      };
+      expect(payload.brand_identity?.mission).toBe('Help solo founders win their market.');
+      expect(payload.voice_status).toBe('calibrated');
+      expect(payload.prompt_context).toContain('BRAND VOICE RULES');
+      expect(payload.prompt_context).toContain('Help solo founders win their market.');
+      expect(payload.prompt_context.match(/BRAND VOICE RULES/g)?.length).toBe(1);
+    } finally {
+      db.prepare('DELETE FROM voice_profiles WHERE workspace_id = ?').run(ws.workspaceId);
+      db.prepare('DELETE FROM brand_identity_deliverables WHERE workspace_id = ?').run(ws.workspaceId);
+    }
+  });
+
+  it('prepare_brief_context returns target hints when provided', async () => {
+    const result = await callMcpTool('prepare_brief_context', {
+      workspace_id: ws.workspaceId,
+      topic: 'best CRMs for solopreneurs',
+      target_keyword: 'best crm for solopreneurs',
+      target_page_path: '/blog/best-crm',
+      layout: buildLayout(),
+    });
+    expect(result.isError).toBeFalsy();
+
+    const payload = JSON.parse(result.content[0].text) as Record<string, unknown>;
+    expect(payload.target_keyword).toBe('best crm for solopreneurs');
+    expect(payload.target_page_path).toBe('/blog/best-crm');
+    expect(String(payload.prompt_context)).toContain('## Brief Target');
+    expect(String(payload.prompt_context)).toContain('Target keyword: best crm for solopreneurs');
+    expect(String(payload.prompt_context)).toContain('Target page path: /blog/best-crm');
   });
 
   it('save_brief persists a brief and logs mcp_brief_saved activity', async () => {

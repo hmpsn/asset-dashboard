@@ -1,5 +1,5 @@
 import type { Workspace, AdminWorkspaceView } from '../../shared/types/workspace.js';
-import { computeEffectiveTier } from '../workspaces.js';
+import { computeEffectiveTier, resolveSegmentProfile } from '../workspaces.js';
 import { computeTrialState } from '../billing/trial-state.js';
 
 const DENIED_KEYS: ReadonlySet<string> = new Set([
@@ -57,6 +57,25 @@ export function toAdminWorkspaceView(ws: Workspace, nowMs = Date.now()): AdminWo
     customPromptNotes: ws.customPromptNotes,
     scoringConfig: ws.scoringConfig,
     intelligenceProfile: ws.intelligenceProfile,
+    // The Issue (Client) P0 — admin-edited outcome value + segment override. Explicit-field-list
+    // lockstep: the type carries these (AdminWorkspaceView) but the body must list them too, or the
+    // admin Outcome Value / segment subsections silently never read back the persisted value.
+    outcomeValue: ws.outcomeValue,
+    segmentConfig: ws.segmentConfig,
+    // SEO Decision Engine P4 — admin-set national/international SERP target geo. Same
+    // explicit-field-list lockstep as outcomeValue above: the type carries it but the body
+    // must list it too, or the BusinessFootprint geo editor silently never reads back the
+    // persisted value.
+    targetGeo: ws.targetGeo,
+    // The Issue (Client) P1a — admin reads back the persisted Webflow form-source mapping +
+    // setup-confirmation timestamp (same explicit-field-list lockstep as outcomeValue above). The
+    // signing secret is denied (see DENIED_KEYS) and intentionally absent here.
+    webflowFormSources: ws.webflowFormSources,
+    conversionTrackingConfirmedAt: ws.conversionTrackingConfirmedAt,
+    // Pre-resolved segment profile (authority-layered): the admin segment UI reads
+    // segmentProfile.segment to seed the override + gate the local/multi read-only axis. Without
+    // this the UI always falls through to the b2b_saas default and the local-axis guard never fires.
+    segmentProfile: resolveSegmentProfile(ws),
     autoPublishBriefings: ws.autoPublishBriefings,
     autoPublishAfterHours: ws.autoPublishAfterHours,
     lastBriefingRunWeekOf: ws.lastBriefingRunWeekOf,

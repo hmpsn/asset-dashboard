@@ -1,14 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../../server/workspace-intelligence.js', () => ({
-  buildWorkspaceIntelligence: vi.fn(),
-  formatPersonasForPrompt: vi.fn((personas) => {
-    if (!personas?.length) return '';
-    return `\n\nTARGET AUDIENCE PERSONAS:\n${personas.map((p: { name: string; painPoints?: string[] }) => [
-      `**${p.name}**`,
-      ...(p.painPoints ?? []),
-    ].join('\n')).join('\n\n')}`;
-  }),
+vi.mock('../../server/schema-intelligence.js', () => ({
+  buildSchemaIntelligence: vi.fn(),
 }));
 
 vi.mock('../../server/keyword-feedback.js', () => ({
@@ -45,8 +38,8 @@ vi.mock('../../server/analytics-insights-store.js', () => ({
   getInsights: vi.fn().mockReturnValue([]),
 }));
 
-import { buildSchemaContext } from '../../server/helpers.js';
-import { buildWorkspaceIntelligence } from '../../server/workspace-intelligence.js';
+import { buildSchemaContext } from '../../server/schema/context-builder.js';
+import { buildSchemaIntelligence } from '../../server/schema-intelligence.js';
 import { getDeclinedKeywords } from '../../server/keyword-feedback.js';
 import { listWorkspaces } from '../../server/workspaces.js';
 
@@ -54,7 +47,7 @@ describe('buildSchemaContext — slice migration (Pattern B starter)', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it('reads siteKeywords from intel.seoContext.strategy.siteKeywords (not direct ws read)', async () => {
-    vi.mocked(buildWorkspaceIntelligence).mockResolvedValue({
+    vi.mocked(buildSchemaIntelligence).mockResolvedValue({
       seoContext: {
         strategy: { siteKeywords: ['from-slice-1', 'from-slice-2', 'from-slice-3'] },
         brandVoice: '',
@@ -80,7 +73,7 @@ describe('buildSchemaContext — slice migration (Pattern B starter)', () => {
   });
 
   it('applies declined-keyword filter at schema layer (slice does NOT apply it per audit Correction 3)', async () => {
-    vi.mocked(buildWorkspaceIntelligence).mockResolvedValue({
+    vi.mocked(buildSchemaIntelligence).mockResolvedValue({
       seoContext: {
         strategy: { siteKeywords: ['keep-this', 'declined-this', 'keep-that'] },
         brandVoice: '',
@@ -106,8 +99,8 @@ describe('buildSchemaContext — slice migration (Pattern B starter)', () => {
     expect(ctx.siteKeywords).toEqual(['keep-this', 'keep-that']);
   });
 
-  it('reads knowledgeBase and personas from intel.seoContext instead of legacy helpers', async () => {
-    vi.mocked(buildWorkspaceIntelligence).mockResolvedValue({
+  it('does not attach unused prompt-only seo context fields to schema generation context', async () => {
+    vi.mocked(buildSchemaIntelligence).mockResolvedValue({
       seoContext: {
         strategy: { siteKeywords: [] },
         brandVoice: '',
@@ -139,14 +132,14 @@ describe('buildSchemaContext — slice migration (Pattern B starter)', () => {
 
     const { ctx } = await buildSchemaContext('site_test_123');
 
-    expect(ctx.businessContext).toBe('B2B SaaS implementation partner');
-    expect(ctx.knowledgeBase).toBe('Slice knowledge base');
-    expect(ctx._personasBlock).toContain('Operations Director');
-    expect(ctx._personasBlock).toContain('No clear ROI');
+    expect('businessContext' in ctx).toBe(false);
+    expect('knowledgeBase' in ctx).toBe(false);
+    expect('_personasBlock' in ctx).toBe(false);
+    expect('searchIntent' in ctx).toBe(false);
   });
 
   it('reads _businessProfile from intel.seoContext.businessProfile', async () => {
-    vi.mocked(buildWorkspaceIntelligence).mockResolvedValue({
+    vi.mocked(buildSchemaIntelligence).mockResolvedValue({
       seoContext: {
         strategy: { siteKeywords: [] },
         brandVoice: '',
@@ -193,7 +186,7 @@ describe('buildSchemaContext — slice migration (Pattern B starter)', () => {
   });
 
   it('does not request backlink enrichment for schema context when no schema consumer uses backlinks', async () => {
-    vi.mocked(buildWorkspaceIntelligence).mockResolvedValue({
+    vi.mocked(buildSchemaIntelligence).mockResolvedValue({
       seoContext: {
         strategy: { siteKeywords: [] },
         brandVoice: '',
@@ -201,7 +194,7 @@ describe('buildSchemaContext — slice migration (Pattern B starter)', () => {
         businessContext: '',
         knowledgeBase: '',
         personas: [],
-        serpFeatures: { featuredSnippets: 1, peopleAlsoAsk: 2, localPack: false, videoCarousel: 0 },
+        serpFeatures: { featuredSnippets: 1, peopleAlsoAsk: 2, localPack: false, videoCarousel: 0, aiOverview: 0 },
         backlinkProfile: { referringDomains: 42 },
       } as never,
     } as never);
@@ -218,14 +211,16 @@ describe('buildSchemaContext — slice migration (Pattern B starter)', () => {
     const { ctx } = await buildSchemaContext('site_test_123');
 
     expect(ctx.workspaceId).toBe('ws_test');
-    expect(buildWorkspaceIntelligence).toHaveBeenCalledWith(
-      'ws_test',
-      expect.objectContaining({ enrichWithBacklinks: undefined }),
+    expect(buildSchemaIntelligence).toHaveBeenCalledWith(
+      expect.objectContaining({
+        siteId: 'site_test_123',
+        includeEeatAssets: true,
+      }),
     );
   });
 
   it('does not read migrated-forbidden legacy workspace fields', async () => {
-    vi.mocked(buildWorkspaceIntelligence).mockResolvedValue({
+    vi.mocked(buildSchemaIntelligence).mockResolvedValue({
       seoContext: {
         strategy: { siteKeywords: ['slice-keyword'] },
         brandVoice: '',
@@ -265,8 +260,8 @@ describe('buildSchemaContext — slice migration (Pattern B starter)', () => {
 
     const { ctx } = await buildSchemaContext('site_test_123');
 
-    expect(ctx.businessContext).toBe('Slice business context');
     expect(ctx.siteKeywords).toEqual(['slice-keyword']);
+    expect('businessContext' in ctx).toBe(false);
     expect(ctx._businessProfile?.phone).toBe('+1-555-0100');
   });
 });

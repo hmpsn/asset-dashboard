@@ -25,11 +25,27 @@ interface FeatureUsage {
   provider: string;
 }
 
+interface DataForSeoUsage {
+  totalCredits: number;
+  totalCalls: number;
+  cachedCalls: number;
+}
+
+interface DataForSeoDaily {
+  date: string;
+  credits: number;
+  calls: number;
+  cachedCalls: number;
+}
+
 interface AIUsageData {
   totalTokens: number;
   estimatedCost: number;
   daily: DailyUsage[];
   byFeature: FeatureUsage[];
+  // P5 — served by GET /api/ai/usage but previously dropped by this component.
+  dataforseo?: DataForSeoUsage;
+  dataforseoDaily?: DataForSeoDaily[];
 }
 
 export function AIUsageSection() {
@@ -42,7 +58,9 @@ export function AIUsageSection() {
       .catch((err) => { console.error('WorkspaceOverview operation failed:', err); });
   }, [days]);
 
-  if (!data || (data.totalTokens === 0 && data.daily.every(d => d.calls === 0))) return null;
+  const hasAiUsage = !!data && (data.totalTokens > 0 || data.daily.some(d => d.calls > 0));
+  const hasSeoUsage = !!data?.dataforseo && data.dataforseo.totalCalls > 0;
+  if (!data || (!hasAiUsage && !hasSeoUsage)) return null;
 
   const totalCost = data.estimatedCost;
   const totalCalls = data.daily.reduce((s, d) => s + d.calls, 0);
@@ -50,6 +68,10 @@ export function AIUsageSection() {
   const anthropicCost = data.daily.reduce((s, d) => s + d.anthropicCost, 0);
 
   const chartDays = data.daily.slice(-days);
+
+  const seo = data.dataforseo;
+  const seoDaily = (data.dataforseoDaily ?? []).slice(-days);
+  const seoCacheHitRate = seo && seo.totalCalls > 0 ? Math.round((seo.cachedCalls / seo.totalCalls) * 100) : 0;
 
   const fmtCost = (v: number) => v < 0.01 ? '<$0.01' : `$${v.toFixed(2)}`;
 
@@ -96,6 +118,10 @@ export function AIUsageSection() {
         </div>
       }
     >
+      {/* AI cards + daily cost chart only when there IS AI activity — the section can
+          also be shown for DataForSEO usage alone, where these would read all-zero. */}
+      {hasAiUsage && (
+      <>
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
@@ -151,6 +177,8 @@ export function AIUsageSection() {
           </BarChart>
         </ResponsiveContainer>
       </div>
+      </>
+      )}
 
       {/* Feature breakdown */}
       {data.byFeature.length > 0 && (
@@ -174,6 +202,51 @@ export function AIUsageSection() {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* SEO provider (DataForSEO) credit usage — data is served by /api/ai/usage (P5). */}
+      {seo && seo.totalCalls > 0 && (
+        <div className="mt-4 pt-4 border-t border-[var(--brand-border)]">
+          <div className="t-caption-sm text-[var(--brand-text-muted)] mb-2">SEO Provider — DataForSEO</div>
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
+              <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Credits Used</div>
+              <div className="text-sm font-semibold text-blue-400">{seo.totalCredits.toFixed(2)}</div>
+            </div>
+            <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
+              <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Provider Calls</div>
+              <div className="text-sm font-semibold text-[var(--brand-text-bright)]">{seo.totalCalls.toLocaleString()}</div>
+            </div>
+            <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
+              <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Cache Hit Rate</div>
+              <div className="text-sm font-semibold text-emerald-400">{seoCacheHitRate}%</div>
+            </div>
+          </div>
+          {seoDaily.some(d => d.credits > 0) && (
+            <ResponsiveContainer width="100%" height={90}>
+              <BarChart data={seoDaily} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+                <XAxis dataKey="date" tick={{ fill: chartAxisColor(), fontSize: 9 }} tickLine={false} axisLine={false} interval={'preserveStartEnd'} tickFormatter={(v: string) => v.slice(5)} />
+                <YAxis hide />
+                <Tooltip content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const row = payload[0]?.payload as DataForSeoDaily | undefined;
+                  if (!row) return null;
+                  return (
+                    <div className="bg-[var(--surface-2)] border border-[var(--brand-border-hover)] rounded-[var(--radius-md)] shadow-xl shadow-black/40 min-w-[140px] overflow-hidden">
+                      <div className="px-3 py-1.5 border-b border-[var(--brand-border)] t-caption-sm font-semibold text-[var(--brand-text-bright)]">{row.date}</div>
+                      <div className="px-3 py-1.5 space-y-1">
+                        <div className="flex justify-between t-caption-sm"><span className="text-[var(--brand-text-muted)]">Credits</span><span className="text-blue-400 font-medium">{row.credits.toFixed(2)}</span></div>
+                        <div className="flex justify-between t-caption-sm"><span className="text-[var(--brand-text-muted)]">Calls</span><span className="text-[var(--brand-text)]">{row.calls}</span></div>
+                        <div className="flex justify-between t-caption-sm"><span className="text-[var(--brand-text-muted)]">Cached</span><span className="text-emerald-400">{row.cachedCalls}</span></div>
+                      </div>
+                    </div>
+                  );
+                }} />
+                <Bar dataKey="credits" fill="#60a5fa" radius={[2, 2, 0, 0]} isAnimationActive={false} /> {/* chart-hex-ok — blue-400 for SEO credit data */}
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       )}
     </SectionCard>

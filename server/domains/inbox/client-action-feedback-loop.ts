@@ -5,7 +5,7 @@ import {
   updateActionContext,
   updateAttribution,
 } from '../../outcome-tracking.js';
-import { toInsightPageId } from '../../helpers.js';
+import { toInsightPageId } from '../../utils/page-address.js';
 import { createLogger } from '../../logger.js';
 import db from '../../db/index.js';
 import type { AnalyticsInsight } from '../../../shared/types/analytics.js';
@@ -19,6 +19,7 @@ const OUTCOME_ACTION_TYPE_BY_SOURCE: Record<ClientActionSourceType, ActionType> 
   internal_link: 'internal_link_added',
   redirect_proposal: 'audit_fix_applied',
   content_decay: 'content_refreshed',
+  cannibalization: 'cannibalization_resolved',
 };
 
 const ensureLifecycleTrackedActionTx = db.transaction((params: {

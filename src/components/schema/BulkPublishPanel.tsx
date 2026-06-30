@@ -37,7 +37,7 @@ export function BulkPublishPanel({
   return (
     <>
       {graphValidation && (
-        <div className={`flex items-start gap-2 rounded-[var(--radius-md)] border px-2.5 py-2 t-caption-sm ${
+        <div className={`flex w-full items-start gap-2 rounded-[var(--radius-md)] border px-2.5 py-2 t-caption-sm sm:w-auto sm:max-w-md ${
           graphValidation.status === 'errors'
             ? 'border-red-500/20 bg-red-500/8 text-red-300'
             : graphValidation.status === 'warnings'
@@ -68,6 +68,7 @@ export function BulkPublishPanel({
           size="sm"
           icon={bulkPublishing ? Loader2 : Upload}
           loading={bulkPublishing}
+          className="max-sm:w-full"
         >
           {bulkPublishing
             ? `Publishing ${bulkProgress?.done}/${bulkProgress?.total}...`
@@ -82,7 +83,7 @@ export function BulkPublishPanel({
         size="sm"
         loading={sendingToClient}
         icon={sendingToClient ? undefined : Send}
-        className="gap-1.5 px-2.5 py-1 rounded-[var(--radius-md)] t-caption text-teal-400 hover:text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="gap-1.5 px-2.5 py-1 rounded-[var(--radius-md)] t-caption text-teal-400 hover:text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed max-sm:w-full"
       >
         {sentToClient ? 'Sent to Client' : sendingToClient ? 'Sending...' : 'Send to Client'}
       </Button>
@@ -94,7 +95,7 @@ export function BulkPublishPanel({
           maxLength={2000}
           placeholder="Add a note for your client (optional)"
           rows={2}
-          className="mt-2 w-full t-caption placeholder:text-[var(--brand-text-muted)] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full t-caption placeholder:text-[var(--brand-text-muted)] disabled:opacity-50 disabled:cursor-not-allowed sm:w-56 lg:w-64"
         />
       )}
     </>

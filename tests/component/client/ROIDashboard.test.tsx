@@ -61,13 +61,32 @@ function mockROI(data: ROIData | null = makeROIData()) {
   } as unknown as ReturnType<typeof useClientROI>);
 }
 
-function renderDashboard(tier: 'free' | 'growth' | 'premium' = 'growth') {
+function renderDashboard(
+  tier: 'free' | 'growth' | 'premium' = 'growth',
+  props: { compact?: boolean; evergreen?: boolean } = {},
+) {
   return render(
     <MemoryRouter>
-      <ROIDashboard workspaceId="ws-roi" tier={tier} />
+      <ROIDashboard workspaceId="ws-roi" tier={tier} {...props} />
     </MemoryRouter>,
   );
 }
+
+const outcomeVerdict: NonNullable<ROIData['outcomeVerdict']> = {
+  outcomeCount: 14,
+  outcomeUnitLabel: 'new patients',
+  valuePerOutcome: 800,
+  estimatedValue: 11_234,
+  monthlyRetainer: 1_500,
+  baseline: {
+    engagementStart: '2026-01-01T00:00:00.000Z',
+    baselineConversions: 6,
+    baselineCapturedAt: '2026-01-01T00:00:00.000Z',
+    state: 'ready',
+  },
+  baselineDeltaCount: 8,
+  provenance: 'estimate_ga4',
+};
 
 describe('ROIDashboard methodology explainer', () => {
   beforeEach(() => {
@@ -113,5 +132,45 @@ describe('ROIDashboard methodology explainer', () => {
 
     expect(screen.getAllByText('ROI Dashboard').length).toBeGreaterThan(0);
     expect(screen.queryByText('How we calculate this')).not.toBeInTheDocument();
+  });
+});
+
+describe('ROIDashboard compact + lead-value frame (The Issue P0 spine)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('compact=false (default) still renders the Traffic Value by Page table (byte-identical)', () => {
+    mockROI();
+    renderDashboard('growth');
+    expect(screen.getByText('Traffic Value by Page')).toBeInTheDocument();
+  });
+
+  it('compact=true hides the Traffic Value by Page table (it relocates to Under the hood)', () => {
+    mockROI();
+    renderDashboard('growth', { compact: true });
+    expect(screen.queryByText('Traffic Value by Page')).not.toBeInTheDocument();
+  });
+
+  it('renders the banded estimated dollar value + unit label when outcomeVerdict is present', () => {
+    mockROI(makeROIData({ outcomeVerdict }));
+    renderDashboard('growth', { evergreen: true });
+    expect(screen.getByText('~$11,000')).toBeInTheDocument();
+    expect(screen.getAllByText(/new patients/i).length).toBeGreaterThan(0);
+  });
+
+  it('demotes the traffic-value model to a labeled reference metric when a verdict leads', () => {
+    mockROI(makeROIData({ outcomeVerdict }));
+    renderDashboard('growth');
+    expect(screen.getByText('Traffic value (reference)')).toBeInTheDocument();
+    expect(screen.queryByText('Organic Traffic Value')).not.toBeInTheDocument();
+  });
+
+  it('methodology prose states the lead-value multiplier (no "do not multiply by lead value")', () => {
+    mockROI(makeROIData({ outcomeVerdict }));
+    renderDashboard('growth');
+    fireEvent.click(screen.getByText('How we calculate this'));
+    expect(screen.getByText(/multiply your tracked conversions by the per-lead value/i)).toBeInTheDocument();
+    expect(screen.queryByText(/We do not multiply by lead value/i)).not.toBeInTheDocument();
   });
 });

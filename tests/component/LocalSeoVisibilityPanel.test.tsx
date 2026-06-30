@@ -49,10 +49,21 @@ vi.mock('../../src/hooks/admin', () => ({
     isLoading: false,
     isError: false,
   }),
+  // P7 (local-gbp): GbpReviewsPanel mounts inside this panel. Return the empty readout so it
+  // self-renders nothing here (its own behavior is covered by GbpReviewsPanel.test.tsx).
+  useGbpReviews: () => ({ data: { owned: null, competitors: [], completenessScore: null } }),
+  useLocalGbpRefresh: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
 
 vi.mock('../../src/hooks/useBackgroundTasks', () => ({
   useBackgroundTasks: () => ({ findActiveJob: () => null }),
+}));
+
+// GbpReviewsPanel (mounted in keywords mode) now reads useFeatureFlag directly to decide whether
+// to show its bootstrap card — mock it so the test renderer needs no QueryClientProvider. OFF here
+// so the empty GBP payload keeps the panel hidden (this suite asserts the non-GBP local-SEO UI).
+vi.mock('../../src/hooks/useFeatureFlag', () => ({
+  useFeatureFlag: () => false,
 }));
 
 // Wave 1 added useRankTrackingAddKeyword to LocalSeoVisibilityPanel; mock it here so
@@ -293,6 +304,26 @@ describe('LocalSeoVisibilityPanel setup drawer', () => {
     expect(screen.getByText('Keyword visibility lives in Keywords')).toBeInTheDocument();
     expect(screen.getByText('Possible')).toBeInTheDocument();
     expect(screen.getByText('Not Found')).toBeInTheDocument();
+  });
+
+  it('surfaces provider-degraded result counts when refreshes partially fail', () => {
+    localSeoData = makeReadResponse({
+      report: {
+        setupState: 'has_data',
+        setupLabel: 'Local visibility ready',
+        setupDetail: 'Use Keywords to inspect local visibility by keyword.',
+        activeMarketCount: 1,
+        configuredMarketCount: 1,
+        checkedKeywordCount: 12,
+        degradedCount: 2,
+      },
+    });
+
+    renderPanel({ workspaceId: 'ws-1', mode: 'keywords', onOpenKeywords: vi.fn() });
+
+    expect(screen.getByText('Degraded')).toBeInTheDocument();
+    expect(screen.getByText('provider warnings')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
   });
 
   it('renders the per-market visibility trend when the read model includes a series with >= 2 points', () => {

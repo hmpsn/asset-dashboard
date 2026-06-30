@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getWorkspace } from '../workspaces.js';
 import { getUploadRoot } from '../data-dir.js';
-import { getVoiceProfile } from '../voice-calibration.js';
+import { getVoiceProfile } from '../voice-profile-read-model.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
 import { renderVoiceDNAForPrompt, renderVoiceDNASummary } from '../voice-dna-render.js';
@@ -11,7 +11,7 @@ import type { ContextEmphasis, VoiceProfile, VoiceSample } from '../../shared/ty
 const log = createLogger('workspace-intelligence/seo-context-source');
 const MISSING_SCHEMA_ERROR_RE = /no such (table|column)/i;
 
-function safeBrandEngineRead<T>(context: string, workspaceId: string, fn: () => T, fallback: T): T {
+export function safeBrandEngineRead<T>(context: string, workspaceId: string, fn: () => T, fallback: T): T {
   try {
     return fn();
   } catch (err) {

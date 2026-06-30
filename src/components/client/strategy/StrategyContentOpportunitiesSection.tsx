@@ -5,8 +5,10 @@ import { ContentGapRow } from '../../shared/ContentGapRow';
 import type { ClientContentRequest, ClientKeywordStrategy } from '../types';
 import { kdColor } from '../../page-intelligence/pageIntelligenceDisplay';
 import { keywordComparisonKey } from '../../../../shared/keyword-normalization';
+import { compareOrganicContentGapDisplayOrder } from '../../../../shared/keyword-opportunity-projection';
 import { useCart } from '../useCart';
 import { contentProductType } from '../../../../shared/types/payments';
+import { useClientPricing } from '../ClientPricingContext';
 
 type ContentGap = NonNullable<ClientKeywordStrategy['contentGaps']>[number];
 type KeywordFeedbackStatus = 'approved' | 'declined' | 'requested';
@@ -31,17 +33,6 @@ export function isContentGapAlreadyRequested(
   return findActiveContentRequestForKeyword(contentRequests, targetKeyword) != null || requestedTopics.has(targetKeywordKey);
 }
 
-interface PricingModalState {
-  serviceType: 'brief_only' | 'full_post';
-  topic: string;
-  targetKeyword: string;
-  intent?: string;
-  priority?: string;
-  rationale?: string;
-  source: 'strategy';
-  pageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
-}
-
 interface StrategyContentOpportunitiesSectionProps {
   newContentRef: RefObject<HTMLDivElement | null>;
   effectiveTier: Tier;
@@ -61,11 +52,6 @@ interface StrategyContentOpportunitiesSectionProps {
   submitFeedback: (keyword: string, status: 'approved' | 'declined', source: string) => Promise<void>;
   onDeclineKeyword: (keyword: string, source: string) => void;
   betaMode: boolean;
-  setPricingModal: (modal: PricingModalState) => void;
-  briefPrice: number | null;
-  fullPostPrice: number | null;
-  fmtPrice: (n: number) => string;
-  hidePrices?: boolean;
   onTabChange?: (tab: string) => void;
 }
 
@@ -97,13 +83,9 @@ function ContentGapCard({
   submitFeedback,
   onDeclineKeyword,
   betaMode,
-  setPricingModal,
-  briefPrice,
-  fullPostPrice,
-  fmtPrice,
-  hidePrices,
   onTabChange,
 }: Omit<StrategyContentOpportunitiesSectionProps, 'newContentRef' | 'effectiveTier' | 'newContentTopicCount' | 'contentGapsFound' | 'keywordGapCount' | 'strategyData' | 'expandedSections' | 'toggleSection'> & { gap: ContentGap }) {
+  const { setPricingModal, briefPrice, fullPostPrice, fmtPrice, hidePrices } = useClientPricing();
   const targetKeywordKey = keywordComparisonKey(gap.targetKeyword);
   const matchingReq = findActiveContentRequestForKeyword(contentRequests, gap.targetKeyword);
   const alreadyRequested = isContentGapAlreadyRequested(contentRequests, requestedTopics, gap.targetKeyword);
@@ -292,11 +274,6 @@ export function StrategyContentOpportunitiesSection({
   submitFeedback,
   onDeclineKeyword,
   betaMode,
-  setPricingModal,
-  briefPrice,
-  fullPostPrice,
-  fmtPrice,
-  hidePrices,
   onTabChange,
 }: StrategyContentOpportunitiesSectionProps) {
   return (
@@ -346,9 +323,7 @@ export function StrategyContentOpportunitiesSection({
                       // SEO Generation Quality P2: organically-surfaced gaps sort by
                       // opportunity score; backfilled (deterministic-floor) gaps sort
                       // strictly after them so the strongest ideas stay on top.
-                      .sort((a, b) =>
-                        (a.backfilled ? 1 : 0) - (b.backfilled ? 1 : 0)
-                        || (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0))
+                      .sort(compareOrganicContentGapDisplayOrder)
                       .slice(0, expandedSections.has('new-content-gaps-all') ? undefined : 6)
                       .map((gap, i) => (
                         <ContentGapCard
@@ -364,11 +339,6 @@ export function StrategyContentOpportunitiesSection({
                           submitFeedback={submitFeedback}
                           onDeclineKeyword={onDeclineKeyword}
                           betaMode={betaMode}
-                          setPricingModal={setPricingModal}
-                          briefPrice={briefPrice}
-                          fullPostPrice={fullPostPrice}
-                          fmtPrice={fmtPrice}
-                          hidePrices={hidePrices}
                           onTabChange={onTabChange}
                         />
                       ))}

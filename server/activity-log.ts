@@ -1,8 +1,9 @@
 /**
- * Activity Log — per-workspace activity feed with 500-entry cap.
+ * Activity Log — per-workspace activity feed with a per-workspace entry cap.
  * Entries are broadcast in real time via WebSocket.
  */
 
+import { randomUUID } from 'node:crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
@@ -97,6 +98,9 @@ export type ActivityType =
   | 'deliverable_responded'
   | 'deliverable_reminded'   // operator: admin re-nudged the client about a pending deliverable (NOT client-visible)
   | 'meeting_brief_generated'
+  | 'strategy_pov_generated'   // The Issue (Lane B): admin generated/regenerated/edited the curated POV
+  | 'strategy_issue_pushed'    // The Issue (Phase 3): the weekly cron pre-baked the POV + rang the operator doorbell (OPERATOR-only, never client-visible)
+  | 'strategy_autosent'        // The Issue (Phase 4): the trust-ladder cron auto-sent N low-risk moves (OPERATOR-only, never client-visible)
   | 'brandscript_created'
   | 'brandscript_deleted'
   | 'brandscript_imported'
@@ -146,10 +150,50 @@ export type ActivityType =
   // recommendation triage is an internal admin-facing audit trail, not a client deliverable.
   | 'rec_status_updated'   // client triage: pending/in_progress/completed
   | 'rec_dismissed'        // client dismissed a recommendation
+  // Strategy v3 curation lifecycle (spec §7.5). rec_sent + rec_approved are CLIENT-VISIBLE
+  // (real client-facing milestones); rec_struck + rec_throttled are ADMIN-ONLY (internal
+  // curation hygiene the client must never see — a struck rec read as activity would leak
+  // "we decided not to do this").
+  | 'rec_sent'             // CLIENT-VISIBLE: operator sent a curated rec to the client
+  | 'rec_approved'         // CLIENT-VISIBLE: client approved a sent rec
+  | 'rec_struck'           // admin-only: operator permanently suppressed a rec
+  | 'rec_throttled'        // admin-only: operator throttled a rec for 7/30/90 days
+  // Strategy v3 P3 — admin-only staleness nudge (a sent rec waiting >14d with no client
+  // response, or superseded by a newer rec). Internal curation hygiene; deliberately NOT
+  // in CLIENT_VISIBLE_TYPES — a stale-rec nudge must never surface in the client activity feed.
+  | 'rec_nudge_stale'      // admin-only: a sent rec is stale (waiting >14d) or superseded
   | 'suggested_brief_accepted'   // admin accepted a suggested brief (AI-generated)
   | 'suggested_brief_dismissed'  // admin dismissed a suggested brief
   | 'suggested_brief_snoozed'    // admin snoozed a suggested brief
-  | 'post_voice_scored';         // admin-only: voice score persisted for a post
+  | 'post_voice_scored'          // admin-only: voice score persisted for a post
+  // Strategy redesign P2 pre-commit (consumed in P3 Lane A) — managed keyword working-set
+  // mutations (strategy_keyword_set table). Admin-only curation hygiene; deliberately NOT
+  // in CLIENT_VISIBLE_TYPES — keyword-set add/remove/keep is an internal operator audit
+  // trail, never a client-facing milestone. The matching `tracked_actions` keep markers
+  // (topic_cluster_keep / content_gap_keep) live in shared/types/outcome-tracking.ts
+  // (ActionType), a SEPARATE union — do not conflate.
+  | 'strategy_keyword_kept'      // admin-only: operator explicitly kept a keyword (survives regen)
+  | 'strategy_keyword_removed'   // admin-only: operator removed a keyword from the managed set
+  | 'strategy_keyword_added'     // admin-only: keyword added to the managed set (client_request / manual_add)
+  // The Issue — Lane 1E: cannibalization keeper-override (operator sets the canonical page).
+  | 'cannibalization_keeper_set' // admin-only: operator set the keeper page for a cannibalization URL set
+  // The Issue (Client) P1a: a Webflow named lead was captured via the daily Data-API poller.
+  // ADMIN-ONLY — deliberately NOT in CLIENT_VISIBLE_TYPES (the capture is an internal operator
+  // signal, not a client deliverable) and its metadata omits PII (D7): only { formId, outcomeType }.
+  | 'form_submission_captured'
+  // The Issue (Client) P1a: the operator saved the tracked-Webflow-forms mapping (PUT form-sources),
+  // which can flip the D6 provenance marker (confirmed setup) — audit trail for a config mutation.
+  // ADMIN-ONLY — deliberately NOT in CLIENT_VISIBLE_TYPES; PII-free metadata: only { formCount }.
+  | 'form_capture_configured'
+  // The Issue (Client) P1c: the weekly return-hook cron sent the client their "what came in" digest.
+  // ADMIN-ONLY (operator audit trail) — deliberately NOT in CLIENT_VISIBLE_TYPES; PII-free metadata:
+  // only counts/flags ({ weekOf, leadCount, hasMoney, pendingCount }), never lead identity.
+  | 'client_return_hook_sent'
+  // Strategy trust-ladder: the operator enabled/disabled auto-send for an archetype — the opt-in that
+  // lets recommendations auto-send to the client WITHOUT per-item review (the single most audit-worthy
+  // operation in the trust-ladder). ADMIN-ONLY — deliberately NOT in CLIENT_VISIBLE_TYPES; PII-free
+  // metadata: only { archetype, enabled }.
+  | 'autosend_policy_changed';
 
 export interface ActivityEntry {
   id: string;
@@ -163,7 +207,7 @@ export interface ActivityEntry {
   createdAt: string;
 }
 
-const MAX_ENTRIES = 500;
+const MAX_ENTRIES_PER_WORKSPACE = 500;
 
 // --- SQLite row shape ---
 
@@ -204,6 +248,7 @@ const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
   'post_client_edit', 'brief_sent_for_review', 'post_sent_for_review', 'client_action_sent', 'client_action_approved',
   'client_action_changes_requested', 'client_action_completed',
   'deliverable_sent', 'deliverable_responded',
+  'rec_sent', 'rec_approved',
 ]);
 
 const CLIENT_ENGAGEMENT_TYPES: ActivityType[] = [
@@ -236,6 +281,9 @@ const stmts = createStmtCache(() => ({
   selectByWorkspace: db.prepare(
     'SELECT * FROM activity_log WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ?',
   ),
+  selectByWorkspaceAndType: db.prepare(
+    'SELECT * FROM activity_log WHERE workspace_id = ? AND type = ? ORDER BY created_at DESC LIMIT ?',
+  ),
   selectAll: db.prepare(
     'SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?',
   ),
@@ -248,7 +296,6 @@ const stmts = createStmtCache(() => ({
   countByType: db.prepare(
     `SELECT COUNT(*) as count FROM activity_log WHERE workspace_id = ? AND type = ? AND created_at > datetime('now', ? || ' days')`,
   ),
-  countAll: db.prepare('SELECT COUNT(*) as count FROM activity_log'),
   clientActivitySummary: db.prepare(`
     SELECT
       COUNT(DISTINCT date(created_at)) AS distinct_days,
@@ -258,13 +305,20 @@ const stmts = createStmtCache(() => ({
       AND type IN (${CLIENT_ENGAGEMENT_TYPES.map(() => '?').join(',')})
       AND created_at > datetime('now', ? || ' days')
   `),
-  // Global retention policy: prune the N oldest rows across all workspaces
-  // to enforce the global activity-log size cap. Scoping to a single workspace
-  // here would defeat the purpose of the global cap.
-  // ws-scope-ok
-  pruneOldest: db.prepare(`
-        DELETE FROM activity_log WHERE id IN (
-          SELECT id FROM activity_log ORDER BY created_at ASC LIMIT ?
+  pruneRetention: db.prepare(`
+        DELETE FROM activity_log
+        WHERE rowid IN (
+          SELECT rowid
+          FROM (
+            SELECT
+              rowid,
+              ROW_NUMBER() OVER (
+                PARTITION BY workspace_id
+                ORDER BY created_at DESC, rowid DESC
+              ) AS retention_rank
+            FROM activity_log
+          )
+          WHERE retention_rank > ?
         )
       `),
 }));
@@ -273,7 +327,7 @@ const stmts = createStmtCache(() => ({
 
 export function addActivity(workspaceId: string, type: ActivityType, title: string, description?: string, metadata?: Record<string, unknown>, actor?: { id?: string; name?: string }): ActivityEntry {
   const entry: ActivityEntry = {
-    id: `act_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: `act_${randomUUID()}`,
     workspaceId,
     type,
     title,
@@ -296,16 +350,15 @@ export function addActivity(workspaceId: string, type: ActivityType, title: stri
     created_at: entry.createdAt,
   });
 
-  // Enforce 500-entry cap
-  const { count } = stmts().countAll.get() as { count: number };
-  if (count > MAX_ENTRIES) {
-    stmts().pruneOldest.run(count - MAX_ENTRIES);
-  }
-
   // Broadcast to subscribed workspace clients
   _broadcastFn?.(workspaceId, 'activity:new', entry);
 
   return entry;
+}
+
+export function pruneActivityLogRetention(): number {
+  const result = stmts().pruneRetention.run(MAX_ENTRIES_PER_WORKSPACE);
+  return result.changes;
 }
 
 export function listActivity(workspaceId?: string, limit = 50): ActivityEntry[] {
@@ -315,6 +368,17 @@ export function listActivity(workspaceId?: string, limit = 50): ActivityEntry[] 
   } else {
     rows = stmts().selectAll.all(limit) as ActivityRow[];
   }
+  return rows.map(rowToEntry);
+}
+
+/**
+ * List the most-recent activity entries of a SINGLE type for a workspace.
+ * Unlike listActivity (which caps the most-recent N rows across ALL types), the
+ * LIMIT here applies only to rows of `type`, so a type-scoped dedup read cannot
+ * be pushed past the cap by unrelated high-volume activity (portal_session, etc.).
+ */
+export function listActivityByType(workspaceId: string, type: ActivityType, limit = 50): ActivityEntry[] {
+  const rows = stmts().selectByWorkspaceAndType.all(workspaceId, type, limit) as ActivityRow[];
   return rows.map(rowToEntry);
 }
 

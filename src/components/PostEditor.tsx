@@ -81,6 +81,13 @@ interface PostEditorProps {
   onDelete?: () => void;
 }
 
+type EditingTarget =
+  | { type: 'title' }
+  | { type: 'intro' }
+  | { type: 'conclusion' }
+  | { type: 'section'; index: number }
+  | null;
+
 interface FeedbackFixModalState {
   open: boolean;
   target: AiFeedbackTarget;
@@ -191,10 +198,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const versionsLoading = versionsQ.isLoading;
 
   const [expandedSectionsByPost, setExpandedSectionsByPost] = useState<Record<string, Set<number>>>({});
-  const [editingSection, setEditingSection] = useState<number | null>(null);
-  const [editingIntro, setEditingIntro] = useState(false);
-  const [editingConclusion, setEditingConclusion] = useState(false);
-  const [editingTitle, setEditingTitle] = useState(false);
+  const [editingTarget, setEditingTarget] = useState<EditingTarget>(null);
   const [titleBuffer, setTitleBuffer] = useState('');
   const [regenerating, setRegenerating] = useState<number | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -225,6 +229,19 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   // Tracks the last save attempt parameters so onError can capture them for retry binding.
   // Set synchronously at the start of sectionAutoSaveFn before any await.
   const lastSectionSaveAttempt = useRef<{ sectionIndex: number; html: string } | null>(null);
+  const editingTitle = editingTarget?.type === 'title';
+  const editingIntro = editingTarget?.type === 'intro';
+  const editingConclusion = editingTarget?.type === 'conclusion';
+  const editingSection = editingTarget?.type === 'section' ? editingTarget.index : null;
+  const canStartEdit = editingTarget === null;
+  const canStartSectionEdit = editingTarget === null || editingTarget.type === 'section';
+  const editTitle = () => {
+    setTitleBuffer(post?.title ?? '');
+    setEditingTarget({ type: 'title' });
+  };
+  const editSection = (index: number | null) => {
+    setEditingTarget(index === null ? null : { type: 'section', index });
+  };
 
   // Auto-save for section editing via RichTextEditor (SectionEditor new interface)
   const sectionAutoSaveFn = async (html: string) => {
@@ -314,7 +331,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const saveTitleEdit = () => {
     if (!post) return;
     // Exit edit mode optimistically; surface failure via toast if the save throws.
-    setEditingTitle(false);
+    setEditingTarget(null);
     saveField({ title: titleBuffer }).catch((err) => {
       toast(err instanceof Error ? err.message : 'Failed to save title', 'error');
     });
@@ -497,6 +514,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     }
   };
 
+  // use-toggle-set-ok -- section expansion is keyed by postId, so this is a map of Sets rather than one Set state.
   const toggleSection = (i: number) => {
     setExpandedSectionsByPost(prev => {
       const autoExpanded = new Set(post?.sections.filter(s => s.status === 'done').map(s => s.index) ?? []);
@@ -553,20 +571,22 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             <div className="flex items-center gap-2">
               <FormInput value={titleBuffer} onChange={setTitleBuffer} className="flex-1" />
               <IconButton icon={Check} label="Save title" size="sm" variant="solid" className="bg-teal-600/20 text-teal-300 hover:bg-teal-600/30" onClick={saveTitleEdit} />
-              <IconButton icon={X} label="Cancel title edit" size="sm" variant="solid" className="bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]" onClick={() => setEditingTitle(false)} />
+              <IconButton icon={X} label="Cancel title edit" size="sm" variant="solid" className="bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]" onClick={() => setEditingTarget(null)} />
             </div>
           ) : (
             <div className="flex items-center gap-2 group">
               {/* duplicate-heading-ok -- inline editor title and exported html heading intentionally share post.title */}
               <h2 className="text-lg font-semibold text-[var(--brand-text-bright)] truncate">{post.title}</h2>
-              <IconButton
-                icon={Pencil}
-                label="Edit title"
-                size="sm"
-                variant="ghost"
-                className="opacity-0 group-hover:opacity-100 transition-all"
-                onClick={() => { setEditingTitle(true); setTitleBuffer(post.title); }}
-              />
+              {canStartEdit && (
+                <IconButton
+                  icon={Pencil}
+                  label="Edit title"
+                  size="sm"
+                  variant="ghost"
+                  className="opacity-0 group-hover:opacity-100 transition-all"
+                  onClick={editTitle}
+                />
+              )}
             </div>
           )}
           <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -732,12 +752,12 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 <span className="text-xs font-medium text-[var(--brand-text-bright)]">Introduction</span>
                 {post.introduction && <span className="t-caption-sm text-[var(--brand-text-muted)]">{countWordsFromHtml(post.introduction)}w</span>}
               </div>
-              {post.introduction && !editingIntro && (
+              {post.introduction && canStartEdit && (
                 <Button
                   variant="ghost"
                   size="sm"
                   icon={Pencil}
-                  onClick={() => setEditingIntro(true)}
+                  onClick={() => setEditingTarget({ type: 'intro' })}
                   className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] !px-0 !py-0 bg-transparent hover:bg-transparent"
                 >
                   Edit
@@ -761,7 +781,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                       onClick={async () => {
                         const { ok } = await flushIntro();
                         // Only exit edit mode if the save succeeded (Finding 2).
-                        if (ok) setEditingIntro(false);
+                        if (ok) setEditingTarget(null);
                       }}
                       className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
                     >
@@ -803,6 +823,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 editing={editingSection === section.index}
                 regenerating={regenerating === section.index}
                 isGenerating={isGenerating}
+                canStartSectionEdit={canStartSectionEdit}
                 saveStatus={sectionSaveStatus === 'error' ? 'idle' : sectionSaveStatus}
                 onToggleExpand={toggleSection}
                 onStartEdit={async (index) => {
@@ -811,13 +832,13 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                   // section would fire onSuccess and silently clear the failed section's
                   // error + capture, making the failure vanish (invariant 4).
                   const { ok } = await flushSection();
-                  if (ok) setEditingSection(index);
+                  if (ok) editSection(index);
                 }}
                 onChange={(html) => { setAutoSaveError(null); scheduleSectionSave(html); }}
                 onDone={async () => {
                   // Only exit edit mode if the save succeeded (Finding 2).
                   const { ok } = await flushSection();
-                  if (ok) setEditingSection(null);
+                  if (ok) editSection(null);
                 }}
                 onRegenerate={handleRegenerate}
                 onGenerateWithFeedback={(sectionIndex) => {
@@ -875,12 +896,12 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 <span className="text-xs font-medium text-[var(--brand-text-bright)]">Conclusion</span>
                 {post.conclusion && <span className="t-caption-sm text-[var(--brand-text-muted)]">{countWordsFromHtml(post.conclusion)}w</span>}
               </div>
-              {post.conclusion && !editingConclusion && (
+              {post.conclusion && canStartEdit && (
                 <Button
                   variant="ghost"
                   size="sm"
                   icon={Pencil}
-                  onClick={() => setEditingConclusion(true)}
+                  onClick={() => setEditingTarget({ type: 'conclusion' })}
                   className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] !px-0 !py-0 bg-transparent hover:bg-transparent"
                 >
                   Edit
@@ -904,7 +925,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                       onClick={async () => {
                         const { ok } = await flushConclusion();
                         // Only exit edit mode if the save succeeded (Finding 2).
-                        if (ok) setEditingConclusion(false);
+                        if (ok) setEditingTarget(null);
                       }}
                       className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
                     >

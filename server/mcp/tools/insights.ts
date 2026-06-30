@@ -3,9 +3,15 @@ import {
   getAnomaliesInputSchema,
   getInsightsInputSchema,
   getUnresolvedInsightsInputSchema,
+  resolveInsightInputSchema,
+  bulkResolveInsightsInputSchema,
 } from '../../../shared/types/mcp-action-schemas.js';
-import { getInsights, getInsightsByDomain, getUnresolvedInsights } from '../../analytics-insights-store.js';
+import { getInsights, getInsightsByDomain, getUnresolvedInsights, resolveInsight } from '../../analytics-insights-store.js';
+import { recordInsightResolutionOutcome } from '../../outcome-tracking.js';
 import { getWorkspace } from '../../workspaces.js';
+import { addActivity } from '../../activity-log.js';
+import { broadcastToWorkspace } from '../../broadcast.js';
+import { WS_EVENTS } from '../../ws-events.js';
 import type { InsightType } from '../../../shared/types/analytics.js';
 import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
@@ -30,6 +36,18 @@ export const insightTools: Tool[] = [
     description:
       'Get unresolved insight queue entries for a workspace, ordered by impact for operational follow-up.',
     inputSchema: toMcpJsonSchema(getUnresolvedInsightsInputSchema),
+  },
+  {
+    name: 'resolve_insight',
+    description:
+      "Close the loop on an insight: mark it 'resolved' (done) or 'in_progress' (being worked) with an optional note. Use after you have acted on an insight returned by get_unresolved_insights/get_insights so it stops re-surfacing. Resolving records an outcome baseline for the learning system. Returns the updated insight; errors if the insight id is not in this workspace.",
+    inputSchema: toMcpJsonSchema(resolveInsightInputSchema),
+  },
+  {
+    name: 'bulk_resolve_insights',
+    description:
+      "Mark multiple insights 'resolved' or 'in_progress' in one call (give an array of insightIds, max 100). Returns { updatedCount, updated, notFound } — which ids were updated vs not found in this workspace. Use to triage a batch of insights after acting on them.",
+    inputSchema: toMcpJsonSchema(bulkResolveInsightsInputSchema),
   },
 ];
 
@@ -99,7 +117,73 @@ export async function handleInsightTool(
       if (!resolved) {
         anomalies = anomalies.filter(a => a.resolutionStatus !== 'resolved');
       }
-      return { content: [{ type: 'text' as const, text: JSON.stringify(anomalies) }] };
+      // Bound the payload (mirrors get_unresolved_insights) so a large anomaly
+      // backlog can't blow the response size; raise `limit` for the full set.
+      const bounded = anomalies.slice(0, parsed.data.limit ?? 100);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(bounded) }] };
+    }
+
+    if (name === 'resolve_insight') {
+      const parsed = resolveInsightInputSchema.safeParse(args);
+      if (!parsed.success) {
+        return {
+          isError: true,
+          content: [{ type: 'text' as const, text: `Validation failed: ${JSON.stringify(parsed.error.issues)}` }],
+        };
+      }
+      const { insightId, status, note } = parsed.data;
+      const updated = resolveInsight(insightId, workspaceId, status, note, 'mcp-chat');
+      if (!updated) {
+        return {
+          isError: true,
+          content: [{ type: 'text' as const, text: `Insight not found: ${insightId}` }],
+        };
+      }
+      if (status === 'resolved') recordInsightResolutionOutcome(workspaceId, updated);
+      addActivity(
+        workspaceId,
+        'insight_resolved',
+        `Insight ${status}${note ? ': ' + note : ''} via MCP`,
+        undefined,
+        { source: 'mcp-chat', insightId, status }
+      );
+      broadcastToWorkspace(workspaceId, WS_EVENTS.INSIGHT_RESOLVED, { insightId, status });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(updated) }] };
+    }
+
+    if (name === 'bulk_resolve_insights') {
+      const parsed = bulkResolveInsightsInputSchema.safeParse(args);
+      if (!parsed.success) {
+        return {
+          isError: true,
+          content: [{ type: 'text' as const, text: `Validation failed: ${JSON.stringify(parsed.error.issues)}` }],
+        };
+      }
+      const { insightIds, status, note } = parsed.data;
+      // `status` may be 'resolved' OR 'in_progress', so the accumulator holds "updated"
+      // ids, not strictly "resolved" ones.
+      const updatedIds: string[] = [];
+      const notFound: string[] = [];
+      for (const insightId of insightIds) {
+        const updated = resolveInsight(insightId, workspaceId, status, note, 'mcp-chat');
+        if (!updated) { notFound.push(insightId); continue; }
+        if (status === 'resolved') recordInsightResolutionOutcome(workspaceId, updated);
+        updatedIds.push(insightId);
+      }
+      // One activity + one broadcast for the batch (only if anything actually changed).
+      if (updatedIds.length > 0) {
+        addActivity(
+          workspaceId,
+          'insight_resolved',
+          `${updatedIds.length} insight(s) ${status}${note ? ': ' + note : ''} via MCP`,
+          undefined,
+          { source: 'mcp-chat', insightIds: updatedIds, status }
+        );
+        broadcastToWorkspace(workspaceId, WS_EVENTS.INSIGHT_RESOLVED, { insightIds: updatedIds, status });
+      }
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ updatedCount: updatedIds.length, updated: updatedIds, notFound }) }],
+      };
     }
 
     return {

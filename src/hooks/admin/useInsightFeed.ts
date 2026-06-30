@@ -11,9 +11,9 @@ import { getSafe } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { STALE_TIMES } from '../../lib/queryClient';
 import { fmtNum } from '../../utils/formatNumbers';
-import { capitalizeWord } from '../../utils/strings';
 import { INSIGHT_FILTER_KEYS, type AnalyticsInsight } from '../../../shared/types/analytics.js';
 import type { FeedInsight, SummaryCount } from '../../../shared/types/insights.js';
+import { pathToTitle } from '../../../shared/slug-title';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -26,33 +26,7 @@ const GA_PLACEHOLDER_RE = /^\((not set|not provided|other)\)$/i;
  */
 export function cleanSlugToTitle(url: string | null): string {
   if (!url) return 'Unknown Page';
-
-  // Root path = homepage
-  if (url === '/') return 'Home';
-
-  try {
-    const parsed = new URL(url);
-    const parts = parsed.pathname.replace(/\/$/, '').split('/').filter(Boolean);
-    if (parts.length === 0) return 'Home';
-    const slug = parts[parts.length - 1];
-    return slug
-      .replace(/[-_]/g, ' ')
-      .split(' ')
-      .map(word => capitalizeWord(word))
-      .join(' ')
-      .trim() || 'Home';
-  } catch {
-    // Not a valid URL — treat as a path and take the last segment (mirrors server behavior)
-    const segments = url.replace(/\/$/, '').split('/').filter(Boolean);
-    if (segments.length === 0) return 'Home';
-    const slug = segments[segments.length - 1];
-    return slug
-      .replace(/[-_]/g, ' ')
-      .split(' ')
-      .map(word => capitalizeWord(word))
-      .join(' ')
-      .trim() || 'Home';
-  }
+  return pathToTitle(url, 'Unknown Page');
 }
 
 // ── Transform ─────────────────────────────────────────────────────────────────
@@ -374,6 +348,28 @@ export function transformToFeedInsight(insight: AnalyticsInsight): FeedInsight {
       }
       const currentClicks = data.currentClicks as number | undefined;
       if (currentClicks !== undefined) contextParts.push(`${fmtNum(currentClicks)} clicks tracked`);
+      break;
+    }
+
+    case 'serp_feature_opportunity': {
+      const keyword = data.keyword as string | undefined;
+      const currentPosition = data.currentPosition as number | undefined;
+      const aiOverviewPresent = data.aiOverviewPresent as boolean | undefined;
+      const aiOverviewCited = data.aiOverviewCited as boolean | undefined;
+      const presentFeatures = (data.presentFeatures as string[] | undefined) ?? [];
+      const estimatedMonthlyCitations = data.estimatedMonthlyCitations as number | undefined;
+      const kwLabel = keyword ? `"${keyword}"` : 'a ranked keyword';
+      if (aiOverviewPresent && aiOverviewCited === false) {
+        headline = `AI Overview opportunity for ${kwLabel}`;
+      } else if (presentFeatures.includes('featured_snippet')) {
+        headline = `Featured snippet opportunity for ${kwLabel}`;
+      } else {
+        headline = `SERP feature opportunity for ${kwLabel}`;
+      }
+      if (currentPosition !== undefined) contextParts.push(`Position ${currentPosition}`);
+      if (estimatedMonthlyCitations !== undefined && estimatedMonthlyCitations > 0) {
+        contextParts.push(`~${fmtNum(estimatedMonthlyCitations)} citations/mo`);
+      }
       break;
     }
 

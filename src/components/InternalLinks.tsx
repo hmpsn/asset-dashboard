@@ -10,35 +10,8 @@ import { webflow } from '../api/seo';
 import { clientActions } from '../api/clientActions';
 import { toInternalLinkClientActionItem } from '../lib/internal-link-client-action';
 import { queryKeys } from '../lib/queryKeys';
-
-interface LinkSuggestion {
-  fromPage: string;
-  fromTitle: string;
-  toPage: string;
-  toTitle: string;
-  anchorText: string;
-  reason: string;
-  priority: 'high' | 'medium' | 'low';
-}
-
-interface PageLinkHealth {
-  path: string;
-  title: string;
-  outboundLinks: number;
-  inboundLinks: number;
-  score: number;
-  isOrphan: boolean;
-}
-
-interface InternalLinkResult {
-  suggestions: LinkSuggestion[];
-  pageCount: number;
-  attemptedPageCount?: number;
-  existingLinkCount: number;
-  analyzedAt: string;
-  pageHealth?: PageLinkHealth[];
-  orphanCount?: number;
-}
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
+import type { InternalLinkResult } from '../../shared/types/internal-links';
 
 interface Props {
   siteId: string;
@@ -58,7 +31,7 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<PriorityFilter>('all');
   const [search, setSearch] = useState('');
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [expanded, toggleExpanded] = useToggleSet<number>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [viewMode, setViewMode] = useState<'list' | 'grouped'>('list');
   const [copied, setCopied] = useState<number | null>(null);
   const [showOrphans, setShowOrphans] = useState(false);
@@ -107,14 +80,6 @@ export function InternalLinks({ siteId, workspaceId }: Props) {
   const loading = analyzeMutation.isPending;
   const initialLoading = !data && (snapshotQuery.isLoading || analyzeMutation.isPending);
   const snapshotError = snapshotQuery.error instanceof Error ? snapshotQuery.error.message : null;
-
-  const toggleExpanded = (idx: number) => {
-    setExpanded(prev => {
-      const n = new Set(prev);
-      if (n.has(idx)) n.delete(idx); else n.add(idx);
-      return n;
-    });
-  };
 
   const filtered = data?.suggestions.filter(s => {
     const matchesFilter = filter === 'all' || s.priority === filter;

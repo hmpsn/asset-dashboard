@@ -1,28 +1,26 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { formatPageMapForPrompt } from './workspace-intelligence.js';
-import { buildContentGenerationContext } from './intelligence/generation-context-builders.js';
+import { formatPageMapForPrompt } from './intelligence/formatters.js';
+import {
+  getBrief as readBrief,
+  listBriefs as readBriefs,
+} from './content-brief-read-model.js';
 import type { KeywordMetrics, RelatedKeyword } from './seo-data-provider.js';
 import { callAI } from './ai.js';
 import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
 import type { ScrapedPage } from './web-scraper.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
+import type { IntelligenceOptions, IntelligenceSlice, LearningsSlice, PromptVerbosity, WorkspaceIntelligence } from '../shared/types/intelligence.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
-import { sanitizeQueryForPrompt } from './helpers.js';
+import { sanitizeQueryForPrompt } from './utils/text.js';
 
 export type { ContentBrief } from '../shared/types/content.ts';
 import type { ContentBrief, ContentGenerationStyle, StrategyCardContext } from '../shared/types/content.ts';
-import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
-import {
-  outlineItemSchema, serpAnalysisSchema, eeatGuidanceSchema,
-  schemaRecommendationSchema, keywordValidationSchema, realTopResultSchema,
-  briefSourceEvidenceSchema,
-} from './schemas/content-schemas.js';
+import { outlineItemSchema } from './schemas/content-schemas.js';
 import {
   parseContentBriefOutline,
   parseContentBriefSchema,
 } from './schemas/ai-content-brief.js';
-import { z } from 'zod';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
 import { buildOutcomeLearningStatusNote } from './outcome-learning-default-path.js';
@@ -36,6 +34,49 @@ import {
 import type { EeatAssetRecommendation } from '../shared/types/eeat-assets.js';
 
 const log = createLogger('content-brief');
+
+type ContentGenerationLearningsDomain = NonNullable<IntelligenceOptions['learningsDomain']>;
+
+interface ContentGenerationContextOptions {
+  pagePath?: string;
+  verbosity?: PromptVerbosity;
+  tokenBudget?: number;
+  learningsDomain?: ContentGenerationLearningsDomain;
+  slices?: readonly IntelligenceSlice[];
+  enrichWithBacklinks?: boolean;
+  includeLocalSeo?: boolean;
+  includeRankMovers?: boolean;
+}
+
+interface ContentGenerationContextResult {
+  intelligence: WorkspaceIntelligence;
+  slices: readonly IntelligenceSlice[];
+  promptContext: string;
+  pagePath?: string;
+  learningsDomain: ContentGenerationLearningsDomain;
+  learningsAvailability: LearningsSlice['availability'] | 'not_requested';
+}
+
+interface GenerationContextBuildersModule {
+  buildContentGenerationContext(
+    workspaceId: string,
+    opts?: ContentGenerationContextOptions,
+  ): Promise<ContentGenerationContextResult>;
+}
+
+function intelligenceModulePath(name: string): string {
+  return `./intelligence/${name}.js`;
+}
+
+const generationContextBuildersModule = intelligenceModulePath('generation-context-builders');
+
+async function buildContentGenerationContext(
+  workspaceId: string,
+  opts?: ContentGenerationContextOptions,
+): Promise<ContentGenerationContextResult> {
+  const { buildContentGenerationContext: build } = await import(generationContextBuildersModule) as GenerationContextBuildersModule; // dynamic-import-ok - content brief generation lazily reads workspace intelligence to avoid import-cycle fan-in.
+  return build(workspaceId, opts);
+}
 
 // ── Analytics Intelligence for brief enrichment ──
 
@@ -114,47 +155,6 @@ export function buildBriefIntelligenceBlock(opts: BriefIntelligenceInput): strin
 
 // ── SQLite row shape ──
 
-interface BriefRow {
-  id: string;
-  workspace_id: string;
-  target_keyword: string;
-  secondary_keywords: string;
-  suggested_title: string;
-  suggested_meta_desc: string;
-  outline: string;
-  word_count_target: number;
-  intent: string;
-  audience: string;
-  competitor_insights: string;
-  internal_link_suggestions: string;
-  created_at: string;
-  executive_summary: string | null;
-  content_format: string | null;
-  tone_and_style: string | null;
-  people_also_ask: string | null;
-  topical_entities: string | null;
-  serp_analysis: string | null;
-  difficulty_score: number | null;
-  traffic_potential: string | null;
-  cta_recommendations: string | null;
-  eeat_guidance: string | null;
-  content_checklist: string | null;
-  schema_recommendations: string | null;
-  page_type: string | null;
-  reference_urls: string | null;
-  real_people_also_ask: string | null;
-  real_top_results: string | null;
-  keyword_locked: number | null;
-  keyword_source: string | null;
-  keyword_validation: string | null;
-  template_id: string | null;
-  title_variants: string | null;
-  meta_desc_variants: string | null;
-  generation_style: string | null;
-  source_evidence: string | null;
-  superseded_by: string | null;
-}
-
 const stmts = createStmtCache(() => ({
   insert: db.prepare(
     `INSERT INTO content_briefs
@@ -179,15 +179,6 @@ const stmts = createStmtCache(() => ({
             @keyword_locked, @keyword_source, @keyword_validation, @template_id,
             @title_variants, @meta_desc_variants, @generation_style, @source_evidence,
             @superseded_by)`,
-  ),
-  selectByWorkspace: db.prepare(
-    `SELECT * FROM content_briefs WHERE workspace_id = ? AND superseded_by IS NULL ORDER BY created_at DESC`,
-  ),
-  selectByWorkspaceAll: db.prepare(
-    `SELECT * FROM content_briefs WHERE workspace_id = ? ORDER BY created_at DESC`,
-  ),
-  selectById: db.prepare(
-    `SELECT * FROM content_briefs WHERE id = ? AND workspace_id = ?`,
   ),
   update: db.prepare(
     `UPDATE content_briefs SET
@@ -215,61 +206,6 @@ const stmts = createStmtCache(() => ({
     `DELETE FROM content_briefs WHERE id = ? AND workspace_id = ?`,
   ),
 }));
-
-function rowToBrief(row: BriefRow): ContentBrief {
-  return {
-    id: row.id,
-    workspaceId: row.workspace_id,
-    targetKeyword: row.target_keyword,
-    secondaryKeywords: parseJsonSafeArray(row.secondary_keywords, z.string(), { field: 'secondary_keywords', table: 'content_briefs' }),
-    suggestedTitle: row.suggested_title,
-    suggestedMetaDesc: row.suggested_meta_desc,
-    outline: parseJsonSafeArray(row.outline, outlineItemSchema, { field: 'outline', table: 'content_briefs' }),
-    wordCountTarget: row.word_count_target,
-    intent: row.intent,
-    audience: row.audience,
-    competitorInsights: row.competitor_insights,
-    internalLinkSuggestions: parseJsonSafeArray(row.internal_link_suggestions, z.string(), { field: 'internal_link_suggestions', table: 'content_briefs' }),
-    createdAt: row.created_at,
-    executiveSummary: row.executive_summary ?? undefined,
-    contentFormat: row.content_format ?? undefined,
-    toneAndStyle: row.tone_and_style ?? undefined,
-    peopleAlsoAsk: row.people_also_ask ? parseJsonSafeArray(row.people_also_ask, z.string(), { field: 'people_also_ask', table: 'content_briefs' }) : undefined,
-    topicalEntities: row.topical_entities ? parseJsonSafeArray(row.topical_entities, z.string(), { field: 'topical_entities', table: 'content_briefs' }) : undefined,
-    serpAnalysis: row.serp_analysis
-      ? parseJsonSafe(row.serp_analysis, serpAnalysisSchema, null, { field: 'serp_analysis', table: 'content_briefs' }) ?? undefined
-      : undefined,
-    difficultyScore: row.difficulty_score ?? undefined,
-    trafficPotential: row.traffic_potential ?? undefined,
-    ctaRecommendations: row.cta_recommendations ? parseJsonSafeArray(row.cta_recommendations, z.string(), { field: 'cta_recommendations', table: 'content_briefs' }) : undefined,
-    eeatGuidance: row.eeat_guidance
-      ? parseJsonSafe(row.eeat_guidance, eeatGuidanceSchema, null, { field: 'eeat_guidance', table: 'content_briefs' }) ?? undefined
-      : undefined,
-    contentChecklist: row.content_checklist ? parseJsonSafeArray(row.content_checklist, z.string(), { field: 'content_checklist', table: 'content_briefs' }) : undefined,
-    schemaRecommendations: row.schema_recommendations
-      ? parseJsonSafeArray(row.schema_recommendations, schemaRecommendationSchema, { field: 'schema_recommendations', table: 'content_briefs' })
-      : undefined,
-    pageType: row.page_type as ContentBrief['pageType'] ?? undefined,
-    referenceUrls: row.reference_urls ? parseJsonSafeArray(row.reference_urls, z.string(), { field: 'reference_urls', table: 'content_briefs' }) : undefined,
-    realPeopleAlsoAsk: row.real_people_also_ask ? parseJsonSafeArray(row.real_people_also_ask, z.string(), { field: 'real_people_also_ask', table: 'content_briefs' }) : undefined,
-    realTopResults: row.real_top_results
-      ? parseJsonSafeArray(row.real_top_results, realTopResultSchema, { field: 'real_top_results', table: 'content_briefs' })
-      : undefined,
-    keywordLocked: row.keyword_locked ? true : undefined,
-    keywordSource: (row.keyword_source as ContentBrief['keywordSource']) ?? undefined,
-    keywordValidation: row.keyword_validation
-      ? parseJsonSafe(row.keyword_validation, keywordValidationSchema, null, { field: 'keyword_validation', table: 'content_briefs' }) ?? undefined
-      : undefined,
-    templateId: row.template_id ?? undefined,
-    titleVariants: row.title_variants ? parseJsonSafeArray(row.title_variants, z.string(), { field: 'title_variants', table: 'content_briefs' }) : undefined,
-    metaDescVariants: row.meta_desc_variants ? parseJsonSafeArray(row.meta_desc_variants, z.string(), { field: 'meta_desc_variants', table: 'content_briefs' }) : undefined,
-    generationStyle: resolveContentGenerationStyle(row.generation_style),
-    sourceEvidence: row.source_evidence
-      ? parseJsonSafe(row.source_evidence, briefSourceEvidenceSchema, null, { workspaceId: row.workspace_id, field: 'source_evidence', table: 'content_briefs' }) ?? undefined
-      : undefined,
-    supersededBy: row.superseded_by ?? undefined,
-  };
-}
 
 function briefToParams(brief: ContentBrief): Record<string, unknown> {
   return {
@@ -328,15 +264,11 @@ export function upsertBrief(workspaceId: string, brief: ContentBrief): void {
 }
 
 export function listBriefs(workspaceId: string, opts?: { includeSuperseded?: boolean }): ContentBrief[] {
-  const rows = (opts?.includeSuperseded
-    ? stmts().selectByWorkspaceAll.all(workspaceId)
-    : stmts().selectByWorkspace.all(workspaceId)) as BriefRow[];
-  return rows.map(rowToBrief);
+  return readBriefs(workspaceId, opts);
 }
 
 export function getBrief(workspaceId: string, briefId: string): ContentBrief | undefined {
-  const row = stmts().selectById.get(briefId, workspaceId) as BriefRow | undefined;
-  return row ? rowToBrief(row) : undefined;
+  return readBrief(workspaceId, briefId);
 }
 
 export function updateBrief(workspaceId: string, briefId: string, updates: Partial<Omit<ContentBrief, 'id' | 'workspaceId' | 'createdAt'>>): ContentBrief | null {
@@ -1109,13 +1041,22 @@ export async function generateBrief(
     keywordLocked?: boolean;
     keywordSource?: ContentBrief['keywordSource'];
     keywordValidation?: ContentBrief['keywordValidation'];
-    // Pre-computed page analysis from Page Intelligence (avoids re-lookup)
+    // Pre-computed page analysis from Page Intelligence (avoids re-lookup) or strategy-layer
+    // context from Content Gaps brief pre-seed (Lane E). Both populate the same context shape;
+    // the 6 extra fields below are absent for Page Intelligence paths and are simply ignored.
     pageAnalysisContext?: {
       optimizationScore?: number;
       optimizationIssues?: string[];
       recommendations?: string[];
       contentGaps?: string[];
       searchIntent?: string;
+      // Brief pre-seed fields from Content Gaps / strategy layer (Lane E)
+      rationale?: string;
+      competitorProof?: string;
+      volume?: number;
+      intent?: string;
+      questionKeywords?: string[];
+      serpFeatures?: string[];
     };
     /** Blueprint entry ID that triggered this brief (Phase 3 — used to backlink the brief to its entry via updateEntry(blueprintId, entryId, { briefId })). Not read in this function. */
     blueprintEntryId?: string;
@@ -1216,14 +1157,23 @@ export async function generateBrief(
   }
 
   // If no match found via keyword lookup, use pre-computed analysis from Page Intelligence
+  // or strategy-layer context (Content Gaps brief pre-seed). Both paths populate pageAnalysisContext;
+  // the 6 new fields (rationale, competitorProof, volume, intent, questionKeywords, serpFeatures)
+  // are additive — they are emitted when present regardless of the 5 existing Page Intelligence fields.
   if (!pageAnalysisBlock && context.pageAnalysisContext) {
     const pac = context.pageAnalysisContext;
     const parts: string[] = [];
     if (pac.optimizationScore !== undefined) parts.push(`Optimization score: ${pac.optimizationScore}/100`);
     if (pac.searchIntent) parts.push(`Search intent: ${pac.searchIntent}`);
+    if (pac.intent && pac.intent !== pac.searchIntent) parts.push(`Keyword intent: ${pac.intent}`);
     if (pac.optimizationIssues?.length) parts.push(`Issues to address:\n${pac.optimizationIssues.map(i => `- ${i}`).join('\n')}`);
     if (pac.contentGaps?.length) parts.push(`Content gaps to fill:\n${pac.contentGaps.map(g => `- ${g}`).join('\n')}`);
     if (pac.recommendations?.length) parts.push(`Recommendations from page analysis:\n${pac.recommendations.map(r => `- ${r}`).join('\n')}`);
+    // Brief pre-seed: strategy-layer signals from Content Gaps (Lane E)
+    if (pac.rationale) parts.push(`Why this topic matters: ${pac.rationale}`);
+    if (pac.competitorProof) parts.push(`Competitor proof: ${pac.competitorProof}`);
+    if (pac.volume !== undefined) parts.push(`Estimated search volume: ${pac.volume.toLocaleString()} searches/month`);
+    if (pac.questionKeywords?.length) parts.push(`Related questions to address:\n${pac.questionKeywords.map(q => `- ${q}`).join('\n')}`);
     if (parts.length > 0) {
       pageAnalysisBlock = `\n\nPAGE ANALYSIS CONTEXT (from prior Page Intelligence analysis — address these specific issues in the brief):\n${parts.join('\n')}`;
     }
@@ -1236,9 +1186,16 @@ export async function generateBrief(
   // SERP feature directives — derived from per-page serpFeatures stored in page_keywords.
   // Provider flags which SERP features are present for the primary keyword; we translate
   // those signals into concrete structural directives for the brief writer.
+  // Precedence: matchedPage?.serpFeatures (page_keywords-derived, live provider data) WINS when
+  // present. context.pageAnalysisContext?.serpFeatures (strategy-layer fallback from Content Gaps)
+  // is used only when no matched page was found — so we get SERP directives even on gap keywords
+  // that don't yet have a matching page in page_keywords.
   let serpFeaturesDirectiveBlock = '';
-  if (matchedPage?.serpFeatures?.length) {
-    const feats = matchedPage.serpFeatures;
+  const serpFeaturesSource = matchedPage?.serpFeatures?.length
+    ? matchedPage.serpFeatures
+    : context.pageAnalysisContext?.serpFeatures ?? [];
+  if (serpFeaturesSource.length > 0) {
+    const feats = serpFeaturesSource;
     const directives: string[] = [];
     if (feats.includes('featured_snippet')) {
       directives.push('FEATURED SNIPPET OPPORTUNITY: Structure a clear, concise definition or numbered step list in the first 100 words. The opening paragraph should directly answer the target query in 40-60 words.');
@@ -1251,6 +1208,9 @@ export async function generateBrief(
     }
     if (feats.includes('local_pack')) {
       directives.push('LOCAL PACK OPPORTUNITY: Include location-specific content, NAP details, and recommend LocalBusiness schema markup.');
+    }
+    if (feats.includes('ai_overview')) {
+      directives.push('AI OVERVIEW OPPORTUNITY: This query triggers a Google AI Overview — lead with a citable, extractable answer. Open with a direct 2-3 sentence definition or summary, use clear entity definitions and structured Q&A, and make claims authoritative and well-sourced so an answer engine can quote the page.');
     }
     if (directives.length > 0) {
       serpFeaturesDirectiveBlock = `\n\nSERP FEATURE OPPORTUNITIES (${providerLabel} data shows these are present for "${targetKeyword}" — structure the content to target them):\n${directives.join('\n')}`;

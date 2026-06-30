@@ -3,12 +3,13 @@
  *
  * Categories & limits:
  *   status       (request_status, request_response)         → 1/day, morning digest
- *   audit        (audit_complete, audit_improved, recs)     → 1 per 14 days
+ *   audit        (audit_complete, recommendations_ready)    → 1 per 14 days
  *   action       (approval_ready, brief_ready, published…)  → 3/day
  *   alert        (anomaly_alert, audit_alert)               → 1/day
  *   transactional (password_reset, welcome, trial_warning)  → unlimited
  *   internal     (request_new, content_request, payment…)   → admin inbox, unlimited
  *   report       (monthly/weekly)                           → handled by its own module
+ *   return       (client_return_hook)                       → exempt; ISO-week marker is the cap (P1c)
  *
  * Global cap: max 5 non-transactional client emails per day.
  *
@@ -24,7 +25,7 @@ const log = createLogger('email-throttle');
 
 // ── Category mapping ──
 
-export type ThrottleCategory = 'status' | 'audit' | 'action' | 'alert' | 'transactional' | 'internal' | 'report';
+export type ThrottleCategory = 'status' | 'audit' | 'action' | 'alert' | 'transactional' | 'internal' | 'report' | 'return';
 
 const CATEGORY_MAP: Record<EmailEventType, ThrottleCategory> = {
   // Status — daily morning digest
@@ -33,7 +34,6 @@ const CATEGORY_MAP: Record<EmailEventType, ThrottleCategory> = {
 
   // Audit — max 1 per 14 days
   audit_complete: 'audit',
-  audit_improved: 'audit',
   recommendations_ready: 'audit',
 
   // Action — requires client action, max 3/day
@@ -63,6 +63,8 @@ const CATEGORY_MAP: Record<EmailEventType, ThrottleCategory> = {
   work_order_comment_team: 'internal',     // client → team, admin inbox
   client_briefing_ready: 'action',
   work_order_comment_client: 'action',     // team → client reply
+  curated_recs_sent: 'action',             // Strategy v3 — batched "N recs ready for your decision"
+  client_return_hook: 'return',            // The Issue P1c — weekly "what came in" pull-back digest
 };
 
 export function getThrottleCategory(type: EmailEventType): ThrottleCategory {
@@ -81,6 +83,9 @@ const LIMITS: Record<string, CategoryLimit> = {
   audit:  { maxPerWindow: 1, windowDays: 14 },
   action: { maxPerWindow: 3, windowDays: 1 },
   alert:  { maxPerWindow: 1, windowDays: 1 },
+  // NOTE: 'return' has NO LIMITS entry on purpose — it is short-circuited in canSend (the ISO-week
+  // marker is its authoritative cap). A rolling-window throttle would conflict with the Monday-anchored
+  // week and silently drop legitimate consecutive-week sends.
 };
 
 const GLOBAL_DAILY_CAP = 5; // max non-transactional emails per client per day
@@ -104,7 +109,7 @@ const stmts = createStmtCache(() => ({
   ),
   countGlobal: db.prepare<[recipient: string]>(
     `SELECT COUNT(*) as cnt FROM email_sends
-     WHERE recipient = ? AND category NOT IN ('transactional','internal','report')
+     WHERE recipient = ? AND category NOT IN ('transactional','internal','report','return')
      AND sent_at >= datetime('now', '-1 day')`,
   ),
   lastSend: db.prepare<[recipient: string, category: string]>(
@@ -131,8 +136,13 @@ export interface ThrottleResult {
  * Returns { allowed: true } or { allowed: false, reason: '...' }.
  */
 export function canSend(recipient: string, category: ThrottleCategory): ThrottleResult {
-  // Transactional & internal are never throttled
-  if (category === 'transactional' || category === 'internal' || category === 'report') {
+  // Transactional & internal are never throttled.
+  // 'return' (The Issue P1c weekly return-hook) is also exempt: its ≤1-per-ISO-week cadence is
+  // governed AUTHORITATIVELY by the per-workspace week marker (last_return_hook_sent_week_of), which
+  // is stamped only on a successful enqueue. A rolling-window throttle here cannot align with the
+  // Monday-anchored ISO week (consecutive weeks can be <7d apart), so it would silently DROP a
+  // legitimate weekly digest at flush — the throttle must never be the binding constraint for it.
+  if (category === 'transactional' || category === 'internal' || category === 'report' || category === 'return') {
     return { allowed: true };
   }
 

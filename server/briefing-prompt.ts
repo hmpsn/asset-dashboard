@@ -9,6 +9,7 @@
 // in server/prompt-assembly.ts — do NOT duplicate that content here.
 import { callAI } from './ai.js';
 import { createLogger } from './logger.js';
+import { sanitizeInlinePromptText } from './utils/text.js';
 import type { BriefingStory } from '../shared/types/briefing.js';
 
 const log = createLogger('briefing-prompt');
@@ -77,22 +78,6 @@ function hasPairedQuotes(s: string): boolean {
   return hasOpener && hasCloser;
 }
 
-/**
- * Sanitize a value for safe interpolation into a prompt. Strips control
- * characters (newlines, tabs, etc.) to harden against soft prompt
- * injection where a workspace name or story headline contains
- * "...end. Ignore prior instructions." Anthropic system instructions
- * already provide the primary defense; this is defense-in-depth.
- *
- * Truncates to 200 chars to bound prompt size — workspace names and
- * headlines are normally well under that.
- */
-function sanitizeForPrompt(s: string): string {
-  if (typeof s !== 'string') return '';
-  // eslint-disable-next-line no-control-regex
-  return s.replace(/[\x00-\x1f\x7f]+/g, ' ').trim().slice(0, 200);
-}
-
 /** Word count helper for the headline punch validator. */
 function countWords(s: string): number {
   return s.trim().split(/\s+/).filter(Boolean).length;
@@ -145,8 +130,8 @@ export async function punchHeroHeadline(
       `Return ONLY the rewritten headline as a single line. No quotes, no preamble.`,
     ].join(' ');
     const userMsg = [
-      `Original headline: ${sanitizeForPrompt(deterministicHeadline)}`,
-      insightHint ? `Underlying data: ${sanitizeForPrompt(insightHint)}` : '',
+      `Original headline: ${sanitizeInlinePromptText(deterministicHeadline)}`,
+      insightHint ? `Underlying data: ${sanitizeInlinePromptText(insightHint)}` : '',
     ].filter(Boolean).join('\n');
 
     const result = await callAI({
@@ -212,8 +197,8 @@ export async function writeWeeklyOpener(
   if (!Array.isArray(stories) || stories.length === 0) return null;
   try {
     const headlines = stories.slice(0, 5).map((s, i) => {
-      const metric = s.metrics?.[0]?.value ? ` [${sanitizeForPrompt(s.metrics[0].value)}]` : '';
-      return `${i + 1}. ${sanitizeForPrompt(s.headline)}${metric}`;
+      const metric = s.metrics?.[0]?.value ? ` [${sanitizeInlinePromptText(s.metrics[0].value)}]` : '';
+      return `${i + 1}. ${sanitizeInlinePromptText(s.headline)}${metric}`;
     }).join('\n');
 
     // System prompt carries rules; user prompt carries data. Codebase
@@ -229,7 +214,7 @@ export async function writeWeeklyOpener(
       `Return ONLY the line.`,
     ].join('\n');
     const userMsg = [
-      `Workspace: ${sanitizeForPrompt(ctx.workspaceName)}`,
+      `Workspace: ${sanitizeInlinePromptText(ctx.workspaceName)}`,
       `Week of: ${ctx.weekOf}`,
       ``,
       `Stories in this briefing:`,

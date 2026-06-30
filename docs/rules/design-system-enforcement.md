@@ -128,12 +128,11 @@ violations and fixture coverage was added.
 | `public/tokens.css` | Build mirror — copied from `src/tokens.css` by `copyTokensPlugin()` in `vite.config.ts`. Used by `public/styleguide.css`. |
 | `public/styleguide.css` | `@import url('/tokens.css')` + styleguide chrome only. Zero `--*` declarations. |
 
-Verification: `npx tsx scripts/verify-styleguide-parity.ts`
-pr-check rule: `styleguide-token-parity` (warn → error in Phase 3)
+Verification: `npm run pr-check`
 
-`src/index.css` token declaration gap is now mechanized via
-`src-index-css-no-token-declarations` (error tier). `verify-styleguide-parity.ts`
-remains as an additional parity gate.
+Active pr-check rules: `styleguide-token-parity`,
+`styleguide-typography-parity`, `styleguide-css-must-import-public-tokens`,
+and `src-index-css-no-token-declarations`.
 
 Route-level cleanliness heuristics for duplicate headings, nested `SectionCard`
 density, and blue-styled action controls are now enforced as `error` in

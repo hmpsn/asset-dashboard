@@ -360,7 +360,9 @@ describe('DataForSeoProvider — keyword difficulty endpoint', () => {
           { keyword: 'some keyword', search_volume: 1000, competition_index: 45, cpc: 0.5, competition: 0.45, monthly_searches: [] },
         ]}] }),
       } as Response)
-      .mockRejectedValueOnce(new Error('KD endpoint unavailable'));
+      // Persistent (not Once): P5 retry makes 3 attempts on the KD network error; a
+      // single Once-reject would let retries fall through to the real global.fetch.
+      .mockRejectedValue(new Error('KD endpoint unavailable'));
 
     const results = await provider.getKeywordMetrics(['some keyword'], 'ws-kd-fallback', 'us');
     expect(results[0].difficulty).toBe(45); // falls back to competition_index
@@ -806,14 +808,18 @@ describe('DataForSeoProvider — keyword discovery endpoints', () => {
   it('returns an empty result when a discovery endpoint fails', async () => {
     reapplyFsMocks();
     const provider = new DataForSeoProvider();
-    vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('provider unavailable'));
+    // Persistent (not Once): P5 retry makes 3 attempts; a single Once-reject would let
+    // the retries fall through to the real global.fetch (live network in a unit test).
+    vi.spyOn(global, 'fetch').mockRejectedValue(new Error('provider unavailable'));
 
     await expect(provider.getKeywordSuggestions('seo dashboard', 'ws-discovery-failure', 20, 'us')).resolves.toEqual([]);
   });
 });
 
 describe('DataForSeoProvider — getReferringDomains date normalization', () => {
-  afterEach(() => vi.restoreAllMocks());
+  // The backlinks 40204 test below now trips the P5 capability breaker (markCapabilityDisabled);
+  // clear it so the in-memory breaker state can't leak into later describe blocks.
+  afterEach(() => { vi.restoreAllMocks(); clearCapabilityDisabled('dataforseo', 'backlinks'); });
 
   it('normalizes first_seen / last_visited via normalizeProviderDate', async () => {
     reapplyFsMocks();
@@ -1177,7 +1183,9 @@ describe('DataForSeoProvider — local visibility', () => {
   it('degrades provider failures into a typed provider_failed result', async () => {
     reapplyFsMocks();
     const provider = new DataForSeoProvider();
-    vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('network down'));
+    // Persistent rejection (not Once): P5 bounded retry makes up to 3 attempts on a
+    // transient network error; provider_failed is the terminal state once they exhaust.
+    vi.spyOn(global, 'fetch').mockRejectedValue(new Error('network down'));
 
     const result = await provider.getLocalVisibility({
       keyword: 'austin dentist',
@@ -1191,5 +1199,168 @@ describe('DataForSeoProvider — local visibility', () => {
     expect(result.localPackPresent).toBe(false);
     expect(result.results).toEqual([]);
     expect(result.degradedReason).toContain('Network error');
+  });
+});
+
+// ── P4: geo correctness for the DOMAIN-analysis methods ──
+// Behavioral (request-body + cache-path) assertions. The six domain methods
+// (getDomainKeywords / getUrlKeywords / getDomainOverview / getCompetitors /
+// getKeywordGap / getKeywordsForKeywords) must (1) thread an explicit
+// locationCode+languageCode into the request body, (2) default to US (2840)/'en'
+// when none is passed (flag-OFF parity), and (3) keep the flag-OFF cache key on the
+// legacy un-versioned `database` token so the 7–14 day domain cache is NOT re-warmed.
+describe('DataForSeoProvider — P4 domain-method geo threading', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const okEmpty = () => ({ ok: true, json: async () => dfsTaskResponse([{ items: [] }]) } as Response);
+
+  it('threads location_code + language_code into all six domain-method request bodies', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const CA = 2124;
+    const fetchSpy = vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(okEmpty())  // getDomainKeywords
+      .mockResolvedValueOnce(okEmpty())  // getUrlKeywords
+      .mockResolvedValueOnce(okEmpty())  // getDomainOverview
+      .mockResolvedValueOnce(okEmpty())  // getCompetitors
+      .mockResolvedValueOnce(okEmpty())  // getKeywordGap → competitor getDomainKeywords
+      .mockResolvedValueOnce(okEmpty())  // getKeywordGap → client getDomainKeywords
+      .mockResolvedValueOnce(okEmpty()); // getKeywordsForKeywords (google_ads)
+
+    const bodyOf = (call: number) => JSON.parse((fetchSpy.mock.calls[call][1] as RequestInit).body as string)[0];
+
+    await provider.getDomainKeywords('example.com', 'ws-p4-1', 50, undefined, CA, 'fr');
+    expect(bodyOf(0)).toMatchObject({ location_code: CA, language_code: 'fr' });
+
+    await provider.getUrlKeywords('https://example.com/page', 'ws-p4-2', 20, undefined, CA, 'fr');
+    expect(bodyOf(1)).toMatchObject({ location_code: CA, language_code: 'fr' });
+
+    await provider.getDomainOverview('example.com', 'ws-p4-3', undefined, CA, 'fr');
+    expect(bodyOf(2)).toMatchObject({ location_code: CA, language_code: 'fr' });
+
+    await provider.getCompetitors('example.com', 'ws-p4-4', 10, undefined, CA, 'fr');
+    expect(bodyOf(3)).toMatchObject({ location_code: CA, language_code: 'fr' });
+
+    // getKeywordGap has no own request body — geo flows through its nested
+    // getDomainKeywords calls (competitor queried first → call 4, then the client
+    // domain for the dedup set → call 5). BOTH must carry the client geo: a dropped
+    // geo on the client call (index 5) would compute the "already ranks" set against
+    // the wrong SERP and silently corrupt the gap output, yet the comp-only assert
+    // would still pass.
+    await provider.getKeywordGap('example.com', ['competitor.com'], 'ws-p4-5', 50, undefined, CA, 'fr');
+    expect(String(fetchSpy.mock.calls[4][0])).toContain('ranked_keywords');
+    expect(bodyOf(4)).toMatchObject({ location_code: CA, language_code: 'fr', target: 'competitor.com' });
+    expect(String(fetchSpy.mock.calls[5][0])).toContain('ranked_keywords');
+    expect(bodyOf(5)).toMatchObject({ location_code: CA, language_code: 'fr', target: 'example.com' });
+
+    await provider.getKeywordsForKeywords(['seo'], 'ws-p4-6', 50, undefined, CA, 'fr');
+    expect(bodyOf(6)).toMatchObject({ location_code: CA, language_code: 'fr' });
+
+    flushCreditsToDisk();
+  });
+
+  it('defaults the domain methods to US (2840) / en when no geo is threaded (flag-OFF parity)', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce(okEmpty()).mockResolvedValueOnce(okEmpty());
+    const bodyOf = (call: number) => JSON.parse((fetchSpy.mock.calls[call][1] as RequestInit).body as string)[0];
+
+    // Pre-P4 call shape: neither database nor geo passed. Exercise a ranked_keywords
+    // method AND a separate-endpoint method (competitors_domain) so a per-method
+    // omission of the `locationCode ?? locationCodeFromDatabase(database)` default
+    // resolution would be caught.
+    await provider.getDomainKeywords('example.com', 'ws-p4-default', 50);
+    expect(bodyOf(0)).toMatchObject({ location_code: 2840, language_code: 'en' });
+
+    await provider.getCompetitors('example.com', 'ws-p4-default-comp', 10);
+    expect(bodyOf(1)).toMatchObject({ location_code: 2840, language_code: 'en' });
+    flushCreditsToDisk();
+  });
+
+  it('keeps the flag-OFF cache key on the legacy un-versioned database token (no v2 re-warm)', async () => {
+    reapplyFsMocks();
+    const writeSpy = vi.spyOn(fs, 'writeFileSync');
+    const provider = new DataForSeoProvider();
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(okEmpty());
+    // No geo → flag-OFF parity. Cache filename must use the legacy `database` token.
+    await provider.getDomainKeywords('example.com', 'ws-p4-cache-off', 100);
+    const domainWrite = writeSpy.mock.calls.find(c => String(c[0]).includes('domain_ranked'));
+    expect(domainWrite).toBeDefined();
+    expect(String(domainWrite![0])).toContain('domain_ranked_us_');
+    expect(String(domainWrite![0])).not.toContain('v2_');
+    flushCreditsToDisk();
+  });
+
+  it('versions the flag-ON cache key on v2:<locationCode>:<language> (geo isolation)', async () => {
+    reapplyFsMocks();
+    const writeSpy = vi.spyOn(fs, 'writeFileSync');
+    const provider = new DataForSeoProvider();
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(okEmpty());
+    await provider.getDomainKeywords('example.com', 'ws-p4-cache-on', 100, undefined, 2826, 'en');
+    const domainWrite = writeSpy.mock.calls.find(c => String(c[0]).includes('domain_ranked'));
+    expect(domainWrite).toBeDefined();
+    // getCachePath sanitizes ':' → '_', so the v2:2826:en token lands as v2_2826_en.
+    expect(String(domainWrite![0])).toContain('domain_ranked_v2_2826_en_');
+    flushCreditsToDisk();
+  });
+});
+
+describe('DataForSeoProvider — P8 LLM mentions geo threading', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const okLlmEmpty = () => ({ ok: true, json: async () => dfsTaskResponse([{ items: [] }]) } as Response);
+
+  it('threads location_name + normalized language_code into the LLM mentions request body', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce(okLlmEmpty());
+
+    await provider.getLlmMentions(
+      { domain: 'example.com', platform: 'chat_gpt', locationName: 'Canada', languageCode: 'FR' },
+      'ws-llm-geo-body',
+    );
+
+    const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string)[0];
+    expect(body).toMatchObject({
+      platform: 'chat_gpt',
+      location_name: 'Canada',
+      language_code: 'fr',
+    });
+    flushCreditsToDisk();
+  });
+
+  it('resolves a known locationCode to location_name when no explicit name is passed', async () => {
+    reapplyFsMocks();
+    const provider = new DataForSeoProvider();
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce(okLlmEmpty());
+
+    await provider.getLlmMentions(
+      { domain: 'example.com', platform: 'chat_gpt', locationCode: 2826, languageCode: 'en' },
+      'ws-llm-geo-code',
+    );
+
+    const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string)[0];
+    expect(body).toMatchObject({
+      location_name: 'United Kingdom',
+      language_code: 'en',
+    });
+    flushCreditsToDisk();
+  });
+
+  it('keys the LLM mentions cache by geo token and language', async () => {
+    reapplyFsMocks();
+    const writeSpy = vi.spyOn(fs, 'writeFileSync');
+    const provider = new DataForSeoProvider();
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(okLlmEmpty());
+
+    await provider.getLlmMentions(
+      { domain: 'example.com', platform: 'chat_gpt', locationCode: 2124, locationName: 'Canada', languageCode: 'fr' },
+      'ws-llm-geo-cache',
+    );
+
+    const llmWrite = writeSpy.mock.calls.find(c => String(c[0]).includes('llm_mentions'));
+    expect(llmWrite).toBeDefined();
+    expect(String(llmWrite![0])).toContain('llm_mentions_example_com_chat_gpt_2124_fr');
+    flushCreditsToDisk();
   });
 });

@@ -20,6 +20,12 @@ interface PaginateWebflowOptions<TPage, TItem> {
   tokenOverride?: string;
   limit?: number;
   advanceBy?: 'items-length' | 'page-size';
+  /**
+   * Hard cap on the number of pages fetched (network-cost bound). When set, pagination stops after
+   * `maxPages` requests even if more items remain — the caller accepts a partial result rather than an
+   * unbounded crawl. Used by the daily form poller to bound the cost of a large backfill.
+   */
+  maxPages?: number;
 }
 
 export function getToken(): string | null {
@@ -90,9 +96,11 @@ export async function paginateWebflow<TPage, TItem>({
   tokenOverride,
   limit = 100,
   advanceBy = 'page-size',
+  maxPages,
 }: PaginateWebflowOptions<TPage, TItem>): Promise<TItem[]> {
   const allItems: TItem[] = [];
   let offset = 0;
+  let pages = 0;
 
   while (true) {
     const result = await webflowJson<TPage>(buildEndpoint(offset, limit), {}, tokenOverride);
@@ -100,8 +108,11 @@ export async function paginateWebflow<TPage, TItem>({
 
     const items = extractItems(result.data) || [];
     allItems.push(...items);
+    pages += 1;
 
     if (items.length === 0) break;
+    // Network-cost bound: stop after maxPages requests even if more items remain (partial result).
+    if (typeof maxPages === 'number' && pages >= maxPages) break;
 
     offset += advanceBy === 'items-length' ? items.length : limit;
 

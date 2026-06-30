@@ -40,7 +40,7 @@ vi.mock('../../server/seo-data-provider.js', () => ({
   normalizeRuntimeSeoDataProvider: (provider?: string | null) => provider === 'dataforseo' || provider === 'semrush' ? 'dataforseo' : 'dataforseo',
 }));
 
-vi.mock('../../server/workspace-intelligence.js', () => ({
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
   invalidateIntelligenceCache: h.invalidateIntelligenceCache,
 }));
 
@@ -100,7 +100,7 @@ describe('mcp keyword action tools', () => {
     expect(payload.results).toHaveLength(1);
     expect(payload.results[0]?.term).toBe('best hvac tips');
     expect(payload.results[0]?.research_handle).toMatch(/^keyword-research_/);
-    expect(h.recordPaidCall).toHaveBeenCalledWith(1);
+    expect(h.recordPaidCall).toHaveBeenCalledWith(1, 'ws-1');
   });
 
   it('research_keywords handles missing provider and provider errors', async () => {

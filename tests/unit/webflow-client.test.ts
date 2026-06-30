@@ -163,6 +163,34 @@ describe('webflow-client', () => {
     expect(fetchMock.mock.calls[1]?.[0]).toBe('https://api.webflow.com/v2/sites/site_1/assets?limit=100&offset=100');
   });
 
+  it('paginateWebflow stops after maxPages even when more items remain (network-cost bound)', async () => {
+    process.env.WEBFLOW_API_TOKEN = 'wf_env_token';
+    // Every page returns a FULL page with a large total → without maxPages this crawls indefinitely.
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        formSubmissions: Array.from({ length: 100 }, (_, i) => ({ id: `sub-${i}` })),
+        pagination: { total: 100000 },
+      }),
+    } as Response);
+    vi.stubGlobal('fetch', fetchMock);
+    const { paginateWebflow } = await import('../../server/webflow-client.js');
+
+    const result = await paginateWebflow<
+      { formSubmissions?: Array<{ id: string }>; pagination?: { total?: number } },
+      { id: string }
+    >({
+      buildEndpoint: (offset, limit) => `/sites/site_1/forms/form_1/submissions?limit=${limit}&offset=${offset}`,
+      extractItems: page => page.formSubmissions,
+      getTotal: page => page.pagination?.total,
+      maxPages: 3,
+    });
+
+    // Exactly 3 pages fetched, 300 items — bounded despite total=100000.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(result).toHaveLength(300);
+  });
+
   it('webflowMutation returns parsed JSON data when requested', async () => {
     process.env.WEBFLOW_API_TOKEN = 'wf_env_token';
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({

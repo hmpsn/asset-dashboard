@@ -9,9 +9,9 @@ import { Router } from 'express';
 import { requireWorkspaceSiteAccess } from '../auth.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
-import { tryResolvePagePath, normalizePageUrl } from '../helpers.js';
+import { tryResolvePagePath, normalizePageUrl } from '../utils/page-address.js';
 import { createLogger } from '../logger.js';
-import { resolveRecommendationsForChange } from '../recommendations.js';
+import { resolveRecommendationsForChange } from '../domains/recommendations/resolution-service.js';
 import { recordSeoChange } from '../seo-change-tracker.js';
 import { updatePageSeo } from '../webflow.js';
 import {
@@ -20,7 +20,7 @@ import {
   updatePageState,
 } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { invalidateIntelligenceCache } from '../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 
 const router = Router();
 const log = createLogger('webflow-seo-apply');

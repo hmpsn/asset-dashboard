@@ -3,7 +3,7 @@
 // Registered at startup via startOutcomeCrons(); safe to call multiple times (idempotent).
 
 import { createLogger } from './logger.js';
-import { invalidateIntelligenceCache } from './workspace-intelligence.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { queueKeywordStrategyPostUpdateFollowOns } from './keyword-strategy-follow-ons.js';
 import { runBackfill } from './outcome-backfill.js';
 import type * as OutcomeMeasurement from './outcome-measurement.js';
@@ -15,6 +15,7 @@ import type * as ActivityLog from './activity-log.js';
 import type * as OpportunityDetectors from './scoring/opportunity-detectors.js';
 import type * as OutcomeEmvCalibration from './outcome-emv-calibration.js';
 import type * as PlatformLearningsPriors from './platform-learnings-priors.js';
+import type * as RecommendationStaleness from './recommendation-staleness.js';
 
 const log = createLogger('outcome-crons');
 
@@ -34,6 +35,7 @@ let decayScanInterval: ReturnType<typeof setInterval> | null = null;
 let rankDeclineScanInterval: ReturnType<typeof setInterval> | null = null;
 let emvCalibrationInterval: ReturnType<typeof setInterval> | null = null;
 let platformPriorsInterval: ReturnType<typeof setInterval> | null = null;
+let stalenessScanInterval: ReturnType<typeof setInterval> | null = null;
 
 // Startup timeout handles — stored so stopOutcomeCrons() can cancel them
 // if shutdown is called during the startup warmup window (currently up to ~60s).
@@ -284,6 +286,25 @@ export function startOutcomeCrons() {
     }
   };
 
+  // ── Strategy v3 P3 — sent-rec staleness scan (24h). ──
+  // Thin cron wrapper around runSentRecStalenessScan: derives stale_sent / superseded nudges
+  // from the persisted rec sets (no crawl, no AI) and writes deduplicated admin-only activity.
+  // Per-workspace flag-gated INSIDE the scan ('strategy-staleness-scan') — flag OFF = no-op for
+  // that workspace. Loaded via dynamic import so the cron module doesn't pull recommendation
+  // transitive deps at startup.
+  const runStalenessScanJob = async () => {
+    try {
+      const { runSentRecStalenessScan }: typeof RecommendationStaleness = await import('./recommendation-staleness.js'); // dynamic-import-ok
+      const result = runSentRecStalenessScan();
+      log.info(
+        { workspacesScanned: result.workspacesScanned, nudgesWritten: result.nudgesWritten },
+        'Sent-rec staleness scan cron complete',
+      );
+    } catch (err) {
+      log.error({ err }, 'Sent-rec staleness scan cron failed');
+    }
+  };
+
   // Run each job once after a short startup delay, then on their normal interval.
   // Store handles so stopOutcomeCrons() can cancel them during early shutdown.
   startupTimeouts = [
@@ -297,6 +318,7 @@ export function startOutcomeCrons() {
     setTimeout(() => void runRankDeclineScan(), 50_000),
     setTimeout(() => void runEmvCalibrationJob(), 55_000),
     setTimeout(() => void runPlatformPriorsJob(), 60_000),
+    setTimeout(() => void runStalenessScanJob(), 65_000),
   ];
 
   measureInterval = setInterval(() => void runMeasure(), DAILY_MS);
@@ -308,6 +330,7 @@ export function startOutcomeCrons() {
   rankDeclineScanInterval = setInterval(() => void runRankDeclineScan(), DAILY_MS);
   emvCalibrationInterval = setInterval(() => void runEmvCalibrationJob(), WEEKLY_MS);
   platformPriorsInterval = setInterval(() => void runPlatformPriorsJob(), WEEKLY_MS);
+  stalenessScanInterval = setInterval(() => void runStalenessScanJob(), DAILY_MS);
 
   playbooksInterval = setInterval(() => void runPlaybooks(), 7 * DAILY_MS);
 
@@ -327,6 +350,7 @@ export function stopOutcomeCrons() {
   if (rankDeclineScanInterval) clearInterval(rankDeclineScanInterval);
   if (emvCalibrationInterval) clearInterval(emvCalibrationInterval);
   if (platformPriorsInterval) clearInterval(platformPriorsInterval);
+  if (stalenessScanInterval) clearInterval(stalenessScanInterval);
   measureInterval = null;
   learningsInterval = null;
   detectionInterval = null;
@@ -337,5 +361,6 @@ export function stopOutcomeCrons() {
   rankDeclineScanInterval = null;
   emvCalibrationInterval = null;
   platformPriorsInterval = null;
+  stalenessScanInterval = null;
   log.info('Outcome crons stopped');
 }

@@ -64,6 +64,10 @@ export interface HubKeywordListProps {
   onClearSelection: () => void;
   /** Resets the active segment/search/advanced-filter (NOT the multi-select). Wired to the empty-state "Clear filters" CTA. */
   onResetFilters: () => void;
+  /** Refetches the active row query after an error. */
+  onRetry?: () => void;
+  /** Focuses the page-level add-keyword input for an unfiltered empty state. */
+  onFocusAddKeyword?: () => void;
   /** Opens the per-keyword journey drawer for a row (P2 drawer wiring). */
   onRowClick: (row: KeywordCommandCenterRow) => void;
   /** normalizedKeyword of the row whose drawer is currently open — drives the active-row highlight. */
@@ -160,6 +164,8 @@ export function HubKeywordList({
   isRowActionPending,
   onClearSelection,
   onResetFilters,
+  onRetry = () => undefined,
+  onFocusAddKeyword = () => undefined,
   onRowClick,
   activeKeyword,
   showLocalSeo,
@@ -195,6 +201,7 @@ export function HubKeywordList({
           title="Could not load keywords"
           message="Check your connection and try again."
           type="data"
+          action={{ label: 'Retry', onClick: onRetry }}
         />
       </div>
     );
@@ -222,17 +229,26 @@ export function HubKeywordList({
     : {
         icon: PlusCircle,
         title: 'No keywords yet',
-        // The add-keyword input lives in the page header above the list — point
-        // there instead of offering a no-op "Clear filters" on an unfiltered view.
         description:
           'Use the "Add keyword" input above to start tracking rank, clicks, and local visibility — or generate a keyword strategy to seed the universe.',
-        action: undefined,
+        action: (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onFocusAddKeyword}
+            aria-label="Add a keyword"
+          >
+            Add a keyword
+          </Button>
+        ),
       };
 
   return (
-    // pb-24 gates on someSelected: the floating bulk bar only renders when rows
-    // are selected; the clearance is dead padding otherwise (KCC :402-406 parity).
-    <div className={someSelected ? 'pb-24' : ''}>
+    // Scroll clearance (pb-24) is applied by KeywordHub.tsx on the outer page
+    // wrapper — outside SectionCard.overflow-hidden — so the fixed bulk bar
+    // never covers the last keyword row.
+    <>
+    <div>
       {/* Mobile: overflow-x-auto + min-width inner container so the table scrolls
           horizontally on narrow viewports rather than collapsing (KCC :544-545 parity). */}
       <div className="overflow-x-auto">
@@ -321,15 +337,17 @@ export function HubKeywordList({
         </nav>
       )}
 
-      {/* Bulk action bar — floats over the bottom of the page when rows are selected */}
-      {someSelected && (
-        <KeywordBulkActionBar
-          selectedCount={selectedKeys.size}
-          isPending={isBulkPending}
-          onAction={onBulkAction}
-          onClear={onClearSelection}
-        />
-      )}
     </div>
+    {/* Fixed bulk bar — rendered here so React mounts/unmounts it with the list.
+        It positions itself via CSS fixed (see KeywordBulkActionBar). */}
+    {someSelected && (
+      <KeywordBulkActionBar
+        selectedCount={selectedKeys.size}
+        isPending={isBulkPending}
+        onAction={onBulkAction}
+        onClear={onClearSelection}
+      />
+    )}
+    </>
   );
 }

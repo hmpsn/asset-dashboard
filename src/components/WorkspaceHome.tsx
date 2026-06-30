@@ -22,6 +22,7 @@ import { type Page, adminPath, clientPath } from '../routes';
 import { useWorkspaceHomeData, useAdminROI, useWorkspaceIntelligence } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
+import { timeAgo } from '../lib/timeAgo';
 
 const MeetingBriefPage = lazyWithRetry(() => import('./admin/MeetingBrief/MeetingBriefPage').then(m => ({ default: m.MeetingBriefPage })));
 
@@ -221,7 +222,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   // Data freshness
   const ageMs = lastFetched ? now.getTime() - lastFetched.getTime() : 0;
   const isStale = ageMs > 60 * 60 * 1000; // >1 hour
-  const freshnessLabel = !lastFetched ? '' : ageMs < 60_000 ? 'Just now' : ageMs < 3_600_000 ? `${Math.floor(ageMs / 60_000)}m ago` : `${Math.floor(ageMs / 3_600_000)}h ago`;
+  const freshnessLabel = lastFetched ? timeAgo(lastFetched.toISOString(), { capitalizeJustNow: true }) : '';
 
   const handleRefresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
 
@@ -366,47 +367,32 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       {/* ── Metric Cards ── */}
       <div className={`grid grid-cols-2 ${contentPipeline && contentPipeline.totalCells > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}>
         {audit ? (
-          <div
-            className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-3 text-left cursor-pointer hover:border-[var(--brand-border-hover)] transition-colors"
-            style={{ borderRadius: 'var(--radius-signature)', animation: 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both', animationDelay: '0ms' }}
+          <StatCard
+            label="Site Health"
+            value={audit.siteScore}
+            icon={Shield}
+            iconColor={themeColor('#71717a', '#94a3b8')}
+            delta={scoreDelta ?? undefined}
+            deltaLabel=" pts"
+            showZeroDelta
+            sub={`${audit.errors} err · ${audit.warnings} warn`}
+            trailing={<MetricRing score={audit.siteScore} size={44} />}
             onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))}
-          >
-            <div className="flex items-center gap-1.5 mb-2">
-              <Icon as={Shield} size="sm" className="flex-shrink-0 text-[var(--brand-text-muted)]" />
-              <span className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider font-medium leading-none">Site Health</span>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-2xl font-bold leading-none text-[var(--brand-text-bright)]">{audit.siteScore}</span>
-                  {scoreDelta != null && (
-                    <span className={`t-caption-sm font-medium ${scoreDelta >= 0 ? 'text-accent-success' : 'text-accent-danger'}`}>
-                      {scoreDelta >= 0 ? '+' : ''}{scoreDelta} pts
-                    </span>
-                  )}
-                </div>
-                <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">{audit.errors} err · {audit.warnings} warn</div>
-              </div>
-              <MetricRing score={audit.siteScore} size={44} />
-            </div>
-          </div>
+            size="hero"
+            staggerIndex={0}
+          />
         ) : (
-          <div
-            className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-3 text-left"
-            style={{ borderRadius: 'var(--radius-signature)', animation: 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both', animationDelay: '0ms' }}
-          >
-            <div className="flex items-center gap-1.5 mb-2">
-              <Icon as={Shield} size="sm" className="flex-shrink-0 text-[var(--brand-text-muted)]" />
-              <span className="t-caption-sm text-[var(--brand-text-muted)] uppercase tracking-wider font-medium leading-none">Site Health</span>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <div className="text-2xl font-bold leading-none text-[var(--brand-text-muted)]">—</div>
-                <div className="t-caption-sm text-[var(--brand-text-muted)] mt-1">No audit yet</div>
-              </div>
-              <MetricRing score={0} size={44} noAnimation />
-            </div>
-          </div>
+          <StatCard
+            label="Site Health"
+            value="—"
+            icon={Shield}
+            iconColor={themeColor('#71717a', '#94a3b8')}
+            valueColor="text-[var(--brand-text-muted)]"
+            sub="No audit yet"
+            trailing={<MetricRing score={0} size={44} noAnimation />}
+            size="hero"
+            staggerIndex={0}
+          />
         )}
 
         {searchData ? (

@@ -34,14 +34,16 @@ const groundingState = vi.hoisted(() => ({
   shouldThrow: false,
   marker: 'SLICE_DERIVED_GROUNDING_MARKER_42',
   lastSlices: undefined as readonly string[] | undefined,
+  lastIncludeRankMovers: undefined as boolean | undefined,
 }));
 
 vi.mock('../../server/intelligence/generation-context-builders.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../server/intelligence/generation-context-builders.js')>();
   return {
     ...original,
-    buildSeoPromptContext: vi.fn(async (_workspaceId: string, opts?: { slices?: readonly string[] }) => {
+    buildSeoPromptContext: vi.fn(async (_workspaceId: string, opts?: { slices?: readonly string[]; includeRankMovers?: boolean }) => {
       groundingState.lastSlices = opts?.slices;
+      groundingState.lastIncludeRankMovers = opts?.includeRankMovers;
       if (groundingState.shouldThrow) {
         throw new Error('Simulated intelligence assembly failure (FM-2)');
       }
@@ -132,9 +134,11 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
-  groundingState.shouldThrow = false;
-  aiState.lastSystem = '';
-});
+    groundingState.shouldThrow = false;
+    groundingState.lastSlices = undefined;
+    groundingState.lastIncludeRankMovers = undefined;
+    aiState.lastSystem = '';
+  });
 
 describe('client chat — server-side grounding (E4 / audit #17)', () => {
   it('injected client JSON never reaches the prompt; slice-derived block does', async () => {
@@ -169,10 +173,11 @@ describe('client chat — server-side grounding (E4 / audit #17)', () => {
     expect(aiState.lastSystem.length).toBeLessThan(50_000);
   });
 
-  it('grounds on the client-safe slice set (no admin-only clientSignals slice)', async () => {
-    await chat({ question: 'What should I focus on?' });
-    expect(groundingState.lastSlices).toEqual(['seoContext', 'insights', 'siteHealth', 'learnings']);
-    // clientSignals carries agency-only churn/intent data — must never be requested here.
+	  it('grounds on the client-safe slice set (no admin-only clientSignals slice)', async () => {
+	    await chat({ question: 'What should I focus on?' });
+	    expect(groundingState.lastSlices).toEqual(['seoContext', 'insights', 'siteHealth', 'learnings']);
+	    expect(groundingState.lastIncludeRankMovers).toBe(false);
+	    // clientSignals carries agency-only churn/intent data — must never be requested here.
     expect(groundingState.lastSlices).not.toContain('clientSignals');
     expect(groundingState.lastSlices).not.toContain('operational');
     expect(groundingState.lastSlices).not.toContain('eeatAssets');

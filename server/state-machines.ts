@@ -98,10 +98,31 @@ export type ClientActionStateStatus = 'pending' | 'approved' | 'changes_requeste
 // is reversible; completed and dismissed are reopenable back to pending so a
 // regen that re-detects the issue (or a client un-dismiss) can revive it.
 export const RECOMMENDATION_TRANSITIONS: Record<string, readonly string[]> = {
+  // Internal RecStatus axis (unchanged) — admin triage.
   pending:     ['in_progress', 'completed', 'dismissed'],
   in_progress: ['pending', 'completed', 'dismissed'],
   completed:   ['pending', 'in_progress'],   // pending/in_progress = issue re-detected
   dismissed:   ['pending'],                  // un-dismiss
+  // Strategy v3 operator curation axis (clientStatus) — admin-only (validated separately
+  // from the client-side map below). 'system' is the implicit start for an absent clientStatus.
+  system:      ['curated'],
+  curated:     ['sent', 'system'],           // 'system' = operator un-curated before sending
+  // 'sent' has NO operator-side forward edge here — the client owns sent → approved|declined|
+  // discussing via CLIENT_REC_TRANSITIONS. (A re-send is a fresh sentAt, not a transition.)
+};
+
+// Strategy v3 — client-side response axis (spec §7.2). A sent rec is the only thing the
+// client can act on. Distinct from RecStatus AND from the operator curation axis: the
+// client act-on route (POST /api/public/recommendations/:ws/:recId/act-on) validates
+// ONLY against this map and mutates ONLY clientStatus — never RecStatus, never completion.
+// "Act on this" (greenlight) is the sent|discussing → approved edge; it also creates a durable
+// content REQUEST (nothing is pre-generated). The other client edges (declined / discussing)
+// flow through the same axis.
+export const CLIENT_REC_TRANSITIONS: Record<string, readonly string[]> = {
+  sent:       ['approved', 'declined', 'discussing'],
+  discussing: ['approved', 'declined'],   // a discussion resolves to a decision
+  approved:   [],                         // terminal (client side)
+  declined:   [],                         // terminal (client side)
 };
 
 export type RecommendationStateStatus = 'pending' | 'in_progress' | 'completed' | 'dismissed';
@@ -133,6 +154,32 @@ export const BACKGROUND_JOB_TRANSITIONS: Record<string, readonly string[]> = {
 };
 
 export type BackgroundJobStatus = 'pending' | 'running' | 'done' | 'error' | 'cancelled';
+
+// ── Google Business Profile Review Response ──
+// Drafts can be sent to the client or approved internally by an admin. Publishing is only legal
+// after explicit approval metadata is recorded by the GBP response service.
+export const GBP_REVIEW_RESPONSE_TRANSITIONS: Record<string, readonly string[]> = {
+  draft: ['awaiting_client', 'approved', 'cancelled'],
+  awaiting_client: ['awaiting_client', 'approved', 'changes_requested', 'declined', 'cancelled'],
+  changes_requested: ['draft', 'awaiting_client', 'cancelled'],
+  declined: [],
+  approved: ['publishing', 'cancelled'],
+  publishing: ['published', 'publish_failed'],
+  published: [],
+  publish_failed: ['publishing', 'cancelled'],
+  cancelled: [],
+};
+
+export type GbpReviewResponseStateStatus =
+  | 'draft'
+  | 'awaiting_client'
+  | 'changes_requested'
+  | 'declined'
+  | 'approved'
+  | 'publishing'
+  | 'published'
+  | 'publish_failed'
+  | 'cancelled';
 
 // ── Client Deliverable (unified send-to-client spine) ──
 // One canonical status vocabulary across the five bespoke send-to-client pipelines
@@ -240,8 +287,8 @@ export const MATRIX_CELL_TRANSITIONS: Record<string, readonly string[]> = {
 
 // ── Client Request (support tickets) ──
 // The 6 RequestStatus values from shared/types/requests.ts. PATCH /api/requests/:id
-// (server/routes/requests.ts) is currently any-to-any and re-fires the client status
-// email on illegal moves like closed→new (B24/M11). This map closes that gap.
+// and PATCH /api/requests/bulk both validate this map before mutating so illegal moves
+// like closed→new do not re-fire client status email, broadcast, or partially bulk-apply.
 // Forward flow with operator reopen edges; closed is terminal.
 export const REQUEST_TRANSITIONS: Record<string, readonly string[]> = {
   new:         ['in_review', 'in_progress', 'on_hold', 'completed', 'closed'],
@@ -290,12 +337,12 @@ export type SchemaPlanStatus =
 // The four TRACKED_KEYWORD_STATUS values (shared/types/rank-tracking.ts). Until P3
 // (Keyword Hub Wave 4) the tracked-keyword lifecycle was the ONLY status entity whose
 // mutations were not state-machine-guarded: every other status column already routes
-// through validateTransition, but `applyKeywordCommandCenterActionInternal` flipped
-// active↔paused↔deprecated directly. This map closes that gap so the live KCC/Hub
+// through validateTransition, but the KCC action service flipped active↔paused↔deprecated
+// directly. This map closes that gap so the live KCC/Hub
 // action engine refuses illegal moves (defense-in-depth: an illegal transition is
 // "never allowed", orthogonal to protection which is "needs confirmation").
 //
-// The edge set is DERIVED from the real action switch (`applyKeywordCommandCenterActionInternal`)
+// The edge set is DERIVED from the real action switch in the KCC action service
 // — the minimal map that ADMITS every transition the switch performs and REJECTS the rest:
 //   active → paused      PAUSE_TRACKING
 //   active → deprecated  RETIRE, DECLINE-of-tracked

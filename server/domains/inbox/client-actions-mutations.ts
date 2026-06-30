@@ -5,7 +5,7 @@ import { enqueuePlaybook } from '../../playbooks.js';
 import { mutationError, runWorkspaceMutation } from '../../workspace-mutation-helper.js';
 import { getClientPortalUrl, getWorkspace } from '../../workspaces.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
-import { invalidateIntelligenceCache } from '../../workspace-intelligence.js';
+import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { InvalidTransitionError } from '../../state-machines.js';
 import type { ClientAction, ClientActionPayload, ClientActionSourceType } from '../../../shared/types/client-actions.js';

@@ -25,6 +25,32 @@ export interface AIOperationContract {
   defaultResearchMode?: boolean;
 }
 
+export type AIOperationRuntimeDefaults = Pick<
+  AIOperationContract,
+  | 'feature'
+  | 'defaultProvider'
+  | 'defaultModel'
+  | 'defaultResponseFormat'
+  | 'defaultMaxRetries'
+  | 'defaultTimeoutMs'
+  | 'defaultResearchMode'
+>;
+
+export type AIOperationPolicyMetadata = Pick<
+  AIOperationContract,
+  | 'id'
+  | 'domain'
+  | 'feature'
+  | 'providerIntent'
+  | 'modelIntent'
+  | 'outputMode'
+  | 'parserExpectation'
+  | 'researchMode'
+  | 'executionMode'
+  | 'retryPolicy'
+  | 'timeoutProfile'
+>;
+
 export const AI_OPERATION_REGISTRY = {
   'content-brief-regenerate': {
     id: 'content-brief-regenerate',
@@ -154,6 +180,25 @@ export const AI_OPERATION_REGISTRY = {
     defaultResponseFormat: { type: 'json_object' },
     defaultMaxRetries: 3,
     defaultTimeoutMs: 60_000,
+    defaultResearchMode: false,
+  },
+  'gbp-review-response-draft': {
+    id: 'gbp-review-response-draft',
+    domain: 'integrations',
+    feature: 'gbp-review-response-draft',
+    providerIntent: 'openai',
+    modelIntent: 'plain-text public review response drafting',
+    outputMode: 'json',
+    parserExpectation: 'parseAIJson + zod schema validation',
+    researchMode: 'forbidden',
+    executionMode: 'sync-only',
+    retryPolicy: 'standard',
+    timeoutProfile: 'short',
+    defaultProvider: 'openai',
+    defaultModel: 'gpt-5.4',
+    defaultResponseFormat: { type: 'json_object' },
+    defaultMaxRetries: 2,
+    defaultTimeoutMs: 45_000,
     defaultResearchMode: false,
   },
   'content-post-unify': {
@@ -382,6 +427,25 @@ export const AI_OPERATION_REGISTRY = {
     defaultTimeoutMs: 60_000,
     defaultResearchMode: false,
   },
+  'strategy-pov': {
+    id: 'strategy-pov',
+    domain: 'analytics-intelligence',
+    feature: 'strategy-pov',
+    providerIntent: 'openai',
+    modelIntent: 'system-drafted curated point-of-view (narrated situation + lead move + wins/flags) over the curated rec set; deterministic JSON shape',
+    outputMode: 'json',
+    parserExpectation: 'parseStructuredAIOutput(strategy-pov)',
+    researchMode: 'forbidden',
+    executionMode: 'sync-only',
+    retryPolicy: 'standard',
+    timeoutProfile: 'standard',
+    defaultProvider: 'openai',
+    defaultModel: 'gpt-5.4',
+    defaultResponseFormat: { type: 'json_object' },
+    defaultMaxRetries: 3,
+    defaultTimeoutMs: 60_000,
+    defaultResearchMode: false,
+  },
   'knowledge-base-gen': {
     id: 'knowledge-base-gen',
     domain: 'platform-foundation',
@@ -568,6 +632,29 @@ export const AI_OPERATION_REGISTRY = {
     defaultTimeoutMs: 90_000,
     defaultResearchMode: false,
   },
+  'the-issue-lead-value-enrich': {
+    id: 'the-issue-lead-value-enrich',
+    domain: 'analytics-intelligence',
+    feature: 'the-issue-lead-value-enrich',
+    providerIntent: 'openai',
+    // The Issue (Client) P0 — single AI op: a low-confidence per-workspace lead/customer-value
+    // estimate used ONLY as the basis='ai_enriched' fallback when no client_provided/agency_estimate
+    // value exists. The advisory estimate never persists itself; the admin confirms via the standard
+    // workspace PATCH (basis stamped in code, not by the model). Segment derivation is P1.
+    modelIntent: 'small structured per-workspace lead/customer-value estimate (advisory, lowest confidence)',
+    outputMode: 'json',
+    parserExpectation: 'parseAIJson + leadValueEnrichSchema.safeParse → null on failure',
+    researchMode: 'forbidden',
+    executionMode: 'sync-only',
+    retryPolicy: 'standard',
+    timeoutProfile: 'short',
+    defaultProvider: 'openai',
+    defaultModel: 'gpt-5.4-nano',
+    defaultResponseFormat: { type: 'json_object' },
+    defaultMaxRetries: 2,
+    defaultTimeoutMs: 20_000,
+    defaultResearchMode: false,
+  },
 } as const satisfies Record<string, AIOperationContract>;
 
 export type AIOperationId = keyof typeof AI_OPERATION_REGISTRY;
@@ -578,4 +665,34 @@ export function isAIOperationId(value: string): value is AIOperationId {
 
 export function getAIOperationContract(operationId: AIOperationId): AIOperationContract {
   return AI_OPERATION_REGISTRY[operationId];
+}
+
+export function getAIOperationRuntimeDefaults(operationId: AIOperationId): AIOperationRuntimeDefaults {
+  const contract = getAIOperationContract(operationId);
+  return {
+    feature: contract.feature,
+    defaultProvider: contract.defaultProvider,
+    defaultModel: contract.defaultModel,
+    defaultResponseFormat: contract.defaultResponseFormat,
+    defaultMaxRetries: contract.defaultMaxRetries,
+    defaultTimeoutMs: contract.defaultTimeoutMs,
+    defaultResearchMode: contract.defaultResearchMode,
+  };
+}
+
+export function getAIOperationPolicyMetadata(operationId: AIOperationId): AIOperationPolicyMetadata {
+  const contract = getAIOperationContract(operationId);
+  return {
+    id: contract.id,
+    domain: contract.domain,
+    feature: contract.feature,
+    providerIntent: contract.providerIntent,
+    modelIntent: contract.modelIntent,
+    outputMode: contract.outputMode,
+    parserExpectation: contract.parserExpectation,
+    researchMode: contract.researchMode,
+    executionMode: contract.executionMode,
+    retryPolicy: contract.retryPolicy,
+    timeoutProfile: contract.timeoutProfile,
+  };
 }

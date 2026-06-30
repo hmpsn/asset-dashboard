@@ -12,7 +12,7 @@ import { CannibalizationAlert } from './ui/CannibalizationAlert';
 import { WorkflowStepper } from './ui';
 import { adminPath } from '../routes';
 import { useWorkspaceIntelligence } from '../hooks/admin';
-import type { FixContext } from '../App';
+import type { FixContext } from '../types/fix-context';
 import { clearTabSearchParam, resolveTabSearchParam } from '../lib/tab-search-param';
 
 /** Synthetic FixContext built from an AI-suggested signal to prefill ContentBriefs. */
@@ -326,7 +326,7 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
         label="Content Pipeline Guide"
         size="lg"
         variant="ghost"
-        className={"fixed bottom-6 right-6 z-[var(--z-tooltip)] rounded-[var(--radius-pill)] bg-[var(--surface-3)] border border-[var(--brand-border)] hover:border-teal-500/50 hover:bg-[var(--brand-border-hover)] shadow-lg group" // rounded-literal-ok
+        className={"fixed bottom-24 right-6 z-[var(--z-tooltip)] rounded-[var(--radius-pill)] bg-[var(--surface-3)] border border-[var(--brand-border)] hover:border-teal-500/50 hover:bg-[var(--brand-border-hover)] shadow-lg group" // rounded-literal-ok
         }
         title="Content Pipeline Guide"
       />

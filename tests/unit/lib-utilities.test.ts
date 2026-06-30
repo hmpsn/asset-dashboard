@@ -6,7 +6,7 @@
  * pure — no React, no React Query, no browser APIs required.
  *
  * Covered modules:
- *  - src/lib/decision-adapters.ts  (badgeForBatch, clientActionSourceLabel, normalizeClientAction, normalizeApprovalBatch)
+ *  - src/lib/decision-adapters.ts  (badgeForBatch, clientActionSourceLabel)
  *  - src/lib/pathUtils.ts          (normalizePath, matchPagePath, normalizePageUrl, findPageMapEntry, findPageMapEntryBySlug, resolvePageAddress, tryResolvePagePath)
  *  - src/lib/queryKeys.ts          (admin copy pipeline, admin CMS, admin rank tracking, rank history queries, page join)
  *  - src/lib/inline-markdown.ts    (inlineMarkdownToHtml — bold, em, code, custom classes, XSS)
@@ -28,46 +28,7 @@ import { rankTrackingHistoryPath } from '../../src/lib/keywordTracking';
 import {
   badgeForBatch,
   clientActionSourceLabel,
-  normalizeClientAction,
-  normalizeApprovalBatch,
 } from '../../src/lib/decision-adapters';
-import type { ClientAction } from '../../shared/types/client-actions';
-import type { ApprovalBatch } from '../../shared/types/approvals';
-
-const baseAction: ClientAction = {
-  id: 'act-1',
-  workspaceId: 'ws-1',
-  sourceType: 'aeo_change',
-  title: 'AEO Changes',
-  summary: '2 answers to update',
-  payload: {},
-  status: 'pending',
-  priority: 'medium',
-  createdAt: '2026-01-01T00:00:00Z',
-  updatedAt: '2026-01-01T00:00:00Z',
-};
-
-const baseBatch: ApprovalBatch = {
-  id: 'batch-1',
-  workspaceId: 'ws-1',
-  siteId: 'site-1',
-  name: 'SEO Editor — 3 pages',
-  items: [
-    {
-      id: 'i1', pageId: 'p1', pageTitle: 'Home', pageSlug: '/',
-      field: 'seoTitle', currentValue: 'Old Title', proposedValue: 'New Title',
-      status: 'pending', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
-    },
-    {
-      id: 'i2', pageId: 'p2', pageTitle: 'About', pageSlug: '/about',
-      field: 'seoDescription', currentValue: 'Old desc', proposedValue: 'New desc',
-      status: 'pending', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
-    },
-  ],
-  status: 'pending',
-  createdAt: '2026-01-01T00:00:00Z',
-  updatedAt: '2026-01-01T00:00:00Z',
-};
 
 describe('decision-adapters — badgeForBatch', () => {
   it('returns "Schema" for names starting with "Schema"', () => {
@@ -132,56 +93,6 @@ describe('decision-adapters — clientActionSourceLabel', () => {
   it('returns "SEO Update" fallback for unknown source types', () => {
     expect(clientActionSourceLabel('unknown_type')).toBe('SEO Update');
     expect(clientActionSourceLabel('')).toBe('SEO Update');
-  });
-});
-
-describe('decision-adapters — normalizeClientAction itemCount', () => {
-  it('uses diffs array length when payload has diffs', () => {
-    const action = { ...baseAction, payload: { diffs: [{}, {}, {}, {}] } };
-    expect(normalizeClientAction(action as ClientAction).itemCount).toBe(4);
-  });
-
-  it('uses suggestions array length when payload has suggestions', () => {
-    const action = { ...baseAction, payload: { suggestions: [{}, {}] } };
-    expect(normalizeClientAction(action as ClientAction).itemCount).toBe(2);
-  });
-
-  it('uses redirects array length when payload has redirects', () => {
-    const action = { ...baseAction, payload: { redirects: [{}] } };
-    expect(normalizeClientAction(action as ClientAction).itemCount).toBe(1);
-  });
-
-  it('falls back to 1 for content_decay (no array payload)', () => {
-    const action = { ...baseAction, sourceType: 'content_decay' as const, payload: {} };
-    expect(normalizeClientAction(action).itemCount).toBe(1);
-  });
-
-  it('falls back to 1 when payload is empty object', () => {
-    const action = { ...baseAction, payload: {} };
-    expect(normalizeClientAction(action).itemCount).toBe(1);
-  });
-});
-
-describe('decision-adapters — normalizeApprovalBatch summary', () => {
-  it('uses singular "change" when batch has exactly 1 item', () => {
-    const batch = { ...baseBatch, items: [baseBatch.items[0]] };
-    const result = normalizeApprovalBatch(batch);
-    expect(result.summary).toBe('1 change ready for your approval');
-  });
-
-  it('uses plural "changes" when batch has multiple items', () => {
-    const result = normalizeApprovalBatch(baseBatch);
-    expect(result.summary).toBe('2 changes ready for your approval');
-  });
-
-  it('uses plural "changes" for zero items (edge case: empty batch)', () => {
-    const emptyBatch = { ...baseBatch, items: [] };
-    const result = normalizeApprovalBatch(emptyBatch);
-    expect(result.summary).toBe('0 changes ready for your approval');
-  });
-
-  it('priority is undefined for approval batches', () => {
-    expect(normalizeApprovalBatch(baseBatch).priority).toBeUndefined();
   });
 });
 
@@ -484,10 +395,6 @@ describe('queryKeys — admin outcome + signals keys', () => {
 
   it('aiSuggestedBriefs key shape', () => {
     expect(queryKeys.admin.aiSuggestedBriefs(WS)).toEqual(['admin-ai-suggested-briefs', WS]);
-  });
-
-  it('actionQueue key shape', () => {
-    expect(queryKeys.admin.actionQueue(WS)).toEqual(['admin-action-queue', WS]);
   });
 });
 

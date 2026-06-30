@@ -16,6 +16,7 @@ import {
   RETENTION_WEEKLY_MAX_DAYS,
   __resetRefreshTimingsForTesting,
   __setRefreshTimingsForTesting,
+  buildLocalSeoKeywordVisibilitySummaryByKey,
   countLocalVisibilitySnapshots,
   listLatestLocalVisibilitySnapshots,
   runLocationBackfillJob,
@@ -640,6 +641,37 @@ describe('W2.4 — latestSnapshots deterministic tiebreaker', () => {
 
     const latest = listLatestLocalVisibilitySnapshots(ws.id);
     expect(latest.length).toBe(1); // not 2
+  });
+
+  it('summary visibility uses the same same-timestamp tiebreaker as detail reads', () => {
+    const ws = createWorkspace('Summary Tiebreaker Same Timestamp');
+    cleanupWorkspaceIds.add(ws.id);
+
+    const ts = makeIsoTimestamp(1);
+    insertRawSnapshotWithVariant({ workspaceId: ws.id, marketId: 'm', keyword: 'dentist', capturedAt: ts, device: 'desktop', languageCode: 'en', id: 'summary-aaa-low-id' });
+    insertRawSnapshotWithVariant({ workspaceId: ws.id, marketId: 'm', keyword: 'dentist', capturedAt: ts, device: 'desktop', languageCode: 'en', id: 'summary-zzz-high-id' });
+
+    const summary = buildLocalSeoKeywordVisibilitySummaryByKey(ws.id).get('dentist');
+    expect(summary?.marketCount).toBe(1);
+  });
+
+  it('treats malformed stored snapshot statuses as degraded, not successful provider rows', () => {
+    const ws = createWorkspace('Malformed Snapshot Status');
+    cleanupWorkspaceIds.add(ws.id);
+
+    insertRawSnapshotWithVariant({
+      workspaceId: ws.id,
+      marketId: 'm',
+      keyword: 'dentist',
+      capturedAt: makeIsoTimestamp(1),
+      device: 'desktop',
+      languageCode: 'en',
+      status: 'unexpected_status',
+    });
+
+    const latest = listLatestLocalVisibilitySnapshots(ws.id);
+    expect(latest).toHaveLength(1);
+    expect(latest[0].status).toBe(LOCAL_VISIBILITY_STATUS.DEGRADED);
   });
 });
 

@@ -11,6 +11,7 @@ import type { PageElementCatalog } from './page-elements.js';
 import type { SiteInventorySlice } from './site-inventory.js';
 import type { EntityResolutionSlice } from './entity-resolution.js';
 import type { EeatAsset, EeatAssetType } from './eeat-assets.js';
+import type { StoredGenerationQuality } from './generation-quality.js';
 import type {
   TrackedAction,
   ActionOutcome,
@@ -37,6 +38,8 @@ export const INTELLIGENCE_SLICES = [
   'localSeo',
   'entityResolution',
   'eeatAssets',
+  'generationQuality',
+  'brand',
 ] as const;
 
 export type IntelligenceSlice = typeof INTELLIGENCE_SLICES[number];
@@ -127,6 +130,10 @@ export interface WorkspaceIntelligence {
   entityResolution?: EntityResolutionSlice;
   /** Workspace-scoped E-E-A-T trust-signal inventory. */
   eeatAssets?: EeatAssetsSlice;
+  /** Latest internal generation-quality telemetry for workspace-scoped AI generation health. */
+  generationQuality?: GenerationQualitySlice;
+  /** Unified brand voice (authority-resolved block) + approved identity. Read-only; non-formattable; assembled on request. */
+  brand?: BrandSlice;
 }
 
 // ── Slice interfaces ────────────────────────────────────────────────────
@@ -151,6 +158,14 @@ export interface SeoContextSlice {
    *    - otherwise → legacy workspace.brandVoice + brand-docs block
    *
    *  Empty string means "no brand voice configured" — render nothing.
+   *
+   *  INVARIANT: this field is byte-identical to `BrandSlice.voicePromptBlock` — both are
+   *  sourced from the same `buildEffectiveBrandVoiceBlock(workspaceId)`. The value lives on
+   *  TWO slices on purpose, not by accident: this copy is load-bearing for the prompt
+   *  formatter (`formatSeoContextSection` receives only the seoContext slice), while the
+   *  brand-slice copy serves on-demand brand-context (MCP) consumers. Do NOT "consolidate"
+   *  by deleting one — re-converge the sources if they ever diverge. Enforced by
+   *  tests/contract/voice-block-slice-parity.test.ts (brand-slice P4, Option A).
    */
   effectiveBrandVoiceBlock: string;
   businessContext: string;
@@ -224,6 +239,21 @@ export interface SeoContextSlice {
     /** Admin/AI-only — never serialize to a client surface. */
     emvPerWeek: number;
     components: OpportunityComponent[];
+  };
+  /** SEO Decision Engine P8 (AI-visibility / LLM citation) — aggregates-only AI-visibility
+   *  summary from the latest `chat_gpt` LLM-mention snapshot. AGGREGATES ONLY — never raw
+   *  LLM transcripts. Undefined when the `ai-visibility` flag is off for the workspace OR
+   *  there is no snapshot yet (so flag-off / no-data = no change). All numerics are absent
+   *  rather than 0 when the underlying snapshot column is NULL (never invented). */
+  aiVisibility?: {
+    /** Times the client domain was cited in LLM answers; undefined when not measured. */
+    mentions?: number;
+    /** Share of voice vs co-mentioned brands, 0..1; undefined when not measured. */
+    shareOfVoice?: number;
+    /** Most-cited co-mentioned competitor brand (max by mentions). */
+    topCompetitor?: { name: string; mentions: number };
+    /** Most-cited source domain feeding LLM answers (max by mentions) — the AEO target. */
+    topSourceDomain?: { domain: string; mentions: number };
   };
 }
 
@@ -476,6 +506,21 @@ export interface ClientSignalsSlice {
     completed: number;
     recentDecisions: Array<{ title: string; status: string; sourceType: string; updatedAt: string }>;
   };
+  /**
+   * Strategy v3 (spec §7.5, data-flow rule #6) — the client's responses to SENT curated recs.
+   * The outcome write alone is not enough for AdminChat/strategy to "see the loop" — this slice
+   * field surfaces it. Counts derive from Recommendation.clientStatus across the rec set; the
+   * outcome (approve→TrackedAction, decline→advisory learning) is recorded separately.
+   * Populated by `assembleClientSignals` (P3 writes); read by the curated overview context (P4).
+   * Field declared here in Phase 1 Lane 1A — Track B (P3 writes) and Track C (P4 reads) both
+   * touch this file, so the shape is frozen before either dispatches.
+   */
+  recResponses?: {
+    approved: number;
+    declined: number;
+    discussing: number;
+    recentResponses: Array<{ title: string; clientStatus: string; respondedAt: string }>;
+  };
 }
 
 export interface OperationalSlice {
@@ -616,6 +661,22 @@ export interface LocalSeoSlice {
     winsAgainstClient: number;
     markets: ReadonlyArray<string>;
   }>;
+  /** SEO Decision Engine P7 (GBP + reviews) — aggregates-only review/GBP summary for the
+   *  workspace's OWN listing plus the single strongest local competitor (by review count).
+   *  AGGREGATES ONLY — never individual reviews or authors. Undefined when there is neither an
+   *  owned listing nor any competitor listing data (so flag-off / no-data = no change). */
+  reviewSummary?: {
+    /** Star rating of the client's own listing; undefined = no reviews yet (NEVER 0). */
+    ownRating?: number;
+    /** Review count of the client's own listing; undefined = no reviews yet (NEVER 0). */
+    ownReviewCount?: number;
+    /** 0..100 GBP completeness signal for the owned listing (deriveGbpCompletenessScore). */
+    completenessScore?: number;
+    /** Whether the owned listing is claimed; undefined when unknown. */
+    claimed?: boolean;
+    /** Strongest local competitor by review count (non-owned). */
+    topCompetitor?: { name: string; rating?: number; reviewCount?: number };
+  };
   /** Pre-formatted prompt block — stratified-sampled internally. Inject directly into prompts. */
   effectiveLocalSeoBlock: string;
   /** ISO timestamp of the latest visibility snapshot reflected here. */
@@ -628,6 +689,37 @@ export interface EeatAssetsSlice {
   byType: Array<{ type: EeatAssetType; count: number }>;
   /** Pre-formatted trust-signal block for prompt consumers. Inject directly. */
   effectiveTrustSignalsBlock: string;
+}
+
+export interface GenerationQualitySlice {
+  /** Latest persisted generation-quality row, or null when the workspace has no observations yet. */
+  latest: StoredGenerationQuality | null;
+}
+
+export interface BrandSlice {
+  /** 'ready' when any approved identity field or a non-empty voice block exists. */
+  availability: 'ready' | 'no_data';
+  /** Structured, approved-only brand identity (each a single content blob). */
+  identity: {
+    mission?: string;
+    vision?: string;
+    values?: string;
+    tagline?: string;
+    elevatorPitch?: string;
+    positioning?: string;
+  };
+  /** Voice metadata. P1: status only (structured tone/guardrails deferred to a later phase). */
+  voice: { status: 'calibrated' | 'legacy' | 'none' };
+  /** Authority-resolved voice block — inject directly; never re-derive from structured fields.
+   *  INVARIANT: byte-identical to `SeoContextSlice.effectiveBrandVoiceBlock` (both sourced from
+   *  `buildEffectiveBrandVoiceBlock(workspaceId)`). The duplication across two slices is
+   *  intentional — see the note on `effectiveBrandVoiceBlock`. Enforced by
+   *  tests/contract/voice-block-slice-parity.test.ts (brand-slice P4, Option A). */
+  voicePromptBlock: string;
+  /** Layer-2 voice DNA + guardrails (semantic rules). Populated ONLY for calibrated profiles — non-calibrated already carry DNA in voicePromptBlock. Inject directly; do not combine with voicePromptBlock. */
+  voiceDnaBlock: string;
+  /** Pre-formatted approved-identity block for prompt injection. Inject directly. */
+  identityPromptBlock: string;
 }
 
 // ── Client Intelligence API types (Phase 4C) ────────────────────────────────
@@ -777,6 +869,8 @@ export interface SerpFeatures {
   localPack: boolean;
   /** Pages where a video carousel is present for the primary keyword. */
   videoCarousel: number;
+  /** Pages whose primary keyword's SERP shows an AI Overview (answer-engine surface). */
+  aiOverview: number;
 }
 
 export interface EngagementMetrics {
@@ -834,6 +928,27 @@ export interface RankTrackingSummary {
   trackedKeywords: number;
   avgPosition: number | null;
   positionChanges: { improved: number; declined: number; stable: number };
+  /** Top changed keywords by absolute SERP movement, derived from latest rank snapshots. */
+  topKeywordMovers?: RankTrackingKeywordMover[];
+}
+
+export interface RankTrackingKeywordMover {
+  query: string;
+  position: number;
+  /** Signed getLatestRanks() movement: negative = improved/moved up, positive = declined/dropped. */
+  change: number;
+  direction: 'improved' | 'declined';
+  clicks: number;
+  impressions: number;
+  /** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */
+  ctr: number;
+  pagePath?: string;
+  pageTitle?: string;
+  /**
+   * Optional keyword value score when a caller has already joined value scoring
+   * into rank context. The current getLatestRanks() read path does not compute it.
+   */
+  valueScore?: number;
 }
 
 export interface DiscoveredQuerySummary {
@@ -936,6 +1051,8 @@ export interface PromptFormatOptions {
   tokenBudget?: number;
   learningsDomain?: 'content' | 'strategy' | 'technical' | 'all';
   pagePath?: string;
+  /** Client-facing prompts should keep aggregate rank context without exact changed queries. */
+  includeRankMovers?: boolean;
 }
 
 // ── Suggested briefs (shared between server store + frontend API client) ──

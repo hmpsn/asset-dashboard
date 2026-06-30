@@ -36,6 +36,15 @@ export interface StoredKeywordStrategy {
   siteKeywords: string[];
   /** Keyword gaps / untapped opportunities (blob-sourced). */
   opportunities: string[];
+  /** Strategy v3 (#6b) — typed opportunities backing the per-row "interested?" send. Parallel
+   *  to the bare `opportunities` string[] above (which stays for the byte-identical read path);
+   *  P5 Lane 5C populates this. Optional: absent on every pre-v3 blob. */
+  opportunitiesDetailed?: Array<{
+    keyword: string;
+    volume?: number;
+    difficulty?: number;
+    rationale?: string;
+  }>;
   /** SEMRush data for site keywords — `site_keyword_metrics` table (#19b),
    *  table-first with blob fallback (the blob is kept until the 3b-ii strip). */
   siteKeywordMetrics?: SiteKeywordMetric[];
