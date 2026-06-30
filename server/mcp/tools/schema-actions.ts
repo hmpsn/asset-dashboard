@@ -9,8 +9,12 @@
  * `POST /api/webflow/schema-publish/:siteId` route uses — never raw DB writes:
  *   - generate:  generateSchemaForPage() + upsertPageResultInSnapshot()
  *   - validate:  validateLeanSchema() (structural) + validateForGoogleRichResults() (Google)
- *   - publish:   publishSchemaToCmsField() | publishSchemaToPage() (live)
- *                + updatePageSchemaInSnapshot() + recordSchemaPublish() + updatePageState()
+ *   - publish:   publishSchemaToLive() — the SHARED domain service the admin route
+ *                also calls. It runs the full follow-on set (CMS-field-or-static
+ *                publish + recordSchemaPublish + updatePageSchemaInSnapshot +
+ *                recordSeoChange + llms.txt regen + rec-regen + updatePageState +
+ *                invalidateIntelligenceCache), so the MCP path can no longer drift
+ *                from the route and no longer imports anything from server/routes/.
  */
 import type { Tool } from '@modelcontextprotocol/sdk/types';
 import {
@@ -25,17 +29,11 @@ import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { generateSchemaForPage } from '../../schema-suggester.js';
 import { prepareSinglePageSchemaGenerationContext } from '../../schema-generation-context.js';
-import {
-  upsertPageResultInSnapshot,
-  updatePageSchemaInSnapshot,
-  recordSchemaPublish,
-} from '../../schema-store.js';
+import { upsertPageResultInSnapshot } from '../../schema-store.js';
 import { validateForGoogleRichResults } from '../../schema-validator.js';
 import { validateLeanSchema } from '../../schema/validator.js';
-import { publishSchemaToPage } from '../../webflow-pages.js';
-import { publishSchemaToCmsField } from '../../routes/webflow-schema.js';
-import { getTokenForSite, updatePageState } from '../../workspaces.js';
-import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
+import { publishSchemaToLive } from '../../domains/schema/publish-schema-to-live.js';
+import { getTokenForSite } from '../../workspaces.js';
 import { createLogger } from '../../logger.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { toMcpJsonSchema } from '../json-schema.js';
@@ -308,7 +306,7 @@ async function handlePublishSchema(
   try {
     const generated = await generateAndPersist(workspaceId, siteId, token, pageId, pageType);
     if (!generated.ok) return generated.error;
-    const { schema } = generated.value;
+    const { result, schema } = generated.value;
 
     // ── VALIDATE-FIRST GUARD (owner decision) ──
     // Refuse to publish schema that fails validation. The publish service functions
@@ -322,68 +320,54 @@ async function handlePublishSchema(
       );
     }
 
-    // ── PUBLISH TO LIVE ──
-    // CMS-backed page first (writes the schema into the mapped CMS field); falls back
-    // to static-page custom-code injection. Mirrors the admin publish route's ordering.
-    const cmsDelivery = await publishSchemaToCmsField({
+    // ── PUBLISH TO LIVE (shared domain service) ──
+    // publishSchemaToLive performs CMS-field-first then static-page custom-code
+    // publish AND runs the full canonical follow-on set (recordSchemaPublish +
+    // updatePageSchemaInSnapshot + recordSeoChange + llms.txt regen + rec-regen +
+    // updatePageState(live) + invalidateIntelligenceCache + the published
+    // SCHEMA_SNAPSHOT_UPDATED broadcast + activity log). Using it closes the
+    // parity gap: the MCP path now fires recordSeoChange + llms.txt + rec-regen,
+    // which the old inline reimplementation omitted.
+    const publishResult = await publishSchemaToLive({
       siteId,
       pageId,
       schema,
-      publishAfter: publishAfter ?? false,
+      workspaceId,
       token,
+      pageTitle: result.pageTitle || undefined,
+      publishedPath: result.publishedPath || undefined,
+      publishAfter: publishAfter ?? false,
     });
 
-    let mode: 'cms-field' | 'page-custom-code';
-    let deliveryStatus: string;
-    let deliveryMessage: string;
-
-    if (cmsDelivery) {
-      if (cmsDelivery.status === 'blocked' || cmsDelivery.status === 'failed') {
-        return mcpError(`Schema publish failed (CMS field): ${cmsDelivery.message}`);
+    if (!publishResult.ok) {
+      if (publishResult.kind === 'cms-blocked' || publishResult.kind === 'cms-failed') {
+        return mcpError(`Schema publish failed (CMS field): ${publishResult.message}`);
       }
-      mode = 'cms-field';
-      deliveryStatus = cmsDelivery.status;
-      deliveryMessage = cmsDelivery.message;
-    } else {
-      const result = await publishSchemaToPage(siteId, pageId, schema, token);
-      if (result.delivery.status === 'manual-required') {
+      if (publishResult.kind === 'manual-required') {
         return mcpError(
-          `Schema could not be published automatically: ${result.delivery.message} (manual action required in Webflow).`,
+          `Schema could not be published automatically: ${publishResult.message} (manual action required in Webflow).`,
         );
       }
-      if (!result.success) {
-        return mcpError(`Schema publish failed: ${result.error || 'Webflow rejected the schema script.'}`);
-      }
-      mode = 'page-custom-code';
-      deliveryStatus = result.delivery.status;
-      deliveryMessage = result.delivery.message;
+      return mcpError(`Schema publish failed: ${publishResult.message}`);
     }
 
-    // Persist the published schema to the snapshot + record version history for rollback.
-    updatePageSchemaInSnapshot(siteId, pageId, schema);
-    recordSchemaPublish(siteId, pageId, workspaceId, schema);
-    updatePageState(workspaceId, pageId, { status: 'live', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
-    invalidateIntelligenceCache(workspaceId);
-
-    broadcastToWorkspace(workspaceId, WS_EVENTS.SCHEMA_SNAPSHOT_UPDATED, {
-      siteId,
-      action: 'published',
-      pageId,
-    });
+    // The service emits a generic 'schema-publish' activity; add the MCP-tagged
+    // activity so chat-driven publishes are attributable to the MCP surface
+    // (pr-check requires addActivity({ source: 'mcp-chat' }) in tool write paths).
     addActivity(
       workspaceId,
       'schema_published',
       `Published schema to page ${pageId.slice(0, 8)}…`,
-      deliveryMessage,
-      { source: 'mcp-chat', siteId, pageId, mode, action: 'mcp_schema_published' },
+      publishResult.deliveryMessage,
+      { source: 'mcp-chat', siteId, pageId, mode: publishResult.mode, action: 'mcp_schema_published' },
     );
 
     return mcpSuccess({
       ok: true,
       page_id: pageId,
       published: true,
-      mode,
-      delivery_status: deliveryStatus,
+      mode: publishResult.mode,
+      delivery_status: publishResult.deliveryStatus,
       published_to_live: publishAfter ?? false,
       validation,
       dashboard_url: buildDashboardUrl(workspaceId, 'schema'),

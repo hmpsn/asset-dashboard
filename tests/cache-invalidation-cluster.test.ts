@@ -63,11 +63,13 @@ describe('Task 4.1 — Cache-invalidation cluster (A-9/11/12/13) — bounded sou
     expect(read('server/routes/webflow-schema.ts')).toContain('invalidateIntelligenceCache');
   });
 
-  it('server/routes/webflow-schema.ts calls invalidateIntelligenceCache on schema-publish (bounded — not whole-file)', () => {
-    const src = read('server/routes/webflow-schema.ts');
-    // The old slice ran to EOF (whole file). Bound it to the next route decl.
-    const section = boundedSection(src, "router.post('/api/webflow/schema-publish/:siteId'", ['\nrouter.']);
-    expect(section).toContain('invalidateIntelligenceCache');
+  it('schema-publish invalidates the intelligence cache via the shared publishSchemaToLive service', () => {
+    // C2: schema-publish's intelligence-cache invalidation (and the rest of the
+    // post-publish follow-on set) moved out of the route into the shared
+    // publishSchemaToLive domain service, consumed by both the admin route and the
+    // MCP publish_schema tool. The route's schema-publish handler now delegates.
+    expect(read('server/domains/schema/publish-schema-to-live.ts')).toContain('invalidateIntelligenceCache');
+    expect(read('server/routes/webflow-schema.ts')).toContain('publishSchemaToLive');
   });
 
   it('server/routes/webflow-schema.ts calls invalidateIntelligenceCache on schema-rollback (bounded)', () => {

@@ -5,14 +5,12 @@
  * @writes schema_snapshots, schema_templates, schema_plans, schema_validations, schema_publish_history, schema_cms_field_mappings, pending_schemas, approvals, outcome_actions, seo_changes, activities
  */
 import { Router } from 'express';
-import { createHash } from 'node:crypto';
 
 import { requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { requireClientPortalAuth } from '../middleware.js';
 import { addActivity } from '../activity-log.js';
 import { validate, z } from '../middleware/validate.js';
 import { buildSchemaContext } from '../schema/context-builder.js';
-import { normalizePageUrl } from '../utils/page-address.js';
 import { prepareBulkSchemaGenerationContext, prepareSinglePageSchemaGenerationContext } from '../schema-generation-context.js';
 import { buildSchemaIntelligence } from '../schema-intelligence.js';
 import { getSchemaSnapshot, getSiteTemplate, getOrSeedSiteTemplate, patchSiteTemplate, saveSiteTemplate, updatePageSchemaInSnapshot, upsertPageResultInSnapshot, getSchemaPlan, removePageFromSnapshot, getPageTypes, savePageType, recordSchemaPublish, getSchemaPublishHistory, getSchemaPublishEntry, getPublishDatesForSite, getSchemaCmsFieldMappings, saveSchemaCmsFieldMapping } from '../schema-store.js';
@@ -23,20 +21,14 @@ import { WS_EVENTS } from '../ws-events.js';
 import {
   listCollections,
   getCollectionSchema,
-  getCollectionItem,
-  updateCollectionItem,
-  publishCollectionItems,
   publishSite,
   publishSchemaToPage,
   retractSchemaFromPage,
 } from '../webflow.js';
 import { detectSchemaFieldTarget, getRecommendedSchemaFieldSlug } from '../schema/site-inventory.js';
-import type { SchemaCmsDeliveryStatus, SchemaFieldTarget } from '../../shared/types/site-inventory.ts';
+import type { SchemaFieldTarget } from '../../shared/types/site-inventory.ts';
 import { getTokenForSite, getWorkspace, getWorkspaceBySiteId, updatePageState } from '../workspaces.js';
-import { queueLlmsTxtRegeneration } from '../llms-txt-generator.js';
-import { queueKeywordStrategyPostUpdateFollowOns } from '../keyword-strategy-follow-ons.js';
-import { recordSeoChange } from '../seo-change-tracker.js';
-import { recordAction, getActionByWorkspaceAndSource } from '../outcome-tracking.js';
+import { publishSchemaToLive } from '../domains/schema/publish-schema-to-live.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import {
   syncSchemaPlanDeliverable,
@@ -48,7 +40,6 @@ import {
   sendSchemaPlanToClientForReview,
   updateSchemaPlanForAdmin,
 } from '../domains/schema/schema-plan-lifecycle.js';
-import { captureBaselineFromGsc } from '../outcome-measurement.js';
 // listPendingSchemas import removed in W6.3 (GET /api/pending-schemas endpoint deleted — no UI consumer)
 import { createLogger } from '../logger.js';
 import {
@@ -82,14 +73,6 @@ const schemaPlanFeedbackSchema = z.object({
   note: z.string().max(2000).optional(),
 }).strict();
 
-function schemaHash(schema: Record<string, unknown>): string {
-  return createHash('sha256').update(JSON.stringify(schema)).digest('hex').slice(0, 16);
-}
-
-function sanitizeSchemaJsonForCms(schema: Record<string, unknown>): string {
-  return JSON.stringify(schema).replace(/<\/script/gi, '<\\/script');
-}
-
 function broadcastSchemaSnapshotUpdated(
   siteId: string,
   workspaceId: string | undefined,
@@ -104,101 +87,11 @@ function broadcastSchemaSnapshotUpdated(
   });
 }
 
-export async function publishSchemaToCmsField(opts: {
-  siteId: string;
-  pageId: string;
-  schema: Record<string, unknown>;
-  publishAfter?: boolean;
-  token?: string;
-}): Promise<SchemaCmsDeliveryStatus | null> {
-  const snapshot = getSchemaSnapshot(opts.siteId);
-  const page = snapshot?.results.find(r => r.pageId === opts.pageId);
-  const collection = page?.generationDiagnostics?.collection;
-  if (!collection?.collectionId || !collection.itemId) return null;
-
-  const mappings = getSchemaCmsFieldMappings(opts.siteId);
-  const mapping = mappings.find(m => m.collectionId === collection.collectionId);
-  const fieldSlug = mapping?.schemaFieldSlug || page?.generationDiagnostics?.cmsDeliveryStatus?.fieldSlug;
-  if (!fieldSlug) {
-    return {
-      mode: 'cms-field',
-      status: 'blocked',
-      message: `CMS publish blocked: no mapped schema field for collection ${collection.collectionName}.`,
-    };
-  }
-  const collectionSchema = await getCollectionSchema(collection.collectionId, opts.token);
-  const mappedField = collectionSchema.fields.find(f => f.slug === fieldSlug);
-  if (!mappedField || !['PlainText', 'RichText'].includes(mappedField.type)) {
-    return {
-      mode: 'cms-field',
-      status: 'blocked',
-      fieldSlug,
-      message: mappedField
-        ? `CMS publish blocked: mapped field ${fieldSlug} is ${mappedField.type}, not a text field.`
-        : `CMS publish blocked: mapped field ${fieldSlug} was not found on ${collection.collectionName}.`,
-    };
-  }
-
-  const schemaJson = sanitizeSchemaJsonForCms(opts.schema);
-  const hash = schemaHash(opts.schema);
-  const currentItem = await getCollectionItem(collection.collectionId, collection.itemId, opts.token);
-  const currentFieldData = (currentItem?.fieldData || currentItem || {}) as Record<string, unknown>;
-  if (currentFieldData[fieldSlug] === schemaJson) {
-    if (opts.publishAfter) {
-      const publishResult = await publishCollectionItems(collection.collectionId, [collection.itemId], opts.token);
-      if (!publishResult.success) {
-        return {
-          mode: 'cms-field',
-          status: 'failed',
-          fieldSlug,
-          hash,
-          message: publishResult.error || `CMS item publish failed for unchanged ${fieldSlug}.`,
-        };
-      }
-    }
-    return {
-      mode: 'cms-field',
-      status: 'unchanged',
-      fieldSlug,
-      hash,
-      message: opts.publishAfter
-        ? `CMS field unchanged: ${fieldSlug}; CMS item published.`
-        : `CMS field unchanged: ${fieldSlug}.`,
-    };
-  }
-
-  const updateResult = await updateCollectionItem(collection.collectionId, collection.itemId, { [fieldSlug]: schemaJson }, opts.token);
-  if (!updateResult.success) {
-    return {
-      mode: 'cms-field',
-      status: 'failed',
-      fieldSlug,
-      hash,
-      message: updateResult.error || `CMS field write failed: ${fieldSlug}.`,
-    };
-  }
-
-  if (opts.publishAfter) {
-    const publishResult = await publishCollectionItems(collection.collectionId, [collection.itemId], opts.token);
-    if (!publishResult.success) {
-      return {
-        mode: 'cms-field',
-        status: 'failed',
-        fieldSlug,
-        hash,
-        message: publishResult.error || `CMS item publish failed after writing ${fieldSlug}.`,
-      };
-    }
-  }
-
-  return {
-    mode: 'cms-field',
-    status: 'written',
-    fieldSlug,
-    hash,
-    message: `CMS field written: ${fieldSlug}, hash changed.`,
-  };
-}
+// `publishSchemaToCmsField` moved to server/domains/schema/publish-schema-to-cms-field.ts
+// (it formerly lived here and the MCP tool imported it FROM this route — a
+// tool→route smell). Re-exported for backward compatibility with existing
+// importers (tests, etc.); new code should import it from the schema domain.
+export { publishSchemaToCmsField } from '../domains/schema/publish-schema-to-cms-field.js';
 
 router.get('/api/webflow/schema-suggestions/:siteId', requireWorkspaceSiteAccessFromQuery(), async (req, res) => {
   try {
@@ -441,82 +334,50 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
     }
 
     const token = getTokenForSite(req.params.siteId) || undefined;
-    const cmsDelivery = await publishSchemaToCmsField({
+    const workspaceId = getWorkspaceBySiteId(req.params.siteId)?.id || '';
+
+    // The full publish + canonical follow-on set (CMS-field first, then static
+    // custom-code) lives in the shared `publishSchemaToLive` domain service so
+    // the admin route and the MCP `publish_schema` tool stay in lockstep.
+    const publishResult = await publishSchemaToLive({
       siteId: req.params.siteId,
       pageId,
       schema,
-      publishAfter,
+      workspaceId,
       token,
+      pageTitle: req.body.pageTitle || '',
+      publishedPath: req.body.publishedPath || req.body.pageSlug || '',
+      publishAfter,
     });
-    if (cmsDelivery) {
-      if (cmsDelivery.status === 'blocked' || cmsDelivery.status === 'failed') {
-        return res.status(422).json({ success: false, cmsDeliveryStatus: cmsDelivery, error: cmsDelivery.message });
+
+    if (!publishResult.ok) {
+      if (publishResult.kind === 'cms-blocked' || publishResult.kind === 'cms-failed') {
+        return res.status(422).json({
+          success: false,
+          cmsDeliveryStatus: publishResult.cmsDelivery,
+          error: publishResult.message,
+        });
       }
-      const cmsWs = getWorkspaceBySiteId(req.params.siteId);
-      const snapshotUpdated = updatePageSchemaInSnapshot(req.params.siteId, pageId, schema);
-      if (snapshotUpdated) broadcastSchemaSnapshotUpdated(req.params.siteId, cmsWs?.id, 'published', pageId);
-      if (cmsWs) {
-        recordSchemaPublish(req.params.siteId, pageId, cmsWs.id || '', schema);
-        addActivity(cmsWs.id, 'schema_published', 'Schema written to CMS field', cmsDelivery.message, { pageId });
-        updatePageState(cmsWs.id, pageId, { status: 'live', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
-        const rawCmsPublishedPath = req.body.publishedPath || req.body.pageSlug || '';
-        const cmsPublishedPath = rawCmsPublishedPath ? normalizePageUrl(rawCmsPublishedPath) : '';
-        recordSeoChange(cmsWs.id, pageId, cmsPublishedPath, req.body.pageTitle || '', ['schema'], 'schema-cms-field');
-        // Record for outcome tracking — guard prevents duplicates on re-deploy.
-        // Mirrors the direct-publish path below (line ~512).
-        try {
-          if (!getActionByWorkspaceAndSource(cmsWs.id, 'schema', pageId)) {
-            const schemaAction = recordAction({ // recordAction-ok: cmsWs guaranteed non-null by enclosing if
-              workspaceId: cmsWs.id,
-              actionType: 'schema_deployed',
-              sourceType: 'schema',
-              sourceId: pageId,
-              pageUrl: cmsPublishedPath || null,
-              targetKeyword: null,
-              baselineSnapshot: {
-                captured_at: new Date().toISOString(),
-                rich_result_eligible: true,
-                rich_result_appearing: false,
-              },
-              attribution: 'platform_executed',
-            });
-            if (cmsPublishedPath) void captureBaselineFromGsc(schemaAction.id, cmsWs.id, cmsPublishedPath);
-          }
-        } catch (err) {
-          log.warn({ err, pageId }, 'Failed to record outcome action for CMS-field schema deployment');
-        }
-        // Enqueue debounced rec regen — schema deploy changes page SEO signals so
-        // recommendations should reflect the updated schema state. The shared regen
-        // scheduler deduplicates concurrent per-workspace execution.
-        queueKeywordStrategyPostUpdateFollowOns({ workspaceId: cmsWs.id });
-        invalidateIntelligenceCache(cmsWs.id);
+      if (publishResult.kind === 'manual-required') {
+        // Preserve the historical response: echo the full publish result so the
+        // admin UI can render the manual-native-schema-field copy instructions.
+        return res.json(publishResult.pageResult);
       }
-      return res.json({ success: true, published: !!publishAfter, cmsDeliveryStatus: cmsDelivery });
+      // Static publish failed (Webflow rejected the schema script).
+      return res.status(500).json(publishResult.pageResult);
     }
 
-    const result = await publishSchemaToPage(req.params.siteId, pageId, schema, token);
-    if (result.delivery.status === 'manual-required') return res.json(result);
-    if (!result.success) return res.status(500).json(result);
-
-    // Optionally publish the site so changes go live
-    let sitePublished = false;
-    if (publishAfter) {
-      const pubResult = await publishSite(req.params.siteId, token);
-      sitePublished = pubResult.success;
-      if (!pubResult.success) {
-        log.error({ detail: pubResult.error }, 'Site publish failed');
-      }
+    if (publishResult.mode === 'cms-field') {
+      return res.json({
+        success: true,
+        published: !!publishAfter,
+        cmsDeliveryStatus: publishResult.cmsDelivery,
+      });
     }
 
-    // Persist edited schema back to snapshot so it survives reload
-    const snapshotUpdated = updatePageSchemaInSnapshot(req.params.siteId, pageId, schema);
-
-    // Record version history for rollback support
-    const pubWsForHistory = getWorkspaceBySiteId(req.params.siteId);
-    if (snapshotUpdated) broadcastSchemaSnapshotUpdated(req.params.siteId, pubWsForHistory?.id, 'published', pageId);
-    recordSchemaPublish(req.params.siteId, pageId, pubWsForHistory?.id || '', schema);
-
-    // Auto-save site template if this is a homepage publish
+    // ── Static-page custom-code publish succeeded ──
+    // Auto-save site template if this is a homepage publish. This is route-only
+    // request-shaping (driven by req.body.isHomepage) so it stays in the adapter.
     const isHomepage = req.body.isHomepage || false;
     if (isHomepage && schema?.['@graph']) {
       try {
@@ -536,59 +397,8 @@ router.post('/api/webflow/schema-publish/:siteId', requireWorkspaceSiteAccessFro
       } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: programming error'); /* best-effort */ }
     }
 
-    // Log to activity feed + track edit status
-    const pubWs = getWorkspaceBySiteId(req.params.siteId);
-    const rawPublishedPath = req.body.publishedPath || req.body.pageSlug || '';
-    const publishedPath = rawPublishedPath ? normalizePageUrl(rawPublishedPath) : '';
-    if (pubWs) {
-      addActivity(pubWs.id, 'schema_published', 'Schema published to Webflow', `Page ${pageId.slice(0, 8)}… — ${sitePublished ? 'site published' : 'saved as draft'}`, { pageId });
-      updatePageState(pubWs.id, pageId, { status: 'live', source: 'schema', fields: ['schema'], updatedBy: 'admin' });
-      recordSeoChange(pubWs.id, pageId, publishedPath, req.body.pageTitle || '', ['schema'], 'schema');
-      invalidateIntelligenceCache(pubWs.id);
-    }
-
-    res.json({ ...result, success: true, published: result.published ?? true, sitePublished });
-
-    // Record for outcome tracking (only when workspace is known).
-    // Idempotency guard: skip if this page already has a tracked schema action in this workspace.
-    // Prevents duplicate entries when the same page is re-published in quick succession (retries,
-    // double-clicks). Intentional re-deployments with schema changes are tracked via external
-    // detection when GSC metrics change rather than as new tracked_actions entries.
-    try {
-      if (!pubWs) throw new Error('no workspace');
-      if (getActionByWorkspaceAndSource(pubWs.id, 'schema', pageId)) throw new Error('already tracked');
-      const schemaAction = recordAction({ // recordAction-ok: pubWs guaranteed non-null by throw guard at line 206
-        workspaceId: pubWs.id,
-        actionType: 'schema_deployed',
-        sourceType: 'schema',
-        sourceId: pageId,
-        pageUrl: publishedPath || null,
-        targetKeyword: null,
-        baselineSnapshot: {
-          captured_at: new Date().toISOString(),
-          rich_result_eligible: true,
-          rich_result_appearing: false,
-        },
-        attribution: 'platform_executed',
-      });
-      if (publishedPath) void captureBaselineFromGsc(schemaAction.id, pubWs.id, publishedPath);
-    } catch (err) {
-      log.warn({ err, pageId }, 'Failed to record outcome action for schema deployment');
-    }
-
-    // Trigger background llms.txt regeneration after schema publish
-    try {
-      const llmsWs = getWorkspaceBySiteId(req.params.siteId);
-      if (llmsWs) queueLlmsTxtRegeneration(llmsWs.id, 'schema_published');
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: programming error'); /* non-critical — response already sent */ }
-
-    // Enqueue debounced rec regen after direct schema publish — schema changes
-    // page SEO signals so recommendations should be refreshed. The shared regen
-    // scheduler deduplicates concurrent per-workspace execution, so bulk schema
-    // deploys do not trigger N overlapping regen calls.
-    try {
-      if (pubWs) queueKeywordStrategyPostUpdateFollowOns({ workspaceId: pubWs.id });
-    } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-schema: programming error'); /* non-critical — response already sent */ }
+    const result = publishResult.pageResult!;
+    res.json({ ...result, success: true, published: result.published ?? true, sitePublished: publishResult.sitePublished });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.error({ detail: msg, err }, 'Schema publish error');
