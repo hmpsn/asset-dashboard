@@ -105,10 +105,13 @@ describe('mcp job action tools', () => {
   it('records a paid call for the two paid jobs, but not for the unpaid seo audit', async () => {
     await handleJobActionTool('start_keyword_strategy_generation', { workspace_id: 'ws-1' });
     expect(h.recordPaidCall).toHaveBeenCalledTimes(1);
+    // Per-workspace attribution: the workspaceId must be threaded as the 2nd arg.
+    expect(h.recordPaidCall).toHaveBeenCalledWith(1, 'ws-1');
 
     h.recordPaidCall.mockClear();
     await handleJobActionTool('start_local_seo_refresh', { workspace_id: 'ws-1', refresh_body: {} });
     expect(h.recordPaidCall).toHaveBeenCalledTimes(1);
+    expect(h.recordPaidCall).toHaveBeenCalledWith(1, 'ws-1');
 
     // start_seo_audit is NOT in the audit's paid-tool list → must not count.
     h.recordPaidCall.mockClear();

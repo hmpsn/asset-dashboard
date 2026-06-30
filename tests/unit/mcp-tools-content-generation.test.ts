@@ -102,6 +102,8 @@ describe('mcp content generation action tools', () => {
     );
     // Paid AI work runs inside the job — the tool counts it.
     expect(getPaidCallCount()).toBe(1);
+    // ...and attributes it to the workspace (workspaceId threaded as the 2nd arg).
+    expect(getPaidCallCount('ws-1')).toBe(1);
   });
 
   it('start_brief_generation (request) routes through the request source and validates the request exists', async () => {
