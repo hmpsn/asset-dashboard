@@ -10,7 +10,7 @@ import {
   Map, Rocket, FileSearch, Clock, DollarSign, Flag, Layers, ChevronRight,
 } from 'lucide-react';
 import { Button, ClickableRow, MetricRingSvg, PageHeader, SectionCard, Badge, StatCard, Icon, cn } from './ui';
-import { themeColor } from './ui/constants';
+import { themeColor, CHART_SERIES_COLORS } from './ui/constants';
 import { STUDIO_NAME } from '../constants';
 import { timeAgo } from '../lib/timeAgo';
 import { adminPath } from '../routes';
@@ -113,7 +113,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
     if (ws.approvals.pending > 0) {
       const n = ws.approvals.pending;
       const label = `${n} pending approval${n > 1 ? 's' : ''}`;
-      attentionItems.push({ label, value: 'Approvals', color: 'text-accent-brand', icon: ClipboardCheck, priority: 3, href: adminPath(ws.id, 'seo-editor'), wsName: ws.name, ariaLabel: `${label} · ${ws.name}` });
+      attentionItems.push({ label, value: 'Approvals', color: 'text-accent-info', icon: ClipboardCheck, priority: 3, href: adminPath(ws.id, 'seo-editor'), wsName: ws.name, ariaLabel: `${label} · ${ws.name}` });
     }
   }
 
@@ -131,7 +131,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
     const pending = ws.workOrders?.pending || 0;
     if (pending > 0) {
       const label = `${pending} purchased fix${pending > 1 ? 'es' : ''} awaiting fulfillment`;
-      attentionItems.push({ label, value: 'Work Orders', color: 'text-accent-brand', icon: ClipboardCheck, priority: 5, href: adminPath(ws.id, 'requests'), wsName: ws.name, ariaLabel: `${label} · ${ws.name}` });
+      attentionItems.push({ label, value: 'Work Orders', color: 'text-accent-info', icon: ClipboardCheck, priority: 5, href: adminPath(ws.id, 'requests'), wsName: ws.name, ariaLabel: `${label} · ${ws.name}` });
     }
   }
 
@@ -219,12 +219,12 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
 
       {/* ── Global Stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard label="New Requests" value={totalNewRequests} icon={Bell} iconColor={totalNewRequests > 0 ? '#f87171' : themeColor('#71717a', '#94a3b8')} />
-        <StatCard label="Active Requests" value={totalActiveRequests} icon={MessageSquare} iconColor={totalActiveRequests > 0 ? '#fbbf24' : themeColor('#71717a', '#94a3b8')} />
-        <StatCard label="Content Pipeline" value={`${totalPendingContent + totalInProgressContent}/${totalDeliveredContent}`} icon={FileText} iconColor={totalPendingContent > 0 ? '#f59e0b' : totalInProgressContent > 0 ? '#60a5fa' : themeColor('#71717a', '#94a3b8')} />
-        <StatCard label="Approvals" value={totalPendingApprovals} icon={ClipboardCheck} iconColor={totalPendingApprovals > 0 ? '#2dd4bf' : themeColor('#71717a', '#94a3b8')} />
-        <StatCard label="Avg Health" value={avgScore !== null ? avgScore : '—'} icon={Shield} iconColor={avgScore !== null ? (avgScore >= 80 ? '#4ade80' : avgScore >= 60 ? '#fbbf24' : '#f87171') : themeColor('#71717a', '#94a3b8')} />
-        <StatCard label="Hours Saved" value={timeSaved ? `${timeSaved.totalHoursSaved}h` : '—'} icon={Clock} iconColor={timeSaved && timeSaved.totalHoursSaved > 0 ? '#60a5fa' : themeColor('#71717a', '#94a3b8')} sub={timeSaved ? `${timeSaved.operationCount} AI ops this month` : undefined} />
+        <StatCard label="New Requests" value={totalNewRequests} icon={Bell} iconColor={totalNewRequests > 0 ? CHART_SERIES_COLORS.red : themeColor('#71717a', '#94a3b8') /* chart-hex-ok — inactive zinc via themeColor */} />
+        <StatCard label="Active Requests" value={totalActiveRequests} icon={MessageSquare} iconColor={totalActiveRequests > 0 ? CHART_SERIES_COLORS.amber : themeColor('#71717a', '#94a3b8') /* chart-hex-ok — inactive zinc via themeColor */} />
+        <StatCard label="Content Pipeline" value={`${totalPendingContent + totalInProgressContent}/${totalDeliveredContent}`} icon={FileText} iconColor={totalPendingContent > 0 ? CHART_SERIES_COLORS.amber : totalInProgressContent > 0 ? CHART_SERIES_COLORS.blue : themeColor('#71717a', '#94a3b8') /* chart-hex-ok — inactive zinc via themeColor */} />
+        <StatCard label="Approvals" value={totalPendingApprovals} icon={ClipboardCheck} iconColor={totalPendingApprovals > 0 ? CHART_SERIES_COLORS.teal : themeColor('#71717a', '#94a3b8') /* chart-hex-ok — inactive zinc via themeColor */} />
+        <StatCard label="Avg Health" value={avgScore !== null ? avgScore : '—'} icon={Shield} iconColor={avgScore !== null ? (avgScore >= 80 ? CHART_SERIES_COLORS.emerald : avgScore >= 60 ? CHART_SERIES_COLORS.amber : CHART_SERIES_COLORS.red) : themeColor('#71717a', '#94a3b8') /* chart-hex-ok — inactive zinc via themeColor */} />
+        <StatCard label="Hours Saved" value={timeSaved ? `${timeSaved.totalHoursSaved}h` : '—'} icon={Clock} iconColor={timeSaved && timeSaved.totalHoursSaved > 0 ? CHART_SERIES_COLORS.blue : themeColor('#71717a', '#94a3b8') /* chart-hex-ok — inactive zinc via themeColor */} sub={timeSaved ? `${timeSaved.operationCount} AI ops this month` : undefined} />
       </div>
 
       {/* ── Online Now ── */}
@@ -390,7 +390,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                     {ws.requests.total > 0 ? (
                       <div className="flex items-center gap-2 t-caption-sm">
                         {ws.requests.new > 0 && <span className="text-accent-danger font-medium">{ws.requests.new} new</span>}
-                        {ws.requests.active > 0 && <span className="text-accent-brand">{ws.requests.active} active</span>}
+                        {ws.requests.active > 0 && <span className="text-accent-info">{ws.requests.active} active</span>}
                         {ws.requests.latestDate && <span className="text-[var(--brand-text-muted)]">{timeAgo(ws.requests.latestDate)}</span>}
                       </div>
                     ) : (
@@ -405,7 +405,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                     <div className="t-caption-sm font-medium text-[var(--brand-text-muted)] mb-0.5">Approvals</div>
                     {ws.approvals.total > 0 ? (
                       ws.approvals.pending > 0 ? (
-                        <div className="t-caption-sm text-accent-brand font-medium">{ws.approvals.pending} pending</div>
+                        <div className="t-caption-sm text-accent-info font-medium">{ws.approvals.pending} pending</div>
                       ) : (
                         <div className="flex items-center gap-1 t-caption-sm text-accent-success">
                           <CheckCircle2 className="w-2.5 h-2.5" /> All clear
@@ -425,7 +425,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                       <div className="flex items-center gap-2 t-caption-sm">
                         {(ws.contentRequests?.pending || 0) > 0 && <span className="text-accent-warning font-medium">{ws.contentRequests!.pending} pending</span>}
                         {(ws.contentRequests?.inProgress || 0) > 0 && <span className="text-accent-info">{ws.contentRequests!.inProgress} in progress</span>}
-                        {(ws.contentRequests?.delivered || 0) > 0 && <span className="text-accent-brand">{ws.contentRequests!.delivered} delivered</span>}
+                        {(ws.contentRequests?.delivered || 0) > 0 && <span className="text-accent-success">{ws.contentRequests!.delivered} delivered</span>}
                       </div>
                     ) : (
                       <div className="t-caption-sm text-[var(--brand-text-muted)]">None</div>
@@ -481,7 +481,7 @@ export function WorkspaceOverview({ onSelectWorkspace }: { onSelectWorkspace: (i
                   key={entry.id}
                   className="flex items-start gap-3 px-4 py-2.5"
                 >
-                  <EntryIcon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-accent-brand" />
+                  <EntryIcon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-accent-info" />
                   <div className="flex-1 min-w-0">
                     <div className="t-caption text-[var(--brand-text-bright)]">{entry.title}</div>
                     {entry.description && <div className="t-caption-sm mt-0.5 text-[var(--brand-text-muted)]">{entry.description}</div>}

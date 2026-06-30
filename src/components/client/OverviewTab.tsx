@@ -24,7 +24,7 @@ import { TheIssueClientPage } from './the-issue/TheIssueClientPage';
 import { pinnedOutcomeNouns } from './the-issue/outcomeNoun';
 import { AgencyWorkFeed } from './AgencyWorkFeed';
 import { DiagnosticRootCauseCards } from './DiagnosticRootCauseCards';
-import { themeColor } from '../ui/constants';
+import { themeColor, CHART_SERIES_COLORS } from '../ui/constants';
 import type { ClientGA4Data } from '../../hooks/client/useClientGA4';
 import type { IssueOutcomeCount, OutcomeType, OutcomeTypeBreakdown } from '../../../shared/types/the-issue';
 import type {
@@ -288,19 +288,19 @@ export function OverviewTab({
     {(() => {
       const cards: { label: React.ReactNode; value: string; icon?: typeof Users; color: string; sub?: string; delta?: number }[] = [];
       if (ga4Overview) {
-        cards.push({ label: 'Visitors', value: ga4Overview.totalUsers.toLocaleString(), icon: Users, color: '#60a5fa', sub: ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : undefined, delta: ga4Comparison?.changePercent.users });
+        cards.push({ label: 'Visitors', value: ga4Overview.totalUsers.toLocaleString(), icon: Users, color: CHART_SERIES_COLORS.blue, sub: ga4Overview.dateRange ? `${ga4Overview.dateRange.start} — ${ga4Overview.dateRange.end}` : undefined, delta: ga4Comparison?.changePercent.users });
       }
       if (overview) {
-        cards.push({ label: <><span>Search Clicks</span><Explainer term="clicks" /></>, value: overview.totalClicks.toLocaleString(), icon: MousePointerClick, color: '#60a5fa', sub: overview.totalImpressions > 0 ? `${((overview.totalClicks / overview.totalImpressions) * 100).toFixed(1)}% CTR` : undefined, delta: searchComparison?.changePercent.clicks });
-        cards.push({ label: <><span>Impressions</span><Explainer term="impressions" /></>, value: overview.totalImpressions.toLocaleString(), icon: Eye, color: '#60a5fa', sub: 'Google searches', delta: searchComparison?.changePercent.impressions });
+        cards.push({ label: <><span>Search Clicks</span><Explainer term="clicks" /></>, value: overview.totalClicks.toLocaleString(), icon: MousePointerClick, color: CHART_SERIES_COLORS.blue, sub: overview.totalImpressions > 0 ? `${((overview.totalClicks / overview.totalImpressions) * 100).toFixed(1)}% CTR` : undefined, delta: searchComparison?.changePercent.clicks });
+        cards.push({ label: <><span>Impressions</span><Explainer term="impressions" /></>, value: overview.totalImpressions.toLocaleString(), icon: Eye, color: CHART_SERIES_COLORS.blue, sub: 'Google searches', delta: searchComparison?.changePercent.impressions });
       } else if (ga4Overview) {
-        cards.push({ label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), icon: BarChart3, color: '#60a5fa', sub: 'last period', delta: ga4Comparison?.changePercent.sessions });
+        cards.push({ label: 'Sessions', value: ga4Overview.totalSessions.toLocaleString(), icon: BarChart3, color: CHART_SERIES_COLORS.blue, sub: 'last period', delta: ga4Comparison?.changePercent.sessions });
       }
       if (strategyData) {
         const ranked = strategyData.pageMap.filter(p => p.currentPosition);
         if (ranked.length > 0) {
           const avgP = ranked.reduce((s, p) => s + (p.currentPosition || 0), 0) / ranked.length;
-          cards.push({ label: <><span>Avg Position</span><Explainer term="position" /></>, value: `#${avgP.toFixed(1)}`, icon: Target, color: avgP <= 10 ? '#34d399' : avgP <= 20 ? '#fbbf24' : '#60a5fa', sub: `${ranked.length} pages ranking` });
+          cards.push({ label: <><span>Avg Position</span><Explainer term="position" /></>, value: `#${avgP.toFixed(1)}`, icon: Target, color: avgP <= 10 ? CHART_SERIES_COLORS.emerald : avgP <= 20 ? CHART_SERIES_COLORS.amber : CHART_SERIES_COLORS.blue, sub: `${ranked.length} pages ranking` });
         }
       }
       const totalItems = cards.length + (audit ? 1 : 0);
@@ -360,7 +360,7 @@ export function OverviewTab({
       const postReviews = contentRequests.filter(r => r.status === 'post_review').length;
       if (!betaMode && briefReviews > 0) actions.push({ label: `${briefReviews} content brief${briefReviews > 1 ? 's' : ''} ready for review`, count: briefReviews, tab: 'inbox', inboxSection: 'reviews', color: 'text-accent-info', icon: 'content' });
       if (!betaMode && postReviews > 0) actions.push({ label: `${postReviews} post${postReviews > 1 ? 's' : ''} ready for review`, count: postReviews, tab: 'inbox', inboxSection: 'reviews', color: 'text-accent-info', icon: 'content' });
-      if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'inbox', inboxSection: 'conversations', color: 'text-accent-brand', icon: 'reply' });
+      if (unreadTeamNotes > 0) actions.push({ label: `${unreadTeamNotes} request${unreadTeamNotes > 1 ? 's' : ''} with new team replies`, count: unreadTeamNotes, tab: 'inbox', inboxSection: 'conversations', color: 'text-accent-info', icon: 'reply' });
       if (contentPlanSummary && contentPlanSummary.reviewCells > 0) actions.push({ label: `${contentPlanSummary.reviewCells} content plan page${contentPlanSummary.reviewCells > 1 ? 's' : ''} to review`, count: contentPlanSummary.reviewCells, tab: 'inbox', inboxSection: 'decisions', color: 'text-accent-info', icon: 'content-plan' });
       if (actions.length === 0) return null;
       const total = actions.reduce((s, a) => s + a.count, 0);
@@ -699,13 +699,13 @@ export function OverviewTab({
           const workEntries = activityLog.filter(e => WORK_TYPES.has(e.type)).slice(0, 5);
           if (workEntries.length === 0) return null;
           const icons: Record<string, { color: string; label: string }> = {
-            audit_completed: { color: '#60a5fa', label: 'Audit' },
-            request_resolved: { color: '#34d399', label: 'Done' },
-            approval_applied: { color: '#2dd4bf', label: 'Applied' },
-            seo_updated: { color: '#fbbf24', label: 'SEO' },
-            images_optimized: { color: '#38bdf8', label: 'Media' },
-            links_fixed: { color: '#fb923c', label: 'Links' },
-            content_updated: { color: '#2dd4bf', label: 'Content' },
+            audit_completed: { color: CHART_SERIES_COLORS.blue, label: 'Audit' },
+            request_resolved: { color: CHART_SERIES_COLORS.emerald, label: 'Done' },
+            approval_applied: { color: CHART_SERIES_COLORS.teal, label: 'Applied' },
+            seo_updated: { color: CHART_SERIES_COLORS.amber, label: 'SEO' },
+            images_optimized: { color: CHART_SERIES_COLORS.cyan, label: 'Media' },
+            links_fixed: { color: CHART_SERIES_COLORS.orange, label: 'Links' },
+            content_updated: { color: CHART_SERIES_COLORS.teal, label: 'Content' },
           };
           return (
             <SectionCard title="Recent Work" titleIcon={<Icon as={Activity} size="md" className="text-accent-brand" />}>
@@ -713,7 +713,7 @@ export function OverviewTab({
                 <div className="absolute left-[5px] top-1 bottom-1 w-px bg-[var(--surface-3)]" />
                 <div className="space-y-2.5">
                   {workEntries.map(entry => {
-                    const cfg = icons[entry.type] || { color: '#94a3b8', label: 'Note' };
+                    const cfg = icons[entry.type] || { color: '#94a3b8', label: 'Note' }; // chart-hex-ok — slate-400 fallback for unknown activity type, no CHART_SERIES_COLORS equivalent
                     return (
                       <div key={entry.id} className="flex items-start gap-2.5 pl-0">
                         <div className="w-[11px] h-[11px] rounded-[var(--radius-pill)] border-2 flex-shrink-0 mt-1 z-[var(--z-sticky)]" style={{ borderColor: cfg.color, backgroundColor: themeColor('#0f1219', '#f8fafc') }} />

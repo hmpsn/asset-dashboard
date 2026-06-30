@@ -56,10 +56,11 @@
           "source": "UX review 2026-06-30 · F5",
           "est": "M",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "owner": "design-system",
-          "notes": "Static counts are rendered in text-accent-brand (mint) across the overview ('3 active', '5 delivered', approvals count). Mint is the action color; on static numbers it makes everything read as clickable and dilutes real CTAs. Fix: recolor static counts to blue (data) or emerald (completed/positive); mint only on actual click targets. Do as a repo-wide grep for text-accent-brand / var(--teal) on non-interactive text — complements the existing report-style-drift.ts baseline. Highest-leverage, lowest-risk item.",
-          "createdAt": "2026-06-30"
+          "notes": "Static counts are rendered in text-accent-brand (mint) across the overview ('3 active', '5 delivered', approvals count). Mint is the action color; on static numbers it makes everything read as clickable and dilutes real CTAs. Fix: recolor static counts to blue (data) or emerald (completed/positive); mint only on actual click targets. Do as a repo-wide grep for text-accent-brand / var(--teal) on non-interactive text — complements the existing report-style-drift.ts baseline. Highest-leverage, lowest-risk item. [Wave 0b: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-workspace-home-statcard-hierarchy",
@@ -89,10 +90,11 @@
           "source": "UX review 2026-06-30 · WH-F3",
           "est": "S",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "owner": "design-system",
-          "notes": "The Users StatCard sets iconColor='#a78bfa' (purple) — a direct violation of the fourth color law (purple = admin AI only, never client-facing data). Several sibling cards also hardcode hex (#22d3ee, #4ade80, #f87171) instead of tokens. Fix: recolor Users to var(--blue) (it's a data metric); replace every hardcoded hex iconColor with a token so light mode + palette shifts stay correct; keep purple exclusive to AdminChat/admin intelligence. Pairs with the repo-wide color sweep. Artifact: ux-review-workspace-home.html.",
-          "createdAt": "2026-06-30"
+          "notes": "The Users StatCard sets iconColor='#a78bfa' (purple) — a direct violation of the fourth color law (purple = admin AI only, never client-facing data). Several sibling cards also hardcode hex (#22d3ee, #4ade80, #f87171) instead of tokens. Fix: recolor Users to var(--blue) (it's a data metric); replace every hardcoded hex iconColor with a token so light mode + palette shifts stay correct; keep purple exclusive to AdminChat/admin intelligence. Pairs with the repo-wide color sweep. Artifact: ux-review-workspace-home.html. [Wave 0b: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-x-hex-tokenize-sweep",
@@ -100,10 +102,11 @@
           "source": "Pre-plan audit 2026-06-30 · D4 (owner-approved scope add)",
           "est": "L",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "owner": "design-system",
-          "notes": "~50+ hardcoded hex instances beyond the 3 Law-4 purple cards (RedirectManager, SiteArchitecture, LocalSeoVisibilityPanel, GbpAuthenticatedReviewsPanel, OutcomeScorecard, matrix/CellDetailPanel, client charts, audit/*, etc.) map to existing CHART_SERIES_COLORS constants or tokens. Keep brand-justified (#059669 OpenAI, #ea580c Anthropic, chart-hex-ok) and CSS-var fallbacks. Add missing constants to src/components/ui/constants.ts. Wave 0b. See docs/superpowers/audits/2026-06-30-design-cleanup-audit.md §1b.",
-          "createdAt": "2026-06-30"
+          "notes": "~50+ hardcoded hex instances beyond the 3 Law-4 purple cards (RedirectManager, SiteArchitecture, LocalSeoVisibilityPanel, GbpAuthenticatedReviewsPanel, OutcomeScorecard, matrix/CellDetailPanel, client charts, audit/*, etc.) map to existing CHART_SERIES_COLORS constants or tokens. Keep brand-justified (#059669 OpenAI, #ea580c Anthropic, chart-hex-ok) and CSS-var fallbacks. Add missing constants to src/components/ui/constants.ts. Wave 0b. See docs/superpowers/audits/2026-06-30-design-cleanup-audit.md §1b. [Wave 0b: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-wh-setup-triplicated",
@@ -221,10 +224,11 @@
           "source": "UX review 2026-06-30 · CP-F4",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "owner": "design-system",
-          "notes": "The health summary renders brief/matrix counts in text-accent-brand (mint) and the posts count in text-accent-warning (amber) — static data wearing action/warning colors (same drift as CC-F5; amber implies a problem that isn't there). Fix: counts are data -> neutral bright (or blue); reserve amber for genuine decay/cannibalization warnings. Folds into the repo-wide color-law sweep (design-color-law-sweep-mint-on-data). Artifact: ux-review-content-pipeline.html.",
-          "createdAt": "2026-06-30"
+          "notes": "The health summary renders brief/matrix counts in text-accent-brand (mint) and the posts count in text-accent-warning (amber) — static data wearing action/warning colors (same drift as CC-F5; amber implies a problem that isn't there). Fix: counts are data -> neutral bright (or blue); reserve amber for genuine decay/cannibalization warnings. Folds into the repo-wide color-law sweep (design-color-law-sweep-mint-on-data). Artifact: ux-review-content-pipeline.html. [Wave 0b: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-x-menu-primitive",
@@ -265,10 +269,11 @@
           "source": "UX review 2026-06-30 · AC-F3",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "owner": "design-system",
-          "notes": "The 'POV may be out of date' banner uses raw Tailwind text-amber-400 / border-amber-500/30 / bg-amber-500/5 instead of the --amber token + the soft-warning surface convention (StatusBadge/InlineBanner). Won't follow palette/light-theme changes; a second way of spelling 'warning surface'. Fix: use the warning tokens + shared soft-amber convention. Pairs with WH-F3 / the color-law + tokenize-hardcoded-hex work. Artifact: ux-review-admin-cockpit.html.",
-          "createdAt": "2026-06-30"
+          "notes": "The 'POV may be out of date' banner uses raw Tailwind text-amber-400 / border-amber-500/30 / bg-amber-500/5 instead of the --amber token + the soft-warning surface convention (StatusBadge/InlineBanner). Won't follow palette/light-theme changes; a second way of spelling 'warning surface'. Fix: use the warning tokens + shared soft-amber convention. Pairs with WH-F3 / the color-law + tokenize-hardcoded-hex work. Artifact: ux-review-admin-cockpit.html. [Wave 0b: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-ac-add-rec-placement",
@@ -331,10 +336,11 @@
           "source": "UX review 2026-06-30 · CD-F5",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "owner": "design-system",
-          "notes": "Trial-countdown and trial-ended banners use raw bg-amber-500/8 border-amber-500/20 and bg-red-500/8 border-red-500/20 mixed with text-accent-warning/danger token classes — a half-tokenized warning surface and a third spelling of 'amber notice' alongside InlineBanner and the cockpit staleness nudge (AC-F3). Fix: route both through InlineBanner (or its token-backed warning/danger variants) so every alert surface shares one definition. Folds into the tokenize-hardcoded-hex theme. Artifact: ux-review-client-shell.html.",
-          "createdAt": "2026-06-30"
+          "notes": "Trial-countdown and trial-ended banners use raw bg-amber-500/8 border-amber-500/20 and bg-red-500/8 border-red-500/20 mixed with text-accent-warning/danger token classes — a half-tokenized warning surface and a third spelling of 'amber notice' alongside InlineBanner and the cockpit staleness nudge (AC-F3). Fix: route both through InlineBanner (or its token-backed warning/danger variants) so every alert surface shares one definition. Folds into the tokenize-hardcoded-hex theme. Artifact: ux-review-client-shell.html. [Wave 0b: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-x-gradient-card-variant",

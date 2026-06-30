@@ -10,7 +10,7 @@ import { normalizePageUrl } from '../lib/pathUtils';
 import { redirects } from '../api/misc';
 import { clientActions } from '../api/clientActions';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../hooks/useToggleSet';
-import { themeColor } from './ui/constants';
+import { themeColor, CHART_SERIES_COLORS } from './ui/constants';
 
 interface RedirectHop {
   url: string;
@@ -278,10 +278,10 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Healthy" value={summary.healthy} icon={CheckCircle} iconColor="#34d399" valueColor="text-emerald-400" size="hero" staggerIndex={0} />
-        <StatCard label="Redirecting" value={summary.redirecting} icon={ArrowRight} iconColor="#fbbf24" valueColor="text-amber-400" size="hero" staggerIndex={1} />
-        <StatCard label="404s" value={summary.notFound} icon={Ban} iconColor="#f87171" valueColor="text-red-400" size="hero" staggerIndex={2} />
-        <StatCard label="Chains" value={summary.chainsDetected} icon={Link2} iconColor="#2dd4bf" valueColor="text-teal-400" sub={summary.longestChain > 1 ? `longest: ${summary.longestChain} hops` : undefined} size="hero" staggerIndex={3} />
+        <StatCard label="Healthy" value={summary.healthy} icon={CheckCircle} iconColor={CHART_SERIES_COLORS.emerald} valueColor="text-emerald-400" size="hero" staggerIndex={0} />
+        <StatCard label="Redirecting" value={summary.redirecting} icon={ArrowRight} iconColor={CHART_SERIES_COLORS.amber} valueColor="text-amber-400" size="hero" staggerIndex={1} />
+        <StatCard label="404s" value={summary.notFound} icon={Ban} iconColor={CHART_SERIES_COLORS.red} valueColor="text-red-400" size="hero" staggerIndex={2} />
+        <StatCard label="Chains" value={summary.chainsDetected} icon={Link2} iconColor={CHART_SERIES_COLORS.teal} valueColor="text-teal-400" sub={summary.longestChain > 1 ? `longest: ${summary.longestChain} hops` : undefined} size="hero" staggerIndex={3} />
       </div>
 
       {/* Redirect Chains */}
@@ -449,7 +449,7 @@ export function RedirectManager({ siteId, workspaceId }: Props) {
               className="rounded-[var(--radius-sm)] font-medium"
               style={filter === f.id ? {
                 backgroundColor: 'rgba(45,212,191,0.1)',
-                color: '#2dd4bf',
+                color: CHART_SERIES_COLORS.teal,
               } : {
                 color: themeColor('#71717a', '#94a3b8'),
               }}

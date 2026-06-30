@@ -4,6 +4,7 @@ import {
   useSyncGbpAuthenticatedReviews,
 } from '../../hooks/admin/useGoogleBusinessProfile';
 import { Badge, Button, EmptyState, ErrorState, SectionCard, StatCard } from '../ui';
+import { CHART_SERIES_COLORS } from '../ui/constants';
 
 function formatRating(value?: number): string {
   return typeof value === 'number' ? value.toFixed(1) : '-';
@@ -101,10 +102,10 @@ export function GbpAuthenticatedReviewsPanel({ workspaceId }: { workspaceId: str
         )}
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard label="Average" value={formatRating(data.aggregate.averageRating)} icon={Star} iconColor="#60a5fa" valueColor="text-blue-400" sub={`${data.aggregate.totalReviewCount} total`} />
-          <StatCard label="Stored" value={data.aggregate.storedReviewCount} icon={Star} iconColor="#60a5fa" valueColor="text-blue-400" sub="synced review subset" />
-          <StatCard label="Stored unanswered" value={data.aggregate.unansweredCount} icon={MessageSquareReply} iconColor="#f59e0b" valueColor={data.aggregate.unansweredCount > 0 ? 'text-amber-400' : 'text-emerald-400'} sub="need reply triage" />
-          <StatCard label="Stored low rating" value={data.aggregate.lowRatingCount} icon={AlertTriangle} iconColor="#f87171" valueColor={data.aggregate.lowRatingCount > 0 ? 'text-red-400' : 'text-emerald-400'} sub={`Newest ${formatDate(data.aggregate.newestReviewAt)}`} />
+          <StatCard label="Average" value={formatRating(data.aggregate.averageRating)} icon={Star} iconColor={CHART_SERIES_COLORS.blue} valueColor="text-blue-400" sub={`${data.aggregate.totalReviewCount} total`} />
+          <StatCard label="Stored" value={data.aggregate.storedReviewCount} icon={Star} iconColor={CHART_SERIES_COLORS.blue} valueColor="text-blue-400" sub="synced review subset" />
+          <StatCard label="Stored unanswered" value={data.aggregate.unansweredCount} icon={MessageSquareReply} iconColor={CHART_SERIES_COLORS.amber} valueColor={data.aggregate.unansweredCount > 0 ? 'text-amber-400' : 'text-emerald-400'} sub="need reply triage" />
+          <StatCard label="Stored low rating" value={data.aggregate.lowRatingCount} icon={AlertTriangle} iconColor={CHART_SERIES_COLORS.red} valueColor={data.aggregate.lowRatingCount > 0 ? 'text-red-400' : 'text-emerald-400'} sub={`Newest ${formatDate(data.aggregate.newestReviewAt)}`} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">

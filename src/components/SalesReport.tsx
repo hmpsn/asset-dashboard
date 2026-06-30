@@ -141,7 +141,7 @@ export function SalesReport() {
         {/* URL Input */}
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
-            <div className="w-14 h-14 rounded-[var(--radius-xl)] flex items-center justify-center mx-auto mb-4" style={{ background: 'linear-gradient(135deg, #2dd4bf, #14b8a6)' }}>
+            <div className="w-14 h-14 rounded-[var(--radius-xl)] flex items-center justify-center mx-auto mb-4" style={{ background: 'linear-gradient(135deg, #2dd4bf, #14b8a6)' }}> {/* chart-hex-ok — teal gradient in branded icon well; no CSS-var token for inline gradient string */}
               <Globe className="w-7 h-7 text-black" />
             </div>
             <h2 className="text-xl font-bold text-[var(--brand-text-bright)]">Sales SEO Report</h2>

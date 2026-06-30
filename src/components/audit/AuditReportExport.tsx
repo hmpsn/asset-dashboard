@@ -32,6 +32,8 @@ export function getCSV(data: SeoAuditResult): string {
   return rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
 }
 
+// chart-hex-ok — all hex values below are in an HTML export string for a standalone browser report (PDF-printable).
+// They cannot reference JS constants and are intentional export/print colors, not chart series colors.
 export function generateHtmlReport(data: SeoAuditResult): string {
   const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const errorPages = data.pages.filter(p => p.score < 60);

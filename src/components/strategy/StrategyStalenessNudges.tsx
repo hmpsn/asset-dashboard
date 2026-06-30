@@ -17,7 +17,7 @@ export function StrategyStalenessNudges({
     <>
       {/* ── Unvalidated Strategy Warning ── */}
       {!hasVolumeValidation && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-[var(--radius-lg)] px-4 py-3 flex items-start gap-2.5">
+        <div className="bg-accent-warning-soft border border-accent-warning-soft rounded-[var(--radius-lg)] px-4 py-3 flex items-start gap-2.5">
           <Icon as={AlertTriangle} size="md" className="text-accent-warning flex-shrink-0 mt-0.5" />
           <div className="t-caption text-accent-warning leading-relaxed">
             <strong className="text-accent-warning">This strategy was generated without keyword volume validation.</strong>{' '}
@@ -30,7 +30,7 @@ export function StrategyStalenessNudges({
       {localSyncApplies && strategyStaleVsLocal && dismissedRefreshAt !== lastLocalRefreshAt && (
         <div
           data-testid="reverse-staleness-nudge"
-          className="bg-amber-500/10 border border-amber-500/30 rounded-[var(--radius-lg)] px-4 py-3 flex items-start gap-2.5"
+          className="bg-accent-warning-soft border border-accent-warning-soft rounded-[var(--radius-lg)] px-4 py-3 flex items-start gap-2.5"
         >
           <Icon as={AlertTriangle} size="md" className="text-accent-warning flex-shrink-0 mt-0.5" />
           <div className="flex-1 t-caption text-accent-warning leading-relaxed">

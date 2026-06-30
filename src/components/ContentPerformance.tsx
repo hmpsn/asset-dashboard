@@ -66,7 +66,7 @@ function TrendChart({ trend }: { trend: TrendPoint[] }) {
               </div>
             );
           }} />
-          <Line yAxisId="imps" type="monotone" dataKey="impressions" stroke="#22d3ee" strokeWidth={1.5} strokeOpacity={0.5} dot={false} isAnimationActive={false} /> {/* chart-hex-ok — cyan-400 for impressions axis contrast */}
+          <Line yAxisId="imps" type="monotone" dataKey="impressions" stroke={CHART_SERIES_COLORS.cyan} strokeWidth={1.5} strokeOpacity={0.5} dot={false} isAnimationActive={false} />
           <Line yAxisId="clicks" type="monotone" dataKey="clicks" stroke={CHART_SERIES_COLORS.blue} strokeWidth={2} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
@@ -104,10 +104,10 @@ function coverageLabel(item: ContentItem): string {
 const PAGE_TYPE_COLORS: Record<string, string> = {
   blog: 'bg-blue-500/10 text-accent-info border-blue-500/20',
   landing: 'bg-blue-500/10 text-accent-info border-blue-500/20',
-  service: 'bg-teal-500/10 text-accent-brand border-teal-500/20',
+  service: 'bg-blue-500/10 text-accent-info border-blue-500/20',
   location: 'bg-amber-500/10 text-accent-warning border-amber-500/20',
   product: 'bg-emerald-500/10 text-accent-success border-emerald-500/20',
-  pillar: 'bg-teal-500/10 text-accent-brand border-teal-500/20',
+  pillar: 'bg-blue-500/10 text-accent-info border-blue-500/20',
   resource: 'bg-amber-500/10 text-accent-warning border-amber-500/20',
 };
 
@@ -266,7 +266,7 @@ export function ContentPerformance({ workspaceId }: Props) {
                         <Badge label={item.status} tone={item.status === 'published' ? 'emerald' : 'blue'} />
                         <Badge label={coverageLabel(item)} tone={coverageTone(item.coverage.status)} />
                         {item.source === 'matrix' && (
-                          <span className="flex items-center gap-0.5 t-micro px-1.5 py-0.5 rounded-[var(--radius-pill)] badge-span-ok bg-teal-500/10 text-accent-brand border border-teal-500/20">
+                          <span className="flex items-center gap-0.5 t-micro px-1.5 py-0.5 rounded-[var(--radius-pill)] badge-span-ok bg-blue-500/10 text-accent-info border border-blue-500/20">
                             <Icon as={Layers} size="sm" /> Content Plan
                           </span>
                         )}

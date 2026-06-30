@@ -75,7 +75,7 @@ export function applyRewriteToSection(
   const paragraph = docBody.ownerDocument.createElement('p');
   paragraph.textContent = content;
   paragraph.className = 't-caption text-slate-500 leading-[1.7] mb-3'; // arbitrary-text-ok
-  paragraph.style.cssText = 'background-color:rgba(13,148,136,0.2);border-left:2px solid #0d9488;padding-left:10px;transition:background-color 2s ease,border-left 2s ease,padding-left 2s ease';
+  paragraph.style.cssText = 'background-color:rgba(13,148,136,0.2);border-left:2px solid #0d9488;padding-left:10px;transition:background-color 2s ease,border-left 2s ease,padding-left 2s ease'; // chart-hex-ok — #0d9488 (teal-600) is a transient JS-driven insertion highlight on a contenteditable element; cannot use CSS token or CHART_SERIES_COLORS in cssText string
 
   if (heading ?? docBody.lastElementChild) {
     (heading ?? docBody.lastElementChild!).insertAdjacentElement('afterend', paragraph);
