@@ -75,6 +75,7 @@ import llmsTxtRoutes from './routes/llms-txt.js';
 import competitorSchemaRoutes from './routes/competitor-schema.js';
 import { aiStatsRoutes } from './routes/ai-stats.js';
 import featuresRouter from './routes/features.js';
+import mcpApiKeysRouter from './routes/mcp-api-keys.js';
 import outcomesRouter from './routes/outcomes.js';
 import intelligenceRouter from './routes/intelligence.js';
 import debugRouter from './routes/debug.js';
@@ -378,6 +379,7 @@ export function createApp(): express.Express {
     return res.status(403).json({ error: 'Admin access required' });
   }, aiStatsRoutes);
   app.use(featuresRouter);
+  app.use(mcpApiKeysRouter);
   app.use(outcomesRouter);
   app.use(intelligenceRouter);
   app.use(debugRouter);

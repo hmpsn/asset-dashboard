@@ -306,15 +306,27 @@
         },
         {
           "id": "mcp-admin-key-minting-ui",
-          "title": "Follow-up — admin UI/route to mint/list/revoke per-workspace MCP API keys + caller-label attribution",
+          "title": "Follow-up — admin UI/route to mint/list/revoke per-workspace MCP API keys",
           "source": "PR #1411",
           "est": "M",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "plannedSprint": "deferred",
           "createdAt": "2026-06-29",
           "owner": "integrations",
-          "notes": "PR #1411 added the per-workspace key STORE (createMcpApiKey/findActiveKeyByHash/revokeMcpApiKey in server/mcp/api-keys.ts) + scope enforcement, but no admin surface to create/list/revoke keys yet (forward-looking infra — only the master key is in use today). Add an admin route + UI. Also thread req.mcpAuth.label into the addActivity({source:'mcp-chat'}) calls so delegated mutations are attributable per key."
+          "notes": "DONE. Admin Settings surface (Settings → MCP API Keys, src/components/McpApiKeysSettings.tsx) + global admin route (server/routes/mcp-api-keys.ts, requireAdminAuth/HMAC-only — JWT client users fully excluded, so no workspace-access guard needed; documented inline hatch): GET list-all (metadata only, workspace-name enriched, masterKeyConfigured flag), POST mint (workspace picker + label → plaintext revealed ONCE via copy-to-clipboard callout), DELETE revoke (ConfirmDialog → 200, 409 if already revoked, 404 unknown). Added listMcpApiKeys(workspaceId?) to server/mcp/api-keys.ts (never leaks key_hash/plaintext). New shared/types/mcp-api-keys.ts, src/api/mcpApiKeys.ts, src/hooks/admin/useMcpApiKeys.ts, queryKeys.admin.mcpApiKeys(). 2 admin-only ActivityTypes (mcp_key_created/mcp_key_revoked, deliberately NOT in CLIENT_VISIBLE_TYPES). Tests: integration mcp-api-keys-admin (create→list-no-secret→/mcp auth works→revoke→/mcp 401→404/409 paths) + component McpApiKeysSettings (loaded/empty/create-reveal, real hooks). Four Laws compliant (teal actions, emerald active badge, no purple). The caller-label attribution half is split to mcp-key-label-attribution."
+        },
+        {
+          "id": "mcp-key-label-attribution",
+          "title": "Follow-up — thread req.mcpAuth.label into MCP write-tool addActivity calls (per-key attribution)",
+          "source": "PR #1411",
+          "est": "M",
+          "priority": "P3",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-30",
+          "owner": "integrations",
+          "notes": "Split from mcp-admin-key-minting-ui (its store + scope enforcement + minting UI are done). What remains: attribute delegated MCP write actions to the authenticating key. handleMcpRequest has req.mcpAuth.{label,keyId,scope} but the tool handlers (handleContentTool/handleInsightTool/etc.) receive only (name,args) and call addActivity with source:'mcp-chat' and no key identity. Plumb the auth label/keyId into the handler signatures (or a shared context arg) and into each write tool's addActivity actor/metadata so an operator can see WHICH key drove a mutation. Cross-cutting across the ~6 tool-category files + their tests; ship as its own PR."
         },
         {
           "id": "mcp-per-workspace-paid-attribution",

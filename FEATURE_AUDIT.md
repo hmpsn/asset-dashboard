@@ -1,8 +1,18 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **539 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **540 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 540. Admin MCP API key management (Settings → MCP API Keys)
+
+**What it does:** Adds the admin surface for the per-workspace MCP API keys whose store + scope enforcement shipped in PR #1411. A new section in global Settings (`McpApiKeysSettings.tsx`) lists every per-workspace key across all workspaces (workspace name, label, created / last-used, Active/Revoked status) and shows whether the env `MCP_API_KEY` master key is configured. The operator mints a key by picking a workspace + label; the plaintext is revealed **exactly once** in a copy-to-clipboard callout (only a sha256 hash is stored — a lost key is rotated, not recovered) and revokes a key via a confirmation dialog. Backed by a global admin route (`server/routes/mcp-api-keys.ts`, HMAC-only `requireAdminAuth` — JWT client users are fully excluded) with GET (list — metadata only, never the hash/plaintext), POST (mint), DELETE (revoke; 409 if already revoked, 404 unknown). Mint/revoke are recorded as two admin-only activity types (`mcp_key_created` / `mcp_key_revoked`, deliberately kept out of `CLIENT_VISIBLE_TYPES`). From the 2026-06-26 MCP surface audit follow-up (`mcp-admin-key-minting-ui`).
+
+**Why it matters to the agency:** Until now the per-workspace keys could only be minted in code (the all-workspace master key was the only key in real use). The agency can now hand a scoped, revocable key to any MCP client (a teammate's Claude desktop, an automation) that may act on exactly one workspace — and rotate or kill it instantly from the dashboard if it leaks — without ever exposing the master key. One-time reveal + hash-only storage means the platform never holds a recoverable secret.
+
+**Why it matters to clients:** Indirect but real — a leaked or over-broad agency credential is a cross-tenant data risk. Per-workspace scoping plus instant revocation keeps any key an operator issues blast-radius-limited to a single client's workspace, and the activity log records who minted/revoked it.
 
 ---
 
