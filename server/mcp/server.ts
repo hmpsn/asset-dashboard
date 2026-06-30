@@ -14,6 +14,7 @@ import { brandTools, handleBrandTool } from './tools/brand.js';
 import { clientTools, handleClientTool } from './tools/clients.js';
 import { keywordActionTools, handleKeywordActionTool } from './tools/keyword-actions.js';
 import { contentActionTools, handleContentActionTool } from './tools/content-actions.js';
+import { recommendationActionTools, handleRecommendationActionTool } from './tools/recommendation-actions.js';
 import { jobActionTools, handleJobActionTool } from './tools/job-actions.js';
 import { MCP_SERVER_INSTRUCTIONS } from './instructions.js';
 
@@ -28,6 +29,7 @@ const ALL_TOOLS = [
   ...clientTools,
   ...keywordActionTools,
   ...contentActionTools,
+  ...recommendationActionTools,
   ...jobActionTools,
 ];
 
@@ -74,6 +76,9 @@ function createMcpServer() {
     }
     if (contentActionTools.some(t => t.name === name)) {
       return handleContentActionTool(name, safeArgs);
+    }
+    if (recommendationActionTools.some(t => t.name === name)) {
+      return handleRecommendationActionTool(name, safeArgs);
     }
     if (jobActionTools.some(t => t.name === name)) {
       return handleJobActionTool(name, safeArgs);

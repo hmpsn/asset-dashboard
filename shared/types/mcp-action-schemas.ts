@@ -458,6 +458,26 @@ export const createContentRequestInputSchema = z.object({
     .describe('When true, skip creating a duplicate request if a matching topic/keyword request already exists.'),
 }).strict();
 
+// --- Recommendation lifecycle tool input schemas ---------------------------
+
+export const listRecommendationsInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  filter: z.enum(['active', 'all']).optional()
+    .describe("Which recommendations to return: 'active' (default — only the live, surfaceable set: not completed/dismissed/struck/throttled and not already sent to the client) or 'all' (every recommendation regardless of lifecycle/clientStatus)."),
+}).strict();
+export type ListRecommendationsInput = z.infer<typeof listRecommendationsInputSchema>;
+
+export const applyRecommendationInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  recommendation_id: z.string().min(1)
+    .describe('The id of the recommendation to act on (from list_recommendations).'),
+  action: z.enum(['send', 'throttle', 'strike'])
+    .describe("Lifecycle action: 'send' (deliver the curated rec to the client — clientStatus → sent), 'throttle' (hide it for a fixed window — lifecycle → throttled; requires throttle_days), or 'strike' (permanently suppress it so it is never re-suggested — lifecycle → struck)."),
+  throttle_days: z.union([z.literal(7), z.literal(30), z.literal(90)]).optional()
+    .describe('Required when action is `throttle`: how many days to hide the recommendation (7, 30, or 90). The rec auto-resurfaces on-read once the window passes. Ignored for send/strike.'),
+}).strict();
+export type ApplyRecommendationInput = z.infer<typeof applyRecommendationInputSchema>;
+
 export const createWorkspaceInputSchema = z.object({
   name: z.string().trim().min(1).max(200)
     .describe('Display name for the new workspace (client).'),
