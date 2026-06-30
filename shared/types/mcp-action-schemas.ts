@@ -3,6 +3,7 @@ import {
   LOCAL_SEO_DEVICE,
   LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP,
 } from './local-seo.js';
+import { CONTENT_GENERATION_STYLES } from './content.js';
 
 // --- Shared building blocks -------------------------------------------------
 
@@ -772,6 +773,32 @@ export const cancelJobInputSchema = z.object({
     .describe('The id of the running background job to cancel.'),
 });
 
+// --- Grounded content generation job schemas --------------------------------
+
+export const startBriefGenerationInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  target_keyword: z.string().trim().min(1).max(300).optional()
+    .describe('[Paid API] The primary keyword to build the brief around. Required for a standalone brief; omit only when request_id is supplied (the brief is then keyed off that content request\'s keyword).'),
+  request_id: z.string().trim().min(1).optional()
+    .describe('Optional id of an existing content request to generate the brief for. When supplied, the brief is generated from that request (pulling its keyword, intent, and page type) and the request is advanced to brief_generated. Omit for a standalone brief driven by target_keyword.'),
+  business_context: z.string().trim().max(4000).optional()
+    .describe('Optional extra business context to ground the brief (services, audience, differentiators). Ignored on the request path. Falls back to the workspace strategy business context when omitted.'),
+  page_type: pageTypeSchema.optional()
+    .describe('Optional page type the brief targets (blog, landing, service, location, product, pillar, resource). Shapes the outline and structure. Ignored on the request path (the request\'s own page type wins).'),
+  reference_urls: z.array(z.string().url()).max(5).optional()
+    .describe('Optional list of up to 5 reference URLs (http/https) to scrape for grounding evidence. Standalone path only.'),
+  generation_style: z.enum(CONTENT_GENERATION_STYLES).optional()
+    .describe('Optional writing style for the brief and downstream post: standard, concise, or hybrid.'),
+}).strict();
+
+export const startPostGenerationInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  brief_id: z.string().trim().min(1)
+    .describe('[Paid API] The id of the saved content brief to generate a full post from. The brief\'s outline, keyword, and target word count drive grounded section-by-section generation. Required.'),
+  generation_style: z.enum(CONTENT_GENERATION_STYLES).optional()
+    .describe('Optional writing style override for the post: standard, concise, or hybrid. Defaults to the brief\'s own style.'),
+}).strict();
+
 const pageKeywordEntrySchema = z.object({
   pagePath: z.string().min(1),
   pageTitle: z.string().min(1),
@@ -845,6 +872,8 @@ export type StartLocalSeoRefreshInput = z.infer<typeof startLocalSeoRefreshInput
 export type GetJobStatusInput = z.infer<typeof getJobStatusInputSchema>;
 export type ListJobsInput = z.infer<typeof listJobsInputSchema>;
 export type CancelJobInput = z.infer<typeof cancelJobInputSchema>;
+export type StartBriefGenerationInput = z.infer<typeof startBriefGenerationInputSchema>;
+export type StartPostGenerationInput = z.infer<typeof startPostGenerationInputSchema>;
 export type GetKeywordStrategyInput = z.infer<typeof getKeywordStrategyInputSchema>;
 export type RemovePageKeywordInput = z.infer<typeof removePageKeywordInputSchema>;
 export type AddKeywordsBatchInput = z.infer<typeof addKeywordsBatchInputSchema>;
