@@ -140,7 +140,7 @@ describe('mcp server routing', () => {
   });
 
   it('constructs the Server with the agent instructions string in its options', async () => {
-    await handleMcpRequest({ body: {} } as never, {} as never);
+    await handleMcpRequest({ body: {}, mcpAuth: { scope: 'all' } } as never, {} as never);
 
     const server = h.serverInstances.at(-1);
     expect(server).toBeDefined();
@@ -152,7 +152,7 @@ describe('mcp server routing', () => {
   });
 
   it('registers list + call handlers and dispatches each tool family', async () => {
-    await handleMcpRequest({ body: {} } as never, {} as never);
+    await handleMcpRequest({ body: {}, mcpAuth: { scope: 'all' } } as never, {} as never);
 
     const server = h.serverInstances.at(-1);
     expect(server).toBeDefined();
@@ -214,7 +214,7 @@ describe('mcp server routing', () => {
   });
 
   it('creates stateless transport and closes server after handling request', async () => {
-    const req = { body: { jsonrpc: '2.0', method: 'tools/list' } };
+    const req = { body: { jsonrpc: '2.0', method: 'tools/list' }, mcpAuth: { scope: 'all' } };
     const res = {};
 
     await handleMcpRequest(req as never, res as never);
@@ -231,7 +231,7 @@ describe('mcp server routing', () => {
 
   it('still closes server when request handling throws', async () => {
     h.state.throwOnHandle = true;
-    await expect(handleMcpRequest({ body: {} } as never, {} as never)).rejects.toThrow('transport boom');
+    await expect(handleMcpRequest({ body: {}, mcpAuth: { scope: 'all' } } as never, {} as never)).rejects.toThrow('transport boom');
 
     const server = h.serverInstances.at(-1);
     expect(server?.close).toHaveBeenCalledTimes(1);
