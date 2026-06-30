@@ -8595,3 +8595,20 @@ Service and location page brief defaults are now shorter and more conversion-den
 **Tests:** `tests/component/client/ClientHeader.test.tsx` (8 badge tests: render, content-plan aggregation, singular/plural, deep-link, flag-off + free-tier + zero-count gating, >99 cap); `tests/unit/compute-roi-outcome-verdict.test.ts` (+1: per-type priorPeriod populated + per-type sums reconcile with the aggregate). Full suite + typecheck + pr-check + lint:hooks + verify:feature-flags green; flag-ON browser smoke on seeded premium/empty workspaces.
 
 **Files:** `src/api/client.ts`; `src/components/client/ClientHeader.tsx`; `src/components/ClientDashboard.tsx`; `src/components/client/the-issue/TheIssueClientPage.tsx`; `server/roi.ts`; `tests/component/client/ClientHeader.test.tsx`; `tests/components/client/client-components.test.tsx`; `tests/unit/compute-roi-outcome-verdict.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 607. The Issue (Client) — "Your next bets" $-forecast band (P1) 2026-06-30
+**Status:** Shipped to staging behind `the-issue-client-next-bets` (flipped reserved→active; default OFF / dark). Follow-up phase after the lightup batch (#1427), per phase-per-PR. Adversarially reviewed before PR.
+
+**What it does:** A compact "Your next bets" `SectionCard` in the client verdict spine (above the content plan) that reframes the top ~3 recommended moves as a forward-looking **dollar forecast**. Each bet shows a conservative banded monthly $ range (from the client-safe `ImpactBand.monthlyRangeUsd` — already floored at $25, capped at $2,000, and stripped of the admin-only `emvPerWeek` server-side) plus an **outcome-unit equivalent shown only when it rounds to ≥1** (e.g. "≈ 1–2 new patients/mo", derived from the verdict's `valuePerOutcome`) — a deliberate framing decision so a "$300 ÷ $850 ≈ 0.4 patients" line never reads as noise. A header sums the combined projection ("We project ~$X–Y/mo from your next N moves"), and each bet carries an "Act on this" greenlight (the same `useActOnRecommendation` content-request path the plan uses). Renders nothing when no rec carries a $ band (below the display floor) — never a non-actionable placeholder.
+
+**Architecture:** Pure, unit-tested forecast helper (`nextBetsForecast.ts` — filter to forecastable recs, sort by `opportunity.value ?? impactScore`, sum the bands, compute outcome-units with the ≥1 gate) + a prop-driven `IssueNextBetsSection` component, mounted in `TheIssueClientPage` behind a top-level (Rules-of-Hooks-safe) `useFeatureFlag('the-issue-client-next-bets')` read with a test-override prop. Flag-OFF the band never mounts (byte-identical legacy path).
+
+**Why it matters to the agency:** Turns the vague per-rec `estimatedGain` strings into a credible, conservative $ story for the retainer conversation — "your next three moves project ~$X/mo" — sourced from the same floored/capped band the Health tab already uses, so it never over-promises.
+
+**Why it matters to clients:** A glanceable, honest answer to "what are my next moves worth?" for a check-signer, framed in dollars (and whole outcomes when meaningful), with one-tap "Act on this" — without surfacing internal AI/EMV jargon.
+
+**Tests:** `tests/unit/nextBetsForecast.test.ts` (6 — filter/sort/cap, $ sums, outcome-≥1 gate, no-per-outcome-value, sub-1 per-bet but combined ≥1) + `tests/component/client/IssueNextBetsSection.test.tsx` (6 — populated render, empty/null render, act-on, outcome display + omission, pending). typecheck + lint:hooks + pr-check + verify:feature-flags green; flag-ON browser smoke (no crash, graceful empty, correct gating — demo workspaces seed 0 recs so the populated state is test-covered + data-shape type-verified).
+
+**Files:** `src/components/client/the-issue/nextBetsForecast.ts`; `src/components/client/the-issue/IssueNextBetsSection.tsx`; `src/components/client/the-issue/TheIssueClientPage.tsx`; `shared/types/feature-flags.ts`; `tests/unit/nextBetsForecast.test.ts`; `tests/component/client/IssueNextBetsSection.test.tsx`; `FEATURE_AUDIT.md`; `data/roadmap.json`.

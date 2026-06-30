@@ -465,9 +465,9 @@
           "source": "docs/superpowers/specs/2026-06-20-the-issue-client-redesign-design.md",
           "est": "TBD",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-06-20",
-          "notes": "Deferred. Flag: the-issue-client-next-bets (declared OFF)."
+          "notes": "Deferred. Flag: the-issue-client-next-bets (declared OFF). || [DONE 2026-06-30]: shipped the 'Your next bets' $-forecast band — a compact SectionCard above the plan reframing the top ~3 recommended moves as a banded monthly $ projection (from the client-safe ImpactBand.monthlyRangeUsd, never raw emvPerWeek) with outcome-units shown only when they round to ≥1 (owner framing decision). Each bet carries an 'Act on this' greenlight (reuses useActOnRecommendation). Pure forecast helper (nextBetsForecast.ts) + IssueNextBetsSection mounted in TheIssueClientPage behind the flag (read at top level, Rules-of-Hooks-safe). Flag flipped reserved→active (default false / dark). 12 tests (6 helper + 6 component). Gated on the spine-ON branch; renders nothing when no rec carries a $ band. Flag-ON smoke: no crash, graceful empty (demo workspaces seed 0 recs). Separate follow-up PR off staging after the lightup batch (#1427)."
         }
       ]
     },
