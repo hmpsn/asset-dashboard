@@ -5,6 +5,8 @@ on:
     branches: [main, staging]
   pull_request:
     branches: [main, staging]
+    # `ready_for_review` so marking a draft PR ready triggers e2e (it is draft-gated below).
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -15,12 +17,13 @@ env:
 
 # Spend policy (mirrors ci.yml's test matrix):
 #   - The heavy e2e jobs (build + Playwright shards + report merge) run on
-#     PULL REQUESTS ONLY. A push to main/staging does NOT re-run e2e — the PR
-#     that produced the commit already ran it on the same code, and the `quality`
-#     job in ci.yml still re-validates typecheck/build/pr-check on the push.
-#   - On a push event the `changes` + `e2e` status jobs still run (cheap) so the
-#     `e2e` required-status check keeps reporting green; it short-circuits when
-#     the event is not a pull_request.
+#     NON-DRAFT PULL REQUESTS ONLY. A push to main/staging does NOT re-run e2e
+#     (the PR already ran it; ci.yml's `quality` still re-validates on push), and
+#     a DRAFT PR skips e2e too — mark the PR "ready for review" to run it. You
+#     cannot merge a draft, so e2e always runs before a merge.
+#   - On a push / draft / no-change event the `changes` + `e2e` status jobs still
+#     run (cheap) so the `e2e` status check keeps reporting; the status job only
+#     fails on a real job `failure`, never on an intentional skip.
 #   - All npm-ci jobs reuse the lockfile-keyed node_modules cache SHARED with
 #     ci.yml (identical key), so the native better-sqlite3/sharp rebuild is paid
 #     at most once per lockfile instead of 4x per e2e run.
@@ -28,6 +31,7 @@ env:
 jobs:
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
@@ -54,9 +58,10 @@ jobs:
 
   e2e-build:
     needs: changes
-    # PR-only (spend policy above): never re-run on main/staging push.
-    if: needs.changes.outputs.e2e == 'true' && github.event_name == 'pull_request'
+    # Spend policy: e2e-relevant changes, on a pull_request, that is NOT a draft.
+    if: needs.changes.outputs.e2e == 'true' && github.event_name == 'pull_request' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: read
@@ -96,8 +101,8 @@ jobs:
 
   e2e-shard:
     needs: [changes, e2e-build]
-    # PR-only (spend policy above): never re-run on main/staging push.
-    if: needs.changes.outputs.e2e == 'true' && github.event_name == 'pull_request'
+    # Spend policy: e2e-relevant changes, on a pull_request, that is NOT a draft.
+    if: needs.changes.outputs.e2e == 'true' && github.event_name == 'pull_request' && github.event.pull_request.draft == false
     strategy:
       fail-fast: false
       matrix:
@@ -172,9 +177,10 @@ jobs:
 
   e2e-merge-report:
     needs: [changes, e2e-shard]
-    # PR-only (spend policy above): never re-run on main/staging push.
-    if: needs.changes.outputs.e2e == 'true' && github.event_name == 'pull_request'
+    # Spend policy: e2e-relevant changes, on a pull_request, that is NOT a draft.
+    if: needs.changes.outputs.e2e == 'true' && github.event_name == 'pull_request' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -227,6 +233,7 @@ jobs:
     if: always()
     needs: [changes, e2e-build, e2e-shard, e2e-merge-report]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: E2E status check
         env:
@@ -236,31 +243,17 @@ jobs:
           SHARD_RESULT: ${{ needs.e2e-shard.result }}
           MERGE_RESULT: ${{ needs.e2e-merge-report.result }}
         run: |
-          echo "event:        $EVENT_NAME"
-          echo "e2e needed:   $E2E_NEEDED"
-          echo "build result: $BUILD_RESULT"
-          echo "shard result: $SHARD_RESULT"
-          echo "merge result: $MERGE_RESULT"
-          # e2e is PR-only (spend policy). On any non-PR event (e.g. push to
-          # main/staging) the heavy jobs are intentionally skipped, so this
-          # status check passes trivially — the PR already ran e2e on this code.
-          if [[ "$EVENT_NAME" != "pull_request" ]]; then
-            echo "e2e is PR-only; skipping enforcement on $EVENT_NAME event."
-            exit 0
-          fi
-          if [[ "$E2E_NEEDED" != "true" ]]; then
-            echo "Skipping E2E: no E2E-relevant file changes detected."
-            exit 0
-          fi
-          if [[ "$BUILD_RESULT" != "success" ]]; then
-            echo "::error::E2E build job failed"
-            exit 1
-          fi
-          if [[ "$SHARD_RESULT" != "success" ]]; then
-            echo "::error::E2E shard job failed"
-            exit 1
-          fi
-          if [[ "$MERGE_RESULT" != "success" ]]; then
-            echo "::error::E2E report merge job failed"
-            exit 1
-          fi
+          echo "event:             $EVENT_NAME"
+          echo "e2e needed:        $E2E_NEEDED"
+          echo "build/shard/merge: $BUILD_RESULT / $SHARD_RESULT / $MERGE_RESULT"
+          # The heavy e2e jobs are skipped (result: skipped) on a non-PR push, when
+          # no e2e-relevant paths changed, OR on a DRAFT PR (spend policy) — all
+          # intentional, so only a real 'failure' blocks. Mark a draft PR "ready
+          # for review" to run e2e and produce success/failure.
+          for r in "$BUILD_RESULT" "$SHARD_RESULT" "$MERGE_RESULT"; do
+            if [[ "$r" == "failure" ]]; then
+              echo "::error::E2E failed (build=$BUILD_RESULT shard=$SHARD_RESULT merge=$MERGE_RESULT)"
+              exit 1
+            fi
+          done
+          echo "e2e ok (passed or intentionally skipped)."
