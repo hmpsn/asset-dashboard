@@ -308,10 +308,27 @@ describe('mcp content action tools', () => {
       brief_id: 'brief_1',
       expected_revision: revision,
       mode: 'patch',
-      updates: { suggestedTitle: 'Tighter HVAC Tips' },
+      updates: {
+        suggestedTitle: 'Tighter HVAC Tips',
+        // Enhanced ContentBrief fields must merge through to updateBrief in patch mode.
+        toneAndStyle: 'crisp',
+        peopleAlsoAsk: ['Why patch?'],
+        schemaRecommendations: [{ type: 'FAQPage', notes: 'add FAQ' }],
+        keywordLocked: true,
+        keywordSource: 'matrix',
+        generationStyle: 'hybrid',
+      },
     });
     expect(patched.isError).toBeUndefined();
-    expect(updateBrief).toHaveBeenCalledWith('ws-1', 'brief_1', expect.objectContaining({ suggestedTitle: 'Tighter HVAC Tips' }));
+    expect(updateBrief).toHaveBeenCalledWith('ws-1', 'brief_1', expect.objectContaining({
+      suggestedTitle: 'Tighter HVAC Tips',
+      toneAndStyle: 'crisp',
+      peopleAlsoAsk: ['Why patch?'],
+      schemaRecommendations: [{ type: 'FAQPage', notes: 'add FAQ' }],
+      keywordLocked: true,
+      keywordSource: 'matrix',
+      generationStyle: 'hybrid',
+    }));
     expect(broadcastToWorkspace).toHaveBeenCalledWith('ws-1', 'brief:updated', expect.objectContaining({ action: 'mcp_brief_updated' }));
 
     const replaced = await handleContentActionTool('update_brief', {
@@ -330,9 +347,25 @@ describe('mcp content action tools', () => {
         audience: 'homeowners',
         competitorInsights: 'none',
         internalLinkSuggestions: ['/a'],
+        // Enhanced ContentBrief fields must overwrite through to updateBrief in replace mode.
+        topicalEntities: ['filters'],
+        ctaRecommendations: ['Schedule service'],
+        realTopResults: [{ position: 1, title: 'Top', url: 'https://example.com/top' }],
+        keywordValidation: { volume: 500, difficulty: 30, cpc: 2, validatedAt: '2026-01-01T00:00:00.000Z' },
+        titleVariants: ['Alt title'],
+        generationStyle: 'standard',
       },
     });
     expect(replaced.isError).toBeUndefined();
+    expect(updateBrief).toHaveBeenCalledWith('ws-1', 'brief_1', expect.objectContaining({
+      targetKeyword: 'hvac checklist',
+      topicalEntities: ['filters'],
+      ctaRecommendations: ['Schedule service'],
+      realTopResults: [{ position: 1, title: 'Top', url: 'https://example.com/top' }],
+      keywordValidation: { volume: 500, difficulty: 30, cpc: 2, validatedAt: '2026-01-01T00:00:00.000Z' },
+      titleVariants: ['Alt title'],
+      generationStyle: 'standard',
+    }));
 
     const conflicted = await handleContentActionTool('update_brief', {
       workspace_id: 'ws-1',
@@ -794,11 +827,64 @@ describe('mcp content action tools', () => {
         audience: 'homeowners',
         competitorInsights: 'none',
         internalLinkSuggestions: ['/a'],
+        // Enhanced ContentBrief fields (v2–v9) must round-trip through to upsertBrief.
+        executiveSummary: 'Quick summary',
+        contentFormat: 'how-to',
+        toneAndStyle: 'friendly authority',
+        peopleAlsoAsk: ['How often should I service my HVAC?'],
+        topicalEntities: ['air filter', 'thermostat'],
+        serpAnalysis: { contentType: 'guide', avgWordCount: 1500, commonElements: ['checklist'], gaps: ['cost data'] },
+        difficultyScore: 42,
+        trafficPotential: 'high',
+        ctaRecommendations: ['Book a tune-up'],
+        eeatGuidance: { experience: 'e', expertise: 'x', authority: 'a', trust: 't' },
+        contentChecklist: ['Add schema'],
+        schemaRecommendations: [{ type: 'Article', notes: 'BlogPosting' }],
+        pageType: 'blog',
+        referenceUrls: ['https://example.com/ref'],
+        realPeopleAlsoAsk: ['Real PAA?'],
+        realTopResults: [{ position: 1, title: 'Top', url: 'https://example.com/top' }],
+        keywordLocked: true,
+        keywordSource: 'dataforseo',
+        keywordValidation: { volume: 1000, difficulty: 42, cpc: 3.5, validatedAt: '2026-01-01T00:00:00.000Z' },
+        templateId: 'tmpl_1',
+        titleVariants: ['Variant A', 'Variant B'],
+        metaDescVariants: ['Meta A', 'Meta B'],
+        generationStyle: 'concise',
       },
     });
 
     expect(result.isError).toBeUndefined();
     expect(upsertBrief).toHaveBeenCalledOnce();
+    // The full structured brief (not just the core subset) must reach upsertBrief.
+    expect(upsertBrief).toHaveBeenCalledWith(
+      'ws-1',
+      expect.objectContaining({
+        executiveSummary: 'Quick summary',
+        contentFormat: 'how-to',
+        toneAndStyle: 'friendly authority',
+        peopleAlsoAsk: ['How often should I service my HVAC?'],
+        topicalEntities: ['air filter', 'thermostat'],
+        serpAnalysis: { contentType: 'guide', avgWordCount: 1500, commonElements: ['checklist'], gaps: ['cost data'] },
+        difficultyScore: 42,
+        trafficPotential: 'high',
+        ctaRecommendations: ['Book a tune-up'],
+        eeatGuidance: { experience: 'e', expertise: 'x', authority: 'a', trust: 't' },
+        contentChecklist: ['Add schema'],
+        schemaRecommendations: [{ type: 'Article', notes: 'BlogPosting' }],
+        pageType: 'blog',
+        referenceUrls: ['https://example.com/ref'],
+        realPeopleAlsoAsk: ['Real PAA?'],
+        realTopResults: [{ position: 1, title: 'Top', url: 'https://example.com/top' }],
+        keywordLocked: true,
+        keywordSource: 'dataforseo',
+        keywordValidation: { volume: 1000, difficulty: 42, cpc: 3.5, validatedAt: '2026-01-01T00:00:00.000Z' },
+        templateId: 'tmpl_1',
+        titleVariants: ['Variant A', 'Variant B'],
+        metaDescVariants: ['Meta A', 'Meta B'],
+        generationStyle: 'concise',
+      }),
+    );
     expect(broadcastToWorkspace).toHaveBeenCalledWith(
       'ws-1',
       'brief:updated',
