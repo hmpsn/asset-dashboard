@@ -62,12 +62,12 @@ export function DualTrendChart({ data, annotations: anns }: { data: PerformanceT
         <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id="cg-clicks-dual" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.15} />
-              <stop offset="100%" stopColor="#60a5fa" stopOpacity={0} />
+              <stop offset="0%" stopColor={CHART_SERIES_COLORS.blue} stopOpacity={0.15} />
+              <stop offset="100%" stopColor={CHART_SERIES_COLORS.blue} stopOpacity={0} />
             </linearGradient>
             <linearGradient id="cg-imps-dual" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.1} />
-              <stop offset="100%" stopColor="#60a5fa" stopOpacity={0} />
+              <stop offset="0%" stopColor={CHART_SERIES_COLORS.blue} stopOpacity={0.1} />
+              <stop offset="100%" stopColor={CHART_SERIES_COLORS.blue} stopOpacity={0} />
             </linearGradient>
           </defs>
           <XAxis dataKey="date" hide />
@@ -105,8 +105,8 @@ export function ScoreHistoryChart({ history }: { history: Array<{ id: string; cr
         <AreaChart data={chartData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id="sh-g" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#34d399" stopOpacity={0.15} />
-              <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+              <stop offset="0%" stopColor={CHART_SERIES_COLORS.emerald} stopOpacity={0.15} />
+              <stop offset="100%" stopColor={CHART_SERIES_COLORS.emerald} stopOpacity={0} />
             </linearGradient>
           </defs>
           <XAxis dataKey="date" hide />

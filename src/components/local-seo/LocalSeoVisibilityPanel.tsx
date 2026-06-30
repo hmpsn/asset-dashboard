@@ -7,6 +7,7 @@ import { useLocalSeo, useLocalSeoRefresh } from '../../hooks/admin';
 import { useRankTrackingAddKeyword } from '../../hooks/admin/useKeywordCommandCenter';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
 import { Badge, Button, ErrorState, Icon, IconButton, SectionCard, StatCard, cn } from '../ui';
+import { CHART_SERIES_COLORS } from '../ui/constants';
 import { GbpReviewsPanel } from './GbpReviewsPanel';
 import { LocalSeoMarketSetupDrawer } from './LocalSeoMarketSetupDrawer';
 import { LocalSeoVisibilityTrend } from './LocalSeoVisibilityTrend';
@@ -200,19 +201,19 @@ function LocalSeoStatGrid({ report, mode }: { report: LocalSeoReportSummary; mod
     : mode === 'strategy' ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-5';
   return (
     <div className={`grid ${columns} gap-3`}>
-      <StatCard label="Markets" value={report.activeMarketCount} icon={MapPin} iconColor="#60a5fa" valueColor="text-blue-400" sub={`${report.configuredMarketCount} configured`} />
-      <StatCard label="Checked" value={report.checkedKeywordCount} icon={Search} iconColor="#60a5fa" valueColor="text-blue-400" sub={formatDate(report.lastCapturedAt)} />
-      <StatCard label="Visible" value={report.visibleCount} icon={CheckCircle2} iconColor="#34d399" valueColor="text-emerald-400" sub="verified matches" />
+      <StatCard label="Markets" value={report.activeMarketCount} icon={MapPin} iconColor={CHART_SERIES_COLORS.blue} valueColor="text-blue-400" sub={`${report.configuredMarketCount} configured`} />
+      <StatCard label="Checked" value={report.checkedKeywordCount} icon={Search} iconColor={CHART_SERIES_COLORS.blue} valueColor="text-blue-400" sub={formatDate(report.lastCapturedAt)} />
+      <StatCard label="Visible" value={report.visibleCount} icon={CheckCircle2} iconColor={CHART_SERIES_COLORS.emerald} valueColor="text-emerald-400" sub="verified matches" />
       {mode === 'keywords' ? (
         <>
-          <StatCard label="Possible" value={report.possibleMatchCount} icon={AlertTriangle} iconColor="#fbbf24" valueColor="text-amber-400/80" sub="needs review" />
-          <StatCard label="Not Found" value={report.notVisibleCount} icon={XCircle} iconColor="#f87171" valueColor="text-red-400/80" sub={`${report.localPackPresentCount} local packs`} />
+          <StatCard label="Possible" value={report.possibleMatchCount} icon={AlertTriangle} iconColor={CHART_SERIES_COLORS.amber} valueColor="text-amber-400/80" sub="needs review" />
+          <StatCard label="Not Found" value={report.notVisibleCount} icon={XCircle} iconColor={CHART_SERIES_COLORS.red} valueColor="text-red-400/80" sub={`${report.localPackPresentCount} local packs`} />
         </>
       ) : (
-        <StatCard label="Needs Review" value={report.possibleMatchCount + report.notVisibleCount} icon={AlertTriangle} iconColor="#fbbf24" valueColor="text-amber-400/80" sub={`${report.localPackPresentCount} local packs`} />
+        <StatCard label="Needs Review" value={report.possibleMatchCount + report.notVisibleCount} icon={AlertTriangle} iconColor={CHART_SERIES_COLORS.amber} valueColor="text-amber-400/80" sub={`${report.localPackPresentCount} local packs`} />
       )}
       {hasDegradedResults && (
-        <StatCard label="Degraded" value={report.degradedCount} icon={AlertTriangle} iconColor="#fbbf24" valueColor="text-amber-400/80" sub="provider warnings" />
+        <StatCard label="Degraded" value={report.degradedCount} icon={AlertTriangle} iconColor={CHART_SERIES_COLORS.amber} valueColor="text-amber-400/80" sub="provider warnings" />
       )}
     </div>
   );

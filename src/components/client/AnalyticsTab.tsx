@@ -275,8 +275,8 @@ export function AnalyticsTab({
             <AreaChart data={ga4Trend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
               <defs>
                 <linearGradient id="ga4grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.15} />
-                  <stop offset="100%" stopColor="#60a5fa" stopOpacity={0} />
+                  <stop offset="0%" stopColor={CHART_SERIES_COLORS.blue} stopOpacity={0.15} />
+                  <stop offset="100%" stopColor={CHART_SERIES_COLORS.blue} stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="date" hide />
@@ -298,9 +298,9 @@ export function AnalyticsTab({
                   </div>
                 );
               }} />
-              <Area yAxisId="pv" type="monotone" dataKey="pageviews" stroke="rgba(96,165,250,0.3)" strokeWidth={1.5} fill="none" dot={false} isAnimationActive={false} />
-              <Area yAxisId="sessions" type="monotone" dataKey="sessions" stroke="rgba(96,165,250,0.5)" strokeWidth={1.5} fill="none" dot={false} isAnimationActive={false} />
-              <Area yAxisId="users" type="monotone" dataKey="users" stroke="rgba(96,165,250,0.9)" strokeWidth={2} fill="url(#ga4grad)" dot={false} activeDot={{ r: 3, fill: '#60a5fa', stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
+              <Area yAxisId="pv" type="monotone" dataKey="pageviews" stroke="rgba(96,165,250,0.3)" /* chart-hex-ok — blue-400 at 30% opacity; opacity variant can't use CHART_SERIES_COLORS constant */ strokeWidth={1.5} fill="none" dot={false} isAnimationActive={false} />
+              <Area yAxisId="sessions" type="monotone" dataKey="sessions" stroke="rgba(96,165,250,0.5)" /* chart-hex-ok — blue-400 at 50% opacity; opacity variant can't use CHART_SERIES_COLORS constant */ strokeWidth={1.5} fill="none" dot={false} isAnimationActive={false} />
+              <Area yAxisId="users" type="monotone" dataKey="users" stroke="rgba(96,165,250,0.9)" strokeWidth={2} fill="url(#ga4grad)" dot={false} activeDot={{ r: 3, fill: CHART_SERIES_COLORS.blue, stroke: chartDotStroke(), strokeWidth: 1.5 }} isAnimationActive={false} />
             </AreaChart>
           </ResponsiveContainer>
           <div className="flex items-center justify-center gap-6 mt-2">
@@ -507,8 +507,8 @@ export function AnalyticsTab({
                 <AreaChart data={ga4EventTrend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
                   <defs>
                     <linearGradient id="evtGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.15} />
-                      <stop offset="100%" stopColor="#60a5fa" stopOpacity={0} />
+                      <stop offset="0%" stopColor={CHART_SERIES_COLORS.blue} stopOpacity={0.15} />
+                      <stop offset="100%" stopColor={CHART_SERIES_COLORS.blue} stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="date" hide />

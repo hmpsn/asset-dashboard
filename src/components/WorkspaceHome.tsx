@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist, WorkspaceHealthBar, Icon, Button, ClickableRow, cn, LoadingState, ErrorState } from './ui';
 import { FeatureFlag } from './ui/FeatureFlag';
-import { themeColor } from './ui/constants';
+import { themeColor, CHART_SERIES_COLORS } from './ui/constants';
 import { WorkspaceHealthBadge } from './admin/WorkspaceHealthBadge';
 import { BriefingReviewQueue } from './admin/BriefingReviewQueue';
 import { WorkOrderPanel } from './admin/WorkOrderPanel';
@@ -400,7 +400,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             label="Search Clicks"
             value={fmt(searchData.totalClicks)}
             icon={Search}
-            iconColor="#22d3ee"
+            iconColor={CHART_SERIES_COLORS.cyan}
             sub={`${fmt(searchData.totalImpressions)} impr · ${(searchData.avgCtr * 100).toFixed(1)}% CTR`}
             onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))}
             size="hero"
@@ -415,7 +415,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             label="Users"
             value={fmt(ga4Data.totalUsers)}
             icon={BarChart3}
-            iconColor="#a78bfa"
+            iconColor={CHART_SERIES_COLORS.blue}
             delta={usersDelta ?? undefined}
             deltaLabel="%"
             sub={`${fmt(ga4Data.totalSessions)} sessions · ${ga4Data.newUserPercentage}% new`}
@@ -431,7 +431,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
           label="Rank Changes"
           value={ranks.length > 0 ? `${ranks.length} tracked` : '—'}
           icon={TrendingUp}
-          iconColor={rankUp > rankDown ? '#4ade80' : rankDown > rankUp ? '#f87171' : themeColor('#71717a', '#94a3b8')}
+          iconColor={rankUp > rankDown ? CHART_SERIES_COLORS.emerald : rankDown > rankUp ? CHART_SERIES_COLORS.red : themeColor('#71717a', '#94a3b8')}
           sub={ranks.length > 0 ? `${rankUp} ↑ · ${rankDown} ↓ · ${ranks.length - rankUp - rankDown} =` : 'No keywords tracked'}
           onClick={ranks.length > 0 ? () => navigate(adminPath(workspaceId, ranksTab)) : undefined}
           size="hero"
@@ -443,7 +443,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             label="Traffic Value"
             value={`$${fmt(roiData.organicTrafficValue)}`}
             icon={DollarSign}
-            iconColor="#22c55e"
+            iconColor={CHART_SERIES_COLORS.emerald}
             sub={`≈ $${fmt(roiData.adSpendEquivalent)} ad spend`}
             onClick={() => navigate(clientPath(workspaceId, 'roi'))}
             size="hero"
@@ -456,7 +456,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             label="Content Decay"
             value={contentDecayData.totalDecaying}
             icon={TrendingDown}
-            iconColor={contentDecayData.critical > 0 ? '#f87171' : '#fbbf24'}
+            iconColor={contentDecayData.critical > 0 ? CHART_SERIES_COLORS.red : CHART_SERIES_COLORS.amber}
             sub={contentDecayData.critical > 0 ? `${contentDecayData.critical} critical · ${contentDecayData.warning} at risk` : `${contentDecayData.warning} pages declining`}
             onClick={() => navigate(`${adminPath(workspaceId, 'seo-audit')}?sub=content-decay`)}
             size="hero"
@@ -485,7 +485,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             label="Content Velocity"
             value={`${contentVelocity.trailingThreeMonthAvg}/mo`}
             icon={FileText}
-            iconColor="#22d3ee"
+            iconColor={CHART_SERIES_COLORS.cyan}
             delta={contentVelocity.trendPct ?? undefined}
             deltaLabel="%"
             sub={`${contentVelocity.currentMonthPublished} this month`}
@@ -500,7 +500,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
             label="Coverage Gaps"
             value={intel.contentPipeline.coverageGaps.length}
             icon={Target}
-            iconColor="#f59e0b"
+            iconColor={CHART_SERIES_COLORS.amber}
             sub={`Strategy keywords without briefs`}
             onClick={() => navigate(adminPath(workspaceId, 'seo-strategy'))}
             size="hero"

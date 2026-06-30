@@ -77,7 +77,7 @@ export function AuditToolbar({
               disabled={bulkApplying}
               icon={CheckCircle}
               className="gap-1.5 px-3 py-2 rounded-[var(--radius-lg)] t-caption font-medium disabled:opacity-50"
-              style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.3)' }}
+              style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.3)' }} // chart-hex-ok — admin "Accept All" button uses emerald-300 inline style for intentional tinted UI chrome; not a chart series color
             >
               {bulkApplying && bulkProgress
                 ? `Applying ${bulkProgress.done}/${bulkProgress.total}...`

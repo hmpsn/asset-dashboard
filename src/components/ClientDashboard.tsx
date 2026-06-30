@@ -9,10 +9,9 @@ import { useRecommendations } from '../hooks/useRecommendations';
 import { buildImpactBandsByCheck } from './client/client-dashboard/buildImpactBandsByCheck';
 import { eventDisplayName as deriveEventDisplayName, isEventPinned as deriveIsEventPinned } from './client/the-issue/outcomeNoun';
 import {
-  X,
   Clock, Sparkles,
 } from 'lucide-react';
-import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal, Icon, Button, IconButton, PageHeader, InlineBanner } from './ui';
+import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal, Icon, Button, PageHeader, InlineBanner } from './ui';
 import { STUDIO_NAME, STUDIO_URL } from '../constants';
 import { CartProvider } from './client/useCart';
 import { SeoCartDrawer } from './client/SeoCart';
@@ -666,33 +665,31 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
 
         {/* Trial countdown banner — shows at five days and under */}
         {showTrialCountdownBanner && (
-          <div className="flex items-center gap-3 px-4 py-3 bg-amber-500/8 border border-amber-500/20" style={{ borderRadius: 'var(--radius-signature)' }}>
-            <Icon as={Clock} size="md" className="text-accent-warning flex-shrink-0" />
-            <p className="t-body text-accent-warning flex-1">
-              <strong>{trialCountdownDays} day{trialCountdownDays === 1 ? '' : 's'}</strong> left on your Growth trial.
-              {' '}Choose a plan to keep access to all features.
-            </p>
-            <Button size="sm" onClick={() => setTab('plans')}>View Plans</Button>
-            <IconButton
-              icon={X}
-              label="Dismiss trial reminder"
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                try { localStorage.setItem(trialBannerDismissKey, '1'); } catch (err) { console.error('ClientDashboard operation failed:', err); }
-                setDismissedTrialBannerKey(trialBannerDismissKey);
-              }}
-            />
-          </div>
+          <InlineBanner
+            tone="warning"
+            icon={Clock}
+            onDismiss={() => {
+              try { localStorage.setItem(trialBannerDismissKey, '1'); } catch (err) { console.error('ClientDashboard operation failed:', err); }
+              setDismissedTrialBannerKey(trialBannerDismissKey);
+            }}
+            dismissLabel="Dismiss trial reminder"
+            className="items-center"
+          >
+            <div className="flex items-center gap-2 flex-1">
+              <span className="t-body flex-1">
+                <strong>{trialCountdownDays} day{trialCountdownDays === 1 ? '' : 's'}</strong> left on your Growth trial.
+                {' '}Choose a plan to keep access to all features.
+              </span>
+              <Button size="sm" onClick={() => setTab('plans')}>View Plans</Button>
+            </div>
+          </InlineBanner>
         )}
         {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) === 0 && (
-          <div className="flex items-center gap-3 px-4 py-3 bg-red-500/8 border border-red-500/20" style={{ borderRadius: 'var(--radius-signature)' }}>
-            <Icon as={Clock} size="md" className="text-accent-danger flex-shrink-0" />
-            <p className="t-body text-accent-danger">
-              Your Growth trial has ended. Some features are now limited.
-              {' '}Upgrade to restore full access.
-            </p>
-          </div>
+          <InlineBanner
+            tone="error"
+            icon={Clock}
+            message="Your Growth trial has ended. Some features are now limited. Upgrade to restore full access."
+          />
         )}
 
         {/* Section loading errors */}

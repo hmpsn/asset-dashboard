@@ -55,7 +55,9 @@ describe('client prop-drilling sweep contract', () => {
     const siteArchitecture = readSource('src/components/SiteArchitecture.tsx');
     const topicClusters = readSource('src/components/strategy/TopicClusters.tsx');
 
-    expect(siteArchitecture).toContain("import { scoreColor } from './ui/constants';");
+    // scoreColor must be imported from ./ui/constants (may be grouped with other
+    // constants imports, e.g. CHART_SERIES_COLORS — match by membership, not exact string).
+    expect(siteArchitecture).toMatch(/import \{[^}]*\bscoreColor\b[^}]*\} from '\.\/ui\/constants';/);
     expect(siteArchitecture).toContain('iconColor={scoreColor(coverage.coveragePct)}');
     expect(topicClusters).toContain('scoreColorClass');
     expect(topicClusters).toContain('scoreBgClass');

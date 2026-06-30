@@ -655,9 +655,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           diverged from the drafted POV (anchored on pov.generatedAt; never resets on it). Reuses the
           existing regenerate action. */}
       {povMayBeStale && (
-        <div className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-          <span className="flex items-center gap-2 t-caption-sm text-amber-400">
-            <Icon as={AlertTriangle} size="sm" className="text-amber-400 shrink-0" />
+        <div className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border bg-accent-warning-soft border-accent-warning-soft px-4 py-3">
+          <span className="flex items-center gap-2 t-caption-sm text-accent-warning">
+            <Icon as={AlertTriangle} size="sm" className="text-accent-warning shrink-0" />
             Point of view may be out of date — regenerate?
           </span>
           <Button

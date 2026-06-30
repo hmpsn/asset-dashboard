@@ -24,6 +24,7 @@ export function ScoreTrendChart({ history }: { history: SnapshotSummary[] }) {
       <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 4, left: 32 }}>
         <defs>
           <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+            {/* chart-hex-ok — #2ed9c3 is the bespoke audit score trend teal, paired with the Area stroke below */}
             <stop offset="0%" stopColor="#2ed9c3" stopOpacity={0.15} />
             <stop offset="100%" stopColor="#2ed9c3" stopOpacity={0} />
           </linearGradient>

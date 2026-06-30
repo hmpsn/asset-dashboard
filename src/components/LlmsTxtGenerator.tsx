@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, Download, RefreshCw, FileText, Copy, Check, Bot, Eye, EyeOff, Clock } from 'lucide-react';
 import { SectionCard, StatCard, EmptyState, PageHeader, Button, Icon, cn } from './ui';
+import { CHART_SERIES_COLORS } from './ui/constants';
 import { llmsTxt } from '../api/content';
 import { queryKeys } from '../lib/queryKeys';
 import { timeAgo } from '../lib/timeAgo';
@@ -207,10 +208,10 @@ export function LlmsTxtGenerator({ workspaceId }: LlmsTxtGeneratorProps) {
           {/* Stats */}
           {stats && (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <StatCard label="Pages Indexed" value={data.pageCount} icon={FileText} iconColor="#2dd4bf" />
-              <StatCard label="Sections" value={stats.sections} icon={Bot} iconColor="#60a5fa" />
-              <StatCard label="Content Lines" value={stats.lines} icon={FileText} iconColor="#a78bfa" />
-              <StatCard label="File Size" value={stats.chars > 1024 ? `${(stats.chars / 1024).toFixed(1)} KB` : `${stats.chars} B`} icon={Download} iconColor="#4ade80" />
+              <StatCard label="Pages Indexed" value={data.pageCount} icon={FileText} iconColor={CHART_SERIES_COLORS.teal} />
+              <StatCard label="Sections" value={stats.sections} icon={Bot} iconColor={CHART_SERIES_COLORS.blue} />
+              <StatCard label="Content Lines" value={stats.lines} icon={FileText} iconColor={CHART_SERIES_COLORS.blue} />
+              <StatCard label="File Size" value={stats.chars > 1024 ? `${(stats.chars / 1024).toFixed(1)} KB` : `${stats.chars} B`} icon={Download} iconColor={CHART_SERIES_COLORS.emerald} />
             </div>
           )}
 

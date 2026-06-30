@@ -100,7 +100,7 @@ export function ClientDashboardTab({ workspaceId, webflowSiteId, ws, patchWorksp
   const [editingEventName, setEditingEventName] = useState<string | null>(null);
   const [editingDisplayName, setEditingDisplayName] = useState('');
   const [newGroupName, setNewGroupName] = useState('');
-  const [newGroupColor, setNewGroupColor] = useState('#14b8a6');
+  const [newGroupColor, setNewGroupColor] = useState('#14b8a6'); // chart-hex-ok — teal-500 darker anchor; seed value for user-editable color picker
   const [ga4Pages, setGa4Pages] = useState<{path: string}[]>([]);
   const [expandedGroupPages, setExpandedGroupPages] = useState<string | null>(null);
   const [groupPageSearch, setGroupPageSearch] = useState('');

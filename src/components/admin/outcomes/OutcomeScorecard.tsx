@@ -13,6 +13,7 @@ import {
   scoreColor,
   scoreBgBarClass,
 } from '../../ui';
+import { CHART_SERIES_COLORS } from '../../ui/constants';
 import { useOutcomeScorecard } from '../../../hooks/admin/useOutcomes';
 import { ACTION_TYPE_LABELS } from './outcomeConstants';
 
@@ -113,7 +114,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
             label="Total Tracked"
             value={scorecard.totalTracked}
             icon={Activity}
-            iconColor="#60a5fa"
+            iconColor={CHART_SERIES_COLORS.blue}
             valueColor="text-accent-info"
             sub="actions logged"
             staggerIndex={0}
@@ -131,7 +132,7 @@ export default function OutcomeScorecard({ workspaceId }: Props) {
             label="Pending Measurement"
             value={scorecard.pendingMeasurement}
             icon={Minus}
-            iconColor="#a1a1aa"
+            iconColor="#a1a1aa" // chart-hex-ok — zinc-400 neutral muted; no CHART_SERIES_COLORS equivalent
             sub="awaiting results"
             staggerIndex={2}
           />

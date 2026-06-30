@@ -20,7 +20,7 @@ const COLORS = [CHART_SERIES_COLORS.teal, CHART_SERIES_COLORS.blue, CHART_SERIES
 export function Annotations({ workspaceId }: { workspaceId: string }) {
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newAnn, setNewAnn] = useState({ date: '', label: '', description: '', color: '#2dd4bf' });
+  const [newAnn, setNewAnn] = useState<{ date: string; label: string; description: string; color: string }>({ date: '', label: '', description: '', color: CHART_SERIES_COLORS.teal });
 
   useEffect(() => {
     annotationsApi.list(workspaceId)
@@ -34,7 +34,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
     try {
       const entry = await annotationsApi.create(workspaceId, newAnn);
       setAnnotations(prev => [entry as Annotation, ...prev]);
-      setNewAnn({ date: '', label: '', description: '', color: '#2dd4bf' });
+      setNewAnn({ date: '', label: '', description: '', color: CHART_SERIES_COLORS.teal });
     } catch (err) { console.error('Annotations operation failed:', err); }
   };
 
@@ -114,7 +114,7 @@ export function Annotations({ workspaceId }: { workspaceId: string }) {
         <div className="space-y-2">
           {annotations.sort((a, b) => b.date.localeCompare(a.date)).map(ann => (
             <div key={ann.id} className="flex items-center gap-3 px-4 py-3 bg-[var(--surface-2)] border border-[var(--brand-border)] group hover:border-[var(--brand-border-hover)] transition-colors rounded-[var(--radius-signature)]">
-              <span className="w-3 h-3 rounded-[var(--radius-pill)] flex-shrink-0" style={{ backgroundColor: ann.color || '#2dd4bf' }} />
+              <span className="w-3 h-3 rounded-[var(--radius-pill)] flex-shrink-0" style={{ backgroundColor: ann.color || CHART_SERIES_COLORS.teal }} />
               <span className="text-xs text-[var(--brand-text-muted)] flex-shrink-0 font-mono">{ann.date}</span>
               <div className="flex-1 min-w-0">
                 <span className="text-xs text-[var(--brand-text-bright)] font-medium">{ann.label}</span>

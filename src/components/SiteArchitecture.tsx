@@ -5,7 +5,7 @@ import {
   Zap, Link2,
 } from 'lucide-react';
 import { SectionCard, StatCard, Badge, EmptyState, PageHeader, FormInput, Icon, Button, ClickableRow } from './ui';
-import { scoreColor } from './ui/constants';
+import { scoreColor, CHART_SERIES_COLORS } from './ui/constants';
 import { siteArchitecture } from '../api/content';
 import { formatDateTime } from '../utils/formatDates';
 import { capitalize } from '../utils/strings';
@@ -324,15 +324,15 @@ export function SiteArchitecture({ workspaceId }: SiteArchitectureProps) {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <StatCard label="Total Pages" value={data.totalPages} icon={Layers} iconColor="#2dd4bf" size="hero" staggerIndex={0} />
-        <StatCard label="Live Pages" value={data.existingPages} icon={Globe} iconColor="#4ade80" sub={`${Math.round((data.existingPages / (data.totalPages || 1)) * 100)}% of total`} size="hero" staggerIndex={1} />
-        <StatCard label="Planned" value={data.plannedPages} icon={FileText} iconColor="#60a5fa" sub="From content matrices" size="hero" staggerIndex={2} />
-        <StatCard label="Strategy" value={data.strategyPages} icon={Target} iconColor="#a78bfa" sub="From keyword map" size="hero" staggerIndex={3} />
+        <StatCard label="Total Pages" value={data.totalPages} icon={Layers} iconColor={CHART_SERIES_COLORS.teal} size="hero" staggerIndex={0} />
+        <StatCard label="Live Pages" value={data.existingPages} icon={Globe} iconColor={CHART_SERIES_COLORS.emerald} sub={`${Math.round((data.existingPages / (data.totalPages || 1)) * 100)}% of total`} size="hero" staggerIndex={1} />
+        <StatCard label="Planned" value={data.plannedPages} icon={FileText} iconColor={CHART_SERIES_COLORS.blue} sub="From content matrices" size="hero" staggerIndex={2} />
+        <StatCard label="Strategy" value={data.strategyPages} icon={Target} iconColor={CHART_SERIES_COLORS.blue} sub="From keyword map" size="hero" staggerIndex={3} />
         <StatCard
           label="Gaps Found"
           value={data.gaps.length}
           icon={AlertTriangle}
-          iconColor={data.gaps.length > 0 ? '#fbbf24' : 'var(--brand-text-muted)'}
+          iconColor={data.gaps.length > 0 ? CHART_SERIES_COLORS.amber : 'var(--brand-text-muted)'}
           sub={data.orphanPaths.length > 0 ? `${data.orphanPaths.length} orphan${data.orphanPaths.length !== 1 ? 's' : ''}` : 'No orphans'}
           size="hero"
           staggerIndex={4}
