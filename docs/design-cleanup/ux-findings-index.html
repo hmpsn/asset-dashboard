@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>UX Findings Index</title>
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { background: var(--surface-1); padding: 0; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 56px 32px 120px; }
+  .doc-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brand-text-muted); display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .doc-eyebrow::before { content: ''; width: 28px; height: 1px; background: var(--brand-text-muted); }
+  h1.doc { font-family: var(--font-display); font-weight: 800; font-size: 46px; line-height: 1.04; letter-spacing: -0.04em; color: var(--brand-text-bright); margin: 0 0 18px; }
+  .lede { font-size: 16px; color: var(--brand-text); line-height: 1.6; max-width: 70ch; }
+  .lede b { color: var(--brand-text-bright); font-weight: 600; }
+  .lede code { font-family: var(--font-mono); font-size: 13px; color: var(--teal); }
+
+  .legend { display: flex; gap: 18px; margin-top: 24px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 11px; color: var(--brand-text-muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dotp { width: 8px; height: 8px; border-radius: 2px; }
+
+  section.block { margin-top: 52px; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px; }
+  .sec-head h2 { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -0.02em; color: var(--brand-text-bright); margin: 0; }
+  .sec-head .meta { font-family: var(--font-mono); font-size: 11px; color: var(--brand-text-dim); }
+  .sec-head a { color: var(--teal); font-size: 12px; text-decoration: none; font-family: var(--font-sans); margin-left: auto; }
+  .sec-sub { font-size: 13px; color: var(--brand-text-muted); margin: 0 0 16px; line-height: 1.5; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { text-align: left; padding: 8px 12px; font-family: var(--font-display); font-weight: 500; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--brand-text-muted); border-bottom: 1px solid var(--brand-border); }
+  tbody td { padding: 11px 12px; border-bottom: 1px solid rgba(63,63,70,.3); color: var(--brand-text); vertical-align: top; line-height: 1.45; }
+  tbody tr:hover { background: rgba(63,63,70,.15); }
+  .fid { font-family: var(--font-mono); font-size: 11px; color: var(--brand-text-bright); white-space: nowrap; }
+  .rid { font-family: var(--font-mono); font-size: 11px; color: var(--brand-text-muted); white-space: nowrap; }
+  .title-cell { color: var(--brand-text-bright); }
+  .sev { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 6px; border-radius: var(--radius-sm); white-space: nowrap; }
+  .sev.high { background: rgba(248,113,113,.12); color: var(--red); }
+  .sev.med { background: rgba(251,191,36,.12); color: var(--amber); }
+  .sev.low { background: rgba(96,165,250,.12); color: var(--blue); }
+  .pri { font-family: var(--font-mono); font-size: 11px; font-weight: 500; }
+  .pri.P1 { color: var(--red); } .pri.P2 { color: var(--amber); } .pri.P3 { color: var(--brand-text-muted); }
+  .theme { display: inline-block; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 6px; border-radius: var(--radius-sm); background: var(--surface-3); color: var(--brand-text-dim); }
+
+  .files { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .file { display: flex; gap: 10px; align-items: baseline; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-md); }
+  .file .p { font-family: var(--font-mono); font-size: 11px; color: var(--teal); }
+  .file .d { font-size: 12px; color: var(--brand-text-muted); }
+  .note { font-size: 13px; color: var(--brand-text); line-height: 1.6; margin-top: 14px; padding: 14px 16px; background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-md); }
+  .note b { color: var(--brand-text-bright); }
+</style>
+</head>
+<body class="with-noise">
+<div class="wrap">
+
+  <div class="doc-eyebrow">UX Review · master findings index</div>
+  <h1 class="doc">Every finding, where it lives.</h1>
+  <p class="lede">The single source of truth for the 2026-06-30 UX review program. Each finding has a <b>screen-scoped ID</b> (e.g. <code>CC-F1</code>) for discussion, and a matching <b>roadmap item ID</b> (e.g. <code>design-cc-header-primary-action</code>) in <code>design-cleanup-sprint.json</code>. Nothing is tracked in only one place. <b>6 screens · 30 findings · program complete.</b></p>
+  <div class="legend">
+    <span><span class="dotp" style="background:var(--red)"></span>P1 / high</span>
+    <span><span class="dotp" style="background:var(--amber)"></span>P2 / medium</span>
+    <span><span class="dotp" style="background:var(--blue)"></span>P3 / low</span>
+    <span><span class="theme">x-</span> cross-cutting (design system)</span>
+  </div>
+
+  <!-- COMMAND CENTER -->
+  <section class="block">
+    <div class="sec-head"><h2>Command Center</h2><span class="meta">WorkspaceOverview.tsx · 5 findings</span><a href="ux-review-command-center.html">Open review →</a></div>
+    <p class="sec-sub">Agency all-workspaces home. Root issue: prioritizes work well but renders everything at equal weight.</p>
+    <table>
+      <thead><tr><th>ID</th><th>Sev</th><th>Finding</th><th>Roadmap item</th><th>Pri</th></tr></thead>
+      <tbody>
+        <tr><td class="fid">CC-F1</td><td><span class="sev high">high</span></td><td class="title-cell">Header has five colored buttons and no primary</td><td class="rid">design-cc-header-primary-action</td><td class="pri P1">P1</td></tr>
+        <tr><td class="fid">CC-F2</td><td><span class="sev med">med</span></td><td class="title-cell">Six equal StatCards = no headline; some duplicate Needs Attention</td><td class="rid">design-cc-statrow-hierarchy</td><td class="pri P2">P2</td></tr>
+        <tr><td class="fid">CC-F3</td><td><span class="sev high">high</span></td><td class="title-cell">Needs Attention (the best feature) buried as a plain mid-page list</td><td class="rid">design-cc-needs-attention-hero</td><td class="pri P1">P1</td></tr>
+        <tr><td class="fid">CC-F4</td><td><span class="sev med">med</span></td><td class="title-cell">Workspace rows pack 5 columns of colored micro-text</td><td class="rid">design-cc-workspace-row-density</td><td class="pri P2">P2</td></tr>
+        <tr><td class="fid">CC-F5</td><td><span class="sev low">low</span></td><td class="title-cell">Mint leaking onto static data counts</td><td class="rid">design-color-law-sweep-mint-on-data</td><td class="pri P2">P2</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- WORKSPACE HOME -->
+  <section class="block">
+    <div class="sec-head"><h2>Workspace Home</h2><span class="meta">WorkspaceHome.tsx · 6 findings</span><a href="ux-review-workspace-home.html">Open review →</a></div>
+    <p class="sec-sub">Single-workspace operator home. Sharper version of the same hierarchy problem, plus a color-law break.</p>
+    <table>
+      <thead><tr><th>ID</th><th>Sev</th><th>Finding</th><th>Roadmap item</th><th>Pri</th></tr></thead>
+      <tbody>
+        <tr><td class="fid">WH-F1</td><td><span class="sev high">high</span></td><td class="title-cell">Up to nine hero StatCards — no hero</td><td class="rid">design-workspace-home-statcard-hierarchy</td><td class="pri P3">P3</td></tr>
+        <tr><td class="fid">WH-F2</td><td><span class="sev high">high</span></td><td class="title-cell">Site Health shown four different ways</td><td class="rid">design-wh-health-four-ways</td><td class="pri P2">P2</td></tr>
+        <tr><td class="fid">WH-F3</td><td><span class="sev med">med</span></td><td class="title-cell">Purple on the Users metric breaks the admin-only law</td><td class="rid">design-wh-purple-on-data</td><td class="pri P2">P2</td></tr>
+        <tr><td class="fid">WH-F4</td><td><span class="sev med">med</span></td><td class="title-cell">Setup nudges appear in three places at once</td><td class="rid">design-wh-setup-triplicated</td><td class="pri P3">P3</td></tr>
+        <tr><td class="fid">WH-F5</td><td><span class="sev med">med</span></td><td class="title-cell">Needs Attention differs from the Command Center's version</td><td class="rid">design-x-needs-attention-shared</td><td class="pri P2">P2</td></tr>
+        <tr><td class="fid">WH-F6</td><td><span class="sev med">med</span></td><td class="title-cell">Worklist sits below nine cards + a health bar</td><td class="rid">design-wh-worklist-order</td><td class="pri P3">P3</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- THE ISSUE -->
+  <section class="block">
+    <div class="sec-head"><h2>The Issue (client)</h2><span class="meta">TheIssueClientPage.tsx · spine branch · 5 findings</span><a href="ux-review-client-issue.html">Open review →</a></div>
+    <p class="sec-sub">The verdict-first client money surface. Already excellent — findings are polish + lifting recurring patterns into the system.</p>
+    <table>
+      <thead><tr><th>ID</th><th>Sev</th><th>Finding</th><th>Roadmap item</th><th>Pri</th></tr></thead>
+      <tbody>
+        <tr><td class="fid">ISSUE-F1</td><td><span class="sev med">med</span></td><td class="title-cell">Content Plan (the action) sits below three proof surfaces</td><td class="rid">design-issue-plan-above-proof</td><td class="pri P2">P2</td></tr>
+        <tr><td class="fid">ISSUE-F2</td><td><span class="sev med">med</span></td><td class="title-cell">ROIDashboard renders twice on one page</td><td class="rid">design-issue-roi-double-mount</td><td class="pri P2">P2</td></tr>
+        <tr><td class="fid">ISSUE-F3</td><td><span class="sev low">low</span></td><td class="title-cell">Two pending-work surfaces bookend the page</td><td class="rid">design-issue-pending-surfaces</td><td class="pri P3">P3</td></tr>
+        <tr><td class="fid">ISSUE-F4</td><td><span class="sev low">low</span></td><td class="title-cell">Section headings come in three forms</td><td class="rid">design-x-section-header</td><td class="pri P3">P3</td></tr>
+        <tr><td class="fid">ISSUE-F5</td><td><span class="sev low">low</span></td><td class="title-cell">Tinted-gradient card reinvented per section</td><td class="rid">design-x-gradient-card-variant</td><td class="pri P3">P3</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- CONTENT PIPELINE -->
+  <section class="block">
+    <div class="sec-head"><h2>Content Pipeline</h2><span class="meta">ContentPipeline.tsx · 5 findings</span><a href="ux-review-content-pipeline.html">Open review →</a></div>
+    <p class="sec-sub">Admin plan→brief→write→publish surface. Right instinct (a named journey) undercut by two competing navigation models.</p>
+    <table>
+      <thead><tr><th>ID</th><th>Sev</th><th>Finding</th><th>Roadmap item</th><th>Pri</th></tr></thead>
+      <tbody>
+        <tr><td class="fid">CP-F1</td><td><span class="sev high">high</span></td><td class="title-cell">Stepper and tab bar describe the same flow differently</td><td class="rid">design-cp-unify-stepper-tabs</td><td class="pri P2">P2</td></tr>
+        <tr><td class="fid">CP-F2</td><td><span class="sev med">med</span></td><td class="title-cell">Tab bar is a hand-rolled copy of the TabBar primitive</td><td class="rid">design-cp-use-tabbar-primitive</td><td class="pri P2">P2</td></tr>
+        <tr><td class="fid">CP-F3</td><td><span class="sev med">med</span></td><td class="title-cell">Up to four alert bands stack before the work</td><td class="rid">design-cp-consolidate-alert-bands</td><td class="pri P3">P3</td></tr>
+        <tr><td class="fid">CP-F4</td><td><span class="sev low">low</span></td><td class="title-cell">Mint/amber on static counts in the health bar</td><td class="rid">design-cp-healthbar-color</td><td class="pri P3">P3</td></tr>
+        <tr><td class="fid">CP-F5</td><td><span class="sev low">low</span></td><td class="title-cell">Export menu hand-rolled — missing Menu primitive</td><td class="rid">design-x-menu-primitive</td><td class="pri P3">P3</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ADMIN COCKPIT -->
+  <section class="block">
+    <div class="sec-head"><h2>The Issue (admin cockpit)</h2><span class="meta">KeywordStrategy.tsx · spine · 4 findings</span><a href="ux-review-admin-cockpit.html">Open review →</a></div>
+    <p class="sec-sub">Where the strategist curates moves and sends the issue. Decision-first spine — residual issues are action placement + a catch-all drawer.</p>
+    <table>
+      <thead><tr><th>ID</th><th>Sev</th><th>Finding</th><th>Roadmap item</th><th>Pri</th></tr></thead>
+      <tbody>
+        <tr><td class="fid">AC-F1</td><td><span class="sev med">med</span></td><td class="title-cell">'Send issue' at top; staging happens at the bottom</td><td class="rid">design-ac-send-near-staging</td><td class="pri P2">P2</td></tr>
+        <tr><td class="fid">AC-F2</td><td><span class="sev med">med</span></td><td class="title-cell">'Supporting detail' is a one-toggle junk drawer (8 surfaces)</td><td class="rid">design-x-disclosure-pattern</td><td class="pri P2">P2</td></tr>
+        <tr><td class="fid">AC-F3</td><td><span class="sev low">low</span></td><td class="title-cell">Staleness nudge hardcodes amber instead of tokens</td><td class="rid">design-ac-staleness-tokens</td><td class="pri P3">P3</td></tr>
+        <tr><td class="fid">AC-F4</td><td><span class="sev low">low</span></td><td class="title-cell">'Add a recommendation' floats mid-spine without a home</td><td class="rid">design-ac-add-rec-placement</td><td class="pri P3">P3</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- CLIENT SHELL -->
+  <section class="block">
+    <div class="sec-head"><h2>Client Dashboard shell</h2><span class="meta">ClientDashboard.tsx · 5 findings</span><a href="ux-review-client-shell.html">Open review →</a></div>
+    <p class="sec-sub">The outer client navigation wrapping every client surface. Mid-migration: a sprawling legacy nav vs the right four-tab two-speed shell.</p>
+    <table>
+      <thead><tr><th>ID</th><th>Sev</th><th>Finding</th><th>Roadmap item</th><th>Pri</th></tr></thead>
+      <tbody>
+        <tr><td class="fid">CD-F1</td><td><span class="sev high">high</span></td><td class="title-cell">Two nav models ship side by side (12 tabs vs 4)</td><td class="rid">design-cd-finish-ia-v2-nav</td><td class="pri P2">P2</td></tr>
+        <tr><td class="fid">CD-F2</td><td><span class="sev med">med</span></td><td class="title-cell">Same surfaces mounted twice (tab + Deep Dive/Settings slot)</td><td class="rid">design-cd-dedupe-panel-mounts</td><td class="pri P2">P2</td></tr>
+        <tr><td class="fid">CD-F3</td><td><span class="sev med">med</span></td><td class="title-cell">Up to three notices stack above every tab</td><td class="rid">design-cd-notice-region</td><td class="pri P3">P3</td></tr>
+        <tr><td class="fid">CD-F4</td><td><span class="sev low">low</span></td><td class="title-cell">Per-tab page title just repeats the nav label</td><td class="rid">design-cd-pageheader-title-echo</td><td class="pri P3">P3</td></tr>
+        <tr><td class="fid">CD-F5</td><td><span class="sev low">low</span></td><td class="title-cell">Trial banners hardcode amber/red instead of tokens</td><td class="rid">design-cd-trial-banner-tokens</td><td class="pri P3">P3</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- CROSS-CUTTING -->
+  <section class="block">
+    <div class="sec-head"><h2>Cross-cutting themes</h2><span class="meta">recur across screens</span></div>
+    <p class="sec-sub">Three patterns showed up on more than one screen — these are design-system jobs, not per-screen fixes, and they retire multiple findings at once.</p>
+    <table>
+      <thead><tr><th>Theme</th><th>Roadmap item</th><th>Retires</th></tr></thead>
+      <tbody>
+        <tr><td class="title-cell"><span class="theme">x-</span> One shared NeedsAttention component</td><td class="rid">design-x-needs-attention-shared</td><td>CC-F3 · WH-F5</td></tr>
+        <tr><td class="title-cell"><span class="theme">x-</span> Color = status only (mint/purple discipline)</td><td class="rid">design-color-law-sweep-mint-on-data · design-wh-purple-on-data</td><td>CC-F5 · WH-F3</td></tr>
+        <tr><td class="title-cell"><span class="theme">x-</span> One section-header + one gradient-card variant</td><td class="rid">design-x-section-header · design-x-gradient-card-variant</td><td>ISSUE-F4 · ISSUE-F5</td></tr>
+        <tr><td class="title-cell"><span class="theme">x-</span> Add a Menu/Dropdown primitive (first new-component need)</td><td class="rid">design-x-menu-primitive</td><td>CP-F5</td></tr>
+        <tr><td class="title-cell"><span class="theme">x-</span> Reuse shipped primitives (TabBar) instead of re-rolling</td><td class="rid">design-cp-use-tabbar-primitive</td><td>CP-F2</td></tr>
+        <tr><td class="title-cell"><span class="theme">x-</span> One Disclosure pattern; split catch-all drawers</td><td class="rid">design-x-disclosure-pattern</td><td>AC-F2 · ISSUE under-the-hood</td></tr>
+        <tr><td class="title-cell"><span class="theme">x-</span> Consolidate pre-content notice stacks</td><td class="rid">design-cp-consolidate-alert-bands · design-cd-notice-region</td><td>CP-F3 · CD-F3</td></tr>
+        <tr><td class="title-cell"><span class="theme">x-</span> One tokenized warning surface (InlineBanner)</td><td class="rid">design-ac-staleness-tokens · design-cd-trial-banner-tokens</td><td>AC-F3 · CD-F5 · CP-F4</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><b>Root cause across all operator screens:</b> the product surfaces everything it knows at equal weight. The data layer is excellent; design's job is to rank. Three system moves fix most of it — cap hero metrics at three, give every concept exactly one widget, and let color mean status only.</div>
+  </section>
+
+  <!-- COVERAGE -->
+  <section class="block">
+    <div class="sec-head"><h2>Coverage &amp; files</h2></div>
+    <p class="sec-sub">30 findings across 6 screens, all logged to one roadmap sprint. Status tracked in the JSON (<code>status: pending</code> on every item). The screen-by-screen review program is complete.</p>
+    <div class="files">
+      <div class="file"><span class="p">ux-findings-index.html</span><span class="d">this file — master index</span></div>
+      <div class="file"><span class="p">design-cleanup-sprint.json</span><span class="d">roadmap.json-format sprint, 16 items</span></div>
+      <div class="file"><span class="p">ux-review-command-center.html</span><span class="d">CC-F1…F5</span></div>
+      <div class="file"><span class="p">ux-review-workspace-home.html</span><span class="d">WH-F1…F6</span></div>
+      <div class="file"><span class="p">ux-review-client-issue.html</span><span class="d">ISSUE-F1…F5</span></div>
+      <div class="file"><span class="p">ux-review-content-pipeline.html</span><span class="d">CP-F1…F5</span></div>
+      <div class="file"><span class="p">ux-review-admin-cockpit.html</span><span class="d">AC-F1…F4</span></div>
+      <div class="file"><span class="p">ux-review-client-shell.html</span><span class="d">CD-F1…F5</span></div>
+    </div>
+    <div class="note"><b>Program complete — 6 screens reviewed.</b> Command Center, Workspace Home, The Issue (client), Content Pipeline, The Issue (admin cockpit), and the Client Dashboard shell. 30 findings, all logged to <code>design-cleanup-sprint.json</code>. Next step: consolidate into a sprint brief (PR-description / Linear-ready) and prioritize the build order.</div>
+  </section>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>UX Review · The Issue (admin cockpit)</title>
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { background: var(--surface-1); padding: 0; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 56px 32px 120px; }
+  .doc-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brand-text-muted); display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .doc-eyebrow::before { content: ''; width: 28px; height: 1px; background: var(--brand-text-muted); }
+  h1.doc { font-family: var(--font-display); font-weight: 800; font-size: 52px; line-height: 1.02; letter-spacing: -0.04em; color: var(--brand-text-bright); margin: 0 0 18px; }
+  .lede { font-size: 17px; color: var(--brand-text); line-height: 1.6; max-width: 64ch; }
+  .lede b { color: var(--brand-text-bright); font-weight: 600; }
+  .meta-row { display: flex; gap: 24px; margin-top: 24px; font-family: var(--font-mono); font-size: 11px; color: var(--brand-text-muted); text-transform: uppercase; letter-spacing: 0.1em; flex-wrap: wrap; }
+  .meta-row b { color: var(--brand-text-bright); font-weight: 500; }
+
+  section.block { margin-top: 64px; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 22px; }
+  .sec-head .num { font-family: var(--font-mono); font-size: 11px; color: var(--teal); letter-spacing: 0.1em; }
+  .sec-head h2 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter-spacing: -0.025em; color: var(--brand-text-bright); margin: 0; }
+  .sec-head .rule { flex: 1; height: 1px; background: var(--brand-border); }
+
+  .well { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .well .item { display: flex; gap: 12px; padding: 16px 18px; background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-lg); }
+  .well .item .ico { width: 22px; height: 22px; border-radius: var(--radius-sm); background: rgba(52,211,153,.14); color: var(--emerald); display: flex; align-items: center; justify-content: center; flex: none; font-weight: 800; font-family: var(--font-display); }
+  .well .item p { margin: 0; font-size: 13.5px; color: var(--brand-text); line-height: 1.5; }
+  .well .item b { color: var(--brand-text-bright); font-weight: 600; }
+
+  .finding { background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-signature-lg); padding: 26px 28px; margin-bottom: 18px; }
+  .finding-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+  .sev { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-sm); }
+  .sev.high { background: rgba(248,113,113,.12); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+  .sev.med { background: rgba(251,191,36,.12); color: var(--amber); border: 1px solid rgba(251,191,36,.3); }
+  .sev.low { background: rgba(96,165,250,.12); color: var(--blue); border: 1px solid rgba(96,165,250,.3); }
+  .finding-head .fnum { font-family: var(--font-mono); font-size: 12px; color: var(--brand-text-dim); }
+  .finding-head h3 { font-family: var(--font-display); font-weight: 700; font-size: 19px; letter-spacing: -0.015em; color: var(--brand-text-bright); margin: 0; flex: 1; min-width: 240px; }
+  .finding p.body { font-size: 14px; color: var(--brand-text); line-height: 1.6; margin: 10px 0 0; }
+  .finding p.body b { color: var(--brand-text-bright); font-weight: 600; }
+  .finding code { font-family: var(--font-mono); font-size: 12px; color: var(--teal); background: var(--surface-1); padding: 1px 5px; border-radius: 3px; }
+  .finding .fix-note { font-size: 13.5px; color: var(--brand-text); line-height: 1.6; margin: 14px 0 0; padding: 14px 16px; background: var(--surface-1); border-left: 2px solid var(--teal); border-radius: var(--radius-md); }
+  .finding .fix-note b { color: var(--teal); font-weight: 600; display: block; margin-bottom: 4px; font-family: var(--font-display); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 16px; }
+  .pair .col .lab { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; display: block; }
+  .col.now .lab { color: var(--amber); } .col.fix .lab { color: var(--emerald); }
+  .mock { background: var(--surface-1); border: 1px solid var(--brand-border); border-radius: var(--radius-lg); padding: 14px; }
+  .slots { display: flex; flex-direction: column; gap: 5px; }
+  .slot { font-size: 11.5px; padding: 8px 11px; border: 1px solid var(--brand-border); border-radius: var(--radius-md); background: var(--surface-2); color: var(--brand-text); display: flex; align-items: center; gap: 8px; }
+  .slot .tag { margin-left: auto; font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand-text-dim); }
+  .slot.send { border-color: rgba(45,212,191,.4); box-shadow: inset 2px 0 0 0 var(--teal); } .slot.send .tag { color: var(--teal); }
+  .slot.stage { border-color: rgba(96,165,250,.3); } .slot.stage .tag { color: var(--blue); }
+  .slot.dim { opacity: 0.5; }
+  .drawer { font-size: 11px; padding: 6px 10px; border: 1px solid var(--brand-border); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--brand-text); }
+  .drawer.sub { margin-left: 16px; opacity: 0.85; }
+  .caption { font-family: var(--font-mono); font-size: 10px; color: var(--brand-text-dim); letter-spacing: 0.06em; margin-top: 8px; }
+</style>
+</head>
+<body class="with-noise">
+<div class="wrap">
+
+  <div class="doc-eyebrow">UX Review · admin strategy cockpit · flag “strategy-the-issue”</div>
+  <h1 class="doc">The cockpit —<br />decision-first, almost.</h1>
+  <p class="lede">A review of the <b>admin "The Issue" cockpit</b> (<code>KeywordStrategy</code>, spine branch) — where the strategist curates the moves and <b>sends the issue</b> to the client. Like its client twin, it's already been through a serious pass: a five-beat spine above the fold, everything else collapsed. The residual issues are about <b>where the primary action lives relative to where the work happens</b>, and a collapsed drawer that has become a catch-all — the same pattern as the client page's "Under the hood."</p>
+  <div class="meta-row">
+    <span>Screen · <b>KeywordStrategy.tsx (issueOverviewEl)</b></span>
+    <span>Findings · <b>4</b></span>
+    <span>Severity · <b>mostly low/med</b></span>
+  </div>
+
+  <section class="block">
+    <div class="sec-head"><span class="num">00</span><h2>What's already right</h2><div class="rule"></div></div>
+    <div class="well">
+      <div class="item"><span class="ico">✓</span><p><b>A real spine.</b> Setup-readiness → header → StanceBar → POV → backing moves is a legible top-to-bottom decision sequence, not a section pile.</p></div>
+      <div class="item"><span class="ico">✓</span><p><b>Decision-first.</b> Everything that isn't the spine is collapsed by default, so a cold cockpit opens to the choice, not a wall.</p></div>
+      <div class="item"><span class="ico">✓</span><p><b>Operator agency.</b> "Add a recommendation," edit-wording, and cut/stage give the strategist real control over the AI's output.</p></div>
+      <div class="item"><span class="ico">✓</span><p><b>Honest staleness.</b> The "POV may be out of date" nudge appears only when cut/edited moves diverge from the drafted POV — no false alarms.</p></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="num">01</span><h2>The findings</h2><div class="rule"></div></div>
+
+    <!-- AC-F1 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">AC-F1</span><h3>The "Send issue" button is at the top; the staging happens at the bottom</h3><span class="sev med">Medium · control↔object</span></div>
+      <p class="body">"Send issue" lives in the <code>IssueHeader</code> at the very top, gated on <code>canSend={stagedCount > 0}</code>. But the operator <b>builds that staged set in the BackingMovesQueue near the bottom</b> of the spine (StanceBar → POV → Add rec → <i>then</i> the queue). So the workflow is: scroll down, stage moves, scroll back up to send — and while staging, the button that consumes your work is off-screen. The control is separated from the object it acts on.</p>
+      <div class="pair">
+        <div class="col now"><span class="lab">Now — send up top, stage down low</span><div class="mock"><div class="slots">
+          <div class="slot send">IssueHeader · Send issue (3)<span class="tag">action</span></div>
+          <div class="slot">StanceBar</div>
+          <div class="slot">Drafted POV</div>
+          <div class="slot">Add a recommendation</div>
+          <div class="slot stage">BackingMovesQueue · stage moves<span class="tag">where work happens</span></div>
+        </div><div class="caption">stage at the bottom → scroll up to send</div></div></div>
+        <div class="col fix"><span class="lab">Fix — send travels with the staging</span><div class="mock"><div class="slots">
+          <div class="slot">IssueHeader · config</div>
+          <div class="slot">StanceBar · Drafted POV</div>
+          <div class="slot stage">BackingMovesQueue · stage moves<span class="tag">work</span></div>
+          <div class="slot send">Sticky send bar · Send issue (3)<span class="tag">follows you</span></div>
+        </div><div class="caption">a sticky footer keeps Send in reach while staging</div></div></div>
+      </div>
+      <p class="fix-note"><b>Recommendation</b>Keep the header's Send for the "I'm done, fire it" case, but add a <b>sticky send bar</b> (or a Send affordance docked to the BackingMovesQueue) that appears once <code>stagedCount &gt; 0</code> — so the operator can stage and send without a round-trip scroll. The staged count + Send should be visible from where staging happens.</p>
+    </div>
+
+    <!-- AC-F2 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">AC-F2</span><h3>"Supporting detail" has become a one-toggle junk drawer</h3><span class="sev med">Medium · disclosure</span></div>
+      <p class="body">Below the spine, a single collapsed <code>&lt;details&gt;</code> holds <b>eight unrelated surfaces</b>: admin leads readout, a keyword-targets deep-link, the content-work-order lens, the trust-ladder panel, orient, content gaps, cannibalization, and a strategy diff — plus a competitor link. It's all-or-nothing: to reach cannibalization you expand everything. This is the exact pattern as the client page's "Under the hood" (ISSUE-F-adjacent) — a recurring "drawer of everything."</p>
+      <div class="pair">
+        <div class="col now"><span class="lab">Now — one toggle, eight things</span><div class="mock"><div class="slots">
+          <div class="drawer">▸ Supporting detail · 4 badges</div>
+          <div class="drawer sub">leads · targets · work orders · trust ladder · orient · gaps · cannibalization · diff</div>
+        </div><div class="caption">expand all to reach any one</div></div></div>
+        <div class="col fix"><span class="lab">Fix — a few labeled groups</span><div class="mock"><div class="slots">
+          <div class="drawer">▸ Leads &amp; capture</div>
+          <div class="drawer">▸ Content signals (gaps · cannibalization · diff)</div>
+          <div class="drawer">▸ Targets &amp; work orders</div>
+        </div><div class="caption">open just the group you need</div></div></div>
+      </div>
+      <p class="fix-note"><b>Recommendation</b>Split the one drawer into 2–3 labeled disclosures grouped by job (capture, content signals, targets). Better: define a single <b>Disclosure / collapsible-section</b> pattern in the design system and use it both here and in the client "Under the hood" — same summary chrome, same behavior, sub-grouped. One pattern, two screens.</p>
+    </div>
+
+    <!-- AC-F3 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">AC-F3</span><h3>The staleness nudge hardcodes amber instead of using tokens</h3><span class="sev low">Low · token drift</span></div>
+      <p class="body">The "POV may be out of date" banner uses raw Tailwind <code>text-amber-400</code> / <code>border-amber-500/30</code> / <code>bg-amber-500/5</code> rather than the <code>--amber</code> token (and the system's soft-warning surface convention). It renders correctly today, but it won't follow a palette change or the light theme the way tokenized warnings do — and it's a second way of spelling "warning surface."</p>
+      <p class="fix-note"><b>Recommendation</b>Use the warning tokens (<code>var(--amber)</code> + the soft-amber background/border convention used by StatusBadge / InlineBanner). Pairs with the broader tokenize-hardcoded-hex work in the sprint (WH-F3 / the color sweep).</p>
+    </div>
+
+    <!-- AC-F4 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">AC-F4</span><h3>"Add a recommendation" floats mid-spine without a home</h3><span class="sev low">Low · placement</span></div>
+      <p class="body">A right-aligned secondary "Add a recommendation" button sits on its own line between the Drafted POV editor and the BackingMovesQueue. It's a meaningful action (mint into the curation queue) but visually it's an orphan — not attached to the queue it feeds, just floating in the gap between two sections.</p>
+      <p class="fix-note"><b>Recommendation</b>Dock "Add a recommendation" to the BackingMovesQueue header (it's the queue's own action — it adds a row to it), the same way a SectionCard hosts its action in the header slot. Removes the orphan line and puts the control on the object it modifies.</p>
+    </div>
+
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="num">02</span><h2>Read in context</h2><div class="rule"></div></div>
+    <p class="lede" style="font-size:15px">The cockpit and its client twin are the two best-architected surfaces in the app — both already decision-first with disciplined disclosure. Their shared residual lesson is the same: <b>put the action where the work is</b> (AC-F1, AC-F4) and <b>don't let "collapse the rest" become one infinite drawer</b> (AC-F2, mirroring the client "Under the hood"). That last one is a design-system opportunity — a real Disclosure pattern both screens consume.</p>
+  </section>
+
+</div>
+</body>
+</html>

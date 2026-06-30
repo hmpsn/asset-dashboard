@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>UX Review · The Issue (client)</title>
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { background: var(--surface-1); padding: 0; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 56px 32px 120px; }
+  .doc-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brand-text-muted); display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .doc-eyebrow::before { content: ''; width: 28px; height: 1px; background: var(--brand-text-muted); }
+  h1.doc { font-family: var(--font-display); font-weight: 800; font-size: 52px; line-height: 1.02; letter-spacing: -0.04em; color: var(--brand-text-bright); margin: 0 0 18px; }
+  .lede { font-size: 17px; color: var(--brand-text); line-height: 1.6; max-width: 64ch; }
+  .lede b { color: var(--brand-text-bright); font-weight: 600; }
+  .meta-row { display: flex; gap: 24px; margin-top: 24px; font-family: var(--font-mono); font-size: 11px; color: var(--brand-text-muted); text-transform: uppercase; letter-spacing: 0.1em; flex-wrap: wrap; }
+  .meta-row b { color: var(--brand-text-bright); font-weight: 500; }
+
+  section.block { margin-top: 64px; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 22px; }
+  .sec-head .num { font-family: var(--font-mono); font-size: 11px; color: var(--teal); letter-spacing: 0.1em; }
+  .sec-head h2 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter-spacing: -0.025em; color: var(--brand-text-bright); margin: 0; }
+  .sec-head .rule { flex: 1; height: 1px; background: var(--brand-border); }
+
+  .well { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .well .item { display: flex; gap: 12px; padding: 16px 18px; background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-lg); }
+  .well .item .ico { width: 22px; height: 22px; border-radius: var(--radius-sm); background: rgba(52,211,153,.14); color: var(--emerald); display: flex; align-items: center; justify-content: center; flex: none; font-weight: 800; font-family: var(--font-display); }
+  .well .item p { margin: 0; font-size: 13.5px; color: var(--brand-text); line-height: 1.5; }
+  .well .item b { color: var(--brand-text-bright); font-weight: 600; }
+
+  .finding { background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-signature-lg); padding: 26px 28px; margin-bottom: 18px; }
+  .finding-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+  .sev { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-sm); }
+  .sev.high { background: rgba(248,113,113,.12); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+  .sev.med { background: rgba(251,191,36,.12); color: var(--amber); border: 1px solid rgba(251,191,36,.3); }
+  .sev.low { background: rgba(96,165,250,.12); color: var(--blue); border: 1px solid rgba(96,165,250,.3); }
+  .finding-head .fnum { font-family: var(--font-mono); font-size: 12px; color: var(--brand-text-dim); }
+  .finding-head h3 { font-family: var(--font-display); font-weight: 700; font-size: 19px; letter-spacing: -0.015em; color: var(--brand-text-bright); margin: 0; flex: 1; min-width: 240px; }
+  .finding p.body { font-size: 14px; color: var(--brand-text); line-height: 1.6; margin: 10px 0 0; }
+  .finding p.body b { color: var(--brand-text-bright); font-weight: 600; }
+  .finding code { font-family: var(--font-mono); font-size: 12px; color: var(--teal); background: var(--surface-1); padding: 1px 5px; border-radius: 3px; }
+  .finding .fix-note { font-size: 13.5px; color: var(--brand-text); line-height: 1.6; margin: 14px 0 0; padding: 14px 16px; background: var(--surface-1); border-left: 2px solid var(--teal); border-radius: var(--radius-md); }
+  .finding .fix-note b { color: var(--teal); font-weight: 600; display: block; margin-bottom: 4px; font-family: var(--font-display); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* stack diagram */
+  .stack { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 16px; }
+  .stack .col .lab { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; display: block; }
+  .col.now .lab { color: var(--amber); }
+  .col.fix .lab { color: var(--emerald); }
+  .slots { display: flex; flex-direction: column; gap: 5px; }
+  .slot { font-size: 11.5px; padding: 8px 11px; border: 1px solid var(--brand-border); border-radius: var(--radius-md); background: var(--surface-1); color: var(--brand-text); display: flex; align-items: center; gap: 8px; }
+  .slot .n { font-family: var(--font-mono); font-size: 9px; color: var(--brand-text-dim); flex: none; width: 14px; }
+  .slot .tag { margin-left: auto; font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .slot.proof { border-color: rgba(52,211,153,.3); } .slot.proof .tag { color: var(--emerald); }
+  .slot.action { border-color: rgba(45,212,191,.4); box-shadow: inset 2px 0 0 0 var(--teal); } .slot.action .tag { color: var(--teal); }
+  .slot.dim { opacity: 0.5; }
+  .caption { font-family: var(--font-mono); font-size: 10px; color: var(--brand-text-dim); letter-spacing: 0.06em; margin-top: 8px; }
+</style>
+</head>
+<body class="with-noise">
+<div class="wrap">
+
+  <div class="doc-eyebrow">UX Review · client surface · flag “the-issue-client-spine”</div>
+  <h1 class="doc">The Issue —<br />already the best room in the house.</h1>
+  <p class="lede">A review of <b>TheIssueClientPage</b> (verdict-first spine branch) — the evergreen client money surface. This screen has clearly <b>already had a serious design pass</b>: it leads with a dollar verdict, kills purple, uses honest provenance language, and pushes detail behind progressive disclosure. So this isn't a rescue — it's polish. The residual issues are about <b>how many proof surfaces stack before the client can act</b>, and a few <b>consistency seams</b> that the design system could close for good.</p>
+  <div class="meta-row">
+    <span>Screen · <b>TheIssueClientPage.tsx</b></span>
+    <span>Branch · <b>spineEnabled</b></span>
+    <span>Findings · <b>5</b></span>
+    <span>Severity · <b>mostly low/med</b></span>
+  </div>
+
+  <section class="block">
+    <div class="sec-head"><span class="num">00</span><h2>What's genuinely excellent</h2><div class="rule"></div></div>
+    <div class="well">
+      <div class="item"><span class="ico">✓</span><p><b>Leads with meaning.</b> A baseline-anchored dollar verdict in emerald is the first thing the check-signer sees — not a 0–100 score they don't understand.</p></div>
+      <div class="item"><span class="ico">✓</span><p><b>Honesty guards are everywhere.</b> No fabricated deltas while a baseline establishes, no fake "view names" link, banded <code>~</code> precision until numbers are reconciled. Rare discipline.</p></div>
+      <div class="item"><span class="ico">✓</span><p><b>Color law is clean.</b> Emerald = value/outcomes, blue = data bars, teal = the strategist byline + actions. No purple anywhere. This is the reference implementation.</p></div>
+      <div class="item"><span class="ico">✓</span><p><b>Outcomes in human units.</b> "41 calls · 12 form fills" beats "53 conversions." Typed icons, stable order, real empty state.</p></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="num">01</span><h2>The findings</h2><div class="rule"></div></div>
+
+    <!-- F1 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">F1</span><h3>The plan — the one place they act — sits below three proof surfaces</h3><span class="sev med">Medium · hierarchy</span></div>
+      <p class="body">The flag-OFF branch deliberately <b>leads with the plan</b> ("plan LEADS, proof FOLLOWS," per the file's own comment). The spine branch inverts that: verdict → outcome count → money frame → loop → <b>then</b> the Content Plan at slot 5. For a check-signer the dollar lead is right — but "Request this" (the only retainer action on the page) now sits beneath <b>three stacked proof bands</b>. A client who's convinced by the verdict may never scroll to the action.</p>
+      <div class="stack">
+        <div class="col now"><span class="lab">Now — act last</span><div class="slots">
+          <div class="slot"><span class="n">0</span>Your turn</div>
+          <div class="slot proof"><span class="n">1</span>Verdict $<span class="tag">proof</span></div>
+          <div class="slot proof"><span class="n">2</span>Outcome count<span class="tag">proof</span></div>
+          <div class="slot proof"><span class="n">3</span>Money frame (ROI)<span class="tag">proof</span></div>
+          <div class="slot"><span class="n">4</span>Ask your strategist</div>
+          <div class="slot action"><span class="n">5</span>Content plan<span class="tag">action</span></div>
+        </div></div>
+        <div class="col fix"><span class="lab">Fix — verdict, then act, then prove</span><div class="slots">
+          <div class="slot"><span class="n">0</span>Your turn</div>
+          <div class="slot proof"><span class="n">1</span>Verdict $<span class="tag">proof</span></div>
+          <div class="slot action"><span class="n">2</span>Content plan · Request this<span class="tag">action</span></div>
+          <div class="slot proof"><span class="n">3</span>Outcome count + Money<span class="tag">proof</span></div>
+          <div class="slot"><span class="n">4</span>Ask your strategist</div>
+        </div></div>
+      </div>
+      <p class="fix-note"><b>Recommendation</b>Keep the verdict as the lead (it's the hook), then bring the Content Plan up directly under it so conviction flows straight into action. Let the deeper proof (outcome count, money frame, wins) follow. Worth an A/B: "verdict → plan → proof" vs the current "verdict → proof → plan" on request-rate.</p>
+    </div>
+
+    <!-- F2 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">F2</span><h3>The ROI dashboard renders twice on one page</h3><span class="sev med">Medium · redundancy</span></div>
+      <p class="body">Slot 3 mounts <code>&lt;ROIDashboard compact /&gt;</code> and the "Under the hood" disclosure mounts <code>&lt;ROIDashboard compact={false} /&gt;</code> again. Two instances of the same dollar story on one screen — the client can open "Under the hood" and see the ROI numbers a second time, with no signal that it's the same data expanded. Risk of "wait, which number is right?" plus a second data fetch.</p>
+      <p class="fix-note"><b>Recommendation</b>Render ROI once. Either keep the compact money frame at slot 3 and let "Under the hood" hold only the methodology/tables (not a full second dashboard), or make the compact frame itself expandable in place. One dollar story, one mount.</p>
+    </div>
+
+    <!-- F3 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">F3</span><h3>"Your turn" and "Ask your strategist" are two pending-work surfaces at opposite ends</h3><span class="sev low">Low · redundancy</span></div>
+      <p class="body">Slot 0 is the <code>ActionQueueStrip</code> ("Your turn" — pending decisions). Slot 4 is the <code>IssueLoopFooter</code> ("What needs me — the full pending-decisions queue / loop"). Both represent "things awaiting you," bookending the page. A client could act in the top strip, then meet a second, differently-shaped queue lower down and wonder if it's new work.</p>
+      <p class="fix-note"><b>Recommendation</b>Make the relationship explicit: the top strip is the <i>count/jump</i> ("3 decisions waiting ↓"), the footer is the <i>detail</i>. Same visual language, and ideally the strip anchors down to the loop rather than being a parallel list.</p>
+    </div>
+
+    <!-- F4 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">F4</span><h3>Section headings come in three different forms</h3><span class="sev low">Low · consistency</span></div>
+      <p class="body">Across the page, a "section header" is sometimes a muted <code>&lt;h2 class="t-label"&gt;</code> uppercase mini-label (Money, What's working), sometimes a <code>SectionCard</code> title bar, and sometimes a <code>&lt;summary&gt;</code> row (Under the hood). Three weights doing one job means the page's outline is hard to skim — the eye can't tell a section start from a card header.</p>
+      <p class="fix-note"><b>Recommendation</b>Define one section-header treatment in the design system (the <code>t-label</code> kicker is the right call here) and use it for every top-level section; reserve <code>SectionCard</code> headers for cards <i>within</i> a section. Consistent rhythm makes a long scroll legible.</p>
+    </div>
+
+    <!-- F5 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">F5</span><h3>The tinted-gradient card is reinvented per section instead of being a StatCard variant</h3><span class="sev low">Low · system drift</span></div>
+      <p class="body">The verdict shell hand-rolls <code>from-teal-500/8 … border-teal-500/15</code>; the outcome StatCards pass <code>className="bg-gradient-to-br from-emerald-500/10 … border-emerald-500/20"</code>. The "tinted gradient + matching border" treatment is lovely — and it's being re-typed with slightly different opacities each place it appears. That's exactly the drift a design system exists to prevent.</p>
+      <p class="fix-note"><b>Recommendation</b>Promote it to a first-class <code>StatCard</code> / card <code>tone</code> prop (<code>tone="emerald"</code> → the gradient + border baked in at one canonical opacity). Then the verdict hero and the outcome band share one definition, and future surfaces get it for free.</p>
+    </div>
+
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="num">02</span><h2>Verdict on the verdict screen</h2><div class="rule"></div></div>
+    <p class="lede" style="font-size:15px">This screen is the proof that the team can execute the design language at a high level — it should be the <b>reference</b> the other surfaces are pulled toward. Its findings are nearly all <b>polish and system-consolidation</b>, not fixes: bring the action up under the verdict (F1), dedupe ROI (F2), and lift the recurring patterns (gradient card, section header, attention row) into shared components so the rest of the app inherits this quality instead of re-deriving it.</p>
+  </section>
+
+</div>
+</body>
+</html>
