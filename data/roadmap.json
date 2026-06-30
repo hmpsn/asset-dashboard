@@ -262,11 +262,11 @@
           "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
           "est": "L",
           "priority": "P1",
-          "status": "pending",
-          "plannedSprint": "deferred",
+          "status": "done",
+          "plannedSprint": "sprint-mcp-surface-upgrade-2026-06-26",
           "createdAt": "2026-06-29",
           "owner": "integrations",
-          "notes": "Single biggest scaling blocker. handles.ts:20 is a process-local Map + 15-min lazy TTL: handles from instance A are invisible to B (silent HandleNotFoundError), vanish on restart, no eviction sweeper, no cap (research_keywords issues up to 50/call → slow leak). Move handle store + paid-call counter to a shared SQLite/Redis store with a TTL sweeper + MAX_HANDLES cap (mirror jobs.ts durability)."
+          "notes": "DONE (PR #1410). handles.ts + paid-call-counter.ts now persist to SQLite (migration 162: mcp_handles + mcp_paid_call_counts). API kept synchronous (better-sqlite3) so zero callers changed. TTL sweeper (gated off under tests, .unref()'d), MAX_HANDLES eviction by rowid (deterministic under same-ms ties), single-use consume. Paid counter durable + INFORMATIONAL only (no hard cap — owner decision); global aggregate under '__global__' preserves prior threshold semantics, optional workspaceId adds per-workspace attribution. Follow-up mcp-per-workspace-paid-attribution: thread workspaceId through the keyword-actions/job-actions call sites."
         },
         {
           "id": "mcp-content-jobs-schema-recs-tools",
@@ -274,11 +274,11 @@
           "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
           "est": "L",
           "priority": "P1",
-          "status": "pending",
-          "plannedSprint": "deferred",
+          "status": "done",
+          "plannedSprint": "sprint-mcp-surface-upgrade-2026-06-26",
           "createdAt": "2026-06-29",
           "owner": "content-pipeline",
-          "notes": "Schema is a zero-presence context (no MCP tools): generateSchemaForPage (schema-suggester.ts; wrapper resolves Webflow site+token internally). Recommendations exposes Strategy v3: generateRecommendations + applyBulkRecommendationAction (send/throttle/strike); generate is AI-backed → route via job platform. Grounded content jobs let the agent delegate to the server pipeline (server-side retry, downstream review/voice-score, no agent token spend) — note prepare_* is already grounded via buildContentGenerationContext(); the win is WHO runs the model."
+          "notes": "DONE (PR #1412). 3 new tool categories: schema-actions (generate_schema/validate_schema/publish_schema — validate-first guard refuses invalid schema), recommendation-actions (list_recommendations + apply_recommendation send/throttle/strike via the recommendation-lifecycle single-writer API), content-generation-actions (start_brief_generation/start_post_generation — [Paid API] grounded jobs delegated to the background job platform). Follow-up mcp-schema-publish-to-live-service: publish_schema omits the admin route's best-effort post-publish follow-ons (outcome tracking, recordSeoChange, llms.txt regen, rec-regen) and imports a publish helper from the route module — extract a publishSchemaToLive domain service used by both."
         },
         {
           "id": "mcp-auth-perkey-scoping",
@@ -286,11 +286,47 @@
           "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
           "est": "M",
           "priority": "P1",
+          "status": "done",
+          "plannedSprint": "sprint-mcp-surface-upgrade-2026-06-26",
+          "createdAt": "2026-06-29",
+          "owner": "integrations",
+          "notes": "DONE (PR #1411). Additive per-workspace MCP API keys on top of the RETAINED env MCP_API_KEY master key. mcp_api_keys table (migration 163): sha256-hashed (plaintext shown once), revocable (rotation). mcpAuthMiddleware: master → scope 'all' (unchanged, timing-safe compare preserved); else hash-lookup → workspace scope + caller label. SECURITY-CRITICAL workspace-scope enforcement in handleMcpRequest checks BOTH workspaceId/workspace_id casings; no-workspace_id tools rejected for scoped keys; fail-closed. Follow-up mcp-admin-key-minting-ui: admin route/UI to mint/list/revoke keys + thread req.mcpAuth.label into per-tool activity attribution."
+        },
+        {
+          "id": "mcp-schema-publish-to-live-service",
+          "title": "Follow-up — extract publishSchemaToLive domain service (MCP schema-publish parity + remove tool→route import)",
+          "source": "PR #1412",
+          "est": "M",
+          "priority": "P2",
           "status": "pending",
           "plannedSprint": "deferred",
           "createdAt": "2026-06-29",
           "owner": "integrations",
-          "notes": "Today one static shared MCP_API_KEY (auth.ts:9-24); any holder can touch any workspace + any tool (create/delete workspace, send_to_client, paid research). No per-workspace scoping, no caller identity (all tagged source:mcp-chat), rotation is a hard env+restart cutover. (The timing-safe compare itself is correct/fail-closed — do not rebuild it.)"
+          "notes": "publish_schema (server/mcp/tools/schema-actions.ts) does the core live write + rollback/page-state/intelligence updates, but OMITS the admin route's best-effort post-publish follow-ons (outcome tracking, recordSeoChange, llms.txt regen, rec-regen) and imports publishSchemaToCmsField from server/routes/webflow-schema.ts (tool→route import smell). Extract a publishSchemaToLive domain service in server/domains/schema/ used by both the admin route and the MCP tool — same pattern as onContentRequestLive."
+        },
+        {
+          "id": "mcp-admin-key-minting-ui",
+          "title": "Follow-up — admin UI/route to mint/list/revoke per-workspace MCP API keys + caller-label attribution",
+          "source": "PR #1411",
+          "est": "M",
+          "priority": "P2",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "integrations",
+          "notes": "PR #1411 added the per-workspace key STORE (createMcpApiKey/findActiveKeyByHash/revokeMcpApiKey in server/mcp/api-keys.ts) + scope enforcement, but no admin surface to create/list/revoke keys yet (forward-looking infra — only the master key is in use today). Add an admin route + UI. Also thread req.mcpAuth.label into the addActivity({source:'mcp-chat'}) calls so delegated mutations are attributable per key."
+        },
+        {
+          "id": "mcp-per-workspace-paid-attribution",
+          "title": "Follow-up — thread workspaceId through recordPaidCall call sites for per-workspace paid attribution",
+          "source": "PR #1410",
+          "est": "S",
+          "priority": "P3",
+          "status": "pending",
+          "plannedSprint": "deferred",
+          "createdAt": "2026-06-29",
+          "owner": "integrations",
+          "notes": "PR #1410 made the paid-call counter durable + per-workspace-capable (recordPaidCall(increment, workspaceId?)), but the keyword-actions/job-actions/content-generation-actions call sites still call recordPaidCall(1) without a workspaceId, so only the global '__global__' aggregate is populated. Pass the workspaceId (in scope at each call site) to populate per-workspace rows."
         },
         {
           "id": "mcp-raw-gsc-ga4-daterange",
