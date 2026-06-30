@@ -795,6 +795,8 @@ export const getAnomaliesInputSchema = z.object({
     .describe('The workspace ID whose detected anomalies (traffic drops, rank changes, indexation issues) to fetch.'),
   resolved: z.boolean().optional()
     .describe('When true, include resolved anomalies; when false or omitted, only unresolved anomalies are returned.'),
+  limit: z.number().int().positive().max(500).optional()
+    .describe('Optional max number of anomalies to return (1-500). Defaults to 100 — raise it only if you need the full backlog.'),
 });
 
 export const resolveInsightInputSchema = z.object({

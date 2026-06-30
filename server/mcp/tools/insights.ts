@@ -117,7 +117,10 @@ export async function handleInsightTool(
       if (!resolved) {
         anomalies = anomalies.filter(a => a.resolutionStatus !== 'resolved');
       }
-      return { content: [{ type: 'text' as const, text: JSON.stringify(anomalies) }] };
+      // Bound the payload (mirrors get_unresolved_insights) so a large anomaly
+      // backlog can't blow the response size; raise `limit` for the full set.
+      const bounded = anomalies.slice(0, parsed.data.limit ?? 100);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(bounded) }] };
     }
 
     if (name === 'resolve_insight') {
