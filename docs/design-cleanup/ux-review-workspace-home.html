@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>UX Review · Workspace Home</title>
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { background: var(--surface-1); padding: 0; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 56px 32px 120px; }
+  .doc-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brand-text-muted); display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .doc-eyebrow::before { content: ''; width: 28px; height: 1px; background: var(--brand-text-muted); }
+  h1.doc { font-family: var(--font-display); font-weight: 800; font-size: 52px; line-height: 1.02; letter-spacing: -0.04em; color: var(--brand-text-bright); margin: 0 0 18px; }
+  .lede { font-size: 17px; color: var(--brand-text); line-height: 1.6; max-width: 64ch; }
+  .lede b { color: var(--brand-text-bright); font-weight: 600; }
+  .meta-row { display: flex; gap: 24px; margin-top: 24px; font-family: var(--font-mono); font-size: 11px; color: var(--brand-text-muted); text-transform: uppercase; letter-spacing: 0.1em; flex-wrap: wrap; }
+  .meta-row b { color: var(--brand-text-bright); font-weight: 500; }
+
+  section.block { margin-top: 64px; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 22px; }
+  .sec-head .num { font-family: var(--font-mono); font-size: 11px; color: var(--teal); letter-spacing: 0.1em; }
+  .sec-head h2 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter-spacing: -0.025em; color: var(--brand-text-bright); margin: 0; }
+  .sec-head .rule { flex: 1; height: 1px; background: var(--brand-border); }
+
+  .well { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .well .item { display: flex; gap: 12px; padding: 16px 18px; background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-lg); }
+  .well .item .ico { width: 22px; height: 22px; border-radius: var(--radius-sm); background: rgba(52,211,153,.14); color: var(--emerald); display: flex; align-items: center; justify-content: center; flex: none; font-weight: 800; font-family: var(--font-display); }
+  .well .item p { margin: 0; font-size: 13.5px; color: var(--brand-text); line-height: 1.5; }
+  .well .item b { color: var(--brand-text-bright); font-weight: 600; }
+
+  .finding { background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-signature-lg); padding: 26px 28px; margin-bottom: 18px; }
+  .finding-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+  .sev { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-sm); }
+  .sev.high { background: rgba(248,113,113,.12); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+  .sev.med { background: rgba(251,191,36,.12); color: var(--amber); border: 1px solid rgba(251,191,36,.3); }
+  .sev.low { background: rgba(96,165,250,.12); color: var(--blue); border: 1px solid rgba(96,165,250,.3); }
+  .finding-head .fnum { font-family: var(--font-mono); font-size: 12px; color: var(--brand-text-dim); }
+  .finding-head h3 { font-family: var(--font-display); font-weight: 700; font-size: 19px; letter-spacing: -0.015em; color: var(--brand-text-bright); margin: 0; flex: 1; min-width: 240px; }
+  .finding .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 16px; }
+  .finding .pair .col .lab { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; display: block; }
+  .col.now .lab { color: var(--red); }
+  .col.fix .lab { color: var(--emerald); }
+  .finding p.body { font-size: 14px; color: var(--brand-text); line-height: 1.6; margin: 10px 0 0; }
+  .finding p.body b { color: var(--brand-text-bright); font-weight: 600; }
+  .finding code { font-family: var(--font-mono); font-size: 12px; color: var(--teal); background: var(--surface-1); padding: 1px 5px; border-radius: 3px; }
+  .finding .fix-note { font-size: 13.5px; color: var(--brand-text); line-height: 1.6; margin: 14px 0 0; padding: 14px 16px; background: var(--surface-1); border-left: 2px solid var(--teal); border-radius: var(--radius-md); }
+  .finding .fix-note b { color: var(--teal); font-weight: 600; display: block; margin-bottom: 4px; font-family: var(--font-display); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .mock { background: var(--surface-1); border: 1px solid var(--brand-border); border-radius: var(--radius-lg); padding: 16px; }
+  .m-statgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+  .m-statgrid.g3 { grid-template-columns: 2fr 1fr 1fr; }
+  .m-stat { background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-signature); padding: 8px; }
+  .m-stat .l { font-family: var(--font-display); font-size: 7.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--brand-text-muted); line-height: 1.2; }
+  .m-stat .v { font-family: var(--font-display); font-weight: 700; font-size: 15px; color: var(--brand-text-bright); margin-top: 3px; }
+  .m-stat.lead { background: linear-gradient(135deg, rgba(45,212,191,.08), transparent 60%), var(--surface-2); border-color: rgba(45,212,191,.25); }
+  .m-stat.lead .v { font-size: 24px; }
+  .m-stat.demote { background: transparent; border-color: rgba(63,63,70,.4); }
+  .m-stat.demote .v { font-size: 13px; }
+  .m-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brand-text-dim); margin: 0 0 8px; }
+  .m-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .m-pillbox { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .h-rep { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border: 1px dashed rgba(248,113,113,.4); border-radius: var(--radius-md); font-size: 11px; color: var(--brand-text); }
+  .h-rep .ring { width: 16px; height: 16px; border-radius: 9999px; border: 2px solid var(--teal); border-right-color: transparent; }
+  .m-ring { width: 40px; height: 40px; border-radius: 9999px; border: 4px solid var(--surface-3); border-top-color: var(--teal); border-right-color: var(--teal); flex: none; }
+  .swatch { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--brand-text); }
+  .swatch .chip { width: 22px; height: 22px; border-radius: var(--radius-sm); flex: none; }
+  .stack-list { display: flex; flex-direction: column; gap: 5px; }
+  .stack-item { font-size: 11px; padding: 7px 10px; border: 1px solid var(--brand-border); border-radius: var(--radius-md); background: var(--surface-2); color: var(--brand-text); display: flex; align-items: center; gap: 8px; }
+  .stack-item.dim { opacity: 0.5; }
+  .stack-item .tag { margin-left: auto; font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brand-text-dim); }
+  .stack-item.hero { border-color: rgba(248,113,113,.3); box-shadow: inset 2px 0 0 0 var(--red); }
+  .caption { font-family: var(--font-mono); font-size: 10px; color: var(--brand-text-dim); letter-spacing: 0.06em; margin-top: 8px; }
+</style>
+</head>
+<body class="with-noise">
+<div class="wrap">
+
+  <div class="doc-eyebrow">UX Review · single-workspace home</div>
+  <h1 class="doc">Workspace Home<br />has nine front doors.</h1>
+  <p class="lede">A heuristic review of <b>WorkspaceHome</b> — the screen an operator lives in once they pick a workspace. It's the richest surface in the product and the most data-complete. That's also the problem: it presents <b>up to nine equal hero metrics, four representations of one health score, and setup nudges in three places</b>, then buries the actual worklist below all of it. This is the sharper sibling of the Command Center's hierarchy issue. Every fix reuses primitives you ship.</p>
+  <div class="meta-row">
+    <span>Screen · <b>WorkspaceHome.tsx</b></span>
+    <span>Findings · <b>6</b></span>
+    <span>New components · <b>0</b></span>
+  </div>
+
+  <section class="block">
+    <div class="sec-head"><span class="num">00</span><h2>What's already right</h2><div class="rule"></div></div>
+    <div class="well">
+      <div class="item"><span class="ico">✓</span><p><b>Data freshness is honest.</b> A relative "updated 4m ago", a "Stale" flag past an hour, and a manual Refresh — operators always know how current the numbers are.</p></div>
+      <div class="item"><span class="ico">✓</span><p><b>StatCards deep-link.</b> Every metric routes to its detail surface (audit, analytics, ranks). The cards are navigation, not just decoration.</p></div>
+      <div class="item"><span class="ico">✓</span><p><b>Onboarding is dismissible and remembered.</b> The checklist persists its dismissed state per workspace — it won't nag after setup.</p></div>
+      <div class="item"><span class="ico">✓</span><p><b>Graceful empty metrics.</b> Each StatCard has a real "—" + "Connect GSC/GA4" fallback rather than a broken zero.</p></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="num">01</span><h2>The findings</h2><div class="rule"></div></div>
+
+    <!-- F1 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">F1</span><h3>Nine hero StatCards means no hero</h3><span class="sev high">High · hierarchy</span></div>
+      <p class="body">The metric grid renders up to nine cards — Site Health, Search Clicks, Users, Rank Changes, Traffic Value, Content Decay, Content Pipeline, Content Velocity, Coverage Gaps — <b>every one at <code>size="hero"</code></b>. When everything is a hero, nothing is. The operator faces a uniform 5-column wall and has to read all nine to find the one that changed.</p>
+      <div class="pair">
+        <div class="col now">
+          <span class="lab">Now — 9 equal heroes</span>
+          <div class="mock"><div class="m-statgrid">
+            <div class="m-stat"><div class="l">Site Health</div><div class="v">82</div></div>
+            <div class="m-stat"><div class="l">Search Clicks</div><div class="v">4.1K</div></div>
+            <div class="m-stat"><div class="l">Users</div><div class="v">9.2K</div></div>
+            <div class="m-stat"><div class="l">Rank Chg</div><div class="v">42</div></div>
+            <div class="m-stat"><div class="l">Traffic Val</div><div class="v">$4.2K</div></div>
+            <div class="m-stat"><div class="l">Decay</div><div class="v">6</div></div>
+            <div class="m-stat"><div class="l">Pipeline</div><div class="v">71%</div></div>
+            <div class="m-stat"><div class="l">Velocity</div><div class="v">8/mo</div></div>
+            <div class="m-stat"><div class="l">Gaps</div><div class="v">12</div></div>
+          </div></div>
+        </div>
+        <div class="col fix">
+          <span class="lab">Fix — 3 hero + a quiet rail</span>
+          <div class="mock"><div class="m-statgrid g3" style="margin-bottom:5px">
+            <div class="m-stat lead"><div class="l">Search Clicks</div><div class="v">4.1K</div></div>
+            <div class="m-stat lead" style="grid-column:auto"><div class="l">Users</div><div class="v">9.2K</div></div>
+            <div class="m-stat lead" style="grid-column:auto"><div class="l">Traffic Value</div><div class="v">$4.2K</div></div>
+          </div>
+          <div class="m-statgrid">
+            <div class="m-stat demote"><div class="l">Health</div><div class="v">82</div></div>
+            <div class="m-stat demote"><div class="l">Ranks</div><div class="v">42</div></div>
+            <div class="m-stat demote"><div class="l">Decay</div><div class="v">6</div></div>
+            <div class="m-stat demote"><div class="l">Velocity</div><div class="v">8/mo</div></div>
+            <div class="m-stat demote"><div class="l">Gaps</div><div class="v">12</div></div>
+          </div></div>
+        </div>
+      </div>
+      <p class="fix-note"><b>Recommendation</b>Pick 2–3 hero metrics that tell the performance story (Search Clicks, Users, Traffic Value) and keep them <code>size="hero"</code>. Demote the rest to a compact <code>size="default"</code> secondary rail — still present, still deep-linked, but visibly subordinate. The grid stops being a wall and gains a top line.</p>
+    </div>
+
+    <!-- F2 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">F2</span><h3>Site Health is shown four different ways on one screen</h3><span class="sev high">High · redundancy</span></div>
+      <p class="body">The health score appears as a <code>WorkspaceHealthBadge</code> under the header, again as a <b>Site Health StatCard</b>, a third time as the <code>MetricRing</code> trailing <i>inside</i> that card, and a fourth as the <code>WorkspaceHealthBar</code>. Four widgets, one number — the operator can't tell if they're meant to be different things (they aren't).</p>
+      <div class="pair">
+        <div class="col now">
+          <span class="lab">Now — one score, four widgets</span>
+          <div class="mock"><div style="display:flex;flex-direction:column;gap:8px">
+            <span class="h-rep"><span class="ring"></span> HealthBadge · 82</span>
+            <span class="h-rep">StatCard "Site Health" 82 <span class="m-ring" style="width:16px;height:16px;border-width:2px"></span></span>
+            <span class="h-rep">HealthBar · SEO Audit 82%</span>
+          </div></div>
+        </div>
+        <div class="col fix">
+          <span class="lab">Fix — one canonical health block</span>
+          <div class="mock"><div class="m-row" style="gap:12px;align-items:center">
+            <div class="m-ring"></div>
+            <div><div style="font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--brand-text-bright)">Site Health 82</div><div style="font-size:11px;color:var(--brand-text-muted)">3 err · 8 warn · ↑4 pts</div></div>
+          </div></div>
+        </div>
+      </div>
+      <p class="fix-note"><b>Recommendation</b>Choose one canonical health representation — the StatCard with its <code>MetricRing</code> trailing is the strongest and most on-brand. Drop the standalone badge; fold the HealthBar's "setup %" into the onboarding consolidation (F4). One score, one widget, one place to click.</p>
+    </div>
+
+    <!-- F3 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">F3</span><h3>Purple on the Users metric breaks the admin-only law</h3><span class="sev med">Medium · color law</span></div>
+      <p class="body">The Users StatCard sets <code>iconColor="#a78bfa"</code> — purple. Your fourth law is explicit: <b>purple is for admin AI only and never appears in a client-facing data view</b>. Using it on a core traffic metric both violates the rule and erodes the one signal that's supposed to mean "this is AI/admin." Several sibling cards also hardcode hex (<code>#22d3ee</code>, <code>#4ade80</code>, <code>#f87171</code>) instead of the tokens.</p>
+      <div class="pair">
+        <div class="col now">
+          <span class="lab">Now — purple on data</span>
+          <div class="mock"><div style="display:flex;flex-direction:column;gap:8px">
+            <span class="swatch"><span class="chip" style="background:#a78bfa"></span> Users · #a78bfa (purple = admin AI)</span>
+            <span class="swatch"><span class="chip" style="background:#22d3ee"></span> Clicks · hardcoded #22d3ee</span>
+          </div></div>
+        </div>
+        <div class="col fix">
+          <span class="lab">Fix — blue for data, via token</span>
+          <div class="mock"><div style="display:flex;flex-direction:column;gap:8px">
+            <span class="swatch"><span class="chip" style="background:var(--blue)"></span> Users · var(--blue)</span>
+            <span class="swatch"><span class="chip" style="background:var(--cyan)"></span> Clicks · var(--cyan)</span>
+          </div></div>
+        </div>
+      </div>
+      <p class="fix-note"><b>Recommendation</b>Recolor Users to <code>var(--blue)</code> (it's a data metric). Replace every hardcoded hex <code>iconColor</code> on this screen with a token so light mode and future palette shifts stay correct. Keep purple exclusively for AdminChat / admin intelligence surfaces.</p>
+    </div>
+
+    <!-- F4 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">F4</span><h3>Setup nudges appear in three places at once</h3><span class="sev med">Medium · redundancy</span></div>
+      <p class="body">"Link Webflow / connect GSC / connect GA4" shows up in the <b>OnboardingChecklist</b> (top), again as <b>WorkspaceHealthBar recommendations</b>, and a third time as Needs Attention <b>"setup suggestions"</b>. For a half-configured workspace the same three tasks are on screen three times — noisy, and it's unclear which one is authoritative.</p>
+      <div class="pair">
+        <div class="col now">
+          <span class="lab">Now — same tasks ×3</span>
+          <div class="mock"><div class="stack-list">
+            <div class="stack-item">Connect GSC<span class="tag">Checklist</span></div>
+            <div class="stack-item">Connect GSC<span class="tag">HealthBar rec</span></div>
+            <div class="stack-item">Connect GSC<span class="tag">Needs Attn</span></div>
+          </div></div>
+        </div>
+        <div class="col fix">
+          <span class="lab">Fix — one owner per state</span>
+          <div class="mock"><div class="stack-list">
+            <div class="stack-item">Connect GSC<span class="tag">Checklist (setup)</span></div>
+            <div class="stack-item dim">— not repeated in HealthBar</div>
+            <div class="stack-item dim">— not repeated in Needs Attn</div>
+          </div></div>
+        </div>
+      </div>
+      <p class="fix-note"><b>Recommendation</b>Give setup tasks one home: the OnboardingChecklist while a workspace is unconfigured. Once dismissed/complete, the HealthBar and Needs Attention can surface <i>operational</i> follow-ups only. Don't render the same connect-task in more than one component at the same time.</p>
+    </div>
+
+    <!-- F5 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">F5</span><h3>Needs Attention looks different here than on the Command Center</h3><span class="sev med">Medium · consistency</span></div>
+      <p class="body">Both screens have a "Needs Attention" worklist, but they're built differently: the Command Center uses a status dot + a <code>Badge</code> value + workspace name + chevron; Workspace Home uses a colored icon + label + sub-line + <code>ArrowUpRight</code>, plus a collapsible "setup suggestions" sub-group. Same job, two visual languages — operators relearn the pattern when they drill in.</p>
+      <div class="pair">
+        <div class="col now">
+          <span class="lab">Now — two patterns</span>
+          <div class="mock"><div class="stack-list">
+            <div class="stack-item"><span style="width:6px;height:6px;border-radius:9999px;background:var(--red)"></span>2 new requests<span class="tag">Command Center ·●·badge·›</span></div>
+            <div class="stack-item"><span style="color:var(--red)">▲</span>2 new requests<span class="tag">Home ·icon·sub·↗</span></div>
+          </div></div>
+        </div>
+        <div class="col fix">
+          <span class="lab">Fix — one shared component</span>
+          <div class="mock"><div class="stack-list">
+            <div class="stack-item"><span style="width:6px;height:6px;border-radius:9999px;background:var(--red)"></span>2 new requests<span class="tag">AttentionRow →</span></div>
+            <div class="stack-item"><span style="width:6px;height:6px;border-radius:9999px;background:var(--amber)"></span>1 brief to review<span class="tag">AttentionRow →</span></div>
+          </div></div>
+        </div>
+      </div>
+      <p class="fix-note"><b>Recommendation</b>Extract a single <code>AttentionRow</code> / <code>NeedsAttention</code> component used by both screens (it's a natural addition to the <code>flow/</code> group). One layout, one severity-color mapping, one interaction — defined once in the design system.</p>
+    </div>
+
+    <!-- F6 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">F6</span><h3>The worklist sits below nine stat cards and a health bar</h3><span class="sev med">Medium · hierarchy</span></div>
+      <p class="body">The screen is ~10 stacked full-width sections. The order is roughly: checklist → header → health badge → tabs → weekly → <b>9 metric cards</b> → health bar → <b>Needs Attention</b> → anomalies → briefings → SEO pipeline → recommendations → activity + rankings → requests. The single most actionable block (Needs Attention) lands well below the fold, after the operator scrolls past every metric.</p>
+      <div class="pair">
+        <div class="col now">
+          <span class="lab">Now — worklist buried</span>
+          <div class="mock"><div class="stack-list">
+            <div class="stack-item">Onboarding + Weekly</div>
+            <div class="stack-item">9 metric cards</div>
+            <div class="stack-item">Health bar</div>
+            <div class="stack-item hero">Needs Attention<span class="tag">below fold</span></div>
+            <div class="stack-item dim">Anomalies · Pipeline · Recs · Activity · Requests</div>
+          </div></div>
+        </div>
+        <div class="col fix">
+          <span class="lab">Fix — work first, trends second</span>
+          <div class="mock"><div class="stack-list">
+            <div class="stack-item hero">Needs Attention<span class="tag">top</span></div>
+            <div class="stack-item">3 hero metrics + quiet rail</div>
+            <div class="stack-item">SEO pipeline · Anomalies</div>
+            <div class="stack-item dim">Activity · Rankings · Requests</div>
+          </div></div>
+        </div>
+      </div>
+      <p class="fix-note"><b>Recommendation</b>Lead with Needs Attention (after onboarding for new workspaces), then the trimmed metric grid, then the operational sections. Consider grouping the lower half into the existing TabBar (Overview / Pipeline / Activity) so the default view isn't a ten-section scroll.</p>
+    </div>
+
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="num">02</span><h2>The pattern across both screens</h2><div class="rule"></div></div>
+    <p class="lede" style="font-size:15px">The Command Center and Workspace Home share one root cause: <b>the product surfaces everything it knows at equal weight.</b> The data layer is excellent, so every signal earns a card — but design's job is to rank them. Three system-level moves fix most of it:</p>
+    <div class="well" style="margin-top:18px;grid-template-columns:1fr">
+      <div class="item"><span class="ico">1</span><p><b>Cap heroes at three.</b> A "hero metric" budget per screen forces a choice about what leads. Everything else is a secondary tier.</p></div>
+      <div class="item"><span class="ico">2</span><p><b>One concept, one widget.</b> Health score, setup progress, and the worklist should each have exactly one representation — extract shared components (<code>NeedsAttention</code>, a single health block) into the system so screens can't diverge.</p></div>
+      <div class="item"><span class="ico">3</span><p><b>Color means status, never chrome or plain data.</b> Mint = action, blue = data, emerald = success, amber/red = warn/danger, purple = admin AI only. A repo sweep enforces it cheaply.</p></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="num">03</span><h2>Next</h2><div class="rule"></div></div>
+    <p class="lede" style="font-size:15px">That's both operator home screens covered. I can keep going on the <b>client-facing</b> surfaces (ClientDashboard, the Results/ROI tab) where the bar for clarity is even higher, or the <b>content pipeline</b> flow. Then I'll loop back and fold every finding — Command Center + Workspace Home — into a single <b>sprint brief</b> (PR-description / Linear-ready), updating the roadmap JSON we already started.</p>
+  </section>
+
+</div>
+</body>
+</html>

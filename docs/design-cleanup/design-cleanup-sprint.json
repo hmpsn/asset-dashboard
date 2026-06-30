@@ -1,0 +1,755 @@
+{
+  "id": "sprint-design-cleanup-2026-06-30",
+  "name": "Design cleanup — operator + client surface hierarchy & system consolidation",
+  "hours": "TBD — phased, UI-only, staging-first",
+  "rationale": "From the 2026-06-30 UX reviews of three surfaces judged against the design system primitives and the four laws of color: WorkspaceOverview (agency Command Center), WorkspaceHome (single-workspace operator home), and TheIssueClientPage (the verdict-first client money surface, flag the-issue-client-spine). Shared root cause on the operator screens: everything is surfaced at equal weight, so the eye has nowhere to land. The client surface is already strong — its items are polish + lifting recurring patterns into shared components. All fixes reuse existing primitives. Full findings index: design-system/guidelines/ux-findings-index.html. Per-screen artifacts: ux-review-command-center.html, ux-review-workspace-home.html, ux-review-client-issue.html. Item id prefixes map to screen: cc-=Command Center, wh-=Workspace Home, issue-=The Issue client, x-=cross-cutting.",
+  "items": [
+    {
+      "id": "design-cc-header-primary-action",
+      "title": "Command Center header — collapse 5 colored buttons to one neutral cluster + one primary",
+      "source": "UX review 2026-06-30 · F1",
+      "est": "S",
+      "priority": "P1",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "WorkspaceOverview header renders Prospect/Roadmap/AI Usage/Revenue/Features as five equal secondary buttons, three individually colored amber/emerald/teal — spending the status palette on navigation (teal 'Features' reads as the primary CTA, amber 'AI Usage' reads as a warning). Fix: demote the five to one neutral secondary cluster or an overflow 'More' menu, promote the actual entry action (new/onboard workspace) to the single mint primary, and strip amber/emerald/teal off chrome. Reserve those hues for status only.",
+      "files": [
+        "src/components/WorkspaceOverview.tsx (PageHeader actions block)"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "Header shows at most one mint primary action (new/onboard workspace) plus one neutral secondary cluster or a \"More\" overflow menu",
+        "Zero amber/emerald/teal applied to header buttons (status hues reserved for status)",
+        "All five prior destinations (Prospect/Roadmap/AI Usage/Revenue/Features) remain reachable"
+      ],
+      "verify": [
+        "dark + light",
+        "pr-check",
+        "report-style-drift (header hues gone)"
+      ]
+    },
+    {
+      "id": "design-cc-needs-attention-hero",
+      "title": "Command Center — promote Needs Attention to the top with real presence",
+      "source": "UX review 2026-06-30 · F3",
+      "est": "S",
+      "priority": "P1",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "Needs Attention is the prioritized, deep-linked worklist — the reason operators open the screen — but it sits mid-page at default weight below the header. Fix: make it the first block under PageHeader; add a count in the title ('Needs Attention · 6'); add a subtle red/amber left-accent when a P1 (churn/new request) exists; keep the chevron always visible so rows read as actionable. Component already exists (SectionCard + ClickableRow); this is ordering + emphasis only.",
+      "files": [
+        "src/components/WorkspaceOverview.tsx (Needs Attention SectionCard)",
+        "src/components/ui/NeedsAttention.tsx (new, Wave 0)"
+      ],
+      "dependsOn": [
+        "design-x-needs-attention-shared"
+      ],
+      "acceptanceCriteria": [
+        "Needs Attention is the first block under PageHeader",
+        "Title shows a count (\"Needs Attention · N\"); container gets a red/amber left-accent when a P1 item exists",
+        "Rows render via the shared NeedsAttention component with an always-visible chevron"
+      ],
+      "verify": [
+        "empty (no attention items) + populated",
+        "P1 present vs none",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-cc-statrow-hierarchy",
+      "title": "Command Center — one headline metric, drop stats duplicated by Needs Attention",
+      "source": "UX review 2026-06-30 · F2",
+      "est": "S",
+      "priority": "P2",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "Global stat row shows six equal StatCards; nothing leads, and New Requests / Approvals / Content duplicate the Needs Attention list directly above. Fix: render one headline (Hours Saved — the value story) at size=hero spanning two columns, keep only at-a-glance trend metrics (Avg Health, Active, Content), and drop the actionable counts that already live in Needs Attention. Reduces the row from 6 to ~4 with a clear lead.",
+      "files": [
+        "src/components/WorkspaceOverview.tsx (Global Stats grid)"
+      ],
+      "dependsOn": [
+        "design-cc-needs-attention-hero"
+      ],
+      "acceptanceCriteria": [
+        "Exactly one hero metric (Hours Saved) at size=hero spanning two columns",
+        "Row no longer repeats counts that appear in Needs Attention (New Requests, Approvals)",
+        "Remaining cards are at-a-glance trends only (Avg Health, Active, Content)"
+      ],
+      "verify": [
+        "populated + zero-state",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-cc-workspace-row-density",
+      "title": "Command Center — workspace rows lead with score + single rollup, details on demand",
+      "source": "UX review 2026-06-30 · F4",
+      "est": "M",
+      "priority": "P2",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "Each workspace row packs five metric columns (Health/Requests/Approvals/Content/SEO Status) with inline colored micro-text in every cell; at 3+ workspaces it becomes a wall of multicolored numbers and color loses meaning. Fix: lead each row with the ranking number (health score, in band color) + a single 'N need you' rollup pill; move the five-column breakdown into the row's hover/expanded state or the workspace detail. Color only on the rollup; neutral text elsewhere.",
+      "files": [
+        "src/components/WorkspaceOverview.tsx (workspace ClickableRow map)"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "Each row leads with the health score (band color) + workspace name + one \"N need you\" rollup pill",
+        "The five-column metric breakdown moves to a hover/expanded state or the workspace detail",
+        "Color appears only on the score + rollup; all other row text is neutral"
+      ],
+      "verify": [
+        "1 / 3 / 10 workspaces",
+        "at-risk + healthy",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-color-law-sweep-mint-on-data",
+      "title": "Color-law sweep — stop using mint (text-accent-brand) on static data",
+      "source": "UX review 2026-06-30 · F5",
+      "est": "M",
+      "priority": "P2",
+      "status": "pending",
+      "owner": "design-system",
+      "notes": "Static counts are rendered in text-accent-brand (mint) across the overview ('3 active', '5 delivered', approvals count). Mint is the action color; on static numbers it makes everything read as clickable and dilutes real CTAs. Fix: recolor static counts to blue (data) or emerald (completed/positive); mint only on actual click targets. Do as a repo-wide grep for text-accent-brand / var(--teal) on non-interactive text — complements the existing report-style-drift.ts baseline. Highest-leverage, lowest-risk item.",
+      "files": [
+        "repo-wide (grep text-accent-brand / var(--teal) on non-interactive text)",
+        "src/components/ui/* and screen components"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "No static (non-interactive) count or label renders in mint",
+        "Data counts recolored to blue; completed/positive to emerald; mint only on actual click targets",
+        "report-style-drift count decreases vs baseline"
+      ],
+      "verify": [
+        "report-style-drift before/after",
+        "spot-check 5+ screens",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-workspace-home-statcard-hierarchy",
+      "title": "WorkspaceHome follow-on — tame the up-to-nine equal hero StatCards",
+      "source": "UX review 2026-06-30 · F2 follow-on",
+      "est": "M",
+      "priority": "P3",
+      "status": "pending",
+      "plannedSprint": "deferred",
+      "owner": "ui-platform",
+      "notes": "WorkspaceHome (WH-F1) renders up to nine StatCards all at size=hero (Site Health, Search Clicks, Users, Rank Changes, Traffic Value, Content Decay, Content Pipeline, Content Velocity, Coverage Gaps) — a sharper version of CC-F2 where nine hero metrics means no hero. Fix: choose 2-3 hero metrics, demote the rest to a compact size=default secondary rail (still present, still deep-linked). Artifact: ux-review-workspace-home.html.",
+      "files": [
+        "src/components/WorkspaceHome.tsx (metric cards grid)"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "At most 3 StatCards at size=hero; the rest at size=default in a compact secondary rail",
+        "Every metric remains present and deep-linked",
+        "Grid reads as lead + supporting, not a uniform wall"
+      ],
+      "verify": [
+        "few vs all 9 metrics present",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-wh-health-four-ways",
+      "title": "WorkspaceHome — collapse four health representations into one canonical block",
+      "source": "UX review 2026-06-30 · WH-F2",
+      "est": "S",
+      "priority": "P2",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "Site Health appears four times on one screen: WorkspaceHealthBadge (under header), the Site Health StatCard, the MetricRing trailing inside that card, and WorkspaceHealthBar. One number, four widgets. Fix: keep the StatCard + trailing MetricRing as the single canonical health block; drop the standalone badge; fold HealthBar's setup% into the onboarding consolidation (design-wh-setup-triplicated). Artifact: ux-review-workspace-home.html.",
+      "files": [
+        "src/components/WorkspaceHome.tsx",
+        "src/components/admin/WorkspaceHealthBadge.tsx",
+        "src/components/ui/WorkspaceHealthBar.tsx"
+      ],
+      "dependsOn": [
+        "design-wh-setup-triplicated"
+      ],
+      "acceptanceCriteria": [
+        "Site Health has ONE canonical representation (StatCard + trailing MetricRing)",
+        "Standalone WorkspaceHealthBadge removed from this screen",
+        "WorkspaceHealthBar setup% folded into the onboarding consolidation"
+      ],
+      "verify": [
+        "audit present vs \"no audit yet\"",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-wh-purple-on-data",
+      "title": "WorkspaceHome — recolor Users metric off purple; tokenize hardcoded iconColors",
+      "source": "UX review 2026-06-30 · WH-F3",
+      "est": "S",
+      "priority": "P2",
+      "status": "pending",
+      "owner": "design-system",
+      "notes": "The Users StatCard sets iconColor='#a78bfa' (purple) — a direct violation of the fourth color law (purple = admin AI only, never client-facing data). Several sibling cards also hardcode hex (#22d3ee, #4ade80, #f87171) instead of tokens. Fix: recolor Users to var(--blue) (it's a data metric); replace every hardcoded hex iconColor with a token so light mode + palette shifts stay correct; keep purple exclusive to AdminChat/admin intelligence. Pairs with the repo-wide color sweep. Artifact: ux-review-workspace-home.html.",
+      "files": [
+        "src/components/WorkspaceHome.tsx (Users StatCard + sibling iconColor props)",
+        "src/components/ui/StatCard.tsx"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "Users metric iconColor = var(--blue); no purple anywhere on a client/data surface",
+        "All hardcoded hex iconColors on this screen replaced with tokens",
+        "Purple remains only on AdminChat / admin-intelligence surfaces"
+      ],
+      "verify": [
+        "dark + light",
+        "report-style-drift"
+      ]
+    },
+    {
+      "id": "design-wh-setup-triplicated",
+      "title": "WorkspaceHome — show setup tasks in one place, not three",
+      "source": "UX review 2026-06-30 · WH-F4",
+      "est": "M",
+      "priority": "P3",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "Link Webflow / connect GSC / connect GA4 appears simultaneously in the OnboardingChecklist (top), WorkspaceHealthBar recommendations, and Needs Attention 'setup suggestions'. Same three tasks rendered three times for a half-configured workspace. Fix: give setup tasks one owner (OnboardingChecklist while unconfigured); once dismissed/complete, HealthBar + Needs Attention surface operational follow-ups only. Never render the same connect-task in two components at once. Artifact: ux-review-workspace-home.html.",
+      "files": [
+        "src/components/WorkspaceHome.tsx",
+        "src/components/ui/OnboardingChecklist.tsx",
+        "src/components/ui/WorkspaceHealthBar.tsx"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "A given connect-task (Webflow/GSC/GA4) appears in exactly one component at a time",
+        "OnboardingChecklist owns setup tasks while the workspace is unconfigured",
+        "Once dismissed/complete, HealthBar + Needs Attention show only operational follow-ups"
+      ],
+      "verify": [
+        "unconfigured / partially / fully configured workspace",
+        "checklist dismissed state"
+      ]
+    },
+    {
+      "id": "design-x-needs-attention-shared",
+      "title": "Cross-cutting — extract one shared NeedsAttention/AttentionRow component",
+      "source": "UX review 2026-06-30 · WH-F5 (also CC)",
+      "est": "M",
+      "priority": "P2",
+      "status": "pending",
+      "owner": "design-system",
+      "notes": "Command Center and Workspace Home both render a 'Needs Attention' worklist but with different layouts: Command Center uses dot + Badge value + workspace name + chevron; Workspace Home uses colored icon + label + sub + ArrowUpRight plus a collapsible 'setup suggestions' sub-group. Same job, two visual languages. Fix: extract one AttentionRow / NeedsAttention component into the flow/ group with a single severity-color mapping and interaction; both screens consume it. Closes the divergence for good. Artifacts: ux-review-command-center.html (F3), ux-review-workspace-home.html (F5).",
+      "files": [
+        "src/components/ui/NeedsAttention.tsx (new)",
+        "src/components/ui/NeedsAttention.test.tsx (new)",
+        "consumers: WorkspaceOverview.tsx, WorkspaceHome.tsx"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "One NeedsAttention/AttentionRow component with a single severity→color map (see working agreement §4.1)",
+        "Both Command Center and Workspace Home consume it; no inline attention-row markup remains",
+        "Ships with tests; supports cap/show-more + count-in-title"
+      ],
+      "verify": [
+        "unit tests",
+        "both consuming screens render identically to intended",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-wh-worklist-order",
+      "title": "WorkspaceHome — lead with the worklist; consider tabbing the lower sections",
+      "source": "UX review 2026-06-30 · WH-F6",
+      "est": "M",
+      "priority": "P3",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "~10 stacked full-width sections; the most actionable block (Needs Attention) lands below nine metric cards + the health bar, well under the fold. Fix: order as worklist (after onboarding for new workspaces) -> trimmed metric grid -> operational sections; consider grouping the lower half under the existing TabBar (Overview/Pipeline/Activity) so the default view isn't a ten-section scroll. Depends on design-wh-statcard-hierarchy + design-x-needs-attention-shared. Artifact: ux-review-workspace-home.html.",
+      "files": [
+        "src/components/WorkspaceHome.tsx (top-level section order + TabBar)"
+      ],
+      "dependsOn": [
+        "design-workspace-home-statcard-hierarchy",
+        "design-x-needs-attention-shared"
+      ],
+      "acceptanceCriteria": [
+        "Section order: (onboarding for new ws) → Needs Attention → trimmed metric grid → operational sections",
+        "Lower-half sections grouped under the existing TabBar so the default view is not a 10-section scroll",
+        "Most-actionable block is above the fold"
+      ],
+      "verify": [
+        "new vs established workspace",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-issue-plan-above-proof",
+      "title": "The Issue (client) — bring the Content Plan up directly under the verdict",
+      "source": "UX review 2026-06-30 · ISSUE-F1",
+      "est": "S",
+      "priority": "P2",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "On the spine branch the Content Plan (the only retainer action, 'Request this') sits at slot 5, beneath three stacked proof surfaces (verdict $, outcome count, money/ROI frame) plus the loop footer. A client convinced by the verdict may never scroll to act. Fix: keep verdict as the lead, then surface Content Plan directly under it (verdict -> plan -> proof), with outcome count + money + wins following. Strong A/B candidate on request-rate. Note: the flag-OFF branch already leads with the plan. Artifact: ux-review-client-issue.html.",
+      "files": [
+        "src/components/client/the-issue/TheIssueClientPage.tsx (spineEnabled branch slot order)"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "Spine order: verdict → Content Plan → proof (outcome count, money, wins)",
+        "Content Plan sits directly under the verdict, above the ROI/money frame",
+        "flag-OFF branch unchanged (byte-identical)"
+      ],
+      "verify": [
+        "flag ON + OFF (OFF byte-identical)",
+        "previewMode + live",
+        "instrument request-rate for A/B"
+      ]
+    },
+    {
+      "id": "design-issue-roi-double-mount",
+      "title": "The Issue (client) — render ROIDashboard once, not twice",
+      "source": "UX review 2026-06-30 · ISSUE-F2",
+      "est": "S",
+      "priority": "P2",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "Slot 3 mounts <ROIDashboard compact /> and 'Under the hood' mounts <ROIDashboard compact={false} /> again — the same dollar story twice on one page (possible double fetch, 'which number is right?' confusion). Fix: render ROI once; keep the compact money frame at slot 3 and let 'Under the hood' hold only methodology/tables, or make the compact frame expand in place. Artifact: ux-review-client-issue.html.",
+      "files": [
+        "src/components/client/the-issue/TheIssueClientPage.tsx (slot 3 + \"Under the hood\")"
+      ],
+      "dependsOn": [
+        "design-x-disclosure-pattern"
+      ],
+      "acceptanceCriteria": [
+        "ROIDashboard mounts once on the page",
+        "\"Under the hood\" holds methodology/tables only (or the compact frame expands in place)",
+        "No duplicate ROI fetch"
+      ],
+      "verify": [
+        "network panel (single ROI fetch)",
+        "flag ON + OFF",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-issue-pending-surfaces",
+      "title": "The Issue (client) — relate the top 'Your turn' strip to the 'Ask your strategist' loop",
+      "source": "UX review 2026-06-30 · ISSUE-F3",
+      "est": "S",
+      "priority": "P3",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "ActionQueueStrip (slot 0, 'Your turn') and IssueLoopFooter (slot 4, 'the full pending-decisions queue/loop') are two pending-work surfaces bookending the page; a client may read the footer as new work. Fix: make the top strip the count/jump ('3 decisions waiting v') that anchors to the footer detail, sharing one visual language. Artifact: ux-review-client-issue.html.",
+      "files": [
+        "src/components/client/the-issue/TheIssueClientPage.tsx",
+        "src/components/client/Briefing/ActionQueueStrip.tsx",
+        "src/components/client/the-issue/IssueLoopFooter.tsx"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "Top \"Your turn\" strip reads as a count/jump that anchors to the loop footer",
+        "Strip and footer share one visual language",
+        "A client cannot mistake the footer for new/separate work"
+      ],
+      "verify": [
+        "0 / 1 / many pending decisions",
+        "previewMode"
+      ]
+    },
+    {
+      "id": "design-x-section-header",
+      "title": "Cross-cutting — define one section-header treatment in the design system",
+      "source": "UX review 2026-06-30 · ISSUE-F4",
+      "est": "S",
+      "priority": "P3",
+      "status": "pending",
+      "owner": "design-system",
+      "notes": "On The Issue, a top-level section header is variously a muted h2.t-label kicker, a SectionCard title bar, or a <summary> row — three weights for one job, making a long scroll hard to skim. Fix: standardize one section-header treatment (the t-label kicker) for top-level sections and reserve SectionCard headers for cards within a section. Applies app-wide. Artifact: ux-review-client-issue.html.",
+      "files": [
+        "src/components/ui/SectionLabel.tsx (new) or a documented rule",
+        "consumers across The Issue + others"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "One section-header treatment (t-label kicker) for top-level sections",
+        "SectionCard headers reserved for cards within a section; <summary> only for Disclosure",
+        "The Issue page uses one consistent header weight per role"
+      ],
+      "verify": [
+        "visual scan of The Issue outline",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-cp-unify-stepper-tabs",
+      "title": "Content Pipeline — unify the WorkflowStepper and tab bar into one journey",
+      "source": "UX review 2026-06-30 · CP-F1",
+      "est": "M",
+      "priority": "P2",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "Two navigations describe the same flow differently: the WorkflowStepper says Strategy->Briefs->Posts->Publish while the tab bar says Planner/Calendar/Briefs/Posts/Subscriptions. 'Strategy' leaves the page, 'Publish' and 'Subscriptions' are the same destination under two names, and Planner/Calendar exist only in tabs. Fix: align stepper phases 1:1 with tabs and labels (rename Subscriptions->Publish; point stepper 'Strategy' at the Planner tab, not off-page); treat Calendar as a view toggle, not a peer phase. Stepper shows where you are; tabs are how you move. Artifact: ux-review-content-pipeline.html.",
+      "files": [
+        "src/components/ContentPipeline.tsx (contentWorkflowSteps + TABS + stepper render)"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "Stepper phases map 1:1 to tabs with identical labels (Subscriptions→Publish)",
+        "Stepper \"Strategy\" points at the in-page Planner tab, not off-page navigation",
+        "Calendar is presented as a view toggle, not a peer phase"
+      ],
+      "verify": [
+        "each tab active state",
+        "stepper click targets land in-page",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-cp-use-tabbar-primitive",
+      "title": "Content Pipeline — replace the hand-rolled tab bar with the TabBar primitive",
+      "source": "UX review 2026-06-30 · CP-F2",
+      "est": "S",
+      "priority": "P2",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "The sub-tab bar is built inline from <Button variant='ghost'> with a manual border-b-2 mint underline — re-implementing the TabBar component the system ships and WorkspaceHome already uses. They will drift in padding, hit-target, and keyboard nav. Fix: adopt the TabBar primitive (supports icons + mint active state + arrow-key nav + 44px hit target); move Export beside it as an action, not a fake tab. Artifact: ux-review-content-pipeline.html.",
+      "files": [
+        "src/components/ContentPipeline.tsx (sub-tab bar)",
+        "src/components/ui/TabBar.tsx"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "Sub-tab bar uses the TabBar primitive (no inline Button+border-b-2 reimplementation)",
+        "Export is an action beside the tabs, not a fake tab",
+        "Arrow-key nav + 44px hit target preserved"
+      ],
+      "verify": [
+        "keyboard tab nav",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-cp-consolidate-alert-bands",
+      "title": "Content Pipeline — roll up four pre-content alert bands",
+      "source": "UX review 2026-06-30 · CP-F3",
+      "est": "M",
+      "priority": "P3",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "Between the stepper and tab content sit four full-width bands: health summary, content-decay alert, cannibalization warnings, AI-suggested briefs — three of them amber/red, so the page reads as alarmed before any action. Fix: keep the neutral health summary as the one persistent bar; roll decay + cannibalization + suggestions into a single collapsible 'Alerts & suggestions (N)' strip, or move each into the tab it acts on (decay->Posts, suggestions->Briefs). Reach the work in one screen. Artifact: ux-review-content-pipeline.html.",
+      "files": [
+        "src/components/ContentPipeline.tsx (health summary + decay + cannibalization + AiSuggested region)"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "Neutral health summary persists as the one always-on bar",
+        "Decay + cannibalization + AI suggestions roll into a single collapsible \"Alerts & suggestions (N)\" strip (or move into the acting tab)",
+        "Operator reaches tab content within one screen on a workspace with issues"
+      ],
+      "verify": [
+        "workspace with 0 vs many alerts",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-cp-healthbar-color",
+      "title": "Content Pipeline — neutralize mint/amber on static counts in the health bar",
+      "source": "UX review 2026-06-30 · CP-F4",
+      "est": "S",
+      "priority": "P3",
+      "status": "pending",
+      "owner": "design-system",
+      "notes": "The health summary renders brief/matrix counts in text-accent-brand (mint) and the posts count in text-accent-warning (amber) — static data wearing action/warning colors (same drift as CC-F5; amber implies a problem that isn't there). Fix: counts are data -> neutral bright (or blue); reserve amber for genuine decay/cannibalization warnings. Folds into the repo-wide color-law sweep (design-color-law-sweep-mint-on-data). Artifact: ux-review-content-pipeline.html.",
+      "files": [
+        "src/components/ContentPipeline.tsx (health summary bar counts)"
+      ],
+      "dependsOn": [
+        "design-color-law-sweep-mint-on-data"
+      ],
+      "acceptanceCriteria": [
+        "Brief/matrix/post counts render neutral (or blue as data), not mint/amber",
+        "Amber reserved for genuine decay/cannibalization warnings"
+      ],
+      "verify": [
+        "report-style-drift",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-x-menu-primitive",
+      "title": "Cross-cutting — add a Menu/Dropdown primitive to the design system",
+      "source": "UX review 2026-06-30 · CP-F5",
+      "est": "M",
+      "priority": "P3",
+      "status": "pending",
+      "owner": "design-system",
+      "notes": "The Content Pipeline Export control hand-rolls its own open state, click-outside handler, positioned panel, and per-row CSV/JSON buttons — and the design system has no Dropdown/Menu primitive, so the next menu gets hand-rolled differently. This is the first genuine NEW-component need surfaced by the review program. Fix: add a Menu/Dropdown primitive (trigger + positioned panel + click-outside + keyboard dismiss) and adopt it here. Artifact: ux-review-content-pipeline.html.",
+      "files": [
+        "src/components/ui/Menu.tsx (new)",
+        "src/components/ui/Menu.test.tsx (new)",
+        "consumer: ContentPipeline.tsx Export"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "Menu primitive: trigger + positioned panel + click-outside + Escape + arrow-key nav (see working agreement §4.3)",
+        "Panel at --z-dropdown using --surface-2 / --brand-border / --radius-lg",
+        "Pipeline Export adopts it; bespoke dropdown removed"
+      ],
+      "verify": [
+        "keyboard + click-outside dismiss",
+        "unit tests",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-ac-send-near-staging",
+      "title": "The Issue cockpit — keep Send issue in reach of the staging queue",
+      "source": "UX review 2026-06-30 · AC-F1",
+      "est": "M",
+      "priority": "P2",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "Send issue lives in IssueHeader at the top (canSend = stagedCount > 0), but the operator builds the staged set in the BackingMovesQueue near the bottom of the spine. Workflow becomes stage-at-bottom -> scroll-up-to-send, with the consuming button off-screen while staging. Fix: add a sticky send bar (or a Send affordance docked to BackingMovesQueue) that appears once stagedCount > 0, showing the staged count + Send from where staging happens; keep the header Send too. Artifact: ux-review-admin-cockpit.html.",
+      "files": [
+        "src/components/KeywordStrategy.tsx (issueOverviewEl)",
+        "src/components/strategy/issue/IssueHeader.tsx",
+        "src/components/strategy/issue/BackingMovesQueue.tsx (confirm path)"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "A sticky send bar (or Send docked to BackingMovesQueue) appears once stagedCount > 0",
+        "Staged count + Send are visible from where staging happens",
+        "Header Send retained; no double-send risk"
+      ],
+      "verify": [
+        "stagedCount 0 vs >0",
+        "long-scroll cockpit",
+        "flag ON + OFF"
+      ]
+    },
+    {
+      "id": "design-x-disclosure-pattern",
+      "title": "Cross-cutting — define one Disclosure/collapsible-section pattern; split the catch-all drawers",
+      "source": "UX review 2026-06-30 · AC-F2 (mirrors client 'Under the hood')",
+      "est": "M",
+      "priority": "P2",
+      "status": "pending",
+      "owner": "design-system",
+      "notes": "The cockpit's 'Supporting detail' <details> holds eight unrelated surfaces (leads, keyword-targets link, content-work-order lens, trust ladder, orient, content gaps, cannibalization, strategy diff) behind one all-or-nothing toggle. The client TheIssueClientPage 'Under the hood' does the same (ring + full ROI + leads + competitors). Fix: split each into 2-3 labeled disclosures grouped by job, AND define a single Disclosure/collapsible-section pattern in the design system (consistent summary chrome + behavior + sub-grouping) consumed by both screens. Retires AC-F2 and the client under-the-hood catch-all. Artifact: ux-review-admin-cockpit.html.",
+      "files": [
+        "src/components/ui/Disclosure.tsx (new)",
+        "src/components/ui/Disclosure.test.tsx (new)",
+        "consumers: KeywordStrategy.tsx (Supporting detail), TheIssueClientPage.tsx (Under the hood)"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "One Disclosure pattern with canonical summary chrome + rotating chevron + focus ring (working agreement §4.2)",
+        "Cockpit \"Supporting detail\" split into 2–3 labeled groups; client \"Under the hood\" likewise",
+        "No --radius-signature on disclosures; reduced-motion respected"
+      ],
+      "verify": [
+        "keyboard operability",
+        "reduced-motion",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-ac-staleness-tokens",
+      "title": "The Issue cockpit — tokenize the POV-staleness nudge (raw amber)",
+      "source": "UX review 2026-06-30 · AC-F3",
+      "est": "S",
+      "priority": "P3",
+      "status": "pending",
+      "owner": "design-system",
+      "notes": "The 'POV may be out of date' banner uses raw Tailwind text-amber-400 / border-amber-500/30 / bg-amber-500/5 instead of the --amber token + the soft-warning surface convention (StatusBadge/InlineBanner). Won't follow palette/light-theme changes; a second way of spelling 'warning surface'. Fix: use the warning tokens + shared soft-amber convention. Pairs with WH-F3 / the color-law + tokenize-hardcoded-hex work. Artifact: ux-review-admin-cockpit.html.",
+      "files": [
+        "src/components/KeywordStrategy.tsx (POV-staleness banner)",
+        "src/components/ui/InlineBanner.tsx"
+      ],
+      "dependsOn": [
+        "design-cd-trial-banner-tokens"
+      ],
+      "acceptanceCriteria": [
+        "Staleness nudge uses --amber + the shared soft-warning surface (InlineBanner variant)",
+        "No raw text-amber-400 / border-amber-500 / bg-amber-500 remain on this banner"
+      ],
+      "verify": [
+        "report-style-drift",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-ac-add-rec-placement",
+      "title": "The Issue cockpit — dock 'Add a recommendation' to the BackingMovesQueue header",
+      "source": "UX review 2026-06-30 · AC-F4",
+      "est": "S",
+      "priority": "P3",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "A right-aligned 'Add a recommendation' button sits on its own line between the Drafted POV editor and the BackingMovesQueue — an orphan action floating in the gap. It feeds the queue, so it should live in the queue's header action slot (the SectionCard action pattern). Removes the orphan line and puts the control on the object it modifies. Artifact: ux-review-admin-cockpit.html.",
+      "files": [
+        "src/components/KeywordStrategy.tsx (Add a recommendation button + BackingMovesQueue header)"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "\"Add a recommendation\" lives in the BackingMovesQueue header action slot",
+        "No orphan right-aligned button line between POV editor and the queue"
+      ],
+      "verify": [
+        "dark + light",
+        "flag ON + OFF"
+      ]
+    },
+    {
+      "id": "design-cd-finish-ia-v2-nav",
+      "title": "Client shell — finish the two-speed nav migration; retire the 12-tab legacy nav",
+      "source": "UX review 2026-06-30 · CD-F1",
+      "est": "L",
+      "priority": "P2",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "Behind client-ia-v2 the nav collapses from ~12 top-level tabs (Overview, Performance, Health, Strategy, Inbox, Content Plan, Plans, ROI, Brand, Results, Deep Dive, Settings) to four. Twelve is far too many for a client; while the flag is mid-rollout the product has two front doors depending on flag state. Fix: commit to the two-speed shell and retire legacy nav — Overview = verdict; Deep Dive holds Performance/Health/Rankings/Content sub-views; Inbox = loop; Settings absorbs Plans/Brand. Highest-impact move on this screen. Artifact: ux-review-client-shell.html.",
+      "files": [
+        "src/components/ClientDashboard.tsx",
+        "src/components/client/client-dashboard/clientDashboardNav.ts",
+        "src/components/client/ClientHeader.tsx"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "Client nav is the 4-tab two-speed shell (Overview / Deep Dive / Inbox / Settings); legacy 12-tab nav retired",
+        "client-ia-v2 flag removed or defaulted ON after migration; no two-front-doors state",
+        "All prior destinations reachable within the new shell"
+      ],
+      "verify": [
+        "flag ON + OFF during migration",
+        "every legacy tab destination still reachable",
+        "dark + light",
+        "mobile width"
+      ]
+    },
+    {
+      "id": "design-cd-dedupe-panel-mounts",
+      "title": "Client shell — define each tab panel once; collapse duplicate mounts",
+      "source": "UX review 2026-06-30 · CD-F2",
+      "est": "M",
+      "priority": "P2",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "Health, Performance, Strategy, Content Plan, Brand, and Plans each render both as a standalone tab AND as a slot inside Deep Dive/Settings, with the full prop list duplicated inline (HealthTab + actionPlanSlot repeated verbatim). Two routes reach identical content and can silently drift. Fix: define each panel once (a const or a registry keyed by tab id) and reference it wherever it appears; under the two-speed shell give each surface a single home (Health/Performance/Strategy live inside Deep Dive, not also top-level). Depends on design-cd-finish-ia-v2-nav. Artifact: ux-review-client-shell.html.",
+      "files": [
+        "src/components/ClientDashboard.tsx (panels map + DeepDiveTab/SettingsTab slots)"
+      ],
+      "dependsOn": [
+        "design-cd-finish-ia-v2-nav"
+      ],
+      "acceptanceCriteria": [
+        "Each tab panel defined once (const/registry keyed by tab id) and referenced wherever used",
+        "No verbatim duplicated panel markup (HealthTab/PerformanceTab/StrategyTab/etc.)",
+        "Each surface has a single home under the two-speed shell"
+      ],
+      "verify": [
+        "each tab + each Deep Dive sub-view",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-cd-notice-region",
+      "title": "Client shell — one prioritized notice region above tabs",
+      "source": "UX review 2026-06-30 · CD-F3",
+      "est": "S",
+      "priority": "P3",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "Above tab content sit up to three stacked notices: trial-countdown (or trial-ended) banner, a section-errors InlineBanner, and a per-tab SeoEducationTip — the same 'wall before the work' as CP-F3. Fix: one notice region with priority order (errors > trial > education tip) showing at most one at a time / docked compactly; the education tip yields to a real error. Reuse the CP-F3 consolidation pattern. Artifact: ux-review-client-shell.html.",
+      "files": [
+        "src/components/ClientDashboard.tsx (trial banners + section-errors InlineBanner + SeoEducationTip)"
+      ],
+      "dependsOn": [
+        "design-cp-consolidate-alert-bands"
+      ],
+      "acceptanceCriteria": [
+        "One notice region with priority order: errors > trial > education tip",
+        "At most one notice shown at a time (or docked compactly); education tip yields to a real error"
+      ],
+      "verify": [
+        "trial + error simultaneously",
+        "first-visit education tip",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-cd-pageheader-title-echo",
+      "title": "Client shell — stop echoing the nav label as the per-tab page title",
+      "source": "UX review 2026-06-30 · CD-F4",
+      "est": "S",
+      "priority": "P3",
+      "status": "pending",
+      "owner": "ui-platform",
+      "notes": "Every tab renders a PageHeader whose title is just the active tab's label (click Health -> page says Health); the nav already shows location, so the H1 echoes it without adding info — only the subtitle carries something new. Fix: drop the redundant title echo (let subtitle + content carry the page) or make the header earn its space (verdict line, freshness stamp, the tab's primary action). Artifact: ux-review-client-shell.html.",
+      "files": [
+        "src/components/ClientDashboard.tsx (PageHeader per tab)"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "Per-tab PageHeader no longer renders a title that only repeats the active nav label",
+        "Either the title is dropped (subtitle/content carries the page) or it earns its row (verdict/freshness/primary action)"
+      ],
+      "verify": [
+        "several tabs",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-cd-trial-banner-tokens",
+      "title": "Client shell — route trial banners through InlineBanner / warning tokens",
+      "source": "UX review 2026-06-30 · CD-F5",
+      "est": "S",
+      "priority": "P3",
+      "status": "pending",
+      "owner": "design-system",
+      "notes": "Trial-countdown and trial-ended banners use raw bg-amber-500/8 border-amber-500/20 and bg-red-500/8 border-red-500/20 mixed with text-accent-warning/danger token classes — a half-tokenized warning surface and a third spelling of 'amber notice' alongside InlineBanner and the cockpit staleness nudge (AC-F3). Fix: route both through InlineBanner (or its token-backed warning/danger variants) so every alert surface shares one definition. Folds into the tokenize-hardcoded-hex theme. Artifact: ux-review-client-shell.html.",
+      "files": [
+        "src/components/ClientDashboard.tsx (trial-countdown + trial-ended banners)",
+        "src/components/ui/InlineBanner.tsx"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "Both trial banners route through InlineBanner (token-backed warning/danger variants)",
+        "No raw bg-amber-500/red-500 + border-* mixed with token classes remain"
+      ],
+      "verify": [
+        "trial active (≤5d) + trial ended",
+        "report-style-drift",
+        "dark + light"
+      ]
+    },
+    {
+      "id": "design-x-gradient-card-variant",
+      "title": "Cross-cutting — promote the tinted-gradient card to a StatCard/card tone prop",
+      "source": "UX review 2026-06-30 · ISSUE-F5",
+      "est": "M",
+      "priority": "P3",
+      "status": "pending",
+      "owner": "design-system",
+      "notes": "The 'tinted gradient + matching border' card treatment is hand-rolled with slightly different opacities per surface: the verdict shell uses from-teal-500/8 border-teal-500/15; the outcome StatCards pass className='bg-gradient-to-br from-emerald-500/10 border-emerald-500/20'. Fix: promote it to a first-class StatCard/card tone prop (tone='emerald' -> gradient + border baked in at one canonical opacity) so the verdict hero and outcome band share one definition and future surfaces inherit it. Artifact: ux-review-client-issue.html.",
+      "files": [
+        "src/components/ui/StatCard.tsx (tone prop)",
+        "consumers: client/the-issue/IssueVerdictHeadline.tsx, OutcomeCountBand.tsx"
+      ],
+      "dependsOn": [],
+      "acceptanceCriteria": [
+        "StatCard/card gains a tone prop (neutral/teal/emerald/blue/amber) baking gradient + border at one canonical opacity",
+        "Verdict shell + outcome band use the tone prop; no hand-rolled bg-gradient-to-br className remains",
+        "One opacity definition reused everywhere"
+      ],
+      "verify": [
+        "verdict + outcome band visual parity",
+        "dark + light"
+      ]
+    }
+  ],
+  "workingAgreement": "guidelines/design-cleanup-working-agreement.md",
+  "brief": "guidelines/design-cleanup-sprint-brief.html",
+  "findingsIndex": "guidelines/ux-findings-index.html",
+  "itemFields": "Each item: id, title, source (screen-scoped finding id), est (S/M/L), priority (P1-P3), status, owner (ui-platform|design-system), notes (full fix), files (edit targets - confirm line ranges), dependsOn (item ids that must land first), acceptanceCriteria (testable done checklist), verify (states/scripts to check). Read guidelines/design-cleanup-working-agreement.md before starting any item."
+}

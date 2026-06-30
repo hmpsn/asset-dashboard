@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>UX Review · Content Pipeline</title>
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { background: var(--surface-1); padding: 0; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 56px 32px 120px; }
+  .doc-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brand-text-muted); display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .doc-eyebrow::before { content: ''; width: 28px; height: 1px; background: var(--brand-text-muted); }
+  h1.doc { font-family: var(--font-display); font-weight: 800; font-size: 52px; line-height: 1.02; letter-spacing: -0.04em; color: var(--brand-text-bright); margin: 0 0 18px; }
+  .lede { font-size: 17px; color: var(--brand-text); line-height: 1.6; max-width: 64ch; }
+  .lede b { color: var(--brand-text-bright); font-weight: 600; }
+  .meta-row { display: flex; gap: 24px; margin-top: 24px; font-family: var(--font-mono); font-size: 11px; color: var(--brand-text-muted); text-transform: uppercase; letter-spacing: 0.1em; flex-wrap: wrap; }
+  .meta-row b { color: var(--brand-text-bright); font-weight: 500; }
+
+  section.block { margin-top: 64px; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 22px; }
+  .sec-head .num { font-family: var(--font-mono); font-size: 11px; color: var(--teal); letter-spacing: 0.1em; }
+  .sec-head h2 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter-spacing: -0.025em; color: var(--brand-text-bright); margin: 0; }
+  .sec-head .rule { flex: 1; height: 1px; background: var(--brand-border); }
+
+  .well { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .well .item { display: flex; gap: 12px; padding: 16px 18px; background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-lg); }
+  .well .item .ico { width: 22px; height: 22px; border-radius: var(--radius-sm); background: rgba(52,211,153,.14); color: var(--emerald); display: flex; align-items: center; justify-content: center; flex: none; font-weight: 800; font-family: var(--font-display); }
+  .well .item p { margin: 0; font-size: 13.5px; color: var(--brand-text); line-height: 1.5; }
+  .well .item b { color: var(--brand-text-bright); font-weight: 600; }
+
+  .finding { background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-signature-lg); padding: 26px 28px; margin-bottom: 18px; }
+  .finding-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+  .sev { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-sm); }
+  .sev.high { background: rgba(248,113,113,.12); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+  .sev.med { background: rgba(251,191,36,.12); color: var(--amber); border: 1px solid rgba(251,191,36,.3); }
+  .sev.low { background: rgba(96,165,250,.12); color: var(--blue); border: 1px solid rgba(96,165,250,.3); }
+  .finding-head .fnum { font-family: var(--font-mono); font-size: 12px; color: var(--brand-text-dim); }
+  .finding-head h3 { font-family: var(--font-display); font-weight: 700; font-size: 19px; letter-spacing: -0.015em; color: var(--brand-text-bright); margin: 0; flex: 1; min-width: 240px; }
+  .finding p.body { font-size: 14px; color: var(--brand-text); line-height: 1.6; margin: 10px 0 0; }
+  .finding p.body b { color: var(--brand-text-bright); font-weight: 600; }
+  .finding code { font-family: var(--font-mono); font-size: 12px; color: var(--teal); background: var(--surface-1); padding: 1px 5px; border-radius: 3px; }
+  .finding .fix-note { font-size: 13.5px; color: var(--brand-text); line-height: 1.6; margin: 14px 0 0; padding: 14px 16px; background: var(--surface-1); border-left: 2px solid var(--teal); border-radius: var(--radius-md); }
+  .finding .fix-note b { color: var(--teal); font-weight: 600; display: block; margin-bottom: 4px; font-family: var(--font-display); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 16px; }
+  .pair .col .lab { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; display: block; }
+  .col.now .lab { color: var(--amber); } .col.fix .lab { color: var(--emerald); }
+  .mock { background: var(--surface-1); border: 1px solid var(--brand-border); border-radius: var(--radius-lg); padding: 14px; }
+  .nav-line { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  .nav-line:last-child { margin-bottom: 0; }
+  .nav-line .kind { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brand-text-dim); width: 58px; flex: none; }
+  .pill { font-size: 11px; padding: 4px 9px; border-radius: var(--radius-pill); border: 1px solid var(--brand-border); color: var(--brand-text); background: var(--surface-2); }
+  .pill.on { border-color: var(--teal); color: var(--teal); background: var(--brand-mint-dim); }
+  .pill.away { border-style: dashed; color: var(--brand-text-muted); }
+  .pill.tab { border-radius: var(--radius-sm); }
+  .arrow { color: var(--brand-text-dim); font-size: 11px; }
+  .stack-list { display: flex; flex-direction: column; gap: 5px; }
+  .band { font-size: 11px; padding: 7px 10px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 8px; }
+  .band.amber { background: rgba(251,191,36,.06); border: 1px solid rgba(251,191,36,.25); color: var(--amber); }
+  .band.red { background: rgba(248,113,113,.06); border: 1px solid rgba(248,113,113,.25); color: var(--red); }
+  .band.teal { background: var(--brand-mint-dim); border: 1px solid rgba(45,212,191,.25); color: var(--teal); }
+  .band.neutral { background: var(--surface-2); border: 1px solid var(--brand-border); color: var(--brand-text); }
+  .caption { font-family: var(--font-mono); font-size: 10px; color: var(--brand-text-dim); letter-spacing: 0.06em; margin-top: 8px; }
+</style>
+</head>
+<body class="with-noise">
+<div class="wrap">
+
+  <div class="doc-eyebrow">UX Review · admin content pipeline</div>
+  <h1 class="doc">Content Pipeline<br />has two maps of itself.</h1>
+  <p class="lede">A review of <b>ContentPipeline</b> — where operators plan, brief, write, and publish. The flow framing is right (a clear Strategy → Briefs → Posts → Publish spine), and it deep-links cleanly. The trouble is <b>two navigation systems describe the same journey differently</b>, the tab bar is a hand-rolled copy of a primitive you already ship, and a stack of alert bands sits between the user and the work.</p>
+  <div class="meta-row">
+    <span>Screen · <b>ContentPipeline.tsx</b></span>
+    <span>Findings · <b>5</b></span>
+    <span>New components · <b>0 (1 system gap noted)</b></span>
+  </div>
+
+  <section class="block">
+    <div class="sec-head"><span class="num">00</span><h2>What's already right</h2><div class="rule"></div></div>
+    <div class="well">
+      <div class="item"><span class="ico">✓</span><p><b>The journey is named.</b> A WorkflowStepper frames content as a process, not a pile of tabs — the right mental model for an operator.</p></div>
+      <div class="item"><span class="ico">✓</span><p><b>Signals route into action.</b> AI-suggested briefs and decay alerts deep-link into a pre-filled brief generator — the loop closes.</p></div>
+      <div class="item"><span class="ico">✓</span><p><b>State survives the URL.</b> Tabs sync to <code>?tab=</code> so deep links and refreshes land where you expect.</p></div>
+      <div class="item"><span class="ico">✓</span><p><b>A real guide exists.</b> The slide-over guide is a thoughtful affordance for a complex surface.</p></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="num">01</span><h2>The findings</h2><div class="rule"></div></div>
+
+    <!-- CP-F1 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">CP-F1</span><h3>The stepper and the tab bar describe the same flow differently</h3><span class="sev high">High · mental model</span></div>
+      <p class="body">Two navigations sit one above the other. The <b>WorkflowStepper</b> says <b>Strategy → Briefs → Posts → Publish</b>; the <b>tab bar</b> says <b>Planner · Calendar · Briefs · Posts · Subscriptions</b>. They only partly agree: "Strategy" <i>leaves the page</i>, "Publish" and "Subscriptions" are <b>the same destination under two names</b>, and Planner + Calendar exist only in the tabs. The operator can't tell which control is the real navigation.</p>
+      <div class="pair">
+        <div class="col now"><span class="lab">Now — two disagreeing maps</span><div class="mock">
+          <div class="nav-line"><span class="kind">stepper</span><span class="pill away">Strategy ↗</span><span class="arrow">→</span><span class="pill on">Briefs</span><span class="arrow">→</span><span class="pill">Posts</span><span class="arrow">→</span><span class="pill">Publish</span></div>
+          <div class="nav-line"><span class="kind">tabs</span><span class="pill tab">Planner</span><span class="pill tab">Calendar</span><span class="pill tab on">Briefs</span><span class="pill tab">Posts</span><span class="pill tab">Subscriptions</span></div>
+          <div class="caption">"Publish" = "Subscriptions"; Strategy leaves; Planner/Calendar unmapped</div>
+        </div></div>
+        <div class="col fix"><span class="lab">Fix — one map, aligned labels</span><div class="mock">
+          <div class="nav-line"><span class="kind">stepper</span><span class="pill">Plan</span><span class="arrow">→</span><span class="pill on">Brief</span><span class="arrow">→</span><span class="pill">Write</span><span class="arrow">→</span><span class="pill">Publish</span></div>
+          <div class="nav-line"><span class="kind">tabs</span><span class="pill tab">Planner</span><span class="pill tab on">Briefs</span><span class="pill tab">Posts</span><span class="pill tab">Publish</span><span class="pill tab">Calendar</span></div>
+          <div class="caption">stepper phases map 1:1 to tabs; Calendar is a view toggle, not a phase</div>
+        </div></div>
+      </div>
+      <p class="fix-note"><b>Recommendation</b>Make the stepper and tabs the same four phases with identical labels (rename "Subscriptions" → "Publish", drive the stepper's "Strategy" to the Planner tab instead of off-page). Treat Calendar as a view toggle on the Planner/Posts data, not a peer phase. One journey, described once — the stepper shows where you are, the tabs are how you move.</p>
+    </div>
+
+    <!-- CP-F2 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">CP-F2</span><h3>The tab bar is a hand-rolled copy of the TabBar primitive</h3><span class="sev med">Medium · system drift</span></div>
+      <p class="body">The sub-tab bar is built inline from <code>&lt;Button variant="ghost"&gt;</code> with a manual <code>border-b-2</code> + mint-underline active state — re-implementing the exact <code>TabBar</code> component the system ships and that WorkspaceHome already uses. Same pattern, second implementation: they'll drift in padding, hit-target, and keyboard behavior.</p>
+      <p class="fix-note"><b>Recommendation</b>Replace the inline bar with the <code>TabBar</code> primitive (it already supports icons + the mint active state and handles arrow-key nav + the 44px hit target). The Export control moves beside it as an action, not a fake tab.</p>
+    </div>
+
+    <!-- CP-F3 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">CP-F3</span><h3>Up to four alert bands stack before the work</h3><span class="sev med">Medium · density</span></div>
+      <p class="body">Between the stepper and the tab content sit, in order: the <b>health summary bar</b>, the <b>content-decay alert</b>, the <b>cannibalization warnings</b>, and the <b>AI-suggested briefs</b> block. For a workspace with issues that's four full-width notices to scroll past before reaching Planner or Briefs — and three of them are amber/red, so the page reads as alarmed before the operator has done anything.</p>
+      <div class="pair">
+        <div class="col now"><span class="lab">Now — four pre-content bands</span><div class="mock"><div class="stack-list">
+          <div class="band teal">Health summary · 12 briefs · 4 posts</div>
+          <div class="band red">3 pages losing traffic ↗</div>
+          <div class="band amber">2 cannibalization warnings</div>
+          <div class="band amber">5 AI-suggested briefs</div>
+          <div class="band neutral">— tab content starts here —</div>
+        </div></div></div>
+        <div class="col fix"><span class="lab">Fix — one roll-up, rest in context</span><div class="mock"><div class="stack-list">
+          <div class="band neutral">Health summary · 12 briefs · 4 posts</div>
+          <div class="band amber">3 alerts &amp; 5 suggestions ▾</div>
+          <div class="band neutral">— tab content starts here —</div>
+        </div></div></div>
+      </div>
+      <p class="fix-note"><b>Recommendation</b>Keep the neutral health summary as the one persistent bar; roll decay + cannibalization + AI suggestions into a single collapsible "Alerts &amp; suggestions (N)" strip, or move each into the tab it acts on (decay → Posts, suggestions → Briefs). The operator should reach the work in one screen, not after a wall of warnings.</p>
+    </div>
+
+    <!-- CP-F4 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">CP-F4</span><h3>Mint and amber on static counts in the health bar</h3><span class="sev low">Low · color law</span></div>
+      <p class="body">The health summary renders brief/matrix counts in <code>text-accent-brand</code> (mint) and the posts count in <code>text-accent-warning</code> (amber). These are static data, not actions or warnings — the same mint-on-data drift flagged on the Command Center (CC-F5). Amber on a normal post count also implies a problem that isn't there.</p>
+      <p class="fix-note"><b>Recommendation</b>Counts are data → neutral bright text (or blue if you want them to read as metrics); reserve amber for the decay/cannibalization states that are genuinely warnings. Folds into the repo-wide color-law sweep already in the sprint.</p>
+    </div>
+
+    <!-- CP-F5 -->
+    <div class="finding">
+      <div class="finding-head"><span class="fnum">CP-F5</span><h3>The Export menu is hand-rolled — a missing system primitive</h3><span class="sev low">Low · system gap</span></div>
+      <p class="body">The Export dropdown builds its own open state, click-outside handler, positioned panel, and per-row CSV/JSON buttons inline. It works, but it's a bespoke menu — and the design system has <b>no Dropdown/Menu primitive</b>, so the next menu (and there will be one) gets hand-rolled too, slightly differently.</p>
+      <p class="fix-note"><b>Recommendation</b>Add a <code>Menu</code> / <code>Dropdown</code> primitive to the system (trigger + positioned panel + click-outside + keyboard dismiss baked in) and adopt it here. This is the one genuine new-component need surfaced so far — worth its own roadmap item.</p>
+    </div>
+
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="num">02</span><h2>Read in context</h2><div class="rule"></div></div>
+    <p class="lede" style="font-size:15px">The pipeline's instinct — frame content as a journey — is exactly right and worth protecting. The fixes are about <b>saying that journey once</b> (CP-F1), reusing the primitives you already built (CP-F2), and clearing the runway to the work (CP-F3). CP-F4 folds into the existing color sweep; CP-F5 surfaces the first real new-component need (a Menu primitive). All logged to the index and sprint.</p>
+  </section>
+
+</div>
+</body>
+</html>

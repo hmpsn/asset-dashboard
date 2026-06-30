@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Design Cleanup — Sprint Brief</title>
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { background: var(--surface-1); padding: 0; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 56px 32px 120px; }
+  .doc-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brand-text-muted); display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .doc-eyebrow::before { content: ''; width: 28px; height: 1px; background: var(--brand-text-muted); }
+  h1.doc { font-family: var(--font-display); font-weight: 800; font-size: 50px; line-height: 1.03; letter-spacing: -0.04em; color: var(--brand-text-bright); margin: 0 0 18px; }
+  .lede { font-size: 16.5px; color: var(--brand-text); line-height: 1.6; max-width: 68ch; }
+  .lede b { color: var(--brand-text-bright); font-weight: 600; }
+  .lede code { font-family: var(--font-mono); font-size: 13.5px; color: var(--teal); }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 28px; }
+  .stat { background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-signature); padding: 14px 16px; }
+  .stat .v { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter-spacing: -0.02em; color: var(--brand-text-bright); }
+  .stat .l { font-family: var(--font-display); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--brand-text-muted); margin-top: 2px; }
+
+  section.block { margin-top: 60px; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 12px; }
+  .sec-head .num { font-family: var(--font-mono); font-size: 11px; color: var(--teal); letter-spacing: 0.1em; }
+  .sec-head h2 { font-family: var(--font-display); font-weight: 700; font-size: 26px; letter-spacing: -0.025em; color: var(--brand-text-bright); margin: 0; }
+  .sec-head .rule { flex: 1; height: 1px; background: var(--brand-border); }
+  .sec-intro { font-size: 14.5px; color: var(--brand-text); line-height: 1.6; margin: 0 0 22px; max-width: 72ch; }
+  .sec-intro b { color: var(--brand-text-bright); font-weight: 600; }
+
+  .wave { background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-signature-lg); padding: 24px 26px; margin-bottom: 18px; }
+  .wave-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+  .wave-tag { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 9px; border-radius: var(--radius-sm); background: var(--brand-mint-dim); color: var(--teal); border: 1px solid rgba(45,212,191,.25); }
+  .wave-head h3 { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: -0.02em; color: var(--brand-text-bright); margin: 0; flex: 1; min-width: 220px; }
+  .wave-meta { font-family: var(--font-mono); font-size: 11px; color: var(--brand-text-dim); }
+  .wave-why { font-size: 13.5px; color: var(--brand-text); line-height: 1.55; margin: 6px 0 16px; }
+  .wave-why b { color: var(--brand-text-bright); font-weight: 600; }
+
+  .item { display: grid; grid-template-columns: 16px 1fr auto; gap: 12px; align-items: start; padding: 11px 0; border-top: 1px solid rgba(63,63,70,.3); }
+  .item:first-of-type { border-top: none; }
+  .item .chk { width: 14px; height: 14px; border: 1.5px solid var(--brand-border-strong); border-radius: var(--radius-sm); margin-top: 3px; }
+  .item .body .t { font-size: 14px; color: var(--brand-text-bright); font-weight: 500; line-height: 1.4; }
+  .item .body .rid { font-family: var(--font-mono); font-size: 10.5px; color: var(--brand-text-dim); }
+  .item .body .fix { font-size: 13px; color: var(--brand-text); line-height: 1.5; margin-top: 4px; }
+  .item .body .fix b { color: var(--brand-text-bright); font-weight: 600; }
+  .item .right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; white-space: nowrap; }
+  .tag { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 6px; border-radius: var(--radius-sm); }
+  .est { background: var(--surface-3); color: var(--brand-text); }
+  .pri.P1 { background: rgba(248,113,113,.12); color: var(--red); } .pri.P2 { background: rgba(251,191,36,.12); color: var(--amber); } .pri.P3 { background: rgba(96,165,250,.12); color: var(--blue); }
+  .own { font-family: var(--font-mono); font-size: 9px; color: var(--brand-text-dim); }
+  .retires { font-size: 12px; color: var(--emerald); margin-top: 12px; font-family: var(--font-mono); letter-spacing: 0.03em; }
+
+  .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0 0; }
+  .flow .node { font-size: 12px; padding: 6px 12px; border-radius: var(--radius-md); border: 1px solid var(--brand-border); background: var(--surface-1); color: var(--brand-text-bright); }
+  .flow .node.found { border-color: rgba(45,212,191,.4); color: var(--teal); }
+  .flow .arr { color: var(--brand-text-dim); }
+
+  .appendix .item-app { background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-lg); padding: 16px 18px; margin-bottom: 10px; }
+  .appendix .item-app .t { font-family: var(--font-display); font-weight: 600; font-size: 15px; color: var(--brand-text-bright); margin-bottom: 4px; }
+  .appendix .item-app .d { font-size: 13.5px; color: var(--brand-text); line-height: 1.55; }
+  .appendix .item-app .d b { color: var(--brand-text-bright); }
+  .appendix .grp-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brand-text-muted); margin: 22px 0 12px; }
+  .note { font-size: 13.5px; color: var(--brand-text); line-height: 1.6; margin-top: 16px; padding: 16px 18px; background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-md); }
+  .note b { color: var(--brand-text-bright); }
+</style>
+</head>
+<body class="with-noise">
+<div class="wrap">
+
+  <div class="doc-eyebrow">Sprint brief · design cleanup · 2026-06-30</div>
+  <h1 class="doc">Resolve all 30.<br />Foundations first, then screens.</h1>
+  <p class="lede">The complete build plan for the design-cleanup program — <b>every one of the 30 findings</b> from the six-screen UX review, sequenced into six waves. The ordering is deliberate: <b>a foundations wave lands the shared components and the color/token discipline first</b>, because those retire or unblock roughly half the screen-level findings. After that, each screen wave moves fast because it's assembling pieces that already exist. Source of truth for IDs and status: <code>design-cleanup-sprint.json</code> (30 items) and <code>ux-findings-index.html</code>.</p>
+  <div class="stats">
+    <div class="stat"><div class="v">30</div><div class="l">findings</div></div>
+    <div class="stat"><div class="v">6</div><div class="l">waves</div></div>
+    <div class="stat"><div class="v">16 / 13 / 1</div><div class="l">S / M / L</div></div>
+    <div class="stat"><div class="v">2 / 14 / 14</div><div class="l">P1 / P2 / P3</div></div>
+  </div>
+
+  <!-- THROUGH-LINES -->
+  <section class="block">
+    <div class="sec-head"><span class="num">00</span><h2>The four through-lines</h2><div class="rule"></div></div>
+    <p class="sec-intro">Across six screens the same four problems recur. Naming them is how 30 findings become one coherent body of work rather than a to-do pile — each wave below advances one or more of these.</p>
+    <div class="item"><div class="chk"></div><div class="body"><div class="t">1 · Rank what matters</div><div class="fix">The data layer is excellent, so every signal earns equal weight — and nothing leads. <b>Cap hero metrics at three; promote the worklist; demote the rest.</b> (CC-F2/F3, WH-F1/F6, ISSUE-F1, AC-F1)</div></div><div class="right"></div></div>
+    <div class="item"><div class="chk"></div><div class="body"><div class="t">2 · One model, said once</div><div class="fix">Multiple navigations / representations describe the same thing differently. <b>One nav, one health widget, one journey.</b> (CP-F1, CD-F1, WH-F2, CD-F2)</div></div><div class="right"></div></div>
+    <div class="item"><div class="chk"></div><div class="body"><div class="t">3 · Reuse the system, don't re-roll it</div><div class="fix">Tab bars, menus, gradient cards, disclosures, section headers, attention rows are hand-rolled per screen. <b>Lift them into shared primitives.</b> (CP-F2/F5, AC-F2, ISSUE-F4/F5, WH-F5)</div></div><div class="right"></div></div>
+    <div class="item"><div class="chk"></div><div class="body"><div class="t">4 · Color means status, never chrome</div><div class="fix">Mint on data, purple on a client metric, amber on normal counts, raw hex instead of tokens. <b>One sweep enforces the four laws + tokenizes every warning surface.</b> (CC-F5, WH-F3, CP-F4, AC-F3, CD-F5)</div></div><div class="right"></div></div>
+  </section>
+
+  <!-- DEPENDENCY -->
+  <section class="block">
+    <div class="sec-head"><span class="num">01</span><h2>Why foundations first</h2><div class="rule"></div></div>
+    <p class="sec-intro">Six findings are <b>shared-component extractions</b>, and five are <b>color/token discipline</b>. Building those before the screen work means the screen waves <i>consume</i> finished pieces instead of inventing them — and several screen findings simply disappear once the shared component exists.</p>
+    <div class="flow">
+      <span class="node found">NeedsAttention component</span><span class="arr">→</span><span class="node">CC-F3</span><span class="node">WH-F5/F6</span>
+    </div>
+    <div class="flow">
+      <span class="node found">Disclosure pattern</span><span class="arr">→</span><span class="node">AC-F2</span><span class="node">ISSUE under-the-hood</span>
+    </div>
+    <div class="flow">
+      <span class="node found">Menu primitive</span><span class="arr">→</span><span class="node">CP-F5</span>
+      <span class="node found" style="margin-left:14px">Color/token sweep</span><span class="arr">→</span><span class="node">CC-F5</span><span class="node">WH-F3</span><span class="node">CP-F4</span><span class="node">AC-F3</span><span class="node">CD-F5</span>
+    </div>
+  </section>
+
+  <!-- WAVE 0 -->
+  <section class="block">
+    <div class="sec-head"><span class="num">02</span><h2>The six waves</h2><div class="rule"></div></div>
+
+    <div class="wave">
+      <div class="wave-head"><span class="wave-tag">Wave 0 · Foundations</span><h3>Shared components</h3><span class="wave-meta">5 items · design-system · 4 M + 1 S</span></div>
+      <p class="wave-why"><b>Do first.</b> These are pure design-system additions with no screen dependency — and each one retires or simplifies downstream findings. Land them and the screen waves accelerate.</p>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Extract one <code>NeedsAttention</code> / <code>AttentionRow</code> component</div><div class="rid">design-x-needs-attention-shared</div><div class="fix">Into <code>flow/</code>, one severity-color map + interaction; Command Center and Workspace Home both consume it.</div></div><div class="right"><span class="tag est">M</span><span class="tag pri P2">P2</span><span class="own">design-system</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Define one <code>Disclosure</code> / collapsible-section pattern</div><div class="rid">design-x-disclosure-pattern</div><div class="fix">Consistent summary chrome + behavior + sub-grouping; splits the cockpit "Supporting detail" and client "Under the hood" catch-alls.</div></div><div class="right"><span class="tag est">M</span><span class="tag pri P2">P2</span><span class="own">design-system</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Add a <code>Menu</code> / <code>Dropdown</code> primitive</div><div class="rid">design-x-menu-primitive</div><div class="fix">Trigger + positioned panel + click-outside + keyboard dismiss. The one genuine new-component need; unblocks the pipeline Export.</div></div><div class="right"><span class="tag est">M</span><span class="tag pri P3">P3</span><span class="own">design-system</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Promote the tinted-gradient card to a <code>tone</code> prop</div><div class="rid">design-x-gradient-card-variant</div><div class="fix"><code>tone="emerald"</code> bakes the gradient + border at one canonical opacity; verdict hero + outcome band share it.</div></div><div class="right"><span class="tag est">M</span><span class="tag pri P3">P3</span><span class="own">design-system</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Standardize one section-header treatment</div><div class="rid">design-x-section-header</div><div class="fix">The <code>t-label</code> kicker for top-level sections; <code>SectionCard</code> headers reserved for cards within. Applies app-wide.</div></div><div class="right"><span class="tag est">S</span><span class="tag pri P3">P3</span><span class="own">design-system</span></div></div>
+      <div class="retires">↳ unblocks CC-F3 · WH-F5 · WH-F6 · AC-F2 · CP-F5 · ISSUE-F4 · ISSUE-F5</div>
+    </div>
+
+    <div class="wave">
+      <div class="wave-head"><span class="wave-tag">Wave 0b · Foundations</span><h3>Color &amp; token discipline</h3><span class="wave-meta">5 items · design-system · 1 M + 4 S · parallelizable</span></div>
+      <p class="wave-why"><b>Run alongside Wave 0.</b> One coherent workstream: enforce the four laws (color = status only) and route every warning surface through tokens / <code>InlineBanner</code>. The repo sweep is the highest-leverage, lowest-risk item in the whole sprint.</p>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Repo-wide sweep — mint off static data</div><div class="rid">design-color-law-sweep-mint-on-data</div><div class="fix">Grep <code>text-accent-brand</code> / <code>var(--teal)</code> on non-interactive text; recolor to blue (data) or emerald (success). Complements <code>report-style-drift.ts</code>.</div></div><div class="right"><span class="tag est">M</span><span class="tag pri P2">P2</span><span class="own">design-system</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Recolor Users metric off purple; tokenize iconColors</div><div class="rid">design-wh-purple-on-data</div><div class="fix">Purple is admin-AI-only — Users → <code>var(--blue)</code>; replace hardcoded hex (<code>#22d3ee</code>, <code>#4ade80</code>…) with tokens.</div></div><div class="right"><span class="tag est">S</span><span class="tag pri P2">P2</span><span class="own">design-system</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Neutralize mint/amber on pipeline health-bar counts</div><div class="rid">design-cp-healthbar-color</div><div class="fix">Counts are data → neutral/blue; amber only for genuine decay/cannibalization warnings.</div></div><div class="right"><span class="tag est">S</span><span class="tag pri P3">P3</span><span class="own">design-system</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Tokenize the cockpit POV-staleness nudge</div><div class="rid">design-ac-staleness-tokens</div><div class="fix">Raw <code>amber-400/500</code> → <code>--amber</code> + the shared soft-warning surface convention.</div></div><div class="right"><span class="tag est">S</span><span class="tag pri P3">P3</span><span class="own">design-system</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Route trial banners through <code>InlineBanner</code></div><div class="rid">design-cd-trial-banner-tokens</div><div class="fix">Both trial banners → token-backed warning/danger variants, so every alert surface shares one definition.</div></div><div class="right"><span class="tag est">S</span><span class="tag pri P3">P3</span><span class="own">design-system</span></div></div>
+      <div class="retires">↳ a single warning-surface definition (InlineBanner) now backs AC-F3 · CD-F5 · CP-F4</div>
+    </div>
+
+    <div class="wave">
+      <div class="wave-head"><span class="wave-tag">Wave 1 · Screen</span><h3>Command Center</h3><span class="wave-meta">4 items · ui-platform · both P1s live here</span></div>
+      <p class="wave-why"><b>The fast, visible win.</b> Two P1s, all small except the row redesign, and it consumes the <code>NeedsAttention</code> component from Wave 0. Ships a noticeably calmer operator home early.</p>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Collapse 5 colored header buttons → 1 neutral cluster + 1 primary</div><div class="rid">design-cc-header-primary-action</div><div class="fix">Demote nav to a neutral cluster / "More" menu; promote new-workspace to the single mint primary; strip status colors off chrome.</div></div><div class="right"><span class="tag est">S</span><span class="tag pri P1">P1</span><span class="own">ui-platform</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Promote Needs Attention to the top with presence</div><div class="rid">design-cc-needs-attention-hero</div><div class="fix">First block under the header; count in title; red/amber left-accent on P1; always-visible chevron. Uses the Wave-0 component.</div></div><div class="right"><span class="tag est">S</span><span class="tag pri P1">P1</span><span class="own">ui-platform</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">One headline metric; drop stats duplicated by the worklist</div><div class="rid">design-cc-statrow-hierarchy</div><div class="fix">Hours Saved at <code>size=hero</code> spanning two columns; keep trend metrics only; cut the actionable counts already in Needs Attention.</div></div><div class="right"><span class="tag est">S</span><span class="tag pri P2">P2</span><span class="own">ui-platform</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Workspace rows → score + single "N need you" rollup</div><div class="rid">design-cc-workspace-row-density</div><div class="fix">Lead with the ranking number (band color) + one rollup pill; five-column breakdown moves to hover/detail; neutral text elsewhere.</div></div><div class="right"><span class="tag est">M</span><span class="tag pri P2">P2</span><span class="own">ui-platform</span></div></div>
+    </div>
+
+    <div class="wave">
+      <div class="wave-head"><span class="wave-tag">Wave 2 · Screen</span><h3>Workspace Home</h3><span class="wave-meta">4 items · ui-platform (purple-on-data shipped in 0b)</span></div>
+      <p class="wave-why">Consumes <code>NeedsAttention</code> (Wave 0). Same hierarchy medicine as Command Center, plus collapsing the four health widgets and the triplicated setup nudges.</p>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Tame the up-to-nine equal hero StatCards</div><div class="rid">design-workspace-home-statcard-hierarchy</div><div class="fix">2–3 hero metrics; demote the rest to a compact <code>size=default</code> rail, still deep-linked.</div></div><div class="right"><span class="tag est">M</span><span class="tag pri P3">P3</span><span class="own">ui-platform</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Collapse four health representations into one block</div><div class="rid">design-wh-health-four-ways</div><div class="fix">Keep the StatCard + trailing MetricRing; drop the standalone badge; fold HealthBar's setup% into onboarding.</div></div><div class="right"><span class="tag est">S</span><span class="tag pri P2">P2</span><span class="own">ui-platform</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Show setup tasks in one place, not three</div><div class="rid">design-wh-setup-triplicated</div><div class="fix">OnboardingChecklist owns setup while unconfigured; HealthBar + Needs Attention show operational follow-ups only.</div></div><div class="right"><span class="tag est">M</span><span class="tag pri P3">P3</span><span class="own">ui-platform</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Lead with the worklist; tab the lower sections</div><div class="rid">design-wh-worklist-order</div><div class="fix">Worklist → trimmed metric grid → operational sections; group the lower half under the TabBar. Depends on the two items above + Wave 0.</div></div><div class="right"><span class="tag est">M</span><span class="tag pri P3">P3</span><span class="own">ui-platform</span></div></div>
+    </div>
+
+    <div class="wave">
+      <div class="wave-head"><span class="wave-tag">Wave 3 · Screen</span><h3>The Issue — client + admin cockpit</h3><span class="wave-meta">5 items · ui-platform · high craft, low risk</span></div>
+      <p class="wave-why">The two best surfaces — polish, not rescue. The Wave-0 <code>Disclosure</code> pattern retires both catch-all drawers; the rest is reordering and docking actions where the work happens.</p>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Client — bring the Content Plan up under the verdict</div><div class="rid">design-issue-plan-above-proof</div><div class="fix">Verdict → plan → proof, so conviction flows into action. Strong A/B candidate on request-rate.</div></div><div class="right"><span class="tag est">S</span><span class="tag pri P2">P2</span><span class="own">ui-platform</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Client — render ROIDashboard once, not twice</div><div class="rid">design-issue-roi-double-mount</div><div class="fix">Compact frame at slot 3; "Under the hood" holds only methodology/tables (via the Wave-0 Disclosure).</div></div><div class="right"><span class="tag est">S</span><span class="tag pri P2">P2</span><span class="own">ui-platform</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Client — relate the "Your turn" strip to the loop footer</div><div class="rid">design-issue-pending-surfaces</div><div class="fix">Top strip becomes a count/jump that anchors to the footer detail; shared visual language.</div></div><div class="right"><span class="tag est">S</span><span class="tag pri P3">P3</span><span class="own">ui-platform</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Cockpit — keep Send issue in reach of the staging queue</div><div class="rid">design-ac-send-near-staging</div><div class="fix">Sticky send bar (or Send docked to BackingMovesQueue) once <code>stagedCount > 0</code>; keep the header Send too.</div></div><div class="right"><span class="tag est">M</span><span class="tag pri P2">P2</span><span class="own">ui-platform</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Cockpit — dock "Add a recommendation" to the queue header</div><div class="rid">design-ac-add-rec-placement</div><div class="fix">It feeds the queue → it lives in the queue's header action slot. Removes the orphan line.</div></div><div class="right"><span class="tag est">S</span><span class="tag pri P3">P3</span><span class="own">ui-platform</span></div></div>
+      <div class="retires">↳ the Wave-0 Disclosure pattern also splits the cockpit "Supporting detail" 8-surface drawer (AC-F2)</div>
+    </div>
+
+    <div class="wave">
+      <div class="wave-head"><span class="wave-tag">Wave 4 · Screen</span><h3>Content Pipeline</h3><span class="wave-meta">3 items · ui-platform (Export uses the Wave-0 Menu)</span></div>
+      <p class="wave-why">Say the journey once, reuse the <code>TabBar</code>, and clear the runway to the work. The Export adopts the Wave-0 Menu primitive.</p>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Unify the WorkflowStepper and tab bar into one journey</div><div class="rid">design-cp-unify-stepper-tabs</div><div class="fix">Align phases 1:1 with tabs + labels (Subscriptions→Publish; Strategy→Planner tab); Calendar becomes a view toggle, not a peer phase.</div></div><div class="right"><span class="tag est">M</span><span class="tag pri P2">P2</span><span class="own">ui-platform</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Replace the hand-rolled tab bar with <code>TabBar</code></div><div class="rid">design-cp-use-tabbar-primitive</div><div class="fix">Adopt the shipped primitive (icons, mint active, arrow-key nav, 44px target); Export moves beside it as an action.</div></div><div class="right"><span class="tag est">S</span><span class="tag pri P2">P2</span><span class="own">ui-platform</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Roll up the four pre-content alert bands</div><div class="rid">design-cp-consolidate-alert-bands</div><div class="fix">Keep the neutral health summary; collapse decay + cannibalization + suggestions into one "Alerts &amp; suggestions (N)" strip (or move into the acting tab).</div></div><div class="right"><span class="tag est">M</span><span class="tag pri P3">P3</span><span class="own">ui-platform</span></div></div>
+    </div>
+
+    <div class="wave">
+      <div class="wave-head"><span class="wave-tag">Wave 5 · Screen</span><h3>Client Dashboard shell</h3><span class="wave-meta">4 items · ui-platform · biggest single item (1 L)</span></div>
+      <p class="wave-why"><b>Largest, do last (or parallel with a second dev).</b> Finishing the <code>client-ia-v2</code> migration is the keystone; the panel-dedupe depends on it, and the notice-region reuses the Wave-4 consolidation pattern.</p>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Finish the two-speed nav migration; retire the 12-tab legacy nav</div><div class="rid">design-cd-finish-ia-v2-nav</div><div class="fix">Commit to 4 tabs — Overview / Deep Dive / Inbox / Settings. The single highest-impact move on the client side.</div></div><div class="right"><span class="tag est">L</span><span class="tag pri P2">P2</span><span class="own">ui-platform</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Define each tab panel once; collapse duplicate mounts</div><div class="rid">design-cd-dedupe-panel-mounts</div><div class="fix">Panel registry keyed by tab id; each surface gets one home (Health/Performance/Strategy live in Deep Dive). Depends on the nav migration.</div></div><div class="right"><span class="tag est">M</span><span class="tag pri P2">P2</span><span class="own">ui-platform</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">One prioritized notice region above tabs</div><div class="rid">design-cd-notice-region</div><div class="fix">Priority order (errors &gt; trial &gt; education tip), at most one at a time. Reuses the Wave-4 consolidation pattern.</div></div><div class="right"><span class="tag est">S</span><span class="tag pri P3">P3</span><span class="own">ui-platform</span></div></div>
+      <div class="item"><div class="chk"></div><div class="body"><div class="t">Stop echoing the nav label as the per-tab page title</div><div class="rid">design-cd-pageheader-title-echo</div><div class="fix">Drop the redundant H1 or make the header earn its row (verdict line / freshness / primary action).</div></div><div class="right"><span class="tag est">S</span><span class="tag pri P3">P3</span><span class="own">ui-platform</span></div></div>
+    </div>
+  </section>
+
+  <!-- SUGGESTED SCHEDULE -->
+  <section class="block">
+    <div class="sec-head"><span class="num">03</span><h2>Suggested schedule</h2><div class="rule"></div></div>
+    <p class="sec-intro">Two tracks run in parallel: a <b>design-system track</b> (Waves 0 + 0b) and a <b>product track</b> (the screen waves), with the screen waves pulling from the foundation as it lands.</p>
+    <div class="flow">
+      <span class="node found">Waves 0 + 0b · foundations</span><span class="arr">→</span><span class="node">W1 Command Center</span><span class="arr">→</span><span class="node">W2 Workspace Home</span><span class="arr">→</span><span class="node">W3 The Issue</span><span class="arr">→</span><span class="node">W4 Pipeline</span><span class="arr">→</span><span class="node">W5 Client shell</span>
+    </div>
+    <div class="note"><b>Sequencing logic:</b> P1s (Command Center header + worklist) ship in Wave 1 for an early visible win. The design-system track front-loads so no screen wave hand-rolls a component twice. The color/token sweep (0b) can land independently at any point — it's the safest, broadest improvement. Wave 5 is the heaviest and most isolated, so it can run on its own track without blocking the others.</div>
+  </section>
+
+  <!-- APPENDIX -->
+  <section class="block appendix">
+    <div class="sec-head"><span class="num">04</span><h2>Appendix — future audits &amp; design strategy</h2><div class="rule"></div></div>
+    <p class="sec-intro">Captured so nothing is lost — to revisit <b>after</b> this sprint. Two buckets: surfaces/flows not yet audited, and higher-level moves that would make the product more powerful, not just more consistent.</p>
+
+    <div class="grp-label">Audit gaps — by leverage</div>
+    <div class="item-app"><div class="t">Onboarding / activation, end-to-end</div><div class="d">The full new-workspace journey (login → connect site → GSC/GA4 → first audit → first brief). Where retention is won; only seen in pieces so far.</div></div>
+    <div class="item-app"><div class="t">Empty &amp; zero-data states, systematically</div><div class="d">A day-one workspace has no rankings, traffic, or audit. How every surface degrades when empty is make-or-break for first impressions.</div></div>
+    <div class="item-app"><div class="t">Data-viz consistency</div><div class="d">This is a charts product — the charts <b>are</b> the value. Audit whether the styleguide's deep data-viz tokens are applied consistently (axis discipline, annotations, "what changed &amp; why" overlay). Your clearest differentiator.</div></div>
+    <div class="item-app"><div class="t">Off-platform brand surfaces</div><div class="d">The weekly digest email + the forwardable one-pager (<code>IssueExportBar</code>, <code>brief-export-html</code>) — where the client's <b>boss</b> sees hmpsn. Usually neglected; pure brand ambassadors.</div></div>
+    <div class="item-app"><div class="t">AI advisor loop · light theme · mobile</div><div class="d">The chat/"ask your strategist" UX; full light-theme parity (almost always an afterthought); and the mobile story behind <code>MobileGuard</code>.</div></div>
+
+    <div class="grp-label">Strategic moves — power, not just polish</div>
+    <div class="item-app"><div class="t">Add a non-color cue to the four laws</div><div class="d">Meaning is encoded almost entirely in color; ~8% of men are colorblind and color-only status fails them. Pair each law with a shape/icon/weight cue — an accessibility win <b>and</b> a more robust system.</div></div>
+    <div class="item-app"><div class="t">Propagate the "verdict-first" pattern</div><div class="d">The Issue client page's lead-with-the-dollar, narrated approach is the best design idea in the app. Most other surfaces still lead with raw data. Spreading it is a product strategy.</div></div>
+    <div class="item-app"><div class="t">Formalize density modes &amp; a motion system</div><div class="d">A "comfortable vs compact" density token serves operators (dense) and clients (calm) from one system. And codify <i>when</i> things animate (ScannerReveal, ring charge-up, stagger) so it feels premium, not incidental.</div></div>
+  </section>
+
+  <div class="note" style="margin-top:40px"><b>Tracking:</b> every item here maps 1:1 to <code>design-cleanup-sprint.json</code> (drop into <code>data/roadmap.json</code>) and to a screen-scoped finding ID in <code>ux-findings-index.html</code>. Update <code>status</code> on each JSON item as waves complete. Appendix items are intentionally <i>not</i> in the sprint JSON — they're the next program, not this one.</div>
+
+</div>
+</body>
+</html>
