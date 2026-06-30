@@ -97,32 +97,39 @@ describe('publish service (C3): BOTH publish paths enqueue rec regen via the sha
   });
 });
 
-describe('webflow-schema: schema publish paths enqueue rec regen', () => {
-  const schemaSrc = readFileSync('server/routes/webflow-schema.ts', 'utf-8'); // readFile-ok - wiring contract
+describe('publish-schema-to-live (G1): BOTH schema publish paths enqueue rec regen via the shared service', () => {
+  // G1 extracted ONE publishSchemaToLive() service consumed by BOTH the admin
+  // schema-publish route AND the MCP `publish_schema` tool. The rec-regen
+  // follow-on (plus recordSeoChange + llms.txt) now lives inside that service so
+  // it fires on BOTH paths and across BOTH the CMS-field and static-page publish
+  // branches — before G1 the MCP path silently skipped recordSeoChange/llms.txt/
+  // rec-regen and imported publishSchemaToCmsField straight from the route.
+  const serviceSrc = readFileSync('server/domains/schema/publish-schema-to-live.ts', 'utf-8'); // readFile-ok - wiring contract
+  const routeSrc = readFileSync('server/routes/webflow-schema.ts', 'utf-8'); // readFile-ok - wiring contract
+  const mcpToolSrc = readFileSync('server/mcp/tools/schema-actions.ts', 'utf-8'); // readFile-ok - wiring contract
 
-  it('imports queueKeywordStrategyPostUpdateFollowOns at the top of webflow-schema.ts', () => {
-    const importIdx = schemaSrc.indexOf("from '../keyword-strategy-follow-ons.js'");
-    expect(importIdx, 'import missing from webflow-schema.ts').toBeGreaterThan(0);
-    // Must appear before the schema-publish route handler
-    const routeIdx = schemaSrc.indexOf("router.post('/api/webflow/schema-publish/");
-    expect(importIdx).toBeLessThan(routeIdx);
+  it('imports queueKeywordStrategyPostUpdateFollowOns at the top of the shared service', () => {
+    const importIdx = serviceSrc.indexOf("from '../../keyword-strategy-follow-ons.js'");
+    expect(importIdx, 'follow-ons import missing from publish-schema-to-live.ts').toBeGreaterThan(0);
+    const fnIdx = serviceSrc.indexOf('export async function publishSchemaToLive');
+    expect(importIdx).toBeLessThan(fnIdx);
   });
 
-  it('calls queueKeywordStrategyPostUpdateFollowOns in the CMS field delivery branch', () => {
-    // The CMS delivery branch returns early — the call must be inside that branch
-    const cmsDeliveryStart = schemaSrc.indexOf('if (cmsDelivery) {');
-    expect(cmsDeliveryStart).toBeGreaterThan(0);
-    // Find the closing region of the cmsDelivery block (ends before "publishSchemaToPage")
-    const directPublishStart = schemaSrc.indexOf('const result = await publishSchemaToPage(');
-    const cmsSlice = schemaSrc.slice(cmsDeliveryStart, directPublishStart);
-    expect(cmsSlice).toContain('queueKeywordStrategyPostUpdateFollowOns({ workspaceId');
+  it('runs the full follow-on set (rec regen + recordSeoChange + llms.txt) inside the shared service', () => {
+    expect(serviceSrc).toContain('queueKeywordStrategyPostUpdateFollowOns({ workspaceId }');
+    expect(serviceSrc).toContain('recordSeoChange(');
+    expect(serviceSrc).toContain("queueLlmsTxtRegeneration(workspaceId, 'schema_published')");
   });
 
-  it('calls queueKeywordStrategyPostUpdateFollowOns in the direct publish branch', () => {
-    // The direct-publish branch runs after publishSchemaToPage succeeds
-    const directPublishStart = schemaSrc.indexOf('const result = await publishSchemaToPage(');
-    expect(directPublishStart).toBeGreaterThan(0);
-    const directSlice = schemaSrc.slice(directPublishStart);
-    expect(directSlice).toContain('queueKeywordStrategyPostUpdateFollowOns({ workspaceId');
+  it('the admin schema-publish route consumes the shared publishSchemaToLive service', () => {
+    expect(routeSrc).toContain("from '../domains/schema/publish-schema-to-live.js'");
+    expect(routeSrc).toContain('publishSchemaToLive({');
+  });
+
+  it('the MCP publish_schema tool consumes the shared service (and not the route)', () => {
+    expect(mcpToolSrc).toContain("from '../../domains/schema/publish-schema-to-live.js'");
+    expect(mcpToolSrc).toContain('publishSchemaToLive({');
+    // The tool→route import smell must be gone: no import from server/routes/.
+    expect(mcpToolSrc).not.toContain("from '../../routes/");
   });
 });

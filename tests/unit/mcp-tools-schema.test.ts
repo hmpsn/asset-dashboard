@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../server/workspaces.js', () => ({
   getWorkspace: vi.fn(),
   getTokenForSite: vi.fn(),
-  updatePageState: vi.fn(),
 }));
 vi.mock('../../server/schema-suggester.js', () => ({
   generateSchemaForPage: vi.fn(),
@@ -12,10 +11,7 @@ vi.mock('../../server/schema-generation-context.js', () => ({
   prepareSinglePageSchemaGenerationContext: vi.fn(),
 }));
 vi.mock('../../server/schema-store.js', () => ({
-  getSchemaSnapshot: vi.fn(),
   upsertPageResultInSnapshot: vi.fn(),
-  updatePageSchemaInSnapshot: vi.fn(),
-  recordSchemaPublish: vi.fn(),
 }));
 vi.mock('../../server/schema-validator.js', () => ({
   validateForGoogleRichResults: vi.fn(),
@@ -23,14 +19,12 @@ vi.mock('../../server/schema-validator.js', () => ({
 vi.mock('../../server/schema/validator.js', () => ({
   validateLeanSchema: vi.fn(),
 }));
-vi.mock('../../server/webflow-pages.js', () => ({
-  publishSchemaToPage: vi.fn(),
-}));
-vi.mock('../../server/routes/webflow-schema.js', () => ({
-  publishSchemaToCmsField: vi.fn(),
-}));
-vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
-  invalidateIntelligenceCache: vi.fn(),
+// The MCP publish tool delegates the entire publish + follow-on set to the
+// shared `publishSchemaToLive` domain service. Mock IT (not the low-level
+// publishSchemaToPage / publishSchemaToCmsField primitives) so the test asserts
+// the tool routes through the shared service — closing the parity gap.
+vi.mock('../../server/domains/schema/publish-schema-to-live.js', () => ({
+  publishSchemaToLive: vi.fn(),
 }));
 vi.mock('../../server/broadcast.js', () => ({
   broadcastToWorkspace: vi.fn(),
@@ -39,15 +33,13 @@ vi.mock('../../server/activity-log.js', () => ({
   addActivity: vi.fn(),
 }));
 
-import { getWorkspace, getTokenForSite, updatePageState } from '../../server/workspaces.js';
+import { getWorkspace, getTokenForSite } from '../../server/workspaces.js';
 import { generateSchemaForPage } from '../../server/schema-suggester.js';
 import { prepareSinglePageSchemaGenerationContext } from '../../server/schema-generation-context.js';
-import { upsertPageResultInSnapshot, updatePageSchemaInSnapshot, recordSchemaPublish } from '../../server/schema-store.js';
+import { upsertPageResultInSnapshot } from '../../server/schema-store.js';
 import { validateForGoogleRichResults } from '../../server/schema-validator.js';
 import { validateLeanSchema } from '../../server/schema/validator.js';
-import { publishSchemaToPage } from '../../server/webflow-pages.js';
-import { publishSchemaToCmsField } from '../../server/routes/webflow-schema.js';
-import { invalidateIntelligenceCache } from '../../server/intelligence/cache-invalidation.js';
+import { publishSchemaToLive } from '../../server/domains/schema/publish-schema-to-live.js';
 import { broadcastToWorkspace } from '../../server/broadcast.js';
 import { addActivity } from '../../server/activity-log.js';
 import { schemaActionTools, handleSchemaActionTool } from '../../server/mcp/tools/schema-actions.js';
@@ -83,9 +75,6 @@ describe('mcp schema action tools', () => {
     });
     (generateSchemaForPage as ReturnType<typeof vi.fn>).mockResolvedValue(suggestionWith(VALID_SCHEMA));
     (upsertPageResultInSnapshot as ReturnType<typeof vi.fn>).mockReturnValue(true);
-    (updatePageSchemaInSnapshot as ReturnType<typeof vi.fn>).mockReturnValue(true);
-    (recordSchemaPublish as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'sph_1' });
-    (updatePageState as ReturnType<typeof vi.fn>).mockReturnValue(null);
     // Default: valid schema (no structural errors, no google errors).
     (validateLeanSchema as ReturnType<typeof vi.fn>).mockReturnValue([]);
     (validateForGoogleRichResults as ReturnType<typeof vi.fn>).mockReturnValue({
@@ -94,12 +83,19 @@ describe('mcp schema action tools', () => {
       errors: [],
       warnings: [],
     });
-    // Default: static-page publish path (no CMS field).
-    (publishSchemaToCmsField as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-    (publishSchemaToPage as ReturnType<typeof vi.fn>).mockResolvedValue({
-      success: true,
+    // Default: static-page publish path succeeds via the shared domain service.
+    (publishSchemaToLive as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      mode: 'page-custom-code',
+      deliveryStatus: 'published',
+      deliveryMessage: 'Published.',
+      pageResult: {
+        success: true,
+        published: true,
+        delivery: { method: 'webflow-api', status: 'published', message: 'Published.', jsonLd: '{}' },
+      },
       published: true,
-      delivery: { method: 'webflow-api', status: 'published', message: 'Published.', jsonLd: '{}' },
+      sitePublished: false,
     });
   });
 
@@ -196,11 +192,9 @@ describe('mcp schema action tools', () => {
     const result = await handleSchemaActionTool('publish_schema', { workspace_id: 'ws-1', page_id: 'page_1' });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Schema validation failed — not publishing');
-    // Critical: the publish service functions must NEVER be called on a failed validation.
-    expect(publishSchemaToCmsField).not.toHaveBeenCalled();
-    expect(publishSchemaToPage).not.toHaveBeenCalled();
-    expect(recordSchemaPublish).not.toHaveBeenCalled();
-    expect(updatePageState).not.toHaveBeenCalled();
+    // Critical: the shared publish service (and thus its follow-ons) must NEVER
+    // be called on a failed validation. The VALIDATE-FIRST guard sits before it.
+    expect(publishSchemaToLive).not.toHaveBeenCalled();
   });
 
   it('publish_schema REFUSES to publish when Google validation has errors', async () => {
@@ -213,28 +207,30 @@ describe('mcp schema action tools', () => {
 
     const result = await handleSchemaActionTool('publish_schema', { workspace_id: 'ws-1', page_id: 'page_1' });
     expect(result.isError).toBe(true);
-    expect(publishSchemaToPage).not.toHaveBeenCalled();
-    expect(publishSchemaToCmsField).not.toHaveBeenCalled();
+    expect(publishSchemaToLive).not.toHaveBeenCalled();
   });
 
-  it('publish_schema publishes a valid schema to a static page, records history, tags mcp-chat, broadcasts', async () => {
+  it('publish_schema delegates to the shared publishSchemaToLive service (closing the route/MCP parity gap), tags mcp-chat, returns mode', async () => {
     const result = await handleSchemaActionTool('publish_schema', {
       workspace_id: 'ws-1',
       page_id: 'page_1',
       publish_after: true,
     });
     expect(result.isError).toBeUndefined();
-    expect(publishSchemaToCmsField).toHaveBeenCalledWith(expect.objectContaining({
+    // The tool routes the whole publish + follow-on set through the shared
+    // domain service — it no longer hand-rolls publishSchemaToCmsField /
+    // publishSchemaToPage / recordSchemaPublish / recordSeoChange / llms.txt /
+    // rec-regen inline. publishSchemaToLive runs that canonical set internally.
+    expect(publishSchemaToLive).toHaveBeenCalledTimes(1);
+    expect(publishSchemaToLive).toHaveBeenCalledWith(expect.objectContaining({
       siteId: 'site-1',
       pageId: 'page_1',
+      schema: VALID_SCHEMA,
+      workspaceId: 'ws-1',
+      token: 'token-1',
       publishAfter: true,
     }));
-    expect(publishSchemaToPage).toHaveBeenCalledWith('site-1', 'page_1', VALID_SCHEMA, 'token-1');
-    expect(updatePageSchemaInSnapshot).toHaveBeenCalledWith('site-1', 'page_1', VALID_SCHEMA);
-    expect(recordSchemaPublish).toHaveBeenCalledWith('site-1', 'page_1', 'ws-1', VALID_SCHEMA);
-    expect(updatePageState).toHaveBeenCalledWith('ws-1', 'page_1', expect.objectContaining({ status: 'live', source: 'schema' }));
-    expect(invalidateIntelligenceCache).toHaveBeenCalledWith('ws-1');
-    expect(broadcastToWorkspace).toHaveBeenCalledWith('ws-1', 'schema:snapshot_updated', expect.objectContaining({ action: 'published' }));
+    // The tool adds the MCP-tagged activity on top of the service's generic one.
     expect(addActivity).toHaveBeenCalledWith(
       'ws-1',
       'schema_published',
@@ -247,47 +243,58 @@ describe('mcp schema action tools', () => {
     expect(payload.mode).toBe('page-custom-code');
   });
 
-  it('publish_schema writes to a CMS field when the page is CMS-backed', async () => {
-    (publishSchemaToCmsField as ReturnType<typeof vi.fn>).mockResolvedValue({
+  it('publish_schema returns mode=cms-field when the shared service reports a CMS write', async () => {
+    (publishSchemaToLive as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
       mode: 'cms-field',
-      status: 'written',
-      fieldSlug: 'schema-json',
-      message: 'CMS field written: schema-json.',
+      deliveryStatus: 'written',
+      deliveryMessage: 'CMS field written: schema-json.',
+      cmsDelivery: { mode: 'cms-field', status: 'written', fieldSlug: 'schema-json', message: 'CMS field written: schema-json.' },
+      published: false,
+      sitePublished: false,
     });
 
     const result = await handleSchemaActionTool('publish_schema', { workspace_id: 'ws-1', page_id: 'page_1' });
     expect(result.isError).toBeUndefined();
-    expect(publishSchemaToCmsField).toHaveBeenCalled();
-    // CMS path taken — must NOT also publish to the static page.
-    expect(publishSchemaToPage).not.toHaveBeenCalled();
-    expect(recordSchemaPublish).toHaveBeenCalled();
+    expect(publishSchemaToLive).toHaveBeenCalledTimes(1);
     const payload = JSON.parse(result.content[0].text) as { mode: string };
     expect(payload.mode).toBe('cms-field');
+    expect(addActivity).toHaveBeenCalledWith(
+      'ws-1', 'schema_published', expect.any(String), expect.anything(),
+      expect.objectContaining({ source: 'mcp-chat', mode: 'cms-field' }),
+    );
   });
 
-  it('publish_schema surfaces a CMS blocked status as an error', async () => {
-    (publishSchemaToCmsField as ReturnType<typeof vi.fn>).mockResolvedValue({
-      mode: 'cms-field',
-      status: 'blocked',
+  it('publish_schema surfaces a CMS blocked status from the service as an error', async () => {
+    (publishSchemaToLive as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      kind: 'cms-blocked',
       message: 'CMS publish blocked: no mapped schema field.',
+      cmsDelivery: { mode: 'cms-field', status: 'blocked', message: 'CMS publish blocked: no mapped schema field.' },
     });
 
     const result = await handleSchemaActionTool('publish_schema', { workspace_id: 'ws-1', page_id: 'page_1' });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('CMS publish blocked');
-    expect(recordSchemaPublish).not.toHaveBeenCalled();
+    // No mcp-chat success activity when the publish failed.
+    expect(addActivity).not.toHaveBeenCalled();
   });
 
-  it('publish_schema surfaces a manual-required static delivery as an error', async () => {
-    (publishSchemaToPage as ReturnType<typeof vi.fn>).mockResolvedValue({
-      success: false,
-      delivery: { method: 'manual-native-schema-field', status: 'manual-required', message: 'Copy the JSON-LD into Webflow.', jsonLd: '{}' },
+  it('publish_schema surfaces a manual-required delivery from the service as an error', async () => {
+    (publishSchemaToLive as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      kind: 'manual-required',
+      message: 'Copy the JSON-LD into Webflow.',
+      pageResult: {
+        success: false,
+        delivery: { method: 'manual-native-schema-field', status: 'manual-required', message: 'Copy the JSON-LD into Webflow.', jsonLd: '{}' },
+      },
     });
 
     const result = await handleSchemaActionTool('publish_schema', { workspace_id: 'ws-1', page_id: 'page_1' });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('manual action required');
-    expect(recordSchemaPublish).not.toHaveBeenCalled();
+    expect(addActivity).not.toHaveBeenCalled();
   });
 
   it('returns not-found when the page cannot be generated', async () => {
@@ -309,7 +316,7 @@ describe('mcp schema action tools', () => {
     const result = await handleSchemaActionTool('publish_schema', { workspace_id: 'ws-1', page_id: 'page_1' });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('no linked Webflow site');
-    expect(publishSchemaToPage).not.toHaveBeenCalled();
+    expect(publishSchemaToLive).not.toHaveBeenCalled();
   });
 
   it('returns validation errors for malformed tool input', async () => {
