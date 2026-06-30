@@ -13,6 +13,18 @@ concurrency:
 env:
   HUSKY: 0
 
+# Spend policy (mirrors ci.yml's test matrix):
+#   - The heavy e2e jobs (build + Playwright shards + report merge) run on
+#     PULL REQUESTS ONLY. A push to main/staging does NOT re-run e2e — the PR
+#     that produced the commit already ran it on the same code, and the `quality`
+#     job in ci.yml still re-validates typecheck/build/pr-check on the push.
+#   - On a push event the `changes` + `e2e` status jobs still run (cheap) so the
+#     `e2e` required-status check keeps reporting green; it short-circuits when
+#     the event is not a pull_request.
+#   - All npm-ci jobs reuse the lockfile-keyed node_modules cache SHARED with
+#     ci.yml (identical key), so the native better-sqlite3/sharp rebuild is paid
+#     at most once per lockfile instead of 4x per e2e run.
+
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -42,7 +54,8 @@ jobs:
 
   e2e-build:
     needs: changes
-    if: needs.changes.outputs.e2e == 'true'
+    # PR-only (spend policy above): never re-run on main/staging push.
+    if: needs.changes.outputs.e2e == 'true' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -57,7 +70,18 @@ jobs:
           node-version: 24
           cache: npm
 
+      # Reuse the lockfile-keyed node_modules cache shared with ci.yml (same key)
+      # so the native better-sqlite3/sharp rebuild is paid at most once per
+      # lockfile, not on every e2e job. See ci.yml for the full rationale.
+      - name: Cache node_modules
+        id: node-modules-cache
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-v1-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Build frontend
@@ -72,7 +96,8 @@ jobs:
 
   e2e-shard:
     needs: [changes, e2e-build]
-    if: needs.changes.outputs.e2e == 'true'
+    # PR-only (spend policy above): never re-run on main/staging push.
+    if: needs.changes.outputs.e2e == 'true' && github.event_name == 'pull_request'
     strategy:
       fail-fast: false
       matrix:
@@ -101,7 +126,16 @@ jobs:
           name: e2e-dist
           path: dist/
 
+      # Reuse the lockfile-keyed node_modules cache shared with ci.yml (same key).
+      - name: Cache node_modules
+        id: node-modules-cache
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-v1-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Get Playwright version
@@ -138,7 +172,8 @@ jobs:
 
   e2e-merge-report:
     needs: [changes, e2e-shard]
-    if: needs.changes.outputs.e2e == 'true'
+    # PR-only (spend policy above): never re-run on main/staging push.
+    if: needs.changes.outputs.e2e == 'true' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -153,7 +188,16 @@ jobs:
           node-version: 24
           cache: npm
 
+      # Reuse the lockfile-keyed node_modules cache shared with ci.yml (same key).
+      - name: Cache node_modules
+        id: node-modules-cache
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: node-modules-v1-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Download shard blob reports
@@ -186,15 +230,24 @@ jobs:
     steps:
       - name: E2E status check
         env:
+          EVENT_NAME: ${{ github.event_name }}
           E2E_NEEDED: ${{ needs.changes.outputs.e2e }}
           BUILD_RESULT: ${{ needs.e2e-build.result }}
           SHARD_RESULT: ${{ needs.e2e-shard.result }}
           MERGE_RESULT: ${{ needs.e2e-merge-report.result }}
         run: |
-          echo "e2e needed: $E2E_NEEDED"
+          echo "event:        $EVENT_NAME"
+          echo "e2e needed:   $E2E_NEEDED"
           echo "build result: $BUILD_RESULT"
           echo "shard result: $SHARD_RESULT"
           echo "merge result: $MERGE_RESULT"
+          # e2e is PR-only (spend policy). On any non-PR event (e.g. push to
+          # main/staging) the heavy jobs are intentionally skipped, so this
+          # status check passes trivially — the PR already ran e2e on this code.
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            echo "e2e is PR-only; skipping enforcement on $EVENT_NAME event."
+            exit 0
+          fi
           if [[ "$E2E_NEEDED" != "true" ]]; then
             echo "Skipping E2E: no E2E-relevant file changes detected."
             exit 0
