@@ -249,11 +249,12 @@
           "source": "docs/audits/2026-06-26-mcp-surface-audit.md",
           "est": "M",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "plannedSprint": "deferred",
           "createdAt": "2026-06-29",
           "owner": "content-pipeline",
-          "notes": "Content loop dead-ends at client_review today (send_to_client only ever sets client_review; no content background job is exposed). publish_post wraps publishPostToWebflow (domains/content/publish-post-to-webflow.ts:139) / CONTENT_PUBLISH job; advance_content_status routes through updateContentRequest (content-requests.ts:294, already validates). Reaches approved/changes_requested/post_review/delivered/published."
+          "notes": "Done (closes the content loop — the third stateless loop after analytics + inbox). Two tools in server/mcp/tools/content-actions.ts (auto-routed via the if-name dispatch): (1) advance_content_status(workspace_id, request_id, status, internal_note?) routes through updateContentRequest (validates the transition) + addActivity(content_updated, source mcp-chat) + broadcast(CONTENT_REQUEST_UPDATE). status RESTRICTED to in_progress | delivered (operator-workflow only) — client_review/post_review email the client (go through send_to_client), approved/changes_requested are the client's portal decisions, published is publish_post, declined is a separate dismissal. (2) publish_post(workspace_id, post_id, generate_image?) wraps publishPostToWebflow (the shared service that owns the field map + broadcast CONTENT_PUBLISHED + activity + outcome) — APPROVED-ONLY by owner decision: refuses unless post.status==='approved' (an agent can never push an un-reviewed draft to the client's LIVE site, even though the service itself permits draft/review admin-override). Extended PublishPostToWebflowOptions.activitySource union with 'mcp-chat' for attribution (behaves like 'manual'). Schemas advanceContentStatusInputSchema/publishPostInputSchema (with .describe() per the P0 contract test). Tests extended in tests/unit/mcp-tools-content.test.ts incl. the approved-only refusal across draft/review/generating/error. circular-deps 0/0. Adversarial review pending.",
+          "shippedAt": "2026-06-29"
         },
         {
           "id": "mcp-durable-handle-store",

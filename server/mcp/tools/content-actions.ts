@@ -1,11 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Tool } from '@modelcontextprotocol/sdk/types';
 import {
+  advanceContentStatusInputSchema,
   createContentRequestInputSchema,
   deleteBriefInputSchema,
   deletePostInputSchema,
   getContentRequestInputSchema,
   getBriefInputSchema,
+  publishPostInputSchema,
   getPostInputSchema,
   layoutSchema,
   listPostVersionsInputSchema,
@@ -42,6 +44,8 @@ import {
 } from '../../content-posts-db.js';
 import { countHtmlWords } from '../../content-posts-ai.js';
 import { sendPostToClientForReview, PostNotFoundError } from '../../domains/content/send-post-to-client.js';
+import { publishPostToWebflow, PublishPostError } from '../../domains/content/publish-post-to-webflow.js';
+import { onContentRequestLive } from '../../domains/content/on-content-request-live.js';
 import { sanitizeInlinePromptText } from '../../utils/text.js';
 import { invalidateContentPipelineIntelligence } from '../../intelligence-freshness.js';
 import { buildContentGenerationContext } from '../../intelligence/generation-context-builders.js';
@@ -167,6 +171,18 @@ export const contentActionTools: Tool[] = [
     name: 'create_content_request',
     description: 'Create a content topic request in the workspace request pipeline.',
     inputSchema: toMcpJsonSchema(createContentRequestInputSchema),
+  },
+  {
+    name: 'advance_content_status',
+    description:
+      "Advance a content request through the operator workflow: 'in_progress' (production started) or 'delivered' (delivered to the client). Use after the client has approved, to drive the request toward completion. NOTE: this only sets those two operator states — sending for client review goes through send_to_client (which notifies the client), client approve/decline happens in the client portal, and publishing live is a separate publish_post call.",
+    inputSchema: toMcpJsonSchema(advanceContentStatusInputSchema),
+  },
+  {
+    name: 'publish_post',
+    description:
+      "Publish a post to the workspace's LIVE Webflow site (irreversible, client-visible). The post MUST be status 'approved' — un-reviewed drafts are rejected (take a post through review + approval first). Returns the published item id, slug, and whether it was an update. This is the terminal step of the content loop.",
+    inputSchema: toMcpJsonSchema(publishPostInputSchema),
   },
   {
     name: 'delete_brief',
@@ -1332,6 +1348,85 @@ async function handleSendToClient(
   }
 }
 
+async function handleAdvanceContentStatus(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = advanceContentStatusInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, request_id: requestId, status, internal_note: internalNote } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  let updated;
+  try {
+    // updateContentRequest validates the transition (throws InvalidTransitionError on an illegal move).
+    updated = updateContentRequest(workspaceId, requestId, {
+      status,
+      ...(internalNote !== undefined ? { internalNote } : {}),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return mcpError(`Cannot advance content request to '${status}': ${message}`);
+  }
+  if (!updated) return mcpError(`Content request not found: ${requestId}`);
+
+  // Parity with the admin content-requests route: a transition to `delivered`
+  // makes the target page live, so it must run the same page-state update +
+  // recommendation follow-on enqueue. Shared helper keeps both paths in lockstep.
+  if (status === 'delivered') {
+    onContentRequestLive(workspaceId, updated);
+  }
+
+  addActivity(
+    workspaceId,
+    'content_updated',
+    `Advanced content request to ${status} via MCP`,
+    undefined,
+    { source: 'mcp-chat', requestId, status },
+  );
+  broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: requestId, status });
+  return mcpSuccess({ ok: true, request: updated });
+}
+
+async function handlePublishPost(
+  args: Record<string, unknown>,
+): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
+  const parsed = publishPostInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+  const { workspace_id: workspaceId, post_id: postId, generate_image: generateImage } = parsed.data;
+  const workspace = requireWorkspace(workspaceId);
+  if ('isError' in workspace) return workspace;
+
+  // Approved-only guard (owner decision): an agent may publish only reviewed content,
+  // never an un-reviewed draft. publishPostToWebflow itself permits draft/review (admin
+  // override), so this stricter check is enforced here at the MCP boundary.
+  const post = getPost(workspaceId, postId);
+  if (!post) return mcpError(`Post not found: ${postId}`);
+  if (post.status !== 'approved') {
+    return mcpError(`Post status is '${post.status}' — only 'approved' posts can be published via MCP. Take the post through review and approval first.`);
+  }
+
+  try {
+    // The shared service owns the field map, broadcast (CONTENT_PUBLISHED), activity,
+    // outcome tracking, and rec-regen follow-on — the same path the operator UI uses.
+    const result = await publishPostToWebflow(workspaceId, postId, {
+      generateImage: generateImage ?? false,
+      activitySource: 'mcp-chat',
+    });
+    return mcpSuccess({
+      ok: true,
+      item_id: result.itemId,
+      slug: result.slug,
+      is_update: result.isUpdate,
+      post: result.post,
+    });
+  } catch (err) {
+    if (err instanceof PublishPostError) return mcpError(err.message);
+    const message = err instanceof Error ? err.message : String(err);
+    return mcpError(`Publish failed: ${message}`);
+  }
+}
+
 export async function handleContentActionTool(
   name: string,
   args: Record<string, unknown>,
@@ -1350,6 +1445,8 @@ export async function handleContentActionTool(
   if (name === 'list_content_requests') return handleListContentRequests(args);
   if (name === 'get_content_request') return handleGetContentRequestById(args);
   if (name === 'create_content_request') return handleCreateContentRequest(args);
+  if (name === 'advance_content_status') return handleAdvanceContentStatus(args);
+  if (name === 'publish_post') return handlePublishPost(args);
   if (name === 'delete_brief') return handleDeleteBrief(args);
   if (name === 'delete_post') return handleDeletePost(args);
   if (name === 'list_post_versions') return handleListPostVersions(args);
