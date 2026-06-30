@@ -12,10 +12,11 @@
           "source": "UX review 2026-06-30 · F1",
           "est": "S",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "WorkspaceOverview header renders Prospect/Roadmap/AI Usage/Revenue/Features as five equal secondary buttons, three individually colored amber/emerald/teal — spending the status palette on navigation (teal 'Features' reads as the primary CTA, amber 'AI Usage' reads as a warning). Fix: demote the five to one neutral secondary cluster or an overflow 'More' menu, promote the actual entry action (new/onboard workspace) to the single mint primary, and strip amber/emerald/teal off chrome. Reserve those hues for status only.",
-          "createdAt": "2026-06-30"
+          "notes": "WorkspaceOverview header renders Prospect/Roadmap/AI Usage/Revenue/Features as five equal secondary buttons, three individually colored amber/emerald/teal — spending the status palette on navigation (teal 'Features' reads as the primary CTA, amber 'AI Usage' reads as a warning). Fix: demote the five to one neutral secondary cluster or an overflow 'More' menu, promote the actual entry action (new/onboard workspace) to the single mint primary, and strip amber/emerald/teal off chrome. Reserve those hues for status only. [Wave 1: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-cc-needs-attention-hero",
@@ -23,10 +24,11 @@
           "source": "UX review 2026-06-30 · F3",
           "est": "S",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "Needs Attention is the prioritized, deep-linked worklist — the reason operators open the screen — but it sits mid-page at default weight below the header. Fix: make it the first block under PageHeader; add a count in the title ('Needs Attention · 6'); add a subtle red/amber left-accent when a P1 (churn/new request) exists; keep the chevron always visible so rows read as actionable. Component already exists (SectionCard + ClickableRow); this is ordering + emphasis only.",
-          "createdAt": "2026-06-30"
+          "notes": "Needs Attention is the prioritized, deep-linked worklist — the reason operators open the screen — but it sits mid-page at default weight below the header. Fix: make it the first block under PageHeader; add a count in the title ('Needs Attention · 6'); add a subtle red/amber left-accent when a P1 (churn/new request) exists; keep the chevron always visible so rows read as actionable. Component already exists (SectionCard + ClickableRow); this is ordering + emphasis only. [Wave 1: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-cc-statrow-hierarchy",
@@ -34,10 +36,11 @@
           "source": "UX review 2026-06-30 · F2",
           "est": "S",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "Global stat row shows six equal StatCards; nothing leads, and New Requests / Approvals / Content duplicate the Needs Attention list directly above. Fix: render one headline (Hours Saved — the value story) at size=hero spanning two columns, keep only at-a-glance trend metrics (Avg Health, Active, Content), and drop the actionable counts that already live in Needs Attention. Reduces the row from 6 to ~4 with a clear lead.",
-          "createdAt": "2026-06-30"
+          "notes": "Global stat row shows six equal StatCards; nothing leads, and New Requests / Approvals / Content duplicate the Needs Attention list directly above. Fix: render one headline (Hours Saved — the value story) at size=hero spanning two columns, keep only at-a-glance trend metrics (Avg Health, Active, Content), and drop the actionable counts that already live in Needs Attention. Reduces the row from 6 to ~4 with a clear lead. [Wave 1: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-cc-workspace-row-density",
@@ -45,10 +48,11 @@
           "source": "UX review 2026-06-30 · F4",
           "est": "M",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "Each workspace row packs five metric columns (Health/Requests/Approvals/Content/SEO Status) with inline colored micro-text in every cell; at 3+ workspaces it becomes a wall of multicolored numbers and color loses meaning. Fix: lead each row with the ranking number (health score, in band color) + a single 'N need you' rollup pill; move the five-column breakdown into the row's hover/expanded state or the workspace detail. Color only on the rollup; neutral text elsewhere.",
-          "createdAt": "2026-06-30"
+          "notes": "Each workspace row packs five metric columns (Health/Requests/Approvals/Content/SEO Status) with inline colored micro-text in every cell; at 3+ workspaces it becomes a wall of multicolored numbers and color loses meaning. Fix: lead each row with the ranking number (health score, in band color) + a single 'N need you' rollup pill; move the five-column breakdown into the row's hover/expanded state or the workspace detail. Color only on the rollup; neutral text elsewhere. [Wave 1: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-color-law-sweep-mint-on-data",

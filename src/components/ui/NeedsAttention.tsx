@@ -119,7 +119,7 @@ export function NeedsAttention({
   const effectiveCap = cap !== undefined ? cap : items.length;
   const visibleItems = expanded ? items : items.slice(0, effectiveCap);
   const hiddenCount = items.length - effectiveCap;
-  const hasMore = !expanded && hiddenCount > 0;
+  const canToggle = hiddenCount > 0;
 
   const displayTitle = showCount ? `${title} · ${items.length}` : title;
 
@@ -142,16 +142,16 @@ export function NeedsAttention({
           ))}
         </div>
 
-        {hasMore && (
+        {canToggle && (
           <div className="px-4 py-2 border-t border-[var(--brand-border)]">
             <button
               type="button"
-              onClick={() => setExpanded(true)}
+              onClick={() => setExpanded((e) => !e)}
               className={cn(
                 'w-full text-left t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors',
               )}
             >
-              {`Show ${hiddenCount} more`}
+              {expanded ? 'Show less' : `Show ${hiddenCount} more`}
             </button>
           </div>
         )}
