@@ -124,6 +124,95 @@ export const prepareBriefContextInputSchema = z.object({
     .describe("Output layout, discriminated by `type`: `cms` (requires `collection_id` for a Webflow CMS collection) or `outline` (requires a typed `structure` of heading sections)."),
 });
 
+// --- Enhanced ContentBrief field building blocks (v2–v9) --------------------
+// Each mirrors the matching optional field on the `ContentBrief` interface in
+// shared/types/content.ts. These flow through save_brief / update_brief into
+// upsertBrief / updateBrief (briefToParams persists all of them) so an
+// agent-authored brief round-trips its full structured shape, not just the core
+// subset. `.describe()` is added for agent discovery (nested props are exempt
+// from the top-level-props contract test but documenting them aids the model).
+const briefSerpAnalysisSchema = z.object({
+  contentType: z.string(),
+  avgWordCount: z.number(),
+  commonElements: z.array(z.string()),
+  gaps: z.array(z.string()),
+}).describe('SERP analysis summary: dominant contentType, avgWordCount of ranking pages, commonElements seen across results, and content gaps to exploit.');
+
+const briefEeatGuidanceSchema = z.object({
+  experience: z.string(),
+  expertise: z.string(),
+  authority: z.string(),
+  trust: z.string(),
+}).describe('E-E-A-T guidance — one note each for how to signal Experience, Expertise, Authority, and Trust in this piece.');
+
+const briefSchemaRecommendationSchema = z.object({
+  type: z.string(),
+  notes: z.string(),
+}).describe('A recommended schema.org type with implementation notes.');
+
+const briefRealTopResultSchema = z.object({
+  position: z.number().int().nonnegative(),
+  title: z.string(),
+  url: z.string(),
+}).describe('A real Google top-result row (position, title, url) captured for grounding.');
+
+const briefKeywordValidationSchema = z.object({
+  volume: z.number(),
+  difficulty: z.number(),
+  cpc: z.number(),
+  validatedAt: z.string(),
+}).describe('Validated keyword metrics snapshot: volume, difficulty, cpc, and the validatedAt ISO timestamp.');
+
+const briefKeywordSourceSchema = z.enum(['manual', 'semrush', 'dataforseo', 'gsc', 'matrix', 'template'])
+  .describe('Origin of the locked keyword: manual, semrush, dataforseo, gsc, matrix, or template.');
+
+// Shared optional-enhanced-field set, spread into both the full save/replace
+// schema and the patch schema so the two stay in lockstep with ContentBrief.
+const briefEnhancedFields = {
+  executiveSummary: z.string().optional()
+    .describe('Short executive summary of the brief / planned piece.'),
+  contentFormat: z.string().optional()
+    .describe('Recommended content format (e.g. how-to, listicle, comparison, guide).'),
+  toneAndStyle: z.string().optional()
+    .describe('Tone and writing-style guidance for the piece.'),
+  peopleAlsoAsk: z.array(z.string()).optional()
+    .describe('People-Also-Ask style questions to address.'),
+  topicalEntities: z.array(z.string()).optional()
+    .describe('Topical entities / concepts that should appear for topical authority.'),
+  serpAnalysis: briefSerpAnalysisSchema.optional(),
+  difficultyScore: z.number().optional()
+    .describe('Keyword difficulty score (provider scale).'),
+  trafficPotential: z.string().optional()
+    .describe('Qualitative or quantitative traffic-potential note.'),
+  ctaRecommendations: z.array(z.string()).optional()
+    .describe('Recommended calls-to-action for the piece.'),
+  eeatGuidance: briefEeatGuidanceSchema.optional(),
+  contentChecklist: z.array(z.string()).optional()
+    .describe('Pre-publish content checklist items.'),
+  schemaRecommendations: z.array(briefSchemaRecommendationSchema).optional()
+    .describe('Recommended schema.org types with notes.'),
+  pageType: z.enum(['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource']).optional()
+    .describe('Page type: one of blog, landing, service, location, product, pillar, resource.'),
+  referenceUrls: z.array(z.string()).optional()
+    .describe('Competitor/inspiration URLs scraped for grounding context.'),
+  realPeopleAlsoAsk: z.array(z.string()).optional()
+    .describe('Actual People-Also-Ask questions pulled from live SERP data.'),
+  realTopResults: z.array(briefRealTopResultSchema).optional()
+    .describe('Actual top organic results pulled from live SERP data.'),
+  keywordLocked: z.boolean().optional()
+    .describe('True when the target keyword is locked (template/matrix pre-assignment).'),
+  keywordSource: briefKeywordSourceSchema.optional(),
+  keywordValidation: briefKeywordValidationSchema.optional(),
+  templateId: z.string().optional()
+    .describe('Id of the content template this brief was generated from, if any.'),
+  titleVariants: z.array(z.string()).optional()
+    .describe('A/B title variants for the piece.'),
+  metaDescVariants: z.array(z.string()).optional()
+    .describe('A/B meta-description variants for the piece.'),
+  generationStyle: z.enum(CONTENT_GENERATION_STYLES).optional()
+    .describe('Content generation style: standard, concise, or hybrid.'),
+} as const;
+
 const briefContentSchema = z.object({
   targetKeyword: z.string().min(1),
   secondaryKeywords: z.array(z.string()),
@@ -141,8 +230,7 @@ const briefContentSchema = z.object({
   audience: z.string(),
   competitorInsights: z.string(),
   internalLinkSuggestions: z.array(z.string()),
-  pageType: z.enum(['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource']).optional(),
-  executiveSummary: z.string().optional(),
+  ...briefEnhancedFields,
 }).passthrough();
 
 export const saveBriefInputSchema = z.object({
@@ -209,8 +297,33 @@ const briefPatchContentSchema = z.object({
   audience: z.string().trim().min(1).max(1000).optional(),
   competitorInsights: z.string().trim().max(10000).optional(),
   internalLinkSuggestions: z.array(z.string().trim().min(1).max(500)).optional(),
-  pageType: z.enum(['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource']).optional(),
-  executiveSummary: z.string().trim().max(5000).optional(),
+  // Enhanced ContentBrief fields — same shapes as briefEnhancedFields so the
+  // patch path can edit every field the full save/replace path can persist.
+  // executiveSummary kept here with the patch-specific length cap.
+  executiveSummary: z.string().trim().max(5000).optional()
+    .describe('Short executive summary of the brief / planned piece.'),
+  contentFormat: briefEnhancedFields.contentFormat,
+  toneAndStyle: briefEnhancedFields.toneAndStyle,
+  peopleAlsoAsk: briefEnhancedFields.peopleAlsoAsk,
+  topicalEntities: briefEnhancedFields.topicalEntities,
+  serpAnalysis: briefEnhancedFields.serpAnalysis,
+  difficultyScore: briefEnhancedFields.difficultyScore,
+  trafficPotential: briefEnhancedFields.trafficPotential,
+  ctaRecommendations: briefEnhancedFields.ctaRecommendations,
+  eeatGuidance: briefEnhancedFields.eeatGuidance,
+  contentChecklist: briefEnhancedFields.contentChecklist,
+  schemaRecommendations: briefEnhancedFields.schemaRecommendations,
+  pageType: briefEnhancedFields.pageType,
+  referenceUrls: briefEnhancedFields.referenceUrls,
+  realPeopleAlsoAsk: briefEnhancedFields.realPeopleAlsoAsk,
+  realTopResults: briefEnhancedFields.realTopResults,
+  keywordLocked: briefEnhancedFields.keywordLocked,
+  keywordSource: briefEnhancedFields.keywordSource,
+  keywordValidation: briefEnhancedFields.keywordValidation,
+  templateId: briefEnhancedFields.templateId,
+  titleVariants: briefEnhancedFields.titleVariants,
+  metaDescVariants: briefEnhancedFields.metaDescVariants,
+  generationStyle: briefEnhancedFields.generationStyle,
 }).strict().refine(
   (body) => Object.values(body).some((value) => value !== undefined),
   { message: 'At least one editable field required' },
