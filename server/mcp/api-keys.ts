@@ -32,6 +32,19 @@ export interface CreatedMcpApiKey {
   plaintextKeyOnceShown: string;
 }
 
+/**
+ * Key metadata for the admin management UI. NEVER includes the hash or plaintext —
+ * only non-secret descriptive fields the operator needs to list/rotate keys.
+ */
+export interface McpApiKeyMetadata {
+  id: string;
+  workspaceId: string;
+  label: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
 // INTERNAL — not exported
 interface McpApiKeyRow {
   id: string;
@@ -60,6 +73,16 @@ const stmts = createStmtCache(() => ({
   // Idempotent revoke: only stamps revoked_at if not already revoked.
   revoke: db.prepare<[revokedAt: string, id: string]>(
     `UPDATE mcp_api_keys SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL`,
+  ),
+  // Admin listing — metadata only, never key_hash. Newest first; includes revoked
+  // keys so the operator sees rotation history.
+  listAll: db.prepare(
+    `SELECT id, workspace_id, label, created_at, last_used_at, revoked_at
+       FROM mcp_api_keys ORDER BY created_at DESC`,
+  ),
+  listByWorkspace: db.prepare<[workspaceId: string]>(
+    `SELECT id, workspace_id, label, created_at, last_used_at, revoked_at
+       FROM mcp_api_keys WHERE workspace_id = ? ORDER BY created_at DESC`,
   ),
 }));
 
@@ -99,6 +122,26 @@ export function findActiveKeyByHash(keyHash: string): McpApiKeyRecord | null {
   const row = stmts().findActiveByHash.get(keyHash) as McpApiKeyRow | undefined;
   if (!row) return null;
   return { id: row.id, workspaceId: row.workspace_id, label: row.label };
+}
+
+/**
+ * List API key METADATA (never the hash or plaintext) for the admin management UI.
+ * Pass a `workspaceId` to scope to one workspace; omit for ALL keys across every
+ * workspace (the admin global view). Newest first; revoked keys are included so the
+ * operator can see rotation history.
+ */
+export function listMcpApiKeys(workspaceId?: string): McpApiKeyMetadata[] {
+  const rows = (
+    workspaceId ? stmts().listByWorkspace.all(workspaceId) : stmts().listAll.all()
+  ) as Array<Omit<McpApiKeyRow, 'key_hash'>>;
+  return rows.map((row) => ({
+    id: row.id,
+    workspaceId: row.workspace_id,
+    label: row.label,
+    createdAt: row.created_at,
+    lastUsedAt: row.last_used_at,
+    revokedAt: row.revoked_at,
+  }));
 }
 
 /** Stamp last_used_at for activity/audit. Best-effort; never throws to the caller. */

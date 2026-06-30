@@ -228,6 +228,8 @@ export const queryKeys = {
     ovDivergence: (wsId: string) => ['admin-ov-divergence', wsId] as const,
     notifications: () => ['admin-notifications'] as const,
     featureFlags: () => ['admin-feature-flags'] as const,
+    // Per-workspace MCP API keys (admin global management surface in Settings).
+    mcpApiKeys: () => ['admin-mcp-api-keys'] as const,
     // Per-workspace feature-flag overrides (canary control). Prefix
     // ['admin-workspace-feature-flags', wsId] invalidates that workspace's flags.
     workspaceFeatureFlags: (wsId: string) => ['admin-workspace-feature-flags', wsId] as const,
