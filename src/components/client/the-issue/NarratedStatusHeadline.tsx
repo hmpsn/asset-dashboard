@@ -12,7 +12,7 @@
 
 import { useState } from 'react';
 import { ChevronDown, Zap } from 'lucide-react';
-import { MetricRing, Icon, Button } from '../../ui';
+import { MetricRing, Icon, Button, cardToneClasses } from '../../ui';
 import type { OrientMetrics } from '../../../../shared/types/keyword-strategy-ux';
 import type { Recommendation } from '../../../../shared/types/recommendations';
 import { ISSUE_SECTION_TITLES } from './evergreenCopy';
@@ -52,7 +52,7 @@ export function NarratedStatusHeadline({ orient, topRec, statedGoal }: NarratedS
   const maxContribution = Math.max(...whyComponents.map((c) => c.contribution), 0.0001);
 
   return (
-    <section className="bg-gradient-to-br from-teal-500/8 via-[var(--surface-2)] to-[var(--surface-2)] border border-teal-500/15 px-5 py-4" style={{ borderRadius: 'var(--radius-signature)' }}>
+    <section className={`${cardToneClasses('teal')} border px-5 py-4`} style={{ borderRadius: 'var(--radius-signature)' }}>
       <div className="flex items-center gap-5">
         {score != null && <MetricRing score={score} size={88} />}
         <div className="min-w-0 flex-1">

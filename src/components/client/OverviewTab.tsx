@@ -12,7 +12,7 @@ import { useClientDiagnostics, useClientIntelligence } from '../../hooks/client'
 import { useRecommendationSet } from '../../hooks/useRecommendations';
 import type { Tier } from '../ui/TierGate';
 import { useNavigate } from 'react-router-dom';
-import { StatCard, MetricRing, Icon, Button, ClickableRow, SectionCard, Badge, FreshnessStamp } from '../ui';
+import { StatCard, MetricRing, Icon, Button, ClickableRow, SectionCard, Badge, FreshnessStamp, cardToneClasses } from '../ui';
 import { Explainer } from './SeoGlossary';
 import { useBetaMode } from './BetaContext';
 import { InsightsDigest } from './InsightsDigest';
@@ -626,7 +626,7 @@ export function OverviewTab({
         <SectionCard
           title="Ask your SEO advisor"
           titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
-          className="bg-gradient-to-br from-teal-500/5 via-[var(--surface-2)] to-[var(--surface-2)] border-teal-500/15"
+          className={cardToneClasses('teal')}
         >
           <p className="t-body text-[var(--brand-text-muted)] mb-3">Get instant answers about your site's performance, SEO opportunities, and next steps.</p>
           <div className="space-y-1.5">
@@ -665,7 +665,7 @@ export function OverviewTab({
             <SectionCard
               title="Content Opportunities"
               titleIcon={<Icon as={FileText} size="md" className="text-accent-brand" />}
-              className="bg-gradient-to-br from-teal-500/5 via-[var(--surface-2)] to-[var(--surface-2)] border-teal-500/15"
+              className={cardToneClasses('teal')}
             >
               <div className="space-y-2">
                 {gaps.map((gap, i) => (

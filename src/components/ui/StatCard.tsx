@@ -4,6 +4,26 @@ import type { LucideIcon } from 'lucide-react';
 /* ── Tone gradient map ── */
 type StatCardTone = 'neutral' | 'teal' | 'emerald' | 'blue' | 'amber';
 
+/**
+ * Returns the canonical tinted-gradient + matching-border class string for the given tone.
+ * Use this wherever a "tinted gradient card" treatment is needed so every surface shares
+ * one canonical opacity (bg: /8, border: /20).
+ *
+ * Exported so custom card shells outside StatCard can reuse the exact same treatment without
+ * hand-rolling inline class strings (design-x-gradient-card-variant normalization).
+ */
+export function cardToneClasses(tone: 'teal' | 'emerald' | 'blue' | 'amber'): string {
+  const map: Record<'teal' | 'emerald' | 'blue' | 'amber', string> = {
+    teal:    'bg-gradient-to-br from-teal-500/8 via-[var(--surface-2)] to-[var(--surface-2)] border-teal-500/20',
+    emerald: 'bg-gradient-to-br from-emerald-500/8 via-[var(--surface-2)] to-[var(--surface-2)] border-emerald-500/20',
+    blue:    'bg-gradient-to-br from-blue-500/8 via-[var(--surface-2)] to-[var(--surface-2)] border-blue-500/20',
+    amber:   'bg-gradient-to-br from-amber-500/8 via-[var(--surface-2)] to-[var(--surface-2)] border-amber-500/20',
+  };
+  return map[tone];
+}
+
+/** Internal map consumed by the StatCard tone prop — delegates to cardToneClasses so there
+ *  is exactly ONE source for the canonical gradient/border pair. */
 const TONE_GRADIENT: Record<Exclude<StatCardTone, 'neutral'>, { bg: string; border: string }> = {
   teal:    { bg: 'bg-gradient-to-br from-teal-500/8 via-[var(--surface-2)] to-[var(--surface-2)]',    border: 'border-teal-500/20' },
   emerald: { bg: 'bg-gradient-to-br from-emerald-500/8 via-[var(--surface-2)] to-[var(--surface-2)]', border: 'border-emerald-500/20' },

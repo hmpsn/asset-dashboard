@@ -10,7 +10,7 @@
 // proof, blue = in-discussion data. No purple.
 
 import { Sparkles, CheckCircle2, MessageCircle } from 'lucide-react';
-import { SectionCard, Button, ClickableRow, Icon } from '../../ui';
+import { SectionCard, Button, ClickableRow, Icon, cardToneClasses } from '../../ui';
 import type { ClientRecResponseSummary } from '../../../../shared/types/recommendations';
 import { ISSUE_SECTION_TITLES, ISSUE_SECTION_INTROS, loopStatusLine, workInFlightLine } from './evergreenCopy';
 
@@ -41,7 +41,7 @@ export function IssueLoopFooter({
     <SectionCard
       title={ISSUE_SECTION_TITLES.ask}
       titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
-      className="bg-gradient-to-br from-teal-500/5 via-[var(--surface-2)] to-[var(--surface-2)] border-teal-500/15"
+      className={cardToneClasses('teal')}
     >
       <p className="t-body text-[var(--brand-text-muted)] mb-3">{ISSUE_SECTION_INTROS.ask}</p>
 

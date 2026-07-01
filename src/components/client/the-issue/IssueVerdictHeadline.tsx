@@ -27,7 +27,7 @@
 
 import { useState } from 'react';
 import { ChevronDown, Sparkles, Zap } from 'lucide-react';
-import { Icon, Button } from '../../ui';
+import { Icon, Button, cardToneClasses } from '../../ui';
 import type { ROIData } from '../../../../shared/types/roi';
 import type { Recommendation } from '../../../../shared/types/recommendations';
 import { fmtEstimateRatio } from '../../../utils/formatNumbers';
@@ -70,7 +70,7 @@ export function IssueVerdictHeadline({ verdict, topRec, iaV2 = false }: IssueVer
   return (
     <section
       data-testid="issue-verdict-headline"
-      className="bg-gradient-to-br from-teal-500/8 via-[var(--surface-2)] to-[var(--surface-2)] border border-teal-500/15 px-5 py-4"
+      className={`${cardToneClasses('teal')} border px-5 py-4`}
       style={{ borderRadius: 'var(--radius-signature)' }}
     >
       {verdict == null ? (
