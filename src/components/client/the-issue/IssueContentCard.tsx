@@ -28,7 +28,7 @@
 
 import { useState } from 'react';
 import { ThumbsUp, ThumbsDown, ArrowRight, Check, MessageCircle } from 'lucide-react';
-import { Badge, Button, Icon, TierGate, ConfirmDialog, type Tier } from '../../ui';
+import { Badge, Button, Icon, TierGate, ConfirmDialog, cardToneClasses, type Tier } from '../../ui';
 import { ContentGapRow, type ContentGapRowData, type ContentGapAudience } from '../../shared/ContentGapRow';
 import type { BadgeTone } from '../../ui';
 import type { ClientFacingRecommendation } from '../../../../shared/types/recommendations';
@@ -113,7 +113,7 @@ export function IssueContentCard({
     <div
       className={
         emphasized
-          ? 'bg-gradient-to-br from-teal-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border border-teal-500/25 p-4'
+          ? `${cardToneClasses('teal')} border p-4`
           : 'bg-[var(--surface-2)] border border-[var(--brand-border)] p-4'
       }
       style={{ borderRadius: 'var(--radius-signature)' }}

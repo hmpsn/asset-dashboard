@@ -8612,3 +8612,21 @@ Service and location page brief defaults are now shorter and more conversion-den
 **Tests:** `tests/unit/nextBetsForecast.test.ts` (6 — filter/sort/cap, $ sums, outcome-≥1 gate, no-per-outcome-value, sub-1 per-bet but combined ≥1) + `tests/component/client/IssueNextBetsSection.test.tsx` (6 — populated render, empty/null render, act-on, outcome display + omission, pending). typecheck + lint:hooks + pr-check + verify:feature-flags green; flag-ON browser smoke (no crash, graceful empty, correct gating — demo workspaces seed 0 recs so the populated state is test-covered + data-shape type-verified).
 
 **Files:** `src/components/client/the-issue/nextBetsForecast.ts`; `src/components/client/the-issue/IssueNextBetsSection.tsx`; `src/components/client/the-issue/TheIssueClientPage.tsx`; `shared/types/feature-flags.ts`; `tests/unit/nextBetsForecast.test.ts`; `tests/component/client/IssueNextBetsSection.test.tsx`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+### 608. Design cleanup sprint — operator + client surface hierarchy & system consolidation 2026-06-30
+
+From the 2026-06-30 six-screen UX review (WorkspaceOverview / WorkspaceHome / The Issue client + cockpit / Content Pipeline / Client shell). 31-item sprint shipped as 7 staging-first PRs (#1429–#1435 + closeout). Sprint spec + audit + plan: `docs/design-cleanup/` and `docs/superpowers/{audits,plans}/2026-06-30-design-cleanup-*`.
+
+**Shared primitives (Wave 0):** `NeedsAttention`/`AttentionRow` (one severity→token worklist; consumed by Command Center + Workspace Home), `Disclosure` (canonical `<details>` chrome; consumed by The Issue cockpit "Supporting detail" + client "Under the hood"), `Menu` (thin `items[]` wrapper over the accessible `Popover`; consumed by Content Pipeline Export + AiSuggested snooze), `SectionLabel` (t-label section kicker), `StatCard` `tone` prop + exported `cardToneClasses(tone)` (one canonical tinted-gradient definition, adopted by the verdict/outcome/ROI cards). All in `src/components/ui/`; `useClickOutside` hook extracted.
+
+**Color/token discipline (Wave 0b):** repo-wide four-laws sweep — mint-on-static-data → blue/emerald, 3 Law-4 purple → blue, ~50 hardcoded hex → `CHART_SERIES_COLORS`, warning/danger surfaces (`InlineBanner` `TONE_STYLES`, trial banners, POV-staleness) → soft tokens.
+
+**Screen hierarchy (Waves 1–5):** Command Center (header cluster + Needs-Attention hero + one hero metric + score-led workspace rows); Workspace Home (setup-task dedup, 4-health→1, 9-hero→3, worklist-first + tabbed sections); The Issue (plan-above-proof spine, single ROI mount, docked send, cockpit Disclosure split); Content Pipeline (stepper↔tabs unified, TabBar/Menu primitives, alert consolidation); Client shell (4-tab two-speed IA behind `client-ia-v2`, panel dedup, one notice region, no title echo).
+
+**Why it matters:** operator screens surfaced everything at equal weight ("the eye has nowhere to land"); the sprint restores hierarchy and consolidates hand-rolled patterns into shared primitives so future screens inherit them.
+
+**Tests/quality:** ~180 new/updated unit + component + contract tests; every PR merged on genuine-green CI (full suite ~4293 component + 1542 contract). Also fixed a repo-wide CI time-bomb (style-exception fixtures that expired at UTC midnight).
+
+**Owner-pending:** `client-ia-v2` default-ON flip (Wave 5 shipped flag-gated, OFF byte-identical — flipping lights up all clients at once, no per-workspace pilot); `SectionLabel` renders `<p>` (3 migrated Issue kickers lost `<h2>` heading semantics — consider a heading element).
+
+**Files:** `docs/design-cleanup/*`; `docs/superpowers/{audits,plans}/2026-06-30-design-cleanup-*`; `src/components/ui/{NeedsAttention,Disclosure,Menu,SectionLabel,StatCard,InlineBanner,TabBar}.tsx`; `src/hooks/useClickOutside.ts`; `src/components/{WorkspaceOverview,WorkspaceHome,ContentPipeline,KeywordStrategy,ClientDashboard}.tsx`; `src/components/client/the-issue/*`; + color-sweep across ~30 components; `data/roadmap.json`; `FEATURE_AUDIT.md`; `BRAND_DESIGN_LANGUAGE.md`.

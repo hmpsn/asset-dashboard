@@ -26,7 +26,7 @@
 import { ChevronDown, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '../../ErrorBoundary';
-import { CompactStatBar, Disclosure, Skeleton, SectionCard, Icon } from '../../ui';
+import { CompactStatBar, Disclosure, Skeleton, SectionCard, SectionLabel, Icon } from '../../ui';
 import type { Tier } from '../../ui/TierGate';
 import type { Recommendation } from '../../../../shared/types/recommendations';
 import type { ROIData } from '../../../../shared/types/roi';
@@ -345,7 +345,7 @@ export function TheIssueClientPage({
           {/* 4. Money frame — UN-COLLAPSED (no <details>), compact (tables relocate to slot 9). */}
           <ErrorBoundary label="What your SEO is worth">
             <div data-testid="slot-money" className="space-y-3">
-              <h2 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider">{ISSUE_SECTION_TITLES.roi}</h2>
+              <SectionLabel>{ISSUE_SECTION_TITLES.roi}</SectionLabel>
               <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} evergreen compact />
             </div>
           </ErrorBoundary>
@@ -367,7 +367,7 @@ export function TheIssueClientPage({
           {/* 5. What’s working right now — evergreen proof (Wins). */}
           <div className="space-y-4">
             {/* duplicate-heading-ok: this is the spine-ON branch; the flag-OFF branch below renders the same section title, but the two are mutually exclusive at runtime and the OFF branch must stay byte-identical. */}
-            <h2 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider">{ISSUE_SECTION_TITLES.whatsWorking}</h2>
+            <SectionLabel>{ISSUE_SECTION_TITLES.whatsWorking}</SectionLabel>
             <ErrorBoundary label="Wins">
               <WinsSurface workspaceId={workspaceId} effectiveTier={effectiveTier} />
             </ErrorBoundary>
@@ -516,7 +516,7 @@ export function TheIssueClientPage({
 
         {/* 6. What's working right now — evergreen proof (Wins). */}
         <div className="space-y-4">
-          <h2 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider">{ISSUE_SECTION_TITLES.whatsWorking}</h2>
+          <SectionLabel>{ISSUE_SECTION_TITLES.whatsWorking}</SectionLabel>
           <ErrorBoundary label="Wins">
             <WinsSurface workspaceId={workspaceId} effectiveTier={effectiveTier} />
           </ErrorBoundary>

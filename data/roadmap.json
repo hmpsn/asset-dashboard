@@ -192,10 +192,11 @@
           "source": "UX review 2026-06-30 · ISSUE-F4",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "owner": "design-system",
-          "notes": "On The Issue, a top-level section header is variously a muted h2.t-label kicker, a SectionCard title bar, or a <summary> row — three weights for one job, making a long scroll hard to skim. Fix: standardize one section-header treatment (the t-label kicker) for top-level sections and reserve SectionCard headers for cards within a section. Applies app-wide. Artifact: ux-review-client-issue.html.",
-          "createdAt": "2026-06-30"
+          "notes": "On The Issue, a top-level section header is variously a muted h2.t-label kicker, a SectionCard title bar, or a <summary> row — three weights for one job, making a long scroll hard to skim. Fix: standardize one section-header treatment (the t-label kicker) for top-level sections and reserve SectionCard headers for cards within a section. Applies app-wide. Artifact: ux-review-client-issue.html. [Closeout: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-cp-unify-stepper-tabs",
@@ -371,10 +372,11 @@
           "source": "UX review 2026-06-30 · ISSUE-F5",
           "est": "M",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "owner": "design-system",
-          "notes": "The 'tinted gradient + matching border' card treatment is hand-rolled with slightly different opacities per surface: the verdict shell uses from-teal-500/8 border-teal-500/15; the outcome StatCards pass className='bg-gradient-to-br from-emerald-500/10 border-emerald-500/20'. Fix: promote it to a first-class StatCard/card tone prop (tone='emerald' -> gradient + border baked in at one canonical opacity) so the verdict hero and outcome band share one definition and future surfaces inherit it. Artifact: ux-review-client-issue.html.",
-          "createdAt": "2026-06-30"
+          "notes": "The 'tinted gradient + matching border' card treatment is hand-rolled with slightly different opacities per surface: the verdict shell uses from-teal-500/8 border-teal-500/15; the outcome StatCards pass className='bg-gradient-to-br from-emerald-500/10 border-emerald-500/20'. Fix: promote it to a first-class StatCard/card tone prop (tone='emerald' -> gradient + border baked in at one canonical opacity) so the verdict hero and outcome band share one definition and future surfaces inherit it. Artifact: ux-review-client-issue.html. [Closeout: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         }
       ]
     },
