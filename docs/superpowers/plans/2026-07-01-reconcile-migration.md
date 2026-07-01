@@ -8,7 +8,7 @@
 
 **Tech Stack:** Express + TypeScript, SQLite (better-sqlite3, WAL, forward-only migrations), React 19 + React Query, vitest, pr-check mechanization.
 
-**Platform: Claude/Anthropic** (Haiku / Sonnet / Opus ladder). Controller session: Opus.
+**Platform: Claude/Anthropic** (Haiku / Sonnet / Opus worker ladder). Controller session: **Opus (driver)**. **Fable holds the judgment seats** — R7 prod gate, wave-boundary reviews, the holistic review, STOP adjudication, closeout — dispatched by the controller via Agent model override (`model: fable`), or run in a dedicated Fable session if the override is unavailable.
 
 ---
 
@@ -35,13 +35,16 @@ Ratified decisions binding this plan: R4 keeps the two-axis model (harden, don't
 2. Dispatches one worker per task with: full task text, ownership list, cross-phase contracts, relevant CLAUDE.md conventions, gotchas, model assignment.
 3. After every parallel batch: `git diff` review → duplicate-import grep on multi-agent files → `npm run typecheck` → **one** full `npx vitest run` (never two concurrently — deterministic-port EADDRINUSE flakes; kill orphaned `tsx server/index.ts` procs if a run was interrupted).
 4. Runs the **merge queue**: one PR to `staging` at a time; migration-minting PRs renumber to the next free slot at merge (`164` is taken by whichever merges first; subsequent PRs bump). After each merge, all open lanes rebase.
-5. Per-wave: `scaled-code-review` (Opus reviewers — never downgrade). After Wave B completes: one **holistic end-to-end review** (per-lane review + green gates have missed fixture-masked broken features before).
+5. **Review cadence — three tiers, every reviewer independent of the implementer:**
+   - **Per PR (every PR, before merge):** independent code review — `superpowers:requesting-code-review` for single-task PRs; `scaled-code-review` for any PR built by parallel workers or touching 10+ files. Reviewer model: **Opus minimum — reviewers never downgrade.** All Critical/Important findings fixed before merge; never deferred as "pre-existing" or "minor" (house rule).
+   - **Per wave boundary:** `scaled-code-review` across the wave's full merged diff — **reviewer: Fable.**
+   - **After Wave B:** one **holistic end-to-end review** of the entire arc so far — **Fable** (per-lane reviews + green gates have missed fixture-masked broken features before; this tier exists specifically to catch what they can't).
 6. CI notes: the pr-test component lane OOM-flakes (process killed, no assertion — don't chase); a failed `changes` path-filter job can skip real lanes while aggregators pass — **inspect any red before merging**, don't trust `gh pr checks` exit code alone.
-7. Autonomy contract: merge-on-green without owner input EXCEPT the three owner checkpoints in §Owner Checkpoints. If a task's real code contradicts a plan contract: STOP that lane, report, continue other lanes.
+7. Autonomy contract: merge-on-green without owner input EXCEPT the three owner checkpoints in §Owner Checkpoints. If a task's real code contradicts a plan contract: STOP that lane and report; **a Fable reviewer adjudicates every STOP** (amend the plan contract vs. fix the code) before that lane resumes — other lanes continue meanwhile. A red that survives one fix attempt is a STOP, not a retry loop.
 
 **Worker TDD discipline (state in every dispatch prompt):** (1) READ the real code first; (2) write the failing test from this plan's assertions and RUN it — confirm it fails for the right reason; (3) implement minimally against real signatures; (4) test green + `npm run typecheck`; (5) hand back a file manifest — controller commits. Never transcribe plan snippets; never skip the red.
 
-**Universal per-PR gates:** `npm run typecheck` · `npx vite build` · `npx vitest run` (full) · `npm run pr-check` · `npm run lint:hooks` · `npm run verify:feature-flags` · `npm run verify:coverage-ratchet` · docs updated in the same commit (FEATURE_AUDIT.md / roadmap / rules docs per task).
+**Universal per-PR gates:** `npm run typecheck` · `npx vite build` · `npx vitest run` (full) · `npm run pr-check` · `npm run lint:hooks` · `npm run verify:feature-flags` · `npm run verify:coverage-ratchet` · **independent code review passed with all Critical/Important findings fixed (tier 1 of the review cadence — no PR merges unreviewed)** · docs updated in the same commit (FEATURE_AUDIT.md / roadmap / rules docs per task).
 
 ---
 
@@ -205,7 +208,7 @@ Cross-lane file coordination (from the collision matrix — merge-queue rebases,
 
 ## Task List — Wave B, Lane R (recommendations)
 
-### Task B4 — R7-GATE Staging + prod count verification (Controller-run, Opus; no code)
+### Task B4 — R7-GATE Staging + prod count verification (Controller-run; **judgment seat: Fable**; no code)
 After A4 deploys to staging: run blob-vs-rows counts on staging DB; pull prod backup via `scripts/pull-render-latest-backup.sh` and run the same counts. **PASS =** `recommendation_items` rows ≥ valid blob recs for every workspace with a non-empty blob, and every dropped item has a logged reason that is investigated (a missing RecType enum member would shed every rec of that type — that's a STOP, not a tolerance). Record the evidence table in the PR body of B5. FAIL → STOP lane, report.
 
 ### Task B5 — R7-PR2 Contract cutover (Model: Opus — destructive, follows R0 contract)
@@ -330,7 +333,7 @@ After A4 deploys to staging: run blob-vs-rows counts on staging DB; pull prod ba
 
 **Order:** only families whose removalConditions are already met at execution time (re-derive from `verify:feature-flags` then); The-Issue children retire as their phases ship — most will trail this plan, which is correct.
 
-### Task C4 — Closeout (Controller, Opus)
+### Task C4 — Closeout (Controller; **judgment seat: Fable** for the holistic review + exit-criteria verdict)
 - [ ] Exit-criteria verification against the Reconcile goals: lexicon enforced (`verify:lexicon` in CI) · one action catalog + honest attribution at every live seam · rows-only rec store, mirror sync verifiable, struck≠completed at DB · execution observable (cron census green) · snapshot/archive parity asserted at boot
 - [ ] `npm run verify:platform` + full gates on staging; staging→main promotion per `docs/workflows/deploy.md`
 - [ ] Holistic end-to-end review (scaled-code-review across the whole arc) — fix everything it finds, never defer
@@ -359,4 +362,4 @@ After A4 deploys to staging: run blob-vs-rows counts on staging DB; pull prod ba
 
 1. **A1:** provision the off-site backup destination — owner confirmed none exists (prod backups live on the same Render disk as the DB). Owner creates an S3 or Cloudflare R2 bucket and sets `BACKUP_S3_BUCKET` / `BACKUP_S3_REGION` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (+ `BACKUP_S3_ENDPOINT` for R2) in the Render dashboard for BOTH services (`shared-s3-backups` group). Also confirm Render's own disk-snapshot retention in the dashboard as the platform floor. **The destructive waves (B5, B7, B10, C1) do not merge until the first off-site backup upload is verified in the health payload.**
 2. **C2:** pick canonical wording from the table in the PR (client-visible copy).
-3. **Any STOP report:** a contract-vs-reality mismatch, a failed R7 gate, or a red that survives one fix attempt halts that lane only; other lanes continue.
+3. **Any STOP report:** a contract-vs-reality mismatch, a failed R7 gate, or a red that survives one fix attempt halts that lane only; other lanes continue. Every STOP is adjudicated by a **Fable** reviewer before the lane resumes; the owner is pinged only if the adjudication would change scope, cost, or anything client-visible.
