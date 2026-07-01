@@ -1,8 +1,10 @@
 // Lane D / Task D6 — dedicated spine-ORDER acceptance test for TheIssueClientPage.
 //
-// Proves the verdict-first trust spine (the P0 inversion): with the spine flag ON the
-// verdict / outcome-count / money frame LEAD and the content plan is DEMOTED below the
-// money frame. With the flag OFF the page is byte-identical to today (no spine slots; the
+// Proves the verdict-first trust spine: with the spine flag ON the verdict LEADS and the
+// Content Plan sits DIRECTLY under it (design-cleanup Wave 3 / T3.1 "plan above proof" —
+// this supersedes the earlier "plan demoted below the money frame" ordering so a client
+// convinced by the verdict can act without scrolling past the proof). Outcome-count + money
+// frame follow. With the flag OFF the page is byte-identical to today (no spine slots; the
 // legacy "See full report" <details> proof band is present).
 //
 // Reuses the EXACT provider/render harness, hook mocks, and fixture shape from
@@ -189,7 +191,7 @@ beforeEach(() => {
 });
 
 describe('TheIssueClientPage — spine ORDER (flag ON, theIssueClientSpine=true)', () => {
-  it('renders all spine slots in canonical DOM order: verdict → outcome-count → money → content-plan', () => {
+  it('renders all spine slots in canonical DOM order: verdict → content-plan → outcome-count → money', () => {
     renderPage({ theIssueClientSpine: true, outcomeCount });
 
     const root = screen.getByTestId('the-issue-client-page');
@@ -205,22 +207,22 @@ describe('TheIssueClientPage — spine ORDER (flag ON, theIssueClientSpine=true)
     expect(money).toBeInTheDocument();
     expect(contentPlan).toBeInTheDocument();
 
-    // Verdict / outcome / money LEAD; the content plan is DEMOTED below the money frame.
-    expect(precedes(verdict, outcome)).toBe(true);
+    // T3.1: Verdict LEADS; the Content Plan sits directly under it; outcome + money follow.
+    expect(precedes(verdict, contentPlan)).toBe(true);
+    expect(precedes(contentPlan, outcome)).toBe(true);
     expect(precedes(outcome, money)).toBe(true);
-    expect(precedes(money, contentPlan)).toBe(true);
   });
 
   it('proves the order independently via query-all DOM index ordering', () => {
     renderPage({ theIssueClientSpine: true, outcomeCount });
 
-    const ids = ['slot-verdict', 'slot-outcome-count', 'slot-money', 'slot-content-plan'];
+    const ids = ['slot-verdict', 'slot-content-plan', 'slot-outcome-count', 'slot-money'];
     const all = Array.from(
       document.querySelectorAll<HTMLElement>('[data-testid^="slot-"]'),
     );
     const indexOf = (id: string) => all.findIndex((el) => el.getAttribute('data-testid') === id);
     const positions = ids.map(indexOf);
-    // Every slot found, and indices strictly ascending in the order verdict<count<money<plan.
+    // Every slot found, and indices strictly ascending in the order verdict<plan<count<money.
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
   });

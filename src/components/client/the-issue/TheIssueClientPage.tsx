@@ -26,7 +26,7 @@
 import { ChevronDown, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '../../ErrorBoundary';
-import { CompactStatBar, Skeleton, SectionCard, Icon } from '../../ui';
+import { CompactStatBar, Disclosure, Skeleton, SectionCard, Icon } from '../../ui';
 import type { Tier } from '../../ui/TierGate';
 import type { Recommendation } from '../../../../shared/types/recommendations';
 import type { ROIData } from '../../../../shared/types/roi';
@@ -250,15 +250,34 @@ export function TheIssueClientPage({
   ].filter(Boolean) as { label: string; value: string; valueColor: string }[];
 
   // ── The Issue (Client) P0 spine (flag ON) — verdict-first trust spine ─────────
-  // Slot 0 Your turn → 1 Verdict → 2 Outcome count → 3 Money (un-collapsed) →
-  // 4 What needs me → 5 Content plan (demoted) → 6 Under the hood (collapsed; the ring lives here).
+  // Wave 3 canonical order (T3.1 plan-above-proof):
+  //   0 Your turn (strip + loop-footer jump anchor) → 1 Verdict →
+  //   2 Content plan (HERO — leads proof, sits directly under verdict) →
+  //   3 Also on your plan →
+  //   4 Outcome count (proof begins here) → 5 Your leads (iaV2+exportEnabled) →
+  //   6 Money frame (un-collapsed) → 7 Next bets →
+  //   8 What’s working → 9 Loop footer → 10 Under the hood (Disclosure — methodology only).
   if (spineEnabled) {
     return (
       <ErrorBoundary>
         <div className="space-y-6" data-testid="the-issue-client-page">
-          {/* 0. Your turn — pending decisions (reuse ActionQueueStrip; renders null when empty). */}
+          {/* 0. Your turn — pending decisions (reuse ActionQueueStrip; renders null when empty).
+              T3.3: wrap in a div that carries a jump-link to the loop footer so the strip reads
+              as a count/jump that anchors to the same work queue at the bottom of the page.
+              This shared visual language prevents the footer from reading as separate new work. */}
           {!previewMode && (
-            <ActionQueueStrip workspaceId={workspaceId} betaMode={betaMode} counts={actionCounts} />
+            <div data-testid="action-queue-and-jump">
+              <ActionQueueStrip workspaceId={workspaceId} betaMode={betaMode} counts={actionCounts} />
+              {(actionCounts.approvals + actionCounts.briefs + actionCounts.posts + actionCounts.replies + actionCounts.contentPlan) > 0 && (
+                <a
+                  href="#issue-loop-footer"
+                  className="mt-1 inline-flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] no-underline hover:no-underline"
+                  data-testid="strip-to-footer-jump"
+                >
+                  See your active moves ↓
+                </a>
+              )}
+            </div>
           )}
 
           <DiagnosticRootCauseCards workspaceId={workspaceId} reports={diagnosticReports} />
@@ -282,67 +301,8 @@ export function TheIssueClientPage({
             </ErrorBoundary>
           )}
 
-          {/* 2. Outcome count — outcomes in human units (only when there are pinned events). */}
-          {resolvedOutcomeCount && (
-            <ErrorBoundary label="Outcome count">
-              <div data-testid="slot-outcome-count">
-                <OutcomeCountBand count={resolvedOutcomeCount} />
-              </div>
-            </ErrorBoundary>
-          )}
-
-          {/* 2.5 Your leads — surfaced directly under the count when IA v2 (the check-signer's
-              "show me the N people behind these numbers"). Gated on the return-hook flag; suppressed
-              in admin preview (client PII is not the operator's). When iaV2 OFF this stays in the
-              collapsed "Under the hood" block below (byte-identical). */}
-          {iaV2Enabled && exportEnabled && !previewMode && (
-            <ErrorBoundary label="Your captured leads">
-              <IssueYourLeadsSection workspaceId={workspaceId} />
-            </ErrorBoundary>
-          )}
-
-          {/* 3. Money frame — UN-COLLAPSED (no <details>), compact (tables relocate to slot 6). */}
-          <ErrorBoundary label="What your SEO is worth">
-            <div data-testid="slot-money" className="space-y-3">
-              <h2 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider">{ISSUE_SECTION_TITLES.roi}</h2>
-              <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} evergreen compact />
-            </div>
-          </ErrorBoundary>
-
-          {/* 3.5 Next bets — forward $-forecast of the top recommended moves (the-issue-client-next-bets). */}
-          {nextBetsEnabled && (
-            <ErrorBoundary label="Your next bets">
-              <div data-testid="slot-next-bets">
-                <IssueNextBetsSection
-                  recs={recs}
-                  valuePerOutcome={resolvedVerdict?.valuePerOutcome ?? null}
-                  outcomeUnitLabel={resolvedVerdict?.outcomeUnitLabel ?? null}
-                  onReviewPlan={openStrategy}
-                />
-              </div>
-            </ErrorBoundary>
-          )}
-
-          {/* 4. What needs me — the full pending-decisions queue / loop. */}
-          {previewMode ? (
-            <SectionCard title={ISSUE_SECTION_TITLES.ask}>
-              <p className="t-body text-[var(--brand-text-muted)]">
-                In the live dashboard, your client can ask their strategist a question here and see the moves they’ve greenlit.
-              </p>
-            </SectionCard>
-          ) : (
-            <ErrorBoundary label="Ask your strategist">
-              <IssueLoopFooter
-                responses={recResponses}
-                briefsInProgress={briefsInProgress}
-                quickQuestions={QUICK_QUESTIONS}
-                onOpenChat={onOpenChat}
-                onAskAi={onAskAi}
-              />
-            </ErrorBoundary>
-          )}
-
-          {/* 5. Content plan — DEMOTED below the proof/money band (positional, nothing cut). */}
+          {/* 2. Content plan — HERO: sits DIRECTLY under the verdict (T3.1 plan-above-proof).
+              The plan is what the client is paying for; proof surfaces below validate it. */}
           <ErrorBoundary label="Content plan">
             <div data-testid="slot-content-plan">
               <IssueContentPlanSection
@@ -363,7 +323,48 @@ export function TheIssueClientPage({
             <IssueAlsoOnPlanSection recs={recs} onOpenGroup={openGroup} />
           </ErrorBoundary>
 
-          {/* What's working right now — evergreen proof (Wins). */}
+          {/* 3. Outcome count — outcomes in human units (proof begins; only when pinned events). */}
+          {resolvedOutcomeCount && (
+            <ErrorBoundary label="Outcome count">
+              <div data-testid="slot-outcome-count">
+                <OutcomeCountBand count={resolvedOutcomeCount} />
+              </div>
+            </ErrorBoundary>
+          )}
+
+          {/* 3.5 Your leads — surfaced directly under the count when IA v2 (the check-signer’s
+              "show me the N people behind these numbers"). Gated on the return-hook flag; suppressed
+              in admin preview (client PII is not the operator’s). When iaV2 OFF this stays in the
+              collapsed "Under the hood" block below (byte-identical). */}
+          {iaV2Enabled && exportEnabled && !previewMode && (
+            <ErrorBoundary label="Your captured leads">
+              <IssueYourLeadsSection workspaceId={workspaceId} />
+            </ErrorBoundary>
+          )}
+
+          {/* 4. Money frame — UN-COLLAPSED (no <details>), compact (tables relocate to slot 9). */}
+          <ErrorBoundary label="What your SEO is worth">
+            <div data-testid="slot-money" className="space-y-3">
+              <h2 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider">{ISSUE_SECTION_TITLES.roi}</h2>
+              <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} evergreen compact />
+            </div>
+          </ErrorBoundary>
+
+          {/* 4.5 Next bets — forward $-forecast of the top recommended moves (the-issue-client-next-bets). */}
+          {nextBetsEnabled && (
+            <ErrorBoundary label="Your next bets">
+              <div data-testid="slot-next-bets">
+                <IssueNextBetsSection
+                  recs={recs}
+                  valuePerOutcome={resolvedVerdict?.valuePerOutcome ?? null}
+                  outcomeUnitLabel={resolvedVerdict?.outcomeUnitLabel ?? null}
+                  onReviewPlan={openStrategy}
+                />
+              </div>
+            </ErrorBoundary>
+          )}
+
+          {/* 5. What’s working right now — evergreen proof (Wins). */}
           <div className="space-y-4">
             {/* duplicate-heading-ok: this is the spine-ON branch; the flag-OFF branch below renders the same section title, but the two are mutually exclusive at runtime and the OFF branch must stay byte-identical. */}
             <h2 className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider">{ISSUE_SECTION_TITLES.whatsWorking}</h2>
@@ -386,24 +387,46 @@ export function TheIssueClientPage({
           {segmentProfile?.showLocalMapAndReviews && null /* P1 local map + reviews insert */}
           {segmentProfile?.showPortfolioRollup && null /* P1 portfolio rollup insert */}
 
-          {/* 6. Under the hood — collapsed. The visibility ring + the numbers strip + the
-              relocated ROI tables + (segment-gated) competitor snapshot live here now. */}
+          {/* 6. Loop footer — T3.3: carries id="issue-loop-footer" so the "Your turn" strip at
+              the top can scroll/jump here. The strip reads as a count of the same work queue;
+              the footer shows the resolved state (greenlit / discussing / in-flight). */}
+          {/* tabIndex=-1 so the strip's "#issue-loop-footer" jump moves keyboard focus here
+              (a plain div won't receive focus on fragment navigation otherwise). */}
+          <div id="issue-loop-footer" data-testid="slot-loop-footer" tabIndex={-1}>
+            {previewMode ? (
+              <SectionCard title={ISSUE_SECTION_TITLES.ask}>
+                <p className="t-body text-[var(--brand-text-muted)]">
+                  In the live dashboard, your client can ask their strategist a question here and see the moves they’ve greenlit.
+                </p>
+              </SectionCard>
+            ) : (
+              <ErrorBoundary label="Ask your strategist">
+                <IssueLoopFooter
+                  responses={recResponses}
+                  briefsInProgress={briefsInProgress}
+                  quickQuestions={QUICK_QUESTIONS}
+                  onOpenChat={onOpenChat}
+                  onAskAi={onAskAi}
+                />
+              </ErrorBoundary>
+            )}
+          </div>
+
+          {/* 7. Under the hood — T3.2: uses <Disclosure> (not raw <details>) for a11y and
+              design-x-disclosure-pattern consistency. Holds methodology context and the
+              narrated status / numbers strip only — the second ROIDashboard is REMOVED to
+              eliminate the duplicate data fetch (T3.2 roi-double-mount fix). Tables already
+              visible in slot-money (compact=true includes the traffic-value row). */}
           <ErrorBoundary label="Under the hood">
-            <details className="group bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-signature)] overflow-hidden">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 [&::-webkit-details-marker]:hidden">
-                <span className="t-label text-[var(--brand-text-muted)] uppercase tracking-wider">Under the hood</span>
-                <span className="inline-flex items-center gap-1 t-caption-sm text-accent-brand flex-shrink-0">
-                  See the full picture
-                  <Icon as={ChevronDown} size="sm" className="transition-transform group-open:rotate-180" />
-                </span>
-              </summary>
-              <div className="px-4 pb-4 pt-1 space-y-4">
+            <Disclosure
+              summary="Under the hood"
+            >
+              <div className="space-y-4 pt-2">
                 <NarratedStatusHeadline orient={orient} topRec={topRec} statedGoal={strategyData?.businessContext} />
                 {statItems.length > 0 && <CompactStatBar items={statItems} />}
-                <ROIDashboard workspaceId={workspaceId} tier={effectiveTier} evergreen compact={false} />
-                {/* P1b (Lane C) — the client's OWN captured leads (authed surface only). Gated on the
-                    return-hook flag; suppressed in admin preview (client PII is not the operator's).
-                    P1 (IA v2): when iaV2 ON the leads section is surfaced above (slot 2.5), so guard
+                {/* P1b (Lane C) — the client’s OWN captured leads (authed surface only). Gated on the
+                    return-hook flag; suppressed in admin preview (client PII is not the operator’s).
+                    P1 (IA v2): when iaV2 ON the leads section is surfaced above (slot 3.5), so guard
                     this under-the-hood mount on !iaV2Enabled to avoid a double-mount. */}
                 {!iaV2Enabled && exportEnabled && !previewMode && (
                   <ErrorBoundary label="Your captured leads">
@@ -416,7 +439,7 @@ export function TheIssueClientPage({
                   </ErrorBoundary>
                 )}
               </div>
-            </details>
+            </Disclosure>
           </ErrorBoundary>
         </div>
       </ErrorBoundary>

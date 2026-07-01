@@ -14,7 +14,7 @@
  * No TierGate. All tokens from src/tokens.css. Typography via .t-* utilities.
  */
 import { useMemo, useState } from 'react';
-import { Target } from 'lucide-react';
+import { Target, Plus } from 'lucide-react';
 import { SectionCard, Icon, Button } from '../../ui';
 import { CockpitRow } from '../CockpitRow';
 import { CurationBulkActionBar } from '../CurationBulkActionBar';
@@ -71,6 +71,12 @@ export interface BackingMovesQueueProps {
   stagedRecIds?: Set<string>;
   onStage?: (recId: string) => void;
   onStageMany?: (recIds: string[]) => void;
+  /**
+   * T3.5 — "Add a recommendation" action placed in the SectionCard header (queue header slot).
+   * When provided, renders a compact "+ Add a recommendation" button alongside the counter.
+   * Absent on consumers that don't support manual rec creation.
+   */
+  onAddRec?: () => void;
 }
 
 /**
@@ -189,6 +195,7 @@ export function BackingMovesQueue({
   stagedRecIds,
   onStage,
   onStageMany,
+  onAddRec,
 }: BackingMovesQueueProps) {
   // Group recs by archetype, preserving ARCHETYPE_ORDER
   const groups = useMemo(() => {
@@ -217,14 +224,41 @@ export function BackingMovesQueue({
 
   const titleIcon = <Icon as={Target} size="md" className="text-accent-brand" />;
 
-  // Blocker 5 live counter, rendered as the SectionCard action. N and M share the orchestrator's
-  // single rec set + the shared isCuratedForClient predicate (numerator/denominator-share-a-source).
-  // Only rendered when both counts are provided (the Issue cockpit always passes them).
+  // Blocker 5 live counter, rendered as part of the SectionCard action slot. N and M share the
+  // orchestrator's single rec set + the shared isCuratedForClient predicate
+  // (numerator/denominator-share-a-source). Only rendered when both counts are provided (the Issue
+  // cockpit always passes them).
+  // T3.5 — "Add a recommendation" button (onAddRec) is placed here in the header action slot so
+  // the operator can mint a rec without leaving the queue context. Rendered only when onAddRec is
+  // provided so the queue stays usable by future consumers that don't support manual rec creation.
   const counterEl =
     stagedCount !== undefined && curatedCount !== undefined ? (
-      <span className="t-caption-sm text-[var(--brand-text-muted)] tabular-nums" data-testid="backing-moves-counter">
-        {stagedCount} staged · {curatedCount} already with client
+      <span className="flex items-center gap-3">
+        <span className="t-caption-sm text-[var(--brand-text-muted)] tabular-nums" data-testid="backing-moves-counter">
+          {stagedCount} staged · {curatedCount} already with client
+        </span>
+        {onAddRec && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={Plus}
+            onClick={onAddRec}
+            data-testid="queue-add-rec-btn"
+          >
+            Add a recommendation
+          </Button>
+        )}
       </span>
+    ) : onAddRec ? (
+      <Button
+        variant="ghost"
+        size="sm"
+        icon={Plus}
+        onClick={onAddRec}
+        data-testid="queue-add-rec-btn"
+      >
+        Add a recommendation
+      </Button>
     ) : undefined;
 
   if (groups.length === 0) {

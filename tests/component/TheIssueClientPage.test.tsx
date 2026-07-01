@@ -272,15 +272,17 @@ describe('TheIssueClientPage — spine (flag ON)', () => {
     mockUseClientTheIssue.mockReturnValue({ data: recSet([baseRec()]), isLoading: false });
   });
 
-  it('orders verdict before outcome-count before content-plan', () => {
+  it('orders verdict → content-plan → outcome-count (T3.1 plan-above-proof)', () => {
+    // Wave 3 (T3.1): Content Plan sits DIRECTLY under the verdict; outcome count and money
+    // follow as proof surfaces. The old order (verdict → outcome → plan) is replaced.
     const outcomeCount = { units: [{ label: 'calls', current: 5, baseline: null, priorPeriod: null }], provenance: 'estimate_ga4' as const, namedRecordsAvailable: false };
     renderPage({ theIssueClientSpine: true, outcomeCount });
     const verdict = screen.getByTestId('slot-verdict');
-    const outcome = screen.getByTestId('slot-outcome-count');
     const contentPlan = screen.getByTestId('slot-content-plan');
+    const outcome = screen.getByTestId('slot-outcome-count');
     // DOCUMENT_POSITION_FOLLOWING (4) = the argument node comes AFTER the reference node.
-    expect(verdict.compareDocumentPosition(outcome) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(outcome.compareDocumentPosition(contentPlan) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(verdict.compareDocumentPosition(contentPlan) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(contentPlan.compareDocumentPosition(outcome) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('renders the money frame UN-COLLAPSED (not inside a <details>)', () => {
