@@ -311,10 +311,11 @@
           "source": "UX review 2026-06-30 · CD-F1",
           "est": "L",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "Behind client-ia-v2 the nav collapses from ~12 top-level tabs (Overview, Performance, Health, Strategy, Inbox, Content Plan, Plans, ROI, Brand, Results, Deep Dive, Settings) to four. Twelve is far too many for a client; while the flag is mid-rollout the product has two front doors depending on flag state. Fix: commit to the two-speed shell and retire legacy nav — Overview = verdict; Deep Dive holds Performance/Health/Rankings/Content sub-views; Inbox = loop; Settings absorbs Plans/Brand. Highest-impact move on this screen. Artifact: ux-review-client-shell.html.",
-          "createdAt": "2026-06-30"
+          "notes": "Behind client-ia-v2 the nav collapses from ~12 top-level tabs (Overview, Performance, Health, Strategy, Inbox, Content Plan, Plans, ROI, Brand, Results, Deep Dive, Settings) to four. Twelve is far too many for a client; while the flag is mid-rollout the product has two front doors depending on flag state. Fix: commit to the two-speed shell and retire legacy nav — Overview = verdict; Deep Dive holds Performance/Health/Rankings/Content sub-views; Inbox = loop; Settings absorbs Plans/Brand. Highest-impact move on this screen. Artifact: ux-review-client-shell.html. [Wave 5: shipped behind client-ia-v2 flag; default-ON flip deferred to owner rollout]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-cd-dedupe-panel-mounts",
@@ -322,10 +323,11 @@
           "source": "UX review 2026-06-30 · CD-F2",
           "est": "M",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "Health, Performance, Strategy, Content Plan, Brand, and Plans each render both as a standalone tab AND as a slot inside Deep Dive/Settings, with the full prop list duplicated inline (HealthTab + actionPlanSlot repeated verbatim). Two routes reach identical content and can silently drift. Fix: define each panel once (a const or a registry keyed by tab id) and reference it wherever it appears; under the two-speed shell give each surface a single home (Health/Performance/Strategy live inside Deep Dive, not also top-level). Depends on design-cd-finish-ia-v2-nav. Artifact: ux-review-client-shell.html.",
-          "createdAt": "2026-06-30"
+          "notes": "Health, Performance, Strategy, Content Plan, Brand, and Plans each render both as a standalone tab AND as a slot inside Deep Dive/Settings, with the full prop list duplicated inline (HealthTab + actionPlanSlot repeated verbatim). Two routes reach identical content and can silently drift. Fix: define each panel once (a const or a registry keyed by tab id) and reference it wherever it appears; under the two-speed shell give each surface a single home (Health/Performance/Strategy live inside Deep Dive, not also top-level). Depends on design-cd-finish-ia-v2-nav. Artifact: ux-review-client-shell.html. [Wave 5: shipped behind client-ia-v2 flag; default-ON flip deferred to owner rollout]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-cd-notice-region",
@@ -333,10 +335,11 @@
           "source": "UX review 2026-06-30 · CD-F3",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "Above tab content sit up to three stacked notices: trial-countdown (or trial-ended) banner, a section-errors InlineBanner, and a per-tab SeoEducationTip — the same 'wall before the work' as CP-F3. Fix: one notice region with priority order (errors > trial > education tip) showing at most one at a time / docked compactly; the education tip yields to a real error. Reuse the CP-F3 consolidation pattern. Artifact: ux-review-client-shell.html.",
-          "createdAt": "2026-06-30"
+          "notes": "Above tab content sit up to three stacked notices: trial-countdown (or trial-ended) banner, a section-errors InlineBanner, and a per-tab SeoEducationTip — the same 'wall before the work' as CP-F3. Fix: one notice region with priority order (errors > trial > education tip) showing at most one at a time / docked compactly; the education tip yields to a real error. Reuse the CP-F3 consolidation pattern. Artifact: ux-review-client-shell.html. [Wave 5: shipped behind client-ia-v2 flag; default-ON flip deferred to owner rollout]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-cd-pageheader-title-echo",
@@ -344,10 +347,11 @@
           "source": "UX review 2026-06-30 · CD-F4",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "Every tab renders a PageHeader whose title is just the active tab's label (click Health -> page says Health); the nav already shows location, so the H1 echoes it without adding info — only the subtitle carries something new. Fix: drop the redundant title echo (let subtitle + content carry the page) or make the header earn its space (verdict line, freshness stamp, the tab's primary action). Artifact: ux-review-client-shell.html.",
-          "createdAt": "2026-06-30"
+          "notes": "Every tab renders a PageHeader whose title is just the active tab's label (click Health -> page says Health); the nav already shows location, so the H1 echoes it without adding info — only the subtitle carries something new. Fix: drop the redundant title echo (let subtitle + content carry the page) or make the header earn its space (verdict line, freshness stamp, the tab's primary action). Artifact: ux-review-client-shell.html. [Wave 5: shipped behind client-ia-v2 flag; default-ON flip deferred to owner rollout]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-cd-trial-banner-tokens",
