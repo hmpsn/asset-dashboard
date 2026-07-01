@@ -1,6 +1,6 @@
 // tests/component/WorkspaceHome.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { WorkspaceHome } from '../../src/components/WorkspaceHome';
@@ -38,11 +38,8 @@ vi.mock('../../src/components/workspace-home', () => ({
   WeeklyAccomplishments: () => <div data-testid="weekly-accomplishments" />,
 }));
 
-vi.mock('../../src/components/admin/WorkspaceHealthBadge', () => ({
-  WorkspaceHealthBadge: ({ score }: { score: number }) => (
-    <div data-testid="workspace-health-badge">{score}</div>
-  ),
-}));
+// WorkspaceHealthBadge was removed from WorkspaceHome in T2.2 (design-cleanup Wave 2).
+// The Site Health StatCard + MetricRing is now the single canonical health representation.
 
 vi.mock('../../src/components/client/useCart', () => ({
   CartProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -230,7 +227,9 @@ describe('WorkspaceHome', () => {
 
   it('shows tab bar with Overview and Meeting Brief tabs', () => {
     renderWorkspaceHome();
-    expect(screen.getByText('Overview')).toBeInTheDocument();
+    // Wave 2: two TabBars rendered (HOME_TABS + SECTION_TABS), both have "Overview" — use getAllByText
+    const overviewTabs = screen.getAllByText('Overview');
+    expect(overviewTabs.length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Meeting Brief')).toBeInTheDocument();
   });
 
@@ -244,13 +243,19 @@ describe('WorkspaceHome', () => {
     expect(screen.getByText('Settings →')).toBeInTheDocument();
   });
 
-  it('shows activity feed sub-component', () => {
+  it('shows activity feed sub-component in the Activity tab', () => {
+    // FIX 3 (Wave 2): Activity Feed moved to Activity tab to de-dup from Overview tab
     renderWorkspaceHome();
+    const activityTab = screen.getByRole('tab', { name: /activity/i });
+    fireEvent.click(activityTab);
     expect(screen.getByTestId('activity-feed')).toBeInTheDocument();
   });
 
-  it('shows rankings snapshot sub-component', () => {
+  it('shows rankings snapshot sub-component in the Activity tab', () => {
+    // FIX 3 (Wave 2): Rankings Snapshot moved to Activity tab to de-dup from Overview tab
     renderWorkspaceHome();
+    const activityTab = screen.getByRole('tab', { name: /activity/i });
+    fireEvent.click(activityTab);
     expect(screen.getByTestId('rankings-snapshot')).toBeInTheDocument();
   });
 
@@ -259,13 +264,22 @@ describe('WorkspaceHome', () => {
     expect(screen.getByTestId('anomaly-alerts')).toBeInTheDocument();
   });
 
-  it('shows setup suggestions action items when integrations are missing', () => {
+  it('shows setup suggestions in NeedsAttention when integrations are missing and checklist is dismissed', () => {
+    // Wave 2 (T2.1): setup items surface in NeedsAttention only when the checklist is dismissed.
+    // Simulate dismissed state so the component surfaces them in the attention list.
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+      if (String(key).includes('onboarding_checklist_dismissed')) return '1';
+      return null;
+    });
     renderWorkspaceHome({ webflowSiteId: undefined, gscPropertyUrl: undefined, ga4PropertyId: undefined });
-    // Setup suggestions accordion should include "Needs Attention"
-    expect(screen.getByText('Needs Attention')).toBeInTheDocument();
+    // NeedsAttention renders title as "Needs Attention · N" when showCount=true — use partial match
+    expect(screen.getByText(/Needs Attention/)).toBeInTheDocument();
   });
 
-  it('shows workspace health badge when intel data has composite health score', async () => {
+  // T2.2 (design-cleanup Wave 2): WorkspaceHealthBadge was removed. Health is now
+  // represented solely by the Site Health StatCard + MetricRing. The compositeHealthScore
+  // from intel no longer drives a separate badge on this screen.
+  it('does not render a workspace-health-badge element', async () => {
     const adminHooks = await getAdminHooks();
     vi.mocked(adminHooks.useWorkspaceIntelligence).mockReturnValue({
       data: {
@@ -273,19 +287,12 @@ describe('WorkspaceHome', () => {
       },
     } as ReturnType<typeof adminHooks.useWorkspaceIntelligence>);
     renderWorkspaceHome();
-    expect(screen.getByTestId('workspace-health-badge')).toBeInTheDocument();
-    expect(screen.getByText('78')).toBeInTheDocument();
+    expect(screen.queryByTestId('workspace-health-badge')).not.toBeInTheDocument();
   });
 
-  it('shows "Overall Health" label next to health badge', async () => {
-    const adminHooks = await getAdminHooks();
-    vi.mocked(adminHooks.useWorkspaceIntelligence).mockReturnValue({
-      data: {
-        clientSignals: { compositeHealthScore: 78 },
-      },
-    } as ReturnType<typeof adminHooks.useWorkspaceIntelligence>);
+  it('shows "Site Health" stat card as the canonical health representation', () => {
     renderWorkspaceHome();
-    expect(screen.getByText('Overall Health')).toBeInTheDocument();
+    expect(screen.getByText('Site Health')).toBeInTheDocument();
   });
 
   it('shows weekly accomplishments when weekly summary is present', async () => {
