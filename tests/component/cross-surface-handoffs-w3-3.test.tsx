@@ -42,9 +42,11 @@ describe('WorkspaceHome: "N new client requests" action', () => {
       join(__dirname, '../../src/components/WorkspaceHome.tsx'),
       'utf8',
     ); // readFile-ok — static analysis of sender definition
-    // The new requests action must contain tab: 'requests' and queryString: 'tab=requests'
-    // These may be on the same line in any order after the push call
-    expect(src).toMatch(/tab:\s*'requests'.*queryString:\s*'tab=requests'/s);
+    // The new-requests attention item's href must encode ?tab=requests so the
+    // Requests sub-tab receiver fires (sender half of the two-halves contract).
+    // (Wave 2 moved this from a tab/queryString ActionItem shape to a NeedsAttention
+    // href; the ?tab=requests encoding is what matters and is preserved.)
+    expect(src).toMatch(/id: 'new-requests'[\s\S]*?tab=requests/);
   });
 });
 

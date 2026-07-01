@@ -2,14 +2,17 @@ import { useState, useEffect, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  Shield, Search, BarChart3, TrendingUp, TrendingDown, ArrowUpRight,
-  Loader2, Bell, FileText, AlertTriangle, ChevronDown,
+  Shield, Search, BarChart3, TrendingUp, TrendingDown,
+  Loader2, Bell, FileText, AlertTriangle,
   Globe, Clipboard, Flag, Clock, RefreshCw, Layers, DollarSign, Target,
 } from 'lucide-react';
-import { StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist, WorkspaceHealthBar, Icon, Button, ClickableRow, cn, LoadingState, ErrorState } from './ui';
+import {
+  StatCard, SectionCard, PageHeader, MetricRing, TabBar, OnboardingChecklist,
+  Icon, Button, cn, LoadingState, ErrorState,
+  NeedsAttention, type AttentionItem,
+} from './ui';
 import { FeatureFlag } from './ui/FeatureFlag';
-import { themeColor, CHART_SERIES_COLORS } from './ui/constants';
-import { WorkspaceHealthBadge } from './admin/WorkspaceHealthBadge';
+import { themeColor, CHART_SERIES_COLORS, scoreColor, scoreColorClass } from './ui/constants';
 import { BriefingReviewQueue } from './admin/BriefingReviewQueue';
 import { WorkOrderPanel } from './admin/WorkOrderPanel';
 import { AdminRecommendationQueue } from './admin/AdminRecommendationQueue';
@@ -54,7 +57,15 @@ const HOME_TABS = [
   { id: 'meeting-brief', label: 'Meeting Brief' },
 ];
 
+// Tabs for the lower operational sections (below the metric grid)
+const SECTION_TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'pipeline', label: 'Pipeline' },
+  { id: 'activity', label: 'Activity' },
+];
+
 type HomeTab = 'overview' | 'meeting-brief';
+type SectionTab = 'overview' | 'pipeline' | 'activity';
 
 export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, gscPropertyUrl, ga4PropertyId }: WorkspaceHomeProps) {
   const navigate = useNavigate();
@@ -77,13 +88,12 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const { data: roiData } = useAdminROI(workspaceId);
   const { data: intel } = useWorkspaceIntelligence(workspaceId, ['siteHealth', 'contentPipeline', 'clientSignals']);
   const [now, setNow] = useState(() => new Date());
-  const [showMoreActions, setShowMoreActions] = useState(false);
-  const [showSetupSuggestions, setShowSetupSuggestions] = useState(false);
   const [workOrderPanelOpen, setWorkOrderPanelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<HomeTab>(() => {
     const param = searchParams.get('tab');
     return param === 'meeting-brief' ? 'meeting-brief' : 'overview';
   });
+  const [activeSectionTab, setActiveSectionTab] = useState<SectionTab>('overview');
 
   const storageKey = `onboarding_checklist_dismissed_${workspaceId}`;
   // Must be before any conditional early return (Rules of Hooks).
@@ -164,13 +174,30 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     ? Math.round(((comparison.users.current - comparison.users.previous) / (comparison.users.previous || 1)) * 100)
     : null;
 
-  // Action items — priority: 1=critical, 2=important, 3=setup suggestions
-  type ActionItem = { label: string; sub: string; color: 'red' | 'amber' | 'teal' | 'emerald'; icon: typeof Bell; tab: string; priority: 1 | 2 | 3; queryString?: string; onClick?: () => void };
-  const actions: ActionItem[] = [];
-  if (newRequests.length > 0) actions.push({ label: `${newRequests.length} new client request${newRequests.length > 1 ? 's' : ''}`, sub: 'Review and respond', color: 'red', icon: Bell, tab: 'requests', queryString: 'tab=requests', priority: 1 });
-  // Open orders = any non-terminal order (NOT closed/cancelled). Includes `completed`
-  // so the operator can still reach the panel to reply or close out a fulfilled order
-  // once nothing else is pending — `completed` is the exact state you close FROM.
+  // T2.1 — "checklist active" = shown and not all steps complete.
+  // When the checklist is visible, setup tasks (priority 3) are OWNED by the
+  // OnboardingChecklist and must NOT appear in NeedsAttention or HealthBar.
+  // Once dismissed (or if the user has never triggered it because all are done),
+  // operational follow-ups can surface everywhere.
+  const checklistIsActive = checklistVisible;
+
+  // Operational action items — priority: 1=critical, 2=important.
+  // Setup tasks (connect Webflow / GSC / GA4) are EXCLUDED here when the
+  // checklist is still active — they live in OnboardingChecklist instead.
+  const attentionItems: AttentionItem[] = [];
+
+  if (newRequests.length > 0) attentionItems.push({
+    id: 'new-requests',
+    label: `${newRequests.length} new client request${newRequests.length > 1 ? 's' : ''}`,
+    sub: 'Review and respond',
+    severity: 'critical',
+    icon: Bell,
+    // ?tab=requests deep-links the admin Requests sub-tab (two-halves contract —
+    // App.tsx requestsSubTab receiver fires on the tab query). Must be preserved.
+    href: `${adminPath(workspaceId, 'requests')}?tab=requests`, // inbox-legacy-filter-literal-ok -- admin Requests page deep-link, not the client inbox filter
+  });
+
+  // Open orders = any non-terminal order (NOT closed/cancelled).
   const openOrders = workOrders.filter(o => o.status === 'pending' || o.status === 'in_progress' || o.status === 'completed');
   if (openOrders.length > 0) {
     const readyToClose = openOrders.filter(o => o.status === 'completed').length;
@@ -179,45 +206,109 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       ? `${awaiting} purchased fix${awaiting > 1 ? 'es' : ''} awaiting fulfillment`
       : `${readyToClose} completed order${readyToClose > 1 ? 's' : ''} ready to close out`;
     const sub = awaiting > 0 && readyToClose > 0
-      ? `${readyToClose} completed and ready to close out — open the conversation/close panel to fulfill, reply, and close out`
+      ? `${readyToClose} completed and ready to close out — open the conversation/close panel`
       : 'Open the conversation/close panel to fulfill, reply, and close out';
-    actions.push({ label, sub, color: 'teal', icon: Clipboard, tab: 'workspace-settings', priority: 2, onClick: () => setWorkOrderPanelOpen(true) });
+    attentionItems.push({
+      id: 'open-orders',
+      label,
+      sub,
+      severity: 'info',
+      icon: Clipboard,
+      onClick: () => setWorkOrderPanelOpen(true),
+    });
   }
+
   for (const signal of churnSignals) {
-    actions.push({
+    attentionItems.push({
+      id: `churn-${signal.id}`,
       label: signal.title,
       sub: signal.description,
-      color: signal.severity === 'critical' ? 'red' : 'amber',
+      severity: signal.severity === 'critical' ? 'critical' : 'warning',
       icon: Flag,
-      tab: 'workspace-settings',
-      priority: signal.severity === 'critical' ? 1 : 2,
     });
   }
+
   if (contentDecayData && (contentDecayData.critical > 0 || contentDecayData.warning > 0)) {
     const total = contentDecayData.critical + contentDecayData.warning;
-    actions.push({
+    attentionItems.push({
+      id: 'content-decay',
       label: `${total} page${total > 1 ? 's' : ''} losing search traffic`,
-      sub: contentDecayData.critical > 0 ? `${contentDecayData.critical} critical · ${contentDecayData.warning} at risk — refresh content` : `${contentDecayData.warning} pages declining in clicks`,
-      color: contentDecayData.critical > 0 ? 'red' : 'amber',
+      sub: contentDecayData.critical > 0
+        ? `${contentDecayData.critical} critical · ${contentDecayData.warning} at risk — refresh content`
+        : `${contentDecayData.warning} pages declining in clicks`,
+      severity: contentDecayData.critical > 0 ? 'critical' : 'warning',
       icon: TrendingDown,
-      tab: 'seo-audit',
-      queryString: 'sub=content-decay',
-      priority: contentDecayData.critical > 0 ? 1 : 2,
+      href: `${adminPath(workspaceId, 'seo-audit')}?sub=content-decay`,
     });
   }
-  if (pendingContent.length > 0) actions.push({ label: `${pendingContent.length} content brief${pendingContent.length > 1 ? 's' : ''} awaiting review`, sub: 'Approve or edit briefs', color: 'amber', icon: FileText, tab: 'content-pipeline', priority: 2 });
-  if (audit && audit.errors > 0) actions.push({ label: `${audit.errors} SEO error${audit.errors > 1 ? 's' : ''} found in audit`, sub: `${audit.warnings} warnings · Score ${audit.siteScore}`, color: audit.errors > 5 ? 'red' : 'amber', icon: AlertTriangle, tab: 'seo-audit', priority: 2 });
-  if (rankDown > 3) actions.push({ label: `${rankDown} keywords dropped in position`, sub: `${rankUp} improved`, color: 'amber', icon: TrendingDown, tab: ranksTab, priority: 2 });
-  if (contentPipeline && contentPipeline.reviewCells > 0) actions.push({ label: `${contentPipeline.reviewCells} content plan page${contentPipeline.reviewCells > 1 ? 's' : ''} need${contentPipeline.reviewCells === 1 ? 's' : ''} review`, sub: 'Client flagged or awaiting approval', color: 'teal', icon: Layers, tab: 'content-pipeline', priority: 2 });
-  if (!webflowSiteId) actions.push({ label: 'No Webflow site linked', sub: 'Link a site to enable SEO tools', color: 'amber', icon: Globe, tab: 'workspace-settings', priority: 3 });
-  if (!gscPropertyUrl) actions.push({ label: 'Google Search Console not connected', sub: 'Connect GSC for search data', color: 'amber', icon: Search, tab: 'workspace-settings', priority: 3 });
-  if (!ga4PropertyId) actions.push({ label: 'Google Analytics not connected', sub: 'Connect GA4 for traffic data', color: 'amber', icon: BarChart3, tab: 'workspace-settings', priority: 3 });
 
-  // Sort by priority and separate setup items from urgent
-  actions.sort((a, b) => a.priority - b.priority);
-  const setupActions = actions.filter(a => a.priority === 3);
-  const urgentActions = actions.filter(a => a.priority < 3);
-  const hasP1 = urgentActions.some(a => a.priority === 1);
+  if (pendingContent.length > 0) attentionItems.push({
+    id: 'pending-content',
+    label: `${pendingContent.length} content brief${pendingContent.length > 1 ? 's' : ''} awaiting review`,
+    sub: 'Approve or edit briefs',
+    severity: 'warning',
+    icon: FileText,
+    href: adminPath(workspaceId, 'content-pipeline'),
+  });
+
+  if (audit && audit.errors > 0) attentionItems.push({
+    id: 'seo-errors',
+    label: `${audit.errors} SEO error${audit.errors > 1 ? 's' : ''} found in audit`,
+    sub: `${audit.warnings} warnings · Score ${audit.siteScore}`,
+    severity: audit.errors > 5 ? 'critical' : 'warning',
+    icon: AlertTriangle,
+    href: adminPath(workspaceId, 'seo-audit'),
+  });
+
+  if (rankDown > 3) attentionItems.push({
+    id: 'rank-drops',
+    label: `${rankDown} keywords dropped in position`,
+    sub: `${rankUp} improved`,
+    severity: 'warning',
+    icon: TrendingDown,
+    href: adminPath(workspaceId, ranksTab),
+  });
+
+  if (contentPipeline && contentPipeline.reviewCells > 0) attentionItems.push({
+    id: 'pipeline-review',
+    label: `${contentPipeline.reviewCells} content plan page${contentPipeline.reviewCells > 1 ? 's' : ''} need${contentPipeline.reviewCells === 1 ? 's' : ''} review`,
+    sub: 'Client flagged or awaiting approval',
+    severity: 'info',
+    icon: Layers,
+    href: adminPath(workspaceId, 'content-pipeline'),
+  });
+
+  // T2.1 — setup items appear ONLY when checklist is not active
+  if (!checklistIsActive) {
+    if (!webflowSiteId) attentionItems.push({
+      id: 'setup-webflow',
+      label: 'No Webflow site linked',
+      sub: 'Link a site to enable SEO tools',
+      severity: 'warning',
+      icon: Globe,
+      href: adminPath(workspaceId, 'workspace-settings'),
+    });
+    if (!gscPropertyUrl) attentionItems.push({
+      id: 'setup-gsc',
+      label: 'Google Search Console not connected',
+      sub: 'Connect GSC for search data',
+      severity: 'warning',
+      icon: Search,
+      href: adminPath(workspaceId, 'workspace-settings'),
+    });
+    if (!ga4PropertyId) attentionItems.push({
+      id: 'setup-ga4',
+      label: 'Google Analytics not connected',
+      sub: 'Connect GA4 for traffic data',
+      severity: 'warning',
+      icon: BarChart3,
+      href: adminPath(workspaceId, 'workspace-settings'),
+    });
+  }
+
+  // Sort: critical first, then warning, then info
+  const severityOrder = { critical: 0, warning: 1, info: 2 };
+  attentionItems.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
 
   // Data freshness
   const ageMs = lastFetched ? now.getTime() - lastFetched.getTime() : 0;
@@ -261,34 +352,9 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
     },
   ];
 
-  // ── Workspace Health Bar ──
-  const healthMetrics = [
-    {
-      label: 'SEO Audit',
-      percent: audit?.siteScore ?? 0,
-      onClick: () => navigate(adminPath(workspaceId, 'seo-audit')),
-    },
-    {
-      label: 'Setup',
-      percent: Math.round(([!!webflowSiteId, !!gscPropertyUrl, !!ga4PropertyId].filter(Boolean).length / 3) * 100),
-      onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')),
-    },
-    ...(contentPipeline && contentPipeline.totalCells > 0 ? [{
-      label: 'Content',
-      percent: Math.round((contentPipeline.publishedCells / contentPipeline.totalCells) * 100),
-      onClick: () => navigate(adminPath(workspaceId, 'content-pipeline')),
-    }] : []),
-  ];
-
-  const healthRecommendations = [
-    ...(!webflowSiteId ? [{ label: 'Link your Webflow site', onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')), estimatedTime: '2 min' }] : []),
-    ...(!gscPropertyUrl ? [{ label: 'Connect Google Search Console', onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')), estimatedTime: '3 min' }] : []),
-    ...(!ga4PropertyId ? [{ label: 'Connect Google Analytics', onClick: () => navigate(adminPath(workspaceId, 'workspace-settings')), estimatedTime: '3 min' }] : []),
-    ...(audit && audit.siteScore < 60 ? [{ label: `Fix ${audit.errors} SEO errors`, onClick: () => navigate(adminPath(workspaceId, 'seo-audit')), estimatedTime: '30 min' }] : []),
-  ].slice(0, 3);
-
   return (
     <div className="space-y-8">
+      {/* T2.1 / T2.4 — OnboardingChecklist is the first section and OWNS setup tasks */}
       {checklistVisible && !loading && (
         <OnboardingChecklist
           steps={onboardingSteps}
@@ -304,6 +370,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
           }}
         />
       )}
+
       <PageHeader
         title={workspaceName}
         subtitle={webflowSiteName || 'Workspace Dashboard'}
@@ -339,18 +406,15 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
         }
       />
 
-      {intel?.clientSignals?.compositeHealthScore != null && (
-        <div className="flex items-center gap-2">
-          <WorkspaceHealthBadge score={intel.clientSignals.compositeHealthScore} />
-          <span className="t-caption text-[var(--brand-text-muted)]">Overall Health</span>
-        </div>
-      )}
+      {/* T2.2 — WorkspaceHealthBadge REMOVED. Site Health StatCard + MetricRing
+          is the single canonical health representation on this screen. */}
 
       <TabBar
         tabs={HOME_TABS}
         active={activeTab}
         onChange={handleTabChange}
         className="mb-2"
+        ariaLabel="Workspace view"
       />
 
       {activeTab === 'meeting-brief' ? (
@@ -364,261 +428,242 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       {/* ── Weekly Accomplishments ── */}
       {weeklySummary && <WeeklyAccomplishments summary={weeklySummary} />}
 
-      {/* ── Metric Cards ── */}
-      <div className={`grid grid-cols-2 ${contentPipeline && contentPipeline.totalCells > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}>
-        {audit ? (
-          <StatCard
-            label="Site Health"
-            value={audit.siteScore}
-            icon={Shield}
-            iconColor={themeColor('#71717a', '#94a3b8')}
-            delta={scoreDelta ?? undefined}
-            deltaLabel=" pts"
-            showZeroDelta
-            sub={`${audit.errors} err · ${audit.warnings} warn`}
-            trailing={<MetricRing score={audit.siteScore} size={44} />}
-            onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))}
-            size="hero"
-            staggerIndex={0}
-          />
-        ) : (
-          <StatCard
-            label="Site Health"
-            value="—"
-            icon={Shield}
-            iconColor={themeColor('#71717a', '#94a3b8')}
-            valueColor="text-[var(--brand-text-muted)]"
-            sub="No audit yet"
-            trailing={<MetricRing score={0} size={44} noAnimation />}
-            size="hero"
-            staggerIndex={0}
-          />
-        )}
-
-        {searchData ? (
-          <StatCard
-            label="Search Clicks"
-            value={fmt(searchData.totalClicks)}
-            icon={Search}
-            iconColor={CHART_SERIES_COLORS.cyan}
-            sub={`${fmt(searchData.totalImpressions)} impr · ${(searchData.avgCtr * 100).toFixed(1)}% CTR`}
-            onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))}
-            size="hero"
-            staggerIndex={1}
-          />
-        ) : (
-          <StatCard label="Search Clicks" value="—" icon={Search} iconColor={themeColor('#71717a', '#94a3b8')} sub={gscPropertyUrl ? 'Loading...' : 'Connect GSC'} size="hero" staggerIndex={1} />
-        )}
-
-        {ga4Data ? (
-          <StatCard
-            label="Users"
-            value={fmt(ga4Data.totalUsers)}
-            icon={BarChart3}
-            iconColor={CHART_SERIES_COLORS.blue}
-            delta={usersDelta ?? undefined}
-            deltaLabel="%"
-            sub={`${fmt(ga4Data.totalSessions)} sessions · ${ga4Data.newUserPercentage}% new`}
-            onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))}
-            size="hero"
-            staggerIndex={2}
-          />
-        ) : (
-          <StatCard label="Users" value="—" icon={BarChart3} iconColor={themeColor('#71717a', '#94a3b8')} sub={ga4PropertyId ? 'Loading...' : 'Connect GA4'} size="hero" staggerIndex={2} />
-        )}
-
-        <StatCard
-          label="Rank Changes"
-          value={ranks.length > 0 ? `${ranks.length} tracked` : '—'}
-          icon={TrendingUp}
-          iconColor={rankUp > rankDown ? CHART_SERIES_COLORS.emerald : rankDown > rankUp ? CHART_SERIES_COLORS.red : themeColor('#71717a', '#94a3b8')}
-          sub={ranks.length > 0 ? `${rankUp} ↑ · ${rankDown} ↓ · ${ranks.length - rankUp - rankDown} =` : 'No keywords tracked'}
-          onClick={ranks.length > 0 ? () => navigate(adminPath(workspaceId, ranksTab)) : undefined}
-          size="hero"
-          staggerIndex={3}
-        />
-
-        {roiData && (
-          <StatCard
-            label="Traffic Value"
-            value={`$${fmt(roiData.organicTrafficValue)}`}
-            icon={DollarSign}
-            iconColor={CHART_SERIES_COLORS.emerald}
-            sub={`≈ $${fmt(roiData.adSpendEquivalent)} ad spend`}
-            onClick={() => navigate(clientPath(workspaceId, 'roi'))}
-            size="hero"
-            staggerIndex={4}
-          />
-        )}
-
-        {contentDecayData && contentDecayData.totalDecaying > 0 && (
-          <StatCard
-            label="Content Decay"
-            value={contentDecayData.totalDecaying}
-            icon={TrendingDown}
-            iconColor={contentDecayData.critical > 0 ? CHART_SERIES_COLORS.red : CHART_SERIES_COLORS.amber}
-            sub={contentDecayData.critical > 0 ? `${contentDecayData.critical} critical · ${contentDecayData.warning} at risk` : `${contentDecayData.warning} pages declining`}
-            onClick={() => navigate(`${adminPath(workspaceId, 'seo-audit')}?sub=content-decay`)}
-            size="hero"
-            staggerIndex={5}
-          />
-        )}
-
-        {contentPipeline && contentPipeline.totalCells > 0 && (() => {
-          const pct = Math.round((contentPipeline.publishedCells / contentPipeline.totalCells) * 100);
-          return (
-            <StatCard
-              label="Content Pipeline"
-              value={`${pct}%`}
-              icon={Layers}
-              iconColor={themeColor('#71717a', '#94a3b8')}
-              sub={`${contentPipeline.publishedCells}/${contentPipeline.totalCells} published`}
-              onClick={() => navigate(adminPath(workspaceId, 'content-pipeline'))}
-              size="hero"
-              staggerIndex={6}
-            />
-          );
-        })()}
-
-        {contentVelocity && (
-          <StatCard
-            label="Content Velocity"
-            value={`${contentVelocity.trailingThreeMonthAvg}/mo`}
-            icon={FileText}
-            iconColor={CHART_SERIES_COLORS.cyan}
-            delta={contentVelocity.trendPct ?? undefined}
-            deltaLabel="%"
-            sub={`${contentVelocity.currentMonthPublished} this month`}
-            onClick={() => navigate(adminPath(workspaceId, 'content'))}
-            size="hero"
-            staggerIndex={7}
-          />
-        )}
-
-        {intel?.contentPipeline?.coverageGaps && intel.contentPipeline.coverageGaps.length > 0 && (
-          <StatCard
-            label="Coverage Gaps"
-            value={intel.contentPipeline.coverageGaps.length}
-            icon={Target}
-            iconColor={CHART_SERIES_COLORS.amber}
-            sub={`Strategy keywords without briefs`}
-            onClick={() => navigate(adminPath(workspaceId, 'seo-strategy'))}
-            size="hero"
-            staggerIndex={8}
-          />
-        )}
-      </div>
-
-      {/* ── Workspace Health Bar ── */}
-      {activeTab === 'overview' && healthMetrics.length > 0 && (
-        <WorkspaceHealthBar
-          metrics={healthMetrics}
-          recommendations={healthRecommendations.length > 0 ? healthRecommendations : undefined}
+      {/* T2.4 — Needs Attention: immediately after onboarding, before metrics */}
+      {attentionItems.length > 0 && (
+        <NeedsAttention
+          items={attentionItems}
+          showCount
+          cap={5}
         />
       )}
 
-      {/* ── Needs Attention ── */}
-      {(urgentActions.length > 0 || setupActions.length > 0) && (() => {
-        const colorMap = { red: 'text-accent-danger', amber: 'text-accent-warning', teal: 'text-accent-brand', emerald: 'text-accent-success' };
-        const visibleUrgent = showMoreActions ? urgentActions : urgentActions.slice(0, 5);
-        const hiddenCount = urgentActions.length - visibleUrgent.length;
-        return (
-          <SectionCard title="Needs Attention" titleIcon={<Icon as={AlertTriangle} size="md" className="text-accent-warning" />} noPadding>
-            <div className="divide-y divide-[var(--brand-border)]">
-              {visibleUrgent.map((item, i) => {
-                const ItemIcon = item.icon;
-                return (
-                  <ClickableRow
-                    key={i}
-                    onClick={() => item.onClick ? item.onClick() : navigate(adminPath(workspaceId, item.tab as Page) + (item.queryString ? `?${item.queryString}` : ''))}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)]"
-                  >
-                    <ItemIcon className={cn('w-4 h-4 flex-shrink-0', colorMap[item.color])} />
-                    <div className="flex-1 min-w-0">
-                      <div className="t-caption font-medium text-[var(--brand-text-bright)]">{item.label}</div>
-                      <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{item.sub}</div>
-                    </div>
-                    <Icon as={ArrowUpRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
-                  </ClickableRow>
-                );
-              })}
-              {hiddenCount > 0 && (
-                <ClickableRow
-                  onClick={() => setShowMoreActions(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--surface-3)]"
-                >
-                  <Icon as={ChevronDown} size="sm" className="text-[var(--brand-text-muted)]" />
-                  <span className="t-caption-sm text-[var(--brand-text-muted)]">{hiddenCount} more item{hiddenCount > 1 ? 's' : ''}</span>
-                </ClickableRow>
-              )}
-              {setupActions.length > 0 && !hasP1 && (
-                <>
-                  <ClickableRow
-                    onClick={() => setShowSetupSuggestions(s => !s)}
-                    className="flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--surface-3)]"
-                  >
-                    <Icon as={ChevronDown} size="sm" className={cn('text-[var(--brand-text-muted)] transition-transform', showSetupSuggestions ? 'rotate-180' : '')} />
-                    <span className="t-caption-sm text-[var(--brand-text-muted)]">{setupActions.length} setup suggestion{setupActions.length > 1 ? 's' : ''}</span>
-                  </ClickableRow>
-                  {showSetupSuggestions && setupActions.map((item, i) => {
-                    const ItemIcon = item.icon;
-                    return (
-                      <ClickableRow
-                        key={`setup-${i}`}
-                        onClick={() => item.onClick ? item.onClick() : navigate(adminPath(workspaceId, item.tab as Page) + (item.queryString ? `?${item.queryString}` : ''))}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-3)] opacity-60"
-                      >
-                        <ItemIcon className={cn('w-4 h-4 flex-shrink-0', colorMap[item.color])} />
-                        <div className="flex-1 min-w-0">
-                          <div className="t-caption font-medium text-[var(--brand-text-bright)]">{item.label}</div>
-                          <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{item.sub}</div>
-                        </div>
-                        <Icon as={ArrowUpRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
-                      </ClickableRow>
-                    );
-                  })}
-                </>
-              )}
-            </div>
-          </SectionCard>
-        );
-      })()}
+      {/* ── Metric Cards (T2.3) ──
+          Hero tier (≤3): Site Health · Search Clicks · Traffic Value
+          Default tier: everything else, in a compact secondary rail */}
+      <div>
+        {/* Primary hero row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+          {audit ? (
+            <StatCard
+              label="Site Health"
+              value={audit.siteScore}
+              icon={Shield}
+              iconColor={themeColor('#71717a', '#94a3b8')}
+              delta={scoreDelta ?? undefined}
+              deltaLabel=" pts"
+              showZeroDelta
+              sub={`${audit.errors} err · ${audit.warnings} warn`}
+              trailing={<MetricRing score={audit.siteScore} size={44} />}
+              onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))}
+              size="hero"
+              staggerIndex={0}
+            />
+          ) : (
+            <StatCard
+              label="Site Health"
+              value="—"
+              icon={Shield}
+              iconColor={themeColor('#71717a', '#94a3b8')}
+              valueColor="text-[var(--brand-text-muted)]"
+              sub="No audit yet"
+              trailing={<MetricRing score={0} size={44} noAnimation />}
+              size="hero"
+              staggerIndex={0}
+            />
+          )}
+
+          {searchData ? (
+            <StatCard
+              label="Search Clicks"
+              value={fmt(searchData.totalClicks)}
+              icon={Search}
+              iconColor={CHART_SERIES_COLORS.cyan}
+              sub={`${fmt(searchData.totalImpressions)} impr · ${(searchData.avgCtr * 100).toFixed(1)}% CTR`}
+              onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))}
+              size="hero"
+              staggerIndex={1}
+            />
+          ) : (
+            <StatCard label="Search Clicks" value="—" icon={Search} iconColor={themeColor('#71717a', '#94a3b8')} sub={gscPropertyUrl ? 'Loading...' : 'Connect GSC'} size="hero" staggerIndex={1} />
+          )}
+
+          {roiData ? (
+            <StatCard
+              label="Traffic Value"
+              value={`$${fmt(roiData.organicTrafficValue)}`}
+              icon={DollarSign}
+              iconColor={CHART_SERIES_COLORS.emerald}
+              sub={`≈ $${fmt(roiData.adSpendEquivalent)} ad spend`}
+              onClick={() => navigate(clientPath(workspaceId, 'roi'))}
+              size="hero"
+              staggerIndex={2}
+            />
+          ) : (
+            <StatCard label="Traffic Value" value="—" icon={DollarSign} iconColor={themeColor('#71717a', '#94a3b8')} sub="No ROI data yet" size="hero" staggerIndex={2} />
+          )}
+        </div>
+
+        {/* Secondary supporting rail — size="default" */}
+        <div className={cn(
+          'grid gap-2',
+          // Dynamic columns based on how many secondary cards exist
+          'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6',
+        )}>
+          {ga4Data ? (
+            <StatCard
+              label="Users"
+              value={fmt(ga4Data.totalUsers)}
+              icon={BarChart3}
+              iconColor={CHART_SERIES_COLORS.blue}
+              delta={usersDelta ?? undefined}
+              deltaLabel="%"
+              sub={`${fmt(ga4Data.totalSessions)} sessions · ${ga4Data.newUserPercentage}% new`}
+              onClick={() => navigate(adminPath(workspaceId, 'analytics-hub'))}
+              size="default"
+              staggerIndex={3}
+            />
+          ) : (
+            <StatCard label="Users" value="—" icon={BarChart3} iconColor={themeColor('#71717a', '#94a3b8')} sub={ga4PropertyId ? 'Loading...' : 'Connect GA4'} size="default" staggerIndex={3} />
+          )}
+
+          <StatCard
+            label="Rank Changes"
+            value={ranks.length > 0 ? `${ranks.length} tracked` : '—'}
+            icon={TrendingUp}
+            iconColor={rankUp > rankDown ? CHART_SERIES_COLORS.emerald : rankDown > rankUp ? CHART_SERIES_COLORS.red : themeColor('#71717a', '#94a3b8')}
+            sub={ranks.length > 0 ? `${rankUp} ↑ · ${rankDown} ↓ · ${ranks.length - rankUp - rankDown} =` : 'No keywords tracked'}
+            onClick={ranks.length > 0 ? () => navigate(adminPath(workspaceId, ranksTab)) : undefined}
+            size="default"
+            staggerIndex={4}
+          />
+
+          {contentDecayData && contentDecayData.totalDecaying > 0 && (
+            <StatCard
+              label="Content Decay"
+              value={contentDecayData.totalDecaying}
+              icon={TrendingDown}
+              iconColor={contentDecayData.critical > 0 ? CHART_SERIES_COLORS.red : CHART_SERIES_COLORS.amber}
+              sub={contentDecayData.critical > 0 ? `${contentDecayData.critical} crit · ${contentDecayData.warning} risk` : `${contentDecayData.warning} declining`}
+              onClick={() => navigate(`${adminPath(workspaceId, 'seo-audit')}?sub=content-decay`)}
+              size="default"
+              staggerIndex={5}
+            />
+          )}
+
+          {contentPipeline && contentPipeline.totalCells > 0 && (() => {
+            const pct = Math.round((contentPipeline.publishedCells / contentPipeline.totalCells) * 100);
+            return (
+              <StatCard
+                label="Content Pipeline"
+                value={`${pct}%`}
+                icon={Layers}
+                iconColor={themeColor('#71717a', '#94a3b8')}
+                sub={`${contentPipeline.publishedCells}/${contentPipeline.totalCells} pub`}
+                onClick={() => navigate(adminPath(workspaceId, 'content-pipeline'))}
+                size="default"
+                staggerIndex={6}
+              />
+            );
+          })()}
+
+          {contentVelocity && (
+            <StatCard
+              label="Content Velocity"
+              value={`${contentVelocity.trailingThreeMonthAvg}/mo`}
+              icon={FileText}
+              iconColor={CHART_SERIES_COLORS.cyan}
+              delta={contentVelocity.trendPct ?? undefined}
+              deltaLabel="%"
+              sub={`${contentVelocity.currentMonthPublished} this month`}
+              onClick={() => navigate(adminPath(workspaceId, 'content'))}
+              size="default"
+              staggerIndex={7}
+            />
+          )}
+
+          {intel?.contentPipeline?.coverageGaps && intel.contentPipeline.coverageGaps.length > 0 && (
+            <StatCard
+              label="Coverage Gaps"
+              value={intel.contentPipeline.coverageGaps.length}
+              icon={Target}
+              iconColor={CHART_SERIES_COLORS.amber}
+              sub="Without briefs"
+              onClick={() => navigate(adminPath(workspaceId, 'seo-strategy'))}
+              size="default"
+              staggerIndex={8}
+            />
+          )}
+
+          {/* T2.2 — Overall Health: composite client-signals score (distinct from audit.siteScore) */}
+          {intel?.clientSignals?.compositeHealthScore != null && (
+            <StatCard
+              label="Overall Health"
+              value={Math.round(intel.clientSignals.compositeHealthScore)}
+              icon={Shield}
+              iconColor={scoreColor(Math.round(intel.clientSignals.compositeHealthScore))}
+              valueColor={scoreColorClass(Math.round(intel.clientSignals.compositeHealthScore))}
+              sub="Client signals score"
+              size="default"
+              staggerIndex={9}
+            />
+          )}
+        </div>
+      </div>
 
       {/* ── Anomaly Alerts ── */}
       <AnomalyAlerts workspaceId={workspaceId} isAdmin={true} />
 
-      {/* ── Weekly Briefings (admin review queue, dark-launched behind client-briefing-v2) ── */}
-      <FeatureFlag flag="client-briefing-v2">
-        <ErrorBoundary label="Briefing Review Queue">
-          <BriefingReviewQueue workspaceId={workspaceId} />
-        </ErrorBoundary>
-      </FeatureFlag>
+      {/* T2.4 — Operational sections grouped in a TabBar to avoid a 10-section scroll */}
+      <TabBar
+        tabs={SECTION_TABS}
+        active={activeSectionTab}
+        onChange={(id) => setActiveSectionTab(id as SectionTab)}
+        ariaLabel="Workspace sections"
+      />
 
-      {/* ── SEO Pipeline (Work Status + Change Tracker) ── */}
-      {seoStatus.total > 0 ? (
-        <SectionCard title="SEO Pipeline" titleIcon={<Icon as={Layers} size="md" className="text-accent-brand" />} noPadding>
-          <SeoWorkStatus seoStatus={seoStatus} workspaceId={workspaceId} embedded />
-          <SeoChangeImpact workspaceId={workspaceId} hasGsc={!!gscPropertyUrl} embedded />
-        </SectionCard>
-      ) : (
-        <SeoChangeImpact workspaceId={workspaceId} hasGsc={!!gscPropertyUrl} />
+      {activeSectionTab === 'overview' && (
+        <>
+          {/* ── Weekly Briefings ── */}
+          <FeatureFlag flag="client-briefing-v2">
+            <ErrorBoundary label="Briefing Review Queue">
+              <BriefingReviewQueue workspaceId={workspaceId} />
+            </ErrorBoundary>
+          </FeatureFlag>
+
+          {/* ── Recommendations queue ── */}
+          {workspaceId && (
+            <ErrorBoundary label="Recommendations">
+              <AdminRecommendationQueue workspaceId={workspaceId} />
+            </ErrorBoundary>
+          )}
+        </>
       )}
 
-      {/* ── Recommendations queue (admin surface — full queue, dismissed view, OV breakdown) ── */}
-      {workspaceId && (
-        <ErrorBoundary label="Recommendations">
-          <AdminRecommendationQueue workspaceId={workspaceId} />
-        </ErrorBoundary>
+      {activeSectionTab === 'pipeline' && (
+        <>
+          {/* ── SEO Pipeline (Work Status + Change Tracker) ── */}
+          {seoStatus.total > 0 ? (
+            <SectionCard title="SEO Pipeline" titleIcon={<Icon as={Layers} size="md" className="text-accent-brand" />} noPadding>
+              <SeoWorkStatus seoStatus={seoStatus} workspaceId={workspaceId} embedded />
+              <SeoChangeImpact workspaceId={workspaceId} hasGsc={!!gscPropertyUrl} embedded />
+            </SectionCard>
+          ) : (
+            <SeoChangeImpact workspaceId={workspaceId} hasGsc={!!gscPropertyUrl} />
+          )}
+        </>
       )}
 
-      {/* ── Two-column: Activity + Rankings ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        <ActivityFeed activity={activity} className="lg:col-span-3" />
-        <RankingsSnapshot ranks={ranks} gscPropertyUrl={gscPropertyUrl} workspaceId={workspaceId} className="lg:col-span-2" />
-      </div>
-
-      {/* ── Active Requests + Annotations ── */}
-      <ActiveRequestsAnnotations requests={activeRequests} annotations={annotations} workspaceId={workspaceId} />
+      {activeSectionTab === 'activity' && (
+        <>
+          {/* ── Two-column: Activity + Rankings ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            <ActivityFeed activity={activity} className="lg:col-span-3" />
+            <RankingsSnapshot ranks={ranks} gscPropertyUrl={gscPropertyUrl} workspaceId={workspaceId} className="lg:col-span-2" />
+          </div>
+          {/* ── Active Requests + Annotations ── */}
+          <ActiveRequestsAnnotations requests={activeRequests} annotations={annotations} workspaceId={workspaceId} />
+        </>
+      )}
       </>
       )}
 

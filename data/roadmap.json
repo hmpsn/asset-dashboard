@@ -72,10 +72,11 @@
           "source": "UX review 2026-06-30 · F2 follow-on",
           "est": "M",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "WorkspaceHome (WH-F1) renders up to nine StatCards all at size=hero (Site Health, Search Clicks, Users, Rank Changes, Traffic Value, Content Decay, Content Pipeline, Content Velocity, Coverage Gaps) — a sharper version of CC-F2 where nine hero metrics means no hero. Fix: choose 2-3 hero metrics, demote the rest to a compact size=default secondary rail (still present, still deep-linked). Artifact: ux-review-workspace-home.html.",
-          "createdAt": "2026-06-30"
+          "notes": "WorkspaceHome (WH-F1) renders up to nine StatCards all at size=hero (Site Health, Search Clicks, Users, Rank Changes, Traffic Value, Content Decay, Content Pipeline, Content Velocity, Coverage Gaps) — a sharper version of CC-F2 where nine hero metrics means no hero. Fix: choose 2-3 hero metrics, demote the rest to a compact size=default secondary rail (still present, still deep-linked). Artifact: ux-review-workspace-home.html. [Wave 2: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-wh-health-four-ways",
@@ -83,10 +84,11 @@
           "source": "UX review 2026-06-30 · WH-F2",
           "est": "S",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "Site Health appears four times on one screen: WorkspaceHealthBadge (under header), the Site Health StatCard, the MetricRing trailing inside that card, and WorkspaceHealthBar. One number, four widgets. Fix: keep the StatCard + trailing MetricRing as the single canonical health block; drop the standalone badge; fold HealthBar's setup% into the onboarding consolidation (design-wh-setup-triplicated). Artifact: ux-review-workspace-home.html.",
-          "createdAt": "2026-06-30"
+          "notes": "Site Health appears four times on one screen: WorkspaceHealthBadge (under header), the Site Health StatCard, the MetricRing trailing inside that card, and WorkspaceHealthBar. One number, four widgets. Fix: keep the StatCard + trailing MetricRing as the single canonical health block; drop the standalone badge; fold HealthBar's setup% into the onboarding consolidation (design-wh-setup-triplicated). Artifact: ux-review-workspace-home.html. [Wave 2: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-wh-purple-on-data",
@@ -118,10 +120,11 @@
           "source": "UX review 2026-06-30 · WH-F4",
           "est": "M",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "Link Webflow / connect GSC / connect GA4 appears simultaneously in the OnboardingChecklist (top), WorkspaceHealthBar recommendations, and Needs Attention 'setup suggestions'. Same three tasks rendered three times for a half-configured workspace. Fix: give setup tasks one owner (OnboardingChecklist while unconfigured); once dismissed/complete, HealthBar + Needs Attention surface operational follow-ups only. Never render the same connect-task in two components at once. Artifact: ux-review-workspace-home.html.",
-          "createdAt": "2026-06-30"
+          "notes": "Link Webflow / connect GSC / connect GA4 appears simultaneously in the OnboardingChecklist (top), WorkspaceHealthBar recommendations, and Needs Attention 'setup suggestions'. Same three tasks rendered three times for a half-configured workspace. Fix: give setup tasks one owner (OnboardingChecklist while unconfigured); once dismissed/complete, HealthBar + Needs Attention surface operational follow-ups only. Never render the same connect-task in two components at once. Artifact: ux-review-workspace-home.html. [Wave 2: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-x-needs-attention-shared",
@@ -129,10 +132,11 @@
           "source": "UX review 2026-06-30 · WH-F5 (also CC)",
           "est": "M",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "owner": "design-system",
-          "notes": "Command Center and Workspace Home both render a 'Needs Attention' worklist but with different layouts: Command Center uses dot + Badge value + workspace name + chevron; Workspace Home uses colored icon + label + sub + ArrowUpRight plus a collapsible 'setup suggestions' sub-group. Same job, two visual languages. Fix: extract one AttentionRow / NeedsAttention component into the flow/ group with a single severity-color mapping and interaction; both screens consume it. Closes the divergence for good. Artifacts: ux-review-command-center.html (F3), ux-review-workspace-home.html (F5).",
-          "createdAt": "2026-06-30"
+          "notes": "Command Center and Workspace Home both render a 'Needs Attention' worklist but with different layouts: Command Center uses dot + Badge value + workspace name + chevron; Workspace Home uses colored icon + label + sub + ArrowUpRight plus a collapsible 'setup suggestions' sub-group. Same job, two visual languages. Fix: extract one AttentionRow / NeedsAttention component into the flow/ group with a single severity-color mapping and interaction; both screens consume it. Closes the divergence for good. Artifacts: ux-review-command-center.html (F3), ux-review-workspace-home.html (F5). [Wave 2: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-wh-worklist-order",
@@ -140,10 +144,11 @@
           "source": "UX review 2026-06-30 · WH-F6",
           "est": "M",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "~10 stacked full-width sections; the most actionable block (Needs Attention) lands below nine metric cards + the health bar, well under the fold. Fix: order as worklist (after onboarding for new workspaces) -> trimmed metric grid -> operational sections; consider grouping the lower half under the existing TabBar (Overview/Pipeline/Activity) so the default view isn't a ten-section scroll. Depends on design-wh-statcard-hierarchy + design-x-needs-attention-shared. Artifact: ux-review-workspace-home.html.",
-          "createdAt": "2026-06-30"
+          "notes": "~10 stacked full-width sections; the most actionable block (Needs Attention) lands below nine metric cards + the health bar, well under the fold. Fix: order as worklist (after onboarding for new workspaces) -> trimmed metric grid -> operational sections; consider grouping the lower half under the existing TabBar (Overview/Pipeline/Activity) so the default view isn't a ten-section scroll. Depends on design-wh-statcard-hierarchy + design-x-needs-attention-shared. Artifact: ux-review-workspace-home.html. [Wave 2: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-issue-plan-above-proof",
