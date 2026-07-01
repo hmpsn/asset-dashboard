@@ -156,10 +156,11 @@
           "source": "UX review 2026-06-30 · ISSUE-F1",
           "est": "S",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "On the spine branch the Content Plan (the only retainer action, 'Request this') sits at slot 5, beneath three stacked proof surfaces (verdict $, outcome count, money/ROI frame) plus the loop footer. A client convinced by the verdict may never scroll to act. Fix: keep verdict as the lead, then surface Content Plan directly under it (verdict -> plan -> proof), with outcome count + money + wins following. Strong A/B candidate on request-rate. Note: the flag-OFF branch already leads with the plan. Artifact: ux-review-client-issue.html.",
-          "createdAt": "2026-06-30"
+          "notes": "On the spine branch the Content Plan (the only retainer action, 'Request this') sits at slot 5, beneath three stacked proof surfaces (verdict $, outcome count, money/ROI frame) plus the loop footer. A client convinced by the verdict may never scroll to act. Fix: keep verdict as the lead, then surface Content Plan directly under it (verdict -> plan -> proof), with outcome count + money + wins following. Strong A/B candidate on request-rate. Note: the flag-OFF branch already leads with the plan. Artifact: ux-review-client-issue.html. [Wave 3: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-issue-roi-double-mount",
@@ -167,10 +168,11 @@
           "source": "UX review 2026-06-30 · ISSUE-F2",
           "est": "S",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "Slot 3 mounts <ROIDashboard compact /> and 'Under the hood' mounts <ROIDashboard compact={false} /> again — the same dollar story twice on one page (possible double fetch, 'which number is right?' confusion). Fix: render ROI once; keep the compact money frame at slot 3 and let 'Under the hood' hold only methodology/tables, or make the compact frame expand in place. Artifact: ux-review-client-issue.html.",
-          "createdAt": "2026-06-30"
+          "notes": "Slot 3 mounts <ROIDashboard compact /> and 'Under the hood' mounts <ROIDashboard compact={false} /> again — the same dollar story twice on one page (possible double fetch, 'which number is right?' confusion). Fix: render ROI once; keep the compact money frame at slot 3 and let 'Under the hood' hold only methodology/tables, or make the compact frame expand in place. Artifact: ux-review-client-issue.html. [Wave 3: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-issue-pending-surfaces",
@@ -178,10 +180,11 @@
           "source": "UX review 2026-06-30 · ISSUE-F3",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "ActionQueueStrip (slot 0, 'Your turn') and IssueLoopFooter (slot 4, 'the full pending-decisions queue/loop') are two pending-work surfaces bookending the page; a client may read the footer as new work. Fix: make the top strip the count/jump ('3 decisions waiting v') that anchors to the footer detail, sharing one visual language. Artifact: ux-review-client-issue.html.",
-          "createdAt": "2026-06-30"
+          "notes": "ActionQueueStrip (slot 0, 'Your turn') and IssueLoopFooter (slot 4, 'the full pending-decisions queue/loop') are two pending-work surfaces bookending the page; a client may read the footer as new work. Fix: make the top strip the count/jump ('3 decisions waiting v') that anchors to the footer detail, sharing one visual language. Artifact: ux-review-client-issue.html. [Wave 3: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-x-section-header",
@@ -256,10 +259,11 @@
           "source": "UX review 2026-06-30 · AC-F1",
           "est": "M",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "Send issue lives in IssueHeader at the top (canSend = stagedCount > 0), but the operator builds the staged set in the BackingMovesQueue near the bottom of the spine. Workflow becomes stage-at-bottom -> scroll-up-to-send, with the consuming button off-screen while staging. Fix: add a sticky send bar (or a Send affordance docked to BackingMovesQueue) that appears once stagedCount > 0, showing the staged count + Send from where staging happens; keep the header Send too. Artifact: ux-review-admin-cockpit.html.",
-          "createdAt": "2026-06-30"
+          "notes": "Send issue lives in IssueHeader at the top (canSend = stagedCount > 0), but the operator builds the staged set in the BackingMovesQueue near the bottom of the spine. Workflow becomes stage-at-bottom -> scroll-up-to-send, with the consuming button off-screen while staging. Fix: add a sticky send bar (or a Send affordance docked to BackingMovesQueue) that appears once stagedCount > 0, showing the staged count + Send from where staging happens; keep the header Send too. Artifact: ux-review-admin-cockpit.html. [Wave 3: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-x-disclosure-pattern",
@@ -267,10 +271,11 @@
           "source": "UX review 2026-06-30 · AC-F2 (mirrors client 'Under the hood')",
           "est": "M",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "owner": "design-system",
-          "notes": "The cockpit's 'Supporting detail' <details> holds eight unrelated surfaces (leads, keyword-targets link, content-work-order lens, trust ladder, orient, content gaps, cannibalization, strategy diff) behind one all-or-nothing toggle. The client TheIssueClientPage 'Under the hood' does the same (ring + full ROI + leads + competitors). Fix: split each into 2-3 labeled disclosures grouped by job, AND define a single Disclosure/collapsible-section pattern in the design system (consistent summary chrome + behavior + sub-grouping) consumed by both screens. Retires AC-F2 and the client under-the-hood catch-all. Artifact: ux-review-admin-cockpit.html.",
-          "createdAt": "2026-06-30"
+          "notes": "The cockpit's 'Supporting detail' <details> holds eight unrelated surfaces (leads, keyword-targets link, content-work-order lens, trust ladder, orient, content gaps, cannibalization, strategy diff) behind one all-or-nothing toggle. The client TheIssueClientPage 'Under the hood' does the same (ring + full ROI + leads + competitors). Fix: split each into 2-3 labeled disclosures grouped by job, AND define a single Disclosure/collapsible-section pattern in the design system (consistent summary chrome + behavior + sub-grouping) consumed by both screens. Retires AC-F2 and the client under-the-hood catch-all. Artifact: ux-review-admin-cockpit.html. [Wave 3: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-ac-staleness-tokens",
@@ -290,10 +295,11 @@
           "source": "UX review 2026-06-30 · AC-F4",
           "est": "S",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "A right-aligned 'Add a recommendation' button sits on its own line between the Drafted POV editor and the BackingMovesQueue — an orphan action floating in the gap. It feeds the queue, so it should live in the queue's header action slot (the SectionCard action pattern). Removes the orphan line and puts the control on the object it modifies. Artifact: ux-review-admin-cockpit.html.",
-          "createdAt": "2026-06-30"
+          "notes": "A right-aligned 'Add a recommendation' button sits on its own line between the Drafted POV editor and the BackingMovesQueue — an orphan action floating in the gap. It feeds the queue, so it should live in the queue's header action slot (the SectionCard action pattern). Removes the orphan line and puts the control on the object it modifies. Artifact: ux-review-admin-cockpit.html. [Wave 3: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-cd-finish-ia-v2-nav",

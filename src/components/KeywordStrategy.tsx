@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Target, FileText, HelpCircle, Plus, Search, ArrowRight, AlertTriangle } from 'lucide-react';
-import { AIContextIndicator, TabBar, ErrorState, EmptyState, ProgressIndicator, NextStepsCard, LoadingState, PageHeader, Icon, Tooltip, IconButton, Button, ClickableRow, Badge, type BadgeTone } from './ui';
+import { Target, FileText, HelpCircle, Search, ArrowRight, AlertTriangle, Send } from 'lucide-react';
+import { AIContextIndicator, TabBar, ErrorState, EmptyState, ProgressIndicator, NextStepsCard, LoadingState, PageHeader, Icon, Tooltip, IconButton, Button, ClickableRow, Disclosure, type BadgeTone } from './ui';
 import { isCuratedForClient } from '../../shared/recommendation-predicates';
 import { formatDate } from '../utils/formatDates';
 import { kdColor } from './page-intelligence/pageIntelligenceDisplay';
@@ -671,17 +671,8 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
           </Button>
         </div>
       )}
-      {/* Operator steering §12 — add a rec the system missed (mints into the curation queue). */}
-      <div className="flex justify-end">
-        <Button
-          variant="secondary"
-          icon={Plus}
-          onClick={() => setAddRecOpen(true)}
-          disabled={operatorSteering.isPending}
-        >
-          Add a recommendation
-        </Button>
-      </div>
+      {/* T3.5 — "Add a recommendation" button moved INTO the BackingMovesQueue header action slot
+          (via onAddRec prop). The orphan right-aligned line above has been removed. */}
       <BackingMovesQueue
         workspaceId={workspaceId}
         recs={cockpitRecs}
@@ -694,77 +685,123 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         stagedRecIds={stagedRecIds}
         onStage={toggleStage}
         onStageMany={stageMany}
+        onAddRec={() => setAddRecOpen(true)}
       />
-      {/* ── Supporting detail — collapsed by default. Everything that is NOT the 5-beat spine lives
-          here so the cockpit opens to the decision, not a wall. ── */}
-      <details className="group rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]">
-        <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 t-ui font-medium text-[var(--brand-text)] select-none">
-          <span className="flex min-w-0 flex-wrap items-center gap-2">
-            <span>Supporting detail</span>
-            {supportingDetailBadges.map((badge) => (
-              <Badge
-                key={`${badge.tone}-${badge.label}`}
-                label={badge.label}
-                tone={badge.tone}
-                variant="soft"
-                size="sm"
-                shape="pill"
-              />
-            ))}
+      {/* T3.4 — Docked send bar: appears once stagedCount > 0 so staging is visible at the bottom
+          of the spine near BackingMovesQueue. Reuses handleSendIssue / issueBulkSend (no double-send
+          risk — same handler and mutation as IssueHeader; both buttons are guarded by the same
+          stagedCount > 0 condition so they can't diverge). The IssueHeader Send remains as page-level
+          chrome; this bar is the "near staging" affordance so the operator never has to scroll all
+          the way back up after staging moves. */}
+      {stagedCount > 0 && (
+        <div
+          className="sticky bottom-4 z-[var(--z-sticky)] flex items-center justify-between gap-4 rounded-[var(--radius-lg)] border border-accent-brand/30 bg-[var(--surface-2)] px-4 py-3 shadow-[var(--shadow-lg)]"
+          data-testid="docked-send-bar"
+        >
+          <span className="t-caption-sm text-[var(--brand-text-muted)] tabular-nums">
+            {stagedCount} staged · {curatedCount} already with client
           </span>
-          <Icon
-            as={ArrowRight}
+          <Button
+            variant="primary"
             size="sm"
-            className="text-[var(--brand-text-muted)] transition-transform group-open:rotate-90"
-          />
-        </summary>
-        <div className="space-y-6 border-t border-[var(--brand-border)] px-4 py-4">
-          {/* The Issue (Client) P1b — the operator's captured named-leads (Lane B). Progressive
-              disclosure — lives inside the collapsed "Supporting detail" so the cold cockpit stays
-              decision-first. Flag-gated; absent when OFF → byte-identical. */}
-          {measuredCapture && (
-            <AdminLeadsReadout
-              leads={capturedLeads}
-              total={capturedLeadsTotal}
-              loading={capturedLeadsLoading}
-              onConnectCta={() => navigate(adminPath(workspaceId, 'workspace-settings') + '?tab=dashboard')}
-              onLoadMore={leadsLimit < LEADS_MAX ? () => setLeadsLimit((l) => Math.min(l + LEADS_PAGE, LEADS_MAX)) : undefined}
-            />
-          )}
-          {/* KeywordTargetsLens dropped — one deep-link row into the Keyword Hub instead. */}
-          <ClickableRow
-            onClick={() => navigate(adminPath(workspaceId, 'seo-keywords'))}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/40 border border-[var(--brand-border)]/60"
+            icon={Send}
+            loading={issueBulkSend.isPending}
+            disabled={!stagedCount || issueBulkSend.isPending}
+            onClick={handleSendIssue}
+            data-testid="docked-send-btn"
           >
-            <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0">
-              <Icon as={Search} size="md" className="text-accent-brand" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="t-ui font-medium text-[var(--brand-text-bright)]">Curated keyword targets</div>
-              <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">
-                Open the curated keyword &amp; topic targets in the Keyword Hub
-              </div>
-            </div>
-            <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
-          </ClickableRow>
-          {/* Read-projection lenses + supporting surfaces (each self-nulls when empty). */}
-          <ContentWorkOrderLens workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
-          <TrustLadderPanel workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
-          {orientEl}
-          {/* Content gaps — restored here so the SERP-feature / AI-Overview chips (rendered by the
-              shared ContentGapRow) are reachable to the admin in "The Issue" layout. They sit in the
-              collapsed supporting detail (decision-first spine stays untouched); ContentGaps self-nulls
-              when empty so a cold cockpit shows no chrome. */}
-          {realLeaves?.contentGaps}
-          {realLeaves?.cannibalization}
-          {realLeaves?.strategyDiff}
-          <div className="flex justify-end">
-            <Button variant="link" onClick={() => navigate(adminPath(workspaceId, 'competitors'))}>
-              Competitor intelligence →
-            </Button>
-          </div>
+            Send {stagedCount} staged
+          </Button>
         </div>
-      </details>
+      )}
+      {/* ── Supporting detail — split into 3 labeled Disclosure groups (design-x-disclosure-pattern).
+          Closed by default; the cockpit opens to the decision, not a wall.
+          Group 1 — Leads & Capture: the measured-capture surfaces (setup readiness panel already
+            lives above the spine in slot-0; the leads readout lives here for progressive disclosure).
+            Present only when measuredCapture is ON → byte-identical when OFF.
+          Group 2 — Lenses & surfaces: content-work order, trust ladder, orient + keyword deep-link.
+          Group 3 — Diffs & gaps: content gaps, cannibalization, strategy diff, competitor link.
+          ── */}
+      {/* Group 1 — Leads & Capture (flag-gated; absent when measured-capture is OFF) */}
+      {measuredCapture && (
+        <div data-testid="disclosure-leads">
+          <Disclosure
+            summary="Leads & Capture"
+            badges={supportingDetailBadges
+              .filter((b) => b.label.includes('lead'))
+              .map((b) => ({ label: b.label, tone: b.tone }))}
+          >
+            <div className="space-y-4 pt-2">
+              {/* The Issue (Client) P1b — operator captured named-leads (Lane B). Progressive
+                  disclosure inside its own group so the cold cockpit stays decision-first.
+                  Flag-gated; absent when OFF → byte-identical. */}
+              <AdminLeadsReadout
+                leads={capturedLeads}
+                total={capturedLeadsTotal}
+                loading={capturedLeadsLoading}
+                onConnectCta={() => navigate(adminPath(workspaceId, 'workspace-settings') + '?tab=dashboard')}
+                onLoadMore={leadsLimit < LEADS_MAX ? () => setLeadsLimit((l) => Math.min(l + LEADS_PAGE, LEADS_MAX)) : undefined}
+              />
+            </div>
+          </Disclosure>
+        </div>
+      )}
+      {/* Group 2 — Lenses & surfaces. Also carries any supportingDetailBadges not
+          claimed by the Leads (lead) or Diffs (gap/cannibalization) groups — e.g. the
+          "N backing moves" count — so no summary badge is silently dropped. */}
+      <div data-testid="disclosure-lenses">
+        <Disclosure
+          summary="Lenses & surfaces"
+          badges={supportingDetailBadges
+            .filter((b) => !b.label.includes('lead') && !b.label.includes('gap') && !b.label.includes('cannibalization'))
+            .map((b) => ({ label: b.label, tone: b.tone }))}
+        >
+          <div className="space-y-4 pt-2">
+            {/* KeywordTargetsLens dropped — one deep-link row into the Keyword Hub instead. */}
+            <ClickableRow
+              onClick={() => navigate(adminPath(workspaceId, 'seo-keywords'))}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] bg-[var(--surface-3)]/40 border border-[var(--brand-border)]/60"
+            >
+              <div className="w-8 h-8 rounded-[var(--radius-lg)] bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0">
+                <Icon as={Search} size="md" className="text-accent-brand" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="t-ui font-medium text-[var(--brand-text-bright)]">Curated keyword targets</div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">
+                  Open the curated keyword &amp; topic targets in the Keyword Hub
+                </div>
+              </div>
+              <Icon as={ArrowRight} size="sm" className="text-[var(--brand-text-muted)] flex-shrink-0" />
+            </ClickableRow>
+            {/* Read-projection lenses (each self-nulls when empty). */}
+            <ContentWorkOrderLens workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
+            <TrustLadderPanel workspaceId={workspaceId} theIssueEnabled={theIssueEnabled} />
+            {orientEl}
+          </div>
+        </Disclosure>
+      </div>
+      {/* Group 3 — Diffs & gaps */}
+      <div data-testid="disclosure-diffs">
+        <Disclosure
+          summary="Diffs & gaps"
+          badges={supportingDetailBadges
+            .filter((b) => b.label.includes('gap') || b.label.includes('cannibalization'))
+            .map((b) => ({ label: b.label, tone: b.tone }))}
+        >
+          <div className="space-y-4 pt-2">
+            {/* Content gaps — SERP-feature / AI-Overview chips reachable to admin. ContentGaps
+                self-nulls when empty so a cold cockpit shows no chrome. */}
+            {realLeaves?.contentGaps}
+            {realLeaves?.cannibalization}
+            {realLeaves?.strategyDiff}
+            <div className="flex justify-end">
+              <Button variant="link" onClick={() => navigate(adminPath(workspaceId, 'competitors'))}>
+                Competitor intelligence →
+              </Button>
+            </div>
+          </div>
+        </Disclosure>
+      </div>
       <AddRecommendationModal
         open={addRecOpen}
         onClose={() => setAddRecOpen(false)}
