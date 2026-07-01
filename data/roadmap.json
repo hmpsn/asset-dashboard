@@ -203,10 +203,11 @@
           "source": "UX review 2026-06-30 · CP-F1",
           "est": "M",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "Two navigations describe the same flow differently: the WorkflowStepper says Strategy->Briefs->Posts->Publish while the tab bar says Planner/Calendar/Briefs/Posts/Subscriptions. 'Strategy' leaves the page, 'Publish' and 'Subscriptions' are the same destination under two names, and Planner/Calendar exist only in tabs. Fix: align stepper phases 1:1 with tabs and labels (rename Subscriptions->Publish; point stepper 'Strategy' at the Planner tab, not off-page); treat Calendar as a view toggle, not a peer phase. Stepper shows where you are; tabs are how you move. Artifact: ux-review-content-pipeline.html.",
-          "createdAt": "2026-06-30"
+          "notes": "Two navigations describe the same flow differently: the WorkflowStepper says Strategy->Briefs->Posts->Publish while the tab bar says Planner/Calendar/Briefs/Posts/Subscriptions. 'Strategy' leaves the page, 'Publish' and 'Subscriptions' are the same destination under two names, and Planner/Calendar exist only in tabs. Fix: align stepper phases 1:1 with tabs and labels (rename Subscriptions->Publish; point stepper 'Strategy' at the Planner tab, not off-page); treat Calendar as a view toggle, not a peer phase. Stepper shows where you are; tabs are how you move. Artifact: ux-review-content-pipeline.html. [Wave 4: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-cp-use-tabbar-primitive",
@@ -214,10 +215,11 @@
           "source": "UX review 2026-06-30 · CP-F2",
           "est": "S",
           "priority": "P2",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "The sub-tab bar is built inline from <Button variant='ghost'> with a manual border-b-2 mint underline — re-implementing the TabBar component the system ships and WorkspaceHome already uses. They will drift in padding, hit-target, and keyboard nav. Fix: adopt the TabBar primitive (supports icons + mint active state + arrow-key nav + 44px hit target); move Export beside it as an action, not a fake tab. Artifact: ux-review-content-pipeline.html.",
-          "createdAt": "2026-06-30"
+          "notes": "The sub-tab bar is built inline from <Button variant='ghost'> with a manual border-b-2 mint underline — re-implementing the TabBar component the system ships and WorkspaceHome already uses. They will drift in padding, hit-target, and keyboard nav. Fix: adopt the TabBar primitive (supports icons + mint active state + arrow-key nav + 44px hit target); move Export beside it as an action, not a fake tab. Artifact: ux-review-content-pipeline.html. [Wave 4: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-cp-consolidate-alert-bands",
@@ -225,10 +227,11 @@
           "source": "UX review 2026-06-30 · CP-F3",
           "est": "M",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "owner": "ui-platform",
-          "notes": "Between the stepper and tab content sit four full-width bands: health summary, content-decay alert, cannibalization warnings, AI-suggested briefs — three of them amber/red, so the page reads as alarmed before any action. Fix: keep the neutral health summary as the one persistent bar; roll decay + cannibalization + suggestions into a single collapsible 'Alerts & suggestions (N)' strip, or move each into the tab it acts on (decay->Posts, suggestions->Briefs). Reach the work in one screen. Artifact: ux-review-content-pipeline.html.",
-          "createdAt": "2026-06-30"
+          "notes": "Between the stepper and tab content sit four full-width bands: health summary, content-decay alert, cannibalization warnings, AI-suggested briefs — three of them amber/red, so the page reads as alarmed before any action. Fix: keep the neutral health summary as the one persistent bar; roll decay + cannibalization + suggestions into a single collapsible 'Alerts & suggestions (N)' strip, or move each into the tab it acts on (decay->Posts, suggestions->Briefs). Reach the work in one screen. Artifact: ux-review-content-pipeline.html. [Wave 4: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-cp-healthbar-color",
@@ -248,10 +251,11 @@
           "source": "UX review 2026-06-30 · CP-F5",
           "est": "M",
           "priority": "P3",
-          "status": "pending",
+          "status": "done",
           "owner": "design-system",
-          "notes": "The Content Pipeline Export control hand-rolls its own open state, click-outside handler, positioned panel, and per-row CSV/JSON buttons — and the design system has no Dropdown/Menu primitive, so the next menu gets hand-rolled differently. This is the first genuine NEW-component need surfaced by the review program. Fix: add a Menu/Dropdown primitive (trigger + positioned panel + click-outside + keyboard dismiss) and adopt it here. Artifact: ux-review-content-pipeline.html.",
-          "createdAt": "2026-06-30"
+          "notes": "The Content Pipeline Export control hand-rolls its own open state, click-outside handler, positioned panel, and per-row CSV/JSON buttons — and the design system has no Dropdown/Menu primitive, so the next menu gets hand-rolled differently. This is the first genuine NEW-component need surfaced by the review program. Fix: add a Menu/Dropdown primitive (trigger + positioned panel + click-outside + keyboard dismiss) and adopt it here. Artifact: ux-review-content-pipeline.html. [Wave 4: shipped]",
+          "createdAt": "2026-06-30",
+          "shippedAt": "2026-06-30"
         },
         {
           "id": "design-ac-send-near-staging",
