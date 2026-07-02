@@ -18,6 +18,7 @@ import { invalidateContentPipelineIntelligence } from '../intelligence-freshness
 import { addActivity } from '../activity-log.js';
 import { buildPipelineSignals } from '../insight-feedback.js';
 import { getInsights } from '../analytics-insights-store.js';
+import { InvalidTransitionError } from '../state-machines.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('suggested-briefs-route');
@@ -91,7 +92,13 @@ router.patch(
   requireWorkspaceAccess('workspaceId'),
   validate(updateSchema),
   (req, res) => {
-    const updated = updateSuggestedBrief(req.params.briefId, req.params.workspaceId, req.body.status);
+    let updated;
+    try {
+      updated = updateSuggestedBrief(req.params.briefId, req.params.workspaceId, req.body.status);
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) return res.status(409).json({ error: err.message });
+      throw err;
+    }
     if (!updated) return res.status(404).json({ error: 'Suggested brief not found' });
     invalidateContentPipelineIntelligence(req.params.workspaceId);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.SUGGESTED_BRIEF_UPDATED, { id: updated.id, status: updated.status });
@@ -111,7 +118,13 @@ router.post(
   requireWorkspaceAccess('workspaceId'),
   validate(snoozeSchema),
   (req, res) => {
-    const snoozed = snoozeSuggestedBrief(req.params.briefId, req.params.workspaceId, req.body.until);
+    let snoozed;
+    try {
+      snoozed = snoozeSuggestedBrief(req.params.briefId, req.params.workspaceId, req.body.until);
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) return res.status(409).json({ error: err.message });
+      throw err;
+    }
     if (!snoozed) return res.status(404).json({ error: 'Suggested brief not found' });
     invalidateContentPipelineIntelligence(req.params.workspaceId);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.SUGGESTED_BRIEF_UPDATED, { id: snoozed.id, status: snoozed.status });
@@ -125,7 +138,13 @@ router.post(
   '/api/suggested-briefs/:workspaceId/:briefId/dismiss',
   requireWorkspaceAccess('workspaceId'),
   (req, res) => {
-    const dismissed = dismissSuggestedBrief(req.params.briefId, req.params.workspaceId);
+    let dismissed;
+    try {
+      dismissed = dismissSuggestedBrief(req.params.briefId, req.params.workspaceId);
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) return res.status(409).json({ error: err.message });
+      throw err;
+    }
     if (!dismissed) return res.status(404).json({ error: 'Suggested brief not found' });
     invalidateContentPipelineIntelligence(req.params.workspaceId);
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.SUGGESTED_BRIEF_UPDATED, { id: dismissed.id, status: dismissed.status });

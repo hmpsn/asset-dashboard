@@ -216,7 +216,15 @@ describe('listExtractionsBySource', () => {
 // ─── updateExtractionStatus ─────────────────────────────────────────────────
 
 describe('updateExtractionStatus — status-only (routedTo undefined)', () => {
-  it('updates status without touching routed_to column', async () => {
+  // NOTE (R3-PR2): `accepted` and `dismissed` are TERMINAL in EXTRACTION_TRANSITIONS —
+  // this matches the real product. The DiscoveryTab UI only renders Accept/Dismiss on
+  // PENDING rows (src/components/brand/DiscoveryTab.tsx:122); once triaged, the card is
+  // read-only (no re-triage / undo / send-back). The route + store have no other caller.
+  // So a status-only update is exercised here via the legal idempotent no-op
+  // (accepted → accepted), which still runs updateExtractionStatusOnly and must preserve
+  // routed_to — testing the exact status-only-path behavior WITHOUT the illegal
+  // accepted → dismissed move the old test used only as an incidental vehicle.
+  it('status-only update (routedTo undefined) does not touch the routed_to column', async () => {
     const src = addSource(wsId, 'update-status.txt', 'brand_doc', 'content');
     mockCallOpenAI.mockResolvedValueOnce({
       text: JSON.stringify({
@@ -229,23 +237,43 @@ describe('updateExtractionStatus — status-only (routedTo undefined)', () => {
 
     const [extraction] = listExtractionsBySource(wsId, src.id);
 
-    // First, set a routedTo so we can verify it is NOT cleared
+    // Legal transition that sets a routedTo (pending → accepted with a destination).
     updateExtractionStatus(wsId, extraction.id, 'accepted', 'voice_profile');
 
-    // Now update status only (routedTo: undefined → status-only path)
-    const result = updateExtractionStatus(wsId, extraction.id, 'dismissed');
+    // Status-only update (routedTo: undefined → status-only path). Same status is a
+    // legal no-op (from === to skips the guard) and still runs updateExtractionStatusOnly.
+    const result = updateExtractionStatus(wsId, extraction.id, 'accepted');
     expect(result).toBe(true);
 
-    // routedTo should still be 'voice_profile' (not cleared)
+    // routedTo should still be 'voice_profile' (status-only path never clears it)
     const rows = db
       .prepare('SELECT status, routed_to FROM discovery_extractions WHERE id = ?')
       .get(extraction.id) as { status: string; routed_to: string | null };
-    expect(rows.status).toBe('dismissed');
+    expect(rows.status).toBe('accepted');
     expect(rows.routed_to).toBe('voice_profile');
   });
 
   it('returns false for a nonexistent extraction id', () => {
     expect(updateExtractionStatus(wsId, 'nonexistent', 'accepted')).toBe(false);
+  });
+
+  it('rejects an illegal re-triage of a terminal extraction (accepted → dismissed) with InvalidTransitionError', async () => {
+    const src = addSource(wsId, 'terminal-guard.txt', 'brand_doc', 'content');
+    mockCallOpenAI.mockResolvedValueOnce({
+      text: JSON.stringify({
+        extractions: [
+          { extraction_type: 'voice_pattern', category: 'tone_marker', content: 'Terminal test' },
+        ],
+      }),
+    });
+    await processSource(wsId, src.id);
+    const [extraction] = listExtractionsBySource(wsId, src.id);
+    updateExtractionStatus(wsId, extraction.id, 'accepted');
+    // accepted is terminal — a re-triage the UI never offers must be rejected, not silently
+    // accepted (route maps InvalidTransitionError → 409).
+    expect(() => updateExtractionStatus(wsId, extraction.id, 'dismissed')).toThrow(
+      /Invalid discovery_extraction transition/,
+    );
   });
 });
 
@@ -284,8 +312,12 @@ describe('updateExtractionStatus — full update (routedTo provided)', () => {
     await processSource(wsId, src.id);
 
     const [extraction] = listExtractionsBySource(wsId, src.id);
+    // Legal transition that sets a routedTo (pending → accepted, routed to 'identity').
     updateExtractionStatus(wsId, extraction.id, 'accepted', 'identity');
-    const cleared = updateExtractionStatus(wsId, extraction.id, 'pending', null);
+    // Explicit routedTo: null clears the destination. Same status is a legal no-op
+    // (from === to), so this exercises the routed_to-clearing branch without the illegal
+    // accepted → pending move the old test used only as a vehicle to reach it.
+    const cleared = updateExtractionStatus(wsId, extraction.id, 'accepted', null);
     expect(cleared).toBe(true);
 
     const rows = db

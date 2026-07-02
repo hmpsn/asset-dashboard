@@ -10,6 +10,7 @@ import { listBrandscripts } from './brandscript.js';
 import { listExtractions } from './discovery-ingestion.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
+import { BRAND_DELIVERABLE_TRANSITIONS, validateTransition } from './state-machines.js';
 import type {
   BrandDeliverable, BrandDeliverableType, DeliverableTier,
   VoiceSampleContext,
@@ -26,8 +27,8 @@ const stmts = createStmtCache(() => ({
   getById: db.prepare(`SELECT * FROM brand_identity_deliverables WHERE id = ? AND workspace_id = ?`),
   getByType: db.prepare(`SELECT * FROM brand_identity_deliverables WHERE workspace_id = ? AND deliverable_type = ? ORDER BY updated_at DESC LIMIT 1`),
   insert: db.prepare(`INSERT INTO brand_identity_deliverables (id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at) VALUES (@id, @workspace_id, @deliverable_type, @content, @status, @version, @tier, @created_at, @updated_at)`),
-  updateContent: db.prepare(`UPDATE brand_identity_deliverables SET content = @content, status = @status, version = @version, tier = @tier, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`),
-  updateStatus: db.prepare(`UPDATE brand_identity_deliverables SET status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: brand deliverable status is not a platform state machine column
+  updateContent: db.prepare(`UPDATE brand_identity_deliverables SET content = @content, status = @status, version = @version, tier = @tier, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: content-edit always resets to 'draft' (a content-reset side-effect, not a lifecycle transition); the guarded lifecycle write is setDeliverableStatus()
+  updateStatus: db.prepare(`UPDATE brand_identity_deliverables SET status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: BRAND_DELIVERABLE_TRANSITIONS guard runs in setDeliverableStatus() before this write (draft↔approved)
   insertVersion: db.prepare(`INSERT INTO brand_identity_versions (id, deliverable_id, content, steering_notes, version, created_at) VALUES (@id, @deliverable_id, @content, @steering_notes, @version, @created_at)`),
 }));
 
@@ -315,6 +316,13 @@ export function setDeliverableStatus(
     // (already approved, no-op on status). The auto-sample side effect must
     // only run on the transition.
     const priorStatus = row.status;
+    // Guard the two-state approve/revert lifecycle only on an actual change. Re-approval
+    // (approved → approved) is a no-op handled below via the priorStatus short-circuit,
+    // so it never reaches the guard as a self-edge. An out-of-union prior status throws
+    // InvalidTransitionError (route maps to 4xx).
+    if (priorStatus !== status) {
+      validateTransition('brand_deliverable', BRAND_DELIVERABLE_TRANSITIONS, priorStatus, status);
+    }
     const now = new Date().toISOString();
     stmts().updateStatus.run({ id, workspace_id: workspaceId, status, updated_at: now });
     log.info({ workspaceId, deliverableType: row.deliverable_type, status }, 'deliverable status updated');

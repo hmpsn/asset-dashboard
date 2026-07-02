@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { CLIENT_LOCATION_STATUS } from '../shared/types/local-seo.js';
+import { CLIENT_LOCATION_TRANSITIONS, validateTransition } from './state-machines.js';
 import type { ClientLocation } from '../shared/types/local-seo.js';
 
 interface LocationRow {
@@ -174,6 +175,13 @@ export function updateClientLocation(
 ): ClientLocation | null {
   const existing = getClientLocationById(id, workspaceId);
   if (!existing) return null;
+  // Guard the needs_review ↔ confirmed lifecycle only on an actual status change —
+  // updateClientLocation is a general multi-field update that carries status through
+  // unchanged on address/phone edits (from === to must be a silent no-op). An illegal
+  // move throws InvalidTransitionError (route maps to 409).
+  if (input.status !== undefined && input.status !== existing.status) {
+    validateTransition('client_location', CLIENT_LOCATION_TRANSITIONS, existing.status, input.status);
+  }
   stmts().update.run({
     id,
     workspace_id: workspaceId,

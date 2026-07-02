@@ -8,6 +8,9 @@
  */
 
 import { randomUUID } from 'crypto';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import db from '../../server/db/index.js';
 
@@ -34,6 +37,25 @@ import {
 import { resolveScoringConfig, DEFAULT_SCORING_CONFIG } from '../../server/outcome-scoring-defaults.js';
 import type { CopySectionStatus } from '../../shared/types/copy-pipeline.js';
 import type { SectionPlanItem } from '../../shared/types/page-strategy.js';
+
+// ── R3-PR2 fold: the parallel VALID_TRANSITIONS map is deleted; copy-review now
+// reads the shared COPY_SECTION_TRANSITIONS table from state-machines.ts ──────────
+describe('copy-review parallel-validator fold (R3-PR2)', () => {
+  const COPY_REVIEW_SRC = readFileSync(
+    path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../server/copy-review.ts'),
+    'utf8',
+  );
+
+  it('no longer declares its own VALID_TRANSITIONS map', () => {
+    expect(COPY_REVIEW_SRC).not.toContain('const VALID_TRANSITIONS');
+  });
+
+  it('imports COPY_SECTION_TRANSITIONS + validateTransition from state-machines.ts', () => {
+    expect(COPY_REVIEW_SRC).toContain('COPY_SECTION_TRANSITIONS');
+    expect(COPY_REVIEW_SRC).toContain("from './state-machines.js'");
+    expect(COPY_REVIEW_SRC).toContain('validateTransition(');
+  });
+});
 
 // ── Part A: isValidTransition ─────────────────────────────────────────────────
 

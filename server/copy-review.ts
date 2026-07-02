@@ -10,6 +10,7 @@ import { createLogger } from './logger.js';
 import { addVoiceSample, getVoiceProfile, deleteVoiceSample } from './voice-calibration.js';
 import { getEntry } from './page-strategy.js';
 import { addActivity } from './activity-log.js';
+import { COPY_SECTION_TRANSITIONS, validateTransition, InvalidTransitionError } from './state-machines.js';
 import type {
   CopySection,
   CopyMetadata,
@@ -114,12 +115,12 @@ const stmts = createStmtCache(() => ({
   ),
   updateSectionCopy: db.prepare(
     `UPDATE copy_sections
-     SET generated_copy = @generated_copy, ai_annotation = @ai_annotation, ai_reasoning = @ai_reasoning, quality_flags = @quality_flags, status = @status, version = @version, updated_at = @updated_at
+     SET generated_copy = @generated_copy, ai_annotation = @ai_annotation, ai_reasoning = @ai_reasoning, quality_flags = @quality_flags, status = @status, version = @version, updated_at = @updated_at -- status-ok: COPY_SECTION_TRANSITIONS guard runs in saveGeneratedCopy() before this write (pending→draft)
      WHERE id = @id AND workspace_id = @workspace_id`,
   ),
   updateSectionStatus: db.prepare(
     `UPDATE copy_sections
-     SET status = @status, updated_at = @updated_at -- status-ok: validated by isValidTransition() before run()
+     SET status = @status, updated_at = @updated_at -- status-ok: COPY_SECTION_TRANSITIONS guard runs in updateSectionStatus() before this write
      WHERE id = @id AND workspace_id = @workspace_id`,
   ),
   updateSectionSteering: db.prepare(
@@ -129,12 +130,12 @@ const stmts = createStmtCache(() => ({
   ),
   updateSectionClientSuggestions: db.prepare(
     `UPDATE copy_sections
-     SET client_suggestions = @client_suggestions, status = @status, updated_at = @updated_at
+     SET client_suggestions = @client_suggestions, status = @status, updated_at = @updated_at -- status-ok: addClientSuggestion() only advances client_review→revision_requested (a legal COPY_SECTION_TRANSITIONS edge); otherwise status is carried through unchanged (no transition)
      WHERE id = @id AND workspace_id = @workspace_id`,
   ),
   updateSectionText: db.prepare(
     `UPDATE copy_sections
-     SET generated_copy = @generated_copy, status = @status, version = @version, updated_at = @updated_at
+     SET generated_copy = @generated_copy, status = @status, version = @version, updated_at = @updated_at -- status-ok: updateCopyText() is a manual content edit that always resets to 'draft' (a content-reset side-effect, not a lifecycle transition; blocked on approved sections)
      WHERE id = @id AND workspace_id = @workspace_id`,
   ),
 
@@ -206,17 +207,13 @@ function rowToMetadata(row: CopyMetadataRow): CopyMetadata {
 }
 
 // ── Status transition validation ──
-
-const VALID_TRANSITIONS: Record<CopySectionStatus, CopySectionStatus[]> = {
-  pending: ['draft'],
-  draft: ['client_review', 'approved'],
-  client_review: ['approved', 'revision_requested'],
-  revision_requested: ['draft'],
-  approved: [],
-};
+// The copy-section transition table lives in server/state-machines.ts
+// (COPY_SECTION_TRANSITIONS) — this module no longer owns a parallel map.
+// isValidTransition is a boolean convenience wrapper over the shared table for the
+// internal callers below; the write-boundary guard uses validateTransition() (throws).
 
 export function isValidTransition(from: CopySectionStatus, to: CopySectionStatus): boolean {
-  return VALID_TRANSITIONS[from]?.includes(to) ?? false;
+  return COPY_SECTION_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
 // ── Approve side-effects ──
@@ -428,11 +425,19 @@ export function saveGeneratedCopy(
     return null;
   }
 
-  // pending → draft (or re-generation: draft/revision_requested → draft)
+  // pending → draft (or re-generation: draft/revision_requested → draft, both no-op
+  // self-edges handled here since generation legitimately re-writes an existing draft).
   const targetStatus: CopySectionStatus = 'draft';
-  if (!isValidTransition(existing.status, targetStatus) && existing.status !== 'draft' && existing.status !== 'revision_requested') {
-    log.warn({ sectionId, currentStatus: existing.status }, 'saveGeneratedCopy: invalid status transition');
-    return null;
+  if (existing.status !== 'draft' && existing.status !== 'revision_requested') {
+    try {
+      validateTransition('copy_section', COPY_SECTION_TRANSITIONS, existing.status, targetStatus);
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) {
+        log.warn({ sectionId, currentStatus: existing.status }, 'saveGeneratedCopy: invalid status transition');
+        return null;
+      }
+      throw err;
+    }
   }
 
   const now = new Date().toISOString();
@@ -464,9 +469,18 @@ export function updateSectionStatus(
     log.warn({ sectionId, workspaceId }, 'updateSectionStatus: section not found');
     return null;
   }
-  if (!isValidTransition(existing.status, status)) {
-    log.warn({ sectionId, from: existing.status, to: status }, 'updateSectionStatus: invalid status transition');
-    return null;
+  // Route through the shared state machine. Preserve the historical return-null-on-
+  // invalid contract (the route maps null → 404) by catching InvalidTransitionError
+  // rather than propagating it — a bulk send-to-client transaction must not abort on
+  // one illegal section.
+  try {
+    validateTransition('copy_section', COPY_SECTION_TRANSITIONS, existing.status, status);
+  } catch (err) {
+    if (err instanceof InvalidTransitionError) {
+      log.warn({ sectionId, from: existing.status, to: status }, 'updateSectionStatus: invalid status transition');
+      return null;
+    }
+    throw err;
   }
 
   const now = new Date().toISOString();

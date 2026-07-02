@@ -55,10 +55,11 @@ const stmts = createStmtCache(() => ({
                           END,
       last_snapshot_date = excluded.last_snapshot_date,
       last_snapshot_impressions = excluded.last_snapshot_impressions,
-      status            = '${DISCOVERED_QUERY_STATUS.ACTIVE}'
+      status            = '${DISCOVERED_QUERY_STATUS.ACTIVE}' -- status-ok: upsert-revive — a fresh GSC observation re-activates the query (lost_visibility→active is a legal DiscoveredQueryStatus edge); this is an INSERT...ON CONFLICT upsert, not a guarded per-row transition. Documented exemption, see docs/rules/lifecycle-state-machines.md.
   `),
   markLost: db.prepare(`
     UPDATE discovered_queries
+    -- status-ok: documented exemption — cron-driven bulk detector. The WHERE status = 'active' clause below structurally enforces the sole legal origin (active→lost_visibility, DiscoveredQueryStatus); upsert always re-sets 'active' (revive). No per-row id read path. See docs/rules/lifecycle-state-machines.md.
     SET status = '${DISCOVERED_QUERY_STATUS.LOST_VISIBILITY}'
     WHERE workspace_id = ?
       AND status = '${DISCOVERED_QUERY_STATUS.ACTIVE}'

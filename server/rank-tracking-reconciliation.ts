@@ -11,6 +11,7 @@ import {
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { resolveSiteKeywordMetrics } from './site-keyword-metrics.js';
 import { listTrackedKeywordRows } from './tracked-keywords-store.js';
+import { TRACKED_KEYWORD_TRANSITIONS, validateTransition } from './state-machines.js';
 import type { KeywordStrategy, PageKeywordMap } from '../shared/types/workspace.js';
 
 export interface StrategyRankTrackingTarget {
@@ -226,9 +227,17 @@ export function reconcileStrategyRankTracking(
       // belt-and-suspenders so client-requested data can never be auto-deprecated.
       if (isStrategyOwned(existing) && !existing.pinned && !isProtected(existing)) {
         const replacement = existing.pagePath ? targetsByPage.get(existing.pagePath) : undefined;
+        const nextStatus = replacement ? TRACKED_KEYWORD_STATUS.REPLACED : TRACKED_KEYWORD_STATUS.DEPRECATED;
+        // Route the reconcile-only lifecycle edge through the shared guard (this was
+        // the documented bypass at state-machines.ts). existingStatus is `active` here
+        // (line 218 above skips any strategy-owned keyword that is not active), and
+        // active → replaced|deprecated are legal edges, so this never throws in
+        // practice — it makes the reconcile writer honour the same machine as the KCC
+        // action service instead of writing status out-of-band.
+        validateTransition('tracked_keyword', TRACKED_KEYWORD_TRANSITIONS, existingStatus, nextStatus);
         const removed: TrackedKeyword = {
           ...existing,
-          status: replacement ? TRACKED_KEYWORD_STATUS.REPLACED : TRACKED_KEYWORD_STATUS.DEPRECATED,
+          status: nextStatus,
           replacedBy: replacement?.query,
           lastStrategySeenAt: generatedAt,
           deprecatedAt: generatedAt,

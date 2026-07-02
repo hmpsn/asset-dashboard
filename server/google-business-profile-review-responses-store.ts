@@ -149,7 +149,7 @@ const stmts = createStmtCache(() => ({
   `),
   markSent: db.prepare(`
     UPDATE google_business_review_responses
-    SET status = 'awaiting_client', sent_deliverable_id = @deliverableId, updated_at = @now
+    SET status = 'awaiting_client', sent_deliverable_id = @deliverableId, updated_at = @now -- status-ok: GBP_REVIEW_RESPONSE_TRANSITIONS guard runs in the calling mark* function before this write
     WHERE id = @id AND workspace_id = @workspaceId
   `),
   markDecision: db.prepare(`
@@ -161,18 +161,18 @@ const stmts = createStmtCache(() => ({
   `),
   markPublishing: db.prepare(`
     UPDATE google_business_review_responses
-    SET status = 'publishing', publish_job_id = @jobId, last_error = NULL, updated_at = @now
+    SET status = 'publishing', publish_job_id = @jobId, last_error = NULL, updated_at = @now -- status-ok: GBP_REVIEW_RESPONSE_TRANSITIONS guard runs in the calling mark* function before this write
     WHERE id = @id AND workspace_id = @workspaceId
   `),
   markPublished: db.prepare(`
     UPDATE google_business_review_responses
-    SET status = 'published', published_at = @publishedAt, google_reply_update_time = @googleReplyUpdateTime,
+    SET status = 'published', published_at = @publishedAt, google_reply_update_time = @googleReplyUpdateTime, -- status-ok: GBP_REVIEW_RESPONSE_TRANSITIONS guard runs in the calling mark* function before this write
       last_error = NULL, updated_at = @publishedAt
     WHERE id = @id AND workspace_id = @workspaceId
   `),
   markPublishFailed: db.prepare(`
     UPDATE google_business_review_responses
-    SET status = 'publish_failed', last_error = @error, updated_at = @now
+    SET status = 'publish_failed', last_error = @error, updated_at = @now -- status-ok: GBP_REVIEW_RESPONSE_TRANSITIONS guard runs in the calling mark* function before this write
     WHERE id = @id AND workspace_id = @workspaceId
   `),
   insertEvent: db.prepare(`
@@ -190,12 +190,12 @@ const stmts = createStmtCache(() => ({
   `),
   markAttemptDone: db.prepare(`
     UPDATE google_business_review_reply_publish_attempts
-    SET status = 'done', completed_at = @completedAt
+    SET status = 'done', completed_at = @completedAt -- status-ok: documented exemption — provider-attempt/job tracker (running→done/failed), NOT the response lifecycle. Insert-running then terminal outcome, per attempt. Census classification (docs/rules/lifecycle-state-machines.md).
     WHERE id = @id AND workspace_id = @workspaceId
   `),
   markAttemptFailed: db.prepare(`
     UPDATE google_business_review_reply_publish_attempts
-    SET status = 'failed', provider_status = @providerStatus, provider_kind = @providerKind,
+    SET status = 'failed', provider_status = @providerStatus, provider_kind = @providerKind, -- status-ok: documented exemption — provider-attempt/job tracker (see markAttemptDone), not a guarded lifecycle. docs/rules/lifecycle-state-machines.md.
       error = @error, completed_at = @completedAt
     WHERE id = @id AND workspace_id = @workspaceId
   `),

@@ -86,7 +86,7 @@ const stmts = createStmtCache(() => ({
           product_type = @product_type,
           amount = @amount,
           currency = @currency,
-          status = @status,
+          status = @status, -- status-ok: Stripe-owned external lifecycle (pending→paid|failed|refunded). Stripe/webhook is the authority for the legal order; this is an idempotent upsert-of-record, not a platform-guarded transition. Documented exemption (docs/rules/lifecycle-state-machines.md).
           content_request_id = @content_request_id,
           metadata = @metadata,
           created_at = @created_at,

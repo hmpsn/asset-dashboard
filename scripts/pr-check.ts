@@ -2474,18 +2474,53 @@ export const CHECKS: Check[] = [
   {
     // FM-5: Direct SET status without a validation function.
     // State machine transitions should use validateTransition() to reject invalid transitions.
+    // FM-5: Direct SET <status-column> = <value> without a state-machine guard.
+    // State machine transitions should route through validateTransition() to reject
+    // illegal moves. Implemented as a customCheck (was a single-line regex) to close
+    // three verified structural escape classes the old `SET\s+(status|batch_status)\s*=\s*[?@]`
+    // pattern missed (R3-PR2 / Reconcile inventory):
+    //   (1) LITERAL writes — `SET status = 'applied'` (the `[?@]` char class missed literals)
+    //   (2) MID-CLAUSE writes — `..., status = @status` (only matched status as the FIRST
+    //       column after SET, so `SET name = @name, status = @status` escaped)
+    //   (3) OTHER lifecycle columns — `resolution_status = ?` (the column allow-list was
+    //       only `status|batch_status`)
+    // Hatches: inline OR preceding-line `// status-ok` / `-- status-ok` (both comment
+    // prefixes since these lines are usually inside backtick-SQL template literals where
+    // `//` breaks the SQL). `validateTransition` on the same line also suppresses. The
+    // hatch prefix is required so a bare `status-ok` substring can't false-suppress.
     name: 'Unguarded SET status = ? (state machine transition)',
-    pattern: "SET\\s+(status|batch_status)\\s*=\\s*[?@]",
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    // Accept both JS comment (`// status-ok`) and SQL comment (`-- status-ok`)
-    // forms since this rule fires on lines that are often inside backtick-SQL
-    // template literals where `//` would break the SQL. The comment prefix
-    // (`//` or `--`) is required so the hatch can't false-suppress via a bare
-    // `status-ok` substring inside an identifier, enum value, or string literal.
-    excludeLines: ['// status-ok', '-- status-ok', 'validateTransition'],
-    message: 'State machine transitions must use validateTransition(from, to). Direct SET status = ? skips guard. Add // status-ok (JS comment) or -- status-ok (SQL comment) if this is a non-state-machine column.',
+    message: 'State machine transitions must route through validateTransition(from, to). A direct SET status = ... (including literal writes, mid-clause `, status =`, and lifecycle columns like resolution_status) skips the guard. Add // status-ok (JS comment) or -- status-ok (SQL comment) — with a rationale — if this is a non-state-machine column or a documented exemption.',
     severity: 'error',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Lifecycle status columns this rule governs. `status`, `batch_status`, and the
+      // insight `resolution_status` column (the R3-PR2 gap). A `\b` word boundary keeps
+      // it from matching an unrelated `foo_status` column unless explicitly named here.
+      const STATUS_COLS = ['status', 'batch_status', 'resolution_status'];
+      // Match `SET <col> = <val>` OR mid-clause `, <col> = <val>` where <val> is a bound
+      // parameter (?, @name) or a string literal ('applied'). The `(?:SET|,)` prefix with
+      // required whitespace prevents matching a column NAMED e.g. `last_status` (the char
+      // before the col must be SET-keyword whitespace or a comma+whitespace).
+      const colAlt = STATUS_COLS.join('|');
+      const setStatusRe = new RegExp(
+        `(?:\\bSET\\b|,)\\s*(?:${colAlt})\\s*=\\s*(?:[?@]|')`,
+        'i',
+      );
+      for (const file of files) {
+        const lines = readFileOrEmpty(file).split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!setStatusRe.test(line)) continue;
+          if (line.includes('validateTransition')) continue;
+          if (hasHatch(lines, i, '// status-ok')) continue;
+          if (hasHatch(lines, i, '-- status-ok')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
   },
   {
     // FM-4: Untyped dynamic import results — as any suppresses field name checks.

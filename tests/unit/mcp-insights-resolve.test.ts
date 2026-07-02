@@ -184,4 +184,24 @@ describe('resolve_insight / bulk_resolve_insights MCP tools', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain('Validation failed');
   });
+
+  // R3-PR2: the resolution_status transition guard must never crash a bulk batch.
+  it('bulk payload carries a `rejected` field for skip-and-report and stays empty for idempotent re-resolve', async () => {
+    const id1 = makeInsight(ws.workspaceId, '/r1');
+    // First resolve id1.
+    await handleInsightTool('bulk_resolve_insights', { workspaceId: ws.workspaceId, insightIds: [id1], status: 'resolved' });
+    vi.clearAllMocks();
+    // Re-resolving an already-resolved insight in a batch is an idempotent no-op
+    // (resolved → resolved is handled at the call site) — it must NOT throw and must
+    // NOT land in `rejected` (that field is reserved for genuine InvalidTransitionError).
+    const id2 = makeInsight(ws.workspaceId, '/r2');
+    const result = await handleInsightTool('bulk_resolve_insights', {
+      workspaceId: ws.workspaceId, insightIds: [id1, id2, 'ins_missing'], status: 'resolved',
+    });
+    expect(result.isError).toBeFalsy();
+    const payload = parse(result);
+    expect(payload.updated).toEqual(expect.arrayContaining([id1, id2]));
+    expect(payload.notFound).toEqual(['ins_missing']);
+    expect(payload.rejected).toEqual([]); // idempotent re-resolve is NOT a rejection
+  });
 });

@@ -11,6 +11,7 @@ import {
 } from '../brand-identity.js';
 import type { DeliverableTier } from '../../shared/types/brand-engine.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
+import { InvalidTransitionError } from '../state-machines.js';
 import { getWorkspace } from '../workspaces.js';
 import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 import { aiLimiter } from '../middleware.js';
@@ -148,7 +149,12 @@ router.patch('/api/brand-identity/:workspaceId/:id', requireWorkspaceAccess('wor
   }
 
   if (typeof status !== 'undefined') {
-    result = setDeliverableStatus(workspaceId, deliverableId, status);
+    try {
+      result = setDeliverableStatus(workspaceId, deliverableId, status);
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) return res.status(409).json({ error: err.message });
+      throw err;
+    }
     if (!result) return res.status(404).json({ error: 'Not found' });
     const typeLabel = result.deliverableType.replace(/_/g, ' ');
     if (status === 'approved') {

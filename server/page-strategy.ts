@@ -17,6 +17,7 @@ import type {
 } from '../shared/types/page-strategy.js';
 import type { ContentPageType } from '../shared/types/content.js';
 import type { EntryScope } from '../shared/types/page-strategy.js';
+import { BLUEPRINT_TRANSITIONS, validateTransition } from './state-machines.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('page-strategy');
@@ -89,6 +90,7 @@ const stmts = createStmtCache(() => ({
   `),
   updateBlueprint: db.prepare(`
     UPDATE site_blueprints
+    -- status-ok: BLUEPRINT_TRANSITIONS guard runs in updateBlueprint() before this write (draft→active→archived, guarded only on actual status change)
     SET name = @name, status = @status, brandscript_id = @brandscript_id,
         industry_type = @industry_type, generation_inputs_json = @generation_inputs_json,
         notes = @notes, updated_at = @updated_at
@@ -291,6 +293,14 @@ export function updateBlueprint(
 ): SiteBlueprint | null {
   const existing = getBlueprint(workspaceId, id);
   if (!existing) return null;
+  // Guard the blueprint lifecycle (draft/active/archived) only when the status
+  // actually changes — updateBlueprint is a general multi-field update that carries
+  // status through unchanged on name/notes edits (from === to must be a silent
+  // no-op, not a self-edge throw). An illegal move throws InvalidTransitionError,
+  // which the route maps to a 4xx via WorkspaceMutationError handling.
+  if (input.status !== undefined && input.status !== existing.status) {
+    validateTransition('blueprint', BLUEPRINT_TRANSITIONS, existing.status, input.status);
+  }
   const now = new Date().toISOString();
   stmts().updateBlueprint.run({
     id,

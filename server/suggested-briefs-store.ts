@@ -6,6 +6,7 @@
 import { randomUUID, createHash } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { SUGGESTED_BRIEF_TRANSITIONS, validateTransition } from './state-machines.js';
 import type { SuggestedBrief } from '../shared/types/intelligence.js';
 
 export type { SuggestedBrief };
@@ -63,10 +64,10 @@ const stmts = createStmtCache(() => ({
   `),
   getById: db.prepare(`SELECT * FROM suggested_briefs WHERE id = ? AND workspace_id = ?`),
   updateStatus: db.prepare(`
-    UPDATE suggested_briefs SET status = ?, resolved_at = ? WHERE id = ? AND workspace_id = ? -- status-ok: simple pending/accepted/rejected lifecycle
+    UPDATE suggested_briefs SET status = ?, resolved_at = ? WHERE id = ? AND workspace_id = ? -- status-ok: SUGGESTED_BRIEF_TRANSITIONS guard runs in updateSuggestedBrief() before this write
   `),
   updateSnooze: db.prepare(`
-    UPDATE suggested_briefs SET status = 'snoozed', snoozed_until = ? WHERE id = ? AND workspace_id = ?
+    UPDATE suggested_briefs SET status = 'snoozed', snoozed_until = ? WHERE id = ? AND workspace_id = ? -- status-ok: SUGGESTED_BRIEF_TRANSITIONS guard runs in snoozeSuggestedBrief() before this write
   `),
   checkDismissed: db.prepare(`
     SELECT 1 FROM suggested_briefs
@@ -170,6 +171,14 @@ export function getSuggestedBrief(id: string, workspaceId: string): SuggestedBri
 }
 
 export function updateSuggestedBrief(id: string, workspaceId: string, status: 'accepted' | 'dismissed'): SuggestedBrief | null {
+  // Guard the triage transition. Not found → null. Idempotent re-resolve (from === to)
+  // is a no-op that must not throw; an illegal move (e.g. accepted → dismissed) throws
+  // InvalidTransitionError which the route maps to 409.
+  const existing = getSuggestedBrief(id, workspaceId);
+  if (!existing) return null;
+  if (existing.status !== status) {
+    validateTransition('suggested_brief', SUGGESTED_BRIEF_TRANSITIONS, existing.status, status);
+  }
   const now = new Date().toISOString();
   stmts().updateStatus.run(status, now, id, workspaceId);
   return getSuggestedBrief(id, workspaceId);
@@ -180,6 +189,13 @@ export function dismissSuggestedBrief(id: string, workspaceId: string): Suggeste
 }
 
 export function snoozeSuggestedBrief(id: string, workspaceId: string, until: string): SuggestedBrief | null {
+  // Guard pending → snoozed (re-snooze of an already-snoozed brief is a no-op skipped
+  // here). A snooze of an accepted/dismissed terminal brief throws → route 409.
+  const existing = getSuggestedBrief(id, workspaceId);
+  if (!existing) return null;
+  if (existing.status !== 'snoozed') {
+    validateTransition('suggested_brief', SUGGESTED_BRIEF_TRANSITIONS, existing.status, 'snoozed');
+  }
   stmts().updateSnooze.run(until, id, workspaceId);
   return getSuggestedBrief(id, workspaceId);
 }

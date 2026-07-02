@@ -46,6 +46,7 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM approval_batches WHERE id = ? AND workspace_id = ?`,
   ),
   update: db.prepare(
+    // status-ok: approval_batches.status is a DERIVED aggregate of item statuses (recomputed in recalcBatchStatus, lines ~189-197), NOT an independent lifecycle. The guarded machine is the ITEM transition (validateTransition + APPROVAL_ITEM_TRANSITIONS, line ~177). Census verdict: aggregation, not a state machine (docs/rules/lifecycle-state-machines.md).
     `UPDATE approval_batches SET items = @items, status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`,
   ),
   deleteById: db.prepare(
