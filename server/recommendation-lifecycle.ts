@@ -54,7 +54,10 @@ export const REC_POLICY_REGISTRY: RecPolicyRegistry = {
 
 /** Run a lifecycle mutation transactionally: re-read inside the txn, mutate the matched rec,
  *  recompute summary, persist. Returns the mutated rec (or null when the rec id is absent).
- *  The `apply` callback mutates ONLY the lifecycle axis — it must never touch `rec.status`. */
+ *  The `apply` callback mutates ONLY the lifecycle axis — it must never touch `rec.status`,
+ *  with ONE narrow, invariant-preserving exception: strikeRecommendation resets a `completed`
+ *  status to `pending` (see its body) to keep the two axes consistent with the struck≠completed
+ *  DB trigger (migration 168). No other lifecycle mutation writes RecStatus. */
 function mutateRec(
   workspaceId: string,
   recId: string,
@@ -133,6 +136,20 @@ export function strikeRecommendation(
     rec.lifecycle = 'struck';
     rec.struckAt = new Date().toISOString();
     if (cascade) rec.cascade = cascade;
+    // NARROW invariant-preserving RecStatus reset (the ONE documented exception to the
+    // "lifecycle mutations never write RecStatus" contract — see mutateRec's doc). Striking a
+    // rec that was already `completed` (a legal, unguarded state: complete an active rec, then
+    // strike it) would otherwise persist lifecycle='struck' + status='completed' — the exact
+    // contradiction the struck≠completed DB trigger (migration 168) aborts, turning a legitimate
+    // operator strike (and, via applyBulkRecommendationAction's single txn, an ENTIRE bulk strike)
+    // into a 500. Reset to 'pending' so the two axes stay consistent. This mirrors regen's own
+    // exempt-completed handling (server/domains/recommendations/finalization.ts ~205-209), which
+    // already reverts completed→pending under the same validateTransition guard. A struck rec must
+    // never read as "✓ done" to the client, so undoing the stale completion is also correct UX.
+    if (rec.status === 'completed') {
+      validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, rec.status, 'pending');
+      rec.status = 'pending';
+    }
   });
 }
 
