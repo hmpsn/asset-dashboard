@@ -137,6 +137,85 @@ describe('public summary returns the full scorecard the client component renders
     expect(body.totalScored).toBe(1);
     expect(Array.isArray(body.byCategory)).toBe(true);
   });
+
+  // C4 (attribution honesty): a `not_acted_on` action — an unexecuted proposal — must NOT
+  // count toward the client scorecard win rate or scored/confirmed-wins totals, even when its
+  // outcome scored a win. The PUBLIC summary route computes the scorecard with not_acted_on
+  // EXCLUDED (excludeNotActedOn: true); the admin route keeps them.
+  it('excludes not_acted_on actions from the client win rate and scored counts', async () => {
+    const seeded = seedWorkspace({ clientPassword: '' });
+    const isolatedWs = seeded.workspaceId;
+    try {
+      // 1 executed win — counts.
+      const executedId = await recordActionViaApi(isolatedWs, {
+        actionType: 'meta_updated',
+        sourceType: 'c4-executed',
+        sourceId: `c4-exec-${RUN_ID}`,
+        attribution: 'platform_executed',
+      });
+      insertOutcomeRow({ actionId: executedId, score: 'strong_win' });
+
+      // 1 unexecuted proposal that ALSO scored a win — must be excluded.
+      const proposalId = await recordActionViaApi(isolatedWs, {
+        actionType: 'meta_updated',
+        sourceType: 'c4-proposal',
+        sourceId: `c4-prop-${RUN_ID}`,
+        attribution: 'not_acted_on',
+      });
+      insertOutcomeRow({ actionId: proposalId, score: 'strong_win' });
+
+      const res = await api(`/api/public/outcomes/${isolatedWs}/summary`);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+
+      // Only the executed win counts: 1 scored, 100% win rate — NOT 2 scored / diluted.
+      expect(body.totalScored).toBe(1);
+      expect(body.overallWinRate).toBeCloseTo(1.0, 5);
+      expect(body.strongWinRate).toBeCloseTo(1.0, 5);
+      // The proposal is dropped from totalTracked too (client sees only executed work).
+      expect(body.totalTracked).toBe(1);
+    } finally {
+      seeded.cleanup();
+    }
+  });
+
+  // C4: the not_acted_on proposal must also never appear in the "we called it" wins feed,
+  // and every entry carries its honest attribution field.
+  it('excludes not_acted_on from the wins feed and carries attribution on each entry', async () => {
+    const seeded = seedWorkspace({ clientPassword: '' });
+    const isolatedWs = seeded.workspaceId;
+    try {
+      const executedId = await recordActionViaApi(isolatedWs, {
+        actionType: 'content_refreshed',
+        sourceType: 'c4-wins-exec',
+        sourceId: `c4-wins-exec-${RUN_ID}`,
+        attribution: 'platform_executed',
+      });
+      insertOutcomeRow({ actionId: executedId, score: 'win', attributedValue: 50 });
+
+      const proposalId = await recordActionViaApi(isolatedWs, {
+        actionType: 'content_refreshed',
+        sourceType: 'c4-wins-prop',
+        sourceId: `c4-wins-prop-${RUN_ID}`,
+        attribution: 'not_acted_on',
+      });
+      insertOutcomeRow({ actionId: proposalId, score: 'strong_win', attributedValue: 999 });
+
+      const res = await api(`/api/public/outcomes/${isolatedWs}/wins`);
+      expect(res.status).toBe(200);
+      const wins = await res.json() as Array<Record<string, unknown>>;
+
+      expect(wins.find(w => w.actionId === executedId)).toBeDefined();
+      expect(wins.find(w => w.actionId === proposalId)).toBeUndefined();
+      // Every surfaced win carries an honest, non-not_acted_on attribution.
+      for (const w of wins) {
+        expect(w.attribution).toBeDefined();
+        expect(w.attribution).not.toBe('not_acted_on');
+      }
+    } finally {
+      seeded.cleanup();
+    }
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

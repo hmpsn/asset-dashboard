@@ -156,6 +156,43 @@ describe('PATCH /api/public/deliverables/:workspaceId/:id/respond auth', () => {
     expect(getSchemaPlan(pwless.webflowSiteId)?.status).toBe('sent_to_client');
     expect(getDeliverable(deliverable.id)?.status).toBe('awaiting_client');
   });
+
+  it('returns 409 for a recommendation-type deliverable (canonical decision is the act-on route, not generic respond)', async () => {
+    const now = new Date().toISOString();
+    const deliverable = upsertDeliverable({
+      workspaceId: pwless.workspaceId,
+      type: 'recommendation',
+      kind: 'decision',
+      status: 'awaiting_client',
+      title: 'Refresh the HVAC pillar',
+      summary: 'Traffic is decaying on the pillar page.',
+      payload: {
+        family: 'recommendation',
+        recommendationId: 'rec_test_1',
+        recType: 'content',
+        insight: 'why',
+        estimatedGain: '+12% clicks',
+        targetKeyword: 'hvac repair',
+        strategyCardContext: {},
+      },
+      externalRef: 'rec_test_1',
+      sentAt: now,
+      generatedAt: now,
+      source: 'recommendation-mirror',
+      sourceRef: 'recommendation:rec_test_1',
+    });
+
+    const res = await clientFetch(
+      `/api/public/deliverables/${pwless.workspaceId}/${deliverable.id}/respond`,
+      { method: 'PATCH', body: JSON.stringify({ decision: 'approved' }) },
+    );
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toMatch(/act-on/i);
+    // The mirror must NOT have been mutated by the generic respond path.
+    expect(getDeliverable(deliverable.id)?.status).toBe('awaiting_client');
+  });
 });
 
 describe('POST /api/deliverables/:workspaceId/:id/remind (admin)', () => {

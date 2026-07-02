@@ -38,6 +38,8 @@ import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
 import db from '../../server/db/index.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
+import { saveSnapshot } from '../../server/reports.js';
+import { saveRedirectSnapshot } from '../../server/redirect-store.js';
 import {
   SNAPSHOT_TABLE_REGISTRY,
   SNAPSHOT_TABLE_NAMES,
@@ -214,24 +216,43 @@ describe('snapshot table registry census', () => {
 });
 
 describe('migration 167 retrofit — row preservation + orphan quarantine', () => {
-  it('audit_snapshots: workspace_id backfills correctly for resolvable rows', () => {
+  it('audit_snapshots: the REAL writer (saveSnapshot) threads workspace_id forward (C1/D3)', () => {
     const ws = seedWorkspace();
     cleanups.push(ws.cleanup);
 
-    const id = `audit-${randomUUID().slice(0, 8)}`;
-    db.prepare(`
-      INSERT INTO audit_snapshots (id, site_id, site_name, created_at, audit, action_items)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, ws.webflowSiteId, 'Test Site', new Date().toISOString(), '{}', '[]');
-    cleanups.push(() => db.prepare('DELETE FROM audit_snapshots WHERE id = ?').run(id));
+    const EMPTY_AUDIT = {
+      siteScore: 0, totalPages: 0, errors: 0, warnings: 0, infos: 0, pages: [], siteWideIssues: [],
+    };
 
-    // A row inserted post-migration via the legacy site_id-only INSERT (matching
-    // server/reports.ts saveSnapshot(), which does not set workspace_id) has a NULL
-    // workspace_id until backfilled — this test documents that new inserts through the
-    // existing write path do NOT automatically populate workspace_id (it's additive,
-    // not yet wired into the writer — see server/reports.ts insertSnapshotStmt()).
-    const row = db.prepare('SELECT workspace_id, site_id FROM audit_snapshots WHERE id = ?').get(id) as { workspace_id: string | null; site_id: string };
+    // Insert through the ACTUAL production write path, not a hand-rolled legacy INSERT.
+    // Pre-D3 this writer set only site_id and every post-167 row landed with a NULL
+    // workspace_id (the FK CASCADE the registry advertises never fired). D3 threads the
+    // 1:1-resolved workspace_id — seedWorkspace() gives this site_id a single owning
+    // workspace, so the COUNT=1 resolution must populate it.
+    const snapshot = saveSnapshot(ws.webflowSiteId, 'Test Site', EMPTY_AUDIT);
+    cleanups.push(() => db.prepare('DELETE FROM audit_snapshots WHERE id = ?').run(snapshot.id));
+
+    const row = db.prepare('SELECT workspace_id, site_id FROM audit_snapshots WHERE id = ?').get(snapshot.id) as { workspace_id: string | null; site_id: string };
     expect(row.site_id).toBe(ws.webflowSiteId);
+    expect(row.workspace_id).toBe(ws.workspaceId);
+  });
+
+  it('redirect_snapshots: the REAL writer (saveRedirectSnapshot) threads workspace_id forward (C1/D3)', () => {
+    const ws = seedWorkspace();
+    cleanups.push(ws.cleanup);
+
+    const EMPTY_REDIRECT_RESULT = {
+      chains: [], pageStatuses: [],
+      summary: { totalPages: 0, healthy: 0, redirecting: 0, notFound: 0, errors: 0, chainsDetected: 0, longestChain: 0 },
+      scannedAt: new Date(0).toISOString(),
+    };
+
+    const snapshot = saveRedirectSnapshot(ws.webflowSiteId, EMPTY_REDIRECT_RESULT);
+    cleanups.push(() => db.prepare('DELETE FROM redirect_snapshots WHERE id = ?').run(snapshot.id));
+
+    const row = db.prepare('SELECT workspace_id, site_id FROM redirect_snapshots WHERE id = ?').get(snapshot.id) as { workspace_id: string | null; site_id: string };
+    expect(row.site_id).toBe(ws.webflowSiteId);
+    expect(row.workspace_id).toBe(ws.workspaceId);
   });
 
   it('performance_snapshots_orphaned exists and quarantines rows whose site_id does not resolve to a workspace (never deletes)', () => {

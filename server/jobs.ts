@@ -329,6 +329,14 @@ export function cancelJob(id: string): Job | undefined {
   if (ac) ac.abort();
   const job = jobs.get(id);
   if (job && (job.status === 'pending' || job.status === 'running')) {
+    try {
+      validateTransition('background_job', BACKGROUND_JOB_TRANSITIONS, job.status, 'cancelled');
+    } catch (err) {
+      if (isProgrammingError(err)) {
+        log.warn({ err, jobId: id, from: job.status, to: 'cancelled' }, 'jobs/cancelJob: invalid status transition ignored');
+      }
+      return job;
+    }
     Object.assign(job, { status: 'cancelled', message: 'Cancelled by user', updatedAt: new Date().toISOString() });
     stmts().update.run({
       id: job.id,

@@ -56,8 +56,23 @@ const router = Router();
 
 // ── Helpers ──
 
-function computeScorecard(workspaceId: string): OutcomeScorecard {
-  const actions = getActionsByWorkspace(workspaceId);
+/**
+ * Compute the outcome scorecard for a workspace.
+ *
+ * `excludeNotActedOn` (C4 attribution-honesty): when true, `not_acted_on` actions —
+ * unexecuted proposals the workspace never acted on — are dropped from ALL rollups
+ * (win-rate numerator/denominator, byCategory, totals, trend) so they never inflate
+ * a client-facing win rate or "confirmed wins" count. The ADMIN summary route leaves
+ * this false to preserve the historical admin-parity semantics (admin surfaces
+ * deliberately include not_acted_on for full-funnel visibility — see the /overview
+ * parity contract). The PUBLIC summary route passes true. This mirrors the A1
+ * exclusion already applied to the wins surfaces (getTopWinsFromActions).
+ */
+function computeScorecard(workspaceId: string, opts?: { excludeNotActedOn?: boolean }): OutcomeScorecard {
+  const allActions = getActionsByWorkspace(workspaceId);
+  const actions = opts?.excludeNotActedOn
+    ? allActions.filter(a => a.attribution !== 'not_acted_on')
+    : allActions;
 
   // Group by action type
   const byType = new Map<ActionType, { wins: number; strongWins: number; scored: number; total: number }>();
@@ -444,7 +459,13 @@ router.get('/api/public/outcomes/:workspaceId/summary', requireClientPortalAuth(
     // Full OutcomeScorecard serialization (E5): the client OutcomeSummary component
     // renders strongWinRate and pendingMeasurement — omitting them produced NaN%.
     // Nothing here is admin-sensitive (aggregate win-rate stats only; no $ values).
-    const scorecard = computeScorecard(req.params.workspaceId);
+    //
+    // C4 (attribution honesty): exclude `not_acted_on` actions — unexecuted proposals
+    // the workspace never acted on — from the CLIENT win-rate and confirmed-wins counts.
+    // Including them would inflate the client's win rate with outcomes for work nobody
+    // did. The admin summary/overview routes deliberately keep them (admin parity); this
+    // is the client-only honest variant.
+    const scorecard = computeScorecard(req.params.workspaceId, { excludeNotActedOn: true });
     res.json(scorecard);
   } catch (err) {
     log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get client summary');
@@ -545,6 +566,9 @@ router.get('/api/public/outcomes/:workspaceId/wins', requireClientPortalAuth(), 
       delta: w.delta,
       score: w.score,
       attributedValue: w.attributedValue,
+      // C4: carry honest execution attribution so WinsSurface frames externally_executed
+      // wins truthfully ("we called it") instead of claiming "we shipped it".
+      attribution: w.attribution,
       detectedAt: w.scoredAt,
     }));
     res.json(entries);

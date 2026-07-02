@@ -26,6 +26,7 @@ import {
 import { mutateRecommendationItem } from './domains/recommendations/storage.js';
 import { validateTransition, RECOMMENDATION_TRANSITIONS, CLIENT_REC_TRANSITIONS } from './state-machines.js';
 import { creditArchetypeCycleOnSend } from './strategy-autosend-store.js';
+import { getActionBySource, updateAttribution } from './outcome-tracking.js';
 import { createLogger } from './logger.js';
 import type { Recommendation, RecPolicyRegistry } from '../shared/types/recommendations.js';
 
@@ -131,7 +132,13 @@ export function strikeRecommendation(
   recId: string,
   cascade?: Recommendation['cascade'],
 ): Recommendation | null {
-  return mutateRec(workspaceId, recId, (rec) => {
+  // C4 (attribution honesty): capture whether THIS strike reset a `completed` rec. When it
+  // did, a `platform_executed` tracked_actions row was recorded at completion — and once the
+  // rec is struck that credit is a lie: the work was un-done, but the outcome row (with its
+  // immortal B11 snapshot title) can still surface as a client "win". We neutralize that row
+  // AFTER the txn commits (below).
+  let resetFromCompleted = false;
+  const struck = mutateRec(workspaceId, recId, (rec) => {
     if (rec.lifecycle === 'struck') return; // idempotent re-strike — keep the original struckAt
     rec.lifecycle = 'struck';
     rec.struckAt = new Date().toISOString();
@@ -149,8 +156,26 @@ export function strikeRecommendation(
     if (rec.status === 'completed') {
       validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, rec.status, 'pending');
       rec.status = 'pending';
+      resetFromCompleted = true;
     }
   });
+
+  // C4: neutralize the completion-time outcome so a struck rec can never become a client win.
+  // Only when we actually reset a completed rec (a re-strike or a strike of a never-completed rec
+  // recorded no such outcome). Fired AFTER the txn commits — mirrors sendRecommendation's
+  // post-commit cycle-credit pattern. Best-effort: never throw into the strike path.
+  if (struck && resetFromCompleted) {
+    try {
+      const action = getActionBySource('recommendation', recId);
+      if (action && action.attribution !== 'not_acted_on') {
+        updateAttribution(action.id, workspaceId, 'not_acted_on');
+      }
+    } catch (err) {
+      log.warn({ err, workspaceId, recId }, 'Failed to neutralize struck-rec outcome attribution');
+    }
+  }
+
+  return struck;
 }
 
 /** Undo a strike (lifecycle: struck → active). Restores the rec to active and clears the

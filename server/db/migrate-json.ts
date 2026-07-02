@@ -840,7 +840,7 @@ function migrateWorkOrders(): number {
  */
 function normalizeLegacyRecommendation(raw: any, workspaceId: string, index: number): Recommendation {
   const now = new Date().toISOString();
-  return {
+  const normalized = {
     ...(raw && typeof raw === 'object' ? raw : {}),
     id: typeof raw?.id === 'string' && raw.id ? raw.id : `legacy-rec-${index}`,
     workspaceId: typeof raw?.workspaceId === 'string' && raw.workspaceId ? raw.workspaceId : workspaceId,
@@ -862,6 +862,15 @@ function normalizeLegacyRecommendation(raw: any, workspaceId: string, index: num
     createdAt: typeof raw?.createdAt === 'string' && raw.createdAt ? raw.createdAt : now,
     updatedAt: typeof raw?.updatedAt === 'string' && raw.updatedAt ? raw.updatedAt : now,
   } as Recommendation;
+  // struck≠completed invariant (migration 168): a struck rec must never read as "done".
+  // A legacy blob may carry lifecycle:'struck' + status:'completed'; demote status to
+  // 'pending' before insert so the DB trigger doesn't ABORT and the stale value doesn't
+  // survive in the payload (reads parse the payload only). Mirrors coerceStruckCompleted
+  // in server/domains/recommendations/storage.ts.
+  if (normalized.lifecycle === 'struck' && normalized.status === 'completed') {
+    normalized.status = 'pending';
+  }
+  return normalized;
 }
 
 /**

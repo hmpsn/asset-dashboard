@@ -182,6 +182,9 @@ function PremiumBreakdown({ scorecard }: { scorecard: OutcomeScorecard }) {
 // --- Main component -----------------------------------------------------
 
 export default function OutcomeSummary({ workspaceId, tier }: OutcomeSummaryProps) {
+  // C4 (attribution honesty): useClientOutcomeSummary reads GET /api/public/outcomes/:ws/summary,
+  // which computes the scorecard with not_acted_on actions EXCLUDED — so the win rate, scored /
+  // confirmed-wins counts, and category breakdown below never count unexecuted proposals as wins.
   const { data, isLoading } = useClientOutcomeSummary(workspaceId);
   // A scorecard with nothing scored yet renders as a wall of 0% — that reads as
   // failure, not "too early". Treat it the same as no data: show the empty state.

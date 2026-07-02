@@ -150,6 +150,10 @@ export function ContentGaps({ contentGaps, workspaceId, maxVisible }: ContentGap
                         sourceType: 'content_gap',
                         sourceId: gapSourceId,
                         targetKeyword: gap.targetKeyword,
+                        // C4: "Keep" is a pure curation decision — no execution happened.
+                        // not_acted_on is the honest attribution (never ride the deprecated
+                        // default, which would let a kept gap become a phantom "win").
+                        attribution: 'not_acted_on',
                       });
                     }
                   }}

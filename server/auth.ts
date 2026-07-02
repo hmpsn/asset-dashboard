@@ -245,7 +245,7 @@ export function requestUserCanAccessWorkspace(req: Request, workspaceId: string)
   return !!req.user.workspaceIds?.includes(workspaceId);
 }
 
-function requestUserCanOmitWorkspaceScope(req: Request): boolean {
+export function requestUserCanOmitWorkspaceScope(req: Request): boolean {
   return !req.user || req.user.role === 'owner';
 }
 

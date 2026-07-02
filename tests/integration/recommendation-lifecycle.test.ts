@@ -26,6 +26,7 @@ import {
 } from '../../server/recommendation-lifecycle.js';
 import { InvalidTransitionError } from '../../server/state-machines.js';
 import { StruckRecCompletionError, updateRecommendationStatus } from '../../server/domains/recommendations/status-service.js';
+import { recordAction, getActionBySource } from '../../server/outcome-tracking.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
 
 let wsId = '';
@@ -92,6 +93,56 @@ describe('recommendation-lifecycle single-writer', () => {
     expect(after.lifecycle).toBe('struck');
     expect(after.struckAt).toBeTruthy();
     expect(after.status).toBe('pending'); // RecStatus untouched — the trust-critical graft
+  });
+
+  // C4 (attribution honesty): striking a COMPLETED rec resets its RecStatus to pending,
+  // but the platform_executed outcome recorded at completion would otherwise remain and
+  // could resurface as a client "win" for un-done work. strikeRecommendation must neutralize
+  // that tracked action to not_acted_on so the wins/digest exclusion filters drop it.
+  it('strikeRecommendation neutralizes the completion-time outcome of a struck completed rec', () => {
+    seed([rec({ id: 'strike_neutralize', status: 'completed' })]);
+    // A platform_executed outcome recorded at completion time, keyed by sourceType/sourceId.
+    const action = recordAction({ // recordAction-ok
+      attribution: 'platform_executed',
+      workspaceId: wsId,
+      actionType: 'insight_acted_on',
+      sourceType: 'recommendation',
+      sourceId: 'strike_neutralize',
+      pageUrl: '/struck-page',
+      baselineSnapshot: { captured_at: new Date().toISOString(), clicks: 10 },
+    });
+    expect(action.attribution).toBe('platform_executed');
+
+    strikeRecommendation(wsId, 'strike_neutralize');
+
+    // The completed rec was reset to pending (existing invariant) AND its outcome neutralized.
+    const after = loadRecommendations(wsId)!.recommendations.find(r => r.id === 'strike_neutralize')!;
+    expect(after.lifecycle).toBe('struck');
+    expect(after.status).toBe('pending');
+    const neutralized = getActionBySource('recommendation', 'strike_neutralize');
+    expect(neutralized?.attribution).toBe('not_acted_on');
+  });
+
+  // Guard the no-op case: striking a rec that was NEVER completed records no completion
+  // outcome, so there is nothing to neutralize and any pre-existing action is left alone.
+  it('strikeRecommendation leaves a non-completed rec\'s outcome attribution untouched', () => {
+    seed([rec({ id: 'strike_pending_keep', status: 'pending' })]);
+    const action = recordAction({ // recordAction-ok
+      attribution: 'platform_executed',
+      workspaceId: wsId,
+      actionType: 'insight_acted_on',
+      sourceType: 'recommendation',
+      sourceId: 'strike_pending_keep',
+      pageUrl: '/pending-page',
+      baselineSnapshot: { captured_at: new Date().toISOString(), clicks: 10 },
+    });
+
+    strikeRecommendation(wsId, 'strike_pending_keep');
+
+    // status was already pending → no RecStatus reset → no neutralization. Attribution unchanged.
+    const unchanged = getActionBySource('recommendation', 'strike_pending_keep');
+    expect(unchanged?.id).toBe(action.id);
+    expect(unchanged?.attribution).toBe('platform_executed');
   });
 
   it('strikeRecommendation is idempotent — a re-strike returns the struck rec', () => {

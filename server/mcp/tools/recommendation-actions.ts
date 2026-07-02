@@ -17,6 +17,7 @@ import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidati
 import { createLogger } from '../../logger.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { toMcpJsonSchema } from '../json-schema.js';
+import { mirrorRecommendationToDeliverable } from '../../domains/inbox/recommendation-dual-write.js';
 import {
   buildDashboardUrl,
   mcpError,
@@ -43,6 +44,38 @@ export const recommendationActionTools: Tool[] = [
     inputSchema: toMcpJsonSchema(applyRecommendationInputSchema),
   },
 ];
+
+/**
+ * Observe the typed dual-write MirrorResult (R4-PR1 contract — see
+ * server/domains/inbox/recommendation-dual-write.ts). Mirrors the `observeRecMirror` helper in
+ * server/routes/recommendations.ts (kept local to this file rather than shared/exported: it is a
+ * thin activity+log observer, not domain logic). The mirror is best-effort — the rec is already
+ * sent — but a failure must not be swallowed silently: on `ok:false` record a durable admin-only
+ * activity entry (rec_status_updated is NOT client-visible) + a Pino error so the operator and the
+ * divergence sweep can see that an MCP-sent rec never reached the client feed.
+ */
+function observeRecMirror(
+  workspaceId: string,
+  rec: Pick<Recommendation, 'id' | 'title'>,
+  result: ReturnType<typeof mirrorRecommendationToDeliverable>,
+): void {
+  if (result.ok) return;
+  try {
+    addActivity(
+      workspaceId,
+      'rec_status_updated',
+      `Client-deliverable mirror failed for "${rec.title}"`,
+      `The recommendation was sent but its unified deliverable mirror did not write (${result.error}). The client feed may not show it until reconciled.`,
+      { source: 'mcp-chat', recId: rec.id, mirrorError: result.error },
+    );
+  } catch (activityErr) {
+    log.error({ err: activityErr, workspaceId, recId: rec.id }, 'failed to record rec mirror-failure activity');
+  }
+  log.error(
+    { workspaceId, recId: rec.id, error: result.error },
+    'recommendation dual-write mirror failed (observed by mcp tool)',
+  );
+}
 
 function recToSummary(rec: Recommendation): Record<string, unknown> {
   return {
@@ -133,6 +166,12 @@ async function handleApplyRecommendation(
   invalidateIntelligenceCache(workspaceId);
   if (action === 'send') {
     broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, clientStatus: 'sent' });
+    // Close-the-loop half #1 (spec §7 / P2-2), same seam as the per-row /send route and the bulk
+    // send action: mirror the freshly-sent rec into the unified client_deliverable model so it
+    // actually reaches the client feed/inbox. Best-effort + fires its OWN DELIVERABLE_SENT
+    // broadcast (never throws) — do NOT broadcast again here. R4-PR1: observe the typed result and
+    // record a durable activity on failure rather than silently swallowing the divergence.
+    observeRecMirror(workspaceId, rec, mirrorRecommendationToDeliverable(workspaceId, rec));
     addActivity(
       workspaceId,
       'rec_sent',

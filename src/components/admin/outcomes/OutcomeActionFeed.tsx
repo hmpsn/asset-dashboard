@@ -3,26 +3,26 @@ import { Activity, ChevronDown, ChevronUp, ExternalLink, Filter } from 'lucide-r
 import { Button, ClickableRow, SectionCard, Badge, EmptyState, FormSelect, Skeleton } from '../../ui';
 import { useOutcomeActions } from '../../../hooks/admin/useOutcomes';
 import type { ActionType, TrackedAction } from '../../../../shared/types/outcome-tracking';
+import { ACTION_CATALOG } from '../../../../shared/types/action-catalog';
 import { ACTION_TYPE_LABELS, formatOutcomeDate } from './outcomeConstants';
 
 interface Props {
   workspaceId: string;
 }
 
+// Derived from the canonical action catalog (shared/types/action-catalog.ts)
+// instead of a hand-maintained literal — a hand-rolled list previously drifted
+// out of sync and silently omitted live ActionTypes from the filter dropdown.
+// `Object.keys` typed via `as ActionType[]` is safe: ACTION_CATALOG.outcome is
+// `satisfies Record<ActionType, ActionCatalogEntry>`, so its keys are exactly
+// the ActionType union (see outcomeConstants.ts ACTION_TYPE_LABELS for the
+// same pattern).
 const ACTION_TYPE_OPTIONS: Array<{ value: ActionType | ''; label: string }> = [
   { value: '', label: 'All Types' },
-  { value: 'insight_acted_on', label: 'Insight' },
-  { value: 'content_published', label: 'Content Published' },
-  { value: 'brief_created', label: 'Brief Created' },
-  { value: 'strategy_keyword_added', label: 'Strategy Update' },
-  { value: 'schema_deployed', label: 'Schema Deployed' },
-  { value: 'audit_fix_applied', label: 'Audit Fix' },
-  { value: 'content_refreshed', label: 'Content Refresh' },
-  { value: 'internal_link_added', label: 'Internal Link' },
-  { value: 'meta_updated', label: 'Meta Update' },
-  { value: 'voice_calibrated', label: 'Voice Calibration' },
-  // Reconcile R8-PR1 (B13) — ships dark; see shared/types/outcome-tracking.ts.
-  { value: 'gbp_review_reply', label: 'GBP Review Reply Published' },
+  ...(Object.keys(ACTION_CATALOG.outcome) as ActionType[]).map((type) => ({
+    value: type,
+    label: ACTION_TYPE_LABELS[type],
+  })),
 ];
 
 const SCORE_OPTIONS: Array<{ value: string; label: string }> = [

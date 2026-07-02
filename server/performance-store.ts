@@ -11,11 +11,22 @@ import { matchPageIdentity } from './utils/page-address.js';
 // ── Prepared statements (lazy) ──
 
 const stmts = createStmtCache(() => ({
+  // C1 (D3): write workspace_id forward on every snapshot. Migration 167 backfilled it
+  // + advertises an FK ON DELETE CASCADE, but this writer only set site_id, so every
+  // post-167 row landed with workspace_id NULL and the cascade never fired.
   upsert: db.prepare(`
     INSERT OR REPLACE INTO performance_snapshots
-      (sub, site_id, created_at, result)
-    VALUES (@sub, @site_id, @created_at, @result)
+      (sub, site_id, workspace_id, created_at, result)
+    VALUES (@sub, @site_id, @workspace_id, @created_at, @result)
   `),
+  // C1 (D3): resolve site_id -> workspace_id ONLY on an exact 1:1 (COUNT=1) match. This
+  // table's site_id is OVERLOADED — saveSinglePageSpeed stores `${webflowSiteId}_${pageKey}`
+  // and saveCompetitorCompare stores a URL-derived key with no workspace — so those keys
+  // never equal a real workspaces.webflow_site_id and correctly resolve to NULL here,
+  // exactly as migration 167 quarantines them (never guessed via prefix/arbitrary pick).
+  resolveWorkspaceIdBySiteId: db.prepare(
+    `SELECT COUNT(*) AS n, MIN(id) AS id FROM workspaces WHERE webflow_site_id = ?`,
+  ),
   get: db.prepare<[sub: string, siteId: string]>(
     `SELECT * FROM performance_snapshots WHERE sub = ? AND site_id = ?`,
   ),
@@ -118,6 +129,15 @@ export interface PageSpeedSummaryProjection {
   worstPages: Array<{ url?: string; page?: string; score: number }>;
 }
 
+// C1 (D3): 1:1-only resolution — NULL for zero-match / ambiguous / overloaded composite
+// site_ids (see resolveWorkspaceIdBySiteId statement above). webflow_site_id has no UNIQUE
+// constraint, so the ambiguity guard (n === 1) is load-bearing, not defensive.
+function resolveWorkspaceIdForSnapshot(siteId: string): string | null {
+  if (!siteId) return null;
+  const row = stmts().resolveWorkspaceIdBySiteId.get(siteId) as { n: number; id: string | null } | undefined;
+  return row && row.n === 1 ? row.id : null;
+}
+
 function save<T>(sub: string, siteId: string, result: T): Snapshot<T> {
   const snapshot: Snapshot<T> = {
     siteId,
@@ -127,6 +147,8 @@ function save<T>(sub: string, siteId: string, result: T): Snapshot<T> {
   stmts().upsert.run({
     sub,
     site_id: siteId,
+    // C1 (D3): thread the 1:1-resolved workspace_id so the FK CASCADE actually fires.
+    workspace_id: resolveWorkspaceIdForSnapshot(siteId),
     created_at: snapshot.createdAt,
     result: JSON.stringify(result),
   });

@@ -87,12 +87,16 @@ describe('Suite 1: Public client summary endpoint', () => {
   });
 
   it('with 0 scored actions: overallWinRate is 0, totalTracked reflects unscored count', async () => {
-    // Record 2 unscored actions
+    // Record 2 unscored EXECUTED actions. C4 attribution honesty: the client
+    // scorecard counts only executed work — not_acted_on proposals are excluded
+    // (pinned by the dedicated exclusion test below) — so these carry an explicit
+    // executed attribution to appear in totalTracked.
     for (let i = 0; i < 2; i++) {
       const r = await postJson(`/api/outcomes/${wsId}/actions`, {
         actionType: 'meta_updated',
         sourceType: 'summary-test',
         sourceId: `unscored-${RUN_ID}-${i}`,
+        attribution: 'platform_executed',
         baselineSnapshot: { position: 5, clicks: 10, impressions: 100 },
       });
       expect(r.status).toBe(200);
@@ -121,6 +125,9 @@ describe('Suite 1: Public client summary endpoint', () => {
           actionType: 'audit_fix_applied',
           sourceType: 'denom-test',
           sourceId: `denom-${RUN_ID}-${i}`,
+          // C4: executed actions so the honest public scorecard counts them (the
+          // denominator contract is orthogonal to the not_acted_on exclusion).
+          attribution: 'platform_executed',
           baselineSnapshot: { position: i + 1, clicks: i + 5 },
         });
         expect(r.status).toBe(200);
@@ -159,6 +166,56 @@ describe('Suite 1: Public client summary endpoint', () => {
       const naiveWinsFromTracked = body.overallWinRate * body.totalTracked;
       // This assertion documents the mismatch:
       expect(naiveWinsFromTracked).not.toBe(body.totalScored * body.overallWinRate);
+    } finally {
+      fresh.cleanup();
+    }
+  });
+
+  it('C4 attribution honesty: not_acted_on actions are excluded from the client scorecard', async () => {
+    // The public scorecard must count only executed work. A not_acted_on action is
+    // an unexecuted proposal the workspace never acted on — including it (or an
+    // outcome measured on it) in the client win-rate/tracked counts would claim a
+    // result for work nobody did. The admin overview route keeps them (admin parity);
+    // this pins the client-only exclusion.
+    const fresh = seedWorkspace({ clientPassword: '' });
+    const freshWsId = fresh.workspaceId;
+    try {
+      // One executed action, scored a win → should count.
+      const executed = await postJson(`/api/outcomes/${freshWsId}/actions`, {
+        actionType: 'audit_fix_applied',
+        sourceType: 'honesty-test',
+        sourceId: `exec-${RUN_ID}`,
+        attribution: 'platform_executed',
+        baselineSnapshot: { position: 3, clicks: 8 },
+      });
+      expect(executed.status).toBe(200);
+      const executedId = (await executed.json()).action.id;
+      insertOutcomeRow({ actionId: executedId, score: 'win' });
+
+      // Two not_acted_on proposals, one of them scored a win → must NOT count.
+      const proposalIds: string[] = [];
+      for (let i = 0; i < 2; i++) {
+        const r = await postJson(`/api/outcomes/${freshWsId}/actions`, {
+          actionType: 'meta_updated',
+          sourceType: 'honesty-test',
+          sourceId: `proposal-${RUN_ID}-${i}`,
+          attribution: 'not_acted_on',
+          baselineSnapshot: { position: 5, clicks: 10 },
+        });
+        expect(r.status).toBe(200);
+        proposalIds.push((await r.json()).action.id);
+      }
+      insertOutcomeRow({ actionId: proposalIds[0], score: 'win' });
+
+      const res = await api(`/api/public/outcomes/${freshWsId}/summary`);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+
+      // Only the executed action is counted; the two not_acted_on proposals (and
+      // the phantom win measured on one of them) are dropped entirely.
+      expect(body.totalTracked).toBe(1);
+      expect(body.totalScored).toBe(1);
+      expect(body.overallWinRate).toBeCloseTo(1.0, 5);
     } finally {
       fresh.cleanup();
     }

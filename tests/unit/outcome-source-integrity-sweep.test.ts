@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
     existsPost: { get: vi.fn(() => undefined) },
     existsBrief: { get: vi.fn(() => undefined) },
     existsClientAction: { get: vi.fn(() => undefined) },
+    existsGbpReviewResponse: { get: vi.fn(() => undefined) },
     // outcome-backfill.ts statements (shared mock module — see note below)
     nullLabelRecActions: { all: vi.fn(() => []) },
     fillSourceLabelIfNull: { run: vi.fn(() => ({ changes: 1 })) },
@@ -78,6 +79,7 @@ beforeEach(() => {
   mocks.stmts.existsPost.get.mockReturnValue(undefined);
   mocks.stmts.existsBrief.get.mockReturnValue(undefined);
   mocks.stmts.existsClientAction.get.mockReturnValue(undefined);
+  mocks.stmts.existsGbpReviewResponse.get.mockReturnValue(undefined);
   mocks.stmts.nullLabelRecActions.all.mockReturnValue([]);
   mocks.stmts.fillSourceLabelIfNull.run.mockReturnValue({ changes: 1 });
   mocks.loadRecommendationItem.mockReturnValue(null);
@@ -131,11 +133,15 @@ describe('sweepWorkspaceSourceIntegrity', () => {
       { source_type: 'internal_link', source_id: '/target-page' },
       { source_type: 'schema', source_id: 'webflow_page_123' },
       { source_type: 'approval', source_id: 'item_abc' },
+      // B13 (D2): 'audit' sourceId is the synthetic `${pageId}-${check}` bulk-accept-fix
+      // dedup key — no backing row exists, so it must land in the not-checkable bucket,
+      // NOT unclassifiedTypes.
+      { source_type: 'audit', source_id: 'page_1-missing-meta-description' },
     ]);
 
     const result = sweepWorkspaceSourceIntegrity('ws_1');
 
-    expect(result.totalRefs).toBe(7);
+    expect(result.totalRefs).toBe(8);
     expect(result.rowBackedCoverage).toEqual([]);
     expect(result.danglingRefs).toEqual([]);
     expect(result.selfRefCounts).toEqual({ strategy: 1, brand_voice: 1 });
@@ -145,6 +151,7 @@ describe('sweepWorkspaceSourceIntegrity', () => {
       internal_link: 1,
       schema: 1,
       approval: 1,
+      audit: 1,
     });
     expect(result.unclassifiedTypes).toEqual([]);
   });
@@ -183,6 +190,31 @@ describe('sweepWorkspaceSourceIntegrity', () => {
     // content_request resolves against content_briefs (existsBrief), not a content_requests table.
     expect(mocks.stmts.existsBrief.get).toHaveBeenCalledWith('ws_1', 'brief_missing');
     expect(mocks.stmts.existsBrief.get).toHaveBeenCalledWith('ws_1', 'brief_for_request_missing');
+  });
+
+  it('row-backed-checks gbp_review_response against google_business_review_responses (B13/D2)', () => {
+    mocks.stmts.sourceRefsByWorkspace.all.mockReturnValue([
+      { source_type: 'gbp_review_response', source_id: 'grr_alive' },
+      { source_type: 'gbp_review_response', source_id: 'grr_missing' },
+    ]);
+    // grr_alive still exists; grr_missing was deleted/regenerated -> dangling.
+    mocks.stmts.existsGbpReviewResponse.get.mockImplementation((_ws: string, id: string) =>
+      id === 'grr_alive' ? { 1: 1 } : undefined,
+    );
+
+    const result = sweepWorkspaceSourceIntegrity('ws_1');
+
+    expect(result.rowBackedCoverage).toEqual([
+      { sourceType: 'gbp_review_response', total: 2, dangling: 1 },
+    ]);
+    expect(result.danglingRefs).toEqual([
+      { sourceType: 'gbp_review_response', sourceId: 'grr_missing' },
+    ]);
+    // Probed workspace-scoped against the verified GBP review-responses table.
+    expect(mocks.stmts.existsGbpReviewResponse.get).toHaveBeenCalledWith('ws_1', 'grr_alive');
+    expect(mocks.stmts.existsGbpReviewResponse.get).toHaveBeenCalledWith('ws_1', 'grr_missing');
+    // NOT unclassified — it is a known row-backed type now.
+    expect(result.unclassifiedTypes).toEqual([]);
   });
 
   it('caps danglingRefs at 200 but reports the true count via danglingTotal + danglingTruncated', () => {
@@ -230,6 +262,43 @@ describe('runOutcomeSourceIntegritySweepJob', () => {
       }),
     );
     expect(mocks.unregisterAbort).toHaveBeenCalledWith('job-1');
+  });
+
+  it('warns when the sweep sees an unclassified source_type so a newly-minted type cannot sit silent (D2)', async () => {
+    mocks.stmts.allWorkspaceIds.all.mockReturnValue([{ id: 'ws_1' }]);
+    mocks.stmts.sourceRefsByWorkspace.all.mockReturnValue([
+      // An unknown type -> zero danglers (unclassified is never counted dangling), which
+      // WITHOUT the fleet-wide warn would let the job read "zero danglers" silently.
+      { source_type: 'freshly_minted_source_type', source_id: 'x1' },
+    ]);
+
+    await runOutcomeSourceIntegritySweepJob('job-unclassified');
+
+    expect(mocks.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ unclassifiedTypes: ['freshly_minted_source_type'] }),
+      expect.stringContaining('source types it does not classify'),
+    );
+    // Still completes (report-only) despite the unclassified type.
+    expect(mocks.updateJob).toHaveBeenCalledWith(
+      'job-unclassified',
+      expect.objectContaining({ status: 'done' }),
+    );
+  });
+
+  it('does NOT warn about unclassified types for the B13 seams now that they are classified (D2)', async () => {
+    mocks.stmts.allWorkspaceIds.all.mockReturnValue([{ id: 'ws_1' }]);
+    mocks.stmts.sourceRefsByWorkspace.all.mockReturnValue([
+      { source_type: 'gbp_review_response', source_id: 'grr_1' },
+      { source_type: 'audit', source_id: 'page_1-missing-meta' },
+    ]);
+    mocks.stmts.existsGbpReviewResponse.get.mockReturnValue({ 1: 1 });
+
+    await runOutcomeSourceIntegritySweepJob('job-b13-classified');
+
+    expect(mocks.warn).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('source types it does not classify'),
+    );
   });
 
   it('mutates nothing — result.workspaces carries zero modified/write side effects (report-only contract)', async () => {

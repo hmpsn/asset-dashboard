@@ -121,7 +121,7 @@ Terms are grouped into four **word classes**:
 
 **`useWorkspaceEvents`** — The frontend React hook for receiving workspace-scoped WebSocket broadcasts. Must be used (not `useGlobalAdminEvents`) for all events emitted via `broadcastToWorkspace()`. The hook sends a `subscribe` action to the server so the workspace filter routes the message to the correct connection. `useGlobalAdminEvents` does not subscribe and will silently miss workspace-scoped events.
 
-**WinsSurface** — A client-facing module (gated by `client-wins-surface` feature flag) that surfaces a curated feed of verified positive outcomes from the `outcome_tracking` table. Shows only actions that scored `positive` outcome, paired with context about the change and its impact. Distinct from the full Outcomes dashboard (admin-only). Located in `src/components/client/wins/`.
+**WinsSurface** — A client-facing module (no feature flag gate) that surfaces a curated feed of verified positive outcomes from the `tracked_actions` / `action_outcomes` tables. Shows only actions whose latest outcome scored `win` or `strong_win` (see `WIN_SCORES` in `server/outcome-tracking.ts`), paired with context about the change and its impact. Distinct from the full Outcomes dashboard (admin-only). Located in `src/components/client/Briefing/WinsSurface.tsx`.
 
 **Work Order** — A billable deliverable unit associated with a workspace and optionally a Stripe payment. Tracked in the `work_orders` table. Active work orders are surfaced in `ContentPipelineSlice.workOrders`. WS event: `WS_EVENTS.WORK_ORDER_UPDATE`.
 

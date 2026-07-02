@@ -130,6 +130,63 @@ describe('getROIHighlightsFromOutcomes', () => {
     expect(highlights.length).toBeLessThanOrEqual(2);
   });
 
+  // C4 (attribution honesty): a `not_acted_on` action — an unexecuted proposal the
+  // workspace never acted on — must NEVER contribute to the client monthly digest wins,
+  // even when its outcome scored a win. getWinsWithValueByWorkspace (the digest's read
+  // path) must exclude it via the `ta.attribution != 'not_acted_on'` predicate.
+  it('excludes a not_acted_on action from digest wins even when its outcome scored a win', () => {
+    const ws = `${WS_BASE}-not-acted-on`;
+    seedWorkspace(ws);
+
+    // An executed win — SHOULD appear.
+    const executed = recordAction({ // recordAction-ok
+      attribution: 'platform_executed',
+      workspaceId: ws,
+      actionType: 'content_published',
+      sourceType: 'test',
+      sourceId: crypto.randomUUID(),
+      pageUrl: '/executed-page',
+      baselineSnapshot: { captured_at: new Date().toISOString(), clicks: 10 },
+    });
+    recordOutcome({
+      actionId: executed.id,
+      checkpointDays: 30,
+      metricsSnapshot: { captured_at: new Date().toISOString(), clicks: 60 },
+      score: 'strong_win',
+      deltaSummary: { ...WIN_DELTA, delta_absolute: 50, delta_percent: 500 },
+      attributedValue: 120,
+      valueBasis: 'clicks_delta_x_cpc',
+    });
+
+    // An UNEXECUTED proposal that also "scored a win" — MUST NOT appear.
+    const proposal = recordAction({ // recordAction-ok
+      attribution: 'not_acted_on',
+      workspaceId: ws,
+      actionType: 'content_published',
+      sourceType: 'test',
+      sourceId: crypto.randomUUID(),
+      pageUrl: '/proposal-page',
+      baselineSnapshot: { captured_at: new Date().toISOString(), clicks: 10 },
+    });
+    recordOutcome({
+      actionId: proposal.id,
+      checkpointDays: 30,
+      metricsSnapshot: { captured_at: new Date().toISOString(), clicks: 90 },
+      score: 'strong_win',
+      deltaSummary: { ...WIN_DELTA, delta_absolute: 80, delta_percent: 800 },
+      attributedValue: 200,
+      valueBasis: 'clicks_delta_x_cpc',
+    });
+
+    const highlights = getROIHighlightsFromOutcomes(ws, 10);
+
+    // Only the executed win survives.
+    expect(highlights.length).toBe(1);
+    expect(highlights[0].pageUrl).toBe('/executed-page');
+    // The phantom proposal win must be absent.
+    expect(highlights.some(h => h.pageUrl === '/proposal-page')).toBe(false);
+  });
+
   // FIX 4: dedup — an action with win outcomes at BOTH the 30-day and 60-day
   // checkpoints must yield exactly ONE highlight (the higher checkpoint wins).
   it('deduplicates: one action with wins at two checkpoints yields exactly one highlight', () => {
