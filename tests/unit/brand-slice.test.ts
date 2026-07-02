@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BrandDeliverable, DeliverableType, DeliverableStatus } from '../../shared/types/brand-engine.js';
+import type { BrandDeliverable, BrandDeliverableType, BrandDeliverableStatus } from '../../shared/types/brand-engine.js';
 
 const mocks = vi.hoisted(() => ({
   buildEffectiveBrandVoiceBlock: vi.fn(),
@@ -30,9 +30,9 @@ vi.mock('../../server/brand-deliverable-read-model.js', () => ({
 const { assembleBrand } = await import('../../server/intelligence/brand-slice.js');
 
 function makeDeliverable(
-  deliverableType: DeliverableType,
+  deliverableType: BrandDeliverableType,
   content: string,
-  status: DeliverableStatus,
+  status: BrandDeliverableStatus,
 ): BrandDeliverable {
   return {
     id: `bid_${deliverableType}`,

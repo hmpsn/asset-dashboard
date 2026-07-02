@@ -179,21 +179,21 @@ export interface CalibrationSession {
 
 // ═══ BRAND IDENTITY ═══
 
-export type DeliverableType =
+export type BrandDeliverableType =
   | 'mission' | 'vision' | 'values' | 'tagline' | 'elevator_pitch'
   | 'archetypes' | 'personality_traits' | 'voice_guidelines' | 'tone_examples'
   | 'messaging_pillars' | 'differentiators' | 'positioning_matrix' | 'brand_story'
   | 'personas' | 'customer_journey' | 'objection_handling' | 'emotional_triggers';
 
 export type DeliverableTier = 'essentials' | 'professional' | 'premium';
-export type DeliverableStatus = 'draft' | 'approved';
+export type BrandDeliverableStatus = 'draft' | 'approved';
 
 export interface BrandDeliverable {
   id: string;
   workspaceId: string;
-  deliverableType: DeliverableType;
+  deliverableType: BrandDeliverableType;
   content: string;
-  status: DeliverableStatus;
+  status: BrandDeliverableStatus;
   version: number;
   tier: DeliverableTier;
   createdAt: string;
@@ -211,7 +211,7 @@ export interface DeliverableVersion {
 
 // ═══ DELIVERABLE TIER CONFIG ═══
 
-export const DEFAULT_TIER_MAP: Record<DeliverableType, DeliverableTier> = {
+export const DEFAULT_TIER_MAP: Record<BrandDeliverableType, DeliverableTier> = {
   mission: 'essentials',
   vision: 'essentials',
   values: 'essentials',

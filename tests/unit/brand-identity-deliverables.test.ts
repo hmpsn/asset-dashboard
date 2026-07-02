@@ -2,7 +2,7 @@
  * Unit + DB-backed tests for server/brand-identity.ts
  *
  * Covers:
- *   - getDeliverableInstructions: all 17 DeliverableType values return non-empty,
+ *   - getDeliverableInstructions: all 17 BrandDeliverableType values return non-empty,
  *     type-specific strings (the main bug risk: type added to union but not the
  *     instructions object silently returns the generic fallback)
  *   - exportDeliverables: empty case, approved-only filter, tier filter, markdown format
@@ -78,7 +78,7 @@ import {
   approveDeliverable,
   setDeliverableStatus,
 } from '../../server/brand-identity.js';
-import type { DeliverableType, DeliverableTier } from '../../shared/types/brand-engine.js';
+import type { BrandDeliverableType, DeliverableTier } from '../../shared/types/brand-engine.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
@@ -88,7 +88,7 @@ import { randomUUID } from 'crypto';
 
 function insertDeliverable(opts: {
   workspaceId: string;
-  type: DeliverableType;
+  type: BrandDeliverableType;
   content: string;
   status: 'draft' | 'approved';
   tier: DeliverableTier;
@@ -118,28 +118,28 @@ function insertDeliverable(opts: {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('getDeliverableInstructions — return type', () => {
-  const ALL_TYPES: DeliverableType[] = [
+  const ALL_TYPES: BrandDeliverableType[] = [
     'mission', 'vision', 'values', 'tagline', 'elevator_pitch',
     'archetypes', 'personality_traits', 'voice_guidelines', 'tone_examples',
     'messaging_pillars', 'differentiators', 'positioning_matrix', 'brand_story',
     'personas', 'customer_journey', 'objection_handling', 'emotional_triggers',
   ];
 
-  it('always returns a string for every DeliverableType value', () => {
+  it('always returns a string for every BrandDeliverableType value', () => {
     for (const type of ALL_TYPES) {
       const result = getDeliverableInstructions(type);
       expect(typeof result, `type="${type}" should return string`).toBe('string');
     }
   });
 
-  it('never returns null or undefined for any DeliverableType value', () => {
+  it('never returns null or undefined for any BrandDeliverableType value', () => {
     for (const type of ALL_TYPES) {
       const result = getDeliverableInstructions(type);
       expect(result, `type="${type}" should not be null/undefined`).toBeTruthy();
     }
   });
 
-  it('never returns an empty string for any DeliverableType value', () => {
+  it('never returns an empty string for any BrandDeliverableType value', () => {
     for (const type of ALL_TYPES) {
       const result = getDeliverableInstructions(type);
       expect(result.length, `type="${type}" returned empty string`).toBeGreaterThan(0);
@@ -281,23 +281,23 @@ describe('getDeliverableInstructions — all 17 types return specific (non-gener
 describe('getDeliverableInstructions — unknown/future type uses generic fallback', () => {
   it('unknown type returns a non-empty string', () => {
     // Cast to bypass TypeScript — simulates a type added to the union but not the map
-    const result = getDeliverableInstructions('some_future_type' as DeliverableType);
+    const result = getDeliverableInstructions('some_future_type' as BrandDeliverableType);
     expect(typeof result).toBe('string');
     expect(result.length).toBeGreaterThan(0);
   });
 
   it('unknown type returns fallback containing the type name (underscores → spaces)', () => {
-    const result = getDeliverableInstructions('some_future_type' as DeliverableType);
+    const result = getDeliverableInstructions('some_future_type' as BrandDeliverableType);
     expect(result).toContain('some future type');
   });
 
   it('unknown type fallback matches the exact generic template', () => {
-    const result = getDeliverableInstructions('some_future_type' as DeliverableType);
+    const result = getDeliverableInstructions('some_future_type' as BrandDeliverableType);
     expect(result).toBe('Write a some future type for this brand. Be specific, not generic.');
   });
 
   it('another unknown type also gets underscore replacement in fallback', () => {
-    const result = getDeliverableInstructions('brand_promise' as DeliverableType);
+    const result = getDeliverableInstructions('brand_promise' as BrandDeliverableType);
     expect(result).toContain('brand promise');
   });
 });
