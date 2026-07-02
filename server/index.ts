@@ -87,6 +87,32 @@ import { migrateTrackedKeywordsFromConfigBlob } from './tracked-keywords-store.j
 import { inferTrackedKeywordSourcesForWorkspace } from './domains/keyword-command-center/tracked-keyword-provenance.js';
 migrateTrackedKeywordsFromConfigBlob(inferTrackedKeywordSourcesForWorkspace);
 
+// Backfill legacy recommendation_sets.recommendations blobs into the normalized
+// recommendation_items row table (Reconcile R7-PR1, ADDITIVE). Idempotent + mixed-prod-safe:
+// any workspace whose recommendation_items already has rows is skipped (count>0 guard) and
+// its blob is never re-read, so post-158 regens are never clobbered. Malformed recs are
+// dropped-with-reason (never silently), and a per-workspace transaction failure never aborts
+// the sweep. Readers are unaffected — the items-win fallback still serves blob data for any
+// workspace that fails backfill. MUST run BEFORE runOutcomeRemediation so remediation sees
+// materialized rows. Retire once the blob column is dropped in a later Reconcile PR.
+import { materializeAllRecommendationItems } from './domains/recommendations/storage.js';
+const recBackfill = materializeAllRecommendationItems();
+log.info(
+  {
+    workspaces: recBackfill.workspaces,
+    blobRecs: recBackfill.blobRecs,
+    rowsWritten: recBackfill.rowsWritten,
+    dropped: recBackfill.dropped.length,
+  },
+  'Recommendation blob → rows backfill sweep complete',
+);
+if (recBackfill.dropped.length > 0) {
+  log.warn(
+    { dropped: recBackfill.dropped },
+    'Recommendation backfill dropped one or more recs — investigate reasons',
+  );
+}
+
 // One-time historical outcome-pollution remediation (A1 audit #1): relabel
 // recommendation-sourced actions the pre-A1 backfill hardcoded to audit_fix_applied,
 // and re-mark phantom-metric neutral/loss outcomes as inconclusive. Idempotent by
