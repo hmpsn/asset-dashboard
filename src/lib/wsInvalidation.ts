@@ -285,6 +285,9 @@ function adminInvalidationKeys(
         queryKeys.admin.outcomeActions(workspaceId),
         queryKeys.admin.outcomeScorecard(workspaceId),
         queryKeys.admin.outcomeTimeline(workspaceId),
+        // R9 (B15): a newly-tracked action can carry a fresh (possibly NULL-provenance)
+        // outcome row once scored — refresh the coverage funnel too.
+        queryKeys.admin.outcomeCoverage(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.client.intelligence(workspaceId),
       ] as const;
@@ -294,6 +297,9 @@ function adminInvalidationKeys(
         queryKeys.admin.outcomeScorecard(workspaceId),
         queryKeys.admin.outcomeTimeline(workspaceId),
         queryKeys.admin.outcomeTopWins(workspaceId),
+        // R9 (B15): a scored outcome writes/updates a provenance-bearing row — the funnel
+        // counts must refresh.
+        queryKeys.admin.outcomeCoverage(workspaceId),
         queryKeys.admin.outcomeLearnings(workspaceId),
         queryKeys.client.outcomeSummary(workspaceId),
         queryKeys.client.outcomeWins(workspaceId),

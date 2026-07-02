@@ -8,8 +8,10 @@ const OutcomeActionFeed = lazy(() => import('./OutcomeActionFeed'));
 const OutcomeTopWins = lazy(() => import('./OutcomeTopWins'));
 const OutcomeLearningsPanel = lazy(() => import('./OutcomeLearningsPanel'));
 const OutcomePlaybooks = lazy(() => import('./OutcomePlaybooks'));
+// R9 (B15): admin-only coverage funnel — see OutcomeCoverageFunnel.tsx header comment.
+const OutcomeCoverageFunnel = lazy(() => import('./OutcomeCoverageFunnel'));
 
-type OutcomeTab = 'scorecard' | 'actions' | 'wins' | 'learnings' | 'playbooks';
+type OutcomeTab = 'scorecard' | 'actions' | 'wins' | 'learnings' | 'playbooks' | 'coverage';
 
 interface OutcomeDashboardProps {
   workspaceId: string;
@@ -24,6 +26,8 @@ export default function OutcomeDashboard({ workspaceId }: OutcomeDashboardProps)
     { id: 'playbooks', label: 'Playbooks' },
     { id: 'actions', label: 'Actions' },
     { id: 'learnings', label: 'Learnings' },
+    // R9 (B15): admin-only diagnostic tab — never surfaced client-side.
+    { id: 'coverage', label: 'Coverage' },
   ];
 
   return (
@@ -41,6 +45,7 @@ export default function OutcomeDashboard({ workspaceId }: OutcomeDashboardProps)
           {activeTab === 'wins' && <OutcomeTopWins workspaceId={workspaceId} />}
           {activeTab === 'learnings' && <OutcomeLearningsPanel workspaceId={workspaceId} />}
           {activeTab === 'playbooks' && <OutcomePlaybooks workspaceId={workspaceId} />}
+          {activeTab === 'coverage' && <OutcomeCoverageFunnel workspaceId={workspaceId} />}
         </Suspense>
       </ErrorBoundary>
     </div>

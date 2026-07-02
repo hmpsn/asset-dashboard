@@ -25,6 +25,7 @@ import type {
   TopWin,
   OutcomeReadback,
   TrackedActionSourceSnapshot,
+  OutcomeCoverageProvenance,
 } from '../shared/types/outcome-tracking.js';
 import type { ROIHighlight } from '../shared/types/narrative.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
@@ -70,8 +71,8 @@ const stmts = createStmtCache(() => ({
   // fill a missing snapshot; nothing may ever overwrite one.
   fillPredictedEmvIfNull: db.prepare(`UPDATE tracked_actions SET predicted_emv = ?, updated_at = datetime('now') WHERE id = ? AND workspace_id = ? AND predicted_emv IS NULL`),
   insertOutcome: db.prepare(`
-    INSERT OR REPLACE INTO action_outcomes (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal, delta_summary, competitor_context, measured_at, attributed_value, value_basis)
-    VALUES (@id, @action_id, @checkpoint_days, @metrics_snapshot, @score, @early_signal, @delta_summary, @competitor_context, @measured_at, @attributed_value, @value_basis)
+    INSERT OR REPLACE INTO action_outcomes (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal, delta_summary, competitor_context, measured_at, attributed_value, value_basis, provenance)
+    VALUES (@id, @action_id, @checkpoint_days, @metrics_snapshot, @score, @early_signal, @delta_summary, @competitor_context, @measured_at, @attributed_value, @value_basis, @provenance)
   `),
   getOutcomesByAction: db.prepare(`SELECT * FROM action_outcomes WHERE action_id = ? ORDER BY checkpoint_days ASC`),
   // Returns ONE win-scored outcome per action_id (the highest checkpoint that scored
@@ -570,6 +571,12 @@ export function recordOutcome(params: {
   attributedValue?: number | null;
   /** How attributedValue was computed (e.g. 'clicks_delta_x_cpc'). Omit or pass null when attributedValue is null. */
   valueBasis?: string | null;
+  /**
+   * R9 (B15): admin-only coverage-funnel signal — how this outcome's value was derived.
+   * Omit or pass null to store NULL (computeOutcomeCoverage treats NULL as the 'estimate_ga4'
+   * read-fallback). Never rendered client-side.
+   */
+  provenance?: OutcomeCoverageProvenance | null;
 }): ActionOutcome {
   const id = crypto.randomUUID();
 
@@ -586,6 +593,7 @@ export function recordOutcome(params: {
       measured_at: new Date().toISOString(),
       attributed_value: params.attributedValue ?? null,
       value_basis: params.valueBasis ?? null,
+      provenance: params.provenance ?? null,
     });
 
     // Mark action complete after 90-day checkpoint.

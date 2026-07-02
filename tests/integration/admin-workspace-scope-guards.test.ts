@@ -115,6 +115,25 @@ describe('query/body workspaceId guards — cross-workspace JWT denial', () => {
     expect(res.status).toBe(403);
   });
 
+  // Reconcile R9 (Task B15) — GET /api/outcomes/:workspaceId/coverage is a route-PARAM
+  // (not query/body) workspaceId guard, using the SAME requireWorkspaceAccess('workspaceId')
+  // middleware as the sibling /scorecard, /top-wins, etc. routes. Admin-only coverage funnel —
+  // must reject a JWT scoped to a different workspace exactly like the rest of the outcomes
+  // admin surface.
+  it('GET /api/outcomes/:workspaceId/coverage with <other> in the path → 403 for a JWT scoped elsewhere', async () => {
+    const res = await ctx.api(`/api/outcomes/${otherWorkspace!.workspaceId}/coverage`, {
+      headers: asScopedUser(),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('GET /api/outcomes/:workspaceId/coverage with <own> in the path → 200 for the scoped JWT', async () => {
+    const res = await ctx.api(`/api/outcomes/${scopedAuth!.workspaceId}/coverage`, {
+      headers: asScopedUser(),
+    });
+    expect(res.status).toBe(200);
+  });
+
   it('no-JWT request (legacy HMAC/APP_PASSWORD path) passes through unchanged', async () => {
     // requestUserCanAccessWorkspace passes when req.user is unset — the legacy admin
     // auth model owns access. Pin it so the guard rollout can't lock out HMAC admins.

@@ -10,6 +10,7 @@ import {
   deltaSummarySchema,
   competitorContextSchema,
   earlySignalEnum,
+  outcomeCoverageProvenanceEnum,
   playbookStepSchema,
   playbookOutcomeSchema,
   workspaceLearningsDataSchema,
@@ -25,6 +26,7 @@ import type {
   DeltaSummary,
   PlaybookOutcome,
   EarlySignal,
+  OutcomeCoverageProvenance,
 } from '../../shared/types/outcome-tracking.js';
 
 // --- Row interfaces (snake_case from DB) ---
@@ -68,6 +70,10 @@ export interface ActionOutcomeRow {
   measured_at: string;
   attributed_value: number | null;
   value_basis: string | null;
+  // R9 (B15): admin-only coverage-funnel signal (nullable). NULL = legacy row recorded
+  // before this column existed; computeOutcomeCoverage() treats NULL as the 'estimate_ga4'
+  // read-fallback. See OutcomeCoverageProvenance doc in shared/types/outcome-tracking.ts.
+  provenance: string | null;
 }
 
 export interface ActionPlaybookRow {
@@ -156,6 +162,14 @@ export function rowToActionOutcome(row: ActionOutcomeRow): ActionOutcome {
     measuredAt: row.measured_at,
     attributedValue: row.attributed_value ?? null,
     valueBasis: row.value_basis ?? null,
+    // R9 (B15): validate against the enum rather than a bare cast — an unrecognized stored
+    // value degrades to null (treated as the estimate_ga4 fallback downstream) instead of
+    // silently widening the type.
+    provenance: row.provenance != null
+      ? (outcomeCoverageProvenanceEnum.safeParse(row.provenance).success
+          ? row.provenance as OutcomeCoverageProvenance
+          : null)
+      : null,
   };
 }
 

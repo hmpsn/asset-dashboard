@@ -35,6 +35,13 @@ export const outcomeScoreEnum = z.enum([
 
 export const earlySignalEnum = z.enum(['on_track', 'no_movement', 'too_early']);
 
+// Reconcile R9 (Task B15) — must stay in lockstep with OutcomeCoverageProvenance in
+// shared/types/outcome-tracking.ts. Distinct from (do not merge with) the client-facing
+// OutcomeProvenance type in the same file — see that type's doc comment for the split rationale.
+export const outcomeCoverageProvenanceEnum = z.enum([
+  'estimate_ga4', 'measured_action', 'actual_reconciled',
+]);
+
 // --- Baseline Snapshot ---
 export const baselineSnapshotSchema = z.object({
   captured_at: z.string(),
