@@ -1,8 +1,18 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **540 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **541 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 541. Enforced lexicon — GLOSSARY promoted from reference to contract (Reconcile R1-PR1)
+
+**What it does:** Promotes `GLOSSARY.md` from a flat, drift-prone reference into an **enforced vocabulary contract**. A new machine-readable registry (`shared/types/lexicon.ts`) mirrors every glossary term with a governance tag — a **word class** (`canonical` / `externally-mirrored` / `historical` / `proposed`) — and grandfathers the duplicate-exported-type-name census (30 names verified across `shared/` + `server/`, each tagged with the ticket that will resolve it: `R2` for the brand-artifact `Deliverable*` pair; `permanent` for the GA4/GSC/ROI mirror + server-internal twin pairs). `npm run verify:lexicon` (`scripts/lexicon-registry.ts`, modeled on the feature-flag lifecycle verifier) checks GLOSSARY ↔ registry parity in both directions, runs a live scan that fails on any unregistered duplicate exported name, and enforces allowlist hygiene (every entry has a `resolvingTicket`). The glossary is restructured into the four word-class sections plus a PROPOSED section that intakes the redesign mockup vocabulary (client-thread kinds `request`/`instruction`/`approval`, `promotable`, thread `new/ack/handled`, the four cockpit rail names, "promote to strategy signal") snapshotted from the untracked design folder. Wired as a pr-ci-blocking gate (package.json, ci.yml, `verify-platform.ts`, governance registry). Full contract: `docs/rules/lexicon.md`.
+
+**Why it matters to the agency:** This is the root ticket of the Reconcile migration — every later ticket's vocabulary hangs off it. The lexicon closes the class of silent bugs where a barrel importer resolves the wrong `DeliverableStatus`, where a new `ActivityType` is minted freehand with no definition, or where a duplicate type name drifts apart across two files. New collisions are now caught in CI (and nightly `pr-check --all`) instead of shipping. The word classes encode a rename policy the compiler can't: never rename a Stripe/GBP/Webflow word, never rename a persisted activity-log value.
+
+**Why it matters to clients:** Indirect but foundational — a governed vocabulary is what lets the platform's data/type layer stop moving under the P2 client-UI rebuild. Fewer silent data-shape mismatches means fewer client-visible regressions when the redesign lands.
 
 ---
 

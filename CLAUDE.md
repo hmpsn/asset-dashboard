@@ -108,6 +108,7 @@ Every completed task must include:
 | `npm run verify:platform` | Full platform health verification suite |
 | `npm run verify:platform:quick` | Quick platform checks (skips slow verifiers) |
 | `npm run verify:feature-flags` | Validate feature flag catalog consistency |
+| `npm run verify:lexicon` | Validate GLOSSARY ↔ lexicon registry parity + duplicate exported-name allowlist |
 | `npm run verify:coverage-ratchet` | Fail if coverage has regressed below ratchet |
 | `npm run rules:generate` | Regenerate `docs/rules/automated-rules.md` from pr-check CHECKS array |
 
@@ -259,6 +260,7 @@ as quick guidance plus links to the canonical rule docs.
 - **Phase-per-PR** — multi-phase features ship as one PR per phase. Never open phase N+1 until phase N is merged and CI is green on `staging`. Use `<FeatureFlag flag="...">` to dark-launch incomplete phases so production never serves broken UI. Add the flag to `shared/types/feature-flags.ts` before the first commit of any new multi-phase feature. **Before touching a gated area, read `shared/types/feature-flags.ts` directly** — look for flags with `lifecycle: 'active'` in `FEATURE_FLAG_CATALOG`. The CLAUDE.md does not maintain a static list; the file is the canonical source of truth.
 - **Client `useFeatureFlag` resolves GLOBAL flags, not per-workspace.** `src/hooks/useFeatureFlag.ts` fetches `/api/feature-flags` (the global map) — per-workspace overrides (`feature_flag_workspace_overrides`) gate the SERVER (`isFeatureEnabled(flag, workspaceId)`) and the admin, but do NOT reach the client UI's render gate. So a per-workspace override can serve client data for one workspace while the client UI still renders the OFF branch (a confusing half-on state). To pilot a client-facing flag for a single workspace you must either enable it globally (all clients' UI; only configured workspaces show real data) or make the specific gate workspace-aware. Plan client rollouts accordingly; don't assume per-workspace flips light up the client UI.
 - **Staging before main** — all PRs merge into `staging` first. After verifying on the staging deploy, merge `staging` → `main` to release to production. Never merge an unverified PR directly to `main`.
+- **Lexicon is enforced — new domain terms and duplicate type names are governed.** `GLOSSARY.md` is parity-checked against the machine-readable registry `shared/types/lexicon.ts` by `npm run verify:lexicon` (both directions). When you add a domain term to `GLOSSARY.md`, add a matching `LexiconEntry` with the correct `wordClass` (canonical / externally-mirrored / historical / proposed) in the same commit — a bare GLOSSARY edit fails the verifier. Never rename an `externally-mirrored` (Stripe/GBP/Webflow) or a persisted `historical` (`ActivityType`) value. A newly-duplicated exported `type`/`interface` name across `shared/` + `server/` fails unless added to `DUPLICATE_NAME_ALLOWLIST` with a `resolvingTicket`; when you remove a duplicate, remove its allowlist entry in the same commit (burn-down). Full contract: `docs/rules/lexicon.md`.
 - **String literal renames** — when renaming a discriminator value used across the codebase (insight type, status enum, filter key), grep the entire repo for the old literal and update ALL references in one commit. Never split a rename across multiple tasks or PRs.
 - **Retiring or renaming a public function** — when a function is retired or renamed, grep `CLAUDE.md` and all `docs/rules/*.md` for the old name and update or remove those references in the same commit. Doc examples using stale function names silently mislead agents; the compiler cannot catch it.
 - **New insight type registration** — adding a value to `InsightType` requires all four of these in the same commit: (1) `InsightType` union in `shared/types/analytics.ts`, (2) typed `XData` interface + `InsightDataMap` entry — never `Record<string,unknown>`, (3) Zod schema in `server/schemas/`, (4) frontend renderer case. Missing any one fails silently. See `docs/rules/analytics-insights.md`.
@@ -332,7 +334,8 @@ as quick guidance plus links to the canonical rule docs.
 | `docs/rules/content-quality-grounding.md` | Research-mode and provenance contracts for factual content generation and post review |
 | `docs/testing-plan.md` | Test strategy, failure mode catalog, coverage gaps, infrastructure |
 | `AI_CHATBOT_ROADMAP.md` | Client AI advisor roadmap — chat feature phases, upgrade hooks, proactive insights spec |
-| `GLOSSARY.md` | Domain terminology — Activity Log, Approval Batch, Blueprint, Insight, Playbook, etc. |
+| `GLOSSARY.md` | Domain terminology — Activity Log, Approval Batch, Blueprint, Insight, Playbook, etc. **Enforced** against the machine-readable lexicon registry (`shared/types/lexicon.ts`) by `npm run verify:lexicon`: every term has a word class (canonical / externally-mirrored / historical / proposed) and parity is checked both directions. |
+| `docs/rules/lexicon.md` | Lexicon contract — word-class semantics, PROPOSED intake, duplicate-name allowlist burn-down, relationship to ui-vocabulary + the pr-check rules |
 | `docs/rules/background-generation.md` | Full background job platform contract — when to use it, worker patterns, pr-check escape hatch |
 | `docs/rules/inbox-section-routing.md` | Inbox section routing rules — Decisions vs Conversations vs Reviews routing logic |
 | `docs/rules/seo-editor-write-targets.md` | SEO Editor static/CMS/manual write-target contract |
@@ -391,4 +394,5 @@ Work is not done until ALL pass:
 - [ ] All bugs surfaced during review are fixed — never dismiss a fixable bug as "pre-existing", "minor", or "out of scope". If a review agent or manual review finds it and it can be fixed, fix it in this PR.
 - [ ] If multi-phase feature: this PR covers exactly one phase. Phase N+1 is not started until phase N is merged and green.
 - [ ] `npm run verify:feature-flags` — no orphaned or ungrouped feature flag keys
+- [ ] `npm run verify:lexicon` — GLOSSARY ↔ lexicon registry parity holds and no unregistered duplicate exported type name
 - [ ] `npm run verify:coverage-ratchet` — coverage has not regressed below ratchet baseline
