@@ -23,6 +23,10 @@ feature/branch  →  staging  →  main (production)
 2. Run `npx tsc --noEmit --skipLibCheck` — zero type errors
 3. Run `npx vitest run` — full test suite green
 4. Run `git diff --stat` to review unstaged changes
+5. If this deploy includes a destructive migration wave (anything that drops a table per
+   `docs/rules/destructive-migrations.md`) or a bulk delete/backfill sweep: run
+   `npm run backup:restore-drill` and confirm a clean exit before proceeding — see
+   `docs/workflows/data-integrity-recovery.md`.
 
 ### 2. Push to staging
 5. Stage and commit changes

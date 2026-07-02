@@ -3079,6 +3079,117 @@ describe('Rule: New JSON-array TEXT column without normalization review', () => 
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Rule: New migration DROP TABLE without rename-to-archive contract
+// ════════════════════════════════════════════════════════════════════════════
+//
+// A1 (Reconcile R0): a migration must never DROP TABLE directly — the
+// destructive-migrations contract (docs/rules/destructive-migrations.md)
+// requires rename-to-archive (or copy-to-archive) in PR N, actual DROP in
+// PR N+1 only after staging verify + one retention window. This rule
+// baselines the 6 pre-existing DROP migrations (019, 029, 037, 049, 091,
+// 119 — all already-shipped table-rebuild patterns) and requires either
+// baseline membership (matched by filename basename, since fixtures in this
+// harness never live under the real ROOT) or an inline `-- drop-table-ok:
+// <reason>` hatch on the DROP TABLE line itself. Hatches are INLINE-ONLY —
+// unlike some other rules in this file, a hatch on the line above is
+// deliberately NOT honoured, because a destructive DROP deserves a hatch
+// that cannot be separated from the statement by a later edit.
+
+describe('Rule: New migration DROP TABLE without rename-to-archive contract', () => {
+  const RULE = 'New migration DROP TABLE without rename-to-archive contract';
+
+  it('flags a bare DROP TABLE in a new (non-baselined) migration', () => {
+    const file = write(
+      uniqPath('rule-drop-table', 'server/db/migrations/999-drop-fixture.sql'),
+      lines(
+        'DROP TABLE stale_reports;',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('stale_reports');
+  });
+
+  it('allows a DROP TABLE with an inline hatch comment on the same line', () => {
+    const file = write(
+      uniqPath('rule-drop-table-hatch', 'server/db/migrations/999-drop-hatched.sql'),
+      lines(
+        'DROP TABLE stale_reports; -- drop-table-ok: PR N+1 delayed drop, rename-to-archive shipped in #1234, one retention window elapsed',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT honour a hatch comment placed on the line above (inline-only contract)', () => {
+    const file = write(
+      uniqPath('rule-drop-table-hatch-above', 'server/db/migrations/999-drop-hatch-above.sql'),
+      lines(
+        '-- drop-table-ok: PR N+1 delayed drop, rename-to-archive shipped in #1234',
+        'DROP TABLE stale_reports;',
+      ),
+    );
+
+    // The hatch is on the line ABOVE, not the DROP TABLE line itself — must still flag.
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('allows a baselined pre-existing DROP migration by filename', () => {
+    const file = write(
+      uniqPath('rule-drop-table-baseline', 'server/db/migrations/019-cascade-workspace-delete.sql'),
+      lines(
+        'DROP TABLE IF EXISTS client_users;',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags every un-hatched DROP TABLE line when a migration has multiple', () => {
+    const file = write(
+      uniqPath('rule-drop-table-multi', 'server/db/migrations/999-drop-multi.sql'),
+      lines(
+        'DROP TABLE first_table;',
+        'DROP TABLE second_table; -- drop-table-ok: reason',
+        'DROP TABLE third_table;',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
+    expect(hits.some(h => h.text.includes('first_table'))).toBe(true);
+    expect(hits.some(h => h.text.includes('third_table'))).toBe(true);
+    expect(hits.some(h => h.text.includes('second_table'))).toBe(false);
+  });
+
+  it('ignores migrations with no DROP TABLE statement (negative control)', () => {
+    const file = write(
+      uniqPath('rule-drop-table-negative', 'server/db/migrations/999-no-drop.sql'),
+      lines(
+        'CREATE TABLE IF NOT EXISTS fresh_table (',
+        '  id TEXT PRIMARY KEY',
+        ');',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('ignores DROP TABLE IF EXISTS in the same way as bare DROP TABLE (both are destructive)', () => {
+    const file = write(
+      uniqPath('rule-drop-table-if-exists', 'server/db/migrations/999-drop-if-exists.sql'),
+      lines(
+        'DROP TABLE IF EXISTS old_table;',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // Rule: TabBar component without ?tab= deep-link support
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -5825,6 +5936,9 @@ describe('Meta: customCheck rule name registry', () => {
     // Keyword Hub cutover Phase C (2026-06-11) — the standalone Rank Tracker (seo-ranks)
     // was folded into the Hub; the 'seo-ranks' Page literal must not return to src/.
     'Retired seo-ranks route literal in src',
+    // Reconcile A1 (2026-07-01) — a migration must never DROP TABLE directly; see
+    // docs/rules/destructive-migrations.md for the rename-to-archive contract.
+    'New migration DROP TABLE without rename-to-archive contract',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {

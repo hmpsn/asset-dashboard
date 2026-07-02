@@ -26,6 +26,8 @@ const mocks = vi.hoisted(() => ({
   logInfo: vi.fn(),
   logDebug: vi.fn(),
   logError: vi.fn(),
+  getLastBackupAt: vi.fn(() => null as string | null),
+  isOffsiteConfigured: vi.fn(() => false),
 }));
 
 vi.mock('../../server/errors.js', () => ({
@@ -41,9 +43,26 @@ vi.mock('../../server/logger.js', () => ({
   }),
 }));
 
+vi.mock('../../server/backup.js', () => ({
+  DEFAULT_BACKUP_RETENTION_DAYS: 3,
+  getLastBackupAt: mocks.getLastBackupAt,
+  isOffsiteConfigured: mocks.isOffsiteConfigured,
+}));
+
 // ── Types ──
 
 type PruneFn = (arg?: number) => { sessionsRemoved: number; bytesFreed: number; errors: string[] };
+type StorageReportFn = () => Promise<{
+  totalBytes: number;
+  totalFiles: number;
+  breakdown: unknown[];
+  backupRetentionDays: number;
+  lastBackupAt: string | null;
+  offsiteConfigured: boolean;
+  chatSessionCount: number;
+  oldestChatSession: string | null;
+  timestamp: string;
+}>;
 
 // ── Per-test state ──
 
@@ -52,11 +71,15 @@ let pruneChatSessions: PruneFn;
 let pruneBackups: PruneFn;
 let pruneReportSnapshots: PruneFn;
 let pruneActivityLogs: PruneFn;
+let getStorageReport: StorageReportFn;
 
 beforeEach(async () => {
   tmpDir = mkdtempSync(join(tmpdir(), 'storage-stats-test-'));
   process.env.DATA_DIR = tmpDir;
   delete process.env.BACKUP_DIR;
+  delete process.env.BACKUP_RETENTION_DAYS;
+  mocks.getLastBackupAt.mockReturnValue(null);
+  mocks.isOffsiteConfigured.mockReturnValue(false);
 
   // Reset module registry so DATA_BASE is re-evaluated on each import
   vi.resetModules();
@@ -65,11 +88,13 @@ beforeEach(async () => {
   pruneBackups = m.pruneBackups as PruneFn;
   pruneReportSnapshots = m.pruneReportSnapshots as PruneFn;
   pruneActivityLogs = m.pruneActivityLogs as PruneFn;
+  getStorageReport = m.getStorageReport as StorageReportFn;
 });
 
 afterEach(() => {
   delete process.env.DATA_DIR;
   delete process.env.BACKUP_DIR;
+  delete process.env.BACKUP_RETENTION_DAYS;
   vi.restoreAllMocks();
   try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* best-effort */ }
 });
@@ -344,6 +369,31 @@ describe('pruneBackups', () => {
     // We can't easily set mtime to mocked-now, so just verify count
     const r_after = pruneBackups(3);
     expect(r_after.sessionsRemoved).toBe(1);
+  });
+
+  it('defaults retainDays to BACKUP_RETENTION_DAYS (env) when called with no argument', async () => {
+    // Set a custom retention via env and re-import so the module-level default picks it up.
+    process.env.BACKUP_RETENTION_DAYS = '10';
+    vi.resetModules();
+    const m = await import('../../server/storage-stats.js');
+    const pruneBackupsEnvDefault = m.pruneBackups as PruneFn;
+
+    // 5 days old: within a 10-day window (env-driven default) but would be pruned under
+    // the old hard-coded 3-day default. Asserts the two can't drift.
+    const fiveDaysAgo = -5 * 24 * 60 * 60 * 1000;
+    writeBackupDir('backup-5-days-old', fiveDaysAgo);
+
+    const r = pruneBackupsEnvDefault();
+    expect(r.sessionsRemoved).toBe(0);
+  });
+
+  it('falls back to the shared DEFAULT_BACKUP_RETENTION_DAYS (3) when BACKUP_RETENTION_DAYS is unset and no argument is passed', () => {
+    // BACKUP_RETENTION_DAYS is deleted in beforeEach.
+    const tenDaysAgo = -10 * 24 * 60 * 60 * 1000;
+    writeBackupDir('backup-10-days-old', tenDaysAgo);
+
+    const r = pruneBackups();
+    expect(r.sessionsRemoved).toBe(1);
   });
 });
 
@@ -676,5 +726,50 @@ describe('pruneActivityLogs', () => {
     // Now with 365-day window on remaining file (only twoHoursAgo left): nothing removed
     const r2 = pruneActivityLogs(365);
     expect(r2.sessionsRemoved).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getStorageReport — backup posture fields (lastBackupAt, offsiteConfigured)
+// and the backupRetentionDays fallback source-of-truth sync
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('getStorageReport backup posture', () => {
+  it('backupRetentionDays falls back to the shared DEFAULT_BACKUP_RETENTION_DAYS (3), not the old hard-coded 7', async () => {
+    // BACKUP_RETENTION_DAYS is deleted in beforeEach.
+    const report = await getStorageReport();
+    expect(report.backupRetentionDays).toBe(3);
+  });
+
+  it('backupRetentionDays reflects BACKUP_RETENTION_DAYS when set', async () => {
+    process.env.BACKUP_RETENTION_DAYS = '14';
+    vi.resetModules();
+    const m = await import('../../server/storage-stats.js');
+    const report = await (m.getStorageReport as StorageReportFn)();
+    expect(report.backupRetentionDays).toBe(14);
+  });
+
+  it('surfaces lastBackupAt from server/backup.js getLastBackupAt()', async () => {
+    mocks.getLastBackupAt.mockReturnValue('2026-05-20T00:00:00.000Z');
+    const report = await getStorageReport();
+    expect(report.lastBackupAt).toBe('2026-05-20T00:00:00.000Z');
+  });
+
+  it('surfaces lastBackupAt as null when no backup has ever run', async () => {
+    mocks.getLastBackupAt.mockReturnValue(null);
+    const report = await getStorageReport();
+    expect(report.lastBackupAt).toBeNull();
+  });
+
+  it('surfaces offsiteConfigured true when BACKUP_S3_BUCKET is set', async () => {
+    mocks.isOffsiteConfigured.mockReturnValue(true);
+    const report = await getStorageReport();
+    expect(report.offsiteConfigured).toBe(true);
+  });
+
+  it('surfaces offsiteConfigured false when BACKUP_S3_BUCKET is not set', async () => {
+    mocks.isOffsiteConfigured.mockReturnValue(false);
+    const report = await getStorageReport();
+    expect(report.offsiteConfigured).toBe(false);
   });
 });

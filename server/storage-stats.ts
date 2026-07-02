@@ -10,6 +10,7 @@ import path from 'path';
 import { DATA_BASE, getUploadRoot, getOptRoot } from './data-dir.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
+import { DEFAULT_BACKUP_RETENTION_DAYS, getLastBackupAt, isOffsiteConfigured } from './backup.js';
 
 
 const log = createLogger('storage-stats');
@@ -27,6 +28,10 @@ export interface StorageReport {
   totalFiles: number;
   breakdown: DirStats[];
   backupRetentionDays: number;
+  /** ISO timestamp of the most recent successful backup, or null if none has ever run. Read from disk (backup manifests), not in-memory state, so it survives process restarts. */
+  lastBackupAt: string | null;
+  /** Whether an off-site (S3-compatible) backup destination is configured (BACKUP_S3_BUCKET set). */
+  offsiteConfigured: boolean;
   chatSessionCount: number;
   oldestChatSession: string | null;
   timestamp: string;
@@ -203,13 +208,15 @@ export async function getStorageReport(): Promise<StorageReport> {
     }
   } catch { /* chatDir not found or inaccessible */ } // catch-ok
 
-  const retentionDays = parseInt(process.env.BACKUP_RETENTION_DAYS || '7', 10);
+  const retentionDays = parseInt(process.env.BACKUP_RETENTION_DAYS || String(DEFAULT_BACKUP_RETENTION_DAYS), 10);
 
   return {
     totalBytes,
     totalFiles,
     breakdown,
     backupRetentionDays: retentionDays,
+    lastBackupAt: getLastBackupAt(),
+    offsiteConfigured: isOffsiteConfigured(),
     chatSessionCount,
     oldestChatSession,
     timestamp: new Date().toISOString(),
@@ -265,10 +272,12 @@ export function pruneChatSessions(maxAgeDays: number = 90): PruneResult {
 /* ── Pruning: Backups ── */
 
 /**
- * Reduce backup retention to `retainDays` (default 3).
+ * Reduce backup retention to `retainDays` (defaults to BACKUP_RETENTION_DAYS, falling back to
+ * DEFAULT_BACKUP_RETENTION_DAYS — the same source of truth server/backup.ts's scheduled prune
+ * and server/routes/health.ts's prune-backups route default read from).
  * Returns count of backup dirs removed and bytes freed.
  */
-export function pruneBackups(retainDays: number = 3): PruneResult {
+export function pruneBackups(retainDays: number = parseInt(process.env.BACKUP_RETENTION_DAYS || String(DEFAULT_BACKUP_RETENTION_DAYS), 10)): PruneResult {
   const dataRoot = DATA_BASE || path.join(process.env.HOME || '', '.asset-dashboard');
   const backupRoot = process.env.BACKUP_DIR || path.join(dataRoot, 'backups');
   const cutoff = Date.now() - retainDays * 24 * 60 * 60 * 1000;
