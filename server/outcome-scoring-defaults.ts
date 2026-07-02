@@ -89,6 +89,14 @@ export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
     primary_metric: 'content_produced',
     thresholds: { strong_win: 1, win: 1, neutral_band: 0 },
   },
+  // Reconcile R8-PR1 (B13) — SHIPS DARK. gbp_review_reply is recorded when a GBP review
+  // reply publish succeeds (server/google-business-profile-review-response-publish-job.ts).
+  // No engagement-lift metric exists yet for a published reply, so this mirrors the
+  // non-metric `brief_created` shape (content_produced) until a real signal is available.
+  gbp_review_reply: {
+    primary_metric: 'content_produced',
+    thresholds: { strong_win: 1, win: 1, neutral_band: 0 },
+  },
 };
 
 export function resolveScoringConfig(

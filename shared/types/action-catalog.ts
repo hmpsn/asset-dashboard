@@ -78,7 +78,7 @@ export interface ActionCatalogEntry {
   note?: string;
 }
 
-// ── outcome context — every ActionType member (17) ──────────────────────────
+// ── outcome context — every ActionType member (18) ──────────────────────────
 //
 // Keep-markers (topic_cluster_keep, content_gap_keep) are LIVE PRODUCER entries, not
 // phantom/vestigial vocabulary — verified by grep + DB evidence in the R5 inventory
@@ -204,6 +204,13 @@ const OUTCOME_CATALOG = {
     outcomeActionType: 'content_gap_keep',
     clientVisible: false,
     note: 'LIVE keep-marker producer: src/components/strategy/ContentGaps.tsx (Keep button) via POST /api/outcomes/:ws/actions. Never scored as a win/loss outcome. Pinned by tests/integration/strategy-managed-set-keep.test.ts.',
+  },
+  gbp_review_reply: {
+    label: 'GBP Review Reply Published',
+    phase: 'prove',
+    outcomeActionType: 'gbp_review_reply',
+    clientVisible: true,
+    note: 'Reconcile R8-PR1 (B13) — SHIPS DARK. Producer: server/google-business-profile-review-response-publish-job.ts (runGbpReviewReplyPublishJob), recorded when updateGbpReviewReply succeeds. Cannot fire in production until Google API access opens; recording logic is verified now by tests. See docs/rules/outcome-engine-stubs.md.',
   },
 } as const satisfies Record<ActionType, ActionCatalogEntry>;
 

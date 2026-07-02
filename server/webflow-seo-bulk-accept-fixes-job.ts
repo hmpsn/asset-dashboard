@@ -9,9 +9,54 @@ import { WS_EVENTS } from './ws-events.js';
 import { normalizePageUrl } from './utils/page-address.js';
 import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { resolveRecommendationsForChange } from './domains/recommendations/resolution-service.js';
+import { getActionByWorkspaceAndSource, recordAction } from './outcome-tracking.js';
 import type { SeoBulkAcceptFix } from './schemas/seo-bulk-jobs.js';
 
 const log = createLogger('webflow-seo-bulk-accept-fixes-job');
+
+/**
+ * Reconcile R8-PR1 (Task B13) — attribution seam for the bulk audit-fix apply path.
+ * Records a `meta_updated` tracked action AT THE MOMENT the Webflow SEO field write
+ * succeeds for one fix — never before (a failed `updatePageSeo` call must record
+ * nothing). sourceId is `${pageId}-${check}`, matching the `appliedKey` this job already
+ * uses to identify one applied fix, so re-running bulk-accept on the same (page, check)
+ * pair is idempotent via getActionByWorkspaceAndSource. Mirrors the other meta_updated
+ * producer, server/domains/inbox/approval-batch-apply.ts (sourceType 'approval'), using
+ * sourceType 'audit' to keep the two producers' dedup spaces distinct. Guarded so a
+ * tracking failure can never abort the job — mirrors recordSchemaOutcomeAction in
+ * server/domains/schema/publish-schema-to-live.ts.
+ */
+function recordBulkAcceptFixOutcomeAction(
+  workspaceId: string,
+  fix: SeoBulkAcceptFix,
+  changedField: string,
+  pagePath: string,
+): void {
+  const sourceId = `${fix.pageId}-${fix.check}`;
+  try {
+    if (getActionByWorkspaceAndSource(workspaceId, 'audit', sourceId)) return;
+    recordAction({ // recordAction-ok: only reached after updatePageSeo succeeds, workspaceId is from a resolved workspace
+      workspaceId,
+      actionType: 'meta_updated',
+      sourceType: 'audit',
+      sourceId,
+      pageUrl: pagePath || null,
+      targetKeyword: null,
+      baselineSnapshot: {
+        captured_at: new Date().toISOString(),
+      },
+      attribution: 'platform_executed',
+      // R6 (B11): a bulk audit fix is a PAGE-ref (sourceId is the fix key, not a titled
+      // producer) — no `source` snapshot in scope, mirroring the schema-deploy seam.
+      // The generic per-action-type label is the honest display (FM-2).
+      context: {
+        notes: `Bulk audit fix applied: ${changedField} on ${fix.pageName || fix.pageId}`,
+      },
+    });
+  } catch (err) {
+    log.warn({ err, workspaceId, pageId: fix.pageId, check: fix.check }, 'Failed to record outcome action for bulk audit fix');
+  }
+}
 
 interface RunSeoBulkAcceptFixesJobOptions {
   jobId: string;
@@ -78,6 +123,7 @@ export async function runSeoBulkAcceptFixesJob({
                 : fix.pageSlug ? normalizePageUrl(fix.pageSlug) : '';
               if (pagePath) appliedSlugs.add(pagePath);
               recordSeoChange(ws.id, fix.pageId, pagePath, fix.pageName || '', [changedField], 'audit-fix');
+              recordBulkAcceptFixOutcomeAction(ws.id, fix, changedField, pagePath);
               broadcastToWorkspace(ws.id, WS_EVENTS.PAGE_STATE_UPDATED, {
                 pageId: fix.pageId,
                 fields: [changedField],

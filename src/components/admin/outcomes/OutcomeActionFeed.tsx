@@ -21,6 +21,8 @@ const ACTION_TYPE_OPTIONS: Array<{ value: ActionType | ''; label: string }> = [
   { value: 'internal_link_added', label: 'Internal Link' },
   { value: 'meta_updated', label: 'Meta Update' },
   { value: 'voice_calibrated', label: 'Voice Calibration' },
+  // Reconcile R8-PR1 (B13) — ships dark; see shared/types/outcome-tracking.ts.
+  { value: 'gbp_review_reply', label: 'GBP Review Reply Published' },
 ];
 
 const SCORE_OPTIONS: Array<{ value: string; label: string }> = [

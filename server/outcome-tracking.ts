@@ -895,6 +895,12 @@ export function getROIHighlightsFromOutcomes(workspaceId: string, limit = 10): R
       strategy_keyword_added: 'Keyword strategy update',
       insight_acted_on: 'Insight acted on',
       voice_calibrated: 'Voice calibrated',
+      // Reconcile R8-PR1 (B13) — ships dark. This is a LOOSE Record<string,string> with a
+      // `?? row.action_type` fallback (no compile guard), so gbp_review_reply must be added
+      // by hand or a scored GBP win would render the raw string in the CLIENT-FACING monthly
+      // digest (server/monthly-digest.ts). Label matches the client-facing exhaustive maps
+      // (WIN_FALLBACK_LABELS / WinsSurface) so all client surfaces read consistently.
+      gbp_review_reply: 'Replied to a Google Business Profile review',
     };
     const action = actionLabel[row.action_type] ?? row.action_type;
 

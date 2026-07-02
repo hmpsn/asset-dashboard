@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   updatePageState: vi.fn(),
   recordSeoChange: vi.fn(),
   invalidateIntelligenceCache: vi.fn(),
+  resolveRecommendationsForChange: vi.fn(),
+  getActionByWorkspaceAndSource: vi.fn(),
+  recordAction: vi.fn(),
   logger: {
     debug: vi.fn(),
     error: vi.fn(),
@@ -43,6 +46,13 @@ vi.mock('../../server/ws-events.js', () => ({
 vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
   invalidateIntelligenceCache: mocks.invalidateIntelligenceCache,
 }));
+vi.mock('../../server/domains/recommendations/resolution-service.js', () => ({
+  resolveRecommendationsForChange: mocks.resolveRecommendationsForChange,
+}));
+vi.mock('../../server/outcome-tracking.js', () => ({
+  getActionByWorkspaceAndSource: mocks.getActionByWorkspaceAndSource,
+  recordAction: mocks.recordAction,
+}));
 
 const { runSeoBulkAcceptFixesJob } = await import('../../server/webflow-seo-bulk-accept-fixes-job.js');
 
@@ -52,6 +62,7 @@ describe('webflow SEO bulk accept fixes job', () => {
     mocks.isJobCancelled.mockReturnValue(false);
     mocks.getWorkspace.mockReturnValue({ id: 'ws_1' });
     mocks.updatePageSeo.mockResolvedValue({ success: true });
+    mocks.getActionByWorkspaceAndSource.mockReturnValue(null);
   });
 
   it('applies supported audit fixes and records terminal success', async () => {
@@ -80,6 +91,17 @@ describe('webflow SEO bulk accept fixes job', () => {
       updatedBy: 'admin',
     });
     expect(mocks.recordSeoChange).toHaveBeenCalledWith('ws_1', 'page_1', '/services/seo', 'Services', ['description'], 'audit-fix');
+    // R8-PR1 (B13): a successful Webflow write records exactly one meta_updated tracked
+    // action with platform_executed attribution, keyed to the fix.
+    expect(mocks.recordAction).toHaveBeenCalledTimes(1);
+    expect(mocks.recordAction).toHaveBeenCalledWith(expect.objectContaining({
+      workspaceId: 'ws_1',
+      actionType: 'meta_updated',
+      sourceType: 'audit',
+      sourceId: 'page_1-meta-description',
+      pageUrl: '/services/seo',
+      attribution: 'platform_executed',
+    }));
     expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws_1', 'page-state:updated', {
       pageId: 'page_1',
       fields: ['description'],
@@ -121,6 +143,8 @@ describe('webflow SEO bulk accept fixes job', () => {
     expect(mocks.recordSeoChange).not.toHaveBeenCalled();
     expect(mocks.addActivity).not.toHaveBeenCalled();
     expect(mocks.broadcastToWorkspace).not.toHaveBeenCalledWith('ws_1', 'page-state:updated', expect.anything());
+    // R8-PR1 (B13) FM-2: a failed Webflow write records NO tracked action.
+    expect(mocks.recordAction).not.toHaveBeenCalled();
     expect(mocks.updateJob).toHaveBeenCalledWith('job_fail', expect.objectContaining({
       status: 'error',
       message: 'Bulk accept fixes failed for all 1 fixes',
@@ -133,6 +157,39 @@ describe('webflow SEO bulk accept fixes job', () => {
       failed: 1,
       total: 1,
     }));
+  });
+
+  it('does not record a duplicate tracked action when one already exists for the fix (idempotency)', async () => {
+    const ac = new AbortController();
+    mocks.getActionByWorkspaceAndSource.mockReturnValue({ id: 'existing_action' });
+
+    await runSeoBulkAcceptFixesJob({
+      jobId: 'job_dup',
+      workspaceId: 'ws_1',
+      token: 'token_1',
+      signal: ac.signal,
+      fixes: [{ pageId: 'page_1', check: 'title', suggestedFix: 'Better Title' }],
+    });
+
+    expect(mocks.getActionByWorkspaceAndSource).toHaveBeenCalledWith('ws_1', 'audit', 'page_1-title');
+    expect(mocks.recordAction).not.toHaveBeenCalled();
+  });
+
+  it('a tracking failure inside recordAction does not abort the job', async () => {
+    const ac = new AbortController();
+    mocks.recordAction.mockImplementation(() => {
+      throw new Error('DB write failed');
+    });
+
+    await runSeoBulkAcceptFixesJob({
+      jobId: 'job_track_fail',
+      workspaceId: 'ws_1',
+      token: 'token_1',
+      signal: ac.signal,
+      fixes: [{ pageId: 'page_1', check: 'title', suggestedFix: 'Better Title' }],
+    });
+
+    expect(mocks.updateJob).toHaveBeenCalledWith('job_track_fail', expect.objectContaining({ status: 'done' }));
   });
 
   it('reports cancellation with partial applied keys', async () => {

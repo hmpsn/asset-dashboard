@@ -26,7 +26,7 @@ import {
 } from '../../shared/types/mcp-action-schemas.js';
 
 // Real union values, sourced from the owning files (not re-typed by hand) — see the file
-// headers for canonical member counts: ActionType (17), RecType (15), ClientActionSourceType (5).
+// headers for canonical member counts: ActionType (18), RecType (15), ClientActionSourceType (5).
 const ACTION_TYPES: ActionType[] = [
   'insight_acted_on',
   'content_published',
@@ -45,6 +45,8 @@ const ACTION_TYPES: ActionType[] = [
   'local_service_added',
   'topic_cluster_keep',
   'content_gap_keep',
+  // Reconcile R8-PR1 (B13) — ships dark; see shared/types/outcome-tracking.ts.
+  'gbp_review_reply',
 ];
 
 const REC_TYPES: RecType[] = [

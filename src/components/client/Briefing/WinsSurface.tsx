@@ -29,6 +29,8 @@ const ACTION_LABELS: Record<ActionType, string> = {
   // recorded as a client-facing outcome; present only to keep this Record exhaustive).
   topic_cluster_keep:     'Prioritized a topic cluster',
   content_gap_keep:       'Prioritized a content opportunity',
+  // Reconcile R8-PR1 (B13) — ships dark; see shared/types/outcome-tracking.ts.
+  gbp_review_reply:       'Replied to a Google Business Profile review',
 };
 
 function actionLabel(type: ActionType): string {
