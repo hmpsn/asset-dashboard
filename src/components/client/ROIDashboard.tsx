@@ -5,7 +5,7 @@ import {
   Info, ChevronDown,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { EmptyState, SectionCard, Button, StatCard, ErrorState, LoadingState, TierGate } from '../ui';
+import { EmptyState, SectionCard, Button, StatCard, ErrorState, LoadingState, TierGate, cardToneClasses } from '../ui';
 import { Icon } from '../ui/Icon';
 import { fmtMoney, fmtMoneyFull, fmtEstimateMoney, fmtEstimateRatio } from '../../utils/formatNumbers';
 import { useClientROI } from '../../hooks/client';
@@ -186,7 +186,7 @@ export function ROIDashboard({ workspaceId, tier, evergreen = false, compact = f
             icon={DollarSign}
             valueColor="text-accent-success"
             sub={`${verdict.outcomeCount.toLocaleString()} ${verdict.outcomeUnitLabel} valued at ${fmtEstimateMoney(verdict.valuePerOutcome)} each — a labeled estimate`}
-            className="bg-gradient-to-br from-emerald-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-emerald-500/20"
+            className={cardToneClasses('emerald')}
           />
           {verdict.monthlyRetainer != null && verdict.monthlyRetainer > 0 && (
             <StatCard
@@ -195,7 +195,7 @@ export function ROIDashboard({ workspaceId, tier, evergreen = false, compact = f
               icon={TrendingUp}
               valueColor="text-accent-success"
               sub={`Estimated value vs your ${fmtMoneyFull(verdict.monthlyRetainer)}/mo retainer`}
-              className="bg-gradient-to-br from-emerald-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-emerald-500/20"
+              className={cardToneClasses('emerald')}
             />
           )}
           {verdict.baseline.state === 'ready' && evergreen && verdict.baselineDeltaCount != null && (
@@ -205,7 +205,7 @@ export function ROIDashboard({ workspaceId, tier, evergreen = false, compact = f
               icon={TrendingUp}
               valueColor={verdict.baselineDeltaCount >= 0 ? 'text-accent-success' : 'text-accent-warning'}
               sub={`${verdict.outcomeUnitLabel} since we started`}
-              className="bg-gradient-to-br from-emerald-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-emerald-500/20"
+              className={cardToneClasses('emerald')}
             />
           )}
         </div>
@@ -220,7 +220,7 @@ export function ROIDashboard({ workspaceId, tier, evergreen = false, compact = f
           icon={DollarSign}
           valueColor="text-accent-success"
           sub={`Monthly value based on ${data.totalClicks.toLocaleString()} clicks × $${data.avgCPC.toFixed(2)} avg CPC`}
-          className="bg-gradient-to-br from-emerald-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-emerald-500/20"
+          className={cardToneClasses('emerald')}
         />
 
         <StatCard
@@ -229,7 +229,7 @@ export function ROIDashboard({ workspaceId, tier, evergreen = false, compact = f
           icon={BarChart3}
           valueColor="text-accent-info"
           sub="What this traffic would cost via Google Ads (incl. management fees)"
-          className="bg-gradient-to-br from-blue-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-blue-500/20"
+          className={cardToneClasses('blue')}
         />
 
         {/* Audit D4: on the evergreen client surface the temporal "Month-over-Month" stat is
@@ -255,7 +255,7 @@ export function ROIDashboard({ workspaceId, tier, evergreen = false, compact = f
                     ? 'Pages generating organic value'
                     : 'Pages generating organic value · growth tracking starts next month'
               }
-              className={`bg-gradient-to-br ${showMoM ? (data.growthPercent! >= 0 ? 'from-teal-500/10 border-teal-500/20' : 'from-amber-500/10 border-amber-500/20') : 'from-teal-500/10 border-teal-500/20'} via-[var(--surface-2)] to-[var(--surface-2)]`}
+              className={cardToneClasses(showMoM ? (data.growthPercent! >= 0 ? 'teal' : 'amber') : 'teal')}
             />
           );
         })()}
@@ -269,7 +269,7 @@ export function ROIDashboard({ workspaceId, tier, evergreen = false, compact = f
             icon={TrendingUp}
             valueColor="text-accent-success"
             sub="Monthly value you'd unlock by moving tracked keywords toward stronger positions"
-            className="bg-gradient-to-br from-emerald-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-emerald-500/20"
+            className={cardToneClasses('emerald')}
           />
         )}
       </div>

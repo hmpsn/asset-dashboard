@@ -24,6 +24,10 @@ vi.mock('../../src/components/FeatureFlagSettings', () => ({
   FeatureFlagSettings: () => <div>FeatureFlagSettingsStub</div>,
 }));
 
+vi.mock('../../src/components/McpApiKeysSettings', () => ({
+  McpApiKeysSettings: () => <div>McpApiKeysSettingsStub</div>,
+}));
+
 function seedCommonApi() {
   getSafeMock.mockResolvedValue([{ id: 'ws-1', name: 'Acme Workspace', webflowSiteId: 'site-1', webflowSiteName: 'Acme Site' }]);
   getMock.mockImplementation((url: string) => {

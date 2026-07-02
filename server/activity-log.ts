@@ -83,6 +83,8 @@ export type ActivityType =
   | 'schema_plan_deleted'
   | 'client_signal'
   | 'note'
+  | 'mcp_key_created'   // ADMIN-ONLY infra audit — operator minted a per-workspace MCP API key. NOT in CLIENT_VISIBLE_TYPES.
+  | 'mcp_key_revoked'   // ADMIN-ONLY infra audit — operator revoked a per-workspace MCP API key. NOT in CLIENT_VISIBLE_TYPES.
   | 'client_profile_updated'
   | 'client_onboarding_submitted'
   | 'client_keyword_feedback'

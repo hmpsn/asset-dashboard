@@ -46,6 +46,8 @@ import {
   BRAND_ENGINE_ROUTE_BASENAMES,
   REQUIRE_AUTH_ALLOWED_BASENAMES,
   GLOBALLY_APPLIED_LIMITERS,
+  ACTIVITY_TYPE_LEXICON_BASELINE,
+  ACTIVITY_TYPE_MEMBER_LINE_RE,
   type Check,
   type CustomCheckMatch,
 } from '../scripts/pr-check.js';
@@ -3079,6 +3081,117 @@ describe('Rule: New JSON-array TEXT column without normalization review', () => 
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Rule: New migration DROP TABLE without rename-to-archive contract
+// ════════════════════════════════════════════════════════════════════════════
+//
+// A1 (Reconcile R0): a migration must never DROP TABLE directly — the
+// destructive-migrations contract (docs/rules/destructive-migrations.md)
+// requires rename-to-archive (or copy-to-archive) in PR N, actual DROP in
+// PR N+1 only after staging verify + one retention window. This rule
+// baselines the 6 pre-existing DROP migrations (019, 029, 037, 049, 091,
+// 119 — all already-shipped table-rebuild patterns) and requires either
+// baseline membership (matched by filename basename, since fixtures in this
+// harness never live under the real ROOT) or an inline `-- drop-table-ok:
+// <reason>` hatch on the DROP TABLE line itself. Hatches are INLINE-ONLY —
+// unlike some other rules in this file, a hatch on the line above is
+// deliberately NOT honoured, because a destructive DROP deserves a hatch
+// that cannot be separated from the statement by a later edit.
+
+describe('Rule: New migration DROP TABLE without rename-to-archive contract', () => {
+  const RULE = 'New migration DROP TABLE without rename-to-archive contract';
+
+  it('flags a bare DROP TABLE in a new (non-baselined) migration', () => {
+    const file = write(
+      uniqPath('rule-drop-table', 'server/db/migrations/999-drop-fixture.sql'),
+      lines(
+        'DROP TABLE stale_reports;',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('stale_reports');
+  });
+
+  it('allows a DROP TABLE with an inline hatch comment on the same line', () => {
+    const file = write(
+      uniqPath('rule-drop-table-hatch', 'server/db/migrations/999-drop-hatched.sql'),
+      lines(
+        'DROP TABLE stale_reports; -- drop-table-ok: PR N+1 delayed drop, rename-to-archive shipped in #1234, one retention window elapsed',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT honour a hatch comment placed on the line above (inline-only contract)', () => {
+    const file = write(
+      uniqPath('rule-drop-table-hatch-above', 'server/db/migrations/999-drop-hatch-above.sql'),
+      lines(
+        '-- drop-table-ok: PR N+1 delayed drop, rename-to-archive shipped in #1234',
+        'DROP TABLE stale_reports;',
+      ),
+    );
+
+    // The hatch is on the line ABOVE, not the DROP TABLE line itself — must still flag.
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('allows a baselined pre-existing DROP migration by filename', () => {
+    const file = write(
+      uniqPath('rule-drop-table-baseline', 'server/db/migrations/019-cascade-workspace-delete.sql'),
+      lines(
+        'DROP TABLE IF EXISTS client_users;',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags every un-hatched DROP TABLE line when a migration has multiple', () => {
+    const file = write(
+      uniqPath('rule-drop-table-multi', 'server/db/migrations/999-drop-multi.sql'),
+      lines(
+        'DROP TABLE first_table;',
+        'DROP TABLE second_table; -- drop-table-ok: reason',
+        'DROP TABLE third_table;',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
+    expect(hits.some(h => h.text.includes('first_table'))).toBe(true);
+    expect(hits.some(h => h.text.includes('third_table'))).toBe(true);
+    expect(hits.some(h => h.text.includes('second_table'))).toBe(false);
+  });
+
+  it('ignores migrations with no DROP TABLE statement (negative control)', () => {
+    const file = write(
+      uniqPath('rule-drop-table-negative', 'server/db/migrations/999-no-drop.sql'),
+      lines(
+        'CREATE TABLE IF NOT EXISTS fresh_table (',
+        '  id TEXT PRIMARY KEY',
+        ');',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('ignores DROP TABLE IF EXISTS in the same way as bare DROP TABLE (both are destructive)', () => {
+    const file = write(
+      uniqPath('rule-drop-table-if-exists', 'server/db/migrations/999-drop-if-exists.sql'),
+      lines(
+        'DROP TABLE IF EXISTS old_table;',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // Rule: TabBar component without ?tab= deep-link support
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -5825,6 +5938,13 @@ describe('Meta: customCheck rule name registry', () => {
     // Keyword Hub cutover Phase C (2026-06-11) — the standalone Rank Tracker (seo-ranks)
     // was folded into the Hub; the 'seo-ranks' Page literal must not return to src/.
     'Retired seo-ranks route literal in src',
+    // Reconcile A1 (2026-07-01) — a migration must never DROP TABLE directly; see
+    // docs/rules/destructive-migrations.md for the rename-to-archive contract.
+    'New migration DROP TABLE without rename-to-archive contract',
+    // Reconcile R1-PR2 (2026-07-01) — the diff-time analogues of
+    // scripts/lexicon-registry.ts's verify:lexicon full-scan checks.
+    'Duplicate exported domain type name',
+    'ActivityType minting guard',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -7417,7 +7537,7 @@ describe('Rule: Style exception registry entry missing required metadata', () =>
               reason: 'Legacy migration still pending',
               owner: 'platform',
               createdAt: '2026-05-01',
-              expiresOn: '2026-06-30',
+              expiresOn: '2126-06-30',
             },
             {
               id: 'dup-id',
@@ -7426,7 +7546,7 @@ describe('Rule: Style exception registry entry missing required metadata', () =>
               reason: 'Legacy migration still pending',
               owner: 'platform',
               createdAt: '2026-05-01',
-              expiresOn: '2026-06-30',
+              expiresOn: '2126-06-30',
             },
           ],
         },
@@ -7453,7 +7573,7 @@ describe('Rule: Style exception registry entry missing required metadata', () =>
             reason: 'Legacy migration still pending',
             owner: 'platform',
             createdAt: '2026-5-01',
-            expiresOn: '2026-06-30',
+            expiresOn: '2126-06-30',
           }],
         },
         null,
@@ -7480,7 +7600,7 @@ describe('Rule: Style exception registry entry missing required metadata', () =>
             reason: 'valid baseline entry',
             owner: 'platform',
             createdAt: '2026-05-15',
-            expiresOn: '2026-06-30',
+            expiresOn: '2126-06-30',
           },
           {
             id: 'second-invalid',
@@ -7489,7 +7609,7 @@ describe('Rule: Style exception registry entry missing required metadata', () =>
             reason: '',
             owner: 'platform',
             createdAt: '2026-05-15',
-            expiresOn: '2026-06-30',
+            expiresOn: '2126-06-30',
           },
         ],
       },
@@ -7519,7 +7639,7 @@ describe('Rule: Style exception registry entry missing required metadata', () =>
             reason: 'Migrating this route in next wave',
             owner: 'platform',
             createdAt: '2026-05-15',
-            expiresOn: '2026-06-30',
+            expiresOn: '2126-06-30',
           }],
         },
         null,
@@ -11627,5 +11747,247 @@ describe('pr-check runner file resolution and source caching', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Duplicate exported domain type name
+// ════════════════════════════════════════════════════════════════════════════
+//
+// This rule reads the REAL on-disk shared/types/ + server/ trees (via
+// collectLexiconDeclarationIndex) to decide whether a fixture's declared name
+// already exists elsewhere — it is the diff-time analogue of
+// scripts/lexicon-registry.ts's full-scan verifier and must agree with it.
+// Fixture paths are chosen so their normalized suffix matches
+// isUnderLexiconScanRoot's `/shared/types/` or `/server/` substring check
+// even though they live under the tmpdir, not the real repo root.
+describe('Rule: Duplicate exported domain type name', () => {
+  const RULE = 'Duplicate exported domain type name';
+
+  it('flags a newly-declared name that already exists elsewhere on disk and is not allowlisted', () => {
+    // `Workspace` is declared exactly once today (shared/types/workspace.ts).
+    // Introducing a second declaration under a different file creates a real
+    // 2-file collision that is NOT in DUPLICATE_NAME_ALLOWLIST.
+    const file = write(
+      uniqPath('rule-lexicon-dup-name', 'shared/types/fixture-collision.ts'),
+      lines(
+        "export interface Workspace {",                 // 1 — flagged
+        "  id: string;",                                 // 2
+        "}",                                              // 3
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('respects // lexicon-dup-name-ok hatch on the declaration line', () => {
+    const file = write(
+      uniqPath('rule-lexicon-dup-name', 'shared/types/fixture-hatch-inline.ts'),
+      lines(
+        "export interface Workspace { // lexicon-dup-name-ok",   // 1
+        "  id: string;",                                          // 2
+        "}",                                                      // 3
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('is inline-only — a hatch on the line above the declaration is silently ignored (still flags)', () => {
+    // Reconcile R1-PR2 task contract: hatches for this rule are inline-only,
+    // unlike most customCheck rules in this file (which use hasHatch()'s
+    // line-above lookbehind). A hatch comment placed above the declaration
+    // must NOT suppress the hit.
+    const file = write(
+      uniqPath('rule-lexicon-dup-name', 'shared/types/fixture-hatch-above.ts'),
+      lines(
+        "// lexicon-dup-name-ok — temporary, allowlist PR pending",  // 1
+        "export interface Workspace {",                              // 2 — still flagged
+        "  id: string;",                                             // 3
+        "}",                                                         // 4
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does not flag a name in DUPLICATE_NAME_ALLOWLIST (e.g. GA4Overview)', () => {
+    // GA4Overview is a real, currently-grandfathered permanent mirror pair
+    // (server/google-analytics.ts <-> shared/types/analytics.ts).
+    const file = write(
+      uniqPath('rule-lexicon-dup-name', 'server/fixture-allowlisted.ts'),
+      lines(
+        "export interface GA4Overview {",   // 1
+        "  sessions: number;",              // 2
+        "}",                                 // 3
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a genuinely unique new exported name (negative control)', () => {
+    const file = write(
+      uniqPath('rule-lexicon-dup-name', 'shared/types/fixture-unique.ts'),
+      lines(
+        "export interface HmpsnLexiconFixtureUniqueTypeName987 {",  // 1
+        "  ok: true;",                                               // 2
+        "}",                                                         // 3
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag files outside the lexicon scan roots (shared/types/, server/)', () => {
+    const file = write(
+      uniqPath('rule-lexicon-dup-name', 'src/components/fixture-out-of-scope.ts'),
+      lines(
+        "export interface Workspace {",   // would collide if in-scope
+        "  id: string;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: ActivityType minting guard
+// ════════════════════════════════════════════════════════════════════════════
+describe('Rule: ActivityType minting guard', () => {
+  const RULE = 'ActivityType minting guard';
+
+  it('flags a new ActivityType union member not in the lexicon baseline', () => {
+    const file = write(
+      uniqPath('rule-activity-type-mint', 'server/activity-log.ts'),
+      lines(
+        "export type ActivityType =",                          // 1
+        "  | 'audit_completed'",                                // 2 — registered
+        "  | 'brand_new_unregistered_activity_type_member';",   // 3 — flagged
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+
+  it('respects // activity-type-mint-ok hatch on the new member line', () => {
+    const file = write(
+      uniqPath('rule-activity-type-mint', 'server/activity-log.ts'),
+      lines(
+        "export type ActivityType =",
+        "  | 'audit_completed'",
+        "  | 'brand_new_unregistered_activity_type_member'; // activity-type-mint-ok",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('is inline-only — a hatch on the line above the new member is silently ignored (still flags)', () => {
+    // Reconcile R1-PR2 task contract: hatches for this rule are inline-only.
+    const file = write(
+      uniqPath('rule-activity-type-mint', 'server/activity-log.ts'),
+      lines(
+        "export type ActivityType =",
+        "  | 'audit_completed'",
+        "  // activity-type-mint-ok — exploratory, registering in a follow-up",
+        "  | 'brand_new_unregistered_activity_type_member';",   // still flagged
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(4);
+  });
+
+  it('does not flag a member that is already registered in the lexicon baseline', () => {
+    const file = write(
+      uniqPath('rule-activity-type-mint', 'server/activity-log.ts'),
+      lines(
+        "export type ActivityType =",
+        "  | 'audit_completed'",
+        "  | 'autosend_policy_changed';",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag an unrelated activity-log.ts edit (no union touched)', () => {
+    const file = write(
+      uniqPath('rule-activity-type-mint', 'server/activity-log.ts'),
+      lines(
+        "export function addActivity(workspaceId: string) {",
+        "  return workspaceId;",
+        "}",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it("does not false-terminate on a NON-final member whose inline comment ends in ';' (later member still flagged)", () => {
+    // Latent false-negative regression guard: a registered member (line 2)
+    // carries an inline comment that ends in ';'. A naive terminal test
+    // (`/;\s*(\/\/.*)?$/` over the whole line) would read line 2 as the
+    // union terminator and stop the scan, letting the genuinely-new member on
+    // line 3 slip through unflagged — the exact silent miss this rule exists
+    // to prevent. The rule must strip the trailing `//…` comment before the
+    // `;`-at-end test, so line 3 is still reached and flagged.
+    const file = write(
+      uniqPath('rule-activity-type-mint', 'server/activity-log.ts'),
+      lines(
+        "export type ActivityType =",
+        "  | 'audit_completed' // legacy alias; do not remove",   // 2 — registered, comment ends in ';'
+        "  | 'brand_new_unregistered_activity_type_member';",     // 3 — flagged
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Meta: ActivityType minting-guard baseline parity
+// ════════════════════════════════════════════════════════════════════════════
+//
+// The ActivityType minting guard flags union members absent from
+// ACTIVITY_TYPE_LEXICON_BASELINE (pr-check's frozen snapshot of registered
+// members). That baseline is hand-maintained, so it can drift from the real
+// union in EITHER direction:
+//   - a new member added to the union but not the baseline → the guard's job
+//     (caught at diff time), but the baseline itself is now stale for the next
+//     PR; and
+//   - a member REMOVED from the union but left in the baseline → silent drift,
+//     and worse, a later re-add of that word would be masked (the guard would
+//     see it in the baseline and pass a genuine re-mint).
+//
+// This meta-test asserts the baseline set === the real union member set BOTH
+// directions, reusing the rule's own ACTIVITY_TYPE_MEMBER_LINE_RE extraction.
+// It fails the instant they diverge either way, forcing baseline maintenance
+// to stay in lockstep with server/activity-log.ts.
+describe('Meta: ActivityType minting-guard baseline parity', () => {
+  it('ACTIVITY_TYPE_LEXICON_BASELINE exactly matches the real ActivityType union (both directions)', () => {
+    const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+    const activityLogPath = path.join(repoRoot, 'server', 'activity-log.ts');
+    const content = readFileSync(activityLogPath, 'utf-8');
+    const srcLines = content.split('\n');
+
+    const unionStart = srcLines.findIndex((line) => line.trim() === 'export type ActivityType =');
+    expect(unionStart).toBeGreaterThan(-1);
+
+    const unionMembers: string[] = [];
+    for (let i = unionStart + 1; i < srcLines.length; i++) {
+      const line = srcLines[i];
+      const match = line.match(ACTIVITY_TYPE_MEMBER_LINE_RE);
+      // Mirror the rule's terminal detection exactly: strip the trailing
+      // `//…` comment before the `;`-at-end-of-code test.
+      const codePortion = line.replace(/\/\/.*$/, '');
+      const terminal = /;\s*$/.test(codePortion);
+      if (match) unionMembers.push(match[1]);
+      if (terminal) break;
+    }
+
+    // Deterministic order for a readable diff on failure.
+    const unionSet = new Set(unionMembers);
+    expect([...unionSet].sort()).toEqual([...ACTIVITY_TYPE_LEXICON_BASELINE].sort());
   });
 });

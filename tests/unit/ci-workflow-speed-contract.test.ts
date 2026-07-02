@@ -61,3 +61,36 @@ describe('CI workflow speed contract', () => {
     }
   });
 });
+
+describe('CI spend guardrails', () => {
+  const ci = readRepoFile('.github/workflows/ci.yml');
+  const e2e = readRepoFile('.github/workflows/e2e.yml');
+
+  it('draft-gates the heavy test matrix so WIP draft PRs run only the fast quality gate', () => {
+    // The test matrix must require a NON-draft PR: iterate in a draft PR (only the
+    // ~2-min quality gate runs), mark it ready to run the full matrix. Dropping this
+    // gate re-bills ~55 runner-min on every WIP push.
+    expect(ci).toContain('github.event.pull_request.draft == false');
+    // `ready_for_review` must be a PR trigger or marking a draft ready won't start a run.
+    expect(ci).toContain('ready_for_review');
+  });
+
+  it('keeps e2e PR-only + draft-gated and caches its node_modules (mirrors ci.yml)', () => {
+    expect(e2e).toContain('github.event.pull_request.draft == false');
+    // e2e shares ci.yml's EXACT node_modules cache key so it hits the same cache.
+    expect(e2e).toContain(
+      "key: node-modules-v1-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('package-lock.json') }}",
+    );
+    // Every npm ci in e2e.yml must be cache-miss-guarded (else cache + reinstall = waste).
+    const installs = e2e.match(/run: npm ci\b/g) ?? [];
+    const guards = e2e.match(/if: steps\.node-modules-cache\.outputs\.cache-hit != 'true'/g) ?? [];
+    expect(installs.length).toBeGreaterThanOrEqual(3); // build + 2 shards + merge-report
+    expect(guards.length).toBe(installs.length);
+  });
+
+  it('caps every job with timeout-minutes so a hung/OOM job cannot bill to the 6h default', () => {
+    // One timeout-minutes per job: ci.yml has 6 jobs, e2e.yml has 5.
+    expect((ci.match(/timeout-minutes:/g) ?? []).length).toBeGreaterThanOrEqual(6);
+    expect((e2e.match(/timeout-minutes:/g) ?? []).length).toBeGreaterThanOrEqual(5);
+  });
+});

@@ -230,7 +230,7 @@ export function RequestManager({ workspaceId }: { workspaceId: string }) {
             {[
               { label: 'Total', value: counts.total, cls: 'text-[var(--brand-text-bright)]' },
               { label: 'New', value: counts.new, cls: 'text-accent-info' },
-              { label: 'Active', value: counts.in_progress, cls: 'text-accent-brand' },
+              { label: 'Active', value: counts.in_progress, cls: 'text-accent-info' },
               { label: 'Resolved', value: counts.completed, cls: 'text-accent-success' },
             ].map(s => (
               <div key={s.label} className="text-center">

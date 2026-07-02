@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>UX Review · Command Center</title>
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { background: var(--surface-1); padding: 0; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 56px 32px 120px; }
+  .doc-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brand-text-muted); display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .doc-eyebrow::before { content: ''; width: 28px; height: 1px; background: var(--brand-text-muted); }
+  h1.doc { font-family: var(--font-display); font-weight: 800; font-size: 52px; line-height: 1.02; letter-spacing: -0.04em; color: var(--brand-text-bright); margin: 0 0 18px; }
+  .lede { font-size: 17px; color: var(--brand-text); line-height: 1.6; max-width: 64ch; }
+  .lede b { color: var(--brand-text-bright); font-weight: 600; }
+  .meta-row { display: flex; gap: 24px; margin-top: 24px; font-family: var(--font-mono); font-size: 11px; color: var(--brand-text-muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  .meta-row b { color: var(--brand-text-bright); font-weight: 500; }
+
+  section.block { margin-top: 64px; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 22px; }
+  .sec-head .num { font-family: var(--font-mono); font-size: 11px; color: var(--teal); letter-spacing: 0.1em; }
+  .sec-head h2 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter-spacing: -0.025em; color: var(--brand-text-bright); margin: 0; }
+  .sec-head .rule { flex: 1; height: 1px; background: var(--brand-border); }
+
+  .well { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .well .item { display: flex; gap: 12px; padding: 16px 18px; background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-lg); }
+  .well .item .ico { width: 22px; height: 22px; border-radius: var(--radius-sm); background: rgba(52,211,153,.14); color: var(--emerald); display: flex; align-items: center; justify-content: center; flex: none; font-weight: 800; font-family: var(--font-display); }
+  .well .item p { margin: 0; font-size: 13.5px; color: var(--brand-text); line-height: 1.5; }
+  .well .item b { color: var(--brand-text-bright); font-weight: 600; }
+
+  .finding { background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-signature-lg); padding: 26px 28px; margin-bottom: 18px; }
+  .finding-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+  .sev { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-sm); }
+  .sev.high { background: rgba(248,113,113,.12); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+  .sev.med { background: rgba(251,191,36,.12); color: var(--amber); border: 1px solid rgba(251,191,36,.3); }
+  .sev.low { background: rgba(96,165,250,.12); color: var(--blue); border: 1px solid rgba(96,165,250,.3); }
+  .finding-head .fnum { font-family: var(--font-mono); font-size: 12px; color: var(--brand-text-dim); }
+  .finding-head h3 { font-family: var(--font-display); font-weight: 700; font-size: 19px; letter-spacing: -0.015em; color: var(--brand-text-bright); margin: 0; flex: 1; min-width: 240px; }
+  .finding .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 16px; }
+  .finding .pair .col .lab { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; display: block; }
+  .col.now .lab { color: var(--red); }
+  .col.fix .lab { color: var(--emerald); }
+  .finding p.body { font-size: 14px; color: var(--brand-text); line-height: 1.6; margin: 10px 0 0; }
+  .finding p.body b { color: var(--brand-text-bright); font-weight: 600; }
+  .finding .fix-note { font-size: 13.5px; color: var(--brand-text); line-height: 1.6; margin: 14px 0 0; padding: 14px 16px; background: var(--surface-1); border-left: 2px solid var(--teal); border-radius: var(--radius-md); }
+  .finding .fix-note b { color: var(--teal); font-weight: 600; display: block; margin-bottom: 4px; font-family: var(--font-display); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* mock chrome */
+  .mock { background: var(--surface-1); border: 1px solid var(--brand-border); border-radius: var(--radius-lg); padding: 16px; }
+  .mock.sketch { background: var(--surface-1); }
+  .m-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .m-btn { font-family: var(--font-sans); font-size: 12px; padding: 6px 11px; border-radius: var(--radius-md); border: 1px solid var(--brand-border); background: var(--surface-3); color: var(--brand-text); }
+  .m-btn.amber { color: var(--amber); border-color: rgba(251,191,36,.25); background: rgba(251,191,36,.06); }
+  .m-btn.emerald { color: var(--emerald); border-color: rgba(52,211,153,.25); background: rgba(52,211,153,.06); }
+  .m-btn.teal { color: var(--teal); border-color: rgba(45,212,191,.25); background: rgba(45,212,191,.06); }
+  .m-btn.primary { background: linear-gradient(90deg, var(--teal), var(--emerald)); color: var(--button-primary-text); border: none; font-weight: 600; }
+  .m-statrow { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .m-stat { background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-signature); padding: 9px; }
+  .m-stat .l { font-family: var(--font-display); font-size: 8px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--brand-text-muted); }
+  .m-stat .v { font-family: var(--font-display); font-weight: 700; font-size: 18px; color: var(--brand-text-bright); margin-top: 3px; }
+  .m-stat.lead { grid-column: span 2; background: linear-gradient(135deg, rgba(45,212,191,.08), transparent 60%), var(--surface-2); border-color: rgba(45,212,191,.25); }
+  .m-stat.lead .v { font-size: 26px; }
+  .m-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brand-text-dim); margin: 0 0 8px; }
+  .m-att { background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-md); }
+  .m-att.hero { border-color: rgba(248,113,113,.3); box-shadow: inset 2px 0 0 0 var(--red); }
+  .m-att .li { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid rgba(63,63,70,.3); font-size: 12px; color: var(--brand-text-bright); }
+  .m-att .li:first-child { border-top: none; }
+  .m-att .dot { width: 6px; height: 6px; border-radius: 9999px; flex: none; }
+  .m-att .li .ws { margin-left: auto; font-size: 10px; color: var(--brand-text-muted); }
+  .m-card-strip { background: var(--surface-2); border: 1px solid var(--brand-border); border-radius: var(--radius-signature-lg); padding: 12px 14px; }
+  .m-noisy { font-size: 10px; }
+  .m-noisy .teal { color: var(--teal); } .m-noisy .amber { color: var(--amber); } .m-noisy .blue { color: var(--blue); } .m-noisy .red { color: var(--red); }
+  .caption { font-family: var(--font-mono); font-size: 10px; color: var(--brand-text-dim); letter-spacing: 0.06em; margin-top: 8px; }
+</style>
+</head>
+<body class="with-noise">
+<div class="wrap">
+
+  <div class="doc-eyebrow">UX Review · agency Command Center</div>
+  <h1 class="doc">Command Center,<br />read top to bottom.</h1>
+  <p class="lede">A heuristic review of <b>WorkspaceOverview</b> — the all-workspaces home your operators open first — judged against your own primitives and the four laws of color. The screen does the hard part right: it <b>prioritizes work and deep-links it</b>. What's missing is <b>hierarchy</b> — too many elements claim equal weight, so the eye has nowhere to land. Every fix below uses components you already ship.</p>
+  <div class="meta-row">
+    <span>Screen · <b>WorkspaceOverview.tsx</b></span>
+    <span>Findings · <b>5</b></span>
+    <span>New components · <b>0</b></span>
+  </div>
+
+  <!-- WHAT WORKS -->
+  <section class="block">
+    <div class="sec-head"><span class="num">00</span><h2>What's already right</h2><div class="rule"></div></div>
+    <div class="well">
+      <div class="item"><span class="ico">✓</span><p><b>Needs Attention is prioritized.</b> Items are sorted by severity (churn → requests → approvals → …) and each deep-links to the exact workspace tab. This is the screen's best idea.</p></div>
+      <div class="item"><span class="ico">✓</span><p><b>Real-time presence.</b> "Online Now" and per-card online banners give operators live context — a genuinely useful, calm signal.</p></div>
+      <div class="item"><span class="ico">✓</span><p><b>Signature radius is disciplined.</b> StatCards and workspace rows correctly carry the asymmetric corners; nothing else does.</p></div>
+      <div class="item"><span class="ico">✓</span><p><b>Empty &amp; loading states exist.</b> The zero-workspace welcome and the spinner are designed, not afterthoughts.</p></div>
+    </div>
+  </section>
+
+  <!-- FINDINGS -->
+  <section class="block">
+    <div class="sec-head"><span class="num">01</span><h2>The findings</h2><div class="rule"></div></div>
+
+    <!-- F1 -->
+    <div class="finding">
+      <div class="finding-head">
+        <span class="fnum">F1</span>
+        <h3>The header has five buttons and no primary</h3>
+        <span class="sev high">High · hierarchy</span>
+      </div>
+      <p class="body">Prospect, Roadmap, AI Usage, Revenue, and Features sit in the header as five equal secondary buttons — and three are individually colored amber, emerald, and teal. This <b>spends your status colors on navigation</b>: a teal "Features" button reads as the primary action, an amber "AI Usage" button reads as a warning. Per the four laws, those colors mean <b>warning</b> and <b>success</b> — not "this is a nav link."</p>
+      <div class="pair">
+        <div class="col now">
+          <span class="lab">Now — five colored peers</span>
+          <div class="mock"><div class="m-row">
+            <span class="m-btn">Prospect</span><span class="m-btn">Roadmap</span>
+            <span class="m-btn amber">AI Usage</span><span class="m-btn emerald">Revenue</span><span class="m-btn teal">Features</span>
+          </div></div>
+        </div>
+        <div class="col fix">
+          <span class="lab">Fix — one neutral cluster</span>
+          <div class="mock"><div class="m-row">
+            <span class="m-btn primary">+ New workspace</span>
+            <span class="m-btn">Revenue</span><span class="m-btn">AI Usage</span>
+            <span class="m-btn">More ▾</span>
+          </div></div>
+        </div>
+      </div>
+      <p class="fix-note"><b>Recommendation</b>Demote the five to one neutral secondary cluster (or an overflow "⋯ More" menu), and promote the one thing an operator actually starts here — creating/onboarding a workspace — to the single mint primary. Reserve amber/emerald/teal for status, never chrome.</p>
+    </div>
+
+    <!-- F2 -->
+    <div class="finding">
+      <div class="finding-head">
+        <span class="fnum">F2</span>
+        <h3>Six equal StatCards = no headline metric</h3>
+        <span class="sev med">Medium · hierarchy</span>
+      </div>
+      <p class="body">The global stat row shows six identical cards — New Requests, Active Requests, Content Pipeline, Approvals, Avg Health, Hours Saved. They're all the same size, so nothing leads, and several <b>duplicate the Needs Attention list directly above</b> (requests, approvals, content all appear in both). The operator reads the same numbers twice with no added meaning.</p>
+      <div class="pair">
+        <div class="col now">
+          <span class="lab">Now — six peers</span>
+          <div class="mock"><div class="m-statrow">
+            <div class="m-stat"><div class="l">New Req</div><div class="v">7</div></div>
+            <div class="m-stat"><div class="l">Active</div><div class="v">12</div></div>
+            <div class="m-stat"><div class="l">Content</div><div class="v">4/9</div></div>
+            <div class="m-stat"><div class="l">Approvals</div><div class="v">3</div></div>
+            <div class="m-stat"><div class="l">Health</div><div class="v">78</div></div>
+            <div class="m-stat"><div class="l">Hours</div><div class="v">41h</div></div>
+          </div></div>
+        </div>
+        <div class="col fix">
+          <span class="lab">Fix — lead + supporting</span>
+          <div class="mock"><div class="m-statrow">
+            <div class="m-stat lead"><div class="l">Hours saved this month</div><div class="v">41h</div></div>
+            <div class="m-stat"><div class="l">Avg Health</div><div class="v">78</div></div>
+            <div class="m-stat"><div class="l">Active</div><div class="v">12</div></div>
+            <div class="m-stat"><div class="l">Content</div><div class="v">4/9</div></div>
+          </div></div>
+        </div>
+      </div>
+      <p class="fix-note"><b>Recommendation</b>Pick one headline (Hours Saved is the value story you sell), render it <code>size="hero"</code> spanning two columns, and keep only the metrics that <i>aren't</i> already in Needs Attention. Drop New Requests / Approvals from the row — they're actionable items, not at-a-glance trends.</p>
+    </div>
+
+    <!-- F3 -->
+    <div class="finding">
+      <div class="finding-head">
+        <span class="fnum">F3</span>
+        <h3>Your best feature is buried as a plain list</h3>
+        <span class="sev high">High · hierarchy</span>
+      </div>
+      <p class="body">Needs Attention is the prioritized, deep-linked worklist — the reason an operator opens this screen. But it renders as an untitled-weight <code>SectionCard</code> sitting between the header and a six-card stat row, with no visual claim on the eye. The most important thing on the page looks like the third-most important.</p>
+      <div class="pair">
+        <div class="col now">
+          <span class="lab">Now — quiet, mid-page</span>
+          <div class="mock"><div class="m-att">
+            <div class="li"><span class="dot" style="background:var(--red)"></span>2 new client requests<span class="ws">Acme</span></div>
+            <div class="li"><span class="dot" style="background:var(--teal)"></span>3 pending approvals<span class="ws">Borealis</span></div>
+            <div class="li"><span class="dot" style="background:var(--amber)"></span>1 brief awaiting review<span class="ws">Corvi</span></div>
+          </div></div>
+        </div>
+        <div class="col fix">
+          <span class="lab">Fix — hero worklist, top of page</span>
+          <div class="mock"><div class="m-att hero">
+            <div class="li"><span class="dot" style="background:var(--red)"></span>2 new client requests<span class="ws">Acme →</span></div>
+            <div class="li"><span class="dot" style="background:var(--red)"></span>Borealis at risk of churn<span class="ws">Borealis →</span></div>
+            <div class="li"><span class="dot" style="background:var(--amber)"></span>1 brief awaiting review<span class="ws">Corvi →</span></div>
+          </div></div>
+        </div>
+      </div>
+      <p class="fix-note"><b>Recommendation</b>Make Needs Attention the first thing under the header and give it presence — a subtle red/amber left-accent when a P1 exists, a count in the title ("Needs Attention · 6"), and the chevron always visible so it reads as actionable. It earns the spotlight the stat row currently steals.</p>
+    </div>
+
+    <!-- F4 -->
+    <div class="finding">
+      <div class="finding-head">
+        <span class="fnum">F4</span>
+        <h3>Workspace rows pack five metric columns of colored micro-text</h3>
+        <span class="sev med">Medium · density &amp; scannability</span>
+      </div>
+      <p class="body">Each workspace row crams Health, Requests, Approvals, Content, and SEO Status into one horizontal strip, divided by hairlines, with inline colored counts in every cell ("2 new" red, "3 active" teal, "1 pending" amber…). At three or more workspaces the page becomes a wall of small multicolored numbers — high cognitive load, and the color stops meaning anything because it's everywhere.</p>
+      <div class="pair">
+        <div class="col now">
+          <span class="lab">Now — 5 columns, color everywhere</span>
+          <div class="mock"><div class="m-card-strip">
+            <div style="font-family:var(--font-display);font-weight:600;font-size:13px;color:var(--brand-text-bright);margin-bottom:6px">Acme Webflow</div>
+            <div class="m-row m-noisy" style="gap:14px">
+              <span><b style="color:var(--brand-text-bright)">82</b> health</span>
+              <span class="red">2 new</span><span class="teal">3 active</span>
+              <span class="amber">1 pending</span><span class="blue">2 in progress</span>
+              <span class="teal">5 delivered</span><span class="amber">3 issues</span><span class="teal">4 live</span>
+            </div>
+          </div></div>
+        </div>
+        <div class="col fix">
+          <span class="lab">Fix — score + one status, rest on demand</span>
+          <div class="mock"><div class="m-card-strip">
+            <div class="m-row" style="justify-content:space-between">
+              <div class="m-row" style="gap:10px"><span style="font-family:var(--font-display);font-weight:700;font-size:20px;color:var(--teal)">82</span><span style="font-family:var(--font-display);font-weight:600;font-size:13px;color:var(--brand-text-bright)">Acme Webflow</span></div>
+              <span style="font-size:11px;color:var(--red);border:1px solid rgba(248,113,113,.3);padding:2px 7px;border-radius:var(--radius-sm)">2 need you</span>
+            </div>
+          </div></div>
+        </div>
+      </div>
+      <p class="fix-note"><b>Recommendation</b>Lead each row with the one number that ranks workspaces (health score, in its band color) plus a single "N need you" pill that rolls up everything actionable. Move the five-column breakdown into the row's expanded/hover state or the workspace detail. Use color only for the rollup status — neutral text for the rest.</p>
+    </div>
+
+    <!-- F5 -->
+    <div class="finding">
+      <div class="finding-head">
+        <span class="fnum">F5</span>
+        <h3>Mint is leaking onto data</h3>
+        <span class="sev low">Low · color law drift</span>
+      </div>
+      <p class="body">Several non-interactive counts are rendered in <code>text-accent-brand</code> (mint): "3 active" requests, "5 delivered" content, the approvals count. Mint is your <b>action</b> color — when static numbers wear it, everything looks clickable and the genuine CTAs stop standing out. This is the most common drift across the app and the cheapest to fix.</p>
+      <div class="pair">
+        <div class="col now">
+          <span class="lab">Now — mint on static counts</span>
+          <div class="mock"><div class="m-row" style="gap:16px">
+            <span style="font-size:12px;color:var(--teal)">3 active</span>
+            <span style="font-size:12px;color:var(--teal)">5 delivered</span>
+            <span style="font-size:12px;color:var(--teal)">3 pending</span>
+          </div><div class="caption">all read as "click me"</div></div>
+        </div>
+        <div class="col fix">
+          <span class="lab">Fix — blue=data, mint=action only</span>
+          <div class="mock"><div class="m-row" style="gap:16px">
+            <span style="font-size:12px;color:var(--blue)">3 active</span>
+            <span style="font-size:12px;color:var(--blue)">5 delivered</span>
+            <span style="font-size:12px;color:var(--emerald)">3 approved</span>
+          </div><div class="caption">data is blue; success is emerald</div></div>
+        </div>
+      </div>
+      <p class="fix-note"><b>Recommendation</b>Recolor static counts to blue (data) or emerald (completed/positive), and let mint appear only on the row's actual click target. A repo-wide sweep for <code>text-accent-brand</code> on non-interactive text would catch most of these in one pass.</p>
+    </div>
+
+  </section>
+
+  <!-- RECOMMENDED LAYOUT -->
+  <section class="block">
+    <div class="sec-head"><span class="num">02</span><h2>The recommended stack</h2><div class="rule"></div></div>
+    <p class="lede" style="font-size:15px;margin-bottom:20px">Same components, re-ordered by what an operator needs in the first three seconds: <b>what needs me → how are we doing → which workspace</b>. One headline metric, one prioritized worklist, calm scannable rows.</p>
+    <div class="mock" style="padding:20px;display:flex;flex-direction:column;gap:14px">
+      <!-- header -->
+      <div class="m-row" style="justify-content:space-between">
+        <div><div style="font-family:var(--font-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--brand-text-muted)">12 workspaces · Monday, June 30</div><div style="font-family:var(--font-display);font-weight:700;font-size:22px;letter-spacing:-.02em;color:var(--brand-text-bright);margin-top:4px">Command Center</div></div>
+        <div class="m-row"><span class="m-btn primary">+ New workspace</span><span class="m-btn">More ▾</span></div>
+      </div>
+      <!-- attention hero -->
+      <div><p class="m-label">① What needs me</p>
+      <div class="m-att hero">
+        <div class="li"><span class="dot" style="background:var(--red)"></span>Borealis at risk of churn<span class="ws">Borealis →</span></div>
+        <div class="li"><span class="dot" style="background:var(--red)"></span>2 new client requests<span class="ws">Acme →</span></div>
+        <div class="li"><span class="dot" style="background:var(--amber)"></span>1 brief awaiting review<span class="ws">Corvi →</span></div>
+      </div></div>
+      <!-- stats -->
+      <div><p class="m-label">② How are we doing</p>
+      <div class="m-statrow">
+        <div class="m-stat lead"><div class="l">Hours saved this month</div><div class="v">41h</div></div>
+        <div class="m-stat"><div class="l">Avg Health</div><div class="v">78</div></div>
+        <div class="m-stat"><div class="l">Active req</div><div class="v">12</div></div>
+        <div class="m-stat"><div class="l">Content</div><div class="v">4/9</div></div>
+      </div></div>
+      <!-- workspaces -->
+      <div><p class="m-label">③ Which workspace</p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="m-card-strip" style="padding:10px 14px"><div class="m-row" style="justify-content:space-between"><div class="m-row" style="gap:10px"><span style="font-family:var(--font-display);font-weight:700;font-size:18px;color:var(--teal)">82</span><span style="font-size:13px;color:var(--brand-text-bright);font-family:var(--font-display);font-weight:600">Acme Webflow</span></div><span style="font-size:11px;color:var(--red);border:1px solid rgba(248,113,113,.3);padding:2px 7px;border-radius:var(--radius-sm)">2 need you</span></div></div>
+        <div class="m-card-strip" style="padding:10px 14px"><div class="m-row" style="justify-content:space-between"><div class="m-row" style="gap:10px"><span style="font-family:var(--font-display);font-weight:700;font-size:18px;color:var(--amber)">58</span><span style="font-size:13px;color:var(--brand-text-bright);font-family:var(--font-display);font-weight:600">Borealis</span></div><span style="font-size:11px;color:var(--red);border:1px solid rgba(248,113,113,.3);padding:2px 7px;border-radius:var(--radius-sm)">churn risk</span></div></div>
+        <div class="m-card-strip" style="padding:10px 14px"><div class="m-row" style="justify-content:space-between"><div class="m-row" style="gap:10px"><span style="font-family:var(--font-display);font-weight:700;font-size:18px;color:var(--emerald)">91</span><span style="font-size:13px;color:var(--brand-text-bright);font-family:var(--font-display);font-weight:600">Corvi Labs</span></div><span style="font-size:11px;color:var(--brand-text-muted)">all clear</span></div></div>
+      </div></div>
+    </div>
+    <p class="caption">Sketch rendered with the real tokens — not a finished screen. Use it to react to the ordering and weight, not the pixels.</p>
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="num">03</span><h2>If this lands</h2><div class="rule"></div></div>
+    <p class="lede" style="font-size:15px">Three ways to take it further: I can run the same teardown on <b>WorkspaceHome</b> (the single-workspace view — it has up to <b>nine</b> equal hero StatCards, an even sharper version of F2); produce a <b>repo-wide color-law sweep</b> for the F5 mint-on-data drift; or turn the recommended stack into a <b>live, clickable prototype</b> using the bundle components so you can feel the new ordering. Tell me which.</p>
+  </section>
+
+</div>
+</body>
+</html>

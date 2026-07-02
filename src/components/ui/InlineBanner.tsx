@@ -27,17 +27,17 @@ const TONE_STYLES: Record<InlineBannerTone, {
   defaultIcon: LucideIcon;
 }> = {
   error: {
-    container: 'border-red-500/20 bg-red-500/8 text-accent-danger',
+    container: 'border-accent-danger-soft bg-accent-danger-soft text-accent-danger',
     icon: 'text-accent-danger',
     title: 'text-accent-danger',
     message: 'text-[var(--brand-text-muted)]',
     defaultIcon: AlertTriangle,
   },
   warning: {
-    container: 'border-amber-500/25 bg-amber-500/8 text-accent-warning',
+    container: 'border-accent-warning-soft bg-accent-warning-soft text-accent-warning',
     icon: 'text-accent-warning',
     title: 'text-accent-warning',
-    message: 'text-amber-100/80',
+    message: 'text-[var(--brand-text-muted)]',
     defaultIcon: AlertTriangle,
   },
   info: {

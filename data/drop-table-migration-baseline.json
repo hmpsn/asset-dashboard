@@ -1,0 +1,10 @@
+{
+  "allowedMigrationFiles": [
+    "server/db/migrations/019-cascade-workspace-delete.sql",
+    "server/db/migrations/029-keyword-requested.sql",
+    "server/db/migrations/037-analytics-insights-fix-unique.sql",
+    "server/db/migrations/049-client-signals-v2.sql",
+    "server/db/migrations/091-retire-feedback-table.sql",
+    "server/db/migrations/119-strategy-history-fk.sql"
+  ]
+}

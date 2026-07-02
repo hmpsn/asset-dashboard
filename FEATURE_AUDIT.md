@@ -1,8 +1,28 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **539 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **541 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 541. Enforced lexicon — GLOSSARY promoted from reference to contract (Reconcile R1-PR1)
+
+**What it does:** Promotes `GLOSSARY.md` from a flat, drift-prone reference into an **enforced vocabulary contract**. A new machine-readable registry (`shared/types/lexicon.ts`) mirrors every glossary term with a governance tag — a **word class** (`canonical` / `externally-mirrored` / `historical` / `proposed`) — and grandfathers the duplicate-exported-type-name census (30 names verified across `shared/` + `server/`, each tagged with the ticket that will resolve it: `R2` for the brand-artifact `Deliverable*` pair; `permanent` for the GA4/GSC/ROI mirror + server-internal twin pairs). `npm run verify:lexicon` (`scripts/lexicon-registry.ts`, modeled on the feature-flag lifecycle verifier) checks GLOSSARY ↔ registry parity in both directions, runs a live scan that fails on any unregistered duplicate exported name, and enforces allowlist hygiene (every entry has a `resolvingTicket`). The glossary is restructured into the four word-class sections plus a PROPOSED section that intakes the redesign mockup vocabulary (client-thread kinds `request`/`instruction`/`approval`, `promotable`, thread `new/ack/handled`, the four cockpit rail names, "promote to strategy signal") snapshotted from the untracked design folder. Wired as a pr-ci-blocking gate (package.json, ci.yml, `verify-platform.ts`, governance registry). Full contract: `docs/rules/lexicon.md`.
+
+**Why it matters to the agency:** This is the root ticket of the Reconcile migration — every later ticket's vocabulary hangs off it. The lexicon closes the class of silent bugs where a barrel importer resolves the wrong `DeliverableStatus`, where a new `ActivityType` is minted freehand with no definition, or where a duplicate type name drifts apart across two files. New collisions are now caught in CI (and nightly `pr-check --all`) instead of shipping. The word classes encode a rename policy the compiler can't: never rename a Stripe/GBP/Webflow word, never rename a persisted activity-log value.
+
+**Why it matters to clients:** Indirect but foundational — a governed vocabulary is what lets the platform's data/type layer stop moving under the P2 client-UI rebuild. Fewer silent data-shape mismatches means fewer client-visible regressions when the redesign lands.
+
+---
+
+### 540. Admin MCP API key management (Settings → MCP API Keys)
+
+**What it does:** Adds the admin surface for the per-workspace MCP API keys whose store + scope enforcement shipped in PR #1411. A new section in global Settings (`McpApiKeysSettings.tsx`) lists every per-workspace key across all workspaces (workspace name, label, created / last-used, Active/Revoked status) and shows whether the env `MCP_API_KEY` master key is configured. The operator mints a key by picking a workspace + label; the plaintext is revealed **exactly once** in a copy-to-clipboard callout (only a sha256 hash is stored — a lost key is rotated, not recovered) and revokes a key via a confirmation dialog. Backed by a global admin route (`server/routes/mcp-api-keys.ts`, HMAC-only `requireAdminAuth` — JWT client users are fully excluded) with GET (list — metadata only, never the hash/plaintext), POST (mint), DELETE (revoke; 409 if already revoked, 404 unknown). Mint/revoke are recorded as two admin-only activity types (`mcp_key_created` / `mcp_key_revoked`, deliberately kept out of `CLIENT_VISIBLE_TYPES`). From the 2026-06-26 MCP surface audit follow-up (`mcp-admin-key-minting-ui`).
+
+**Why it matters to the agency:** Until now the per-workspace keys could only be minted in code (the all-workspace master key was the only key in real use). The agency can now hand a scoped, revocable key to any MCP client (a teammate's Claude desktop, an automation) that may act on exactly one workspace — and rotate or kill it instantly from the dashboard if it leaks — without ever exposing the master key. One-time reveal + hash-only storage means the platform never holds a recoverable secret.
+
+**Why it matters to clients:** Indirect but real — a leaked or over-broad agency credential is a cross-tenant data risk. Per-workspace scoping plus instant revocation keeps any key an operator issues blast-radius-limited to a single client's workspace, and the activity log records who minted/revoked it.
 
 ---
 
@@ -2929,13 +2949,15 @@ When the user asks to update this document with recent features, follow this pro
 **Mutual:** Reduces the friction of maintaining AI context, which means it actually gets maintained. Better context → better AI outputs → fewer revision cycles.
 
 ### 69. Storage Monitor & Pruning Tools
-**What it does:** `server/storage-stats.ts` scans all 25+ data directories (chat sessions, backups, reports, uploads, optimized images, etc.) and returns a per-category size breakdown via `GET /api/admin/storage-stats`. Three POST pruning endpoints: `/prune-chat` (delete sessions >90 days), `/prune-backups` (reduce retention to 3 days), `/prune-activity` (trim log entries >6 months). Storage Monitor UI panel in Settings: colored stacked bar chart showing top-6 categories, per-row breakdown with file count/size/percentage, quick stats (chat session count, backup retention, oldest chat), and one-click prune buttons with loading states and toast feedback.
+**What it does:** `server/storage-stats.ts` scans all 25+ data directories (chat sessions, backups, reports, uploads, optimized images, etc.) and returns a per-category size breakdown via `GET /api/admin/storage-stats`. Three POST pruning endpoints: `/prune-chat` (delete sessions >90 days), `/prune-backups` (reduce retention to the shared `BACKUP_RETENTION_DAYS` default), `/prune-activity` (trim log entries >6 months). The storage-stats payload also surfaces backup posture: `lastBackupAt` (ISO timestamp of the most recent successful backup, read from disk so it survives restarts) and `offsiteConfigured` (`true` when `BACKUP_S3_BUCKET` is set) — checkable via HTTP without SSH. `backupRetentionDays` (report) and the `/prune-backups` route default now read from one shared source of truth (`DEFAULT_BACKUP_RETENTION_DAYS` in `server/backup.ts`, default 3) instead of three independently-drifting literals (previously the report fallback said 7, the prune default said 3, and `.env.example` documented 7 — all three now agree). Storage Monitor UI panel in Settings: colored stacked bar chart showing top-6 categories, per-row breakdown with file count/size/percentage, quick stats (chat session count, backup retention, oldest chat), and one-click prune buttons with loading states and toast feedback.
 
-**Agency value:** Visibility into what's consuming disk on Render persistent storage. One-click cleanup when approaching limits instead of manual SSH. Prevents surprise downtime from full disk.
+**Agency value:** Visibility into what's consuming disk on Render persistent storage. One-click cleanup when approaching limits instead of manual SSH. Prevents surprise downtime from full disk. Backup posture (last successful backup, off-site configured or not) is now answerable from a single API call.
 
 **Client value:** N/A — admin-only infrastructure tool.
 
-**Mutual:** Platform stability. Proactive monitoring prevents data loss from disk exhaustion.
+**Mutual:** Platform stability. Proactive monitoring prevents data loss from disk exhaustion. A single retention-days source of truth prevents the "runtime prunes 3-day-old backups while the docs claim 7 days" class of drift bug.
+
+**Files (A1 update):** `server/backup.ts`; `server/storage-stats.ts`; `server/routes/health.ts`; `tests/unit/backup.test.ts`; `tests/unit/storage-stats-prune.test.ts`.
 
 ---
 
@@ -7259,15 +7281,15 @@ Bug hardening included:
 ---
 
 ### 414. Data Integrity & Recovery Drills
-**What it does:** Adds a repeatable platform integrity-and-recovery verification surface for SQLite-backed state. New command `npm run verify:data-integrity` runs quick/full SQLite integrity checks, reports foreign-key violations, detects workspace-orphaned rows across workspace-scoped tables, and performs explicit cross-table consistency scans from declared FK relationships. It also emits a canonical preserve-vs-rebuild artifact classification map so incident response can triage what must be restored versus what can be recomputed.
+**What it does:** Adds a repeatable platform integrity-and-recovery verification surface for SQLite-backed state. New command `npm run verify:data-integrity` runs quick/full SQLite integrity checks, reports foreign-key violations, detects workspace-orphaned rows across workspace-scoped tables, and performs explicit cross-table consistency scans from declared FK relationships. It also emits a canonical preserve-vs-rebuild artifact classification map so incident response can triage what must be restored versus what can be recomputed. **A1 update:** the backup/restore drill described in this doc is now automated — `npm run backup:restore-drill` (`scripts/restore-drill.ts`) restores the latest available backup (local backup dir → S3/R2 tar → `/api/admin/db-export` fallback, in that precedence order) to a scratch path, runs the same integrity report engine against it, and diffs every table's restored row count against the backup manifest's recorded counts (`diffManifestCounts` — pure, unit-tested), exiting non-zero on any mismatch. Off-site (S3-compatible) backups now support Cloudflare R2 via `BACKUP_S3_ENDPOINT`, and off-site retention (`BACKUP_S3_RETENTION_DAYS`, default 30) is tracked independently of local on-disk retention (`BACKUP_RETENTION_DAYS`, default 3) — previously one constant drove both prunes. A new pr-check rule (`New migration DROP TABLE without rename-to-archive contract`) mechanically enforces the rename-to-archive-then-drop contract documented in `docs/rules/destructive-migrations.md` for all new migrations.
 
-**Agency value:** Gives operators a concrete pre/post-deploy integrity signal and a structured incident-recovery starting point instead of ad hoc SQL checks.
+**Agency value:** Gives operators a concrete pre/post-deploy integrity signal and a structured incident-recovery starting point instead of ad hoc SQL checks. The restore drill turns "we have backups" into a verified, automatable claim instead of an assumption.
 
 **Client value:** Reduces risk of silent data drift and shortens recovery time when a migration or runtime issue impacts stored customer state.
 
 **Mutual:** Documents a consistent backup/restore drill and restore-based rollback workflow, improving operational confidence without changing product-facing behavior.
 
-**Files:** `scripts/platform-data-integrity-recovery.ts`; `scripts/report-data-integrity-recovery.ts`; `docs/workflows/data-integrity-recovery.md`; `tests/unit/data-integrity-recovery-report.test.ts`; `package.json`; `data/roadmap.json`.
+**Files:** `scripts/platform-data-integrity-recovery.ts`; `scripts/report-data-integrity-recovery.ts`; `scripts/restore-drill.ts`; `docs/workflows/data-integrity-recovery.md`; `docs/workflows/deploy.md`; `docs/workflows/release-safety.md`; `docs/workflows/staging-environment.md`; `docs/rules/destructive-migrations.md`; `tests/unit/data-integrity-recovery-report.test.ts`; `tests/unit/restore-drill.test.ts`; `server/backup.ts`; `server/storage-stats.ts`; `server/routes/health.ts`; `scripts/pr-check.ts`; `data/drop-table-migration-baseline.json`; `render.yaml`; `.env.example`; `package.json`; `data/roadmap.json`.
 
 ---
 
@@ -8567,3 +8589,56 @@ Service and location page brief defaults are now shorter and more conversion-den
 **Tests:** Unit coverage per category — `mcp-handle-store` (durability/TTL/eviction/paid-counter), `mcp-auth-perkey` (master/scoped/revoked/cross-workspace), `mcp-tools-recommendations` (12), `mcp-tools-schema` (16), `mcp-tools-content-generation` (16); `mcp-server-routing` exercises all new categories in `ALL_TOOLS` order; the `.describe()` contract test covers every new input schema.
 
 **Files:** `server/mcp/handles.ts`; `server/mcp/paid-call-counter.ts`; `server/mcp/api-keys.ts`; `server/mcp/auth.ts`; `server/mcp/server.ts`; `server/mcp/instructions.ts`; `server/mcp/tools/schema-actions.ts`; `server/mcp/tools/recommendation-actions.ts`; `server/mcp/tools/content-generation-actions.ts`; `shared/types/mcp-action-schemas.ts`; `server/db/migrations/162-mcp-handle-store.sql`; `server/db/migrations/163-mcp-api-keys.sql`; `tests/unit/mcp-handle-store.test.ts`; `tests/unit/mcp-auth-perkey.test.ts`; `tests/unit/mcp-tools-recommendations.test.ts`; `tests/unit/mcp-tools-schema.test.ts`; `tests/unit/mcp-tools-content-generation.test.ts`; `tests/unit/mcp-server-routing.test.ts`; `tests/contract/mcp-tool-input-schema-properties.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 606. Client redesign "lightup" batch — cross-tab attention badge + verdict count-band MoM consistency + abort-log noise fix 2026-06-30
+**Status:** Shipped to staging. Validation-and-polish batch produced while flag-ON smoke-testing the merged-but-dark client redesign (`strategy-the-issue` + `the-issue-client-spine` + `client-ia-v2` + `the-issue-client-measured-capture`) on real seeded workspaces. The full-program flag-ON smoke (client empty/establishing + rich verdict + admin Strategy cockpit) found no crashes; these are the three fixes/increments it surfaced. cda-sc6 carries no new flag (rides `client-ia-v2`). Adversarially reviewed (3 parallel reviewers + remediation) before PR.
+
+**What it does:**
+- **cda-sc6 — single cross-tab "needs your attention" badge (`ClientHeader`).** A Bell + teal count in the header that aggregates everything awaiting the client into ONE number — `pendingApprovals + pendingReviews + unreadTeamNotes + copyReviewCount + contentPlanSummary.reviewCells` — and deep-links into the Inbox (`setTab('inbox')`). Renders only when `client-ia-v2` is on, the tier is paid (the v2 Inbox tab is paid-only, so the badge never points at a nav-absent surface), and the count is > 0. The prior per-tab inbox count computation was de-duped into one hoisted value reused by both the per-tab badge and the new global one. Count + link only — deliberately not a revived action strip.
+- **Verdict count-band month-over-month consistency (`server/roi.ts` + `TheIssueClientPage`).** The per-type outcome cards previously read "0 / establishing your baseline" while the aggregate verdict headline showed a real month-over-month delta — because the headline used the server's snapshot-based verdict while the count band was assembled client-side from *live* GA4 (which has no history). Now `outcomeVerdict.outcomeTypeBreakdown` carries per-type `baseline`/`priorPeriod` (re-aggregated from the same prior + engagement-baseline snapshots via `aggregatePinnedOutcomes`), and the count band sources from the verdict when present. Headline and per-type cards now reconcile (per-type currents sum to `outcomeCount`, per-type priors sum to `priorPeriodCount`).
+- **Abort-log noise fix (`src/api/client.ts`).** `getSafe` no longer logs `AbortError` (React Query cancels in-flight fetches on unmount/refetch); the fallback return is unchanged. Removes console/Sentry noise; affects only `getSafe` callers that forward the abort signal.
+
+**Why it matters to the agency:** Converts already-built-but-dark client-redesign work into shippable, de-risked value, and removes a trust landmine on the redesign's centerpiece (a client seeing "+10 vs last month" in the headline but "0 / establishing" per type would distrust the whole number). The attention badge means a client never has to hunt across tabs to know something needs them.
+
+**Why it matters to clients:** A single, honest, glanceable signal of what's waiting on them, and a verdict whose breakdown reconciles with its headline — consistent, trustworthy reporting rather than contradictory numbers.
+
+**Tests:** `tests/component/client/ClientHeader.test.tsx` (8 badge tests: render, content-plan aggregation, singular/plural, deep-link, flag-off + free-tier + zero-count gating, >99 cap); `tests/unit/compute-roi-outcome-verdict.test.ts` (+1: per-type priorPeriod populated + per-type sums reconcile with the aggregate). Full suite + typecheck + pr-check + lint:hooks + verify:feature-flags green; flag-ON browser smoke on seeded premium/empty workspaces.
+
+**Files:** `src/api/client.ts`; `src/components/client/ClientHeader.tsx`; `src/components/ClientDashboard.tsx`; `src/components/client/the-issue/TheIssueClientPage.tsx`; `server/roi.ts`; `tests/component/client/ClientHeader.test.tsx`; `tests/components/client/client-components.test.tsx`; `tests/unit/compute-roi-outcome-verdict.test.ts`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+---
+
+### 607. The Issue (Client) — "Your next bets" $-forecast band (P1) 2026-06-30
+**Status:** Shipped to staging behind `the-issue-client-next-bets` (flipped reserved→active; default OFF / dark). Follow-up phase after the lightup batch (#1427), per phase-per-PR. Adversarially reviewed before PR.
+
+**What it does:** A compact "Your next bets" `SectionCard` in the client verdict spine (above the content plan) that reframes the top ~3 recommended moves as a forward-looking **dollar forecast**. Each bet shows a conservative banded monthly $ range (from the client-safe `ImpactBand.monthlyRangeUsd` — already floored at $25, capped at $2,000, and stripped of the admin-only `emvPerWeek` server-side) plus an **outcome-unit equivalent shown only when it rounds to ≥1** (e.g. "≈ 1–2 new patients/mo", derived from the verdict's `valuePerOutcome`) — a deliberate framing decision so a "$300 ÷ $850 ≈ 0.4 patients" line never reads as noise. A header sums the combined projection ("We project ~$X–Y/mo from your next N moves"), and each bet carries an "Act on this" greenlight (the same `useActOnRecommendation` content-request path the plan uses). Renders nothing when no rec carries a $ band (below the display floor) — never a non-actionable placeholder.
+
+**Architecture:** Pure, unit-tested forecast helper (`nextBetsForecast.ts` — filter to forecastable recs, sort by `opportunity.value ?? impactScore`, sum the bands, compute outcome-units with the ≥1 gate) + a prop-driven `IssueNextBetsSection` component, mounted in `TheIssueClientPage` behind a top-level (Rules-of-Hooks-safe) `useFeatureFlag('the-issue-client-next-bets')` read with a test-override prop. Flag-OFF the band never mounts (byte-identical legacy path).
+
+**Why it matters to the agency:** Turns the vague per-rec `estimatedGain` strings into a credible, conservative $ story for the retainer conversation — "your next three moves project ~$X/mo" — sourced from the same floored/capped band the Health tab already uses, so it never over-promises.
+
+**Why it matters to clients:** A glanceable, honest answer to "what are my next moves worth?" for a check-signer, framed in dollars (and whole outcomes when meaningful), with one-tap "Act on this" — without surfacing internal AI/EMV jargon.
+
+**Tests:** `tests/unit/nextBetsForecast.test.ts` (6 — filter/sort/cap, $ sums, outcome-≥1 gate, no-per-outcome-value, sub-1 per-bet but combined ≥1) + `tests/component/client/IssueNextBetsSection.test.tsx` (6 — populated render, empty/null render, act-on, outcome display + omission, pending). typecheck + lint:hooks + pr-check + verify:feature-flags green; flag-ON browser smoke (no crash, graceful empty, correct gating — demo workspaces seed 0 recs so the populated state is test-covered + data-shape type-verified).
+
+**Files:** `src/components/client/the-issue/nextBetsForecast.ts`; `src/components/client/the-issue/IssueNextBetsSection.tsx`; `src/components/client/the-issue/TheIssueClientPage.tsx`; `shared/types/feature-flags.ts`; `tests/unit/nextBetsForecast.test.ts`; `tests/component/client/IssueNextBetsSection.test.tsx`; `FEATURE_AUDIT.md`; `data/roadmap.json`.
+
+### 608. Design cleanup sprint — operator + client surface hierarchy & system consolidation 2026-06-30
+
+From the 2026-06-30 six-screen UX review (WorkspaceOverview / WorkspaceHome / The Issue client + cockpit / Content Pipeline / Client shell). 31-item sprint shipped as 7 staging-first PRs (#1429–#1435 + closeout). Sprint spec + audit + plan: `docs/design-cleanup/` and `docs/superpowers/{audits,plans}/2026-06-30-design-cleanup-*`.
+
+**Shared primitives (Wave 0):** `NeedsAttention`/`AttentionRow` (one severity→token worklist; consumed by Command Center + Workspace Home), `Disclosure` (canonical `<details>` chrome; consumed by The Issue cockpit "Supporting detail" + client "Under the hood"), `Menu` (thin `items[]` wrapper over the accessible `Popover`; consumed by Content Pipeline Export + AiSuggested snooze), `SectionLabel` (t-label section kicker), `StatCard` `tone` prop + exported `cardToneClasses(tone)` (one canonical tinted-gradient definition, adopted by the verdict/outcome/ROI cards). All in `src/components/ui/`; `useClickOutside` hook extracted.
+
+**Color/token discipline (Wave 0b):** repo-wide four-laws sweep — mint-on-static-data → blue/emerald, 3 Law-4 purple → blue, ~50 hardcoded hex → `CHART_SERIES_COLORS`, warning/danger surfaces (`InlineBanner` `TONE_STYLES`, trial banners, POV-staleness) → soft tokens.
+
+**Screen hierarchy (Waves 1–5):** Command Center (header cluster + Needs-Attention hero + one hero metric + score-led workspace rows); Workspace Home (setup-task dedup, 4-health→1, 9-hero→3, worklist-first + tabbed sections); The Issue (plan-above-proof spine, single ROI mount, docked send, cockpit Disclosure split); Content Pipeline (stepper↔tabs unified, TabBar/Menu primitives, alert consolidation); Client shell (4-tab two-speed IA behind `client-ia-v2`, panel dedup, one notice region, no title echo).
+
+**Why it matters:** operator screens surfaced everything at equal weight ("the eye has nowhere to land"); the sprint restores hierarchy and consolidates hand-rolled patterns into shared primitives so future screens inherit them.
+
+**Tests/quality:** ~180 new/updated unit + component + contract tests; every PR merged on genuine-green CI (full suite ~4293 component + 1542 contract). Also fixed a repo-wide CI time-bomb (style-exception fixtures that expired at UTC midnight).
+
+**Owner-pending:** `client-ia-v2` default-ON flip (Wave 5 shipped flag-gated, OFF byte-identical — flipping lights up all clients at once, no per-workspace pilot); `SectionLabel` renders `<p>` (3 migrated Issue kickers lost `<h2>` heading semantics — consider a heading element).
+
+**Files:** `docs/design-cleanup/*`; `docs/superpowers/{audits,plans}/2026-06-30-design-cleanup-*`; `src/components/ui/{NeedsAttention,Disclosure,Menu,SectionLabel,StatCard,InlineBanner,TabBar}.tsx`; `src/hooks/useClickOutside.ts`; `src/components/{WorkspaceOverview,WorkspaceHome,ContentPipeline,KeywordStrategy,ClientDashboard}.tsx`; `src/components/client/the-issue/*`; + color-sweep across ~30 components; `data/roadmap.json`; `FEATURE_AUDIT.md`; `BRAND_DESIGN_LANGUAGE.md`.

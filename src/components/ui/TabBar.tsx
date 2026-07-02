@@ -11,11 +11,12 @@ interface TabBarProps {
   active: string;
   onChange: (id: string) => void;
   className?: string;
+  ariaLabel?: string;
 }
 
-export function TabBar({ tabs, active, onChange, className }: TabBarProps) {
+export function TabBar({ tabs, active, onChange, className, ariaLabel }: TabBarProps) {
   return (
-    <div role="tablist" className={`flex min-w-0 items-center gap-1 overflow-x-auto border-b border-[var(--brand-border)] ${className ?? ''}`}>
+    <div role="tablist" aria-label={ariaLabel} className={`flex min-w-0 items-center gap-1 overflow-x-auto border-b border-[var(--brand-border)] ${className ?? ''}`}>
       {tabs.map(t => {
         const Icon = t.icon;
         const isActive = active === t.id;

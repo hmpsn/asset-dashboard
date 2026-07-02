@@ -41,6 +41,11 @@ This:
 
 **Safety:** The import endpoint only works when `ALLOW_DB_IMPORT=true` (set on staging, never on production).
 
+**Backup/restore drill:** before a destructive migration wave lands on staging, run
+`npm run backup:restore-drill` against a freshly-synced staging database — see
+`docs/workflows/data-integrity-recovery.md` and the contract in
+`docs/rules/destructive-migrations.md`.
+
 ## Environment variables
 
 Staging has all the same env vars as production, with these differences:

@@ -61,6 +61,7 @@ const baseProps = {
   hasAnalytics: false,
   hasAnyData: false,
   effectiveTier: 'growth' as const,
+  clientIaV2: false,
 };
 
 const renderHeader = (props = {}) =>
@@ -226,6 +227,59 @@ describe('ClientHeader — inbox badge', () => {
     renderHeader({ NAV: navWithInbox, pendingApprovals: 0, unreadTeamNotes: 0 });
     // No numeric badge text in DOM
     expect(screen.queryByText(/^\d+$/)).not.toBeInTheDocument();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('ClientHeader — global attention badge (cda-sc6, client-ia-v2)', () => {
+  it('renders a single cross-tab attention badge when client-ia-v2 is on and items await the client', () => {
+    renderHeader({ clientIaV2: true, pendingApprovals: 2, unreadTeamNotes: 1 });
+    const bell = screen.getByRole('button', { name: /need your attention — open inbox/i });
+    expect(bell).toBeInTheDocument();
+    expect(bell).toHaveTextContent('3');
+  });
+
+  it('folds content-plan review cells into the aggregate count', () => {
+    renderHeader({ clientIaV2: true, pendingApprovals: 1, contentPlanSummary: { reviewCells: 4 } });
+    expect(
+      screen.getByRole('button', { name: /5 items need your attention — open inbox/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('uses singular copy for a single item', () => {
+    renderHeader({ clientIaV2: true, pendingApprovals: 1 });
+    expect(
+      screen.getByRole('button', { name: /1 item needs your attention — open inbox/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('deep-links to the inbox when clicked', () => {
+    const setTab = vi.fn();
+    renderHeader({ clientIaV2: true, pendingApprovals: 2, setTab });
+    fireEvent.click(screen.getByRole('button', { name: /need your attention — open inbox/i }));
+    expect(setTab).toHaveBeenCalledWith('inbox');
+  });
+
+  it('is hidden when client-ia-v2 is off, even with actionable items', () => {
+    renderHeader({ clientIaV2: false, pendingApprovals: 5 });
+    expect(screen.queryByRole('button', { name: /your attention/i })).not.toBeInTheDocument();
+  });
+
+  it('is hidden when nothing awaits the client', () => {
+    renderHeader({ clientIaV2: true, pendingApprovals: 0, unreadTeamNotes: 0, contentPlanSummary: null });
+    expect(screen.queryByRole('button', { name: /your attention/i })).not.toBeInTheDocument();
+  });
+
+  it('is hidden on free tier even with actionable items (no Inbox tab to deep-link to)', () => {
+    renderHeader({ clientIaV2: true, effectiveTier: 'free', pendingApprovals: 5 });
+    expect(screen.queryByRole('button', { name: /your attention/i })).not.toBeInTheDocument();
+  });
+
+  it('caps the visible count at 99+ while the aria-label keeps the exact count', () => {
+    renderHeader({ clientIaV2: true, pendingApprovals: 150 });
+    const bell = screen.getByRole('button', { name: /150 items need your attention/i });
+    expect(bell).toHaveTextContent('99+');
   });
 });
 

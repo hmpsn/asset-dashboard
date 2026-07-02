@@ -1,15 +1,15 @@
-import { useState, useRef, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
-import { ArrowUpRight, Clipboard, FileText, RefreshCw, Download, ChevronDown, Layers, HelpCircle, X, TrendingDown, CalendarDays } from 'lucide-react'; // trend-icon-ok
-import { LoadingState, Icon, IconButton, Button, ClickableRow, cn, PageHeader } from './ui';
+import { ArrowUpRight, Clipboard, FileText, RefreshCw, Download, Layers, HelpCircle, X, TrendingDown, CalendarDays, AlertTriangle } from 'lucide-react'; // trend-icon-ok
+import { LoadingState, Icon, IconButton, Button, ClickableRow, cn, PageHeader, TabBar, Menu, Disclosure, WorkflowStepper, tierAtLeast } from './ui';
+import type { MenuItem } from './ui';
 import { useContentPipeline, useWorkspaces } from '../hooks/admin';
 import { ContentBriefs } from './ContentBriefs';
 import { ContentManager } from './ContentManager';
 import { ContentSubscriptions } from './ContentSubscriptions';
 import { AiSuggested } from './pipeline/AiSuggested';
 import { CannibalizationAlert } from './ui/CannibalizationAlert';
-import { WorkflowStepper } from './ui';
 import { adminPath } from '../routes';
 import { useWorkspaceIntelligence } from '../hooks/admin';
 import type { FixContext } from '../types/fix-context';
@@ -37,15 +37,22 @@ interface Props {
   clearFixContext?: () => void;
 }
 
+// T4.1: "Subscriptions" → "Publish" in the tab bar; Calendar is a view toggle.
+// Stepper phases align 1:1 with pipeline tabs (excluding Calendar).
 const TABS = [
   { id: 'planner' as const, label: 'Planner', icon: Layers },
   { id: 'calendar' as const, label: 'Calendar', icon: CalendarDays },
   { id: 'briefs' as const, label: 'Briefs', icon: Clipboard },
   { id: 'posts' as const, label: 'Posts', icon: FileText },
-  { id: 'subscriptions' as const, label: 'Subscriptions', icon: RefreshCw },
-];
+  { id: 'publish' as const, label: 'Publish', icon: RefreshCw },
+] as const;
 
 type PipelineTab = typeof TABS[number]['id'];
+
+// Legacy alias: old ?tab=subscriptions still resolves to 'publish'
+const TAB_LEGACY_ALIASES: Partial<Record<string, PipelineTab>> = {
+  subscriptions: 'publish',
+};
 
 const EXPORTS = [
   { key: 'briefs', label: 'Content Briefs' },
@@ -62,6 +69,7 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
     return resolveTabSearchParam<PipelineTab>(searchParams.get('tab'), {
       validValues: TABS.map(t => t.id),
       fallback: 'briefs',
+      legacyAliases: TAB_LEGACY_ALIASES,
     });
   });
 
@@ -81,12 +89,16 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
   useEffect(() => {
     const param = searchParams.get('tab');
     if (!param) return;
-    const valid = TABS.some(t => t.id === param);
-    if (valid && param !== activeTab) {
-      setActiveTab(param as PipelineTab);
+    const resolved = resolveTabSearchParam<PipelineTab>(param, {
+      validValues: TABS.map(t => t.id),
+      fallback: activeTab,
+      legacyAliases: TAB_LEGACY_ALIASES,
+    });
+    if (resolved !== activeTab) {
+      setActiveTab(resolved);
     }
   }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps -- activeTab intentionally excluded: including it would loop with handleTabChange
-  const [exportOpen, setExportOpen] = useState(false);
+
   const [guideOpen, setGuideOpen] = useState(false);
   const [decayDismissed, setDecayDismissed] = useState(false);
   // Synthetic fixContext built from an AI-suggested signal click; overrides the
@@ -97,7 +109,6 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
   // fixConsumed ref in ContentBriefs is never reset and a second "Create brief" click
   // while already on the tab silently drops the new keyword.
   const [prefillNonce, setPrefillNonce] = useState(0);
-  const exportRef = useRef<HTMLDivElement>(null);
 
   // React Query hook replaces manual data fetching
   const { data: pipelineData } = useContentPipeline(workspaceId);
@@ -112,15 +123,6 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
   const summary = pipelineData?.summary;
   const decay = pipelineData?.decay;
 
-  useEffect(() => {
-    if (!exportOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false);
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [exportOpen]);
-
   // Auto-switch to briefs tab when arriving via "Draft Brief" navigation.
   // Guard on targetRoute so stale fixContext from seo-editor/seo-schema navigations
   // doesn't wrongly trigger a tab switch when the user arrives at content-pipeline.
@@ -133,10 +135,12 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
     }
   }, [fixContext]);
 
-  const handleExport = (dataset: string, format: 'csv' | 'json') => {
-    window.open(`/api/export/${workspaceId}/${dataset}?format=${format}`, '_blank');
-    setExportOpen(false);
-  };
+  // T4.2: Export via <Menu> primitive — no hand-rolled dropdown state.
+  // Each export type has two items (CSV + JSON).
+  const exportMenuItems: MenuItem[] = EXPORTS.flatMap(exp => [
+    { label: `${exp.label} — CSV`, onSelect: () => window.open(`/api/export/${workspaceId}/${exp.key}?format=csv`, '_blank') },
+    { label: `${exp.label} — JSON`, onSelect: () => window.open(`/api/export/${workspaceId}/${exp.key}?format=json`, '_blank') },
+  ]);
 
   // Navigate to briefs tab when an AI-suggested signal is actioned.
   // Builds a synthetic fixContext from the signal's keyword + pageUrl so
@@ -152,12 +156,28 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
     setActiveTab('briefs');
   };
 
+  // T4.1: Stepper phases align 1:1 with pipeline tabs (excluding Calendar which is a view toggle).
+  // "Strategy" phase now points to the in-page Planner tab instead of navigating off-page.
   const contentWorkflowSteps = [
-    { number: 1, label: 'Strategy', completed: activeTab === 'briefs' || activeTab === 'posts' || activeTab === 'subscriptions', current: activeTab === 'planner', onClick: () => navigate(adminPath(workspaceId, 'seo-strategy')) },
-    { number: 2, label: 'Briefs', completed: activeTab === 'posts' || activeTab === 'subscriptions', current: activeTab === 'briefs', onClick: () => handleTabChange('briefs') },
-    { number: 3, label: 'Posts', completed: activeTab === 'subscriptions', current: activeTab === 'posts', onClick: () => handleTabChange('posts') },
-    { number: 4, label: 'Publish', completed: false, current: activeTab === 'subscriptions', onClick: () => handleTabChange('subscriptions') },
+    { number: 1, label: 'Strategy', completed: activeTab === 'briefs' || activeTab === 'posts' || activeTab === 'publish', current: activeTab === 'planner', onClick: () => handleTabChange('planner') },
+    { number: 2, label: 'Briefs', completed: activeTab === 'posts' || activeTab === 'publish', current: activeTab === 'briefs', onClick: () => handleTabChange('briefs') },
+    { number: 3, label: 'Posts', completed: activeTab === 'publish', current: activeTab === 'posts', onClick: () => handleTabChange('posts') },
+    { number: 4, label: 'Publish', completed: false, current: activeTab === 'publish', onClick: () => handleTabChange('publish') },
   ];
+
+  // T4.3: Count alert items for the Disclosure summary badge.
+  const cannibalizationEntries = (intel?.contentPipeline?.cannibalizationWarnings ?? []).map(w => ({
+    keyword: w.keyword,
+    severity: w.severity,
+    pages: w.pages.map(p => ({ path: p })),
+  }));
+  const decayAlertCount = decay && !decayDismissed && (decay.critical > 0 || decay.warning > 0) ? 1 : 0;
+  // Only count cannibalization when the tier can actually open it (CannibalizationAlert is
+  // growth-gated) — otherwise the "(N)" badge would promise items a free-tier user can't reach.
+  const cannibalizationCount = tierAtLeast(workspaceTier, 'growth') ? cannibalizationEntries.length : 0;
+  // AiSuggested renders OUTSIDE this Disclosure (a neutral workflow-entry card, not an alarmed
+  // band), so it is intentionally not part of the alert count.
+  const alertCount = decayAlertCount + cannibalizationCount;
 
   return (
     <div className="space-y-8">
@@ -167,125 +187,106 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
         icon={<Icon as={Layers} size="lg" className="text-accent-brand" />}
       />
 
-      {/* Calendar tab has no workflow phase — stepper only shown for pipeline tabs */}
+      {/* T4.1: Calendar tab has no workflow phase — stepper only shown for pipeline tabs.
+          "Strategy" step clicks into the Planner tab (not off-page nav). */}
       {activeTab !== 'calendar' && <WorkflowStepper steps={contentWorkflowSteps} compact />}
 
-      {/* Health summary bar */}
+      {/* Health summary bar — the ONE persistent bar, always visible */}
       {summary && (summary.briefs > 0 || summary.matrices > 0) && (
         <div className="flex items-center gap-3 px-4 py-2 bg-[var(--surface-2)] border border-[var(--brand-border)] t-caption-sm text-[var(--brand-text)]" style={{ borderRadius: 'var(--radius-signature)' }}>
-          {summary.briefs > 0 && <span className="flex items-center gap-1"><Icon as={Clipboard} size="sm" className="text-accent-brand" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.briefs}</span> brief{summary.briefs !== 1 ? 's' : ''}</span>}
-          {summary.posts > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><Icon as={FileText} size="sm" className="text-accent-warning" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.posts}</span> post{summary.posts !== 1 ? 's' : ''}</span></>}
-          {summary.matrices > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><Icon as={Layers} size="sm" className="text-accent-brand" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.matrices}</span> matri{summary.matrices !== 1 ? 'ces' : 'x'}</span></>}
+          {summary.briefs > 0 && <span className="flex items-center gap-1"><Icon as={Clipboard} size="sm" className="text-accent-info" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.briefs}</span> brief{summary.briefs !== 1 ? 's' : ''}</span>}
+          {summary.posts > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><Icon as={FileText} size="sm" className="text-[var(--brand-text-bright)]" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.posts}</span> post{summary.posts !== 1 ? 's' : ''}</span></>}
+          {summary.matrices > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><Icon as={Layers} size="sm" className="text-accent-info" /><span className="font-medium text-[var(--brand-text-bright)]">{summary.matrices}</span> matri{summary.matrices !== 1 ? 'ces' : 'x'}</span></>}
           {summary.cells > 0 && <><span className="text-[var(--brand-border)]">&middot;</span><span className="flex items-center gap-1"><span className="font-medium text-[var(--brand-text-bright)]">{summary.cells}</span> cell{summary.cells !== 1 ? 's' : ''}</span>{summary.published > 0 && <span className="text-accent-success ml-0.5">({Math.round(summary.published / summary.cells * 100)}% published)</span>}</>}
         </div>
       )}
 
-      {/* Content decay alert — clickable through to Content Decay in SEO Audit */}
-      {decay && !decayDismissed && (decay.critical > 0 || decay.warning > 0) && (
-        <ClickableRow
-          onClick={() => navigate(`${adminPath(workspaceId, 'seo-audit')}?sub=content-decay`)}
-          className={cn('flex items-center gap-3 px-4 py-2.5 border text-xs', decay.critical > 0 ? 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10' : 'bg-amber-500/5 border-amber-500/20 hover:bg-amber-500/10')}
-          style={{ borderRadius: 'var(--radius-signature)' }}
+      {/* T4.3: Alerts & suggestions Disclosure — collapses decay + cannibalization + AI suggestions.
+          Operator can reach tab content without scrolling past three alarmed bands. */}
+      {alertCount > 0 && (
+        <Disclosure
+          summary={
+            <span className="flex items-center gap-2">
+              <Icon as={AlertTriangle} size="md" className="text-accent-warning" aria-hidden />
+              Alerts &amp; suggestions
+            </span>
+          }
+          badges={[{ label: `${alertCount}`, tone: 'amber' }]}
         >
-          <Icon as={TrendingDown} size="md" className={cn('flex-shrink-0', decay.critical > 0 ? 'text-accent-danger' : 'text-accent-warning')} />
-          <div className="flex-1">
-            <span className="font-medium text-[var(--brand-text-bright)]">
-              {decay.totalDecaying} page{decay.totalDecaying !== 1 ? 's' : ''} losing traffic
-            </span>
-            <span className="text-[var(--brand-text-muted)] ml-1.5">
-              {decay.critical > 0 && <span className="text-accent-danger">{decay.critical} critical</span>}
-              {decay.critical > 0 && decay.warning > 0 && <span> · </span>}
-              {decay.warning > 0 && <span className="text-accent-warning">{decay.warning} warning</span>}
-              <span className="ml-1.5">· avg {Math.abs(decay.avgDeclinePct).toFixed(0)}% decline</span>
-            </span>
+          <div className="space-y-4 pt-2">
+            {/* Content decay alert — clickable through to Content Decay in SEO Audit */}
+            {decay && !decayDismissed && (decay.critical > 0 || decay.warning > 0) && (
+              <ClickableRow
+                onClick={() => navigate(`${adminPath(workspaceId, 'seo-audit')}?sub=content-decay`)}
+                className={cn('flex items-center gap-3 px-4 py-2.5 border text-xs', decay.critical > 0 ? 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10' : 'bg-amber-500/5 border-amber-500/20 hover:bg-amber-500/10')}
+                style={{ borderRadius: 'var(--radius-signature)' }}
+              >
+                <Icon as={TrendingDown} size="md" className={cn('flex-shrink-0', decay.critical > 0 ? 'text-accent-danger' : 'text-accent-warning')} />
+                <div className="flex-1">
+                  <span className="font-medium text-[var(--brand-text-bright)]">
+                    {decay.totalDecaying} page{decay.totalDecaying !== 1 ? 's' : ''} losing traffic
+                  </span>
+                  <span className="text-[var(--brand-text-muted)] ml-1.5">
+                    {decay.critical > 0 && <span className="text-accent-danger">{decay.critical} critical</span>}
+                    {decay.critical > 0 && decay.warning > 0 && <span> · </span>}
+                    {decay.warning > 0 && <span className="text-accent-warning">{decay.warning} warning</span>}
+                    <span className="ml-1.5">· avg {Math.abs(decay.avgDeclinePct).toFixed(0)}% decline</span>
+                  </span>
+                </div>
+                <Icon as={ArrowUpRight} size="sm" className="flex-shrink-0 text-[var(--brand-text-muted)]" />
+                <IconButton
+                  onClick={(e) => { e.stopPropagation(); setDecayDismissed(true); }}
+                  icon={X}
+                  label="Dismiss decay alert"
+                  size="sm"
+                  variant="ghost"
+                  className="flex-shrink-0"
+                />
+              </ClickableRow>
+            )}
+
+            {/* Cannibalization warnings — growth-gated, so only surfaced (and counted) for
+                tiers that can act on them; keeps the "(N)" badge honest for free tier. */}
+            {tierAtLeast(workspaceTier, 'growth') && cannibalizationEntries.length > 0 && (
+              <CannibalizationAlert
+                entries={cannibalizationEntries}
+                tier={workspaceTier}
+              />
+            )}
           </div>
-          <Icon as={ArrowUpRight} size="sm" className="flex-shrink-0 text-[var(--brand-text-muted)]" />
-          <IconButton
-            onClick={(e) => { e.stopPropagation(); setDecayDismissed(true); }}
-            icon={X}
-            label="Dismiss decay alert"
-            size="sm"
-            variant="ghost"
-            className="flex-shrink-0"
-          />
-        </ClickableRow>
+        </Disclosure>
       )}
 
-      {/* Cannibalization warnings from intelligence — string-path entries mapped to CannibalizationEntry[] */}
-      <CannibalizationAlert
-        entries={(intel?.contentPipeline?.cannibalizationWarnings ?? []).map(w => ({
-          keyword: w.keyword,
-          severity: w.severity,
-          pages: w.pages.map(p => ({ path: p })),
-        }))}
-        tier={workspaceTier}
-      />
-
-      {/* AI-suggested briefs from insight engine */}
+      {/* AI-suggested briefs from insight engine — always shown (manages own empty state) */}
       <AiSuggested workspaceId={workspaceId} onCreateBrief={handleCreateBrief} />
 
-      {/* Sub-tab bar */}
-      <div className="flex items-center gap-1 border-b border-[var(--brand-border)] pb-0">
-        {TABS.map(t => {
-          const TabIcon = t.icon;
-          const active = activeTab === t.id;
-          return (
-            <Button
-              key={t.id}
-              onClick={() => handleTabChange(t.id)}
-              variant="ghost"
-              size="sm"
-              className={cn(
-                'gap-1.5 px-3 py-2 text-xs font-medium border-b-2 -mb-px rounded-none',
-                active ? 'border-teal-400 text-accent-brand' : 'border-transparent text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]',
-              )}
-            >
-              <Icon as={TabIcon} size="md" />
-              {t.label}
-            </Button>
-          );
-        })}
+      {/* T4.2: Sub-tab bar using <TabBar> primitive + Export via <Menu> (not a fake tab).
+          ?tab= deep-link: handled via useSearchParams init + sync effect above. */}
+      <div className="flex items-center gap-2">
+        <TabBar
+          tabs={TABS as unknown as Array<{ id: string; label: string; icon: import('lucide-react').LucideIcon }>}
+          active={activeTab}
+          onChange={handleTabChange}
+          ariaLabel="Content pipeline sections"
+          className="flex-1"
+        />
 
-        {/* Export dropdown */}
-        <div className="ml-auto relative" ref={exportRef}>
-          <Button
-            onClick={() => setExportOpen(!exportOpen)}
-            variant="ghost"
-            size="sm"
-            className="gap-1 px-2.5 py-1.5 t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] rounded-[var(--radius-md)] hover:bg-[var(--surface-3)]"
-          >
-            <Icon as={Download} size="sm" />
-            Export
-            <Icon as={ChevronDown} size="sm" className={cn('transition-transform', exportOpen && 'rotate-180')} />
-          </Button>
-          {exportOpen && (
-            // pr-check-disable-next-line -- export menu dropdown
-            <div className="absolute right-0 top-full mt-1 w-56 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-[var(--z-dropdown)] py-1 overflow-hidden">
-              {EXPORTS.map(exp => (
-                <div key={exp.key} className="flex items-center justify-between px-3 py-2 hover:bg-[var(--surface-3)] group">
-                  <span className="text-xs text-[var(--brand-text-bright)]">{exp.label}</span>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      onClick={() => handleExport(exp.key, 'csv')}
-                      variant="ghost"
-                      size="sm"
-                      className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-accent-brand hover:bg-teal-500/10"
-                    >
-                      CSV
-                    </Button>
-                    <Button
-                      onClick={() => handleExport(exp.key, 'json')}
-                      variant="ghost"
-                      size="sm"
-                      className="t-caption-sm px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-accent-brand hover:bg-teal-500/10"
-                    >
-                      JSON
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        {/* Export action — moved OUT of tab row; rendered via <Menu> primitive */}
+        <div className="pb-0 border-b border-[var(--brand-border)] flex items-end">
+          <Menu
+            trigger={
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1 px-2.5 py-1.5 t-caption-sm font-medium text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] rounded-[var(--radius-md)] hover:bg-[var(--surface-3)] mb-px"
+              >
+                <Icon as={Download} size="sm" />
+                Export
+              </Button>
+            }
+            items={exportMenuItems}
+            align="end"
+          />
         </div>
       </div>
 
@@ -316,7 +317,7 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
       {activeTab === 'posts' && (
         <ContentManager key={`content-${workspaceId}`} workspaceId={workspaceId} />
       )}
-      {activeTab === 'subscriptions' && (
+      {activeTab === 'publish' && (
         <ContentSubscriptions key={`subs-${workspaceId}`} workspaceId={workspaceId} />
       )}
       {/* Floating help button */}

@@ -108,7 +108,7 @@ export function SearchDetail({ siteId, workspaceId, gscPropertyUrl }: Props) {
       date: f.detectedAt?.slice(0, 10) ?? lastChartDate,
       label: f.headline,
       detail: f.title,
-      color: '#ef4444',
+      color: CHART_SERIES_COLORS.red,
     }));
 
   // Build badge lookup for table rows

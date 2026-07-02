@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { Upload, Image, FileImage } from 'lucide-react';
 import { Icon, cn } from './ui';
-import { themeColor } from './ui/constants';
+import { themeColor, CHART_SERIES_COLORS } from './ui/constants';
 import { postForm } from '../api/client';
 
 interface Props {
@@ -84,8 +84,8 @@ export function DropZone({ workspaceId, type, disabled }: Props) {
         uploading && 'border-emerald-500/50 bg-emerald-500/5',
       )}
       style={!uploading ? {
-        borderColor: dragging ? '#2dd4bf' : themeColor('#3f3f46', '#cbd5e1'),
-        backgroundColor: dragging ? 'rgba(45,212,191,0.1)' : themeColor('#18181b', '#ffffff'),
+        borderColor: dragging ? CHART_SERIES_COLORS.teal : themeColor('#3f3f46', '#cbd5e1'),
+        backgroundColor: dragging ? 'rgba(45,212,191,0.1)' : themeColor('#18181b', '#ffffff'), // chart-hex-ok — rgba teal drop-zone tint; no CSS-var rgba equivalent
       } : undefined}
     >
       <input

@@ -73,6 +73,7 @@ const steps: Step[] = [
     ],
   },
   { label: 'Feature-flag lifecycle audit', cmd: 'npm', args: ['run', 'verify:feature-flags'] },
+  { label: 'Lexicon registry audit', cmd: 'npm', args: ['run', 'verify:lexicon'] },
   { label: 'Performance budget audit', cmd: 'npm', args: ['run', 'verify:performance-budgets'] },
   { label: 'Deprecation lifecycle audit', cmd: 'npm', args: ['run', 'verify:deprecations'] },
   { label: 'Platform health cadence audit', cmd: 'npm', args: ['run', 'verify:platform-health-cadence'] },

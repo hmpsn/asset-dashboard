@@ -9,10 +9,9 @@ import { useRecommendations } from '../hooks/useRecommendations';
 import { buildImpactBandsByCheck } from './client/client-dashboard/buildImpactBandsByCheck';
 import { eventDisplayName as deriveEventDisplayName, isEventPinned as deriveIsEventPinned } from './client/the-issue/outcomeNoun';
 import {
-  X,
   Clock, Sparkles,
 } from 'lucide-react';
-import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal, Icon, Button, IconButton, PageHeader, InlineBanner } from './ui';
+import { type Tier, Skeleton, OverviewSkeleton, ScannerReveal, Icon, Button, PageHeader, InlineBanner } from './ui';
 import { STUDIO_NAME, STUDIO_URL } from '../constants';
 import { CartProvider } from './client/useCart';
 import { SeoCartDrawer } from './client/SeoCart';
@@ -615,6 +614,57 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     })}`
     : ws.name;
 
+  // ── T5.2 dedupe: single-definition panel content ──────────────────────────
+  // Health/Performance/Strategy/Content-Plan/Brand/Plans previously duplicated
+  // their full prop list both as a top-level `panels[...]` entry AND inline
+  // inside the Deep Dive / Settings slots. Define each folded surface's JSX ONCE
+  // here, then reference it from every home. This is a construction refactor,
+  // NOT a behavior change — each home wraps the shared fragment with the SAME
+  // wrappers it used before (top-level panels + Deep Dive slots wrap in
+  // LazyClientTabPanel; Settings slots pass the shared fragment as-is — brandPanelContent
+  // keeps its own inner ErrorBoundary exactly as origin did (so Brand is double-wrapped
+  // under SettingsTab, matching origin byte-for-byte), while plansPanelContent is bare).
+  // Output stays byte-identical for both nav modes (flag-ON and flag-OFF).
+  const performancePanelContent = (
+    <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} searchDataUpdatedAt={searchDataUpdatedAt} ga4Data={ga4Data} ws={ws!} tier={effectiveTier} days={days} dateRange={dateRange} initialSubTab={initialTabId === 'analytics' || initialTabId === 'search' ? initialTabId : undefined} />
+  );
+  const healthPanelContent = (
+    <ErrorBoundary label="Site Health">
+      <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error', 'warning', 'info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check Inbox > Reviews to track progress.', type: 'success' })} tier={effectiveTier} hidePrices={isExternalBilling} impactBandsByCheck={impactBandsByCheck} actionPlanSlot={workspaceId && auditDetail ? (
+        <ErrorBoundary label="Action Plan">
+          <LazyClientTabPanel>
+            <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} onNotify={(msg, type) => setToast({ message: msg, type: type === 'info' ? 'success' : type })} />
+          </LazyClientTabPanel>
+        </ErrorBoundary>
+      ) : undefined}
+      />
+    </ErrorBoundary>
+  );
+  const strategyPanelContent = (
+    <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} contentPlanKeywords={contentPlanKeywords} onTabChange={(nextTab) => setTab(nextTab as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} />
+  );
+  const contentPlanPanelContent = (
+    <ErrorBoundary label="Content Plan">
+      <ContentPlanTab workspaceId={workspaceId} setToast={setToast} />
+    </ErrorBoundary>
+  );
+  const brandPanelContent = (
+    <ErrorBoundary label="Brand">
+      <BrandTab
+        businessProfile={ws?.businessProfile ?? undefined}
+        onSaveBusinessProfile={async (profile) => {
+          const res = await patch<{ businessProfile: BusinessProfile }>(`/api/public/workspaces/${workspaceId}/business-profile`, profile);
+          if (res?.businessProfile) {
+            setWs(prev => prev ? { ...prev, businessProfile: res.businessProfile } : prev);
+          }
+        }}
+      />
+    </ErrorBoundary>
+  );
+  const plansPanelContent = (
+    <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} setToast={setToast} onOpenChat={() => chatApi?.openChat()} />
+  );
+
   return (
     <ErrorBoundary label="Client Dashboard">
     <BetaProvider value={betaMode}>
@@ -652,59 +702,112 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
         hasAnalytics={!!(overview || ga4Overview)}
         hasAnyData={!!(overview || audit || ga4Overview)}
         effectiveTier={effectiveTier}
+        clientIaV2={clientIaV2}
       />
 
       <main className="max-w-6xl mx-auto px-6 py-6">
         <ScannerReveal>
         <div className="space-y-8">
-        <PageHeader
-          title={activeTabLabel}
-          subtitle={activeTabSubtitle}
-          icon={<Icon as={ActiveTabIcon} size="lg" className="text-accent-brand" />}
-        />
+        {/* T5.4 — PageHeader title echo. Under the flag-OFF legacy nav each tab
+            gets a PageHeader whose title just repeats the active nav label. Under
+            the flag-ON 4-tab shell that title is redundant (the active tab is
+            already highlighted in the nav and the subtitle is only `ws.name`), so
+            we drop the header entirely and let each panel's own content carry the
+            heading. OFF stays byte-identical. */}
+        {!clientIaV2 && (
+          <PageHeader
+            title={activeTabLabel}
+            subtitle={activeTabSubtitle}
+            icon={<Icon as={ActiveTabIcon} size="lg" className="text-accent-brand" />}
+          />
+        )}
 
-        {/* Trial countdown banner — shows at five days and under */}
-        {showTrialCountdownBanner && (
-          <div className="flex items-center gap-3 px-4 py-3 bg-amber-500/8 border border-amber-500/20" style={{ borderRadius: 'var(--radius-signature)' }}>
-            <Icon as={Clock} size="md" className="text-accent-warning flex-shrink-0" />
-            <p className="t-body text-accent-warning flex-1">
-              <strong>{trialCountdownDays} day{trialCountdownDays === 1 ? '' : 's'}</strong> left on your Growth trial.
-              {' '}Choose a plan to keep access to all features.
-            </p>
-            <Button size="sm" onClick={() => setTab('plans')}>View Plans</Button>
-            <IconButton
-              icon={X}
-              label="Dismiss trial reminder"
-              size="sm"
-              variant="ghost"
-              onClick={() => {
+        {/* T5.3 — notice region. OFF: the legacy stacked notices below (trial
+            countdown → trial ended → section errors → education tip), each shown
+            independently, byte-identical to today. ON: a SINGLE prioritized region
+            — at most one notice at a time, priority errors > trial > education tip
+            (the education tip yields to any real error or an active trial notice). */}
+        {clientIaV2 ? (
+          <div role="status" aria-live="polite">
+          {Object.keys(sectionErrors).length > 0 ? (
+            <InlineBanner>
+              <div className="t-body space-y-0.5">
+                {Object.values(sectionErrors).map((msg, i) => <p key={i}>{msg} — try refreshing the page.</p>)}
+              </div>
+            </InlineBanner>
+          ) : showTrialCountdownBanner ? (
+            <InlineBanner
+              tone="warning"
+              icon={Clock}
+              onDismiss={() => {
                 try { localStorage.setItem(trialBannerDismissKey, '1'); } catch (err) { console.error('ClientDashboard operation failed:', err); }
                 setDismissedTrialBannerKey(trialBannerDismissKey);
               }}
+              dismissLabel="Dismiss trial reminder"
+              className="items-center"
+            >
+              <div className="flex items-center gap-2 flex-1">
+                <span className="t-body flex-1">
+                  <strong>{trialCountdownDays} day{trialCountdownDays === 1 ? '' : 's'}</strong> left on your Growth trial.
+                  {' '}Choose a plan to keep access to all features.
+                </span>
+                <Button size="sm" onClick={() => setTab('plans')}>View Plans</Button>
+              </div>
+            </InlineBanner>
+          ) : (!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) === 0) ? (
+            <InlineBanner
+              tone="error"
+              icon={Clock}
+              message="Your Growth trial has ended. Some features are now limited. Upgrade to restore full access."
             />
+          ) : (
+            <SeoEducationTip tab={tab} workspaceId={workspaceId} />
+          )}
           </div>
-        )}
-        {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) === 0 && (
-          <div className="flex items-center gap-3 px-4 py-3 bg-red-500/8 border border-red-500/20" style={{ borderRadius: 'var(--radius-signature)' }}>
-            <Icon as={Clock} size="md" className="text-accent-danger flex-shrink-0" />
-            <p className="t-body text-accent-danger">
-              Your Growth trial has ended. Some features are now limited.
-              {' '}Upgrade to restore full access.
-            </p>
-          </div>
-        )}
+        ) : (
+          <>
+            {/* Trial countdown banner — shows at five days and under */}
+            {showTrialCountdownBanner && (
+              <InlineBanner
+                tone="warning"
+                icon={Clock}
+                onDismiss={() => {
+                  try { localStorage.setItem(trialBannerDismissKey, '1'); } catch (err) { console.error('ClientDashboard operation failed:', err); }
+                  setDismissedTrialBannerKey(trialBannerDismissKey);
+                }}
+                dismissLabel="Dismiss trial reminder"
+                className="items-center"
+              >
+                <div className="flex items-center gap-2 flex-1">
+                  <span className="t-body flex-1">
+                    <strong>{trialCountdownDays} day{trialCountdownDays === 1 ? '' : 's'}</strong> left on your Growth trial.
+                    {' '}Choose a plan to keep access to all features.
+                  </span>
+                  <Button size="sm" onClick={() => setTab('plans')}>View Plans</Button>
+                </div>
+              </InlineBanner>
+            )}
+            {!betaMode && !isExternalBilling && ws.isTrial && (ws.trialDaysRemaining ?? 0) === 0 && (
+              <InlineBanner
+                tone="error"
+                icon={Clock}
+                message="Your Growth trial has ended. Some features are now limited. Upgrade to restore full access."
+              />
+            )}
 
-        {/* Section loading errors */}
-        {Object.keys(sectionErrors).length > 0 && (
-          <InlineBanner>
-            <div className="t-body space-y-0.5">
-              {Object.values(sectionErrors).map((msg, i) => <p key={i}>{msg} — try refreshing the page.</p>)}
-            </div>
-          </InlineBanner>
-        )}
+            {/* Section loading errors */}
+            {Object.keys(sectionErrors).length > 0 && (
+              <InlineBanner>
+                <div className="t-body space-y-0.5">
+                  {Object.values(sectionErrors).map((msg, i) => <p key={i}>{msg} — try refreshing the page.</p>)}
+                </div>
+              </InlineBanner>
+            )}
 
-        {/* SEO Education Tips — per-tab first-visit contextual tips */}
-        <SeoEducationTip tab={tab} workspaceId={workspaceId} />
+            {/* SEO Education Tips — per-tab first-visit contextual tips */}
+            <SeoEducationTip tab={tab} workspaceId={workspaceId} />
+          </>
+        )}
 
         <ClientDashboardTabContent
           tab={tab}
@@ -725,26 +828,17 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             ),
             performance: (
               <LazyClientTabPanel>
-                <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} searchDataUpdatedAt={searchDataUpdatedAt} ga4Data={ga4Data} ws={ws!} tier={effectiveTier} days={days} dateRange={dateRange} initialSubTab={initialTabId === 'analytics' || initialTabId === 'search' ? initialTabId : undefined} />
+                {performancePanelContent}
               </LazyClientTabPanel>
             ),
             health: (
               <LazyClientTabPanel>
-                <ErrorBoundary label="Site Health">
-                  <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error', 'warning', 'info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check Inbox > Reviews to track progress.', type: 'success' })} tier={effectiveTier} hidePrices={isExternalBilling} impactBandsByCheck={impactBandsByCheck} actionPlanSlot={workspaceId && auditDetail ? (
-                    <ErrorBoundary label="Action Plan">
-                      <LazyClientTabPanel>
-                        <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} onNotify={(msg, type) => setToast({ message: msg, type: type === 'info' ? 'success' : type })} />
-                      </LazyClientTabPanel>
-                    </ErrorBoundary>
-                  ) : undefined}
-                  />
-                </ErrorBoundary>
+                {healthPanelContent}
               </LazyClientTabPanel>
             ),
             strategy: (
               <LazyClientTabPanel>
-                <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} contentPlanKeywords={contentPlanKeywords} onTabChange={(nextTab) => setTab(nextTab as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} />
+                {strategyPanelContent}
               </LazyClientTabPanel>
             ),
             inbox: (
@@ -754,14 +848,12 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             ),
             'content-plan': (
               <LazyClientTabPanel>
-                <ErrorBoundary label="Content Plan">
-                  <ContentPlanTab workspaceId={workspaceId} setToast={setToast} />
-                </ErrorBoundary>
+                {contentPlanPanelContent}
               </LazyClientTabPanel>
             ),
             plans: (
               <LazyClientTabPanel>
-                <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} setToast={setToast} onOpenChat={() => chatApi?.openChat()} />
+                {plansPanelContent}
               </LazyClientTabPanel>
             ),
             roi: (
@@ -773,17 +865,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             ),
             brand: (
               <LazyClientTabPanel>
-                <ErrorBoundary label="Brand">
-                  <BrandTab
-                    businessProfile={ws?.businessProfile ?? undefined}
-                    onSaveBusinessProfile={async (profile) => {
-                      const res = await patch<{ businessProfile: BusinessProfile }>(`/api/public/workspaces/${workspaceId}/business-profile`, profile);
-                      if (res?.businessProfile) {
-                        setWs(prev => prev ? { ...prev, businessProfile: res.businessProfile } : prev);
-                      }
-                    }}
-                  />
-                </ErrorBoundary>
+                {brandPanelContent}
               </LazyClientTabPanel>
             ),
             results: (
@@ -796,33 +878,22 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
                 <DeepDiveTab
                   analyticsSlot={(
                     <LazyClientTabPanel>
-                      <PerformanceTab overview={overview} searchComparison={searchComparison} trend={trend} annotations={annotations} rankHistory={rankHistory} latestRanks={latestRanks} insights={insights} searchDataUpdatedAt={searchDataUpdatedAt} ga4Data={ga4Data} ws={ws!} tier={effectiveTier} days={days} dateRange={dateRange} initialSubTab={initialTabId === 'analytics' || initialTabId === 'search' ? initialTabId : undefined} />
+                      {performancePanelContent}
                     </LazyClientTabPanel>
                   )}
                   healthSlot={(
                     <LazyClientTabPanel>
-                      <ErrorBoundary label="Site Health">
-                        <HealthTab audit={audit} auditDetail={auditDetail} liveDomain={ws.liveDomain} workspaceId={workspaceId} initialSeverity={(() => { const s = new URLSearchParams(window.location.search).get('severity'); return s && ['error', 'warning', 'info'].includes(s) ? s as 'error' | 'warning' | 'info' : 'all'; })()} onContentRequested={() => setToast({ message: 'Content improvement request created! Check Inbox > Reviews to track progress.', type: 'success' })} tier={effectiveTier} hidePrices={isExternalBilling} impactBandsByCheck={impactBandsByCheck} actionPlanSlot={workspaceId && auditDetail ? (
-                          <ErrorBoundary label="Action Plan">
-                            <LazyClientTabPanel>
-                              <InsightsEngine workspaceId={workspaceId} tier={effectiveTier} onNotify={(msg, type) => setToast({ message: msg, type: type === 'info' ? 'success' : type })} />
-                            </LazyClientTabPanel>
-                          </ErrorBoundary>
-                        ) : undefined}
-                        />
-                      </ErrorBoundary>
+                      {healthPanelContent}
                     </LazyClientTabPanel>
                   )}
                   rankingsSlot={(
                     <LazyClientTabPanel>
-                      <StrategyTab strategyData={strategyData} requestedTopics={requestedTopics} contentRequests={contentRequests} effectiveTier={effectiveTier} contentPlanKeywords={contentPlanKeywords} onTabChange={(nextTab) => setTab(nextTab as ClientTab)} workspaceId={workspaceId} setToast={(msg: string) => setToast({ message: msg, type: 'success' })} />
+                      {strategyPanelContent}
                     </LazyClientTabPanel>
                   )}
                   contentPlanSlot={(clientIaV2 && effectiveTier !== 'free' && contentPlanSummary && contentPlanSummary.totalCells > 0) ? (
                     <LazyClientTabPanel>
-                      <ErrorBoundary label="Content Plan">
-                        <ContentPlanTab workspaceId={workspaceId} setToast={setToast} />
-                      </ErrorBoundary>
+                      {contentPlanPanelContent}
                     </LazyClientTabPanel>
                   ) : undefined}
                 />
@@ -831,22 +902,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
             settings: (
               <LazyClientTabPanel>
                 <SettingsTab
-                  brandSlot={(
-                    <ErrorBoundary label="Brand">
-                      <BrandTab
-                        businessProfile={ws?.businessProfile ?? undefined}
-                        onSaveBusinessProfile={async (profile) => {
-                          const res = await patch<{ businessProfile: BusinessProfile }>(`/api/public/workspaces/${workspaceId}/business-profile`, profile);
-                          if (res?.businessProfile) {
-                            setWs(prev => prev ? { ...prev, businessProfile: res.businessProfile } : prev);
-                          }
-                        }}
-                      />
-                    </ErrorBoundary>
-                  )}
-                  plansSlot={(!betaMode && !isExternalBilling) ? (
-                    <PlansTab workspaceId={workspaceId} ws={ws} effectiveTier={effectiveTier} setToast={setToast} onOpenChat={() => chatApi?.openChat()} />
-                  ) : undefined}
+                  brandSlot={brandPanelContent}
+                  plansSlot={(!betaMode && !isExternalBilling) ? plansPanelContent : undefined}
                 />
               </LazyClientTabPanel>
             ),

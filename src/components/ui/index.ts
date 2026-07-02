@@ -1,6 +1,6 @@
 export { MetricRing, MetricRingSvg } from './MetricRing';
 export { MetricToggleCard } from './MetricToggleCard';
-export { StatCard, CompactStatBar } from './StatCard';
+export { StatCard, CompactStatBar, cardToneClasses } from './StatCard';
 export { PageHeader } from './PageHeader';
 export { SectionCard } from './SectionCard';
 export { DateRangeSelector } from './DateRangeSelector';
@@ -90,6 +90,15 @@ export type {
 
 // Overlays
 export { Modal, Popover, Tooltip } from './overlay';
+export { Menu } from './Menu';
+export type { MenuItem, MenuProps } from './Menu';
+
+// Flow / attention, disclosure, section header (design cleanup Wave 0)
+export { NeedsAttention } from './NeedsAttention';
+export type { NeedsAttentionProps, AttentionItem, AttentionSeverity } from './NeedsAttention';
+export { Disclosure } from './Disclosure';
+export type { DisclosureProps } from './Disclosure';
+export { SectionLabel } from './SectionLabel';
 
 // className merge helper — re-exported so Phase 2 consumers can write
 // `import { cn } from '../ui'` alongside the primitives they're using

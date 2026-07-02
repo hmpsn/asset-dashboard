@@ -135,7 +135,7 @@ export function RevenueDashboard() {
         <SectionCard noPadding>
           <div className="px-4 py-3">
             <div className="flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] mb-1"><Icon as={DollarSign} size="sm" /> Total Revenue</div>
-            <div className="text-xl font-bold text-accent-brand">{fmtCents(data.totalRevenue)}</div>
+            <div className="text-xl font-bold text-accent-info">{fmtCents(data.totalRevenue)}</div>
             <div className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">{data.totalTransactions} transactions</div>
           </div>
         </SectionCard>
@@ -182,7 +182,7 @@ export function RevenueDashboard() {
                     <div className="t-caption text-[var(--brand-text)]">{ws.name}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)]">{ws.count} transactions</div>
                   </div>
-                  <div className="t-caption font-semibold text-accent-brand">{fmtCents(ws.revenue)}</div>
+                  <div className="t-caption font-semibold text-accent-info">{fmtCents(ws.revenue)}</div>
                 </div>
               ))}
             </div>
@@ -200,7 +200,7 @@ export function RevenueDashboard() {
                     <div className="t-caption text-[var(--brand-text)]">{fmtProductType(prod.productType)}</div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)]">{prod.count} sold</div>
                   </div>
-                  <div className="t-caption font-semibold text-accent-brand">{fmtCents(prod.revenue)}</div>
+                  <div className="t-caption font-semibold text-accent-info">{fmtCents(prod.revenue)}</div>
                 </div>
               ))}
             </div>
@@ -228,7 +228,7 @@ export function RevenueDashboard() {
                   <tr key={tx.id} className="group">
                     <td className="py-2 text-[var(--brand-text)]">{tx.workspaceName}</td>
                     <td className="py-2 text-[var(--brand-text-muted)]">{fmtProductType(tx.productType)}</td>
-                    <td className="py-2 text-accent-brand font-medium text-right">{fmtCents(tx.amount)}</td>
+                    <td className="py-2 text-accent-info font-medium text-right">{fmtCents(tx.amount)}</td>
                     <td className="py-2 text-[var(--brand-text-muted)] text-right">{formatDate(tx.paidAt)}</td>
                     <td className="py-2 text-right">
                       <IconButton

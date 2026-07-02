@@ -5,6 +5,10 @@ on:
     branches: [main, staging]
   pull_request:
     branches: [main, staging]
+    # `ready_for_review` is added so that marking a draft PR "ready" triggers a
+    # run — the heavy test matrix is draft-gated (see the spend policy on test-lane),
+    # so a draft PR runs only the fast `quality` gate until it is marked ready.
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 concurrency:
@@ -18,6 +22,7 @@ env:
 jobs:
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
@@ -73,6 +78,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.quality == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: read
@@ -136,6 +142,9 @@ jobs:
 
       - name: Feature flag lifecycle checks
         run: npm run verify:feature-flags
+
+      - name: Lexicon registry checks
+        run: npm run verify:lexicon
 
       - name: Verification governance checks
         run: npm run verify:governance
@@ -215,7 +224,12 @@ jobs:
   test-lane:
     name: pr-test (${{ matrix.lane.name }})
     needs: changes
-    if: github.event_name == 'pull_request' && needs.changes.outputs.test == 'true'
+    # Draft-gated (spend policy): the full test matrix runs only on NON-draft PRs.
+    # Iterate in a draft PR (the ~2-min `quality` gate still runs on every push);
+    # mark the PR "ready for review" to run the matrix. You cannot merge a draft,
+    # so the matrix always runs before a merge. Local `vitest run` + the nightly
+    # staging scan cover WIP commits.
+    if: github.event_name == 'pull_request' && needs.changes.outputs.test == 'true' && github.event.pull_request.draft == false
     strategy:
       fail-fast: false
       matrix:
@@ -237,6 +251,7 @@ jobs:
           - name: integration (3/3)
             command: npm run test:integration -- --reporter=dot --shard=3/3
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
 
@@ -275,6 +290,7 @@ jobs:
     if: ${{ always() && !cancelled() && github.event_name == 'pull_request' }}
     needs: [changes, test-lane]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Verify required PR test lanes passed
         env:
@@ -283,7 +299,10 @@ jobs:
         run: |
           echo "test needed:   $TEST_NEEDED"
           echo "lane result:   $TEST_LANE_RESULT"
-          if [[ "$TEST_NEEDED" == "true" && "$TEST_LANE_RESULT" != "success" ]]; then
+          # The matrix is skipped (result: skipped) on a draft PR or when no test
+          # paths changed — both intentional — so only a real 'failure' blocks here.
+          # Marking the PR ready re-runs the matrix and yields success/failure.
+          if [[ "$TEST_LANE_RESULT" == "failure" ]]; then
             echo "::error::PR test lanes failed"
             exit 1
           fi
@@ -296,6 +315,7 @@ jobs:
     # covered by fast quality gates plus PR test lanes.
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
@@ -347,6 +367,7 @@ jobs:
     if: ${{ always() && !cancelled() }}
     needs: [changes, quality, test, coverage]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Verify required CI jobs passed
         env:

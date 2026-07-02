@@ -997,6 +997,7 @@ const baseHeaderProps = {
   hasAnalytics: false,
   hasAnyData: false,
   effectiveTier: 'growth' as const,
+  clientIaV2: false,
 };
 
 describe('ClientHeader', () => {

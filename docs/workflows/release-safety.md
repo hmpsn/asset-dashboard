@@ -60,7 +60,11 @@ Manual smoke expectations:
 Before production merge, confirm:
 - Rollback trigger conditions are explicit (error budget, user-impact threshold, data integrity signal).
 - Revert path is known (revert PR in `staging`, then promote if needed).
-- Migration safety constraints are documented.
+- Migration safety constraints are documented — destructive migrations (anything that would
+  `DROP TABLE`) MUST follow the rename-to-archive contract in
+  `docs/rules/destructive-migrations.md`, mechanically enforced by pr-check. If this release
+  includes a PR N+1 delayed drop, run `npm run backup:restore-drill` immediately before merge
+  and attach the output as evidence.
 - Provider failure behavior is safe (no phantom success).
 - Owner and communication path are assigned for rollback execution.
 

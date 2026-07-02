@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { StripeSettings } from './StripeSettings';
 import { FeatureFlagSettings } from './FeatureFlagSettings';
+import { McpApiKeysSettings } from './McpApiKeysSettings';
 import { Button, FormInput, Icon, IconButton } from './ui';
 import { get, post, patch, getOptional, getSafe } from '../api/client';
 
@@ -482,6 +483,9 @@ export function SettingsPanel() {
 
       {/* Stripe / Payments */}
       <StripeSettings />
+
+      {/* MCP API Keys */}
+      <McpApiKeysSettings />
 
       {/* Hint */}
       <p className="t-caption text-center py-4 text-[var(--brand-text-muted)]">

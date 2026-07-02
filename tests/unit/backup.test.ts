@@ -52,8 +52,10 @@ const mocks = vi.hoisted(() => {
   const s3Send = vi.fn(async (command: { input?: unknown; constructor: { name: string } }) => {
     if (command.constructor.name === 'ListObjectsV2Command') {
       return {
+        // "old" is outside the default 30-day BACKUP_S3_RETENTION_DAYS window relative to the
+        // fixed test clock (2026-05-25T12:00:00Z); "new" is well inside it.
         Contents: [
-          { Key: 'backups/backup-old.tar.gz', LastModified: new Date('2026-05-01T00:00:00.000Z') },
+          { Key: 'backups/backup-old.tar.gz', LastModified: new Date('2026-03-01T00:00:00.000Z') },
           { Key: 'backups/backup-new.tar.gz', LastModified: new Date('2026-05-25T11:59:00.000Z') },
         ],
       };
@@ -304,6 +306,8 @@ describe('server/backup behavior', () => {
     delete process.env.BACKUP_S3_BUCKET;
     delete process.env.BACKUP_S3_REGION;
     delete process.env.BACKUP_S3_PREFIX;
+    delete process.env.BACKUP_S3_RETENTION_DAYS;
+    delete process.env.BACKUP_S3_ENDPOINT;
   });
 
   afterEach(() => {
@@ -314,6 +318,8 @@ describe('server/backup behavior', () => {
     delete process.env.BACKUP_S3_BUCKET;
     delete process.env.BACKUP_S3_REGION;
     delete process.env.BACKUP_S3_PREFIX;
+    delete process.env.BACKUP_S3_RETENTION_DAYS;
+    delete process.env.BACKUP_S3_ENDPOINT;
   });
 
   it('runBackup (local) creates backup dir, copies uploads (excluding optimized), vacuums DB, writes manifest, and returns stats', async () => {
@@ -477,5 +483,131 @@ describe('server/backup behavior', () => {
     expect(result.files).toBe(2);
     expect(result.bytes).toBe(109);
     expect(mocks.fsApi.unlinkSync).toHaveBeenCalledWith('/backups-root/backup-2026-05-25T12-00-00.tar.gz');
+  });
+
+  it('S3 prune cutoff derives from BACKUP_S3_RETENTION_DAYS, independent of local BACKUP_RETENTION_DAYS', async () => {
+    process.env.BACKUP_S3_BUCKET = 'bucket-test';
+    process.env.BACKUP_S3_REGION = 'us-west-2';
+    process.env.BACKUP_S3_PREFIX = 'backups';
+    // Local retention stays tight (3 days); S3 retention is the long-lived off-site copy (30 days default).
+    process.env.BACKUP_RETENTION_DAYS = '3';
+    process.env.BACKUP_S3_RETENTION_DAYS = '30';
+
+    mocks.seedDir('/uploads-root/workspace-f');
+    mocks.seedFile('/uploads-root/workspace-f/image.png', Buffer.alloc(9));
+
+    // "old" S3 object is 25 days before "now" (2026-05-25T12:00:00Z) — inside a 30-day
+    // window but outside a 3-day window. If the S3 prune cutoff wrongly derived from
+    // BACKUP_RETENTION_DAYS (3 days), this object would be deleted.
+    mocks.s3Send.mockImplementation(async (command: { constructor: { name: string } }) => {
+      if (command.constructor.name === 'ListObjectsV2Command') {
+        return {
+          Contents: [
+            { Key: 'backups/backup-25-days-old.tar.gz', LastModified: new Date('2026-04-30T12:00:00.000Z') },
+          ],
+        };
+      }
+      return {};
+    });
+
+    const backup = await import('../../server/backup.js');
+    await backup.runBackup();
+
+    const deleteCall = mocks.s3Send.mock.calls.find(([cmd]) => cmd.constructor.name === 'DeleteObjectsCommand');
+    expect(deleteCall).toBeUndefined();
+  });
+
+  it('S3 prune cutoff still removes objects older than BACKUP_S3_RETENTION_DAYS', async () => {
+    process.env.BACKUP_S3_BUCKET = 'bucket-test';
+    process.env.BACKUP_S3_REGION = 'us-west-2';
+    process.env.BACKUP_S3_PREFIX = 'backups';
+    process.env.BACKUP_RETENTION_DAYS = '3';
+    process.env.BACKUP_S3_RETENTION_DAYS = '30';
+
+    mocks.seedDir('/uploads-root/workspace-g');
+    mocks.seedFile('/uploads-root/workspace-g/image.png', Buffer.alloc(9));
+
+    // 40 days old — outside the 30-day S3 retention window.
+    mocks.s3Send.mockImplementation(async (command: { constructor: { name: string } }) => {
+      if (command.constructor.name === 'ListObjectsV2Command') {
+        return {
+          Contents: [
+            { Key: 'backups/backup-40-days-old.tar.gz', LastModified: new Date('2026-04-15T12:00:00.000Z') },
+          ],
+        };
+      }
+      return {};
+    });
+
+    const backup = await import('../../server/backup.js');
+    await backup.runBackup();
+
+    const deleteCall = mocks.s3Send.mock.calls.find(([cmd]) => cmd.constructor.name === 'DeleteObjectsCommand');
+    expect(deleteCall).toBeDefined();
+    expect(deleteCall?.[0].input).toMatchObject({
+      Bucket: 'bucket-test',
+      Delete: { Objects: [{ Key: 'backups/backup-40-days-old.tar.gz' }] },
+    });
+  });
+
+  it('defaults BACKUP_S3_RETENTION_DAYS to 30 when unset', async () => {
+    process.env.BACKUP_S3_BUCKET = 'bucket-test';
+    process.env.BACKUP_S3_REGION = 'us-west-2';
+    process.env.BACKUP_S3_PREFIX = 'backups';
+    process.env.BACKUP_RETENTION_DAYS = '3';
+    delete process.env.BACKUP_S3_RETENTION_DAYS;
+
+    mocks.seedDir('/uploads-root/workspace-h');
+    mocks.seedFile('/uploads-root/workspace-h/image.png', Buffer.alloc(9));
+
+    // 25 days old — inside default 30-day S3 retention, so should survive.
+    mocks.s3Send.mockImplementation(async (command: { constructor: { name: string } }) => {
+      if (command.constructor.name === 'ListObjectsV2Command') {
+        return {
+          Contents: [
+            { Key: 'backups/backup-25-days-old.tar.gz', LastModified: new Date('2026-04-30T12:00:00.000Z') },
+          ],
+        };
+      }
+      return {};
+    });
+
+    const backup = await import('../../server/backup.js');
+    await backup.runBackup();
+
+    const deleteCall = mocks.s3Send.mock.calls.find(([cmd]) => cmd.constructor.name === 'DeleteObjectsCommand');
+    expect(deleteCall).toBeUndefined();
+  });
+
+  it('passes BACKUP_S3_ENDPOINT through to the S3Client constructor when set (Cloudflare R2 support)', async () => {
+    process.env.BACKUP_S3_BUCKET = 'bucket-test';
+    process.env.BACKUP_S3_REGION = 'auto';
+    process.env.BACKUP_S3_ENDPOINT = 'https://<accountid>.r2.cloudflarestorage.com';
+
+    mocks.seedDir('/uploads-root/workspace-i');
+    mocks.seedFile('/uploads-root/workspace-i/image.png', Buffer.alloc(9));
+
+    const backup = await import('../../server/backup.js');
+    await backup.runBackup();
+
+    expect(mocks.S3Client).toHaveBeenCalledWith({
+      region: 'auto',
+      endpoint: 'https://<accountid>.r2.cloudflarestorage.com',
+      forcePathStyle: true,
+    });
+  });
+
+  it('does not pass an endpoint key to S3Client when BACKUP_S3_ENDPOINT is unset', async () => {
+    process.env.BACKUP_S3_BUCKET = 'bucket-test';
+    process.env.BACKUP_S3_REGION = 'us-west-2';
+    delete process.env.BACKUP_S3_ENDPOINT;
+
+    mocks.seedDir('/uploads-root/workspace-j');
+    mocks.seedFile('/uploads-root/workspace-j/image.png', Buffer.alloc(9));
+
+    const backup = await import('../../server/backup.js');
+    await backup.runBackup();
+
+    expect(mocks.S3Client).toHaveBeenCalledWith({ region: 'us-west-2' });
   });
 });

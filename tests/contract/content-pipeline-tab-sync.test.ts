@@ -34,11 +34,12 @@ describe('ContentPipeline tab sync contract', () => {
 
   it('has a useEffect that syncs activeTab from searchParams (mount-already-active fix)', () => {
     const src = readFileSync(pipelineFile, 'utf8'); // readFile-ok — intentional static analysis
-    // The sync effect must check whether the param is a valid tab and differs from current state
-    // before calling setActiveTab — verify key phrases are present in the implementation.
-    expect(src).toContain('setActiveTab(param');
-    // Guard against looping: the effect must check the param differs from activeTab
-    expect(src).toContain('param !== activeTab');
+    // The sync effect must resolve the ?tab= param (Wave 4 routes it through
+    // resolveTabSearchParam so legacy aliases like subscriptions→publish map correctly)
+    // and setActiveTab to the resolved value only when it differs from current state.
+    expect(src).toMatch(/setActiveTab\((?:param|resolved)\b/);
+    // Guard against looping: the effect compares the resolved param against activeTab.
+    expect(src).toMatch(/(?:param|resolved) !== activeTab/);
     // Must be inside a useEffect (not just a one-time initializer)
     expect(src).toContain('useEffect(');
   });

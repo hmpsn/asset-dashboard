@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   useAiSuggestedBriefs,
   useDismissSuggestedBrief,
@@ -10,6 +9,7 @@ import { EmptyState } from '../ui/EmptyState.js';
 import { Badge } from '../ui/Badge.js';
 import { Icon } from '../ui/Icon.js';
 import { Button } from '../ui/Button.js';
+import { Menu } from '../ui/Menu.js';
 import { Sparkles, FileText, RefreshCw, X, Clock } from 'lucide-react';
 import type { SuggestedBrief } from '../../hooks/admin/useAiSuggestedBriefs.js';
 
@@ -43,42 +43,15 @@ function priorityTone(p: SuggestedBrief['priority']): 'red' | 'amber' | 'blue' {
   return 'blue';
 }
 
-interface SnoozeMenuProps {
-  briefId: string;
-  onSnooze: (briefId: string, until: string) => void;
-  onClose: () => void;
-}
-
-function SnoozeMenu({ briefId, onSnooze, onClose }: SnoozeMenuProps) {
-  return (
-    // pr-check-disable-next-line -- snooze dropdown
-    <div className="absolute right-0 top-full mt-1 w-40 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-[var(--z-dropdown)] py-1 overflow-hidden">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="w-full justify-start px-3 py-2 text-xs rounded-none text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]"
-        onClick={() => { onSnooze(briefId, snoozeUntilOneWeek()); onClose(); }}
-      >
-        Snooze 1 week
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="w-full justify-start px-3 py-2 text-xs rounded-none text-[var(--brand-text-bright)] hover:bg-[var(--surface-3)]"
-        onClick={() => { onSnooze(briefId, snoozeUntilOneMonth()); onClose(); }}
-      >
-        Snooze 1 month
-      </Button>
-    </div>
-  );
-}
+// SnoozeMenu removed — the snooze now uses the shared <Menu> primitive (below), which
+// checks both the trigger and the panel on outside-click (via Popover), avoiding the
+// close-then-reopen race a bare useClickOutside on the panel alone introduced.
 
 export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
   const { data: briefs = [], isLoading } = useAiSuggestedBriefs(workspaceId);
   const dismissMutation = useDismissSuggestedBrief(workspaceId);
   const snoozeMutation = useSnoozeSuggestedBrief(workspaceId);
   const acceptMutation = useAcceptSuggestedBrief(workspaceId);
-  const [snoozeOpenId, setSnoozeOpenId] = useState<string | null>(null);
 
   const handleDismiss = (briefId: string) => {
     dismissMutation.mutate(briefId);
@@ -174,25 +147,24 @@ export function AiSuggested({ workspaceId, onCreateBrief }: Props) {
                   </Button>
                 )}
 
-                {/* Snooze */}
-                <div className="relative">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    title="Snooze suggestion"
-                    aria-label="Snooze suggestion"
-                    onClick={() => setSnoozeOpenId(snoozeOpenId === brief.id ? null : brief.id)}
-                  >
-                    <Icon as={Clock} size="sm" className="text-[var(--brand-text-muted)]" />
-                  </Button>
-                  {snoozeOpenId === brief.id && (
-                    <SnoozeMenu
-                      briefId={brief.id}
-                      onSnooze={handleSnooze}
-                      onClose={() => setSnoozeOpenId(null)}
-                    />
-                  )}
-                </div>
+                {/* Snooze — shared <Menu> primitive (trigger + outside-click dismissal handled). */}
+                <Menu
+                  align="end"
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Snooze suggestion"
+                      aria-label="Snooze suggestion"
+                    >
+                      <Icon as={Clock} size="sm" className="text-[var(--brand-text-muted)]" />
+                    </Button>
+                  }
+                  items={[
+                    { label: 'Snooze 1 week', onSelect: () => handleSnooze(brief.id, snoozeUntilOneWeek()) },
+                    { label: 'Snooze 1 month', onSelect: () => handleSnooze(brief.id, snoozeUntilOneMonth()) },
+                  ]}
+                />
 
                 {/* Dismiss */}
                 <Button

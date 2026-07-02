@@ -398,9 +398,8 @@ export function computeROI(workspaceId: string): ROIData | null {
       // P1 (IA v2): real month-over-month — re-aggregate the SAME pinned outcomes from the prior
       // snapshot so the delta is apples-to-apples. null when no snapshot lands in the window.
       const priorSnapshot = findPriorOutcomeSnapshot(history, latest.capturedAt);
-      const priorPeriodCount = priorSnapshot
-        ? aggregatePinnedOutcomes(ws, priorSnapshot.byEvent).totalConversions
-        : null;
+      const priorAgg = priorSnapshot ? aggregatePinnedOutcomes(ws, priorSnapshot.byEvent) : null;
+      const priorPeriodCount = priorAgg ? priorAgg.totalConversions : null;
       // P1a current-period window for Webflow form-submission counts/reconciliation: the 30 days
       // ending at the latest snapshot. countFormSubmissions returns 0 when measured-capture is OFF
       // anyway (no leads captured), so the OFF path stays byte-identical.
@@ -427,7 +426,24 @@ export function computeROI(workspaceId: string): ROIData | null {
       // (byte-identical to P0). outcomeTypeBreakdown carries the typed rollup; outcomeReconciliation
       // carries anonymous GA4-vs-captured counts (A8) — counts only, never PII (D7).
       if (isFeatureEnabled('the-issue-client-measured-capture', workspaceId)) {
-        result.outcomeVerdict.outcomeTypeBreakdown = agg.byType;
+        // Per-type MoM: re-aggregate the prior + engagement-baseline snapshots by the SAME pinned
+        // outcomes so each typed card carries the same baseline/prior discipline as the aggregate
+        // headline. Without this the per-type cards read "establishing your baseline" while the
+        // headline shows a real month-over-month delta — a trust-undermining contradiction.
+        const priorByType = priorAgg
+          ? new Map(priorAgg.byType.map(t => [t.outcomeType, t.current]))
+          : null;
+        const baselineSnapshot = baseline.state === 'ready' && baseline.baselineCapturedAt
+          ? history.find(s => s.capturedAt === baseline.baselineCapturedAt) ?? null
+          : null;
+        const baselineByType = baselineSnapshot
+          ? new Map(aggregatePinnedOutcomes(ws, baselineSnapshot.byEvent).byType.map(t => [t.outcomeType, t.current]))
+          : null;
+        result.outcomeVerdict.outcomeTypeBreakdown = agg.byType.map(t => ({
+          ...t,
+          baseline: baselineByType?.get(t.outcomeType) ?? null,
+          priorPeriod: priorByType?.get(t.outcomeType) ?? null,
+        }));
         result.outcomeVerdict.outcomeReconciliation = {
           ga4Count: agg.totalConversions,        // anonymous aggregate
           capturedCount: periodFormCount,        // named-lead COUNT only — no names ride the payload

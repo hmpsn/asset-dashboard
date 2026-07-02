@@ -1,6 +1,36 @@
 import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
+/* ── Tone gradient map ── */
+type StatCardTone = 'neutral' | 'teal' | 'emerald' | 'blue' | 'amber';
+
+/**
+ * Returns the canonical tinted-gradient + matching-border class string for the given tone.
+ * Use this wherever a "tinted gradient card" treatment is needed so every surface shares
+ * one canonical opacity (bg: /8, border: /20).
+ *
+ * Exported so custom card shells outside StatCard can reuse the exact same treatment without
+ * hand-rolling inline class strings (design-x-gradient-card-variant normalization).
+ */
+export function cardToneClasses(tone: 'teal' | 'emerald' | 'blue' | 'amber'): string {
+  const map: Record<'teal' | 'emerald' | 'blue' | 'amber', string> = {
+    teal:    'bg-gradient-to-br from-teal-500/8 via-[var(--surface-2)] to-[var(--surface-2)] border-teal-500/20',
+    emerald: 'bg-gradient-to-br from-emerald-500/8 via-[var(--surface-2)] to-[var(--surface-2)] border-emerald-500/20',
+    blue:    'bg-gradient-to-br from-blue-500/8 via-[var(--surface-2)] to-[var(--surface-2)] border-blue-500/20',
+    amber:   'bg-gradient-to-br from-amber-500/8 via-[var(--surface-2)] to-[var(--surface-2)] border-amber-500/20',
+  };
+  return map[tone];
+}
+
+/** Internal map consumed by the StatCard tone prop — delegates to cardToneClasses so there
+ *  is exactly ONE source for the canonical gradient/border pair. */
+const TONE_GRADIENT: Record<Exclude<StatCardTone, 'neutral'>, { bg: string; border: string }> = {
+  teal:    { bg: 'bg-gradient-to-br from-teal-500/8 via-[var(--surface-2)] to-[var(--surface-2)]',    border: 'border-teal-500/20' },
+  emerald: { bg: 'bg-gradient-to-br from-emerald-500/8 via-[var(--surface-2)] to-[var(--surface-2)]', border: 'border-emerald-500/20' },
+  blue:    { bg: 'bg-gradient-to-br from-blue-500/8 via-[var(--surface-2)] to-[var(--surface-2)]',    border: 'border-blue-500/20' },
+  amber:   { bg: 'bg-gradient-to-br from-amber-500/8 via-[var(--surface-2)] to-[var(--surface-2)]',   border: 'border-amber-500/20' },
+};
+
 /* ── Stat Card: Default ── */
 interface StatCardProps {
   label: React.ReactNode;
@@ -22,15 +52,21 @@ interface StatCardProps {
   size?: 'default' | 'hero';
   /** Stagger index for entrance animation. Cards appear sequentially with 60ms delays. */
   staggerIndex?: number;
+  /** Optional tone: applies a subtle gradient tint to the card surface. 'neutral' (default) preserves the existing appearance exactly. */
+  tone?: StatCardTone;
 }
 
 export function StatCard({
   label, value, icon: Icon, iconColor, valueColor, sub,
   delta, deltaLabel, showZeroDelta, invertDelta, trailing, onClick, className,
-  size = 'default', staggerIndex,
+  size = 'default', staggerIndex, tone = 'neutral',
 }: StatCardProps) {
   const Tag = onClick ? 'button' : 'div';
   const isHero = size === 'hero';
+
+  const toneClasses = tone !== 'neutral' ? TONE_GRADIENT[tone] : null;
+  const bgClass = toneClasses ? toneClasses.bg : 'bg-[var(--surface-2)]';
+  const borderClass = toneClasses ? toneClasses.border : 'border-[var(--brand-border)]';
 
   const baseStyle = {
     borderRadius: 'var(--radius-signature)',
@@ -43,7 +79,7 @@ export function StatCard({
   return (
     <Tag
       onClick={onClick}
-      className={`bg-[var(--surface-2)] ${isHero ? 'p-4' : 'p-3'} border border-[var(--brand-border)] text-left ${onClick ? 'hover:border-[var(--brand-border-hover)] transition-colors cursor-pointer group' : ''} ${className ?? ''}`}
+      className={`${bgClass} ${isHero ? 'p-4' : 'p-3'} border ${borderClass} text-left ${onClick ? 'hover:border-[var(--brand-border-hover)] transition-colors cursor-pointer group' : ''} ${className ?? ''}`}
       style={baseStyle}
     >
       <div className="flex items-center gap-1.5 mb-2">

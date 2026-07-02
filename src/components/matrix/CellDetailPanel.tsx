@@ -4,6 +4,7 @@ import {
   Search, ArrowRight, ChevronRight, Clock,
 } from 'lucide-react';
 import { Badge, Button, FormTextarea, IconButton } from '../ui';
+import { CHART_SERIES_COLORS } from '../ui/constants';
 import { TrendBadge } from '../ui/TrendBadge';
 import type { MatrixCell } from './types';
 import { timeAgo } from '../../lib/timeAgo';
@@ -30,12 +31,12 @@ const STATUS_CONFIG: Record<MatrixCell['status'], { label: string; color: 'zinc'
 
 // Map status color name to actual hex for the timeline dot
 const STATUS_DOT_COLOR: Record<string, string> = {
-  emerald: '#34d399',
-  teal: '#2dd4bf',
-  amber: '#fbbf24',
-  blue: '#60a5fa',
-  orange: '#fb923c',
-  zinc: '#71717a',
+  emerald: CHART_SERIES_COLORS.emerald,
+  teal:    CHART_SERIES_COLORS.teal,
+  amber:   CHART_SERIES_COLORS.amber,
+  blue:    CHART_SERIES_COLORS.blue,
+  orange:  CHART_SERIES_COLORS.orange,
+  zinc:    '#71717a', // chart-hex-ok — neutral muted fallback; no CHART_SERIES_COLORS equivalent
 };
 
 type AuthorityPosture = NonNullable<NonNullable<MatrixCell['keywordCandidates']>[number]['authorityAssessment']>['posture'];
@@ -274,7 +275,7 @@ export function CellDetailPanel({
               <div className="absolute left-[5px] top-1 bottom-1 w-px bg-[var(--brand-border)]" />
               {[...cell.statusHistory].reverse().map((entry, i) => {
                 const toCfg = STATUS_CONFIG[entry.to];
-                const dotColor = toCfg ? STATUS_DOT_COLOR[toCfg.color] ?? '#71717a' : '#71717a';
+                const dotColor = toCfg ? STATUS_DOT_COLOR[toCfg.color] ?? '#71717a' : '#71717a'; // chart-hex-ok — zinc fallback via STATUS_DOT_COLOR map
                 return (
                   <div key={i} className="relative flex items-start gap-2.5 pb-2.5 last:pb-0">
                     <div className="w-2 h-2 rounded-[var(--radius-pill)] mt-1 flex-shrink-0 -ml-[3.5px] ring-2 ring-[var(--surface-2)]" style={{ backgroundColor: dotColor }} />

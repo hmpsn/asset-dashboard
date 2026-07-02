@@ -2,15 +2,18 @@
 //
 // Component tests for the "Needs Attention" section of WorkspaceOverview.
 //
+// After Wave 1, NeedsAttention renders href-bearing rows as <Link> elements
+// (role="link") not <button> elements. Navigation is asserted via href, not
+// navigateMock. The ordering tests use link accessible names.
+//
 // Asserts:
-//   1. Each attention item renders a ClickableRow with the correct adminPath href.
+//   1. Each attention item renders a link with the correct href.
 //   2. Items are ordered by severity (priority) — most urgent first.
-//   3. Workspace name attribution is rendered on each row.
-//   4. ?tab= deep-link items carry the correct query string.
-//   5. Clicking a row calls navigate() with the correct href.
+//   3. Workspace name (meta) attribution is rendered on each row.
+//   4. ?tab= deep-link items carry the correct query string in the href.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -108,6 +111,12 @@ function renderOverview() {
   );
 }
 
+// Helper: find the NeedsAttention link whose accessible name includes a substring.
+// NeedsAttention renders href rows as <Link> (role="link") after Wave 1.
+function getAttentionLink(namePattern: RegExp) {
+  return screen.getByRole('link', { name: namePattern });
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('WorkspaceOverview — Needs Attention section', () => {
@@ -117,7 +126,7 @@ describe('WorkspaceOverview — Needs Attention section', () => {
 
   // ── 1. New client requests ──────────────────────────────────────────────────
 
-  it('renders a clickable row for new client requests and navigates to the requests page', async () => {
+  it('renders a link for new client requests pointing to the requests page', () => {
     mockUseWorkspaceOverviewData.mockReturnValue({
       data: makeOverviewData([
         makeWorkspace({ id: 'ws-1', name: 'Acme Corp', requests: { total: 2, new: 2, active: 0, latestDate: null } }),
@@ -127,20 +136,17 @@ describe('WorkspaceOverview — Needs Attention section', () => {
 
     renderOverview();
 
-    // Label is present
     expect(screen.getByText('2 new client requests')).toBeDefined();
-    // Workspace name appears at least once (attribution row in Needs Attention)
     expect(screen.getAllByText('Acme Corp').length).toBeGreaterThanOrEqual(1);
 
-    // Row has aria-label combining label + workspace name
-    const row = screen.getByRole('button', { name: /2 new client requests.*Acme Corp/i });
-    fireEvent.click(row);
-    expect(navigateMock).toHaveBeenCalledWith('/ws/ws-1/requests');
+    // Wave 1: href-bearing rows render as <Link> (role="link")
+    const link = getAttentionLink(/2 new client requests/i);
+    expect(link.getAttribute('href')).toBe('/ws/ws-1/requests');
   });
 
   // ── 2. Pending approvals ────────────────────────────────────────────────────
 
-  it('renders pending approvals row linking to seo-editor', async () => {
+  it('renders pending approvals link pointing to seo-editor', () => {
     mockUseWorkspaceOverviewData.mockReturnValue({
       data: makeOverviewData([
         makeWorkspace({ id: 'ws-2', name: 'Globex', approvals: { pending: 3, total: 3 } }),
@@ -153,14 +159,13 @@ describe('WorkspaceOverview — Needs Attention section', () => {
     expect(screen.getByText('3 pending approvals')).toBeDefined();
     expect(screen.getAllByText('Globex').length).toBeGreaterThanOrEqual(1);
 
-    const row = screen.getByRole('button', { name: /3 pending approvals.*Globex/i });
-    fireEvent.click(row);
-    expect(navigateMock).toHaveBeenCalledWith('/ws/ws-2/seo-editor');
+    const link = getAttentionLink(/3 pending approvals/i);
+    expect(link.getAttribute('href')).toBe('/ws/ws-2/seo-editor');
   });
 
   // ── 3. Content briefs — ?tab=briefs deep-link ────────────────────────────────
 
-  it('renders content briefs row with ?tab=briefs deep-link', async () => {
+  it('renders content briefs link with ?tab=briefs deep-link', () => {
     mockUseWorkspaceOverviewData.mockReturnValue({
       data: makeOverviewData([
         makeWorkspace({ id: 'ws-3', name: 'Initech', contentRequests: { pending: 1, inProgress: 0, delivered: 0, total: 1 } }),
@@ -173,15 +178,14 @@ describe('WorkspaceOverview — Needs Attention section', () => {
     expect(screen.getByText('1 content brief awaiting review')).toBeDefined();
     expect(screen.getAllByText('Initech').length).toBeGreaterThanOrEqual(1);
 
-    const row = screen.getByRole('button', { name: /1 content brief.*Initech/i });
-    fireEvent.click(row);
+    const link = getAttentionLink(/1 content brief/i);
     // Must include ?tab=briefs (ContentPipeline reads searchParams.get('tab'))
-    expect(navigateMock).toHaveBeenCalledWith('/ws/ws-3/content-pipeline?tab=briefs');
+    expect(link.getAttribute('href')).toBe('/ws/ws-3/content-pipeline?tab=briefs');
   });
 
   // ── 4. No site linked — ?tab=connections deep-link ──────────────────────────
 
-  it('renders no-site-linked row with ?tab=connections deep-link', async () => {
+  it('renders no-site-linked link with ?tab=connections deep-link', () => {
     mockUseWorkspaceOverviewData.mockReturnValue({
       data: makeOverviewData([
         makeWorkspace({ id: 'ws-4', name: 'Umbrella', webflowSiteId: null, webflowSiteName: null }),
@@ -191,19 +195,17 @@ describe('WorkspaceOverview — Needs Attention section', () => {
 
     renderOverview();
 
-    // "No site linked" label text is in both the attention row AND the workspace card
     expect(screen.getAllByText(/No site linked/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Umbrella').length).toBeGreaterThanOrEqual(1);
 
-    const row = screen.getByRole('button', { name: /No site linked.*connect Webflow.*Umbrella/i });
-    fireEvent.click(row);
+    const link = getAttentionLink(/No site linked/i);
     // Must include ?tab=connections (WorkspaceSettings reads searchParams.get('tab'))
-    expect(navigateMock).toHaveBeenCalledWith('/ws/ws-4/workspace-settings?tab=connections');
+    expect(link.getAttribute('href')).toBe('/ws/ws-4/workspace-settings?tab=connections');
   });
 
   // ── 5. Low health score — links to seo-audit ────────────────────────────────
 
-  it('renders low health score row linking to seo-audit', async () => {
+  it('renders low health score link pointing to seo-audit', () => {
     mockUseWorkspaceOverviewData.mockReturnValue({
       data: makeOverviewData([
         makeWorkspace({ id: 'ws-5', name: 'Nakatomi', audit: { score: 42, totalPages: 10, errors: 5, warnings: 3 } }),
@@ -216,14 +218,13 @@ describe('WorkspaceOverview — Needs Attention section', () => {
     expect(screen.getByText(/Health score 42/i)).toBeDefined();
     expect(screen.getAllByText('Nakatomi').length).toBeGreaterThanOrEqual(1);
 
-    const row = screen.getByRole('button', { name: /Health score 42.*Nakatomi/i });
-    fireEvent.click(row);
-    expect(navigateMock).toHaveBeenCalledWith('/ws/ws-5/seo-audit');
+    const link = getAttentionLink(/Health score 42/i);
+    expect(link.getAttribute('href')).toBe('/ws/ws-5/seo-audit');
   });
 
   // ── 6. Rejected changes — links to seo-editor ───────────────────────────────
 
-  it('renders rejected changes row linking to seo-editor', async () => {
+  it('renders rejected changes link pointing to seo-editor', () => {
     mockUseWorkspaceOverviewData.mockReturnValue({
       data: makeOverviewData([
         makeWorkspace({
@@ -239,17 +240,13 @@ describe('WorkspaceOverview — Needs Attention section', () => {
     expect(screen.getByText('2 rejected changes need revision')).toBeDefined();
     expect(screen.getAllByText('Stark').length).toBeGreaterThanOrEqual(1);
 
-    const row = screen.getByRole('button', { name: /2 rejected changes.*Stark/i });
-    fireEvent.click(row);
-    expect(navigateMock).toHaveBeenCalledWith('/ws/ws-6/seo-editor');
+    const link = getAttentionLink(/2 rejected changes/i);
+    expect(link.getAttribute('href')).toBe('/ws/ws-6/seo-editor');
   });
 
   // ── 7. Severity ordering ────────────────────────────────────────────────────
 
-  // Divergent fixture: two workspaces where insertion order != sorted order.
-  // ws-warn (priority 1.5 = warning churn) inserted first, ws-crit (priority 1 = critical churn)
-  // inserted second — sort must place ws-crit (critical) before ws-warn (warning).
-  it('displays critical-churn before warning-churn even when warning workspace is inserted first', async () => {
+  it('displays critical-churn before warning-churn even when warning workspace is inserted first', () => {
     mockUseWorkspaceOverviewData.mockReturnValue({
       data: makeOverviewData([
         makeWorkspace({ id: 'ws-warn', name: 'WarningCo', churnSignals: { critical: 0, warning: 2 } }),
@@ -260,17 +257,17 @@ describe('WorkspaceOverview — Needs Attention section', () => {
 
     renderOverview();
 
-    const buttons = screen.getAllByRole('button');
-    const critIdx = buttons.findIndex(b => b.getAttribute('aria-label')?.includes('CriticalCo'));
-    const warnIdx = buttons.findIndex(b => b.getAttribute('aria-label')?.includes('WarningCo'));
+    // Links — ordered in DOM by priority
+    const links = screen.getAllByRole('link');
+    const critIdx = links.findIndex(l => l.textContent?.includes('CriticalCo'));
+    const warnIdx = links.findIndex(l => l.textContent?.includes('WarningCo'));
 
     expect(critIdx).not.toBe(-1);
     expect(warnIdx).not.toBe(-1);
-    // Critical (priority 1) must render before warning (priority 1.5)
     expect(critIdx).toBeLessThan(warnIdx);
   });
 
-  it('displays churn-risk row before new-requests row (critical churn priority 1 before requests priority 2)', async () => {
+  it('displays churn-risk row before new-requests row (critical churn priority 1 before requests priority 2)', () => {
     mockUseWorkspaceOverviewData.mockReturnValue({
       data: makeOverviewData([
         makeWorkspace({
@@ -284,17 +281,16 @@ describe('WorkspaceOverview — Needs Attention section', () => {
 
     renderOverview();
 
-    const buttons = screen.getAllByRole('button');
-    // Find the positions of the two attention rows
-    const churnIdx = buttons.findIndex(b => b.getAttribute('aria-label')?.includes('churn'));
-    const requestsIdx = buttons.findIndex(b => b.getAttribute('aria-label')?.includes('new client request'));
+    const links = screen.getAllByRole('link');
+    const churnIdx = links.findIndex(l => l.textContent?.includes('churn'));
+    const requestsIdx = links.findIndex(l => l.textContent?.includes('new client request'));
 
     expect(churnIdx).not.toBe(-1);
     expect(requestsIdx).not.toBe(-1);
     expect(churnIdx).toBeLessThan(requestsIdx);
   });
 
-  it('displays new-requests before pending-approvals before content-briefs (priority order)', async () => {
+  it('displays new-requests before pending-approvals before content-briefs (priority order)', () => {
     mockUseWorkspaceOverviewData.mockReturnValue({
       data: makeOverviewData([
         makeWorkspace({
@@ -309,10 +305,11 @@ describe('WorkspaceOverview — Needs Attention section', () => {
 
     renderOverview();
 
-    const labels = screen.getAllByRole('button').map(b => b.getAttribute('aria-label') || '');
-    const requestsIdx = labels.findIndex(l => l.includes('new client request'));
-    const approvalsIdx = labels.findIndex(l => l.includes('pending approval'));
-    const contentIdx = labels.findIndex(l => l.includes('content brief'));
+    const links = screen.getAllByRole('link');
+    const texts = links.map(l => l.textContent || '');
+    const requestsIdx = texts.findIndex(t => t.includes('new client request'));
+    const approvalsIdx = texts.findIndex(t => t.includes('pending approval'));
+    const contentIdx = texts.findIndex(t => t.includes('content brief'));
 
     expect(requestsIdx).not.toBe(-1);
     expect(approvalsIdx).not.toBe(-1);
@@ -323,7 +320,7 @@ describe('WorkspaceOverview — Needs Attention section', () => {
 
   // ── 8. Per-workspace attribution ─────────────────────────────────────────────
 
-  it('shows workspace name as attribution on each attention row', async () => {
+  it('shows workspace name (meta) on each attention row', () => {
     mockUseWorkspaceOverviewData.mockReturnValue({
       data: makeOverviewData([
         makeWorkspace({ id: 'ws-9', name: 'Weyland-Yutani', requests: { total: 1, new: 1, active: 0, latestDate: null } }),
@@ -333,14 +330,14 @@ describe('WorkspaceOverview — Needs Attention section', () => {
 
     renderOverview();
 
-    // The workspace name appears in the aria-label of the row
-    const row = screen.getByRole('button', { name: /1 new client request.*Weyland-Yutani/i });
-    expect(row).toBeDefined();
+    // The workspace name appears in the row text content (as meta)
+    const link = getAttentionLink(/1 new client request/i);
+    expect(link.textContent).toContain('Weyland-Yutani');
   });
 
   // ── 9. Per-workspace rows for multi-workspace items ──────────────────────────
 
-  it('creates a separate row per workspace when multiple have the same issue', async () => {
+  it('creates a separate row per workspace when multiple have the same issue', () => {
     mockUseWorkspaceOverviewData.mockReturnValue({
       data: makeOverviewData([
         makeWorkspace({ id: 'ws-a', name: 'Alpha', requests: { total: 1, new: 1, active: 0, latestDate: null } }),
@@ -351,14 +348,15 @@ describe('WorkspaceOverview — Needs Attention section', () => {
 
     renderOverview();
 
-    // Should have a row for each workspace
-    expect(screen.getByRole('button', { name: /1 new client request.*Alpha/i })).toBeDefined();
-    expect(screen.getByRole('button', { name: /2 new client requests.*Beta/i })).toBeDefined();
+    const alphaLink = getAttentionLink(/1 new client request/i);
+    expect(alphaLink.textContent).toContain('Alpha');
+    const betaLink = getAttentionLink(/2 new client requests/i);
+    expect(betaLink.textContent).toContain('Beta');
   });
 
   // ── 10. No attention section when all is clear ───────────────────────────────
 
-  it('does not render Needs Attention section when all workspaces are healthy', async () => {
+  it('does not render Needs Attention section when all workspaces are healthy', () => {
     mockUseWorkspaceOverviewData.mockReturnValue({
       data: makeOverviewData([
         makeWorkspace({ id: 'ws-ok', name: 'Happy Client' }),
@@ -373,7 +371,7 @@ describe('WorkspaceOverview — Needs Attention section', () => {
 
   // ── 11. Work orders link to requests page (ClientDeliverablesPane) ────────────
 
-  it('renders work orders row linking to requests page (not workspace-settings)', async () => {
+  it('renders work orders link pointing to requests page (not workspace-settings)', () => {
     mockUseWorkspaceOverviewData.mockReturnValue({
       data: makeOverviewData([
         makeWorkspace({ id: 'ws-wo', name: 'WidgetCo', workOrders: { pending: 1, total: 1 } }),
@@ -385,15 +383,14 @@ describe('WorkspaceOverview — Needs Attention section', () => {
 
     expect(screen.getByText('1 purchased fix awaiting fulfillment')).toBeDefined();
 
-    const row = screen.getByRole('button', { name: /1 purchased fix/i });
-    fireEvent.click(row);
+    const link = getAttentionLink(/1 purchased fix/i);
     // Work orders live on the requests page (ClientDeliverablesPane), not workspace-settings
-    expect(navigateMock).toHaveBeenCalledWith('/ws/ws-wo/requests');
+    expect(link.getAttribute('href')).toBe('/ws/ws-wo/requests');
   });
 
   // ── 12. Churn risk links to requests page ─────────────────────────────────────
 
-  it('renders churn-risk row linking to requests page', async () => {
+  it('renders churn-risk link pointing to requests page', () => {
     mockUseWorkspaceOverviewData.mockReturnValue({
       data: makeOverviewData([
         makeWorkspace({ id: 'ws-churn', name: 'Churnco', churnSignals: { critical: 0, warning: 2 } }),
@@ -406,8 +403,7 @@ describe('WorkspaceOverview — Needs Attention section', () => {
     expect(screen.getByText('At risk of churn')).toBeDefined();
     expect(screen.getAllByText('Churnco').length).toBeGreaterThanOrEqual(1);
 
-    const row = screen.getByRole('button', { name: /At risk of churn.*Churnco/i });
-    fireEvent.click(row);
-    expect(navigateMock).toHaveBeenCalledWith('/ws/ws-churn/requests');
+    const link = getAttentionLink(/At risk of churn/i);
+    expect(link.getAttribute('href')).toBe('/ws/ws-churn/requests');
   });
 });

@@ -19,7 +19,7 @@
 
 import { PhoneCall, FileText, CalendarCheck, Mail, MapPin, MessageSquare, Activity } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { StatCard, EmptyState } from '../../ui';
+import { StatCard, EmptyState, cardToneClasses } from '../../ui';
 import type { IssueOutcomeCount, OutcomeType } from '../../../../shared/types/the-issue';
 
 interface OutcomeCountBandProps {
@@ -103,7 +103,7 @@ export function OutcomeCountBand({ count }: OutcomeCountBandProps) {
               iconColor={unit.outcomeType ? 'var(--brand-text-muted)' : undefined}
               valueColor="text-accent-success"
               sub={trendSub(unit.current, unit.priorPeriod, unit.baseline)}
-              className="bg-gradient-to-br from-emerald-500/10 via-[var(--surface-2)] to-[var(--surface-2)] border-emerald-500/20"
+              className={cardToneClasses('emerald')}
             />
           );
           // Untyped (estimate/P0) → render the bare StatCard as the grid child so the DOM degrades

@@ -70,9 +70,12 @@ JSON body, not a header/URL. Fail-closed:
 The master key (`scope: 'all'`) bypasses both checks.
 
 > The `mcp_api_keys` table is created by migration `163-mcp-api-keys.sql`. The store API
-> (`createMcpApiKey`, `findActiveKeyByHash`, `revokeMcpApiKey`, `touchLastUsed`, `hashMcpApiKey`)
-> lives in `server/mcp/api-keys.ts`. Plaintext is unrecoverable after creation — a lost key must be
-> rotated, not recovered.
+> (`createMcpApiKey`, `listMcpApiKeys`, `findActiveKeyByHash`, `revokeMcpApiKey`, `touchLastUsed`,
+> `hashMcpApiKey`) lives in `server/mcp/api-keys.ts`. Plaintext is unrecoverable after creation — a
+> lost key must be rotated, not recovered.
+>
+> Operators mint / list / revoke per-workspace keys from the dashboard at **Settings → MCP API Keys**
+> (`src/components/McpApiKeysSettings.tsx` → `GET/POST/DELETE /api/admin/mcp-api-keys`, HMAC-only).
 
 ---
 
