@@ -131,9 +131,14 @@ describe('backfill-deliverables-client-action', () => {
     // (live dual-write + historical backfill) must converge on one row per (site, type).
     // Fresh send via the DUAL-WRITE path → one redirect:<siteId> deliverable.
     const fresh = seedRedirect('redirects:fresh');
+    // R4-PR1: the mirror now returns a typed MirrorResult { ok, deliverableId } instead of the
+    // deliverable itself. The deliverable is still created; assert ok, then verify the created row's
+    // stable sourceRef by reading it back from the store.
     const mirrored = mirrorClientActionToDeliverable(WS, fresh);
-    expect(mirrored!.sourceRef).toBe('redirect:site-bf-1');
-    expect(listDeliverables(WS).filter((r) => r.type === 'redirect')).toHaveLength(1);
+    expect(mirrored.ok).toBe(true);
+    const redirectRows = listDeliverables(WS).filter((r) => r.type === 'redirect');
+    expect(redirectRows).toHaveLength(1);
+    expect(redirectRows[0].sourceRef).toBe('redirect:site-bf-1');
     // A second, distinct legacy (timestamp-keyed) row for the SAME site, then BACKFILL.
     seedRedirect('redirects:legacy-ts');
     const result = backfillClientActionDeliverables();

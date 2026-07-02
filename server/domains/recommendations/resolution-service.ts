@@ -9,6 +9,7 @@ import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
 import {
   computeRecommendationSummary,
   getRecSourceCategory,
+  isExemptFromAutoResolve,
   toPageSlug,
 } from './rules.js';
 import {
@@ -53,6 +54,11 @@ export function resolveRecommendationsForChange(
   const now = new Date().toISOString();
   for (const rec of set.recommendations) {
     if (rec.status === 'completed' || rec.status === 'dismissed') continue;
+    // R4-PR1 struck≠completed guard: a struck (or sent/discussing/approved) rec must NEVER be swept
+    // to completed by a page-change auto-resolve — that would read as "✓ done" to the client when
+    // the operator decided not to do it, or clobber a client-owned decision. Same predicate the
+    // finalization auto-resolve + status-service completion guard use, so the paths cannot drift.
+    if (isExemptFromAutoResolve(rec)) continue;
     if (sourceCategory && getRecSourceCategory(rec.source) !== sourceCategory) continue;
     const intersects = rec.affectedPages.some(p => changedPages.has(toPageSlug(p)));
     if (!intersects) continue;
@@ -122,6 +128,9 @@ export function resolveContentRecommendationsForPublishedPost(
   const now = new Date().toISOString();
   for (const rec of set.recommendations) {
     if (rec.status === 'completed' || rec.status === 'dismissed') continue;
+    // R4-PR1 struck≠completed guard (same rationale as resolveRecommendationsForChange): never
+    // auto-complete a struck / client-owned rec on a keyword-matched publish.
+    if (isExemptFromAutoResolve(rec)) continue;
     if (rec.type !== 'content') continue;
     if (!rec.targetKeyword || keywordComparisonKey(rec.targetKeyword) !== key) continue;
     validateTransition('recommendation', RECOMMENDATION_TRANSITIONS, rec.status, 'completed');
