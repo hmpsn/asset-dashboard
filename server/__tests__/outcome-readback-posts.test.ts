@@ -45,6 +45,7 @@ describe('enrichPostsWithOutcomes', () => {
     seedWorkspace(ws);
 
     const action = recordAction({ // recordAction-ok
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: ws,
       actionType: 'content_published',
       sourceType: 'post',

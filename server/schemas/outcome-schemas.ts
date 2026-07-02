@@ -22,6 +22,13 @@ export const attributionEnum = z.enum([
   'platform_executed', 'externally_executed', 'not_acted_on',
 ]);
 
+// R8-PR2 (B14): the POST /api/outcomes/:ws/actions body keeps `attribution` OPTIONAL on
+// purpose — this is a tolerate-old contract for external/programmatic recorders (MCP holders
+// of persistent API keys) that predate the field. A missing attribution is NOT a 400; the
+// route (server/routes/outcomes.ts) stores the HONEST `not_acted_on` default + logs a
+// deprecation warn, never the silent `platform_executed`. recordAction()'s param is REQUIRED
+// (compile-time) — only this external HTTP seam applies the honest fallback.
+
 export const outcomeScoreEnum = z.enum([
   'strong_win', 'win', 'neutral', 'loss', 'insufficient_data', 'inconclusive',
 ]);

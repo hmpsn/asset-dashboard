@@ -37,6 +37,7 @@ describe('buildKeywordCommandCenterDetail — outcome read-back', () => {
     addTrackedKeyword(ws, 'dental implants');
 
     const action = recordAction({ // recordAction-ok
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: ws,
       actionType: 'strategy_keyword_added',
       sourceType: 'strategy_page_keyword',

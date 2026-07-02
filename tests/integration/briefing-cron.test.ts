@@ -224,6 +224,7 @@ describe('briefing-cron / runBriefingForWorkspace (deterministic templates)', ()
     // the actionType collectMilestoneAttributionCandidates filters on; sourceId
     // = the content request id (the join key the bridge uses).
     recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: wsId,
       actionType: 'brief_created',
       sourceType: 'content_request',

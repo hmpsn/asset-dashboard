@@ -45,6 +45,7 @@ describe('buildKeywordStrategyUxPayload — outcome read-back enrichment', () =>
     seedWorkspace(ws);
 
     const action = recordAction({ // recordAction-ok
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: ws,
       actionType: 'strategy_keyword_added',
       sourceType: STRATEGY_PAGE_KEYWORD_SOURCE_TYPE,

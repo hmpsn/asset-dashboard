@@ -4,6 +4,7 @@ import type {
   TrackedAction,
   ActionOutcome,
   ActionPlaybook,
+  Attribution,
   OutcomeScorecard,
   TopWin,
   WorkspaceLearnings,
@@ -59,7 +60,14 @@ export const outcomesApi = {
       pageUrl?: string;
       targetKeyword?: string;
       baselineSnapshot?: { position?: number; clicks?: number; impressions?: number; ctr?: number; sessions?: number };
-      attribution?: string;
+      /**
+       * R8-PR2 (B14): the write layer REQUIRES an honest attribution internally, but this
+       * external POST tolerates a missing value for backward compatibility. When omitted,
+       * the server stores the HONEST `not_acted_on` default (never the old silent
+       * `platform_executed`) and logs a deprecation warn. Pass an explicit value —
+       * typed to the `Attribution` union so callers can't send an arbitrary string.
+       */
+      attribution?: Attribution;
     },
   ) =>
     post<{ success: boolean; action: TrackedAction; deduplicated?: boolean }>(

@@ -73,6 +73,7 @@ describe('recordAction — source-identity snapshot persistence', () => {
       page: '/blog/choose-a-plumber',
     };
     const action = recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS,
       actionType: 'content_published',
       sourceType: 'post',
@@ -97,6 +98,7 @@ describe('recordAction — source-identity snapshot persistence', () => {
 
   it('leaves both columns NULL when NO source is threaded (nullable, expand-only)', () => {
     const action = recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS,
       actionType: 'schema_deployed',
       sourceType: 'schema',
@@ -119,6 +121,7 @@ describe('recordAction — source-identity snapshot persistence', () => {
 
   it('accepts a label-only source (snapshot omitted) — source_snapshot stays NULL', () => {
     const action = recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS,
       actionType: 'brief_created',
       sourceType: 'brief',
@@ -136,6 +139,7 @@ describe('archiveOldActions — source snapshot round-trip in archive', () => {
   it('preserves source_label + source_snapshot through the archive sweep', () => {
     const snapshot: TrackedActionSourceSnapshot = { title: 'Archived source title', type: 'recommendation' };
     const action = recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS,
       actionType: 'audit_fix_applied',
       sourceType: 'recommendation',

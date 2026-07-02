@@ -27,7 +27,7 @@ function seedStrongWin(attribution: Attribution, idx: number): string {
     pageUrl: `/win-${attribution}-${idx}`,
     targetKeyword: `kw-${idx}`,
     baselineSnapshot: { captured_at: '2026-01-01T00:00:00Z', position: 20, clicks: 5, impressions: 200 },
-    attribution,
+    attribution, // B14: parameterized — this test asserts not_acted_on is excluded from win surfaces
     sourceFlag: 'live',
     baselineConfidence: 'exact',
   });

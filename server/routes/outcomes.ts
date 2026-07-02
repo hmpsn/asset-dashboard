@@ -35,6 +35,7 @@ import { getPost } from '../content-posts-db.js';
 import { getContentRequest } from '../content-requests.js';
 import type {
   ActionType,
+  Attribution,
   ActionPlaybook,
   OutcomeScorecard,
   WorkspaceOutcomeOverview,
@@ -305,6 +306,22 @@ router.post(
           }
         }
 
+        // R8-PR2 (B14): tolerate-old, HONEST default. recordAction now REQUIRES attribution
+        // (the inverted `?? 'platform_executed'` internal default was removed as a trust
+        // hazard — it silently over-credited the platform). External callers (MCP holders of
+        // persistent API keys, programmatic recorders) that omit attribution keep working —
+        // this is a NON-breaking change — but their action is stored with the honest
+        // `not_acted_on` ("we don't know / not attributed"), NEVER the silent
+        // `platform_executed`, plus a deprecation warn nudging them to send it explicitly.
+        const attribution: Attribution = req.body.attribution ?? 'not_acted_on';
+        if (req.body.attribution === undefined) {
+          log.warn(
+            { workspaceId: req.params.workspaceId, sourceType: req.body.sourceType, actionType: req.body.actionType },
+            'DEPRECATION: POST /api/outcomes/:workspaceId/actions received no `attribution` — defaulting to the honest `not_acted_on`. ' +
+            'Pass an explicit attribution (platform_executed | externally_executed | not_acted_on); the silent default will be removed in a future release.',
+          );
+        }
+
         const action = recordAction({ // recordAction-ok: workspaceId validated by requireWorkspaceAccess middleware
           workspaceId: req.params.workspaceId,
           actionType: req.body.actionType as ActionType,
@@ -313,7 +330,7 @@ router.post(
           pageUrl: req.body.pageUrl,
           targetKeyword: req.body.targetKeyword,
           baselineSnapshot: { ...req.body.baselineSnapshot, captured_at: new Date().toISOString() },
-          attribution: req.body.attribution,
+          attribution,
           measurementWindow: req.body.measurementWindow,
           // R6 (B11): thread the optional source-identity snapshot from the request body.
           source: req.body.source,
