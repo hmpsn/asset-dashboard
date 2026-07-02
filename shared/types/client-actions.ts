@@ -1,5 +1,10 @@
 import type { AeoEffort } from './aeo.js';
 
+// R5 action catalog: every member of ClientActionSourceType has a metadata entry in
+// the `client_action` context of shared/types/action-catalog.ts
+// (ACTION_CATALOG.client_action), verified by tests/contract/action-catalog.test.ts.
+// This union is the source of truth for values — the catalog imports it and never
+// redefines it. See docs/rules/action-catalog.md.
 export type ClientActionSourceType =
   | 'aeo_change'
   | 'internal_link'

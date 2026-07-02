@@ -55,6 +55,7 @@ These files are shared coordination points, not context-owned implementation hom
 - `shared/types/index.ts` and other shared-type barrels
 - `server/middleware/validate.ts`, `server/auth.ts`, `server/middleware.ts`, `server/state-machines.ts`
 - `server/jobs.ts` and `shared/types/background-jobs.ts` for background job platform contracts
+- `shared/types/action-catalog.ts` for action metadata across the recommendation/outcome/client-action/keyword-command-center/MCP contexts — imports, never redefines, the five owning unions (`docs/rules/action-catalog.md`)
 - `docs/PLAN_WRITING_GUIDE.md`, `docs/rules/development-patterns.md`, and this file for operating model guidance
 
 Touch these deliberately. Changes here almost always affect multiple contexts.

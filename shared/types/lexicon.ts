@@ -108,6 +108,13 @@ export interface DuplicateNameAllowEntry {
 
 const CANONICAL: readonly LexiconEntry[] = [
   {
+    term: 'Action Catalog',
+    wordClass: 'canonical',
+    definition: 'Read-only metadata registry keyed by (context, action), importing the five action/status unions.',
+    canonicalType: 'ActionCatalogEntry',
+    declarationSites: ['shared/types/action-catalog.ts'],
+  },
+  {
     term: 'ActionPlaybook',
     wordClass: 'canonical',
     definition: 'Detected pattern of high-win-rate actions surfaced in LearningsSlice.playbooks.',
@@ -370,6 +377,13 @@ const CANONICAL: readonly LexiconEntry[] = [
     wordClass: 'canonical',
     definition: 'UI primitive soft-gating features behind subscription tiers.',
     declarationSites: ['src/components/ui/TierGate.tsx'],
+  },
+  {
+    term: 'Tracked Action',
+    wordClass: 'canonical',
+    definition: 'A tracked_actions row recorded via recordAction(); keep-marker types are live producers, not scored outcomes.',
+    canonicalType: 'ActionType',
+    declarationSites: ['shared/types/outcome-tracking.ts', 'server/outcome-tracking.ts'],
   },
   {
     term: 'Usage Tracking',
