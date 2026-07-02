@@ -9,12 +9,14 @@ import {
   LEGACY_FEATURE_FLAG_ROADMAP_IDS,
 } from '../../shared/types/feature-flags.js';
 import {
+  addDaysToIsoDate,
   buildFeatureFlagLifecycleReport,
   collectRoadmapItemIds,
   formatFeatureFlagLifecycleReportMarkdown,
   isLegacyRoadmapLink,
   parseCliArgs,
   parseIsoDateUtc,
+  PERMANENTLY_EXEMPT_FLAGS,
 } from '../../scripts/feature-flag-lifecycle.js';
 import type { RoadmapData } from '../../shared/types/roadmap.js';
 
@@ -110,5 +112,109 @@ describe('feature-flag lifecycle audit', () => {
     for (const key of FEATURE_FLAG_KEYS) {
       expect(seen.has(key)).toBe(true);
     }
+  });
+
+  describe('R12b — dated burn-down done-targets', () => {
+    it('computes a doneTarget of lastReviewedAt + 3x cadence for a normal active flag', () => {
+      const roadmap = loadRoadmap();
+      const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-29');
+
+      const row = report.rows.find(r => r.key === 'keyword-universe-full');
+      expect(row).toBeDefined();
+      // keyword-universe-full: weekly cadence (7 days), lastReviewedAt 2026-06-02.
+      expect(row?.staleAuditCadence).toBe('weekly');
+      expect(row?.doneTarget).toBe(addDaysToIsoDate('2026-06-02', 7 * 3));
+      expect(typeof row?.pastDoneTarget).toBe('boolean');
+    });
+
+    it('flags pastDoneTarget=true once asOf passes the computed done-target', () => {
+      const roadmap = loadRoadmap();
+      // keyword-universe-full: weekly cadence, reviewed 2026-06-02 → doneTarget = 2026-06-23.
+      const before = buildFeatureFlagLifecycleReport(roadmap, '2026-06-22');
+      const after = buildFeatureFlagLifecycleReport(roadmap, '2026-06-24');
+
+      const rowBefore = before.rows.find(r => r.key === 'keyword-universe-full');
+      const rowAfter = after.rows.find(r => r.key === 'keyword-universe-full');
+      expect(rowBefore?.pastDoneTarget).toBe(false);
+      expect(rowAfter?.pastDoneTarget).toBe(true);
+      expect(after.pastDoneTargetCount).toBeGreaterThan(0);
+    });
+
+    it('assigns no doneTarget to reserved flags', () => {
+      const roadmap = loadRoadmap();
+      const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-29');
+
+      const reservedRows = report.rows.filter(
+        r => FEATURE_FLAG_CATALOG[r.key].lifecycle.status === 'reserved',
+      );
+      expect(reservedRows.length).toBeGreaterThan(0);
+      for (const row of reservedRows) {
+        expect(row.doneTarget).toBeNull();
+        expect(row.pastDoneTarget).toBe(false);
+      }
+    });
+
+    it('includes a Burn-Down Done Targets section in the markdown report', () => {
+      const roadmap = loadRoadmap();
+      const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-29');
+      const markdown = formatFeatureFlagLifecycleReportMarkdown(report);
+
+      expect(markdown).toContain('## Burn-Down Done Targets');
+      expect(markdown).toContain('done-target');
+    });
+
+    it('addDaysToIsoDate is pure/deterministic and UTC-safe', () => {
+      expect(addDaysToIsoDate('2026-06-02', 21)).toBe('2026-06-23');
+      expect(addDaysToIsoDate('2026-01-01', 0)).toBe('2026-01-01');
+      expect(addDaysToIsoDate('not-a-date', 7)).toBeNull();
+    });
+  });
+
+  describe('R12b — permanent retirement exemption', () => {
+    it('keeps strategy-trust-ladder-autosend in the catalog', () => {
+      expect(FEATURE_FLAG_CATALOG['strategy-trust-ladder-autosend']).toBeDefined();
+    });
+
+    it('lists strategy-trust-ladder-autosend in PERMANENTLY_EXEMPT_FLAGS', () => {
+      expect(PERMANENTLY_EXEMPT_FLAGS.has('strategy-trust-ladder-autosend')).toBe(true);
+    });
+
+    it('never marks strategy-trust-ladder-autosend reviewDue, staleCandidate, or with a doneTarget — at any as-of date, however far in the future', () => {
+      const roadmap = loadRoadmap();
+      // Push `asOf` far past every cadence threshold to prove the exemption holds
+      // indefinitely, not just at the current audit anchor.
+      const farFuture = '2099-01-01';
+      const report = buildFeatureFlagLifecycleReport(roadmap, farFuture);
+
+      const row = report.rows.find(r => r.key === 'strategy-trust-ladder-autosend');
+      expect(row).toBeDefined();
+      expect(row?.permanentlyExempt).toBe(true);
+      expect(row?.reviewDue).toBe(false);
+      expect(row?.staleCandidate).toBe(false);
+      expect(row?.doneTarget).toBeNull();
+      expect(row?.pastDoneTarget).toBe(false);
+    });
+
+    it('never appears in the Review Queue or Burn-Down Done Targets sections of the markdown report', () => {
+      const roadmap = loadRoadmap();
+      const report = buildFeatureFlagLifecycleReport(roadmap, '2099-01-01');
+      const markdown = formatFeatureFlagLifecycleReportMarkdown(report);
+
+      // Extract just the Review Queue and Burn-Down Done Targets sections.
+      const reviewQueueSection = markdown.split('## Review Queue')[1]?.split('## ')[0] ?? '';
+      const doneTargetsSection = markdown.split('## Burn-Down Done Targets')[1]?.split('## ')[0] ?? '';
+      expect(reviewQueueSection).not.toContain('strategy-trust-ladder-autosend');
+      expect(doneTargetsSection).not.toContain('strategy-trust-ladder-autosend');
+
+      // It DOES appear in the dedicated exemption section.
+      const exemptSection = markdown.split('## Permanently Exempt')[1] ?? '';
+      expect(exemptSection).toContain('strategy-trust-ladder-autosend');
+    });
+
+    it('is counted in permanentlyExemptCount', () => {
+      const roadmap = loadRoadmap();
+      const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-29');
+      expect(report.permanentlyExemptCount).toBe(PERMANENTLY_EXEMPT_FLAGS.size);
+    });
   });
 });

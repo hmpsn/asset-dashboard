@@ -1112,6 +1112,19 @@ const RETIRED_FLAG_GROUPS: readonly RetiredFlagGroup[] = [
     migrationException: 'server/db/migrations/135-retire-keyword-hub-feature-flag.sql',
     scanTests: true,
   },
+  {
+    // Reconcile R12b flag burn-down: 'client-locations' had full FEATURE_FLAGS/
+    // FEATURE_FLAG_CATALOG/group entries but was NEVER read by isFeatureEnabled/
+    // useFeatureFlag/<FeatureFlag> anywhere in the repo — a genuinely phantom flag
+    // (do not confuse with the unrelated server/client-locations.ts CRUD module,
+    // which is real and unaffected). Zero behavior change on retirement.
+    label: 'client-locations phantom flag',
+    keys: [
+      'client-locations',
+    ],
+    envPattern: /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_CLIENT_LOCATIONS\b/,
+    migrationException: 'server/db/migrations/170-retire-client-locations-flag-overrides.sql',
+  },
 ];
 
 function escapedAlternation(values: readonly string[]): string {

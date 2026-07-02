@@ -198,6 +198,14 @@ describe('isFeatureEnabled — per-workspace dimension', () => {
   });
 });
 
+describe('R12b — client-locations phantom flag retirement', () => {
+  it('is removed from FEATURE_FLAGS, FEATURE_FLAG_CATALOG, and every group', () => {
+    expect(Object.prototype.hasOwnProperty.call(FEATURE_FLAGS, 'client-locations')).toBe(false);
+    expect((FEATURE_FLAG_CATALOG as Record<string, unknown>)['client-locations']).toBeUndefined();
+    expect(FEATURE_FLAG_KEYS).not.toContain('client-locations');
+  });
+});
+
 describe('keyword-universe-full catalog entry', () => {
   it('is registered, defaults false, and is in the Keyword Hub group', () => {
     expect(FEATURE_FLAGS['keyword-universe-full']).toBe(false);
