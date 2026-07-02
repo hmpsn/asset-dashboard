@@ -332,4 +332,15 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
     },
     'tests/unit/intelligence-recompute-job.test.ts',
   ),
+  // Reconcile R6 (B12): read-only sweep reporting dangling tracked_actions source refs.
+  // Findings live in job.result (ephemeral) — there is no domain table to write to.
+  [BACKGROUND_JOB_TYPES.OUTCOME_SOURCE_INTEGRITY_SWEEP]: entry(
+    'OUTCOME_SOURCE_INTEGRITY_SWEEP',
+    {
+      expectedLabel: 'Outcome Source Integrity Sweep',
+      expectedCancellable: true,
+      expectedResultBehavior: 'ephemeral',
+    },
+    'tests/unit/outcome-source-integrity-sweep.test.ts',
+  ),
 };
