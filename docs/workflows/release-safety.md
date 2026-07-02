@@ -77,6 +77,14 @@ If flags are involved:
 - Confirm kill-switch path (disable without redeploy where possible).
 - Document removal condition to prevent stale flags.
 - Validate safe behavior with flag disabled.
+- Check the burn-down `doneTarget` in the lifecycle report (`docs/rules/feature-flag-lifecycle.md`)
+  for every touched flag — a past-due target means the flag should be promoted to default and
+  removed (or explicitly re-scoped with an updated `removalCondition` + `lastReviewedAt`) before
+  or shortly after this release, not carried forward silently.
+- A flag that is a deliberate, indefinite safety gate (e.g. `strategy-trust-ladder-autosend`)
+  belongs in `PERMANENTLY_EXEMPT_FLAGS` (`scripts/feature-flag-lifecycle.ts`), not on the normal
+  burn-down queue — confirm new safety-gate flags are added there instead of accumulating stale
+  review-due nags.
 
 ## 6. Post-release monitoring window
 

@@ -25,6 +25,31 @@ const CADENCE_DAYS: Record<FeatureFlagAuditCadence, number> = {
   quarterly: 90,
 };
 
+/**
+ * Burn-down multiplier applied to a flag's stale-audit cadence to derive its
+ * dated done-target (`doneTarget`). Mirrors the existing `staleCandidate`
+ * "3x cadence" horizon (see `buildFeatureFlagLifecycleReport` below) so the
+ * dated target and the stale-candidate flag agree on what "overdue" means:
+ * a flag is expected to reach a removal decision within 3 audit cycles of
+ * its last review, not linger indefinitely.
+ */
+const DONE_TARGET_CADENCE_MULTIPLIER = 3;
+
+/**
+ * Flags that are PERMANENTLY EXEMPT from the burn-down / retirement queue.
+ * These are deliberate, indefinite safety gates — not rollout scaffolding —
+ * so they never get a dated done-target and must never appear in the
+ * "ready to retire" or stale-candidate queue regardless of age.
+ *
+ * 'strategy-trust-ladder-autosend': auto-send is intentionally never-on until
+ * a decoupled-tick + operator-veto review window ships (see the flag's
+ * removalCondition in shared/types/feature-flags.ts). Do not remove this
+ * entry without a signed-off replacement safety mechanism.
+ */
+export const PERMANENTLY_EXEMPT_FLAGS: ReadonlySet<FeatureFlagKey> = new Set([
+  'strategy-trust-ladder-autosend',
+]);
+
 export interface FeatureFlagLifecycleAuditRow {
   key: FeatureFlagKey;
   label: string;
@@ -41,6 +66,21 @@ export interface FeatureFlagLifecycleAuditRow {
   roadmapLinkValid: boolean;
   rolloutTarget: string;
   removalCondition: string;
+  /** True for flags in `PERMANENTLY_EXEMPT_FLAGS` — never review-due, never stale,
+   *  never assigned a `doneTarget`. Institutionalizes intentional indefinite gates
+   *  (e.g. safety kill-switches) so the burn-down queue never nags them or lists
+   *  them as ready to retire. */
+  permanentlyExempt: boolean;
+  /**
+   * Dated done-target (`YYYY-MM-DD`) by which this flag should reach a removal
+   * decision — `lastReviewedAt + (cadenceDays * DONE_TARGET_CADENCE_MULTIPLIER)`.
+   * `null` for permanently-exempt flags (no target — see `permanentlyExempt`) and
+   * for reserved flags (status: 'reserved' — gating code isn't wired yet, so a
+   * burn-down date would be meaningless until the feature ships).
+   */
+  doneTarget: string | null;
+  /** True when `asOf` is past `doneTarget`. Always false when `doneTarget` is null. */
+  pastDoneTarget: boolean;
 }
 
 export interface FeatureFlagLifecycleReport {
@@ -50,6 +90,10 @@ export interface FeatureFlagLifecycleReport {
   totalFlags: number;
   reviewDueCount: number;
   staleCandidateCount: number;
+  /** Count of rows with a non-null `doneTarget` that is <= `asOf`. */
+  pastDoneTargetCount: number;
+  /** Count of rows in `PERMANENTLY_EXEMPT_FLAGS`. */
+  permanentlyExemptCount: number;
   invalidLifecycle: string[];
   missingRoadmapLinks: string[];
   cadenceCounts: Record<FeatureFlagAuditCadence, number>;
@@ -83,6 +127,19 @@ export function daysBetween(fromIso: string, toIso: string): number | null {
 
   const diffMs = to.getTime() - from.getTime();
   return Math.floor(diffMs / (24 * 60 * 60 * 1000));
+}
+
+/** Adds `days` (may be 0) to an ISO `YYYY-MM-DD` date and returns the result as
+ *  an ISO date string. Pure/deterministic (UTC-based, no `Date.now()`) so callers
+ *  in tests can pass a fixed `asOf` anchor and get a stable result. Returns null
+ *  if `fromIso` fails strict YYYY-MM-DD parsing. */
+export function addDaysToIsoDate(fromIso: string, days: number): string | null {
+  const from = parseIsoDateUtc(fromIso);
+  if (!from) return null;
+
+  const result = new Date(from.getTime());
+  result.setUTCDate(result.getUTCDate() + days);
+  return toIsoDate(result);
 }
 
 export function collectRoadmapItemIds(roadmap: RoadmapData): Set<string> {
@@ -142,12 +199,25 @@ export function buildFeatureFlagLifecycleReport(
     // isn't wired yet) are intentionally unwired — exempt them from the review-due/stale nag so
     // genuine phantom flags stay distinguishable. They flip to active/omit when the gating ships.
     const reserved = lifecycle.status === 'reserved';
-    const reviewDue = !reserved && daysSinceReview != null && daysSinceReview > cadenceThreshold;
+    // Permanently-exempt flags (PERMANENTLY_EXEMPT_FLAGS — deliberate indefinite safety gates,
+    // not rollout scaffolding) never enter the review-due/stale-candidate queue regardless of age.
+    const permanentlyExempt = PERMANENTLY_EXEMPT_FLAGS.has(key);
+    const reviewDue = !reserved && !permanentlyExempt && daysSinceReview != null && daysSinceReview > cadenceThreshold;
     const staleCandidate =
       reviewDue &&
       daysSinceCreated != null &&
       daysSinceCreated > cadenceThreshold * 3 &&
       FEATURE_FLAGS[key] === false;
+
+    // Dated done-target: the burn-down date by which this flag should reach a removal decision.
+    // Permanently-exempt and reserved flags get no target — a burn-down date is meaningless for a
+    // deliberate indefinite gate (exempt) or a feature whose gating code isn't wired yet (reserved).
+    const doneTarget =
+      permanentlyExempt || reserved
+        ? null
+        : addDaysToIsoDate(lifecycle.lastReviewedAt, cadenceThreshold * DONE_TARGET_CADENCE_MULTIPLIER);
+    const daysPastDoneTarget = doneTarget != null ? daysBetween(doneTarget, asOfIso) : null;
+    const pastDoneTarget = daysPastDoneTarget != null && daysPastDoneTarget >= 0;
 
     const roadmapLinkValid =
       isLegacyRoadmapLink(lifecycle.linkedRoadmapItemId) || roadmapIds.has(lifecycle.linkedRoadmapItemId);
@@ -168,6 +238,9 @@ export function buildFeatureFlagLifecycleReport(
       staleCandidate,
       daysSinceCreated,
       daysSinceReview,
+      permanentlyExempt,
+      doneTarget,
+      pastDoneTarget,
       linkedRoadmapItemId: lifecycle.linkedRoadmapItemId,
       roadmapLinkValid,
       rolloutTarget: lifecycle.rolloutTarget,
@@ -188,6 +261,8 @@ export function buildFeatureFlagLifecycleReport(
     totalFlags: rows.length,
     reviewDueCount: rows.filter(row => row.reviewDue).length,
     staleCandidateCount: rows.filter(row => row.staleCandidate).length,
+    pastDoneTargetCount: rows.filter(row => row.pastDoneTarget).length,
+    permanentlyExemptCount: rows.filter(row => row.permanentlyExempt).length,
     invalidLifecycle,
     missingRoadmapLinks,
     cadenceCounts,
@@ -204,6 +279,8 @@ export function formatFeatureFlagLifecycleReportMarkdown(report: FeatureFlagLife
   lines.push(`- Total flags: ${report.totalFlags}`);
   lines.push(`- Review due: ${report.reviewDueCount}`);
   lines.push(`- Stale candidates: ${report.staleCandidateCount}`);
+  lines.push(`- Past done-target: ${report.pastDoneTargetCount}`);
+  lines.push(`- Permanently exempt: ${report.permanentlyExemptCount}`);
   lines.push('');
 
   lines.push('## Cadence Coverage');
@@ -228,9 +305,46 @@ export function formatFeatureFlagLifecycleReportMarkdown(report: FeatureFlagLife
   } else {
     for (const row of dueRows) {
       const staleMarker = row.staleCandidate ? ' · stale-candidate' : '';
+      const targetNote = row.doneTarget
+        ? ` · done-target ${row.doneTarget}${row.pastDoneTarget ? ' (PAST DUE)' : ''}`
+        : '';
       lines.push(
-        `- ${row.key} (${row.group}) — owner ${row.owner}, reviewed ${row.lastReviewedAt}, cadence ${row.staleAuditCadence}${staleMarker}`,
+        `- ${row.key} (${row.group}) — owner ${row.owner}, reviewed ${row.lastReviewedAt}, cadence ${row.staleAuditCadence}${staleMarker}${targetNote}`,
       );
+    }
+  }
+  lines.push('');
+
+  lines.push('## Burn-Down Done Targets');
+  lines.push('Every non-exempt, non-reserved flag gets a dated done-target — the date by which it');
+  lines.push('should reach a removal decision (promote to default + delete flag, or explicitly');
+  lines.push('re-scope) — so the burn-down is trackable instead of open-ended.');
+  lines.push('');
+  const targetRows = report.rows
+    .filter(row => !row.permanentlyExempt)
+    .slice()
+    .sort((a, b) => {
+      if (a.doneTarget == null && b.doneTarget == null) return a.key.localeCompare(b.key);
+      if (a.doneTarget == null) return 1;
+      if (b.doneTarget == null) return -1;
+      return a.doneTarget.localeCompare(b.doneTarget) || a.key.localeCompare(b.key);
+    });
+  for (const row of targetRows) {
+    if (row.doneTarget == null) {
+      lines.push(`- ${row.key} (${row.group}) — reserved, no done-target yet`);
+    } else {
+      lines.push(`- ${row.key} (${row.group}) — done-target ${row.doneTarget}${row.pastDoneTarget ? ' (PAST DUE)' : ''}`);
+    }
+  }
+  lines.push('');
+
+  lines.push('## Permanently Exempt (never review-due, never a retirement target)');
+  const exemptRows = report.rows.filter(row => row.permanentlyExempt);
+  if (exemptRows.length === 0) {
+    lines.push('- none');
+  } else {
+    for (const row of exemptRows) {
+      lines.push(`- ${row.key} (${row.group}) — owner ${row.owner}`);
     }
   }
   lines.push('');
