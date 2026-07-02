@@ -491,8 +491,8 @@ router.get('/api/recommendations/:workspaceId', requireWorkspaceAccess('workspac
     if (status) recs = recs.filter(r => r.status === status);
     if (priority) recs = recs.filter(r => r.priority === priority);
     // The Issue (operator-steering) — apply wording overrides for DISPLAY only so the cockpit shows
-    // the operator-corrected title/insight. Returns shallow clones; the base blob is never mutated
-    // (loadRecommendations stays pure — overrides are never baked back). Not flag-gated: an empty
+    // the operator-corrected title/insight. Returns shallow clones; the base recs (recommendation_items
+    // rows) are never mutated (loadRecommendations stays pure — overrides are never baked back). Not flag-gated: an empty
     // override table is a no-op (byte-identical), and the admin cockpit is already a flag-ON surface.
     recs = applyWordingOverrides(workspaceId, recs);
     res.json({ ...set, recommendations: recs });
@@ -691,7 +691,7 @@ router.post(
 // passes through for HMAC callers). The two LITERAL routes (reorder, manual-rec) + the
 // operator-overrides GET are placed BEFORE the `:recId/*` param routes so their path segment is
 // never swallowed as a :recId (route-ordering rule). Overrides apply ONLY at display boundaries —
-// never baked into the recommendation_sets blob (loadRecommendations stays pure).
+// never baked into the recommendation_items rows (loadRecommendations stays pure).
 
 // GET operator overrides (wording + running order) for the steering UI.
 router.get(
@@ -804,7 +804,7 @@ router.post(
 // PATCH wording — correct a rec's title/insight. recId-keyed override survives regen via
 // id-continuity (applyLifecycleCarryOver carries the rec id old→new). An absent/empty field clears
 // that override (restores the source wording); an all-cleared row is deleted. DISPLAY-only — never
-// baked into the recommendation_sets blob. This is a `:recId/*` param route, placed after the
+// baked into the recommendation_items rows. This is a `:recId/*` param route, placed after the
 // literal routes above.
 const recWordingSchema = z.object({
   title: z.string().max(REC_WORDING_TITLE_MAX).optional(),

@@ -87,9 +87,13 @@ migrateTrackedKeywordsFromConfigBlob(inferTrackedKeywordSourcesForWorkspace);
 // any workspace whose recommendation_items already has rows is skipped (count>0 guard) and
 // its blob is never re-read, so post-158 regens are never clobbered. Malformed recs are
 // dropped-with-reason (never silently), and a per-workspace transaction failure never aborts
-// the sweep. Readers are unaffected — the items-win fallback still serves blob data for any
-// workspace that fails backfill. MUST run BEFORE runOutcomeRemediation so remediation sees
-// materialized rows. Retire once the blob column is dropped in a later Reconcile PR.
+// the sweep. Post the R7-PR2 cutover this sweep is LOAD-BEARING, not just additive: readers
+// see rows ONLY (the items-win fallback is deleted), so a workspace that fails backfill yields
+// an empty set + a loud warn from loadRecommendationSet, never its blob. Runs AFTER
+// runMigrations() (line 32) — migration 166 blanks materialized blobs but its guard leaves an
+// un-backfilled (blob-present, zero-row) workspace intact, so this sweep still materializes it
+// here. MUST also run BEFORE runOutcomeRemediation so remediation sees materialized rows.
+// Retire once the blob column is dropped in a later Reconcile PR.
 import { materializeAllRecommendationItems } from './domains/recommendations/storage.js';
 const recBackfill = materializeAllRecommendationItems();
 log.info(

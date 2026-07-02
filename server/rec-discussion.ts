@@ -5,8 +5,10 @@
  * D2) and NOT the single client_note column. This module is the append-only thread keyed to
  * a rec id within a workspace, backed by the rec_discussion table (migration 138).
  *
- * recId is the in-blob Recommendation.id (recommendation_sets is a JSON blob — no FK target),
- * so there is NO foreign key on rec_id; workspace_id scopes every read/write.
+ * recId is the Recommendation.id addressed in recommendation_items(workspace_id, id) — the sole
+ * store after the R7 blob→rows cutover. This module still keeps NO foreign key on rec_id: recs are
+ * regenerated on every audit and ids carry over via applyLifecycleCarryOver, so a hard FK would
+ * fight the regen. workspace_id scopes every read/write.
  *
  * Read by the cockpit Discuss filter (P2) and the client CuratedRecDiscussThread (P4) via the
  * RecDiscussionEntry contract (shared/types/recommendations.ts §6b).

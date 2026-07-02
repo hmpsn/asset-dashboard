@@ -31,6 +31,7 @@ import {
   buildOvGainString,
   resolveEstimatedGain,
   loadRecommendations,
+  saveRecommendations,
 } from '../../server/recommendations.js';
 import { recordOvDivergence, listOvDivergence, type Top3Entry } from '../../server/ov-divergence.js';
 import { sortRecommendations } from '../../server/recommendations.js';
@@ -257,22 +258,19 @@ describe('P4 (C1) legacy opportunity blob (no predictedEmv) survives loadRecomme
         opportunity: legacyOpportunity as unknown as Recommendation['opportunity'],
       });
 
-      // Write the pre-P4 blob straight into the recommendation_sets row (the actual stored shape).
-      db.prepare(
-        `INSERT INTO recommendation_sets (workspace_id, generated_at, recommendations, summary)
-         VALUES (?, ?, ?, ?)
-         ON CONFLICT(workspace_id) DO UPDATE SET
-           generated_at = excluded.generated_at, recommendations = excluded.recommendations, summary = excluded.summary`,
-      ).run(
-        s.workspaceId,
-        new Date().toISOString(),
-        JSON.stringify([legacyRec]),
-        JSON.stringify({
+      // R7 cutover: the pre-P4 rec now lands in recommendation_items.payload (the actual stored
+      // shape post-cutover) via the normalized write path. The same recommendationSchema validates
+      // the payload on read, so this still exercises the pre-P4 opportunity backward-compat round-trip.
+      saveRecommendations({
+        workspaceId: s.workspaceId,
+        generatedAt: new Date().toISOString(),
+        recommendations: [legacyRec],
+        summary: {
           fixNow: 1, fixSoon: 0, fixLater: 0, ongoing: 0, totalImpactScore: 72,
           trafficAtRisk: 0, estimatedRecoverableClicks: 0, estimatedRecoverableImpressions: 0,
           topRecommendationId: 'rec_legacy_pre_p4',
-        }),
-      );
+        },
+      });
 
       const loaded = loadRecommendations(s.workspaceId);
       expect(loaded).not.toBeNull();

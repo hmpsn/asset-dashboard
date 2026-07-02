@@ -1236,20 +1236,33 @@ describe('migrateRankTracking', () => {
 // ═══════════════════════════════════════════════════════════════════
 
 describe('migrateRecommendations', () => {
-  it('tmig-rec-001: object record inserted correctly', async () => {
+  // R7 cutover: the seeder now emits recommendation_items ROWS via the normalized write path,
+  // NOT the retired recommendations blob (loadRecommendationSet reads rows only). The set
+  // metadata row still exists, but its recommendations column is the '[]' archive placeholder.
+  it('tmig-rec-001: object record emits a set metadata row + normalized item rows', async () => {
     writeJson(path.join(mockPaths.data, 'recommendations', 'tmig-ws-rec.json'), {
       workspaceId: 'tmig-ws-rec',
       generatedAt: '2025-01-01T00:00:00.000Z',
       recommendations: [{ id: 'r1', title: 'Fix metadata' }],
-      summary: { totalCount: 1 },
+      summary: { totalImpactScore: 1 },
     });
 
     await runMigration();
 
-    const row = db.prepare("SELECT * FROM recommendation_sets WHERE workspace_id = 'tmig-ws-rec'").get() as Record<string, unknown>;
-    expect(row).toBeTruthy();
-    expect(row['generated_at']).toBe('2025-01-01T00:00:00.000Z');
-    expect(JSON.parse(row['recommendations'] as string)).toEqual([{ id: 'r1', title: 'Fix metadata' }]);
+    const setRow = db.prepare("SELECT * FROM recommendation_sets WHERE workspace_id = 'tmig-ws-rec'").get() as Record<string, unknown>;
+    expect(setRow).toBeTruthy();
+    expect(setRow['generated_at']).toBe('2025-01-01T00:00:00.000Z');
+    // Blob column is the archive placeholder, NOT the legacy recs.
+    expect(setRow['recommendations']).toBe('[]');
+
+    // The rec is materialized as a row, keyed by its legacy id, with the sparse fields defaulted.
+    const items = db.prepare("SELECT id, status, payload FROM recommendation_items WHERE workspace_id = 'tmig-ws-rec' ORDER BY rank_order").all() as Array<{ id: string; status: string; payload: string }>;
+    expect(items.map(i => i.id)).toEqual(['r1']);
+    expect(items[0].status).toBe('pending');
+    const payload = JSON.parse(items[0].payload) as { id: string; title: string; type: string };
+    expect(payload.id).toBe('r1');
+    expect(payload.title).toBe('Fix metadata');
+    expect(payload.type).toBe('technical'); // defaulted by the normalizer
   });
 
   it('tmig-rec-002: array input is rejected — Array.isArray guard prevents silent bad insert', async () => {
@@ -1263,6 +1276,8 @@ describe('migrateRecommendations', () => {
 
     const row = db.prepare("SELECT recommendations FROM recommendation_sets WHERE workspace_id = 'tmig-ws-rec2'").get();
     expect(row).toBeUndefined();
+    const items = db.prepare("SELECT COUNT(*) as c FROM recommendation_items WHERE workspace_id = 'tmig-ws-rec2'").get() as { c: number };
+    expect(items.c).toBe(0);
   });
 
   it('tmig-rec-003: missing recommendations dir inserts 0 records', async () => {
@@ -1285,6 +1300,85 @@ describe('migrateRecommendations', () => {
 
     const good = db.prepare("SELECT COUNT(*) as c FROM recommendation_sets WHERE workspace_id = 'tmig-ws-good'").get() as { c: number };
     expect(good.c).toBe(1);
+    // An empty-recs set writes the metadata row with no item rows.
+    const items = db.prepare("SELECT COUNT(*) as c FROM recommendation_items WHERE workspace_id = 'tmig-ws-good'").get() as { c: number };
+    expect(items.c).toBe(0);
+  });
+
+  it('tmig-rec-005: a NaN/Infinity numeric rec does NOT abort the batch and still migrates (finite-coerced)', async () => {
+    // typeof NaN === 'number' is true; the OLD guard let NaN through → better-sqlite3 stores it
+    // as NULL → NOT NULL constraint throw → the single outer transaction rolled back the WHOLE
+    // batch. Number.isFinite coercion + per-file isolation must keep the batch alive.
+    writeJson(path.join(mockPaths.data, 'recommendations', 'tmig-ws-nan.json'), {
+      workspaceId: 'tmig-ws-nan',
+      generatedAt: '2025-01-01T00:00:00.000Z',
+      // JSON can't hold NaN/Infinity literally, so pass strings that Number.isFinite rejects and
+      // that the OLD `typeof === 'number'` guard would also reject — but ALSO a genuine number so
+      // the rec is otherwise valid. The regression is specifically the numeric NOT NULL columns.
+      recommendations: [{
+        id: 'r-nan', type: 'technical', priority: 'fix_now', impact: 'high', status: 'pending',
+        actionType: 'manual', impactScore: Number.NaN, trafficAtRisk: Number.POSITIVE_INFINITY,
+        impressionsAtRisk: Number.NaN, source: 'audit:test', title: 'x', description: 'y', insight: 'z',
+      }],
+      summary: {},
+    });
+    // A second, clean workspace must survive regardless of the bad one (batch isolation).
+    writeJson(path.join(mockPaths.data, 'recommendations', 'tmig-ws-clean.json'), {
+      workspaceId: 'tmig-ws-clean',
+      generatedAt: '2025-01-01T00:00:00.000Z',
+      recommendations: [{
+        id: 'r-clean', type: 'content', priority: 'ongoing', impact: 'low', status: 'pending',
+        actionType: 'manual', impactScore: 10, source: 'audit:test', title: 'a', description: 'b', insight: 'c',
+      }],
+      summary: {},
+    });
+
+    await expect(runMigration()).resolves.toBeUndefined();
+
+    // The NaN rec migrated with finite-coerced numerics (0), NOT dropped, NOT crashing.
+    const nanRow = db.prepare("SELECT payload, impact_score FROM recommendation_items WHERE workspace_id = 'tmig-ws-nan' AND id = 'r-nan'").get() as { payload: string; impact_score: number } | undefined;
+    expect(nanRow).toBeTruthy();
+    expect(nanRow!.impact_score).toBe(0);
+    const payload = JSON.parse(nanRow!.payload) as { impactScore: number; trafficAtRisk: number; impressionsAtRisk: number };
+    expect(payload.impactScore).toBe(0);
+    expect(payload.trafficAtRisk).toBe(0);
+    expect(payload.impressionsAtRisk).toBe(0);
+
+    // The clean workspace was NOT rolled back by the bad one (batch isolation).
+    const cleanRow = db.prepare("SELECT COUNT(*) as c FROM recommendation_items WHERE workspace_id = 'tmig-ws-clean'").get() as { c: number };
+    expect(cleanRow.c).toBe(1);
+  });
+
+  it('tmig-rec-006: a present-but-invalid enum is NOT inserted, is reported, and never silently dropped on read', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      writeJson(path.join(mockPaths.data, 'recommendations', 'tmig-ws-badenum.json'), {
+        workspaceId: 'tmig-ws-badenum',
+        generatedAt: '2025-01-01T00:00:00.000Z',
+        recommendations: [
+          // Invalid enum values pass the ?? nullish defaults unchanged, then fail
+          // recommendationSchema — the exact insert-then-silently-drop-on-read this cutover prevents.
+          { id: 'r-bad', type: 'seo-old', priority: 'critical', impact: 'severe', status: 'open', actionType: 'foo', source: 'audit:test', title: 'x', description: 'y', insight: 'z', impactScore: 5 },
+          // A valid sibling in the same file must still migrate.
+          { id: 'r-ok', type: 'technical', priority: 'fix_now', impact: 'high', status: 'pending', actionType: 'manual', source: 'audit:test', title: 'a', description: 'b', insight: 'c', impactScore: 9 },
+        ],
+        summary: {},
+      });
+
+      await runMigration();
+
+      // The invalid rec was skip-and-reported: it is NOT in recommendation_items (fail-closed).
+      const bad = db.prepare("SELECT COUNT(*) as c FROM recommendation_items WHERE workspace_id = 'tmig-ws-badenum' AND id = 'r-bad'").get() as { c: number };
+      expect(bad.c).toBe(0);
+      // The valid sibling DID migrate.
+      const ok = db.prepare("SELECT COUNT(*) as c FROM recommendation_items WHERE workspace_id = 'tmig-ws-badenum' AND id = 'r-ok'").get() as { c: number };
+      expect(ok.c).toBe(1);
+      // It was REPORTED (loud), not silent — a human sees exactly what did not migrate.
+      const reported = warnSpy.mock.calls.some(call => String(call[0]).includes('r-bad'));
+      expect(reported).toBe(true);
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });
 

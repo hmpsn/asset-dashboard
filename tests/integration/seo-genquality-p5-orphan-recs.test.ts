@@ -35,7 +35,9 @@ import {
   recommendationOutcomeActionType,
   cannibalizationUrlSetKey,
   loadRecommendations,
+  saveRecommendations,
 } from '../../server/recommendations.js';
+import type { Recommendation } from '../../shared/types/recommendations.js';
 import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
 import { replaceAllTopicClusters } from '../../server/topic-clusters.js';
 import { replaceAllCannibalizationIssues } from '../../server/cannibalization-issues.js';
@@ -288,28 +290,24 @@ describe('P5 cannibalization dedupe vs active insight', () => {
     // minted in a prior run before the insight appeared), then assert collectAllCandidates drops it.
     const urlSetKey = cannibalizationUrlSetKey(['/crm', '/crm-software']);
     const now = new Date().toISOString();
-    db.prepare(
-      `INSERT INTO recommendation_sets (workspace_id, generated_at, recommendations, summary)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(workspace_id) DO UPDATE SET
-         generated_at = excluded.generated_at, recommendations = excluded.recommendations, summary = excluded.summary`,
-    ).run(
-      s.workspaceId,
-      now,
-      JSON.stringify([{
+    // R7 cutover: seed via the normalized write path (rows) — loadRecommendationSet reads rows only.
+    saveRecommendations({
+      workspaceId: s.workspaceId,
+      generatedAt: now,
+      recommendations: [{
         id: 'rec_cn_dedup', workspaceId: s.workspaceId, priority: 'fix_soon', type: 'cannibalization',
         title: 'Keyword Cannibalization: "crm software"', description: 'x', insight: 'y',
         impact: 'high', effort: 'medium', impactScore: 65,
         source: `cannibalization:${urlSetKey}`, affectedPages: ['/crm', '/crm-software'],
         trafficAtRisk: 80, impressionsAtRisk: 1500, estimatedGain: 'z', actionType: 'manual',
         status: 'pending', assignedTo: 'client', createdAt: now, updatedAt: now,
-      }]),
-      JSON.stringify({
+      }] as Recommendation[],
+      summary: {
         fixNow: 0, fixSoon: 1, fixLater: 0, ongoing: 0, totalImpactScore: 65,
         trafficAtRisk: 80, estimatedRecoverableClicks: 0, estimatedRecoverableImpressions: 0,
         topRecommendationId: 'rec_cn_dedup',
-      }),
-    );
+      },
+    });
 
     const candidates = collectAllCandidates(s.workspaceId);
     // The cannibalization REC candidate (rec-rec_cn_dedup) is dropped; the insight candidate stays.

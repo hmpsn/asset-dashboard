@@ -64,7 +64,8 @@ export function throttleRecommendation(
 export function fixRecommendation(workspaceId: string, recId: string): Recommendation | null;
 ```
 
-All five functions return `null` when the rec id is not found in the workspace blob.
+All five functions return `null` when the rec id is not found in the workspace's
+`recommendation_items` rows (the sole store after the R7 blob→rows cutover).
 
 ## `isActiveRec` — the ONE active-set predicate
 
