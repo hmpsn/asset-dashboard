@@ -16,6 +16,7 @@ import type * as OpportunityDetectors from './scoring/opportunity-detectors.js';
 import type * as OutcomeEmvCalibration from './outcome-emv-calibration.js';
 import type * as PlatformLearningsPriors from './platform-learnings-priors.js';
 import type * as RecommendationStaleness from './recommendation-staleness.js';
+import type * as DeliverableDivergenceSweep from './deliverable-divergence-sweep.js';
 
 const log = createLogger('outcome-crons');
 
@@ -36,6 +37,7 @@ let rankDeclineScanInterval: ReturnType<typeof setInterval> | null = null;
 let emvCalibrationInterval: ReturnType<typeof setInterval> | null = null;
 let platformPriorsInterval: ReturnType<typeof setInterval> | null = null;
 let stalenessScanInterval: ReturnType<typeof setInterval> | null = null;
+let divergenceSweepInterval: ReturnType<typeof setInterval> | null = null;
 
 // Startup timeout handles — stored so stopOutcomeCrons() can cancel them
 // if shutdown is called during the startup warmup window (currently up to ~60s).
@@ -305,6 +307,25 @@ export function startOutcomeCrons() {
     }
   };
 
+  // ── Reconcile R4-PR1 — rec↔deliverable divergence sweep (24h). ──
+  // READ-ONLY: compares each sent/decided rec's clientStatus against its recommendation:<id>
+  // deliverable mirror and reports the pairs that disagree. Mutates NOTHING (no repair, no
+  // broadcast, no activity) — repair is the R4-PR2 trigger + backfill PR. Per-workspace flag-gated
+  // INSIDE the sweep ('strategy-divergence-sweep') — flag OFF = no-op for that workspace. Dynamic
+  // import so the cron module doesn't pull recommendation transitive deps at startup.
+  const runDivergenceSweepJob = async () => {
+    try {
+      const { runDeliverableDivergenceSweep }: typeof DeliverableDivergenceSweep = await import('./deliverable-divergence-sweep.js'); // dynamic-import-ok
+      const result = runDeliverableDivergenceSweep();
+      log.info(
+        { workspacesScanned: result.workspacesScanned, pairsChecked: result.pairsChecked, divergentPairs: result.divergentPairs.length },
+        'Deliverable divergence sweep cron complete',
+      );
+    } catch (err) {
+      log.error({ err }, 'Deliverable divergence sweep cron failed');
+    }
+  };
+
   // Run each job once after a short startup delay, then on their normal interval.
   // Store handles so stopOutcomeCrons() can cancel them during early shutdown.
   startupTimeouts = [
@@ -319,6 +340,7 @@ export function startOutcomeCrons() {
     setTimeout(() => void runEmvCalibrationJob(), 55_000),
     setTimeout(() => void runPlatformPriorsJob(), 60_000),
     setTimeout(() => void runStalenessScanJob(), 65_000),
+    setTimeout(() => void runDivergenceSweepJob(), 70_000),
   ];
 
   measureInterval = setInterval(() => void runMeasure(), DAILY_MS);
@@ -331,6 +353,7 @@ export function startOutcomeCrons() {
   emvCalibrationInterval = setInterval(() => void runEmvCalibrationJob(), WEEKLY_MS);
   platformPriorsInterval = setInterval(() => void runPlatformPriorsJob(), WEEKLY_MS);
   stalenessScanInterval = setInterval(() => void runStalenessScanJob(), DAILY_MS);
+  divergenceSweepInterval = setInterval(() => void runDivergenceSweepJob(), DAILY_MS);
 
   playbooksInterval = setInterval(() => void runPlaybooks(), 7 * DAILY_MS);
 
@@ -351,6 +374,7 @@ export function stopOutcomeCrons() {
   if (emvCalibrationInterval) clearInterval(emvCalibrationInterval);
   if (platformPriorsInterval) clearInterval(platformPriorsInterval);
   if (stalenessScanInterval) clearInterval(stalenessScanInterval);
+  if (divergenceSweepInterval) clearInterval(divergenceSweepInterval);
   measureInterval = null;
   learningsInterval = null;
   detectionInterval = null;
@@ -362,5 +386,6 @@ export function stopOutcomeCrons() {
   emvCalibrationInterval = null;
   platformPriorsInterval = null;
   stalenessScanInterval = null;
+  divergenceSweepInterval = null;
   log.info('Outcome crons stopped');
 }

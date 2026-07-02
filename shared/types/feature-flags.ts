@@ -92,6 +92,11 @@ export const FEATURE_FLAGS = {
   // Strategy v3 — staleness scan child flag. Dark-launches the runSentRecStalenessScan cron
   // pass (sent-rec "no response 14d" nudges + supersession flags). OFF = no nudge engine.
   'strategy-staleness-scan': false,
+  // Reconcile R4-PR1 — deliverable divergence sweep child flag. Dark-launches the READ-ONLY
+  // runDeliverableDivergenceSweep cron pass that compares each rec's clientStatus against its
+  // recommendation:<id> deliverable mirror and reports pairs that DISAGREE (the two named
+  // divergence-by-construction paths). OFF = no sweep. It mutates NOTHING — reporting only.
+  'strategy-divergence-sweep': false,
   // Strategy v3 — DEFERRED paid-topic monetization spine (generic strategy_addon SKU +
   // rec→cart bridge for keyword/topic rec types). OFF until the roadmap item lands; v3 renders
   // Add-to-plan ONLY where rec.productType already resolves a SKU (decision 1 / spec §2 / §11).
@@ -411,6 +416,23 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-17',
     },
   },
+  'strategy-divergence-sweep': {
+    label: 'Reconcile R4 — rec↔deliverable divergence sweep (read-only report cron)',
+    group: 'Strategy',
+    lifecycle: {
+      owner: 'analytics-intelligence',
+      // Aligned to the feature-flag-lifecycle audit anchor (2026-06-29); every existing flag is ≤ that
+      // date, so the audit never reports this entry as "in the future". The lifecycle-meaningful field
+      // is the removalCondition ("Re-audit by 2026-10-02"), which is unaffected by the slightly-earlier
+      // createdAt.
+      createdAt: '2026-06-29',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Remove after the R4-PR2 DB trigger makes struck≠completed + rec↔mirror lockstep UNbypassable AND a full staging soak shows the sweep reports zero divergent pairs; the read-only sweep then runs unconditionally in the 24h outcome tick (or is retired once the trigger guarantees zero drift). Re-audit by 2026-10-02.',
+      linkedRoadmapItemId: 'strategy-v3-curation-cockpit',
+      staleAuditCadence: 'monthly',
+      lastReviewedAt: '2026-06-29',
+    },
+  },
   'strategy-paid-topics': {
     label: 'Strategy v3 — paid-topic monetization spine (DEFERRED roadmap)',
     group: 'Strategy',
@@ -617,7 +639,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Strategy',
-    keys: ['signal-auto-recompute', 'strategy-command-center', 'strategy-staleness-scan', 'strategy-paid-topics', 'strategy-keywords-managed-set', 'strategy-competitor-send', 'strategy-signal-fold', 'strategy-the-issue', 'strategy-trust-ladder-autosend'],
+    keys: ['signal-auto-recompute', 'strategy-command-center', 'strategy-staleness-scan', 'strategy-divergence-sweep', 'strategy-paid-topics', 'strategy-keywords-managed-set', 'strategy-competitor-send', 'strategy-signal-fold', 'strategy-the-issue', 'strategy-trust-ladder-autosend'],
   },
   {
     label: 'The Issue (Client)',

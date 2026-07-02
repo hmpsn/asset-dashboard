@@ -25,6 +25,7 @@ import {
   REC_POLICY_REGISTRY,
 } from '../../server/recommendation-lifecycle.js';
 import { InvalidTransitionError } from '../../server/state-machines.js';
+import { StruckRecCompletionError, updateRecommendationStatus } from '../../server/domains/recommendations/status-service.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
 
 let wsId = '';
@@ -130,6 +131,21 @@ describe('recommendation-lifecycle single-writer', () => {
     const after = fixRecommendation(wsId, 'fix1');
     expect(after?.status).toBe('completed');
     expect(after?.clientStatus).toBeUndefined(); // Fix is the RecStatus axis, not the curation axis
+  });
+
+  // R4-PR1 struck≠completed guard — the app-level half of the trust-critical invariant.
+  it('fixRecommendation refuses to complete a STRUCK rec (StruckRecCompletionError)', () => {
+    seed([rec({ id: 'fix_struck', status: 'pending', lifecycle: 'struck', struckAt: new Date().toISOString() })]);
+    expect(() => fixRecommendation(wsId, 'fix_struck')).toThrow(StruckRecCompletionError);
+    // The rec is untouched — never swept to completed.
+    const after = loadRecommendations(wsId)!.recommendations.find(r => r.id === 'fix_struck')!;
+    expect(after.status).toBe('pending');
+    expect(after.lifecycle).toBe('struck');
+  });
+
+  it('updateRecommendationStatus refuses to complete a client-owned (approved) rec', () => {
+    seed([rec({ id: 'complete_approved', status: 'pending', clientStatus: 'approved' })]);
+    expect(() => updateRecommendationStatus(wsId, 'complete_approved', 'completed')).toThrow(StruckRecCompletionError);
   });
 
   it('exposes a per-RecType policy registry (metadata routes via "rec", cannibalization via "deliverable")', () => {

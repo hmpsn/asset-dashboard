@@ -225,7 +225,7 @@ export const CRON_METADATA: Record<CronId, CronMetadataEntry> = {
     module: 'server/outcome-crons.js',
     intervalMs: DAY_MS,
     description:
-      'Owns 11 staggered intervals (measure/learnings/archive/decayScan/rankDeclineScan/stalenessScan daily; ' +
+      'Owns 12 staggered intervals (measure/learnings/archive/decayScan/rankDeclineScan/stalenessScan/divergenceSweep daily; ' +
       'detection/backfill/emvCalibration/platformPriors weekly; playbooks 7d) under one start/stop pair. ' +
       'Registered as a single entry — internal construction is unchanged in this PR; adoption of the shared ' +
       'execution surface is deferred to a follow-up commit (measured R4×R10 lane collision).',

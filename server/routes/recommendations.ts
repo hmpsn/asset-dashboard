@@ -18,6 +18,7 @@ import {
   isCuratedForClient,
 } from '../recommendations.js';
 import { recommendationOutcomeActionType } from '../domains/recommendations/outcome-action-type.js';
+import { StruckRecCompletionError } from '../domains/recommendations/status-service.js';
 import {
   getOperatorOverrides,
   setWordingOverride,
@@ -70,12 +71,40 @@ import {
   type OperatorOverridesResponse,
 } from '../../shared/types/rec-operator-steering.js';
 import { mirrorRecommendationToDeliverable } from '../domains/inbox/recommendation-dual-write.js';
+import { syncRecommendationDeliverableStatus } from '../domains/inbox/recommendation-mirror-sync.js';
 import { createContentRequest } from '../content-requests.js';
 import { buildStrategyCardContextFromRec } from '../recommendation-strategy-card-context.js';
 import type { StrategyCardContext } from '../../shared/types/content.js';
 
 const log = createLogger('routes:recommendations');
 const router = Router();
+
+/**
+ * Observe the typed dual-write MirrorResult (R4-PR1). The mirror is best-effort — the rec is already
+ * sent — but a failure must NO LONGER be swallowed silently. On `ok:false` record a durable admin-only
+ * activity entry (rec_status_updated is deliberately NOT client-visible) + a Pino error so the
+ * operator and the divergence sweep can see that a sent rec never reached the client feed. Guarded so
+ * a logging failure can't break the already-committed send.
+ */
+function observeRecMirror(
+  workspaceId: string,
+  rec: Pick<Recommendation, 'id' | 'title'>,
+  result: ReturnType<typeof mirrorRecommendationToDeliverable>,
+): void {
+  if (result.ok) return;
+  try {
+    addActivity(
+      workspaceId,
+      'rec_status_updated',
+      `Client-deliverable mirror failed for "${rec.title}"`,
+      `The recommendation was sent but its unified deliverable mirror did not write (${result.error}). The client feed may not show it until reconciled.`,
+      { recId: rec.id, mirrorError: result.error },
+    );
+  } catch (activityErr) {
+    log.error({ err: activityErr, workspaceId, recId: rec.id }, 'failed to record rec mirror-failure activity');
+  }
+  log.error({ workspaceId, recId: rec.id, error: result.error }, 'recommendation dual-write mirror failed (observed by route)');
+}
 
 /** Internal sentinel (L6): thrown inside the act-on transaction when the rec vanishes mid-flight
  *  so the whole greenlight+request unit rolls back and the route can map it to a 404. */
@@ -416,6 +445,13 @@ router.post(
     }
 
     invalidateIntelligenceCache(workspaceId);
+    // R4-PR1 authority split: the greenlight flipped the rec clientStatus → approved; now advance the
+    // rec-sourced deliverable mirror (awaiting_client → approved) IN LOCKSTEP through the deliverable
+    // store so the two axes don't diverge by construction (the audit-named "act-on never advances the
+    // mirror" blind spot). Post-commit + best-effort: the greenlight has already committed and must not
+    // roll back on a mirror-sync hiccup; the divergence sweep surfaces any residual drift. This fires
+    // DELIVERABLE_UPDATED itself (which has full frontend invalidation coverage).
+    syncRecommendationDeliverableStatus(workspaceId, rec, 'approved');
     // Both halves of the feedback loop (data-flow rule #6): the clientStatus change AND the new
     // content request must each broadcast so admin + client React Query caches invalidate.
     broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, clientStatus: 'approved' });
@@ -588,8 +624,9 @@ router.post(
         if (note) addRecDiscussionEntry(workspaceId, rec.id, 'strategist', note);
         // Close-the-loop half #1 (spec §7 / P2-2): mirror EACH sent rec into the unified deliverable
         // so the bulk send reaches the client feed exactly like the per-row /send. Best-effort
-        // (never throws), runs outside the committed txn (upsertDeliverable owns its own). // rec-mirror-ok
-        mirrorRecommendationToDeliverable(workspaceId, rec);
+        // (never throws), runs outside the committed txn (upsertDeliverable owns its own). R4-PR1:
+        // the caller now OBSERVES the typed result and logs a durable activity on failure. // rec-mirror-ok
+        observeRecMirror(workspaceId, rec, mirrorRecommendationToDeliverable(workspaceId, rec));
         addActivity(workspaceId, 'rec_sent', `Recommendation sent to client: ${rec.title}`, note || rec.description);
       } else if (action === 'throttle') {
         addActivity(workspaceId, 'rec_throttled', `Recommendation throttled ${throttleDays}d: ${rec.title}`, rec.description);
@@ -858,8 +895,9 @@ router.patch('/api/recommendations/:workspaceId/:recId/send', requireWorkspaceAc
   // Optional note-on-send → a strategist discussion entry (the narrative lever).
   if (note) addRecDiscussionEntry(workspaceId, recId, 'strategist', note);
   // Close-the-loop half #1 (spec §7 / P2-2): mirror the sent rec into the unified deliverable so it
-  // reaches the client feed/inbox. Best-effort + fires DELIVERABLE_SENT itself (never throws). // rec-mirror-ok
-  mirrorRecommendationToDeliverable(workspaceId, rec);
+  // reaches the client feed/inbox. Best-effort + fires DELIVERABLE_SENT itself (never throws). R4-PR1:
+  // the route now OBSERVES the typed result and records a durable activity on failure. // rec-mirror-ok
+  observeRecMirror(workspaceId, rec, mirrorRecommendationToDeliverable(workspaceId, rec));
   invalidateIntelligenceCache(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { recId, clientStatus: 'sent' });
   addActivity(workspaceId, 'rec_sent', `Recommendation sent to client: ${rec.title}`, note || rec.description);
@@ -950,6 +988,9 @@ router.patch('/api/recommendations/:workspaceId/:recId/fix', requireWorkspaceAcc
     rec = fixRecommendation(workspaceId, recId);
   } catch (err) {
     if (err instanceof InvalidTransitionError) return res.status(400).json({ error: err.message });
+    // R4-PR1 struck≠completed guard: a struck / client-owned rec cannot be silently "fixed" to
+    // completed (it would read as "✓ done" to the client). Surface as a 400, not a 500.
+    if (err instanceof StruckRecCompletionError) return res.status(400).json({ error: err.message });
     throw err;
   }
   if (!rec) return res.status(404).json({ error: 'Recommendation not found' });

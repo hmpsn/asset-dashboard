@@ -112,10 +112,14 @@ export const recommendationAdapter: DeliverableAdapter<RecommendationInput> = {
   sourceRef: ({ rec }) => (rec.id ? `recommendation:${rec.id}` : null),
   // apply opt-out — D-apply (respond-only). Greenlight is the act-on route (clientStatus → approved
   // + content request + TrackedAction); marking the work complete is a manual operator action. The
-  // adapter does NOT implement respondToSource: the rec's clientStatus is the source of truth, and
-  // the public act-on route is the single writer of it (NOT the deliverable respond path — a
-  // rec-derived deliverable's respond is purely an inbox affordance; the canonical client decision
-  // flows through POST /api/public/recommendations/:ws/:recId/act-on).
+  // adapter does NOT implement respondToSource because the canonical client DECISION enters through
+  // the public act-on route (POST /api/public/recommendations/:ws/:recId/act-on), not the deliverable
+  // respond path. Under the ratified R4 two-axis authority split the DELIVERABLE SPINE owns
+  // client-delivery STATE: act-on drives the rec clientStatus AND advances this mirror in lockstep via
+  // `syncRecommendationDeliverableStatus` (server/domains/inbox/recommendation-mirror-sync.ts), so the
+  // two axes no longer diverge by construction. The rec's clientStatus remains the source of truth for
+  // the internal curation/triage axis; the deliverable mirror is the authoritative client-delivery
+  // record the read-only divergence sweep reconciles against.
   applyDeliverable: applyDisabledStub,
 };
 

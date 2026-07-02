@@ -27,7 +27,6 @@
  * unconditionally on every send.)
  */
 import type { ClientAction } from '../../../shared/types/client-actions.js';
-import type { ClientDeliverable } from '../../../shared/types/client-deliverable.js';
 import { upsertDeliverable } from '../../client-deliverables.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { WS_EVENTS } from '../../ws-events.js';
@@ -38,18 +37,21 @@ import {
   clientActionDeliverableType,
 } from './deliverable-adapters/client-action-shared.js';
 import { createLogger } from '../../logger.js';
+import type { MirrorResult } from './recommendation-dual-write.js';
 
 const log = createLogger('client-action-dual-write');
 
 /**
  * Mirror a freshly-created client_action into `client_deliverable`.
- * Returns the mirrored deliverable, or null when the mirror was skipped/failed. Never throws —
- * the live legacy create must not be affected.
+ * Returns a typed `MirrorResult` (Reconcile R4-PR1): `{ ok: true, deliverableId }` on success, an
+ * `ok:true` skip when the adapter benignly rejects the input, and `{ ok: false, error }` when the
+ * store write throws. NEVER throws — the live legacy create must not be affected. The caller
+ * (createAdminClientAction) MUST observe `ok` and record an activity entry on failure.
  */
 export function mirrorClientActionToDeliverable(
   workspaceId: string,
   action: ClientAction,
-): ClientDeliverable | null {
+): MirrorResult {
   try {
     const type = clientActionDeliverableType(action.sourceType);
     const adapter = getAdapter(type);
@@ -66,7 +68,8 @@ export function mirrorClientActionToDeliverable(
         { workspaceId, actionId: action.id, type, reason: sendable.reason },
         'client-action mirror skipped: adapter rejected the action',
       );
-      return null;
+      // Benign not-sendable skip — nothing to mirror, NOT a failure the caller must alert on.
+      return { ok: true, skipped: true, reason: sendable.reason };
     }
 
     const built = adapter.buildPayload(input);
@@ -109,11 +112,14 @@ export function mirrorClientActionToDeliverable(
     } catch (broadcastErr) {
       log.warn({ err: broadcastErr, workspaceId, deliverableId: deliverable.id }, 'DELIVERABLE_SENT broadcast failed (swallowed)');
     }
-    return deliverable;
+    return { ok: true, deliverableId: deliverable.id };
   } catch (err) {
-    // Best-effort: the legacy action is already persisted + the client notified. A mirror
-    // failure must not surface to the operator or roll back the live create.
-    log.error({ err, workspaceId, actionId: action.id }, 'client-action mirror failed (swallowed)');
-    return null;
+    // Best-effort: the legacy action is already persisted + the client notified. A mirror failure
+    // must not surface to the operator or roll back the live create — but it is NO LONGER swallowed
+    // silently. The typed failure result flows back to createAdminClientAction, which records a
+    // durable activity entry so the divergence is observable (R4-PR1).
+    const error = err instanceof Error ? err.message : String(err);
+    log.error({ err, workspaceId, actionId: action.id }, 'client-action mirror failed (surfaced to caller)');
+    return { ok: false, error };
   }
 }

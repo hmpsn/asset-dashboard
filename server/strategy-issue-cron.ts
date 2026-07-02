@@ -247,8 +247,26 @@ export function runAutoSendForWorkspace(workspaceId: string, weekOf: string, wsN
       // clientStatus. Returns the updated rec for the mirror.
       const marked = markRecommendationAutoSent(workspaceId, recId);
       // Mirror to the client-deliverable spine — identical to the manual send path. Best-effort
-      // (never throws; the send already stands).
-      mirrorRecommendationToDeliverable(workspaceId, marked ?? sent);
+      // (never throws; the send already stands). R4-PR1: the cron now OBSERVES the typed result and
+      // records a durable admin-only activity on failure instead of silently swallowing the
+      // divergence (a sent rec that never reached the client feed). rec_status_updated is NOT
+      // client-visible; guarded so a logging failure can't break the auto-send loop.
+      const mirroredRec = marked ?? sent;
+      const mirror = mirrorRecommendationToDeliverable(workspaceId, mirroredRec);
+      if (!mirror.ok) {
+        try {
+          addActivity(
+            workspaceId,
+            'rec_status_updated',
+            `Client-deliverable mirror failed for auto-sent "${mirroredRec.title}"`,
+            `The recommendation was auto-sent but its unified deliverable mirror did not write (${mirror.error}). The client feed may not show it until reconciled.`,
+            { recId: mirroredRec.id, mirrorError: mirror.error, autoSent: true },
+          );
+        } catch (activityErr) {
+          log.error({ err: activityErr, workspaceId, recId: mirroredRec.id }, 'failed to record auto-send mirror-failure activity');
+        }
+        log.error({ workspaceId, recId: mirroredRec.id, error: mirror.error }, 'auto-send dual-write mirror failed (observed by cron)');
+      }
       count++;
       sentArchetypes.add(recArchetype(sent.type));
     } catch (err) {

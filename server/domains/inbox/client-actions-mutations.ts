@@ -11,6 +11,9 @@ import { InvalidTransitionError } from '../../state-machines.js';
 import type { ClientAction, ClientActionPayload, ClientActionSourceType } from '../../../shared/types/client-actions.js';
 import { applyClientActionFeedbackLoop } from './client-action-feedback-loop.js';
 import { mirrorClientActionToDeliverable } from './client-action-dual-write.js';
+import { createLogger } from '../../logger.js';
+
+const log = createLogger('client-actions-mutations');
 
 type ClientActor = { id?: string; name?: string } | undefined;
 
@@ -87,10 +90,28 @@ export function createAdminClientAction(workspaceId: string, input: CreateClient
   // client_deliverable model. Runs UNCONDITIONALLY (no feature flag) and broadcasts
   // DELIVERABLE_SENT for the live unified Inbox. This single seam covers all four producer
   // routes (redirect / internal_link / aeo_change / content_decay). Skipped for duplicates
-  // (the legacy create itself returned the existing row). Best-effort + self-swallowing —
-  // it can NEVER break the legacy create.
+  // (the legacy create itself returned the existing row). Best-effort — it can NEVER break the
+  // legacy create, but the failure is NO LONGER swallowed: R4-PR1 makes the outcome observable.
   if (!isDuplicate) {
-    mirrorClientActionToDeliverable(workspaceId, action);
+    const mirror = mirrorClientActionToDeliverable(workspaceId, action);
+    if (!mirror.ok) {
+      // Durable, observable failure record (R4-PR1) — the legacy action reached the client but its
+      // unified-deliverable mirror did not, so admin + client views can DIVERGE. Admin-only audit
+      // (rec_status_updated is deliberately NOT in CLIENT_VISIBLE_TYPES). The read-only divergence
+      // sweep will also surface it for repair. Guarded so a logging failure can't break the create.
+      try {
+        addActivity(
+          workspaceId,
+          'rec_status_updated',
+          `Client-deliverable mirror failed for "${action.title}"`,
+          `The action reached the client but its unified deliverable mirror did not write (${mirror.error}). Admin/client views may diverge until reconciled.`,
+          { actionId: action.id, sourceType: action.sourceType, mirrorError: mirror.error },
+        );
+      } catch (activityErr) {
+        log.error({ err: activityErr, workspaceId, actionId: action.id }, 'failed to record client-action mirror-failure activity');
+      }
+      log.error({ workspaceId, actionId: action.id, error: mirror.error }, 'client-action dual-write mirror failed (observed by caller)');
+    }
   }
   return action;
 }
