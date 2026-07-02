@@ -16,7 +16,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import db from '../../server/db/index.js';
 import { recordAction, recordOutcome, getAction, getOutcomesForAction } from '../../server/outcome-tracking.js';
 import { runOutcomeRemediation } from '../../server/outcome-remediation.js';
+import { saveRecommendations } from '../../server/recommendations.js';
 import type { DeltaSummary } from '../../shared/types/outcome-tracking.js';
+import type { Recommendation } from '../../shared/types/recommendations.js';
 
 const WS_ID = 'a1-remediation-ws';
 
@@ -92,17 +94,21 @@ describe('I2 outcome remediation', () => {
     db.prepare('DELETE FROM action_outcomes WHERE action_id IN (SELECT id FROM tracked_actions WHERE workspace_id = ?)').run(WS_ID);
     db.prepare('DELETE FROM tracked_actions WHERE workspace_id = ?').run(WS_ID);
     db.prepare('DELETE FROM recommendation_sets WHERE workspace_id = ?').run(WS_ID);
-    db.prepare(`
-      INSERT OR REPLACE INTO recommendation_sets (workspace_id, generated_at, recommendations, summary)
-      VALUES (?, ?, ?, '{}')
-    `).run(
-      WS_ID,
-      new Date().toISOString(),
-      JSON.stringify([
+    // R7 cutover: seed via the normalized write path (rows) — loadRecommendationSet reads rows only.
+    saveRecommendations({
+      workspaceId: WS_ID,
+      generatedAt: new Date().toISOString(),
+      recommendations: [
         makeRecommendation({ id: 'rec-content', type: 'content', source: 'audit:content' }),
         makeRecommendation({ id: 'rec-tech', type: 'technical', source: 'audit:speed' }),
-      ]),
-    );
+      ] as Recommendation[],
+      summary: {
+        fixNow: 0, fixSoon: 2, fixLater: 0, ongoing: 0,
+        totalImpactScore: 100, trafficAtRisk: 0,
+        totalOpportunityValue: 0, actionableOpportunityValue: 0,
+        topRecommendationId: null,
+      },
+    });
   });
 
   afterEach(() => {

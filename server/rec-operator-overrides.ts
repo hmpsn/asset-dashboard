@@ -7,7 +7,7 @@
  * across regen, so a rec_id-keyed override follows the rec automatically (id-continuity).
  *
  * TRUST-CRITICAL — overrides apply ONLY at display boundaries (the admin GET serialization + the
- * public client projection). They are NEVER baked into the recommendation_sets blob, so
+ * public client projection). They are NEVER baked into the recommendation_items rows, so
  * loadRecommendations stays PURE and clearing an override restores the source wording.
  *
  * See: server/db/migrations/145-rec-operator-override.sql

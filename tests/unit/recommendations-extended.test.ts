@@ -16,8 +16,9 @@
  *   - isIntentMismatch (product page case)
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import db from '../../server/db/index.js';
+import { storageLog as storageLogger } from '../../server/domains/recommendations/storage.js';
 import {
   recommendationOutcomeActionType,
   getRecSourceCategory,
@@ -699,12 +700,14 @@ describe('recommendation persistence integrity', () => {
     expect(loaded).toEqual(set);
   });
 
-  it('uses normalized rows over divergent legacy recommendations blob', () => {
+  it('reads normalized rows only — a divergent legacy blob is ignored', () => {
     const workspaceId = makeWorkspaceId('ws_rec_row_wins');
     recWorkspaceIds.add(workspaceId);
     const set = makeRecommendationSet(workspaceId);
     saveRecommendations(set);
 
+    // Post-cutover the blob is an archive placeholder. Even if a divergent blob is written
+    // directly (only a raw SQL path could do this now), the read path never consults it.
     db.prepare(
       'UPDATE recommendation_sets SET recommendations = ? WHERE workspace_id = ?',
     ).run(
@@ -716,75 +719,49 @@ describe('recommendation persistence integrity', () => {
     expect(loaded?.recommendations.map(rec => rec.id)).toEqual(['rec-1', 'rec-2']);
   });
 
-  it('falls back to the legacy recommendations blob when normalized rows are absent', () => {
-    const workspaceId = makeWorkspaceId('ws_rec_legacy_fallback');
+  it('CUTOVER: a legacy blob-only workspace (no rows) yields an EMPTY set and a loud log — the fallback is gone', () => {
+    const workspaceId = makeWorkspaceId('ws_rec_legacy_orphan');
     recWorkspaceIds.add(workspaceId);
     const set = makeRecommendationSet(workspaceId);
     saveRecommendations(set);
+    // Simulate a genuine PRE-cutover legacy row: a metadata row carrying a NON-empty
+    // recommendations blob, with zero materialized rows (this workspace was never backfilled).
+    // saveRecommendations now writes '[]' to the blob, so we restore the legacy blob directly,
+    // then strip the rows.
+    db.prepare('UPDATE recommendation_sets SET recommendations = ? WHERE workspace_id = ?')
+      .run(JSON.stringify(set.recommendations), workspaceId);
     db.prepare('DELETE FROM recommendation_items WHERE workspace_id = ?').run(workspaceId);
 
-    const loaded = loadRecommendations(workspaceId);
-    expect(loaded).toEqual(set);
+    const warnSpy = vi.spyOn(storageLogger, 'warn').mockImplementation(() => storageLogger as never);
+    try {
+      const loaded = loadRecommendations(workspaceId);
+      expect(loaded).not.toBeNull();
+      // Pre-cutover this fell back to the blob; post-cutover rows are the sole store → empty.
+      expect(loaded?.recommendations).toEqual([]);
+      // The metadata row still exists, so generatedAt survives; only the recs are empty.
+      expect(loaded?.generatedAt).toBe(set.generatedAt);
+      // Loud log: a blob-carrying set that produced zero rows is a data-loss signal, not silent.
+      expect(warnSpy).toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
-  it('uses normalized rows when the legacy recommendations blob is malformed', () => {
-    const workspaceId = makeWorkspaceId('ws_rec_corrupt');
+  it('CUTOVER: a set with an empty blob and no rows loads empty WITHOUT the loud log', () => {
+    const workspaceId = makeWorkspaceId('ws_rec_empty');
     recWorkspaceIds.add(workspaceId);
-    const set = makeRecommendationSet(workspaceId);
+    const set: RecommendationSet = { ...makeRecommendationSet(workspaceId), recommendations: [] };
     saveRecommendations(set);
 
-    db.prepare(
-      'UPDATE recommendation_sets SET recommendations = ?, summary = ? WHERE workspace_id = ?',
-    ).run(
-      '{"broken"',
-      '{"broken"',
-      workspaceId,
-    );
-
-    const loaded = loadRecommendations(workspaceId);
-    expect(loaded).toBeDefined();
-    expect(loaded?.recommendations).toEqual(set.recommendations);
-    expect(loaded?.summary).toEqual({
-      fixNow: 0,
-      fixSoon: 0,
-      fixLater: 0,
-      ongoing: 0,
-      totalImpactScore: 0,
-      trafficAtRisk: 0,
-      totalOpportunityValue: 0,
-      actionableOpportunityValue: 0,
-      topRecommendationId: null,
-    });
-  });
-
-  it('falls back gracefully when legacy recommendations/summary JSON is malformed and no rows exist', () => {
-    const workspaceId = makeWorkspaceId('ws_rec_legacy_corrupt');
-    recWorkspaceIds.add(workspaceId);
-    const set = makeRecommendationSet(workspaceId);
-    saveRecommendations(set);
-    db.prepare('DELETE FROM recommendation_items WHERE workspace_id = ?').run(workspaceId);
-    db.prepare(
-      'UPDATE recommendation_sets SET recommendations = ?, summary = ? WHERE workspace_id = ?',
-    ).run(
-      '{"broken"',
-      '{"broken"',
-      workspaceId,
-    );
-
-    const loaded = loadRecommendations(workspaceId);
-    expect(loaded).toBeDefined();
-    expect(loaded?.recommendations).toEqual([]);
-    expect(loaded?.summary).toEqual({
-      fixNow: 0,
-      fixSoon: 0,
-      fixLater: 0,
-      ongoing: 0,
-      totalImpactScore: 0,
-      trafficAtRisk: 0,
-      totalOpportunityValue: 0,
-      actionableOpportunityValue: 0,
-      topRecommendationId: null,
-    });
+    const warnSpy = vi.spyOn(storageLogger, 'warn').mockImplementation(() => storageLogger as never);
+    try {
+      const loaded = loadRecommendations(workspaceId);
+      expect(loaded?.recommendations).toEqual([]);
+      // A genuinely-empty set is normal; no loud log.
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('keeps valid normalized rows when one item payload is malformed', () => {
@@ -814,16 +791,19 @@ describe('recommendation persistence integrity', () => {
     const set = makeRecommendationSet(workspaceId);
     saveRecommendations(set);
 
-    const legacyBefore = (db.prepare(
+    // Post-cutover the blob column is an archive placeholder: saveRecommendations writes '[]'
+    // and no row-level mutation ever touches it again.
+    const archiveBefore = (db.prepare(
       'SELECT recommendations FROM recommendation_sets WHERE workspace_id = ?',
     ).get(workspaceId) as { recommendations: string }).recommendations;
+    expect(archiveBefore).toBe('[]');
     const updated = updateRecommendationStatus(workspaceId, 'rec-1', 'completed');
     expect(updated?.status).toBe('completed');
 
-    const legacyAfter = (db.prepare(
+    const archiveAfter = (db.prepare(
       'SELECT recommendations FROM recommendation_sets WHERE workspace_id = ?',
     ).get(workspaceId) as { recommendations: string }).recommendations;
-    expect(legacyAfter).toBe(legacyBefore);
+    expect(archiveAfter).toBe('[]');
 
     const rows = db.prepare(
       `SELECT id, status, payload FROM recommendation_items
@@ -838,13 +818,14 @@ describe('recommendation persistence integrity', () => {
     expect(loaded?.summary.topRecommendationId).toBe('rec-2');
   });
 
-  it('materializes legacy blob rows before a status update', () => {
+  it('CUTOVER: a status update reads rows only — no lazy blob materialize', () => {
     const workspaceId = makeWorkspaceId('ws_rec_materialize');
     recWorkspaceIds.add(workspaceId);
     const set = makeRecommendationSet(workspaceId);
     saveRecommendations(set);
-    db.prepare('DELETE FROM recommendation_items WHERE workspace_id = ?').run(workspaceId);
 
+    // Rows are the sole store (populated by saveRecommendations / boot backfill). A status
+    // update mutates only the target row; the retired lazy materialize never runs.
     const updated = updateRecommendationStatus(workspaceId, 'rec-1', 'completed');
 
     expect(updated?.status).toBe('completed');

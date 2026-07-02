@@ -1,8 +1,19 @@
 # Recommendation Storage
 
-`recommendation_sets` owns per-workspace set metadata: `generated_at`, `summary`,
-and a legacy `recommendations` JSON fallback. `recommendation_items` owns the
-authoritative per-recommendation rows once rows exist for a workspace.
+`recommendation_sets` owns per-workspace set metadata: `generated_at` and
+`summary`. `recommendation_items` owns the authoritative per-recommendation
+rows — it is the SOLE store after the R7 blob→rows cutover.
+
+The `recommendation_sets.recommendations` JSON column is a retired **archive
+placeholder**: `saveRecommendationSet` writes `'[]'` to it and no read path
+consults it. `loadRecommendationSet` reads rows only; the legacy blob fallback
+is GONE. A workspace with a non-empty archive blob but zero rows now yields an
+empty set plus a loud `recommendation-storage` warn (the visible signal that a
+would-be data loss was averted, not silently masked). The only remaining
+blob→rows path is the idempotent boot-time sweep
+`materializeAllRecommendationItems()` (wired in `server/index.ts` before
+`runOutcomeRemediation`), which seeds rows from any still-populated legacy blob
+until the delayed column-drop migration retires the column entirely.
 
 Domain owners:
 
@@ -18,8 +29,10 @@ Rules:
 - Write full regenerated sets through `saveRecommendations(set)`.
 - Write one-rec lifecycle/status changes through the recommendation service helpers
   so only the target `recommendation_items` row and set summary update.
-- Treat `recommendation_sets.recommendations` as fallback/seed data only after
-  migration 158. It may be stale after row-level mutations.
+- NEVER read `recommendation_sets.recommendations` at runtime — it is a `'[]'`
+  archive placeholder after the R7 cutover, not a fallback. Rows are the sole
+  store. (The boot-time backfill sweep is the one exception; it seeds rows FROM
+  the blob at startup and is retired at the delayed column drop.)
 - Keep indexed columns in `recommendation_items` in lockstep with `payload`:
   `type`, `priority`, `status`, `source`, `impact`, `impact_score`,
   `client_status`, `lifecycle`, `target_keyword`, `created_at`, and `updated_at`.

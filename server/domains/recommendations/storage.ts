@@ -9,13 +9,24 @@ import { parseJsonFallback, parseJsonSafe, parseJsonSafeArray } from '../../db/j
 import { createStmtCache } from '../../db/stmt-cache.js';
 import { createLogger } from '../../logger.js';
 import { recommendationSchema, recommendationSummarySchema } from '../../schemas/workspace-schemas.js';
+import { Sentry, isSentryEnabled } from '../../sentry.js';
 import type { Recommendation, RecommendationSet, RecStatus } from '../../../shared/types/recommendations.js';
 
 const backfillLog = createLogger('recommendation-backfill');
 
+/**
+ * Storage-layer logger. Exported so the loud empty-set log (a legacy blob-only workspace
+ * that survives the R7 cutover with zero materialized rows) is observable/assertable.
+ */
+export const storageLog = createLogger('recommendation-storage');
+
 interface RecSetRow {
   workspace_id: string;
   generated_at: string;
+  // Archive placeholder after the R7 blob→rows cutover: recommendation_items is the sole
+  // store. saveRecommendationSet writes '[]' here; loadRecommendationSet never reads it.
+  // Still selected by the boot-time backfill sweep (materializeAllRecommendationItems) until
+  // the delayed column-drop migration retires it. See docs/rules/recommendation-storage.md.
   recommendations: string;
   summary: string;
 }
@@ -131,6 +142,14 @@ function setRowToSummary(row: RecSetRow, workspaceId: string): RecommendationSet
   ) as RecommendationSet['summary'];
 }
 
+/**
+ * Parse a workspace's legacy `recommendation_sets.recommendations` blob into recs.
+ *
+ * NOT a read fallback after the R7 cutover — loadRecommendationSet reads rows only. This is
+ * used exclusively by the boot-time backfill sweep (materializeAllRecommendationItems) to
+ * seed recommendation_items from any still-populated legacy blob, and is retired when the
+ * delayed column-drop migration removes the column.
+ */
 function legacyRecommendations(row: RecSetRow, workspaceId: string): Recommendation[] {
   return parseJsonSafeArray(
     row.recommendations,
@@ -177,25 +196,53 @@ function writeItems(workspaceId: string, recs: Recommendation[]): void {
   });
 }
 
-function upsertSetRow(set: RecommendationSet, recommendationsJson: string): void {
+// R7 cutover: the recommendations column is an archive placeholder. Always persist '[]' —
+// recommendation_items is the sole store, and no read path consults the blob.
+const ARCHIVED_BLOB = '[]';
+
+function upsertSetRow(set: RecommendationSet): void {
   stmts().upsertSet.run({
     workspace_id: set.workspaceId,
     generated_at: set.generatedAt,
-    recommendations: recommendationsJson,
+    recommendations: ARCHIVED_BLOB,
     summary: JSON.stringify(set.summary),
   });
 }
 
+/**
+ * Load a workspace's recommendation set from the normalized recommendation_items rows.
+ *
+ * R7 cutover: rows are the SOLE store. The legacy recommendations blob fallback is GONE.
+ * A legacy blob-only workspace (metadata row present, a non-empty blob, but zero materialized
+ * rows) now yields an EMPTY recommendations array plus a loud warn — the fallback is deleted,
+ * so this is the visible signal of a would-be data loss. Per the verified A4 backfill sweep
+ * (prod: rows==blob for all workspaces, zero drops; staging: rows populated) no such workspace
+ * exists; the log makes any future regression loud rather than silent.
+ */
 export function loadRecommendationSet(workspaceId: string): RecommendationSet | null {
   const row = stmts().selectSet.get(workspaceId) as RecSetRow | undefined;
   if (!row) return null;
 
   const itemRows = stmts().listItems.all(workspaceId) as RecItemRow[];
-  const recommendations = itemRows.length > 0
-    ? itemRows
-      .map(itemRowToRecommendation)
-      .filter((rec): rec is Recommendation => rec !== null)
-    : legacyRecommendations(row, workspaceId);
+  const recommendations = itemRows
+    .map(itemRowToRecommendation)
+    .filter((rec): rec is Recommendation => rec !== null);
+
+  if (recommendations.length === 0 && row.recommendations && row.recommendations !== ARCHIVED_BLOB) {
+    // A metadata row carrying a non-empty archive blob produced zero rows. Pre-cutover this
+    // fell back to the blob; post-cutover it is empty. Loud so a missed-backfill regression
+    // surfaces instead of silently dropping every rec for the workspace.
+    const anomalyMsg = 'Recommendation set has a non-empty legacy blob but zero normalized rows — the blob fallback is retired (R7); returning empty. Investigate: this workspace was not backfilled.';
+    storageLog.warn({ workspaceId, table: 'recommendation_sets' }, anomalyMsg);
+    // A would-be data-loss anomaly on the destructive-migration path should be alertable, not
+    // grep-only. captureMessage is a no-op when Sentry has no DSN (tests/dev), so this is safe.
+    if (isSentryEnabled) {
+      Sentry.captureMessage(anomalyMsg, {
+        level: 'warning',
+        tags: { workspaceId, area: 'recommendation-storage', anomaly: 'blob-only-zero-rows' },
+      });
+    }
+  }
 
   return {
     workspaceId: row.workspace_id,
@@ -207,30 +254,16 @@ export function loadRecommendationSet(workspaceId: string): RecommendationSet | 
 
 export function saveRecommendationSet(set: RecommendationSet): void {
   const run = db.transaction(() => {
-    upsertSetRow(set, JSON.stringify(set.recommendations));
+    upsertSetRow(set);
     writeItems(set.workspaceId, set.recommendations);
   });
   run();
 }
 
-export function materializeRecommendationItems(workspaceId: string): RecommendationSet | null {
-  const row = stmts().selectSet.get(workspaceId) as RecSetRow | undefined;
-  if (!row) return null;
-  const count = (stmts().countItems.get(workspaceId) as { cnt: number }).cnt;
-  const recs = legacyRecommendations(row, workspaceId);
-  const set: RecommendationSet = {
-    workspaceId: row.workspace_id,
-    generatedAt: row.generated_at,
-    recommendations: recs,
-    summary: setRowToSummary(row, workspaceId),
-  };
-  if (count > 0 || recs.length === 0) return set;
-  const run = db.transaction(() => {
-    writeItems(workspaceId, recs);
-  });
-  run();
-  return set;
-}
+// R7 cutover: the per-workspace on-read lazy materializer (materializeRecommendationItems)
+// is retired. Rows are the sole store — the boot-time backfill sweep
+// (materializeAllRecommendationItems) is the ONLY remaining blob→rows path, and it runs once
+// at startup before any reader. No read path lazily seeds rows from the blob anymore.
 
 /**
  * Result of a full blob → rows backfill sweep.
@@ -265,14 +298,16 @@ function rawRecId(item: unknown): string {
  * has rows is SKIPPED (count>0 guard) and its blob is NOT re-read — prod may already carry
  * post-158 regens that wrote rows, and those authoritative rows must never be clobbered.
  *
- * Per-item validation uses the same per-item semantics as the read path
- * (`legacyRecommendations` → `parseJsonSafeArray`): the written set is exactly the VALID
- * recs, and any malformed/unknown rec is recorded in `dropped` with a reason (and a Pino
- * warn) rather than dropping the whole set or being silently discarded.
+ * Per-item validation uses per-item `parseJsonSafeArray` semantics (`legacyRecommendations`):
+ * the written set is exactly the VALID recs, and any malformed/unknown rec is recorded in
+ * `dropped` with a reason (and a Pino warn) rather than dropping the whole set or being
+ * silently discarded.
  *
  * Each workspace's write is wrapped in its own transaction and try/catch, so one bad
- * workspace never aborts the sweep. Readers are unaffected: the items-win fallback in
- * loadRecommendationSet still serves a workspace that fails backfill from its blob.
+ * workspace never aborts the sweep. Post the R7 contract cutover, readers see ROWS ONLY:
+ * a workspace that fails backfill yields an empty set + a loud `storageLog.warn` from
+ * loadRecommendationSet (the blob fallback is GONE) — its blob is never served. This sweep
+ * is therefore the sole remaining path that materializes rows from the legacy blob.
  */
 export function materializeAllRecommendationItems(): RecommendationBackfillResult {
   const rows = stmts().listSetWorkspaceIds.all() as Array<{ workspace_id: string }>;
@@ -382,7 +417,8 @@ export function updateRecommendationItem(
 }
 
 export function loadRecommendationItem(workspaceId: string, recId: string): Recommendation | null {
-  materializeRecommendationItems(workspaceId);
+  // R7 cutover: rows are the sole store (boot backfill + dual-write keep them populated), so
+  // the on-read lazy materialize is retired — read the row directly.
   const row = stmts().getItem.get(workspaceId, recId) as RecItemRow | undefined;
   return row ? itemRowToRecommendation(row) : null;
 }
@@ -395,9 +431,7 @@ export function setRecommendationItemStatus(
   validateStatusTransition?: (current: RecStatus, next: RecStatus) => void,
 ): Recommendation | null {
   const run = db.transaction((): Recommendation | null => {
-    const materialized = materializeRecommendationItems(workspaceId);
-    if (!materialized) return null;
-
+    // R7 cutover: rows are the sole store, so no lazy materialize is needed — load directly.
     const set = loadRecommendationSet(workspaceId);
     if (!set) return null;
     const rec = set.recommendations.find(r => r.id === recId);
@@ -422,7 +456,7 @@ export function mutateRecommendationItem(
   computeSummary: (recs: Recommendation[]) => RecommendationSet['summary'],
 ): Recommendation | null {
   const run = db.transaction((): Recommendation | null => {
-    materializeRecommendationItems(workspaceId);
+    // R7 cutover: rows are the sole store, so no lazy materialize is needed — load directly.
     const set = loadRecommendationSet(workspaceId);
     if (!set) return null;
     const rec = set.recommendations.find(r => r.id === recId);

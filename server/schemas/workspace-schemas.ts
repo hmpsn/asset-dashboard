@@ -331,13 +331,18 @@ export const intelligenceProfileSchema = z.object({
 
 export const competitorDomainsSchema = z.array(z.string());
 
-// ── Recommendation set (recommendation_sets table) ──
+// ── Recommendation item payload (recommendation_items.payload column) ──
+//
+// After the R7 blob→rows cutover, recommendationSchema validates each
+// recommendation_items.payload on read (itemRowToRecommendation → parseJsonSafe)
+// and recommendationSummarySchema validates recommendation_sets.summary. The
+// legacy recommendation_sets.recommendations blob is a retired '[]' archive
+// placeholder and is no longer read.
 
 // Mirrors the Recommendation interface in shared/types/recommendations.ts.
 // .passthrough() preserves any new fields added to the in-memory model that
-// aren't yet captured in the schema. parseJsonSafeArray validates each
-// recommendation individually so a single malformed row doesn't drop the
-// entire set.
+// aren't yet captured in the schema. Per-row payloads are validated one at a
+// time (parseJsonSafe), so a single malformed row doesn't drop the whole set.
 // Mirrors OpportunityScore / OpportunityComponent in
 // shared/types/recommendations.ts. Validated at the read boundary so a corrupt
 // opportunity blob is caught rather than silently passed through .passthrough().

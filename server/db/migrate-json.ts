@@ -12,6 +12,22 @@ import { getDataDir, getUploadRoot } from '../data-dir.js';
 import db, { runMigrations } from './index.js';
 import { normalizeTrackedKeywords } from '../rank-tracking.js';
 import { replaceAllTrackedKeywordRows } from '../tracked-keywords-store.js';
+import { saveRecommendationSet } from '../domains/recommendations/storage.js';
+import { recommendationSchema } from '../schemas/workspace-schemas.js';
+import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
+
+// R7 cutover: default summary for a legacy import whose JSON omits/partially fills `summary`.
+const emptyRecSummary: RecommendationSet['summary'] = {
+  fixNow: 0,
+  fixSoon: 0,
+  fixLater: 0,
+  ongoing: 0,
+  totalImpactScore: 0,
+  trafficAtRisk: 0,
+  totalOpportunityValue: 0,
+  actionableOpportunityValue: 0,
+  topRecommendationId: null,
+};
 
 // Ensure schema is up to date before migrating data
 runMigrations();
@@ -810,36 +826,137 @@ function migrateWorkOrders(): number {
 
 // ── Recommendations ──
 
+/**
+ * Normalize an arbitrary legacy JSON rec into a full Recommendation so the normalized
+ * write path (saveRecommendationSet → recommendation_items) never inserts NULL into a
+ * NOT NULL column. Legacy JSON files predate the current schema and can be sparse; unknown
+ * fields ride through the JSON `payload` column via the object spread.
+ *
+ * Numeric fields use `Number.isFinite` (NOT `typeof === 'number'`): `typeof NaN === 'number'`
+ * is `true`, and better-sqlite3 stores NaN/Infinity as NULL — which throws
+ * `NOT NULL constraint failed` on the REAL NOT NULL columns and would roll back the whole
+ * migration. `Number.isFinite` rejects NaN, Infinity, and -Infinity, so a bad numeric value
+ * defaults to a safe finite number instead of poisoning the batch.
+ */
+function normalizeLegacyRecommendation(raw: any, workspaceId: string, index: number): Recommendation {
+  const now = new Date().toISOString();
+  return {
+    ...(raw && typeof raw === 'object' ? raw : {}),
+    id: typeof raw?.id === 'string' && raw.id ? raw.id : `legacy-rec-${index}`,
+    workspaceId: typeof raw?.workspaceId === 'string' && raw.workspaceId ? raw.workspaceId : workspaceId,
+    priority: raw?.priority ?? 'ongoing',
+    type: raw?.type ?? 'technical',
+    title: raw?.title ?? '',
+    description: raw?.description ?? '',
+    insight: raw?.insight ?? '',
+    impact: raw?.impact ?? 'low',
+    effort: raw?.effort ?? 'low',
+    impactScore: Number.isFinite(raw?.impactScore) ? raw.impactScore : 0,
+    source: raw?.source ?? 'legacy-import',
+    affectedPages: Array.isArray(raw?.affectedPages) ? raw.affectedPages : [],
+    trafficAtRisk: Number.isFinite(raw?.trafficAtRisk) ? raw.trafficAtRisk : 0,
+    impressionsAtRisk: Number.isFinite(raw?.impressionsAtRisk) ? raw.impressionsAtRisk : 0,
+    estimatedGain: raw?.estimatedGain ?? '',
+    actionType: raw?.actionType ?? 'manual',
+    status: raw?.status ?? 'pending',
+    createdAt: typeof raw?.createdAt === 'string' && raw.createdAt ? raw.createdAt : now,
+    updatedAt: typeof raw?.updatedAt === 'string' && raw.updatedAt ? raw.updatedAt : now,
+  } as Recommendation;
+}
+
+/**
+ * R7 cutover: the legacy JSON→SQLite seeder now emits recommendation_items ROWS via the
+ * normalized write path (saveRecommendationSet), not the retired recommendations blob. A
+ * fresh legacy-JSON import must land in rows because loadRecommendationSet reads rows only —
+ * a blob-only import would silently vanish post-cutover. saveRecommendationSet writes '[]' to
+ * the archive-placeholder blob column and the recs to recommendation_items.
+ *
+ * Idempotent like the previous INSERT OR IGNORE: a workspace that already has a set row is
+ * skipped, so re-running the migration never clobbers authoritative rows.
+ *
+ * Failure isolation (mirrors materializeAllRecommendationItems in storage.ts):
+ *  - Each file's write is wrapped in its own transaction + try/catch, so one bad file skips
+ *    with a loud log instead of aborting the whole batch (the previous single outer
+ *    transaction rolled back EVERY already-seeded workspace on one bad rec).
+ *  - Each normalized rec is validated with recommendationSchema.safeParse BEFORE insert. An
+ *    invalid rec (e.g. a present-but-unknown enum) is NOT inserted — it is pushed to
+ *    `dropped[]` and reported, never inserted-then-silently-dropped on read. Coercing a bad
+ *    enum to a default would silently change semantics; skip-and-report keeps a human in the
+ *    loop about exactly what did not migrate.
+ */
 function migrateRecommendations(): number {
   const dir = getDataDir('recommendations');
   if (!fs.existsSync(dir)) { console.log('[migrate] No recommendations directory — skipping.'); return 0; }
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
   if (files.length === 0) return 0;
 
-  const insert = db.prepare(`
-    INSERT OR IGNORE INTO recommendation_sets
-      (workspace_id, generated_at, recommendations, summary)
-    VALUES (@workspace_id, @generated_at, @recommendations, @summary)
-  `);
+  const existsStmt = db.prepare('SELECT 1 FROM recommendation_sets WHERE workspace_id = ?');
 
   let total = 0;
-  const run = db.transaction(() => {
-    for (const file of files) {
-      const wsId = path.basename(file, '.json');
-      let record: any;
-      try { record = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
-      if (!record || typeof record !== 'object' || Array.isArray(record)) continue;
-      const info = insert.run({
-        workspace_id: record.workspaceId || wsId,
-        generated_at: record.generatedAt || new Date().toISOString(),
-        recommendations: JSON.stringify(record.recommendations || []),
-        summary: JSON.stringify(record.summary || {}),
+  const dropped: Array<{ workspaceId: string; recId: string; reason: string }> = [];
+
+  for (const file of files) {
+    const wsId = path.basename(file, '.json');
+    let record: any;
+    try { record = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+    if (!record || typeof record !== 'object' || Array.isArray(record)) continue;
+
+    const workspaceId = record.workspaceId || wsId;
+    // Idempotent: skip if a set row already exists (matches the old INSERT OR IGNORE semantics
+    // and never resurrects a stale blob over authoritative rows).
+    if (existsStmt.get(workspaceId)) continue;
+
+    const rawRecs = Array.isArray(record.recommendations) ? record.recommendations : [];
+    // Validate each normalized rec BEFORE insert; skip-and-report invalid ones (fail-closed
+    // instead of insert-then-silently-drop-on-read). This also makes the `raw:any` normalizer
+    // fail-closed at runtime rather than trusting the `as Recommendation` cast.
+    const recommendations: Recommendation[] = [];
+    rawRecs.forEach((raw: any, i: number) => {
+      const normalized = normalizeLegacyRecommendation(raw, workspaceId, i);
+      const parsed = recommendationSchema.safeParse(normalized);
+      if (parsed.success) {
+        recommendations.push(normalized);
+      } else {
+        const reason = parsed.error.issues.slice(0, 3)
+          .map(issue => `${issue.path.join('.')}: ${issue.message}`)
+          .join('; ') || 'schema validation failed';
+        dropped.push({ workspaceId, recId: normalized.id, reason });
+      }
+    });
+
+    const summary: RecommendationSet['summary'] = {
+      ...emptyRecSummary,
+      ...(record.summary && typeof record.summary === 'object' && !Array.isArray(record.summary)
+        ? record.summary
+        : {}),
+    };
+
+    try {
+      // Per-file transaction: one bad file must not roll back already-seeded workspaces.
+      const runFile = db.transaction(() => {
+        saveRecommendationSet({
+          workspaceId,
+          generatedAt: record.generatedAt || new Date().toISOString(),
+          recommendations,
+          summary,
+        });
       });
-      total += info.changes;
-      console.log(`[migrate] recommendations/${file}: 1 set`);
+      runFile();
+      total += 1;
+      console.log(`[migrate] recommendations/${file}: 1 set → ${recommendations.length} item row(s)`);
+    } catch (err) {
+      // Loud skip: this file did not migrate, but the batch continues.
+      console.warn(`[migrate] recommendations/${file}: SKIPPED — write failed: ${err instanceof Error ? err.message : String(err)}`);
     }
-  });
-  run();
+  }
+
+  if (dropped.length > 0) {
+    console.warn(`[migrate] recommendations: dropped ${dropped.length} invalid rec(s) — not inserted (would fail schema on read):`);
+    for (const d of dropped) {
+      console.warn(`[migrate]   drop ${d.workspaceId}/${d.recId}: ${d.reason}`);
+    }
+  }
+
   return total;
 }
 
