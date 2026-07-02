@@ -17,6 +17,7 @@ const log = createLogger('outcome-backfill');
 interface ContentPostRow {
   id: string;
   workspace_id: string;
+  title: string | null;
   target_keyword: string | null;
   published_at: string | null;
 }
@@ -38,7 +39,7 @@ interface WorkspaceIdRow {
 const stmts = createStmtCache(() => ({
   allWorkspaceIds: db.prepare(`SELECT id FROM workspaces`),
   publishedPosts: db.prepare(`
-    SELECT id, workspace_id, target_keyword, published_at
+    SELECT id, workspace_id, title, target_keyword, published_at
     FROM content_posts
     WHERE workspace_id = ? AND published_at IS NOT NULL
   `),
@@ -85,6 +86,12 @@ export function backfillPublishedContent(workspaceId: string): number {
           sourceFlag: 'backfill',
           baselineConfidence: 'estimated',
           attribution: 'platform_executed',
+          // R6 (B11): snapshot the post's real title from the row we already read so a
+          // backfilled content win reads the headline, not the generic label. Guarded on
+          // a real title (FM-2); target_keyword captured as a secondary identity hint.
+          ...(post.title?.trim()
+            ? { source: { label: post.title.trim(), snapshot: { title: post.title.trim(), type: 'post' } } }
+            : {}),
         });
         count++;
       }
@@ -203,6 +210,12 @@ export function backfillCompletedRecommendations(workspaceId: string): number {
           // null when the rec carries no opportunity (legacy row / OV not attached).
           predictedEmv: rec.opportunity?.predictedEmv ?? null,
           attribution: 'platform_executed',
+          // R6 (B11): snapshot the rec's identity from the read model we already hold.
+          // Only a real title is captured (FM-2: never fabricated) — omitted when the
+          // legacy row has no title.
+          ...(typeof rec.title === 'string' && rec.title.trim()
+            ? { source: { label: rec.title.trim(), snapshot: { title: rec.title.trim(), type: 'recommendation', page: firstAffectedPage ?? undefined } } }
+            : {}),
         });
         count++;
       }

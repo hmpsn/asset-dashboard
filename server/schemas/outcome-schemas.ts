@@ -46,6 +46,17 @@ export const baselineSnapshotSchema = z.object({
   voice_score: z.number().min(0).max(100).optional(),
 });
 
+// --- Source Snapshot (Reconcile R6 / B11) ---
+// The ephemeral source's identity snapshotted onto the durable tracked_actions row at
+// record time. Read from the nullable `source_snapshot` JSON column via parseJsonSafe.
+// All fields optional (a page-ref source may only carry `page`); `type` stays a free
+// string to mirror the advisory SourceRef union (no hard enum break for new sourceTypes).
+export const trackedActionSourceSnapshotSchema = z.object({
+  title: z.string().optional(),
+  type: z.string().optional(),
+  page: z.string().optional(),
+});
+
 // --- Trailing History ---
 export const trailingDataPointSchema = z.object({
   date: z.string(),

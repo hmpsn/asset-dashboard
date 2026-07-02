@@ -24,6 +24,7 @@ import type {
   EarlySignal,
   TopWin,
   OutcomeReadback,
+  TrackedActionSourceSnapshot,
 } from '../shared/types/outcome-tracking.js';
 import type { ROIHighlight } from '../shared/types/narrative.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
@@ -49,8 +50,8 @@ function broadcastOutcomeEvent(workspaceId: string, event: string, payload: obje
 
 const stmts = createStmtCache(() => ({
   insert: db.prepare(`
-    INSERT INTO tracked_actions (id, workspace_id, action_type, source_type, source_id, page_url, target_keyword, baseline_snapshot, trailing_history, attribution, measurement_window, source_flag, baseline_confidence, context, predicted_emv, created_at, updated_at)
-    VALUES (@id, @workspace_id, @action_type, @source_type, @source_id, @page_url, @target_keyword, @baseline_snapshot, @trailing_history, @attribution, @measurement_window, @source_flag, @baseline_confidence, @context, @predicted_emv, @created_at, @updated_at)
+    INSERT INTO tracked_actions (id, workspace_id, action_type, source_type, source_id, page_url, target_keyword, baseline_snapshot, trailing_history, attribution, measurement_window, source_flag, baseline_confidence, context, predicted_emv, source_label, source_snapshot, created_at, updated_at)
+    VALUES (@id, @workspace_id, @action_type, @source_type, @source_id, @page_url, @target_keyword, @baseline_snapshot, @trailing_history, @attribution, @measurement_window, @source_flag, @baseline_confidence, @context, @predicted_emv, @source_label, @source_snapshot, @created_at, @updated_at)
   `),
   getById: db.prepare(`SELECT * FROM tracked_actions WHERE id = ?`),
   getByWorkspace: db.prepare(`SELECT * FROM tracked_actions WHERE workspace_id = ? ORDER BY created_at DESC`),
@@ -311,6 +312,14 @@ export interface RecordActionParams {
    *  rec blob). Still null on the post/insight recordAction sites — those sources carry
    *  no rec opportunity, so there is no prediction to snapshot (FM-2: never fabricated). */
   predictedEmv?: number | null;
+  /** Reconcile R6 (B11): the ephemeral source's identity, snapshotted onto the durable
+   *  row AT WRITE TIME. Optional — a call site with no source in scope still records a
+   *  valid action (both snapshot columns stay NULL). When passed, `label` is the resolved
+   *  human title (stored flat in source_label for index-free win-title lookup) and
+   *  `snapshot` is the { title?, type?, page? } identity blob (stored as source_snapshot
+   *  JSON). Pass a source ONLY from data the write site already holds — never fabricate a
+   *  title (FM-2). See docs/adr/0008-ephemeral-source-snapshot-ref.md. */
+  source?: { label: string; snapshot?: TrackedActionSourceSnapshot };
 }
 
 export function recordAction(params: RecordActionParams): TrackedAction {
@@ -340,6 +349,12 @@ export function recordAction(params: RecordActionParams): TrackedAction {
     baseline_confidence: params.baselineConfidence ?? 'exact',
     context: JSON.stringify(context),
     predicted_emv: params.predictedEmv ?? null,
+    // R6 (B11): persist the source-identity snapshot. label is denormalized flat into
+    // source_label; the full { title?, type?, page? } blob is JSON in source_snapshot.
+    // Both NULL when no source was threaded — the columns are nullable and this stays
+    // an expand-only change across all call sites.
+    source_label: params.source?.label ?? null,
+    source_snapshot: params.source?.snapshot ? JSON.stringify(params.source.snapshot) : null,
     created_at: now,
     updated_at: now,
   });
@@ -459,6 +474,15 @@ export function recordInsightResolutionOutcome(workspaceId: string, insight: Ana
         page_health_score: insightData?.score as number | undefined,
       },
       attribution: 'platform_executed',
+      // R6 (B11): snapshot the insight's identity. Prefer the enriched pageTitle;
+      // fall back to strategyKeyword. Only pass a source when a real title exists
+      // (FM-2: never fabricate). Captures type + page for the sweep's ref-kind class.
+      ...(() => {
+        const title = insight.pageTitle?.trim() || insight.strategyKeyword?.trim() || null;
+        return title
+          ? { source: { label: title, snapshot: { title, type: 'insight', page: insight.pageId ?? undefined } } }
+          : {};
+      })(),
     });
   } catch (err) {
     log.warn({ err, insightId: insight.id }, 'Failed to record insight resolution outcome');
@@ -799,6 +823,10 @@ export function getTopWinsFromActions(
           actionType: action.actionType,
           sourceType: action.sourceType,
           sourceId: action.sourceId,
+          // R6 (B11): carry the write-time source title so resolveWinTitle can resolve
+          // snapshot-first (before the possibly-stale live lookup). null when the action
+          // carried no source snapshot (legacy rows / page-ref sources).
+          sourceLabel: action.sourceSnapshot?.title ?? action.sourceLabel ?? null,
           pageUrl: action.pageUrl,
           targetKeyword: action.targetKeyword,
           delta: outcome.deltaSummary,

@@ -44,7 +44,7 @@ import type {
   TopWin,
 } from '../../shared/types/outcome-tracking.js';
 import type { RecommendationSet } from '../../shared/types/recommendations.js';
-import { actionTypeEnum, attributionEnum, outcomeScoreEnum } from '../schemas/outcome-schemas.js';
+import { actionTypeEnum, attributionEnum, outcomeScoreEnum, trackedActionSourceSnapshotSchema } from '../schemas/outcome-schemas.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 
 const log = createLogger('outcomes');
@@ -285,6 +285,14 @@ router.post(
     }),
     attribution: attributionEnum.optional(),
     measurementWindow: z.number().int().min(7).max(365).optional(),
+    // R6 (B11): optional source-identity snapshot. Advisory — the API accepts a free-form
+    // { label, snapshot } so external/programmatic recorders can capture the source's
+    // title at write time. `snapshot.type` stays a free string (mirrors the advisory
+    // SourceRef union); no hard enum break.
+    source: z.object({
+      label: z.string().min(1).max(500),
+      snapshot: trackedActionSourceSnapshotSchema.optional(),
+    }).optional(),
   })),
   async (req, res) => {
     try {
@@ -307,6 +315,8 @@ router.post(
           baselineSnapshot: { ...req.body.baselineSnapshot, captured_at: new Date().toISOString() },
           attribution: req.body.attribution,
           measurementWindow: req.body.measurementWindow,
+          // R6 (B11): thread the optional source-identity snapshot from the request body.
+          source: req.body.source,
         });
 
         broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.OUTCOME_ACTION_RECORDED, { actionId: action.id });
@@ -446,13 +456,29 @@ const WIN_FALLBACK_LABELS: Record<ActionType, string> = {
 };
 
 /**
- * Resolve the REAL source title for a win entry via sourceType/sourceId.
- * Falls back to an honest generic action label when the source has no title
- * or no longer exists. `recSet` is lazily loaded once per request by the caller
- * so a 10-win response doesn't re-read the recommendation set 10 times.
+ * Resolve the REAL source title for a win entry.
+ *
+ * R6 (B11) — resolution order is snapshot → live → generic:
+ *   1. SNAPSHOT-FIRST: if the action carried a source title snapshotted at record
+ *      time (`win.sourceLabel`), use it. This is the durable identity captured when
+ *      the action was recorded, so a regenerated/deleted source no longer degrades
+ *      the win to a generic label.
+ *   2. LIVE lookup: fall back to reading the source's CURRENT title via
+ *      sourceType/sourceId (recommendation set, client action, post, brief, request).
+ *      Kept intact for legacy/pre-B11 rows that have no snapshot.
+ *   3. GENERIC fallback: an honest per-action-type label when neither resolves. This
+ *      fallback is DELIBERATELY retained — its demotion is B12's job, after the
+ *      integrity sweep confirms zero danglers. Do not delete it here.
+ *
+ * `recSet` is lazily loaded once per request by the caller so a 10-win response
+ * doesn't re-read the recommendation set 10 times.
  */
 function resolveWinTitle(workspaceId: string, win: TopWin, getRecSet: () => RecommendationSet | null): string {
   const fallback = WIN_FALLBACK_LABELS[win.actionType] ?? win.actionType.replace(/_/g, ' ');
+  // 1. Snapshot-first: the write-time captured title, immune to source regeneration.
+  const snapshotTitle = win.sourceLabel?.trim();
+  if (snapshotTitle) return snapshotTitle;
+  // 2. Live lookup (legacy rows / no snapshot captured).
   if (!win.sourceId) return fallback;
   try {
     switch (win.sourceType) {

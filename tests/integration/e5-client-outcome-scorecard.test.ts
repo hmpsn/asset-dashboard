@@ -237,4 +237,44 @@ describe('public wins resolve real source titles and surface attributed value', 
     expect(entry!.recommendation).toBe('Applied a technical fix');
     expect(entry!.recommendation).not.toMatch(/ action$/);
   });
+
+  // R6-PR1 (B11): resolution order is snapshot → live → generic.
+  it('snapshot-first: uses the write-time source_label even when the LIVE source is gone', async () => {
+    // No recommendation set is saved for this sourceId — the live lookup would fail and
+    // degrade to the generic label. The snapshot captured at record time must win instead.
+    const actionId = await recordActionViaApi(wsId, {
+      actionType: 'content_published',
+      sourceType: 'recommendation',
+      sourceId: `snap-gone-${RUN_ID}`,
+      source: {
+        label: 'Snapshotted headline that outlived its source',
+        snapshot: { title: 'Snapshotted headline that outlived its source', type: 'recommendation' },
+      },
+    });
+    insertOutcomeRow({ actionId, score: 'win' });
+
+    const res = await api(`/api/public/outcomes/${wsId}/wins`);
+    const wins = await res.json() as Array<Record<string, unknown>>;
+    const entry = wins.find(w => w.actionId === actionId);
+    expect(entry).toBeDefined();
+    // Snapshot beats both the (missing) live lookup AND the generic fallback.
+    expect(entry!.recommendation).toBe('Snapshotted headline that outlived its source');
+  });
+
+  it('generic fallback stays INTACT when neither snapshot nor live source resolves (B12 demotes it, not B11)', async () => {
+    const actionId = await recordActionViaApi(wsId, {
+      actionType: 'meta_updated',
+      sourceType: 'unknown_system',
+      sourceId: `no-snap-${RUN_ID}`,
+      // no `source` threaded → no snapshot; unknown_system → no live lookup.
+    });
+    insertOutcomeRow({ actionId, score: 'win' });
+
+    const res = await api(`/api/public/outcomes/${wsId}/wins`);
+    const wins = await res.json() as Array<Record<string, unknown>>;
+    const entry = wins.find(w => w.actionId === actionId);
+    expect(entry).toBeDefined();
+    // The honest generic per-action-type label is still served — the fallback is NOT deleted.
+    expect(entry!.recommendation).toBe('Updated page metadata');
+  });
 });

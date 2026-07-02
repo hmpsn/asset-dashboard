@@ -45,6 +45,65 @@ export type OutcomeScore =
   | 'inconclusive';
 
 export type SourceFlag = 'live' | 'backfill';
+
+/**
+ * Reconcile R6 (Task B11) — the source-system kinds a tracked_actions row is
+ * recorded against, as observed across the ~16 production recordAction call sites.
+ * This is a SOFT/advisory union: `sourceType` on the row (and on `RecordActionParams`)
+ * stays a free `string` so the generic POST /api/outcomes/:ws/actions route and any
+ * future producer accept new kinds without a hard enum break. Use `KnownSourceType`
+ * only where an exhaustive-ish switch benefits from the known members (e.g.
+ * resolveWinTitle) — always keep a fallthrough for the `(string & {})` arm.
+ *
+ * Read aliases: `content_post`/`content_brief` are historical duplicates of
+ * `post`/`brief` that resolveWinTitle already fans in — both kept so the type mirrors
+ * the real data.
+ */
+export type KnownSourceType =
+  | 'recommendation'
+  | 'insight'
+  | 'post'
+  | 'content_post'
+  | 'brief'
+  | 'content_brief'
+  | 'content_request'
+  | 'client_action'
+  | 'approval'
+  | 'schema'
+  | 'strategy'
+  | 'strategy_page_keyword'
+  | 'brand_voice'
+  | 'content_decay'
+  | 'internal_link';
+
+/**
+ * Advisory source-ref type. `KnownSourceType | (string & {})` keeps editor
+ * autocomplete for the known kinds while still accepting any string at runtime —
+ * so threading a snapshot never breaks a producer that emits an unlisted sourceType.
+ */
+export type SourceRef = KnownSourceType | (string & {});
+
+/**
+ * Reconcile R6 (Task B11) — the ephemeral source's IDENTITY snapshotted onto the
+ * durable tracked_actions row AT WRITE TIME. Outcomes are designed to outlive their
+ * sources (recommendation sets/briefs/approvals are regenerated), so this captures
+ * what the source WAS when the action was recorded, letting client-facing win titles
+ * resolve snapshot-first instead of degrading to a generic per-action-type label once
+ * the live source is gone. All fields optional — a page-ref/self-ref source may only
+ * carry a `page`, and a source with no title in scope carries neither.
+ *
+ * Stored in the `source_snapshot` JSON column (nullable); read via parseJsonSafe with
+ * `trackedActionSourceSnapshotSchema`. The resolved title is ALSO denormalized into the
+ * flat `source_label` column so the wins read path can index it without JSON parsing.
+ */
+export interface TrackedActionSourceSnapshot {
+  /** The source's human title at record time (rec/brief/post/request/client-action title). */
+  title?: string;
+  /** The source kind at record time (usually mirrors the row's sourceType). */
+  type?: SourceRef;
+  /** The page URL/path the source targeted, when it is a page-scoped source. */
+  page?: string;
+}
 export type BaselineConfidence = 'exact' | 'estimated';
 export type LearningsConfidence = 'high' | 'medium' | 'low';
 export type LearningsTrend = 'improving' | 'stable' | 'declining';
@@ -159,6 +218,16 @@ export interface TrackedAction {
    *  insights, legacy rows). Feeds the P6 realized-vs-predicted calibration loop
    *  (server/outcome-emv-calibration.ts). */
   predictedEmv?: number | null;
+  /** Reconcile R6 (B11): the source's resolved title snapshotted at record time.
+   *  Denormalized flat copy of `sourceSnapshot.title` for index-free win-title lookup.
+   *  null when the write site had no source title in scope (page-ref/self-ref sources)
+   *  or no `source` was threaded (legacy/pre-B11 rows). */
+  sourceLabel?: string | null;
+  /** Reconcile R6 (B11): the ephemeral source's identity ({ title?, type?, page? })
+   *  captured at record time so client win titles resolve snapshot-first and stop
+   *  degrading to a generic label when the live source is regenerated. null when no
+   *  `source` was threaded. See TrackedActionSourceSnapshot + docs/adr/0008. */
+  sourceSnapshot?: TrackedActionSourceSnapshot | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -284,6 +353,13 @@ export interface TopWin {
   sourceType: string;
   /** Id within the source system; used to resolve the real source title for client display. */
   sourceId: string | null;
+  /** R6 (B11): the source's title snapshotted at record time. Resolution is snapshot-FIRST:
+   *  when present, resolveWinTitle uses this before the (possibly-stale) live lookup, so a
+   *  regenerated/deleted source no longer degrades the win to a generic label. null/absent
+   *  for legacy/pre-B11 rows or sources that carried no title. Optional to keep this an
+   *  expand-only change — the real producer (getTopWinsFromActions) always sets it, and
+   *  every consumer reads it defensively (`win.sourceLabel?.trim()`). */
+  sourceLabel?: string | null;
   pageUrl: string | null;
   targetKeyword: string | null;
   delta: DeltaSummary;

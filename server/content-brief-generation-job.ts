@@ -264,6 +264,11 @@ async function generateStandaloneBrief(params: StandaloneContentBriefGenerationP
         captured_at: new Date().toISOString(),
       },
       attribution: 'platform_executed',
+      // R6 (B11): the brief's suggested title is its identity — snapshot it so the win
+      // title survives brief edits/regeneration. Guarded on a real title (FM-2).
+      ...(brief.suggestedTitle?.trim()
+        ? { source: { label: brief.suggestedTitle.trim(), snapshot: { title: brief.suggestedTitle.trim(), type: 'brief' } } }
+        : {}),
     });
   } catch (err) {
     log.warn({ err, keyword: targetKeyword }, 'Failed to record outcome action for brief creation');
@@ -410,6 +415,11 @@ async function generateBriefForRequest(params: RequestContentBriefGenerationPara
         captured_at: new Date().toISOString(),
       },
       attribution: 'platform_executed',
+      // R6 (B11): the brief generated for this request carries the display identity —
+      // snapshot its suggested title. Guarded on a real title (FM-2).
+      ...(brief.suggestedTitle?.trim()
+        ? { source: { label: brief.suggestedTitle.trim(), snapshot: { title: brief.suggestedTitle.trim(), type: 'content_request' } } }
+        : {}),
     });
   } catch (err) {
     log.warn({ err, keyword: request.targetKeyword }, 'Failed to record outcome action for request brief creation');

@@ -192,6 +192,16 @@ export async function applyApprovedBatchItems(
           captured_at: new Date().toISOString(),
         },
         attribution: 'platform_executed',
+        // R6 (B11): a meta-update approval's identity is the page it changed. Snapshot the
+        // page title (approval items live inside approval_batches.items JSON, so the item
+        // itself is not resolvable by a later live lookup — the snapshot is the durable
+        // record). Fall back to the page path when no title is present (FM-2).
+        ...(() => {
+          const title = item.pageTitle?.trim() || pagePath || null;
+          return title
+            ? { source: { label: title, snapshot: { title, type: 'approval', page: pagePath ?? undefined } } }
+            : {};
+        })(),
       });
       if (pagePath) void captureBaselineFromGsc(action.id, workspaceId, pagePath);
     }

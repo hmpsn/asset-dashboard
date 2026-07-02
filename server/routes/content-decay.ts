@@ -115,6 +115,9 @@ router.post('/api/content-decay/:workspaceId/recommendations', requireWorkspaceA
             targetKeyword: null,
             baselineSnapshot: { captured_at: new Date().toISOString() },
             attribution: 'not_acted_on',
+            // R6 (B11): no `source` — a decay recommendation is a PAGE-URL ref (sourceId =
+            // page path) with no ephemeral titled producer, and it is recorded
+            // `not_acted_on` (a proposal, never a win). Generic label is honest (FM-2).
           });
         }
       }

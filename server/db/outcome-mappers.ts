@@ -6,6 +6,7 @@ import {
   baselineSnapshotSchema,
   trailingHistorySchema,
   actionContextSchema,
+  trackedActionSourceSnapshotSchema,
   deltaSummarySchema,
   competitorContextSchema,
   earlySignalEnum,
@@ -47,6 +48,10 @@ export interface TrackedActionRow {
   // P4: OV predictedEmv snapshot (CPC-proxy placeholder, nullable). NULL when no
   // opportunity was available at record time (e.g. outcome-backfill).
   predicted_emv: number | null;
+  // R6 (B11): source-identity snapshot columns (nullable). source_label is the flat
+  // denormalized title; source_snapshot is the { title?, type?, page? } JSON blob.
+  source_label: string | null;
+  source_snapshot: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -122,6 +127,13 @@ export function rowToTrackedAction(row: TrackedActionRow): TrackedAction {
     baselineConfidence: row.baseline_confidence as TrackedAction['baselineConfidence'],
     context: parseJsonSafe(row.context, actionContextSchema, EMPTY_CONTEXT, { field: 'context', table: 'tracked_actions' }),
     predictedEmv: row.predicted_emv ?? null,
+    sourceLabel: row.source_label ?? null,
+    // R6 (B11): parse the source-identity blob at the read boundary. null when the
+    // column is NULL (no source threaded / legacy row) — parseJsonSafe returns the
+    // `null` fallback for a NULL/empty column, degrading gracefully.
+    sourceSnapshot: row.source_snapshot
+      ? parseJsonSafe(row.source_snapshot, trackedActionSourceSnapshotSchema, null, { field: 'source_snapshot', table: 'tracked_actions' })
+      : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
