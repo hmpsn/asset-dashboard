@@ -31,6 +31,11 @@ const MIGRATION_PATH = path.join(
   '../../server/db/migrations/168-recommendation-items-struck-ne-completed.sql',
 );
 
+const MIGRATION_171_PATH = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../server/db/migrations/171-recommendation-items-struck-completed-payload-cleanup.sql',
+);
+
 /** Extract the exact cleanup UPDATE statement from the migration file so this test and the
  *  migration can never diverge on the resolution status OR the timestamp format. Matches the
  *  first `UPDATE recommendation_items ... ;` statement in the file. */
@@ -38,6 +43,17 @@ function migrationCleanupStatement(): string {
   const sql = readFileSync(MIGRATION_PATH, 'utf-8');
   const match = sql.match(/UPDATE\s+recommendation_items[\s\S]*?;/i);
   if (!match) throw new Error('Could not locate the cleanup UPDATE statement in migration 168');
+  return match[0];
+}
+
+/** Extract the exact one-time payload-cleanup UPDATE from migration 171, so this test and the
+ *  migration can never diverge. Migration 171 finishes what 168 started: 168 reset only the
+ *  STATUS COLUMN of struck+completed rows; 171 also rewrites the payload JSON (reads parse the
+ *  payload only). */
+function migration171Statement(): string {
+  const sql = readFileSync(MIGRATION_171_PATH, 'utf-8');
+  const match = sql.match(/UPDATE\s+recommendation_items[\s\S]*?;/i);
+  if (!match) throw new Error('Could not locate the cleanup UPDATE statement in migration 171');
   return match[0];
 }
 
@@ -329,5 +345,98 @@ describe('C1 — strike of an already-completed rec succeeds (status reset to pe
       .prepare(`SELECT COUNT(*) as cnt FROM recommendation_items WHERE workspace_id = ? AND lifecycle = 'struck' AND status = 'completed'`)
       .get(cwsId) as { cnt: number };
     expect(violations.cnt).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// C4 — migration 171 finishes 168's cleanup by rewriting the PAYLOAD JSON.
+//
+// 168's one-time UPDATE reset only the `status` COLUMN of struck+completed rows. But reads
+// parse the `payload` JSON ONLY (itemRowToRecommendation), so a row whose column was cleaned
+// to 'pending' while its payload still says {status:'completed'} is STILL served as completed
+// on a struck rec — and re-derives a struck+completed column on the next regen, ABORTing the
+// whole writeItems transaction via the 168 trigger. Migration 171 rewrites $.status in the
+// payload (and keeps the column consistent) to close that residual gap.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('migration 171 — one-time payload cleanup for residual struck+completed blobs', () => {
+  let mwsId = '';
+  beforeAll(() => {
+    mwsId = createWorkspace('Rec Migration171 Payload Cleanup Test').id;
+    // Seed an empty set row so recommendation_items FKs are satisfied.
+    saveRecommendations({
+      workspaceId: mwsId, generatedAt: new Date().toISOString(), recommendations: [],
+      summary: computeRecommendationSummary([]),
+    });
+  });
+  afterAll(() => { deleteWorkspace(mwsId); });
+
+  it('rewrites $.status in the payload of a row 168 left half-cleaned (column pending, payload still completed)', () => {
+    // Reproduce EXACTLY the residual state 168 leaves: the STATUS COLUMN is already 'pending'
+    // (168's column-only UPDATE ran), but the PAYLOAD JSON still carries status:'completed'.
+    // This row does NOT violate the trigger (column status='pending'), so we can insert it
+    // directly without dropping the triggers.
+    const now = new Date().toISOString();
+    const staleBlob = JSON.stringify(
+      rec({ id: 'mig171-residual', status: 'completed', lifecycle: 'struck', workspaceId: mwsId }),
+    );
+    db.prepare(`
+      INSERT INTO recommendation_items (
+        workspace_id, id, rank_order, type, priority, status, source, impact,
+        impact_score, client_status, lifecycle, target_keyword, created_at, updated_at, payload
+      ) VALUES (?, 'mig171-residual', 0, 'metadata', 'fix_now', 'pending', 's', 'high',
+        50, NULL, 'struck', NULL, ?, ?, ?)
+    `).run(mwsId, now, now, staleBlob);
+
+    // Precondition: the column is clean but the payload is not — the residual bug 171 fixes.
+    const before = db.prepare(
+      `SELECT status, payload FROM recommendation_items WHERE workspace_id = ? AND id = ?`,
+    ).get(mwsId, 'mig171-residual') as { status: string; payload: string };
+    expect(before.status).toBe('pending');
+    expect((JSON.parse(before.payload) as Recommendation).status).toBe('completed');
+
+    // Run the EXACT statement from the migration file (not a hand-copied one) so this test
+    // can never drift from migration 171.
+    db.exec(migration171Statement());
+
+    const after = db.prepare(
+      `SELECT status, lifecycle, payload, updated_at FROM recommendation_items WHERE workspace_id = ? AND id = ?`,
+    ).get(mwsId, 'mig171-residual') as { status: string; lifecycle: string; payload: string; updated_at: string };
+    // Both the column AND the payload are now 'pending'.
+    expect(after.status).toBe('pending');
+    expect(after.lifecycle).toBe('struck');
+    const payload = JSON.parse(after.payload) as Recommendation;
+    expect(payload.status).toBe('pending');
+    expect(payload.lifecycle).toBe('struck');
+    // ISO-8601 timestamp contract (matches new Date().toISOString()), not SQLite's default.
+    expect(after.updated_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+
+    // The reader (payload-only) now sees pending.
+    const loaded = loadRecommendations(mwsId);
+    const loadedRec = loaded?.recommendations.find(r => r.id === 'mig171-residual');
+    expect(loadedRec?.status).toBe('pending');
+    expect(loadedRec?.lifecycle).toBe('struck');
+  });
+
+  it('does not touch a struck rec whose payload is legitimately non-completed', () => {
+    const now = new Date().toISOString();
+    const okBlob = JSON.stringify(
+      rec({ id: 'mig171-ok', status: 'in_progress', lifecycle: 'struck', workspaceId: mwsId }),
+    );
+    db.prepare(`
+      INSERT INTO recommendation_items (
+        workspace_id, id, rank_order, type, priority, status, source, impact,
+        impact_score, client_status, lifecycle, target_keyword, created_at, updated_at, payload
+      ) VALUES (?, 'mig171-ok', 1, 'metadata', 'fix_now', 'in_progress', 's', 'high',
+        50, NULL, 'struck', NULL, ?, ?, ?)
+    `).run(mwsId, now, now, okBlob);
+
+    db.exec(migration171Statement());
+
+    const after = db.prepare(
+      `SELECT status, payload FROM recommendation_items WHERE workspace_id = ? AND id = ?`,
+    ).get(mwsId, 'mig171-ok') as { status: string; payload: string };
+    expect(after.status).toBe('in_progress');
+    expect((JSON.parse(after.payload) as Recommendation).status).toBe('in_progress');
   });
 });

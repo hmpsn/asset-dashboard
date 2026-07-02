@@ -169,23 +169,47 @@ function itemRowToRecommendation(row: RecItemRow): Recommendation | null {
   return parsed;
 }
 
+/**
+ * Enforce the struck≠completed invariant at the single write choke point.
+ *
+ * recommendation_items is the row-authoritative store: the `status` COLUMN is derived on
+ * write from the payload, and reads parse the payload ONLY (itemRowToRecommendation). A
+ * struck rec must never read as "done". Migration 168 added a DB trigger pair that
+ * RAISE(ABORT)s on lifecycle='struck' AND status='completed', and a one-time cleanup that
+ * fixed only the COLUMN — NOT the payload JSON. So a legacy blob carrying
+ * {lifecycle:'struck', status:'completed'} would still be served as completed AND would
+ * ABORT the whole delete-then-reinsert (writeItems) transaction on the next regen/backfill.
+ *
+ * This is a coerce-and-continue safety net (NOT a throw — throwing would abort a whole regen
+ * for one legacy row, the very failure we're preventing). Demote status to 'pending' for both
+ * the column and the stringified payload so neither the trigger fires nor the stale value
+ * survives. See migration 168 + migration 171 (the one-time payload cleanup for existing rows).
+ */
+function coerceStruckCompleted(rec: Recommendation): Recommendation {
+  if (rec.lifecycle === 'struck' && rec.status === 'completed') {
+    return { ...rec, status: 'pending' };
+  }
+  return rec;
+}
+
 function itemParams(workspaceId: string, rec: Recommendation, rankOrder: number) {
+  const safeRec = coerceStruckCompleted(rec);
   return {
     workspace_id: workspaceId,
-    id: rec.id,
+    id: safeRec.id,
     rank_order: rankOrder,
-    type: rec.type,
-    priority: rec.priority,
-    status: rec.status,
-    source: rec.source,
-    impact: rec.impact,
-    impact_score: rec.impactScore,
-    client_status: rec.clientStatus ?? null,
-    lifecycle: rec.lifecycle ?? null,
-    target_keyword: rec.targetKeyword ?? null,
-    created_at: rec.createdAt,
-    updated_at: rec.updatedAt,
-    payload: JSON.stringify(rec),
+    type: safeRec.type,
+    priority: safeRec.priority,
+    status: safeRec.status,
+    source: safeRec.source,
+    impact: safeRec.impact,
+    impact_score: safeRec.impactScore,
+    client_status: safeRec.clientStatus ?? null,
+    lifecycle: safeRec.lifecycle ?? null,
+    target_keyword: safeRec.targetKeyword ?? null,
+    created_at: safeRec.createdAt,
+    updated_at: safeRec.updatedAt,
+    payload: JSON.stringify(safeRec),
   };
 }
 
