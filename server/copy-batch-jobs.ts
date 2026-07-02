@@ -28,7 +28,7 @@ const batchStmts = createStmtCache(() => ({
     `UPDATE copy_batch_jobs SET progress_json = ?, updated_at = ? WHERE id = ? AND workspace_id = ?`,
   ),
   updateStatus: db.prepare(
-    `UPDATE copy_batch_jobs SET status = ?, updated_at = ? WHERE id = ? AND workspace_id = ?`, // status-ok: batch job lifecycle, not a state-machine column
+    `UPDATE copy_batch_jobs SET status = ?, updated_at = ? WHERE id = ? AND workspace_id = ?`, // status-ok: documented exemption — copy_batch_jobs is a job-progress MIRROR of the real background job (guarded via updateJob → BACKGROUND_JOB_TRANSITIONS). It records running/complete/failed for the batch, with a catch-any→failed crash path; guarding the mirror would risk the crash path. See docs/rules/lifecycle-state-machines.md.
   ),
   getById: db.prepare(
     `SELECT * FROM copy_batch_jobs WHERE id = ? AND workspace_id = ?`,

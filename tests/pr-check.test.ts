@@ -5949,6 +5949,10 @@ describe('Meta: customCheck rule name registry', () => {
     // scripts/lexicon-registry.ts's verify:lexicon full-scan checks.
     'Duplicate exported domain type name',
     'ActivityType minting guard',
+    // Reconcile R3-PR2 (2026-07-02) — converted from a single-line regex to a
+    // customCheck to close three structural escape classes (literal writes,
+    // mid-clause `, status =`, and lifecycle columns like resolution_status).
+    'Unguarded SET status = ? (state machine transition)',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -12143,7 +12147,121 @@ describe('Rule: Live+twin ALTER lockstep (tracked_actions / action_outcomes arch
         ');',
       ),
     );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
 
+// R3-PR2 Rule: Unguarded SET status = ? (state machine transition)
+// The rule was converted from a single-line regex to a customCheck to close three
+// verified structural escape classes: (1) literal writes SET status = 'x', (2)
+// mid-clause writes `, status = @x`, (3) other lifecycle columns (resolution_status).
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Unguarded SET status = ? (state machine transition)', () => {
+  const RULE = 'Unguarded SET status = ? (state machine transition)';
+
+  it('flags a bound-parameter write: SET status = @status (baseline, unchanged)', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/foo-store.ts'),
+      lines(
+        "const stmt = db.prepare(",
+        "  `UPDATE foos SET status = @status WHERE id = @id`,",
+        ");",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.map(h => h.line)).toEqual([2]);
+  });
+
+  it('GAP 1 — flags a LITERAL write: SET status = \'applied\' (old [?@] regex missed this)', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/bar-store.ts'),
+      lines(
+        "db.prepare(`UPDATE bars SET status = 'applied' WHERE id = ?`).run(id);",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.map(h => h.line)).toEqual([1]);
+  });
+
+  it('GAP 2 — flags a MID-CLAUSE write: `, status = @status` (not the first column after SET)', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/baz-store.ts'),
+      lines(
+        "const stmt = db.prepare(`",
+        "  UPDATE bazzes SET name = @name, status = @status, updated_at = @now",
+        "  WHERE id = @id`);",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.map(h => h.line)).toEqual([2]);
+  });
+
+  it('GAP 3 — flags the resolution_status lifecycle column', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/insight-store.ts'),
+      lines(
+        "db.prepare(`UPDATE insights SET resolution_status = ? WHERE id = ?`).run(s, id);",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.map(h => h.line)).toEqual([1]);
+  });
+
+  it('does NOT flag a line that also calls validateTransition (guarded inline)', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/guarded-store.ts'),
+      lines(
+        "const next = validateTransition('foo', FOO_TRANSITIONS, from, to); db.prepare(`UPDATE foos SET status = @status`).run({ status: next });",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects an inline // status-ok hatch (JS comment)', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/hatched-store.ts'),
+      lines(
+        "db.prepare(`UPDATE foos SET status = 'done' WHERE id = ?`).run(id); // status-ok: non-lifecycle column",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects an inline -- status-ok hatch (SQL comment inside a template literal)', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/sql-hatched-store.ts'),
+      lines(
+        "const stmt = db.prepare(`",
+        "  UPDATE foos SET status = 'stale', updated_at = @now -- status-ok: WHERE clause enforces origin",
+        "  WHERE status = 'pending'`);",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects a preceding-line -- status-ok hatch (for SET on its own line)', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/preceding-hatched-store.ts'),
+      lines(
+        "const stmt = db.prepare(`",
+        "  UPDATE foos",
+        "  -- status-ok: guarded in the caller before this write",
+        "  SET status = @status",
+        "  WHERE id = @id`);",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('negative control — does NOT flag an unrelated SET or a non-status column', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/unrelated-store.ts'),
+      lines(
+        "db.prepare(`UPDATE foos SET name = @name, priority = @priority WHERE id = @id`).run(p);",
+        "const s = { status: 'ok' }; // object literal, not a SQL SET",
+      ),
+    );
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });

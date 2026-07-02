@@ -14,6 +14,7 @@ import {
 } from '../discovery-ingestion.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { isProgrammingError } from '../errors.js';
+import { InvalidTransitionError } from '../state-machines.js';
 import { createLogger } from '../logger.js';
 
 
@@ -215,9 +216,16 @@ router.patch('/api/discovery/:workspaceId/extractions/:id', requireWorkspaceAcce
     touched = true;
   }
   if (status) {
-    const ok = updateExtractionStatus(req.params.workspaceId, req.params.id, status, routedTo);
-    if (!ok) return res.status(404).json({ error: 'Extraction not found' });
-    touched = true;
+    try {
+      const ok = updateExtractionStatus(req.params.workspaceId, req.params.id, status, routedTo);
+      if (!ok) return res.status(404).json({ error: 'Extraction not found' });
+      touched = true;
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) {
+        return res.status(409).json({ error: err.message });
+      }
+      throw err;
+    }
   }
 
   if (touched) {

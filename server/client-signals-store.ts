@@ -8,6 +8,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonSafeArray } from './db/json-validation.js';
 import type { ClientSignal, ClientSignalType, ClientSignalStatus } from '../shared/types/client-signals.js';
 import { z } from './middleware/validate.js';
+import { CLIENT_SIGNAL_TRANSITIONS, validateTransition } from './state-machines.js';
 
 interface ClientSignalRow {
   id: string;
@@ -70,7 +71,7 @@ const stmts = createStmtCache(() => ({
   // ws-scope-ok
   updateStatus: db.prepare(`
     UPDATE client_signals
-    SET status = ?, updated_at = ? -- status-ok: simple new/acknowledged/resolved lifecycle
+    SET status = ?, updated_at = ? -- status-ok: CLIENT_SIGNAL_TRANSITIONS guard runs in updateSignalStatus() before this write (new→reviewed→actioned)
     WHERE id = ?
   `),
   countNewByWorkspace: db.prepare(`
@@ -131,6 +132,15 @@ export function getSignalById(id: string): ClientSignal | null {
 }
 
 export function updateSignalStatus(id: string, status: ClientSignalStatus): boolean {
+  // Guard the triage transition (new → reviewed → actioned). Read current status
+  // first; not found → false (route sends 404). Idempotent re-set (from === to) is a
+  // no-op that must not throw; an illegal move throws InvalidTransitionError which the
+  // route maps to 409.
+  const existing = getSignalById(id);
+  if (!existing) return false;
+  if (existing.status !== status) {
+    validateTransition('client_signal', CLIENT_SIGNAL_TRANSITIONS, existing.status, status);
+  }
   const info = stmts().updateStatus.run(status, new Date().toISOString(), id);
   return info.changes > 0;
 }

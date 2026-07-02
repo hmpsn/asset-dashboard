@@ -6,6 +6,7 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { resolveInsight, getUnresolvedInsights } from '../analytics-insights-store.js';
 import { recordInsightResolutionOutcome } from '../outcome-tracking.js';
+import { InvalidTransitionError } from '../state-machines.js';
 
 const router = Router();
 
@@ -30,7 +31,15 @@ router.put(
   (req, res) => {
     const workspaceId = req.params.workspaceId;
     const { status, note } = req.body as { status: 'in_progress' | 'resolved'; note?: string };
-    const updated = resolveInsight(req.params.insightId, workspaceId, status, note);
+    let updated;
+    try {
+      updated = resolveInsight(req.params.insightId, workspaceId, status, note);
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) {
+        return res.status(409).json({ error: err.message });
+      }
+      throw err;
+    }
     if (!updated) return res.status(404).json({ error: 'Insight not found' });
     addActivity(workspaceId, 'insight_resolved', `Insight ${status}${note ? ': ' + note : ''}`);
     broadcastToWorkspace(workspaceId, WS_EVENTS.INSIGHT_RESOLVED, { insightId: req.params.insightId, status });

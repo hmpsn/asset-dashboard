@@ -365,6 +365,189 @@ export const TRACKED_KEYWORD_TRANSITIONS: Record<string, readonly string[]> = {
 
 export type TrackedKeywordTransitionStatus = 'active' | 'paused' | 'deprecated' | 'replaced';
 
+// ── Copy Section (copy pipeline) ──
+// Folded from server/copy-review.ts (was a PARALLEL validator: VALID_TRANSITIONS +
+// isValidTransition). The section-level review machine:
+//   pending → draft                 (AI generates the copy)
+//   draft → client_review | approved  (send for review, or admin fast-approve)
+//   client_review → approved | revision_requested  (client responds)
+//   revision_requested → draft       (author revises)
+//   approved is terminal (approve harvests a voice sample; no reopen).
+// Same-state no-ops (e.g. re-generating a draft) are handled at the write boundary
+// in copy-review.ts by skipping the guard when from === to — never a self-edge here.
+export const COPY_SECTION_TRANSITIONS: Record<string, readonly string[]> = {
+  pending:            ['draft'],
+  draft:              ['client_review', 'approved'],
+  client_review:      ['approved', 'revision_requested'],
+  revision_requested: ['draft'],
+  approved:           [],  // terminal
+};
+
+export type CopySectionTransitionStatus =
+  | 'pending'
+  | 'draft'
+  | 'client_review'
+  | 'approved'
+  | 'revision_requested';
+
+// ── Voice Profile (brand engine calibration) ──
+// Folded from server/voice-calibration.ts (was a PARALLEL validator:
+// LEGAL_STATUS_TRANSITIONS + VoiceProfileStateTransitionError). The critical
+// constraint is that draft → calibrated is FORBIDDEN — the ONLY way to reach
+// `calibrated` is through `calibrating`, which runs the calibration pipeline that
+// populates voiceDNA + guardrails (skipping it would inject undefined DNA into
+// Layer 2 of buildSystemPrompt). See PR #168 scaled-review finding I5.
+//   draft → calibrating
+//   calibrating → draft | calibrated
+//   calibrated → draft | calibrating   (recalibrate)
+// No terminal state (a calibrated profile can be re-opened for recalibration), so
+// this table is registered in the envelope but is NOT part of the graph-contract's
+// terminal-requiring pinned list. Same-state no-ops are pre-filtered at the write
+// boundary in voice-calibration.ts (updates.status !== profile.status).
+export const VOICE_PROFILE_TRANSITIONS: Record<string, readonly string[]> = {
+  draft:       ['calibrating'],
+  calibrating: ['draft', 'calibrated'],
+  calibrated:  ['draft', 'calibrating'],
+};
+
+export type VoiceProfileTransitionStatus = 'draft' | 'calibrating' | 'calibrated';
+
+// ── Insight resolution (analytics_insights.resolution_status) ──
+// The unguarded resolveInsight() path (server/analytics-insights-store.ts). The
+// stored column is nullable: a freshly computed insight has resolution_status NULL
+// (838 NULL rows in dev). NULL is modeled as the synthetic `unresolved` origin —
+// resolveInsight() coerces `currentStatus ?? 'unresolved'` before validating so a
+// null-origin NEVER crashes validateTransition.
+//   unresolved → in_progress | resolved   (start work, or resolve directly)
+//   in_progress → resolved                 (finish)
+//   resolved → in_progress                 (reopen — an admin/agent can re-open a
+//                                           resolved insight; previously tolerated,
+//                                           kept legal to avoid a runtime regression)
+// Idempotent replays (resolved → resolved, in_progress → in_progress) are handled
+// as a no-op at the call site (skip the guard when from === to) — NOT self-edges,
+// so this table has no self-transitions. No terminal state (resolved is reopenable),
+// so it is envelope-registered but not in the graph-contract pinned list.
+export const INSIGHT_RESOLUTION_TRANSITIONS: Record<string, readonly string[]> = {
+  unresolved:  ['in_progress', 'resolved'],
+  in_progress: ['resolved'],
+  resolved:    ['in_progress'],
+};
+
+export type InsightResolutionTransitionStatus = 'unresolved' | 'in_progress' | 'resolved';
+
+// ── Discovery Extraction (brand engine discovery) ──
+// server/discovery-ingestion.ts updateExtractionStatus. A triage lifecycle:
+//   pending → accepted | dismissed
+//   accepted / dismissed are terminal.
+// Re-accepting/re-dismissing an already-resolved extraction (idempotent PATCH) is a
+// no-op skipped at the write boundary — never a self-edge.
+export const EXTRACTION_TRANSITIONS: Record<string, readonly string[]> = {
+  pending:   ['accepted', 'dismissed'],
+  accepted:  [],  // terminal
+  dismissed: [],  // terminal
+};
+
+export type ExtractionTransitionStatus = 'pending' | 'accepted' | 'dismissed';
+
+// ── Suggested Brief (content decay → brief suggestion triage) ──
+// server/suggested-briefs-store.ts. Triage lifecycle:
+//   pending → accepted | dismissed | snoozed
+//   snoozed → accepted | dismissed | pending   (snooze expires back to pending)
+//   accepted / dismissed are terminal.
+export const SUGGESTED_BRIEF_TRANSITIONS: Record<string, readonly string[]> = {
+  pending:   ['accepted', 'dismissed', 'snoozed'],
+  snoozed:   ['accepted', 'dismissed', 'pending'],
+  accepted:  [],  // terminal
+  dismissed: [],  // terminal
+};
+
+export type SuggestedBriefTransitionStatus = 'pending' | 'accepted' | 'dismissed' | 'snoozed';
+
+// ── SEO Suggestion (Webflow SEO meta suggestions) ──
+// server/seo-suggestions.ts markApplied/dismissSuggestions (bulk WHERE id IN writes).
+//   pending → applied | dismissed
+//   applied / dismissed are terminal.
+// Bulk writes read each row's current status and skip idempotent no-ops (re-dismiss a
+// dismissed suggestion, re-apply an applied one) at the write boundary — no self-edges.
+export const SEO_SUGGESTION_TRANSITIONS: Record<string, readonly string[]> = {
+  pending:   ['applied', 'dismissed'],
+  applied:   [],  // terminal
+  dismissed: [],  // terminal
+};
+
+export type SeoSuggestionTransitionStatus = 'pending' | 'applied' | 'dismissed';
+
+// ── Pending Schema (schema queue pre-generation) ──
+// server/schema-queue.ts. Pre-generated skeletons queued for a matrix cell:
+//   pending → applied | stale
+//   applied / stale are terminal.
+// markStaleByCellId already filters WHERE status = 'pending' in SQL; the guard is
+// belt-and-suspenders at the row level for any future direct-write path.
+export const PENDING_SCHEMA_TRANSITIONS: Record<string, readonly string[]> = {
+  pending: ['applied', 'stale'],
+  applied: [],  // terminal
+  stale:   [],  // terminal
+};
+
+export type PendingSchemaTransitionStatus = 'pending' | 'applied' | 'stale';
+
+// ── Client Signal (intent signals from client chat) ──
+// server/client-signals-store.ts updateSignalStatus. Operator triage.
+// IMPORTANT: the admin route (routes/client-signals.ts) DELIBERATELY allows both
+// forward AND backward moves so an operator can undo a mis-triage ("Status
+// transitions are intentionally unrestricted"). The guard therefore models the full
+// reversible triage graph among the three valid statuses — its job is to reject
+// out-of-union values (the stale store comment named new/acknowledged/resolved) and
+// centralise the vocabulary, NOT to impose a forward-only pipeline that would break
+// the documented undo path. Same-status no-ops are skipped at the write boundary.
+export const CLIENT_SIGNAL_TRANSITIONS: Record<string, readonly string[]> = {
+  new:      ['reviewed', 'actioned'],
+  reviewed: ['new', 'actioned'],
+  actioned: ['new', 'reviewed'],
+};
+
+export type ClientSignalTransitionStatus = 'new' | 'reviewed' | 'actioned';
+
+// ── Site Blueprint (page strategy) ──
+// server/page-strategy.ts updateBlueprint. Blueprint lifecycle:
+//   draft → active                (activate after generation/edit)
+//   active → archived | draft      (archive, or send back to rework)
+//   archived → draft | active      (unarchive to rework or reactivate)
+// archived is the primary terminal but reopenable (rework). Same-status updates from
+// the general update() path skip the guard at the write boundary (from === to).
+export const BLUEPRINT_TRANSITIONS: Record<string, readonly string[]> = {
+  draft:    ['active', 'archived'],
+  active:   ['archived', 'draft'],
+  archived: ['draft', 'active'],
+};
+
+export type BlueprintTransitionStatus = 'draft' | 'active' | 'archived';
+
+// ── Brand Identity Deliverable (brand engine) ──
+// server/brand-identity.ts setDeliverableStatus. Two-state approve/revert cycle:
+//   draft → approved
+//   approved → draft   (revert to editing)
+// Re-approval (approved → approved) is a no-op short-circuited in setDeliverableStatus
+// (it captures priorStatus and skips the guard + side-effect when unchanged).
+export const BRAND_DELIVERABLE_TRANSITIONS: Record<string, readonly string[]> = {
+  draft:    ['approved'],
+  approved: ['draft'],
+};
+
+export type BrandDeliverableTransitionStatus = 'draft' | 'approved';
+
+// ── Client Location (local SEO) ──
+// server/client-locations.ts updateClientLocation. Two-state confirmation cycle:
+//   needs_review → confirmed
+//   confirmed → needs_review   (re-review, e.g. GBP data drift)
+// Same-status updates from the general update() path skip the guard (from === to).
+export const CLIENT_LOCATION_TRANSITIONS: Record<string, readonly string[]> = {
+  needs_review: ['confirmed'],
+  confirmed:    ['needs_review'],
+};
+
+export type ClientLocationTransitionStatus = 'needs_review' | 'confirmed';
+
 // ── Lifecycle envelope registration ──
 // A typed VIEW over the transition tables above — never a second source of truth.
 // Each entry's `states` is derived from the table keys, so it can never drift from
@@ -401,6 +584,18 @@ registerTransitionTable('matrix_cell', MATRIX_CELL_TRANSITIONS);
 registerTransitionTable('client_request', REQUEST_TRANSITIONS);
 registerTransitionTable('schema_plan', SCHEMA_PLAN_TRANSITIONS);
 registerTransitionTable('tracked_keyword', TRACKED_KEYWORD_TRANSITIONS);
+// R3-PR2: newly folded / newly guarded lifecycles.
+registerTransitionTable('copy_section', COPY_SECTION_TRANSITIONS);
+registerTransitionTable('voice_profile', VOICE_PROFILE_TRANSITIONS);
+registerTransitionTable('insight_resolution', INSIGHT_RESOLUTION_TRANSITIONS);
+registerTransitionTable('discovery_extraction', EXTRACTION_TRANSITIONS);
+registerTransitionTable('suggested_brief', SUGGESTED_BRIEF_TRANSITIONS);
+registerTransitionTable('seo_suggestion', SEO_SUGGESTION_TRANSITIONS);
+registerTransitionTable('pending_schema', PENDING_SCHEMA_TRANSITIONS);
+registerTransitionTable('client_signal', CLIENT_SIGNAL_TRANSITIONS);
+registerTransitionTable('blueprint', BLUEPRINT_TRANSITIONS);
+registerTransitionTable('brand_deliverable', BRAND_DELIVERABLE_TRANSITIONS);
+registerTransitionTable('client_location', CLIENT_LOCATION_TRANSITIONS);
 
 // ── Generic validator ──
 

@@ -5,6 +5,7 @@ import { getWorkspace } from '../workspaces.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { InvalidTransitionError } from '../state-machines.js';
 import { createLogger } from '../logger.js';
 import {
   mutationError,
@@ -217,6 +218,10 @@ router.put(
       const blueprint = runWorkspaceMutation({
         workspaceId,
         defaultErrorMessage: 'Failed to update blueprint',
+        // An illegal blueprint status transition (draft/active/archived) surfaces as
+        // a 409 instead of a generic 500.
+        mapError: (err) =>
+          err instanceof InvalidTransitionError ? { status: 409, error: err.message } : null,
         mutate: () => {
           const next = updateBlueprint(workspaceId, blueprintId, req.body);
           if (!next) throw mutationError(404, 'Not found');

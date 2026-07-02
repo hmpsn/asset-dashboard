@@ -7,6 +7,7 @@ import { buildSystemPrompt, guardrailsToPromptInstructions } from './prompt-asse
 import { renderVoiceDNAForPrompt } from './voice-dna-render.js';
 import { parseJsonFallback, parseJsonSafeArray } from './db/json-validation.js';
 import { variationFeedbackItemSchema } from './schemas/voice-calibration.js';
+import { VOICE_PROFILE_TRANSITIONS, validateTransition, InvalidTransitionError } from './state-machines.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
 import type {
@@ -108,30 +109,27 @@ export function createVoiceProfile(workspaceId: string): VoiceProfile & { sample
   return { id, workspaceId, status: 'draft', contextModifiers: defaultModifiers, samples: [], createdAt: now, updatedAt: now };
 }
 
-// Legal status transitions for the voice profile state machine. The critical
-// constraint is that `draft → calibrated` is FORBIDDEN — the only way to reach
-// `calibrated` is through `calibrating`, which runs the calibration pipeline
-// that populates voiceDNA + guardrails. Skipping it would let a caller flip
-// the status without any calibration data, breaking Layer 2 buildSystemPrompt
-// (which branches on `status === 'calibrated'` to inject DNA/guardrails and
-// would then inject `undefined`/`null` values). See PR #168 scaled-review
-// finding I5. Same-state "transitions" (e.g. draft → draft) are always legal
-// no-ops.
-const LEGAL_STATUS_TRANSITIONS: Record<VoiceProfileStatus, ReadonlySet<VoiceProfileStatus>> = {
-  draft: new Set<VoiceProfileStatus>(['draft', 'calibrating']),
-  calibrating: new Set<VoiceProfileStatus>(['calibrating', 'draft', 'calibrated']),
-  calibrated: new Set<VoiceProfileStatus>(['calibrated', 'draft', 'calibrating']),
-};
+// The legal voice-profile status transitions now live in server/state-machines.ts
+// (VOICE_PROFILE_TRANSITIONS) — this module no longer owns a parallel validator.
+// The critical constraint is unchanged: `draft → calibrated` is FORBIDDEN (the only
+// way to reach `calibrated` is through `calibrating`, which populates voiceDNA +
+// guardrails; skipping it would inject undefined DNA into Layer 2 buildSystemPrompt).
+// See PR #168 scaled-review finding I5. Same-state "transitions" (e.g. draft → draft)
+// are legal no-ops, filtered out at the write boundary before the guard runs.
 
 /**
  * Thrown when a caller attempts an illegal voice profile status transition.
  * Callers should catch this and return a 400 to the client rather than 500.
+ * Preserved as a distinct class (route handlers catch it by name) even though the
+ * transition TABLE is now shared — the guard translates the shared
+ * InvalidTransitionError into this domain error so the HTTP contract is unchanged.
  */
 export class VoiceProfileStateTransitionError extends Error {
   readonly from: VoiceProfileStatus;
   readonly to: VoiceProfileStatus;
   constructor(from: VoiceProfileStatus, to: VoiceProfileStatus) {
-    super(`Illegal voice profile transition: ${from} → ${to}. Legal transitions from ${from}: ${[...LEGAL_STATUS_TRANSITIONS[from]].filter(s => s !== from).join(', ') || '(none)'}`);
+    const legal = (VOICE_PROFILE_TRANSITIONS[from] ?? []).filter(s => s !== from);
+    super(`Illegal voice profile transition: ${from} → ${to}. Legal transitions from ${from}: ${legal.join(', ') || '(none)'}`);
     this.name = 'VoiceProfileStateTransitionError';
     this.from = from;
     this.to = to;
@@ -148,10 +146,14 @@ export function updateVoiceProfile(
   // internal flow, test harness — flows through here, so the guard catches
   // every path without depending on Zod-schema discipline at the edge.
   if (updates.status !== undefined && updates.status !== profile.status) {
-    const legal = LEGAL_STATUS_TRANSITIONS[profile.status];
-    if (!legal.has(updates.status)) {
-      log.warn({ workspaceId, from: profile.status, to: updates.status }, 'rejected illegal voice profile state transition');
-      throw new VoiceProfileStateTransitionError(profile.status, updates.status);
+    try {
+      validateTransition('voice_profile', VOICE_PROFILE_TRANSITIONS, profile.status, updates.status);
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) {
+        log.warn({ workspaceId, from: profile.status, to: updates.status }, 'rejected illegal voice profile state transition');
+        throw new VoiceProfileStateTransitionError(profile.status, updates.status);
+      }
+      throw err;
     }
   }
   const now = new Date().toISOString();

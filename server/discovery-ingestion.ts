@@ -6,6 +6,7 @@ import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
 import { sanitizeForPromptInjection } from './utils/text.js';
+import { EXTRACTION_TRANSITIONS, validateTransition } from './state-machines.js';
 import type {
   DiscoverySource, DiscoveryExtraction, SourceType,
   ExtractionType, ExtractionCategory, Confidence, ExtractionStatus, ExtractionDestination,
@@ -34,8 +35,9 @@ const stmts = createStmtCache(() => ({
   listExtractionsBySource: db.prepare(`SELECT * FROM discovery_extractions WHERE workspace_id = ? AND source_id = ? ORDER BY extraction_type, category`),
   deleteExtractionsBySource: db.prepare(`DELETE FROM discovery_extractions WHERE workspace_id = ? AND source_id = ?`),
   insertExtraction: db.prepare(`INSERT INTO discovery_extractions (id, source_id, workspace_id, extraction_type, category, content, source_quote, confidence, status, created_at) VALUES (@id, @source_id, @workspace_id, @extraction_type, @category, @content, @source_quote, @confidence, @status, @created_at)`),
-  updateExtractionStatus: db.prepare(`UPDATE discovery_extractions SET status = @status, routed_to = @routed_to WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: extraction status is not a platform state machine column
-  updateExtractionStatusOnly: db.prepare(`UPDATE discovery_extractions SET status = @status WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: extraction status is not a platform state machine column — preserves existing routed_to
+  getExtractionById: db.prepare(`SELECT * FROM discovery_extractions WHERE id = ? AND workspace_id = ?`),
+  updateExtractionStatus: db.prepare(`UPDATE discovery_extractions SET status = @status, routed_to = @routed_to WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: EXTRACTION_TRANSITIONS guard runs in updateExtractionStatus() before this write
+  updateExtractionStatusOnly: db.prepare(`UPDATE discovery_extractions SET status = @status WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: EXTRACTION_TRANSITIONS guard runs in updateExtractionStatus() before this write — preserves existing routed_to
   updateExtractionContent: db.prepare(`UPDATE discovery_extractions SET content = @content WHERE id = @id AND workspace_id = @workspace_id`),
 }));
 
@@ -106,6 +108,16 @@ export function deleteSource(workspaceId: string, id: string): boolean {
 export function updateExtractionStatus(
   workspaceId: string, id: string, status: ExtractionStatus, routedTo?: ExtractionDestination | null,
 ): boolean {
+  // Guard the triage transition. Read the current status first; not found → false
+  // (route sends 404). Idempotent re-accept/re-dismiss (from === to) is a no-op that
+  // must not throw — the guard only runs on an actual change. An illegal move (e.g.
+  // dismissed → accepted) throws InvalidTransitionError which the route maps to 409.
+  const row = stmts().getExtractionById.get(id, workspaceId) as ExtractionRow | undefined;
+  if (!row) return false;
+  const current = row.status as ExtractionStatus;
+  if (current !== status) {
+    validateTransition('discovery_extraction', EXTRACTION_TRANSITIONS, current, status);
+  }
   if (routedTo === undefined) {
     return stmts().updateExtractionStatusOnly.run({ id, workspace_id: workspaceId, status }).changes > 0;
   }

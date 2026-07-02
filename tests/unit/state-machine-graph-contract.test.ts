@@ -9,6 +9,11 @@ import {
   POST_STATUS_TRANSITIONS,
   TRACKED_KEYWORD_TRANSITIONS,
   WORK_ORDER_TRANSITIONS,
+  COPY_SECTION_TRANSITIONS,
+  EXTRACTION_TRANSITIONS,
+  SUGGESTED_BRIEF_TRANSITIONS,
+  SEO_SUGGESTION_TRANSITIONS,
+  PENDING_SCHEMA_TRANSITIONS,
   validateTransition,
 } from '../../server/state-machines.js';
 import { LIFECYCLE_REGISTRY } from '../../shared/types/lifecycle.js';
@@ -30,6 +35,18 @@ const TRANSITION_GRAPHS: TransitionGraphSpec[] = [
   { name: 'briefing_draft', map: BRIEFING_DRAFT_TRANSITIONS },
   { name: 'background_job', map: BACKGROUND_JOB_TRANSITIONS },
   { name: 'tracked_keyword', map: TRACKED_KEYWORD_TRANSITIONS },
+  // R3-PR2: newly folded / newly guarded lifecycles with a terminal state and no
+  // self-edges. Cyclic maps without a terminal state (voice_profile,
+  // insight_resolution, blueprint, brand_deliverable, client_location, client_signal)
+  // are envelope-registered but intentionally excluded from this terminal-requiring
+  // pinned list — client_signal is a fully-reversible triage graph (admin undo path),
+  // the others are recalibrate/reopen cycles; their idempotent no-ops are handled at
+  // the write boundary.
+  { name: 'copy_section', map: COPY_SECTION_TRANSITIONS },
+  { name: 'discovery_extraction', map: EXTRACTION_TRANSITIONS },
+  { name: 'suggested_brief', map: SUGGESTED_BRIEF_TRANSITIONS },
+  { name: 'seo_suggestion', map: SEO_SUGGESTION_TRANSITIONS },
+  { name: 'pending_schema', map: PENDING_SCHEMA_TRANSITIONS },
 ];
 
 function assertGraphShape(name: string, graph: TransitionMap): void {

@@ -39,14 +39,14 @@ const stmts = createStmtCache(() => ({
   listByWorkspace: db.prepare(`
     SELECT * FROM diagnostic_reports WHERE workspace_id = ? ORDER BY created_at DESC LIMIT 50
   `),
-  // ws-scope-ok: id is a UUID primary key (workspace-unique); status-ok: internal store transitions only
+  // ws-scope-ok: id is a UUID primary key (workspace-unique)
   updateStatus: db.prepare(`
-    UPDATE diagnostic_reports SET status = @status, error_message = @error_message WHERE id = @id -- status-ok: internal orchestrator transitions only (running→completed/failed)
+    UPDATE diagnostic_reports SET status = @status, error_message = @error_message WHERE id = @id -- status-ok: documented exemption — internal-orchestrator-only progress tracker (pending→running→completed/failed). No route/client exposure; the restart-recovery sweep must force any→failed from a crash, which a transition map can't model. See docs/rules/lifecycle-state-machines.md.
   `),
   // ws-scope-ok: id is a UUID primary key (workspace-unique)
   updateCompleted: db.prepare(`
     UPDATE diagnostic_reports
-    SET status = 'completed',
+    SET status = 'completed', -- status-ok: documented exemption — internal orchestrator progress tracker (see updateStatus above / docs/rules/lifecycle-state-machines.md)
         diagnostic_context = @diagnostic_context,
         root_causes = @root_causes,
         remediation_actions = @remediation_actions,
@@ -153,6 +153,7 @@ export function deleteDiagnosticReportsByWorkspace(workspaceId: string): void {
  */
 export function recoverStuckDiagnosticReports(): void {
   db.prepare( // ws-scope-ok: intentional global sweep — startup recovery only, no auth context
+    // status-ok: documented exemption — crash-recovery sweep forces any running/pending report to failed after a restart; a transition guard can't model "the process died mid-run". See docs/rules/lifecycle-state-machines.md.
     `UPDATE diagnostic_reports SET status = 'failed', error_message = 'Server restarted — diagnostic interrupted' WHERE status IN ('running', 'pending')`
   ).run();
 }

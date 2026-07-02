@@ -48,9 +48,12 @@ pre-empt it.
 
 ---
 
-## Mapped-lifecycle (16 registered entities)
+## Mapped-lifecycle (27 registered entities)
 
 Each row is an envelope-registered `*_TRANSITIONS` table in `server/state-machines.ts`.
+The first 16 arrived with the envelope (B2, R3-PR1); the 11 marked **(R3-PR2)** were
+added in Task B3 — folding the two parallel validators and guarding the previously
+unguarded lifecycle write paths.
 
 | Entity (registry key) | Backing union(s) | Evidence |
 |---|---|---|
@@ -69,36 +72,72 @@ Each row is an envelope-registered `*_TRANSITIONS` table in `server/state-machin
 | `matrix_cell` | `MatrixCellStatus` | `MATRIX_CELL_TRANSITIONS`; content-plan grid, client-flag edges from review/approved/published. |
 | `client_request` | `RequestStatus` / `RequestTransitionStatus` | `REQUEST_TRANSITIONS`; support-ticket flow, closed terminal (forbids closed→new). |
 | `schema_plan` | `SchemaPlanStatus` (`SchemaSitePlan['status']`) | `SCHEMA_PLAN_TRANSITIONS`; draft→sent_to_client→client_approved→active, admin reset. |
-| `tracked_keyword` | `TrackedKeywordStatus` / `TrackedKeywordTransitionStatus` | `TRACKED_KEYWORD_TRANSITIONS`; active/paused/deprecated/replaced; **note** the `rank-tracking-reconciliation.ts` `replaced` write currently bypasses the guard (routed through `validateTransition` in B3). |
+| `tracked_keyword` | `TrackedKeywordStatus` / `TrackedKeywordTransitionStatus` | `TRACKED_KEYWORD_TRANSITIONS`; active/paused/deprecated/replaced. **(R3-PR2)** the `rank-tracking-reconciliation.ts` `replaced`/`deprecated` write is now routed through `validateTransition('tracked_keyword', …)` in the reconcile mutator (the documented bypass is closed). |
+| `copy_section` **(R3-PR2)** | `CopySectionStatus` | `COPY_SECTION_TRANSITIONS`; **folded** from `copy-review.ts` `VALID_TRANSITIONS`/`isValidTransition`. pending→draft→client_review→{approved\|revision_requested}→draft. Guard in `updateSectionStatus`/`saveGeneratedCopy` catches `InvalidTransitionError` and returns null (route → 404) to preserve the historical contract. `isValidTransition` is now a thin boolean wrapper over the shared table. |
+| `voice_profile` **(R3-PR2)** | `VoiceProfileStatus` | `VOICE_PROFILE_TRANSITIONS`; **folded** from `voice-calibration.ts` `LEGAL_STATUS_TRANSITIONS`. draft→calibrating→calibrated; **draft→calibrated is FORBIDDEN**. `VoiceProfileStateTransitionError` is preserved (route handlers catch it by class); the guard translates the shared `InvalidTransitionError` into it. |
+| `insight_resolution` **(R3-PR2)** | `AnalyticsInsight['resolutionStatus']` (`in_progress`\|`resolved`\|`null`) | `INSIGHT_RESOLUTION_TRANSITIONS`; NULL current status is coerced to the synthetic `unresolved` origin in `resolveInsight()` so a null-origin never crashes the validator (838 NULL rows in dev). unresolved→{in_progress\|resolved}, in_progress→resolved, resolved→in_progress (reopen, kept legal). Idempotent re-resolve is a call-site no-op. Route→409, MCP single→tool error, MCP bulk→per-item `rejected` skip-and-report. |
+| `discovery_extraction` **(R3-PR2)** | `ExtractionStatus` | `EXTRACTION_TRANSITIONS`; pending→{accepted\|dismissed} (terminals). Guard in `updateExtractionStatus`; route→409. |
+| `suggested_brief` **(R3-PR2)** | `SuggestedBrief['status']` | `SUGGESTED_BRIEF_TRANSITIONS`; pending→{accepted\|dismissed\|snoozed}, snoozed→{accepted\|dismissed\|pending}. Guard in `updateSuggestedBrief`/`snoozeSuggestedBrief`; route→409. |
+| `seo_suggestion` **(R3-PR2)** | seo-suggestions inline union | `SEO_SUGGESTION_TRANSITIONS`; pending→{applied\|dismissed}. **Bulk `WHERE id IN` writes** guarded per-row by `legalSuggestionIdsForTarget()` — reads each row's status, drops idempotent no-ops AND illegal moves (re-apply a dismissed suggestion) with a warn, never throws (batch-safe skip-and-report). |
+| `client_signal` **(R3-PR2)** | `ClientSignalStatus` | `CLIENT_SIGNAL_TRANSITIONS`; new/reviewed/actioned **fully reversible** — the admin route deliberately allows backward undo, so the map models the whole reversible triage graph (its job is rejecting out-of-union values, not imposing a forward-only pipeline). Guard in `updateSignalStatus`; route→409. |
+| `blueprint` **(R3-PR2)** | `BlueprintStatus` | `BLUEPRINT_TRANSITIONS`; draft↔active↔archived. Guarded only on actual status change in `updateBlueprint` (general multi-field update carries status through unchanged on name/notes edits). Route maps `InvalidTransitionError`→409 via `runWorkspaceMutation` `mapError`. |
+| `brand_deliverable` **(R3-PR2)** | `BrandDeliverableStatus` | `BRAND_DELIVERABLE_TRANSITIONS`; draft↔approved. Guarded in `setDeliverableStatus` only on change (re-approval is short-circuited before the guard); route→409. |
+| `client_location` **(R3-PR2)** | `ClientLocationStatus` | `CLIENT_LOCATION_TRANSITIONS`; needs_review↔confirmed. Guarded only on change in `updateClientLocation`; route→409. |
+
+> **Idempotency & terminals are enforced at the write boundary, not with self-edges.**
+> The graph-contract test (`tests/unit/state-machine-graph-contract.test.ts`) forbids
+> self-transitions in its pinned maps, so idempotent replays (re-resolve a resolved
+> insight, re-set an unchanged status) are handled by callers skipping the guard when
+> `from === to` — the maps themselves have **no self-edges**. Cyclic maps with no
+> terminal state (`voice_profile`, `insight_resolution`, `blueprint`,
+> `brand_deliverable`, `client_location`, `client_signal`) are envelope-registered
+> but intentionally **excluded from the graph-contract's terminal-requiring pinned list**.
 
 ---
 
-## Unmapped-lifecycle-candidate (get a table in R3-PR2 / PR3 — Task B3)
+## Unmapped-lifecycle-candidate — RESOLVED in R3-PR2 (Task B3)
 
-Genuine transition-driven lifecycles whose write path does not yet route through
-`validateTransition`. **In scope for B3, not this PR (B2).** The two `⚠ parallel` rows are
-existing standalone validators that "never build parallel" requires **folding** into
-`state-machines.ts`, not merely mapping.
+Every genuine transition-driven lifecycle from B2's census work list has now been either
+(a) **mapped + guarded** (moved to the mapped table above), or (b) recorded as a
+**documented exemption** (below, with rationale). The two `⚠ parallel` validators were
+**folded** into `state-machines.ts`, not merely mapped:
 
-| Union / entity | Where | Evidence |
+| Union / entity | Disposition in R3-PR2 |
+|---|---|
+| `CopySectionStatus` ⚠ parallel | **Folded** → `COPY_SECTION_TRANSITIONS` (mapped). Local `VALID_TRANSITIONS` deleted. |
+| `VoiceProfileStatus` ⚠ parallel | **Folded** → `VOICE_PROFILE_TRANSITIONS` (mapped). Local `LEGAL_STATUS_TRANSITIONS` deleted; `VoiceProfileStateTransitionError` preserved. |
+| insight `resolution_status` | **Mapped** → `INSIGHT_RESOLUTION_TRANSITIONS` with `unresolved` synthetic null-origin. |
+| `ExtractionStatus` | **Mapped** → `EXTRACTION_TRANSITIONS`. |
+| `ClientSignalStatus` | **Mapped** → `CLIENT_SIGNAL_TRANSITIONS` (reversible triage). |
+| `BlueprintStatus` | **Mapped** → `BLUEPRINT_TRANSITIONS`. |
+| `SuggestedBrief['status']` | **Mapped** → `SUGGESTED_BRIEF_TRANSITIONS`. |
+| seo-suggestion status | **Mapped** → `SEO_SUGGESTION_TRANSITIONS` (per-row bulk guard). |
+| `PendingSchema` status | **Mapped** → `PENDING_SCHEMA_TRANSITIONS` (WHERE-clause-enforced write is exempt-hatched; see below). |
+| `BrandDeliverableStatus` | **Mapped** → `BRAND_DELIVERABLE_TRANSITIONS`. |
+| `ClientLocationStatus` | **Mapped** → `CLIENT_LOCATION_TRANSITIONS`. |
+| `DiagnosticStatus` | **Documented exemption** (internal orchestrator + crash-recovery sweep). |
+| `DiscoveredQueryStatus` | **Documented exemption** (WHERE-clause-enforced cron detector). |
+| `copy_batch_jobs` status | **Documented exemption** (job-progress mirror of the guarded background job). |
+| payments status | **Documented exemption** (Stripe-owned external lifecycle). |
+
+---
+
+## Exemption registry (documented `// status-ok` / `-- status-ok` hatches)
+
+These status columns are NOT platform-guarded lifecycles. Each carries an inline hatch
+with a rationale that points here. Mapping any of them would fabricate a parallel machine
+or fight a crash-recovery / external-authority path.
+
+| Column / write | Where | Why it is exempt (not a guarded lifecycle) |
 |---|---|---|
-| `CopySectionStatus` ⚠ parallel | `shared/types/copy-pipeline.ts`; `server/copy-review.ts` `VALID_TRANSITIONS`/`isValidTransition` (:210–219) | Real pending→draft→client_review→approved machine, but enforced by a **local** validator — fold into state-machines.ts (B3-PR2). |
-| `VoiceProfileStatus` ⚠ parallel | `shared/types/brand-engine.ts`; `server/voice-calibration.ts` `LEGAL_STATUS_TRANSITIONS` + own `VoiceProfileStateTransitionError` (:120–165) | draft→calibrating→calibrated machine with its **own** error class — fold into the envelope (B3-PR2). |
-| `ExtractionStatus` | `shared/types/brand-engine.ts` (discovery extractions) | pending→accepted/dismissed lifecycle; write path unguarded (B3-PR3). |
-| `ClientSignalStatus` | `shared/types/client-signals.ts`; `client-signals-store.ts` | new→reviewed→actioned; unguarded status writes (B3-PR3). |
-| insight `resolution_status` | `shared/types/analytics.ts` insight store; `analytics-insights-store.ts`, `routes/insights.ts`, MCP insights tools | 852 rows live (838 NULL / 14 in_progress); re-resolve currently silently accepted — needs guard + idempotent self-edge + `InvalidTransitionError`→409 (B3-PR3). |
-| `BlueprintStatus` | `shared/types/page-strategy.ts`; `page-strategy.ts` (:92 mid-clause write) | draft→active→archived; unguarded (B3-PR3). |
-| `DiagnosticStatus` | `shared/types/diagnostics.ts`; `diagnostic-store.ts` (:49/156 literal writes) | pending→running→completed/failed; unguarded (B3-PR3). |
-| `DiscoveredQueryStatus` | `shared/types/local-seo.ts`; `client-discovered-queries.ts` (:62 literal write) | discovered-query triage lifecycle; unguarded (B3-PR3). |
-| `ClientLocationStatus` | `shared/types/local-seo.ts`; `client-locations.ts` | location lifecycle; candidate for a guard (B3-PR3, or documented exemption). |
-| seo-suggestion status | `seo-suggestions.ts` (:160/171/178 literal writes), `schema-queue.ts` (:46) | suggestion/pending-schema lifecycle; re-dismiss a dismissed suggestion currently tolerated — needs self-edge (B3-PR3). |
-| suggested-brief status | `suggested-briefs-store.ts` (:69 literal write) | suggested-brief triage lifecycle; unguarded (B3-PR3). |
-| `BrandDeliverableStatus` | `shared/types/brand-engine.ts`; `brand-identity.ts` (:29 mid-clause write) | draft→approved brand-deliverable lifecycle; candidate for a guard (B3-PR3). |
-
-> The 17th parallel machine (`server/copy-review.ts` `VALID_TRANSITIONS`) and the
-> voice-calibration validator are called out above with the ⚠ marker. **Folding them is
-> B3's job, not B2's** — this census only records that they exist and must not remain
-> parallel.
+| `diagnostic_reports.status` | `diagnostic-store.ts` (`updateStatus`, `updateCompleted`, `recoverStuckDiagnosticReports`) | Internal-orchestrator-only progress tracker (pending→running→completed/failed). No route/client exposure. The startup **crash-recovery sweep** forces any `running`/`pending`→`failed` after a restart — a transition guard can't model "the process died mid-run". |
+| `discovered_queries.status` | `client-discovered-queries.ts` (`markLost`, upsert revive) | Cron-driven **bulk detector**; the `WHERE status = 'active'` clause structurally enforces the only legal origin (active→lost_visibility). Upsert always re-sets `active` (revive). No per-row id read path. |
+| `copy_batch_jobs.status` | `copy-batch-jobs.ts` (`updateStatus`) | Job-progress **mirror** of the real background job (which IS guarded via `updateJob` → `BACKGROUND_JOB_TRANSITIONS`). Records running/complete/failed with a catch-any→failed crash path. |
+| `payments.status` | `payments.ts` (`update`) | **Stripe-owned** external lifecycle (pending→paid/failed/refunded). Stripe/webhook is the authority for the legal order; this is an idempotent upsert-of-record. |
+| `pending_schemas.status` | `schema-queue.ts` (`markStaleByCellId`) | Only status write at HEAD; the `WHERE status = 'pending'` clause structurally enforces the sole legal origin (pending→stale). Cell-scoped bulk write, no per-row id to read. (The map exists for the future `applied` writer.) |
+| `google_business_review_reply_publish_attempts.status` | `google-business-profile-review-responses-store.ts` (`markAttemptDone`, `markAttemptFailed`) | Provider-attempt/job tracker (running→done/failed), separate from the guarded `gbp_review_response` lifecycle. |
+| `approval_batches.status` | `approvals.ts` (`update`) | **Derived aggregate** of item statuses (recomputed in `recalcBatchStatus`). The guarded machine is the *item* transition (`APPROVAL_ITEM_TRANSITIONS`). |
+| Guarded-store write hatches | `requests.ts`, `brand-identity.ts` (`updateContent`), `copy-review.ts` (`updateSectionText`/`updateSectionClientSuggestions`), the GBP response `mark*` stmts | Not exemptions from guarding — the guard runs in the calling store function *before* the SQL write; the hatch documents that the SQL line itself is downstream of a `validateTransition`. |
 
 ---
 
@@ -137,8 +176,8 @@ them would fabricate a parallel machine.
 
 | Verdict | Count |
 |---|---|
-| mapped-lifecycle | 16 registered entities |
-| unmapped-lifecycle-candidate | ~13 (incl. 2 parallel validators to fold) — addressed in B3 |
+| mapped-lifecycle | 27 registered entities (16 from B2 + 11 from B3-R3-PR2) |
+| documented exemption | 7 (diagnostic, discovered-query, copy-batch-job, payments, pending-schema, gbp-reply-attempt, approval-batch-aggregate) |
 | classification (never a lifecycle) | ~18 (17 status unions + 2 zod input types excluded) |
 
 Source of truth for the raw union inventory: the R3 section of
