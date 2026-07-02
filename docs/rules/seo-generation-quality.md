@@ -290,7 +290,11 @@ non-exhaustive maps (G2 — silent mislabel + distorted calibration + false auto
   a `RecType` to the union is a **compile error** until it gets an explicit outcome case.
 - Frontend label maps: `src/components/admin/outcomes/outcomeConstants.ts`,
   `src/components/client/OutcomeSummary.tsx`, `src/components/client/Briefing/WinsSurface.tsx`.
-- `FixRecommendations.tsx` `typeConfig` (+ `REC_TYPE_TAB`/`TYPE_ICONS` for new `RecType`s).
+- `src/components/client/InsightsEngine.tsx` `REC_TYPE_TAB` / `TYPE_ICONS` for new `RecType`s
+  (the `FixRecommendations.tsx` file this checklist previously pointed to no longer exists).
+- Add a catalog entry in `shared/types/action-catalog.ts` (`ACTION_CATALOG.recommendation`)
+  for the new `RecType` — the `satisfies Record<RecType, ActionCatalogEntry>` clause fails to
+  compile until you do. See `docs/rules/action-catalog.md`.
 - A named intelligence slice (`shared/types/intelligence.ts` field + `assemble*()` read +
   `buildWorkspaceIntelligence()` routing) so AdminChat is not blind (Data-Flow #6).
 

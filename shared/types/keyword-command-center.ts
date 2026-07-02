@@ -49,6 +49,12 @@ export const KEYWORD_COMMAND_CENTER_FILTERS = {
 export type KeywordCommandCenterFilter =
   typeof KEYWORD_COMMAND_CENTER_FILTERS[keyof typeof KEYWORD_COMMAND_CENTER_FILTERS];
 
+// R5 action catalog: every verb in KEYWORD_COMMAND_CENTER_ACTIONS has a metadata
+// entry in the `keyword_command_center` context of shared/types/action-catalog.ts
+// (ACTION_CATALOG.keyword_command_center), verified by
+// tests/contract/action-catalog.test.ts. This const is the source of truth for
+// values — the catalog imports it and never redefines it. See
+// docs/rules/action-catalog.md.
 export const KEYWORD_COMMAND_CENTER_ACTIONS = {
   ADD_TO_STRATEGY: 'add_to_strategy',
   PROMOTE_EVIDENCE: 'promote_evidence',

@@ -601,6 +601,12 @@ export const getSearchPerformanceInputSchema = z.object({
 }).strict();
 export type GetSearchPerformanceInput = z.infer<typeof getSearchPerformanceInputSchema>;
 
+// R5 action catalog: the `action` verbs below (send/throttle/strike) have metadata
+// entries in the `mcp` context of shared/types/action-catalog.ts (ACTION_CATALOG.mcp),
+// verified by tests/contract/action-catalog.test.ts. This schema is the source of
+// truth for the wire vocabulary — the catalog reads it and never redefines it.
+// ADDITIVE ONLY: 61 MCP tools + long-lived per-workspace API keys mean these verbs
+// must never be renamed once shipped. See docs/rules/action-catalog.md.
 export const applyRecommendationInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   recommendation_id: z.string().min(1)
@@ -823,6 +829,11 @@ export const bulkResolveInsightsInputSchema = z.object({
 });
 export type BulkResolveInsightsInput = z.infer<typeof bulkResolveInsightsInputSchema>;
 
+// R5 action catalog: the `status` verbs below have metadata entries in the `mcp`
+// context of shared/types/action-catalog.ts, keyed as `respond_client_action:<status>`
+// (ACTION_CATALOG.mcp), verified by tests/contract/action-catalog.test.ts. This schema
+// is the source of truth for the wire vocabulary — the catalog reads it and never
+// redefines it. ADDITIVE ONLY (persistent MCP API keys). See docs/rules/action-catalog.md.
 export const respondToClientActionInputSchema = z.object({
   workspaceId: z.string().min(1)
     .describe('The workspace ID that owns the client action.'),
@@ -838,7 +849,8 @@ export type RespondToClientActionMcpInput = z.infer<typeof respondToClientAction
 // Decline-only by design: an MCP agent may request changes on (decline) an approval
 // item but may NOT approve one on the client's behalf (approval is the client's review
 // decision and triggers "approved" team emails). So this tool takes no status — it
-// always rejects/requests-changes.
+// always rejects/requests-changes. R5 action catalog: this verb has the metadata entry
+// keyed `decline_approval_item` in ACTION_CATALOG.mcp.
 export const respondToApprovalItemInputSchema = z.object({
   workspaceId: z.string().min(1)
     .describe('The workspace ID that owns the approval item.'),

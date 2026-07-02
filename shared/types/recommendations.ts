@@ -3,6 +3,11 @@
 import type { ImpactBand } from './impact-band.js';
 
 export type RecPriority = 'fix_now' | 'fix_soon' | 'fix_later' | 'ongoing';
+// R5 action catalog: every member of RecType has a metadata entry in the
+// `recommendation` context of shared/types/action-catalog.ts (ACTION_CATALOG.recommendation),
+// verified by tests/contract/action-catalog.test.ts. This union is the source of
+// truth for values — the catalog imports it and never redefines it. See
+// docs/rules/action-catalog.md.
 export type RecType = 'technical' | 'content' | 'content_refresh' | 'schema' | 'metadata' | 'performance' | 'accessibility' | 'strategy' | 'aeo' | 'keyword_gap' | 'topic_cluster' | 'cannibalization' | 'local_visibility' | 'local_service_gap' | 'competitor';
 export type RecStatus = 'pending' | 'in_progress' | 'completed' | 'dismissed';
 export type RecActionType = 'automated' | 'manual' | 'content_creation' | 'purchase';

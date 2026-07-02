@@ -1,6 +1,11 @@
 // shared/types/outcome-tracking.ts
 // Outcome Intelligence Engine — shared types for server and frontend
 
+// R5 action catalog: every member of ActionType has a metadata entry in the
+// `outcome` context of shared/types/action-catalog.ts (ACTION_CATALOG.outcome),
+// verified by tests/contract/action-catalog.test.ts. This union is the source of
+// truth for values — the catalog imports it and never redefines it. See
+// docs/rules/action-catalog.md.
 export type ActionType =
   | 'insight_acted_on'
   | 'content_published'
