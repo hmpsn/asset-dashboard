@@ -48,6 +48,7 @@
     "verify:data-integrity": "tsx scripts/report-data-integrity-recovery.ts",
     "verify:observability": "tsx scripts/report-platform-observability.ts",
     "verify:feature-flags": "tsx scripts/feature-flag-lifecycle.ts",
+    "verify:lexicon": "tsx scripts/lexicon-registry.ts",
     "verify:governance": "tsx scripts/report-verification-governance.ts",
     "verify:stripe-prices": "tsx scripts/verify-stripe-prices.ts",
     "verify:deprecations": "tsx scripts/deprecation-lifecycle.ts",

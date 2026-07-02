@@ -2,7 +2,30 @@
 
 Developer reference for domain-specific terms used in the hmpsn.studio codebase.
 
+**This glossary is an enforced contract.** Every bolded term below has a matching
+entry in the machine-readable registry at `shared/types/lexicon.ts`, and every
+registry entry has a term here — parity is verified in both directions by
+`npm run verify:lexicon` (`scripts/lexicon-registry.ts`). See
+[`docs/rules/lexicon.md`](docs/rules/lexicon.md) for the word-class semantics, the
+PROPOSED intake process, and the duplicate-name allowlist burn-down rule.
+
+Terms are grouped into four **word classes**:
+
+- **canonical** — a core domain term the platform owns and defines.
+- **externally-mirrored** — a word whose spelling/values are dictated by a third party
+  (Stripe, Google Business Profile, Webflow); mirrored verbatim, never renamed.
+- **historical** — an append-only / write-time-frozen value; renderers must tolerate
+  retired words.
+- **proposed** — vocabulary snapshotted from the (untracked) redesign mockup;
+  PROPOSED-only, no live identifier renamed and no type reserved.
+
+> Not to be confused with the client-facing SEO-term glossary in
+> `src/components/client/SeoGlossary.tsx` (a UI component with its own unrelated
+> `GLOSSARY` const). This file is the developer domain lexicon.
+
 ---
+
+## canonical
 
 **ActionPlaybook** — A detected pattern of high-win-rate actions and their typical contexts, stored in the `outcome_playbooks` table and surfaced in `LearningsSlice.playbooks`. Playbooks are auto-detected weekly by `detectAllWorkspacePlaybooks()` in `server/outcome-playbooks.ts` and served via `GET /api/outcomes/:workspaceId/playbooks`. Used by the Outcomes dashboard "Playbooks" tab and injected into AI prompt context as strategy guidance.
 
@@ -10,7 +33,7 @@ Developer reference for domain-specific terms used in the hmpsn.studio codebase.
 
 **Admin Events** — WebSocket events broadcast to all connected admin sessions (site-wide fanout), defined in `ADMIN_EVENTS` in `server/ws-events.ts`. Distinct from workspace-scoped events. Examples: `workspace:created`, `queue:update`. Frontend handlers must use `useGlobalAdminEvents`, not `useWorkspaceEvents`.
 
-**Annotation** — A date-label marker placed on an analytics chart to correlate traffic changes with known events (e.g., "Launched new homepage"). Stored in `analytics_annotations` / `annotations` tables. Surfaced in the `OperationalSlice` of workspace intelligence and injected into AI prompt context.
+**Annotation** — A date-label marker placed on an analytics chart to correlate traffic changes with known events (e.g., "Launched new homepage"). Stored in `analytics_annotations` / `annotations` tables. Surfaced in the `OperationalSlice` of workspace intelligence and injected into AI prompt context. (Note: the exported `Annotation` type name is intentionally duplicated across `server/annotations.ts` and `server/analytics-annotations.ts` — see the duplicate-name allowlist in `shared/types/lexicon.ts`.)
 
 **Approval Batch** — A named collection of `ApprovalItem` records sent to a client for review before changes are published to Webflow. Defined in `shared/types/approvals.ts`. Batch status progresses through `pending → partial → approved/rejected → applied`. Created by the SEO Editor, Schema Generator, and CMS Editor. An optional `note` field on the batch determines inbox routing — batches without a note route to Decisions; batches with a note route to Conversations. WS event: `WS_EVENTS.APPROVAL_UPDATE`.
 
@@ -47,6 +70,8 @@ Developer reference for domain-specific terms used in the hmpsn.studio codebase.
 **Discovery** — Source ingestion for the Copy & Brand Engine (Phase 1). Ingests transcripts, brand documents, and competitor analysis to build the brandscript and feed voice calibration. Processed by `server/discovery-ingestion.ts`. WS event: `WS_EVENTS.DISCOVERY_UPDATED`.
 
 **Feature Flag** — A compile-time-keyed toggle defined in `shared/types/feature-flags.ts` as `FEATURE_FLAGS`. Controls which features are dark-launched or enabled per environment. Checked at runtime via `isFeatureEnabled(flag)` (server) or `hasFeatureFlag(ws, flag)` (workspace-scoped). The type `FeatureFlagKey` is the union of all valid flag names. Default value is `false` (dark-launched). Override via env vars: `FEATURE_<FLAG_NAME_UPPERCASED>=true` (server) / `VITE_FEATURE_<FLAG_NAME_UPPERCASED>=true` (Vite build).
+
+**GBP Review Response lifecycle** — The `draft → awaiting_client → … → published / publish_failed` lifecycle for Google Business Profile review replies, defined as `GBP_REVIEW_RESPONSE_TRANSITIONS` / `GbpReviewResponseStateStatus` in `server/state-machines.ts` (statuses + event vocabulary in `shared/types/google-business-profile.ts`). **Canonical, not externally-mirrored:** these status values (`draft`/`awaiting_client`/`changes_requested`/`declined`/`approved`/`publishing`/`published`/`publish_failed`/`cancelled`) are the platform's OWN send-to-client approval lifecycle — Google's review-reply API does not dictate them. Only the star-rating enum (**GBP_REVIEW_RATINGS**) is mirrored from Google.
 
 **Impact Score** — A numeric ranking field on `AnalyticsInsight` used to sort the priority feed. Higher scores surface an insight earlier. Computed at insight-store time from severity, traffic volume, and other signals. Stored as `impact_score` in `analytics_insights`.
 
@@ -97,3 +122,60 @@ Developer reference for domain-specific terms used in the hmpsn.studio codebase.
 **Work Order** — A billable deliverable unit associated with a workspace and optionally a Stripe payment. Tracked in the `work_orders` table. Active work orders are surfaced in `ContentPipelineSlice.workOrders`. WS event: `WS_EVENTS.WORK_ORDER_UPDATE`.
 
 **`WS_EVENTS`** — The canonical registry of all workspace-scoped WebSocket event name constants, defined in `server/ws-events.ts`. Import from here instead of using string literals. Every new feature that emits real-time events must add its constants here.
+
+---
+
+## externally-mirrored
+
+Words whose spelling and values are dictated by a third-party API. We mirror them
+verbatim; renaming them would break the integration. Tagged with `externalSource` in
+the registry.
+
+**ContentSubStatus (past_due)** — The content-subscription status vocabulary in `server/state-machines.ts` (`CONTENT_SUB_TRANSITIONS` / `ContentSubStatus`). The value `past_due` is Stripe's word: `server/stripe.ts` maps `past_due` and `unpaid` from `Stripe.Subscription.Status` onto our `'past_due'`. Externally-mirrored — do not rename.
+
+**GBP_REVIEW_RATINGS** — The Google Business Profile star-rating enum (`ONE`…`FIVE`, plus `STAR_RATING_UNSPECIFIED`) in `shared/types/google-business-profile.ts`, mirrored verbatim from the GBP reviews API. Externally-mirrored.
+
+**Webflow publish state (isDraft / isArchived / lastPublished)** — Webflow API field names for CMS-item and page publish state (`isDraft`, `isArchived` in `server/webflow-cms.ts`; `archived`, `status: 'published'`, `lastPublished` in `server/webflow-pages.ts`). Mirrored from the Webflow API — externally-mirrored.
+
+---
+
+## historical
+
+Append-only / write-time-frozen values. Once a value is persisted (e.g. in an
+`activity_log` row), it is never renamed; renderers must tolerate retired words. This
+class aligns with the `deprecated → hidden → migrated → removed` taxonomy in
+`docs/rules/deprecation-lifecycle.md` (a historical value is frozen-but-live, not
+removed).
+
+**ActivityType** — The ~133-member append-only union of activity-log action words in `server/activity-log.ts` (line 19). Values already persisted in `activity_log` rows must never be renamed (the local dev DB alone holds 40 distinct historical type words). Renderers must tolerate retired/unknown words. Adding a new member requires a matching lexicon registry entry — enforced by the ActivityType minting guard (added by the follow-up pr-check task).
+
+---
+
+## proposed
+
+Vocabulary snapshotted from the redesign mockup (`hmpsn studio Design System/mockup/`,
+untracked). **PROPOSED-only intake** (owner-ratified): no live identifier is renamed and
+no TypeScript type is reserved. These terms are recorded so the P2 redesign inherits a
+governed lexicon rather than re-inventing overlapping words. Each carries a
+`resolvingTicket` that will promote it to canonical or drop it. Definitions are
+snapshotted here because the source folder is not version-controlled.
+
+**thread kind: request** — A client-thread message the client sent back that is *promotable* into a strategy signal (→ the "Insights Engine") rather than staying a task. One of three thread `kind` values in the mockup store (`store.js`). Overlaps the existing canonical **Insight** / recommendation concepts — intake is proposed, not a rename.
+
+**thread kind: instruction** — A client-thread "do-this" message that becomes a task and stays a task (not promotable). Mockup `store.js` thread `kind` value.
+
+**thread kind: approval** — A client-thread message where the client accepted; informational, logged as a "proof point". Mockup `store.js` thread `kind` value.
+
+**promotable** — A boolean on a client-thread request marking it eligible to be *promoted* into a strategy signal / "backing move". Mockup `store.js`.
+
+**thread status: new | ack | handled** — The operator-side lifecycle of a client-thread message (`new → ack → handled`). Mockup `store.js` / `requests.js`.
+
+**Cockpit rail: From {client}** — The cockpit right-rail (co-rail) section surfacing replies from a client's portal — "a human is waiting". Mockup `cockpit.js` (`ck-from`).
+
+**Cockpit rail: Technicals & optimization** — The cockpit rail for site-health fixes that "stay in the cockpit" and only *graduate* into the Insights Engine when they become a proof point. Mockup `cockpit.js` (`ck-tech`).
+
+**Cockpit rail: Keyword position** — The cockpit rail listing tracked keyword terms for the active client. Mockup `cockpit.js` (`ck-kw`).
+
+**Cockpit rail: Content in flight** — The cockpit rail tracking content from "Recommendation → published". Mockup `cockpit.js` (`co-flight`).
+
+**promote to strategy signal** — The operator action turning a promotable client request into a "backing move" in the Insights Engine, with a projected outcome. Mockup `requests.js` / `portal.js`.

@@ -26,6 +26,11 @@ export type * from './diagnostics.ts';
 export type * from './page-strategy.ts';
 export type * from './collaboration-artifact.ts';
 export * from './feature-flags.ts';
+// Lexicon registry — value exports (LEXICON, DUPLICATE_NAME_ALLOWLIST, LEXICON_WORD_CLASSES)
+// need `export *`, not `export type *`. Do NOT add client-deliverable.ts or
+// keyword-universe.ts to this barrel — they TS2308-collide on DeliverableStatus/Type
+// and KeywordCandidate (see shared/types/lexicon.ts DUPLICATE_NAME_ALLOWLIST).
+export * from './lexicon.ts';
 export type * from './features.ts';
 export type * from './narrative.ts';
 export type * from './cms-images.ts';

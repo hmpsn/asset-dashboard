@@ -131,6 +131,11 @@ export const VERIFICATION_GOVERNANCE_REGISTRY = {
     owner: 'platform-foundation',
     rationale: 'Feature flag catalog consistency is cheap, deterministic, and required for every PR.',
   },
+  'verify:lexicon': {
+    classification: 'pr-ci-blocking',
+    owner: 'platform-foundation',
+    rationale: 'Lexicon registry ↔ GLOSSARY.md parity and the duplicate-exported-name allowlist are cheap, deterministic, and required for every PR.',
+  },
   'verify:stripe-prices': {
     classification: 'secret-backed',
     owner: 'billing-monetization',

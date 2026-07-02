@@ -143,6 +143,9 @@ jobs:
       - name: Feature flag lifecycle checks
         run: npm run verify:feature-flags
 
+      - name: Lexicon registry checks
+        run: npm run verify:lexicon
+
       - name: Verification governance checks
         run: npm run verify:governance
 
