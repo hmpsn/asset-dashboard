@@ -10,6 +10,8 @@ import { createLogger } from './logger.js';
 import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 import type { ClientAction } from '../shared/types/client-actions.js';
 import { applyClientActionFeedbackLoop } from './domains/inbox/client-action-feedback-loop.js';
+import { getActionByWorkspaceAndSource, recordAction } from './outcome-tracking.js';
+import type { ContentBrief } from './content-brief.js';
 
 const log = createLogger('playbooks');
 
@@ -53,6 +55,41 @@ function enqueueContentDecayPlaybook(workspaceId: string, action: ClientAction):
     });
 }
 
+/**
+ * Reconcile R8-PR1 (Task B13) — attribution seam for the playbook's brief-creation half.
+ * `applyClientActionFeedbackLoop` (called below on completion) already stamps attribution
+ * for the CLIENT ACTION lifecycle (sourceType: 'client_action'); this records the BRIEF
+ * ITSELF as a tracked action (sourceType: 'brief'), mirroring the two other brief_created
+ * producers (server/content-brief-generation-job.ts). Idempotent via
+ * getActionByWorkspaceAndSource so a retried/duplicate call never double-records. Guarded
+ * so a tracking failure can never abort the playbook — mirrors recordSchemaOutcomeAction
+ * in server/domains/schema/publish-schema-to-live.ts.
+ */
+function recordPlaybookBriefOutcomeAction(workspaceId: string, brief: ContentBrief): void {
+  try {
+    if (getActionByWorkspaceAndSource(workspaceId, 'brief', brief.id)) return;
+    recordAction({ // recordAction-ok: only reached after generateBrief succeeds, workspaceId is caller-validated
+      workspaceId,
+      actionType: 'brief_created',
+      sourceType: 'brief',
+      sourceId: brief.id,
+      pageUrl: null,
+      targetKeyword: brief.targetKeyword,
+      baselineSnapshot: {
+        captured_at: new Date().toISOString(),
+      },
+      attribution: 'platform_executed',
+      // R6 (B11): the brief's suggested title is its identity — snapshot it so the win
+      // title survives brief edits/regeneration. Guarded on a real title (FM-2).
+      ...(brief.suggestedTitle?.trim()
+        ? { source: { label: brief.suggestedTitle.trim(), snapshot: { title: brief.suggestedTitle.trim(), type: 'brief' } } }
+        : {}),
+    });
+  } catch (err) {
+    log.warn({ err, workspaceId, briefId: brief.id }, 'Failed to record outcome action for playbook brief creation');
+  }
+}
+
 async function executeContentDecayPlaybook(
   workspaceId: string,
   actionId: string,
@@ -63,10 +100,16 @@ async function executeContentDecayPlaybook(
   updateJob(jobId, { status: 'running', progress: 10, message: 'Generating content brief...' });
 
   try {
-    await generateBrief(workspaceId, targetKeyword, {
+    const brief = await generateBrief(workspaceId, targetKeyword, {
       pageType: 'BlogPosting',
       referenceUrls: payload?.pageUrl ? [payload.pageUrl as string] : undefined,
     });
+
+    // R8-PR1 (B13): record the brief-creation outcome the moment the external write
+    // (generateBrief, which persists the brief row) succeeds — never before. A failed
+    // generateBrief call throws above and this line is never reached, so no action is
+    // recorded for a failed playbook run.
+    recordPlaybookBriefOutcomeAction(workspaceId, brief);
 
     broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-briefs', workspaceId });
     updateJob(jobId, { status: 'done', progress: 100, message: 'Content brief created' });

@@ -453,6 +453,8 @@ const WIN_FALLBACK_LABELS: Record<ActionType, string> = {
   // scored win; present only to keep this Record<ActionType,…> exhaustive).
   topic_cluster_keep: 'Prioritized a topic cluster',
   content_gap_keep: 'Prioritized a content opportunity',
+  // Reconcile R8-PR1 (B13) — ships dark; see shared/types/outcome-tracking.ts.
+  gbp_review_reply: 'Replied to a Google Business Profile review',
 };
 
 /**

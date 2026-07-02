@@ -30,6 +30,8 @@ const ACTION_TYPE_LABELS: Record<ActionType, string> = {
   // recorded as a client-facing outcome; present only to keep this Record exhaustive).
   topic_cluster_keep: 'Topic cluster prioritized',
   content_gap_keep: 'Content opportunity prioritized',
+  // Reconcile R8-PR1 (B13) — ships dark; see shared/types/outcome-tracking.ts.
+  gbp_review_reply: 'Review response published',
 };
 
 function TrendIcon({ trend }: { trend: LearningsTrend }) {

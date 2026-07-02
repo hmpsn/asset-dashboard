@@ -14,6 +14,8 @@ export const actionTypeEnum = z.enum([
   'voice_calibrated', 'competitor_gap_closed', 'cluster_published',
   'cannibalization_resolved', 'local_visibility_won', 'local_service_added',
   'content_gap_keep', 'topic_cluster_keep',
+  // Reconcile R8-PR1 (B13) — ships dark; see shared/types/outcome-tracking.ts.
+  'gbp_review_reply',
 ]);
 
 export const attributionEnum = z.enum([

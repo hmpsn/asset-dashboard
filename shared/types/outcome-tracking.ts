@@ -29,7 +29,14 @@ export type ActionType =
   // the `strategy_keyword_*` ACTIVITY types live in server/activity-log.ts (ActivityType),
   // NOT here.
   | 'topic_cluster_keep'
-  | 'content_gap_keep';
+  | 'content_gap_keep'
+  // Reconcile R8-PR1 (Task B13) — future GBP (Google Business Profile) review-response
+  // publish seam. SHIPS DARK: server/google-business-profile-review-response-publish-job.ts
+  // records this action at the moment `updateGbpReviewReply` succeeds, but the job cannot
+  // actually fire in production until Google API access opens. The recording logic is
+  // exercised now by tests so it is correct from day one. See
+  // docs/rules/outcome-engine-stubs.md.
+  | 'gbp_review_reply';
 
 export type Attribution =
   | 'platform_executed'
