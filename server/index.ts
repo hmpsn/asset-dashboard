@@ -9,19 +9,7 @@ import db from './db/index.js';
 import { createApp } from './app.js';
 import { initWebSocket } from './websocket.js';
 import { startSchedulers } from './startup.js';
-import { stopDataRetentionCrons } from './data-retention.js';
-import { stopIntelligenceCrons, stopCompetitorMonitoringCron } from './intelligence-crons.js';
-import { stopInsightRecomputeCron } from './insight-recompute-cron.js';
-import { stopScheduler } from './scheduled-audits.js';
-import { stopApprovalReminders } from './approval-reminders.js';
-import { stopTrialReminders } from './trial-reminders.js';
-import { stopChurnSignalScheduler } from './churn-signals.js';
-import { stopAnomalyDetection } from './anomaly-detection.js';
-import { stopOutcomeCrons } from './outcome-crons.js';
-import { stopRankTrackingScheduler } from './rank-tracking-scheduler.js';
-import { stopMonthlyReports } from './monthly-report.js';
-import { stopBriefingCron } from './briefing-cron.js';
-import { stopThrottleCleanup } from './email-throttle.js';
+import { stopAllRegisteredCrons } from './cron-registry.js';
 import { listWorkspaces } from './workspaces.js';
 import { isStripeConfigured } from './stripe.js';
 import { DATA_BASE } from './data-dir.js';
@@ -144,21 +132,13 @@ function gracefulShutdown(signal: string) {
   // 1. Mark health endpoint as 503 so load balancer stops routing traffic
   setShuttingDown();
 
-  // 1a. Cancel background cron timers so they cannot fire after db.close()
-  stopDataRetentionCrons();
-  stopIntelligenceCrons();
-  stopCompetitorMonitoringCron();
-  stopInsightRecomputeCron();
-  stopScheduler();
-  stopApprovalReminders();
-  stopTrialReminders();
-  stopChurnSignalScheduler();
-  stopAnomalyDetection();
-  stopOutcomeCrons();
-  stopRankTrackingScheduler();
-  stopMonthlyReports();
-  stopBriefingCron();
-  stopThrottleCleanup();
+  // 1a. Cancel background cron timers so they cannot fire after db.close().
+  // Registry-driven: stops every CRON_METADATA entry with stopHook:true (see
+  // server/cron-registry.ts). This closes the historical gap where backup,
+  // ga4-conversion-snapshot, webflow-form-poller, strategy-issue, and
+  // return-hook crons had (or were missing) a stop() export that was never
+  // wired into this shutdown path.
+  stopAllRegisteredCrons();
 
   // 2. Mark any in-progress jobs as interrupted in SQLite before shutdown
   const activeJobs = listJobs().filter(j => j.status === 'pending' || j.status === 'running');
