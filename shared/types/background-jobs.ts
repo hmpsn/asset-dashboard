@@ -37,6 +37,7 @@ export const BACKGROUND_JOB_TYPES = {
   LOCAL_GBP_REFRESH: 'local-gbp-refresh',
   GBP_REVIEW_REPLY_PUBLISH: 'gbp-review-reply-publish',
   LLM_MENTIONS_REFRESH: 'llm-mentions-refresh',
+  OUTCOME_SOURCE_INTEGRITY_SWEEP: 'outcome-source-integrity-sweep',
 } as const;
 
 export type BackgroundJobType = typeof BACKGROUND_JOB_TYPES[keyof typeof BACKGROUND_JOB_TYPES];
@@ -365,6 +366,13 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     cancellable: true,
     resultBehavior: 'domain-store',
     class: 'user',
+  },
+  [BACKGROUND_JOB_TYPES.OUTCOME_SOURCE_INTEGRITY_SWEEP]: {
+    label: 'Outcome Source Integrity Sweep',
+    description: 'Reports tracked_actions source references that no longer resolve to a live source row. Read-only — mutates nothing.',
+    cancellable: true,
+    resultBehavior: 'ephemeral',
+    class: 'system',
   },
 };
 

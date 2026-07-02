@@ -8,12 +8,16 @@ const mocks = vi.hoisted(() => ({
     recommendationSet: { get: vi.fn(() => undefined) },
     // A5: predictedEmv repair-pass candidate query (NULL-snapshot rec actions).
     nullEmvRecActions: { all: vi.fn(() => []) },
+    // B12: source_label repair-pass candidate query (NULL-snapshot rec actions).
+    nullLabelRecActions: { all: vi.fn(() => []) },
+    fillSourceLabelIfNull: { run: vi.fn(() => ({ changes: 1 })) },
   },
   parseJsonSafeArray: vi.fn(() => []),
   recordAction: vi.fn(),
   getActionBySource: vi.fn(() => null),
   fillPredictedEmvIfNull: vi.fn(() => true),
   loadRecommendationSet: vi.fn(() => null),
+  loadRecommendationItem: vi.fn(() => null),
   warn: vi.fn(),
   error: vi.fn(),
   info: vi.fn(),
@@ -42,6 +46,7 @@ vi.mock('../../server/outcome-tracking.js', () => ({
 }));
 vi.mock('../../server/domains/recommendations/storage.js', () => ({
   loadRecommendationSet: mocks.loadRecommendationSet,
+  loadRecommendationItem: mocks.loadRecommendationItem,
 }));
 
 import {
@@ -58,10 +63,13 @@ beforeEach(() => {
   mocks.stmts.resolvedInsights.all.mockReturnValue([]);
   mocks.stmts.recommendationSet.get.mockReturnValue(undefined);
   mocks.stmts.nullEmvRecActions.all.mockReturnValue([]);
+  mocks.stmts.nullLabelRecActions.all.mockReturnValue([]);
+  mocks.stmts.fillSourceLabelIfNull.run.mockReturnValue({ changes: 1 });
   mocks.parseJsonSafeArray.mockReturnValue([]);
   mocks.getActionBySource.mockReturnValue(null);
   mocks.fillPredictedEmvIfNull.mockReturnValue(true);
   mocks.loadRecommendationSet.mockReturnValue(null);
+  mocks.loadRecommendationItem.mockReturnValue(null);
 });
 
 describe('outcome-backfill', () => {
