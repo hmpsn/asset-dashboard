@@ -4,6 +4,7 @@
 import crypto from 'node:crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { buildArchiveInsertSql } from './db/archive-twin.js';
 import { createLogger } from './logger.js';
 import { rowToTrackedAction, rowToActionOutcome } from './db/outcome-mappers.js';
 import type { TrackedActionRow, ActionOutcomeRow } from './db/outcome-mappers.js';
@@ -129,25 +130,25 @@ const stmts = createStmtCache(() => ({
   getRecentByWorkspace: db.prepare(`
     SELECT * FROM tracked_actions WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ?
   `),
-  // EXPLICIT column list (NOT SELECT *). P4 added predicted_emv to BOTH tables via ALTER,
-  // but ALTER TABLE always appends at the END: on tracked_actions predicted_emv lands after
-  // updated_at, while on the archive it lands AFTER the pre-existing archived_at (migration 041).
-  // A positional `SELECT *, datetime('now')` would therefore map predicted_emv→archived_at and
-  // datetime('now')→predicted_emv — corrupting the archive (caught by the P4 archive round-trip
-  // test). Naming every column makes the copy order-independent and migration-safe forever, the
-  // same fix migration 106 applied to archiveOldOutcomes.
-  archiveOld: db.prepare(`
-    INSERT INTO tracked_actions_archive
-      (id, workspace_id, action_type, source_type, source_id, page_url, target_keyword,
-       baseline_snapshot, trailing_history, attribution, measurement_window, measurement_complete,
-       source_flag, baseline_confidence, context, created_at, updated_at, predicted_emv, archived_at)
-    SELECT
-       id, workspace_id, action_type, source_type, source_id, page_url, target_keyword,
-       baseline_snapshot, trailing_history, attribution, measurement_window, measurement_complete,
-       source_flag, baseline_confidence, context, created_at, updated_at, predicted_emv, datetime('now')
-    FROM tracked_actions
-    WHERE measurement_complete = 1 AND updated_at < datetime('now', '-24 months')
-  `),
+  // R11-T7: column list is GENERATED (server/db/archive-twin.ts), never hand-copied.
+  // ALTER TABLE always appends at the END, and the live table and its archive twin
+  // do not gain columns in the same relative order (P4/migration 116 near-miss: on
+  // tracked_actions predicted_emv lands after updated_at, while on the archive twin
+  // it lands after archived_at). A positional `SELECT *, datetime('now')` would
+  // therefore silently swap predicted_emv with archived_at. buildArchiveInsertSql()
+  // reads both tables' columns via PRAGMA table_info() and builds an explicit,
+  // name-matched, order-independent column list on BOTH the INSERT and SELECT
+  // sides — so the live and twin lists can never silently diverge; they are always
+  // derived from the exact same PRAGMA read. See docs/rules/destructive-migrations.md
+  // and migration 164-archive-twin-rebuild.sql (which put both twins into the
+  // canonical column order this generator assumes going forward).
+  archiveOld: db.prepare(
+    buildArchiveInsertSql(
+      'tracked_actions',
+      'tracked_actions_archive',
+      `measurement_complete = 1 AND updated_at < datetime('now', '-24 months')`,
+    ),
+  ),
   // Global retention sweep paired with archiveOld; intentionally
   // operates across all workspaces to enforce the 24-month archive policy.
   // ws-scope-ok
@@ -155,18 +156,15 @@ const stmts = createStmtCache(() => ({
     DELETE FROM tracked_actions
     WHERE measurement_complete = 1 AND updated_at < datetime('now', '-24 months')
   `),
-  // Explicit column list prevents positional misalignment caused by migration 106
-  // appending attributed_value/value_basis to the END of action_outcomes but
-  // BEFORE archived_at (which already existed from migration 041) in the archive.
-  // SELECT * positional insert would map attributed_value→archived_at, corrupting data.
-  archiveOldOutcomes: db.prepare(`
-    INSERT INTO action_outcomes_archive
-      (id, action_id, checkpoint_days, metrics_snapshot, score, early_signal, delta_summary, competitor_context, measured_at, attributed_value, value_basis, archived_at)
-    SELECT
-      id, action_id, checkpoint_days, metrics_snapshot, score, early_signal, delta_summary, competitor_context, measured_at, attributed_value, value_basis, datetime('now')
-    FROM action_outcomes
-    WHERE action_id IN (SELECT id FROM tracked_actions_archive)
-  `),
+  // R11-T7: generated column list — see archiveOld comment above for the full
+  // rationale (same positional-corruption hazard migration 106 first fixed).
+  archiveOldOutcomes: db.prepare(
+    buildArchiveInsertSql(
+      'action_outcomes',
+      'action_outcomes_archive',
+      `action_id IN (SELECT id FROM tracked_actions_archive)`,
+    ),
+  ),
   // ── A2: Aggregate readers for GET /api/outcomes/overview ─────────────────
   // Replaces the O(A) per-action loops in the overview route with 4 queries per
   // workspace instead of ~3×A queries.

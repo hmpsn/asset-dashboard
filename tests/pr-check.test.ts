@@ -5941,6 +5941,10 @@ describe('Meta: customCheck rule name registry', () => {
     // Reconcile A1 (2026-07-01) — a migration must never DROP TABLE directly; see
     // docs/rules/destructive-migrations.md for the rename-to-archive contract.
     'New migration DROP TABLE without rename-to-archive contract',
+    // Reconcile B10/R11-T7 (2026-07-02) — an ALTER on tracked_actions/action_outcomes
+    // must ALTER the matching archive twin in the same migration file; see
+    // server/db/archive-twin.ts and docs/rules/destructive-migrations.md.
+    'Live+twin ALTER lockstep (tracked_actions / action_outcomes archive twins)',
     // Reconcile R1-PR2 (2026-07-01) — the diff-time analogues of
     // scripts/lexicon-registry.ts's verify:lexicon full-scan checks.
     'Duplicate exported domain type name',
@@ -11989,5 +11993,157 @@ describe('Meta: ActivityType minting-guard baseline parity', () => {
     // Deterministic order for a readable diff on failure.
     const unionSet = new Set(unionMembers);
     expect([...unionSet].sort()).toEqual([...ACTIVITY_TYPE_LEXICON_BASELINE].sort());
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Live+twin ALTER lockstep (tracked_actions / action_outcomes archive twins)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// B10 (Reconcile R11-T7): tracked_actions/action_outcomes each have a hand-
+// maintained archive twin (tracked_actions_archive / action_outcomes_archive).
+// ALTER TABLE always appends at the end of a table, and the twin already has a
+// trailing archived_at column the live table lacks, so a migration ALTERing the
+// live table without ALTERing the twin in the SAME FILE silently produces a
+// drifted twin — exactly what assertArchiveTwinParity() (server/db/archive-twin.ts)
+// rejects at boot, and what migrations 106/116 had to fix by hand before this
+// rule existed. Four scenarios per docs/rules/pr-check-rule-authoring.md: trigger,
+// hatch-inline, hatch-above (must still trigger — this rule follows the same
+// inline-only convention as the DROP TABLE rule, since a drifted twin is a
+// destructive-adjacent hazard), negative.
+
+describe('Rule: Live+twin ALTER lockstep (tracked_actions / action_outcomes archive twins)', () => {
+  const RULE = 'Live+twin ALTER lockstep (tracked_actions / action_outcomes archive twins)';
+
+  it('flags a live-table ALTER ADD COLUMN with no matching twin ALTER in the same file', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep', 'server/db/migrations/999-twin-fixture.sql'),
+      lines(
+        'ALTER TABLE tracked_actions ADD COLUMN risk_score REAL;',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('tracked_actions');
+    expect(hits[0].text).toContain('risk_score');
+    expect(hits[0].text).toContain('tracked_actions_archive');
+  });
+
+  it('allows a live-table ALTER when the matching twin ALTER is present in the same file (the migration 116 shape)', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-paired', 'server/db/migrations/999-twin-paired.sql'),
+      lines(
+        'ALTER TABLE tracked_actions ADD COLUMN risk_score REAL;',
+        'ALTER TABLE tracked_actions_archive ADD COLUMN risk_score REAL;',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('allows a live-table ALTER with an inline hatch comment on the same line', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-hatch', 'server/db/migrations/999-twin-hatched.sql'),
+      lines(
+        'ALTER TABLE tracked_actions ADD COLUMN internal_debug_flag INTEGER; -- twin-alter-ok: operational-only column, never archived',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT honour a hatch comment placed on the line above (inline-only contract)', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-hatch-above', 'server/db/migrations/999-twin-hatch-above.sql'),
+      lines(
+        '-- twin-alter-ok: operational-only column, never archived',
+        'ALTER TABLE tracked_actions ADD COLUMN internal_debug_flag INTEGER;',
+      ),
+    );
+
+    // The hatch is on the line ABOVE, not the ALTER line itself — must still flag.
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does not flag an ALTER on the archive twin itself as if it were a live-table ALTER (negative control)', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-negative-twin-only', 'server/db/migrations/999-twin-only.sql'),
+      lines(
+        'ALTER TABLE tracked_actions_archive ADD COLUMN backfilled_note TEXT;',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag unrelated tables (negative control)', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-negative-unrelated', 'server/db/migrations/999-unrelated.sql'),
+      lines(
+        'ALTER TABLE workspaces ADD COLUMN some_new_flag INTEGER;',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags action_outcomes independently of tracked_actions (both tables covered)', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-action-outcomes', 'server/db/migrations/999-outcomes-fixture.sql'),
+      lines(
+        'ALTER TABLE action_outcomes ADD COLUMN confidence_band TEXT;',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('action_outcomes');
+    expect(hits[0].text).toContain('confidence_band');
+    expect(hits[0].text).toContain('action_outcomes_archive');
+  });
+
+  it('matches the real migration 106 shape (paired live+twin ALTERs for action_outcomes) with zero hits', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-106-shape', 'server/db/migrations/999-outcomes-paired.sql'),
+      lines(
+        'ALTER TABLE action_outcomes ADD COLUMN attributed_value REAL;',
+        'ALTER TABLE action_outcomes ADD COLUMN value_basis TEXT;',
+        '',
+        'ALTER TABLE action_outcomes_archive ADD COLUMN attributed_value REAL;',
+        'ALTER TABLE action_outcomes_archive ADD COLUMN value_basis TEXT;',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags each un-paired column independently when a migration has a mix of paired and unpaired ALTERs', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-mixed', 'server/db/migrations/999-mixed.sql'),
+      lines(
+        'ALTER TABLE tracked_actions ADD COLUMN paired_col TEXT;',
+        'ALTER TABLE tracked_actions_archive ADD COLUMN paired_col TEXT;',
+        'ALTER TABLE tracked_actions ADD COLUMN unpaired_col TEXT;',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('unpaired_col');
+  });
+
+  it('ignores migrations with no ALTER on tracked_actions/action_outcomes (negative control)', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-no-alter', 'server/db/migrations/999-no-alter.sql'),
+      lines(
+        'CREATE TABLE IF NOT EXISTS fresh_table (',
+        '  id TEXT PRIMARY KEY',
+        ');',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });

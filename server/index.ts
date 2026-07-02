@@ -6,6 +6,7 @@ import fs from 'fs';
 import { WebSocket } from 'ws';
 import { runMigrations } from './db/index.js';
 import db from './db/index.js';
+import { assertKnownArchiveTwinsAtBoot } from './db/archive-twin.js';
 import { createApp } from './app.js';
 import { initWebSocket } from './websocket.js';
 import { startSchedulers } from './startup.js';
@@ -29,6 +30,12 @@ initSentry();
 
 // Run pending SQLite migrations before anything touches the database
 runMigrations();
+
+// R11-T7: fail loudly at boot if the tracked_actions/action_outcomes archive
+// twins have drifted from their live tables. An archive sweep against a
+// drifted twin silently corrupts data (see server/db/archive-twin.ts header) —
+// refusing to boot is safer than booting into a corruption-capable state.
+assertKnownArchiveTwinsAtBoot();
 
 // Migrate pageMap data from workspace JSON blobs into the page_keywords table (idempotent)
 import { migrateFromJsonBlob } from './page-keywords.js';
