@@ -412,6 +412,17 @@ router.get('/api/public/outcomes/:workspaceId/summary', requireClientPortalAuth(
 // resolved (E5, audit #5). Replaces the fabricated `"<action_type> action"` string,
 // which implied a recommendation title that never existed. Record<ActionType, string>
 // keeps this exhaustive — adding an ActionType without a label is a compile error.
+//
+// R5-PR2 (B9) scope note: deliberately NOT re-sourced from the action catalog
+// (shared/types/action-catalog.ts). This map is served by the CLIENT-visible
+// GET /api/public/outcomes/:workspaceId/wins endpoint (WinsSurface.tsx renders
+// `entry.recommendation` — this fallback text — directly), and the catalog's
+// `outcome` context carries short admin-style nouns ("Content Published") rather
+// than these full-sentence client-facing phrases ("Published new content"). Folding
+// client-visible wording into the catalog needs an owner wording sign-off pass
+// (C2/R12a), not a behavior-preserving admin cutover. Pinned by
+// tests/integration/outcomes-client-routes.test.ts ("WIN_FALLBACK_LABELS text is
+// unchanged by the R5 catalog cutover").
 const WIN_FALLBACK_LABELS: Record<ActionType, string> = {
   insight_acted_on: 'Acted on a site insight',
   content_published: 'Published new content',
