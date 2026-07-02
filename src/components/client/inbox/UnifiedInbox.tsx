@@ -544,7 +544,14 @@ export function UnifiedInbox({
   const renderActionableDeliverable = (d: ClientDeliverable) => {
     const decision: NormalizedDecision = normalizeDeliverable(d);
     const projected = isProjectedDeliverable(d.type);
-    const inlineApproval = !projected && d.kind === 'batch' && (d.items?.length ?? 0) > 0;
+    // Recommendation deliverables are a RESPOND-only mirror (server/domains/inbox/send-to-client.ts
+    // now 409s the generic /respond for this type): the canonical client decision is the "Act on
+    // this" greenlight on the recommendation's own card elsewhere (the-issue client surface), not
+    // this generic Approve/Decline. Gate the write verbs off exactly like a projected deliverable;
+    // onReview is wired below to a read-only nudge instead of the write-capable detail modal.
+    const isRecommendation = d.type === 'recommendation';
+    const writeVerbsDisabled = projected || isRecommendation;
+    const inlineApproval = !writeVerbsDisabled && d.kind === 'batch' && (d.items?.length ?? 0) > 0;
     if (d.type === 'gbp_review_response') {
       return (
         <div key={d.id} id={`unified-decision-${d.id}`}>
@@ -578,20 +585,33 @@ export function UnifiedInbox({
             uniformVerbs
             submitting={submittingId === d.id}
             ageLabel={ageLabel(d.sentAt)}
-            onReview={projected ? () => setReviewProjected({ type: d.type, externalRef: d.externalRef ?? '' }) : undefined}
-            onOpen={projected ? () => {} : () => setDetailId(d.id)}
+            onReview={
+              projected
+                ? () => setReviewProjected({ type: d.type, externalRef: d.externalRef ?? '' })
+                : isRecommendation
+                  // No in-inbox review surface for a recommendation mirror — the real decision
+                  // ("Act on this") lives on its Strategy card. Reusing the generic onReview slot
+                  // (rather than falling into uniformActions) keeps this card from rendering dead
+                  // Approve/Request-changes buttons that would no-op or 409 if ever wired live.
+                  ? () => setToast({
+                      message: 'Review and act on this recommendation from your Strategy hub.',
+                      type: 'success',
+                    })
+                  : undefined
+            }
+            onOpen={writeVerbsDisabled ? () => {} : () => setDetailId(d.id)}
             onApprove={
-              projected || submittingId === d.id
+              writeVerbsDisabled || submittingId === d.id
                 ? undefined
                 : () => void handleRespond(d, 'approved')
             }
             onFlagWithNote={
-              projected || submittingId === d.id
+              writeVerbsDisabled || submittingId === d.id
                 ? undefined
                 : (note) => void handleRespond(d, 'changes_requested', note || undefined)
             }
             onDecline={
-              projected || submittingId === d.id
+              writeVerbsDisabled || submittingId === d.id
                 ? undefined
                 : (note) => void handleRespond(d, 'declined', note || undefined)
             }

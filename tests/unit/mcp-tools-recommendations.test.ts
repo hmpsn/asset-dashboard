@@ -21,6 +21,9 @@ vi.mock('../../server/broadcast.js', () => ({
 vi.mock('../../server/activity-log.js', () => ({
   addActivity: vi.fn(),
 }));
+vi.mock('../../server/domains/inbox/recommendation-dual-write.js', () => ({
+  mirrorRecommendationToDeliverable: vi.fn(),
+}));
 
 import { getWorkspace } from '../../server/workspaces.js';
 import { isActiveRec, loadRecommendations } from '../../server/recommendations.js';
@@ -31,6 +34,7 @@ import {
 } from '../../server/recommendation-lifecycle.js';
 import { broadcastToWorkspace } from '../../server/broadcast.js';
 import { addActivity } from '../../server/activity-log.js';
+import { mirrorRecommendationToDeliverable } from '../../server/domains/inbox/recommendation-dual-write.js';
 import { InvalidTransitionError } from '../../server/state-machines.js';
 import {
   recommendationActionTools,
@@ -70,6 +74,7 @@ describe('mcp recommendation action tools', () => {
     (getWorkspace as Mock).mockReturnValue({ id: 'ws-1', name: 'Workspace' });
     (isActiveRec as Mock).mockReturnValue(true);
     (loadRecommendations as Mock).mockReturnValue(null);
+    (mirrorRecommendationToDeliverable as Mock).mockReturnValue({ ok: true, deliverableId: 'cd_1' });
   });
 
   it('registers recommendation action tool names', () => {
@@ -153,6 +158,59 @@ describe('mcp recommendation action tools', () => {
       expect.any(String),
       expect.objectContaining({ source: 'mcp-chat' }),
     );
+  });
+
+  it('apply_recommendation send mirrors the rec into a client_deliverable (close-the-loop half #1)', async () => {
+    const rec = makeRec({ clientStatus: 'sent' });
+    (sendRecommendation as Mock).mockReturnValue(rec);
+    const result = await handleRecommendationActionTool('apply_recommendation', {
+      workspace_id: 'ws-1',
+      recommendation_id: 'rec_1',
+      action: 'send',
+    });
+    expect(result.isError).toBeUndefined();
+    // The mirror is called with the freshly-sent rec (same seam as the per-row /send route and the
+    // bulk send action) — an MCP-driven send must reach the client feed, not just flip clientStatus.
+    expect(mirrorRecommendationToDeliverable).toHaveBeenCalledWith('ws-1', rec);
+    // The mirror fires its OWN DELIVERABLE_SENT broadcast — this tool must not double-broadcast it.
+    expect(broadcastToWorkspace).not.toHaveBeenCalledWith(
+      'ws-1',
+      'deliverable:sent',
+      expect.anything(),
+    );
+  });
+
+  it('apply_recommendation records a durable activity entry when the mirror write fails (R4-PR1, no silent swallow)', async () => {
+    const rec = makeRec({ clientStatus: 'sent' });
+    (sendRecommendation as Mock).mockReturnValue(rec);
+    (mirrorRecommendationToDeliverable as Mock).mockReturnValue({ ok: false, error: 'db write failed' });
+
+    const result = await handleRecommendationActionTool('apply_recommendation', {
+      workspace_id: 'ws-1',
+      recommendation_id: 'rec_1',
+      action: 'send',
+    });
+
+    // The live send is unaffected by a mirror failure — the tool call still succeeds.
+    expect(result.isError).toBeUndefined();
+    expect(addActivity).toHaveBeenCalledWith(
+      'ws-1',
+      'rec_status_updated',
+      expect.stringContaining('Client-deliverable mirror failed'),
+      expect.stringContaining('db write failed'),
+      expect.objectContaining({ recId: 'rec_1', mirrorError: 'db write failed' }),
+    );
+  });
+
+  it('throttle/strike actions do not mirror a deliverable (mirror is send-only)', async () => {
+    (throttleRecommendation as Mock).mockReturnValue(makeRec({ lifecycle: 'throttled' }));
+    await handleRecommendationActionTool('apply_recommendation', {
+      workspace_id: 'ws-1',
+      recommendation_id: 'rec_1',
+      action: 'throttle',
+      throttle_days: 30,
+    });
+    expect(mirrorRecommendationToDeliverable).not.toHaveBeenCalled();
   });
 
   it('apply_recommendation dispatches throttle → throttleRecommendation with days', async () => {

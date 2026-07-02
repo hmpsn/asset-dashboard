@@ -182,6 +182,20 @@ export async function respondToDeliverable(
     throw new SendToClientError('Deliverable not found', 404);
   }
 
+  // Recommendation deliverables are a RESPOND-only mirror (see the recommendation adapter):
+  // the canonical client decision enters through the public act-on route
+  // (POST /api/public/recommendations/:workspaceId/:recId/act-on), which flips the rec's
+  // clientStatus AND advances this mirror in lockstep via syncRecommendationDeliverableStatus.
+  // The adapter deliberately has NO respondToSource, so a generic respond here would flip ONLY
+  // the mirror — no content request, no attribution TrackedAction — a dead greenlight that can
+  // also desync mirror vs. rec (rec-approved / mirror-declined). Reject before any mutation.
+  if (current.type === 'recommendation') {
+    throw new SendToClientError(
+      'Recommendations are responded to via the act-on route, not the generic deliverable respond endpoint.',
+      409,
+    );
+  }
+
   const adapter = getAdapter(current.type);
   const transitions = getDeliverableTransitions(current.type);
   // Guard the client decision against the per-type machine. Throws InvalidTransitionError
