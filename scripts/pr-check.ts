@@ -24,10 +24,15 @@
  */
 
 import { execSync, execFileSync } from 'child_process';
-import { existsSync, readFileSync, realpathSync, statSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parseCoveredWsEventKeys, parseWsEventValues, parseWsEvents } from './ws-contract-parser.js';
+import {
+  SCAN_ROOTS as LEXICON_SCAN_ROOTS,
+  stripBlockCommentsAndTemplateLiterals,
+} from './lexicon-registry.js';
+import { DUPLICATE_NAME_ALLOWLIST } from '../shared/types/lexicon.js';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const SCAN_ALL = process.argv.includes('--all');
@@ -1296,6 +1301,173 @@ function isBackgroundGenerationAllowed(file: string, callee: string, line: strin
     BACKGROUND_GENERATION_SITE_ALLOWLIST.has(backgroundGenerationSiteKey(file, callee, line))
   );
 }
+
+// ─── Lexicon rules (R1-PR2) ─────────────────────────────────────────────────
+// Both rules read shared/types/lexicon.ts as the source of truth. Neither
+// re-declares the allowlist or the ActivityType union — see
+// docs/rules/lexicon.md for the full contract.
+
+/**
+ * Same anchored declaration regex as `scanDuplicateExportedNames` in
+ * scripts/lexicon-registry.ts (kept in lockstep deliberately — this is the
+ * diff-time analogue of that full-scan verifier, not an independent
+ * definition of "duplicate"). Declaration-only: `export type * from` /
+ * `export type { X }` re-exports and indented (non-top-level) declarations
+ * do not match the `^`-anchor.
+ */
+const LEXICON_DECL_RE = /^export\s+(?:type|interface)\s+([A-Za-z_][A-Za-z0-9_]*)\b/gm;
+
+/** Single-line, non-global sibling of LEXICON_DECL_RE — used when a caller
+ *  needs to test/match one line at a time (e.g. to recover a 1-indexed line
+ *  number for a hit) rather than `matchAll` over a whole-file string. Kept in
+ *  lockstep with LEXICON_DECL_RE; the only difference is the `gm` flags. */
+const LEXICON_DECL_LINE_RE = /^export\s+(?:type|interface)\s+([A-Za-z_][A-Za-z0-9_]*)\b/;
+
+/** Extract top-level `export type|interface NAME` names declared in `source`,
+ *  after blanking out block comments and template-literal bodies (same
+ *  false-positive avoidance as the verifier's scan). */
+function extractExportedTypeNames(source: string): string[] {
+  const scannable = stripBlockCommentsAndTemplateLiterals(source);
+  const names: string[] = [];
+  for (const match of scannable.matchAll(LEXICON_DECL_RE)) {
+    names.push(match[1]);
+  }
+  return names;
+}
+
+/** True when `file`'s repo-relative path falls under one of the lexicon
+ *  verifier's scan roots (shared/types/, server/). Mirrors SCAN_ROOTS from
+ *  scripts/lexicon-registry.ts so the diff-time rule and the full-scan
+ *  verifier agree on scope. Uses a normalized-path suffix/substring check
+ *  (not an absolute-root check) so synthetic fixture files under a tmpdir
+ *  (e.g. `<tmp>/shared/types/foo.ts`) are still recognized — the same
+ *  self-filtering pattern used by the KCC and public-portal rules above. */
+function isUnderLexiconScanRoot(file: string): boolean {
+  const normalized = file.split(path.sep).join('/');
+  return LEXICON_SCAN_ROOTS.some((root) => {
+    const marker = `/${root}/`;
+    return normalized.includes(marker) || normalized.startsWith(`${root}/`);
+  });
+}
+
+/** Build a name → declaring-files index across the real on-disk
+ *  shared/types/ + server/ trees (SCAN_ROOTS), skipping .d.ts/.test.ts the
+ *  same way scripts/lexicon-registry.ts's collectTsFiles does. Used to look
+ *  up whether a name a changed file just declared already exists ANYWHERE
+ *  else on disk — including names currently declared in exactly ONE other
+ *  file (a fixture introducing a second declaration would create a NEW
+ *  2-file collision that scanDuplicateExportedNames' >=2 threshold alone
+ *  wouldn't distinguish from "already flagged"). */
+function collectLexiconDeclarationIndex(): Map<string, Set<string>> {
+  const index = new Map<string, Set<string>>();
+  const walk = (dir: string) => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      if (!entry.name.endsWith('.ts')) continue;
+      if (entry.name.endsWith('.d.ts')) continue;
+      if (entry.name.endsWith('.test.ts')) continue;
+      const rel = path.relative(ROOT, full).split(path.sep).join('/');
+      const source = readFileOrEmpty(full);
+      if (!source) continue;
+      for (const name of extractExportedTypeNames(source)) {
+        let set = index.get(name);
+        if (!set) {
+          set = new Set<string>();
+          index.set(name, set);
+        }
+        set.add(rel);
+      }
+    }
+  };
+  for (const root of LEXICON_SCAN_ROOTS) {
+    walk(path.join(ROOT, root));
+  }
+  return index;
+}
+
+const LEXICON_DUPLICATE_ALLOWLIST_NAMES = new Set(DUPLICATE_NAME_ALLOWLIST.map((entry) => entry.name));
+
+/**
+ * ActivityType minting guard baseline — the frozen snapshot of `ActivityType`
+ * union members already registered against `shared/types/lexicon.ts`'s single
+ * `historical`-class `ActivityType` entry as of R1-PR2 (150 members, matching
+ * `server/activity-log.ts` at this commit).
+ *
+ * The lexicon deliberately never re-declares a union (see docs/rules/lexicon.md
+ * "What the lexicon is (and is not)") — `ActivityType` gets ONE type-level
+ * registry entry, not one per member. This baseline is pr-check's own
+ * diff-time bookkeeping of "which words were already minted" so the guard can
+ * tell a genuinely NEW member apart from an existing one, mirroring the
+ * `loadClientVisibleTypes()` precedent (this file already parses a Set out of
+ * activity-log.ts for the CLIENT_VISIBLE_TYPES rule).
+ *
+ * CONTRACT: adding a legitimate new ActivityType member requires EITHER (a)
+ * appending it here in the same commit (the lexicon-registry equivalent of
+ * updating GLOSSARY.md — the word is now "registered"), or (b) an inline
+ * `// activity-type-mint-ok` hatch on the new union line for an
+ * exploratory/temporary addition not yet ready to register. A member added to
+ * the union without either is flagged as an unregistered mint.
+ */
+export const ACTIVITY_TYPE_LEXICON_BASELINE = new Set<string>([
+  'audit_completed', 'audit_suppression_updated', 'request_resolved', 'approval_sent',
+  'approval_deleted', 'approval_applied', 'approval_reverted', 'seo_updated',
+  'images_optimized', 'links_fixed', 'content_updated', 'content_requested',
+  'content_request_deleted', 'content_declined', 'content_request_commented', 'brief_generated',
+  'brief_approved', 'changes_requested', 'briefing_generated', 'briefing_published',
+  'briefing_skipped', 'briefing_auto_published', 'content_upgraded', 'schema_generated',
+  'schema_published', 'schema_mapping_updated', 'schema_plan_generated', 'schema_plan_sent',
+  'redirects_scanned', 'strategy_generated', 'keyword_added', 'rank_tracking_updated',
+  'recommendations_generated', 'rank_snapshot', 'chat_session', 'payment_received',
+  'payment_failed', 'fix_completed', 'work_order_commented', 'order_closed',
+  'anomaly_detected', 'anomaly_positive', 'anomaly_dismissed', 'anomaly_acknowledged',
+  'post_generated', 'post_reverted', 'post_ai_review', 'brief_sent_for_review',
+  'post_sent_for_review', 'content_published', 'content_publish_failed', 'aeo_review',
+  'content_subscription', 'subscription_issue', 'subscription_cancelled', 'invoice_paid',
+  'invoice_failed', 'page_analysis', 'insight_resolved', 'outcome_scored',
+  'external_action_detected', 'playbook_suggested', 'learnings_updated', 'schema_plan_deleted',
+  'client_signal', 'note', 'mcp_key_created', 'mcp_key_revoked',
+  'client_profile_updated', 'client_onboarding_submitted', 'client_keyword_feedback', 'client_keyword_tracked',
+  'client_keyword_removed', 'client_priorities_updated', 'client_content_gap_vote', 'client_action_sent',
+  'client_action_approved', 'client_action_changes_requested', 'client_action_completed', 'deliverable_sent',
+  'deliverable_responded', 'deliverable_reminded', 'meeting_brief_generated', 'strategy_pov_generated',
+  'strategy_issue_pushed', 'strategy_autosent', 'brandscript_created', 'brandscript_deleted',
+  'brandscript_imported', 'brandscript_completed', 'brandscript_sections_updated', 'discovery_source_added',
+  'discovery_source_deleted', 'discovery_processed', 'voice_sample_added', 'voice_sample_deleted',
+  'voice_calibrated', 'voice_refined', 'voice_profile_created', 'voice_profile_updated',
+  'brand_deliverable_generated', 'brand_deliverable_refined', 'brand_deliverable_approved', 'brand_deliverable_reverted',
+  'blueprint_created', 'blueprint_updated', 'blueprint_deleted', 'blueprint_generated',
+  'blueprint_entry_added', 'blueprint_entry_updated', 'blueprint_entry_deleted', 'copy_generated',
+  'copy_approved', 'copy_batch_started', 'copy_batch_complete', 'copy_exported',
+  'copy_suggestion_added', 'copy_section_edited', 'copy_sent_to_client', 'copy_pattern_removed',
+  'diagnostic_completed', 'local_seo_updated', 'eeat_asset_created', 'eeat_asset_updated',
+  'eeat_asset_deleted', 'portal_session', 'action_backlog_alert', 'post_approved',
+  'post_changes_requested', 'post_client_edit', 'llms_txt_generated', 'rec_status_updated',
+  'rec_dismissed', 'rec_sent', 'rec_approved', 'rec_struck',
+  'rec_throttled', 'rec_nudge_stale', 'suggested_brief_accepted', 'suggested_brief_dismissed',
+  'suggested_brief_snoozed', 'post_voice_scored', 'strategy_keyword_kept', 'strategy_keyword_removed',
+  'strategy_keyword_added', 'cannibalization_keeper_set', 'form_submission_captured', 'form_capture_configured',
+  'client_return_hook_sent', 'autosend_policy_changed',
+]);
+
+/** Same anchored member-line pattern the ActivityType parsers in this file
+ *  already use (see loadClientVisibleTypes above): `| 'member_name'` at any
+ *  indent, one member per line — matching server/activity-log.ts's actual
+ *  formatting. Captures the member name only; trailing inline comments
+ *  (`// admin-only: ...`) are not part of the match. Exported so the baseline
+ *  parity meta-test in tests/pr-check.test.ts reuses the exact same extraction
+ *  the rule does. */
+export const ACTIVITY_TYPE_MEMBER_LINE_RE = /^\s*\|\s*'([^']+)'/;
 
 export const CHECKS: Check[] = [
   {
@@ -8962,6 +9134,119 @@ export const CHECKS: Check[] = [
           if (i > 0 && lines[i - 1].includes(HATCH)) continue;
           hits.push({ file, line: i + 1, text: line.trim() });
         }
+      }
+      return hits;
+    },
+  },
+
+  {
+    name: 'Duplicate exported domain type name',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    displayScope: 'shared/types/*.ts and server/**/*.ts (lexicon SCAN_ROOTS)',
+    message:
+      'This exported type/interface name already exists elsewhere in shared/types/ + server/ and is not in the lexicon duplicate-name allowlist (shared/types/lexicon.ts DUPLICATE_NAME_ALLOWLIST). This is a NAME-COLLISION check, not semantic dedupe — a barrel importer of the wrong file can silently resolve to the other declaration. Either rename this declaration to a unique name, or if the duplication is by-design (a permanent mirror pair) or already tracked by a Reconcile ticket, add an entry to DUPLICATE_NAME_ALLOWLIST with a resolvingTicket. Add // lexicon-dup-name-ok on the declaration line itself (inline only — a hatch on the line above is silently ignored by this rule) only for a reviewed, temporary exception pending an allowlist PR.',
+    severity: 'error',
+    rationale:
+      'shared/types/index.ts barrels shared-engine.ts but not client-deliverable.ts, so a colliding exported name across shared/types/ + server/ can make a barrel importer silently resolve to the wrong shape (the DeliverableType/DeliverableStatus incident this rule generalizes from).',
+    claudeMdRef: '#code-conventions',
+    excludeLines: ['// lexicon-dup-name-ok'],
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const candidateFiles = files.filter((file) => {
+        if (!file.endsWith('.ts')) return false;
+        if (file.endsWith('.d.ts') || file.endsWith('.test.ts')) return false;
+        return isUnderLexiconScanRoot(file);
+      });
+      if (candidateFiles.length === 0) return hits;
+
+      // Built once per run (not once per file) — reused across every
+      // candidate file in this batch.
+      const diskIndex = collectLexiconDeclarationIndex();
+
+      for (const file of candidateFiles) {
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const selfRel = path.isAbsolute(file) ? path.relative(ROOT, file).split(path.sep).join('/') : file;
+        const scannable = stripBlockCommentsAndTemplateLiterals(content);
+        const scannableLines = scannable.split('\n');
+        const lines = content.split('\n');
+
+        // Re-run the anchored declaration regex per-line (rather than once
+        // over the whole file) so each hit carries its own line number —
+        // matchAll on the whole string only gives a character offset.
+        for (let i = 0; i < lines.length; i++) {
+          const lineMatch = scannableLines[i]?.match(LEXICON_DECL_LINE_RE);
+          if (!lineMatch) continue;
+          const name = lineMatch[1];
+          if (LEXICON_DUPLICATE_ALLOWLIST_NAMES.has(name)) continue;
+          // Inline-only hatch by design (per the Reconcile R1-PR2 task
+          // contract) — a hatch on the line above the declaration is
+          // deliberately NOT honoured, unlike most customCheck rules in this
+          // file. Same rationale as the public-portal.ts GET rule's
+          // inline-only exception documented on hasHatch(): a duplicate-name
+          // exception is easy to leave stranded if declarations move, so it
+          // must live on the declaration line itself.
+          if (lines[i].includes('// lexicon-dup-name-ok')) continue;
+
+          const declaringFiles = diskIndex.get(name);
+          const collidesElsewhere = declaringFiles
+            ? Array.from(declaringFiles).some((f) => f !== selfRel)
+            : false;
+          if (!collidesElsewhere) continue;
+
+          hits.push({ file, line: i + 1, text: lines[i].trim() });
+        }
+      }
+      return hits;
+    },
+  },
+
+  {
+    name: 'ActivityType minting guard',
+    pattern: '',
+    fileGlobs: ['*.ts'],
+    displayScope: 'server/activity-log.ts',
+    message:
+      'A new ActivityType union member was added without a matching lexicon registry entry. ActivityType is the historical (write-time-frozen, append-only) word class — new members must be deliberately registered, never silently minted. Add the new member string to ACTIVITY_TYPE_LEXICON_BASELINE in scripts/pr-check.ts in the same commit, or add // activity-type-mint-ok on the new union line itself (inline only — a hatch on the line above is silently ignored by this rule) for a reviewed exploratory/temporary addition.',
+    severity: 'error',
+    rationale:
+      'ActivityType values persisted in activity_log rows are never renamed and renderers must tolerate retired words (docs/rules/lexicon.md historical class) — an unregistered mint is a governance gap, not just a missing doc update.',
+    claudeMdRef: '#code-conventions',
+    excludeLines: ['// activity-type-mint-ok'],
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const target = files.find((file) => file.split(path.sep).join('/').endsWith('server/activity-log.ts'));
+      if (!target) return hits;
+      const content = readFileOrEmpty(target);
+      if (!content) return hits;
+      const lines = content.split('\n');
+
+      const unionStart = lines.findIndex((line) => line.trim() === 'export type ActivityType =');
+      if (unionStart === -1) return hits;
+
+      for (let i = unionStart + 1; i < lines.length; i++) {
+        const line = lines[i];
+        const match = line.match(ACTIVITY_TYPE_MEMBER_LINE_RE);
+        // The union's terminal line is the one whose CODE portion ends in the
+        // closing `;` — stop scanning after it so declarations further down the
+        // file (other unions, functions) are never mistaken for ActivityType
+        // members. Strip a trailing `//…` line comment FIRST, then test the
+        // code portion only: a member with an inline comment that happens to
+        // end in `;` (e.g. `| 'foo' // note;`) must NOT read as terminal and
+        // truncate the scan early, letting later members slip through unflagged
+        // — exactly the silent-false-negative class this rule exists to catch.
+        const codePortion = line.replace(/\/\/.*$/, '');
+        const terminal = /;\s*$/.test(codePortion);
+        if (match) {
+          const member = match[1];
+          // Inline-only hatch by design (Reconcile R1-PR2 task contract) —
+          // deliberately not using hasHatch()'s line-above lookbehind here.
+          if (!ACTIVITY_TYPE_LEXICON_BASELINE.has(member) && !line.includes('// activity-type-mint-ok')) {
+            hits.push({ file: target, line: i + 1, text: line.trim() });
+          }
+        }
+        if (terminal) break;
       }
       return hits;
     },
