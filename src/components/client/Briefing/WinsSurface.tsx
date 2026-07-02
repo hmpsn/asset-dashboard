@@ -44,6 +44,12 @@ function WinRow({ entry }: { entry: OutcomeWinEntry }) {
   // carry an empty string — fall back to the action-type label locally.
   const heading = entry.recommendation || clientActionLabel(entry.actionType);
 
+  // C4 (attribution honesty): an `externally_executed` win is work done on the CLIENT's
+  // side that we flagged/called — not something we shipped. Never let the row imply we
+  // executed it; add an honest "implemented on your side" qualifier. `platform_executed`
+  // rows carry no qualifier (the card title already frames them as our shipped work).
+  const isExternal = entry.attribution === 'externally_executed';
+
   // Realized dollar attribution (action_outcomes.attributed_value). Blue = data
   // per the Four Laws — this is a read-only metric, not a CTA.
   const showValue = typeof entry.attributedValue === 'number' && entry.attributedValue > 0;
@@ -55,6 +61,11 @@ function WinRow({ entry }: { entry: OutcomeWinEntry }) {
           <span className="t-ui font-medium text-[var(--brand-text-bright)]">{heading}</span>
           <ScoreBadge score={entry.score} />
         </div>
+        {isExternal && (
+          <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
+            We flagged this — implemented on your side.
+          </p>
+        )}
         {pageLabel && (
           <p className="t-caption text-[var(--brand-text-muted)] mt-0.5 truncate">{pageLabel}</p>
         )}
@@ -86,6 +97,13 @@ export function WinsSurface({ workspaceId, effectiveTier }: WinsSurfaceProps) {
   // Hide entirely until there are real wins to show — no empty-state card.
   // Loading skeleton still renders so layout doesn't shift on first paint.
   if (!isLoading && !isError && wins.length === 0) return null;
+
+  // C4 (attribution honesty): "What we shipped" is only true when every win is
+  // platform-executed. Once the list includes an externally_executed win (work done on
+  // the client's side that we flagged), the honest umbrella is "Wins we called" — the
+  // per-row qualifier then clarifies which side implemented each one.
+  const hasExternal = wins.some(w => w.attribution === 'externally_executed');
+  const cardTitle = hasExternal ? 'Wins we called' : 'What we shipped';
 
   const body = (
     <>
@@ -120,16 +138,18 @@ export function WinsSurface({ workspaceId, effectiveTier }: WinsSurfaceProps) {
 
   return (
     <SectionCard
-      title="What we shipped"
+      title={cardTitle}
       titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
     >
       {effectiveTier === 'free' ? (() => {
         const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
         const now = Date.now();
         const thisMonthCount = wins.filter(w => now - new Date(w.detectedAt).getTime() <= thirtyDaysMs).length;
+        // C4: "what we built" overclaims execution when externally_executed wins are present.
+        // "your wins" is honest regardless of who implemented each one.
         const teaserStr = thisMonthCount > 0
-          ? `${thisMonthCount} win${thisMonthCount === 1 ? '' : 's'} in the last 30 days — upgrade to see what we built.`
-          : 'Wins are being tracked — upgrade to see what we built.';
+          ? `${thisMonthCount} win${thisMonthCount === 1 ? '' : 's'} in the last 30 days — upgrade to see your wins.`
+          : 'Wins are being tracked — upgrade to see your wins.';
         return (
           <TierGate
             tier={effectiveTier}

@@ -25,6 +25,9 @@ const mockWin = (overrides: Partial<OutcomeWinEntry> = {}): OutcomeWinEntry => (
   delta: { primary_metric: 'clicks', baseline_value: 10, current_value: 15, delta_absolute: 5, delta_percent: 50, direction: 'improved' },
   score: 'win',
   attributedValue: null,
+  // C4: default to platform_executed so the umbrella stays "What we shipped"; the
+  // externally_executed honesty path is covered by its own test below.
+  attribution: 'platform_executed',
   detectedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
   ...overrides,
 });
@@ -39,6 +42,26 @@ describe('WinsSurface', () => {
     (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [mockWin()], isLoading: false, isError: false });
     renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
     expect(screen.getByText('What we shipped')).toBeInTheDocument();
+  });
+
+  // C4 (attribution honesty): an externally_executed win is work done on the CLIENT's side
+  // that we flagged — the card must NOT claim "we shipped/built" it.
+  it('reframes the card title and shows an honest qualifier for externally_executed wins', () => {
+    const wins = [mockWin({ actionId: 'ext-1', attribution: 'externally_executed' })];
+    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: wins, isLoading: false, isError: false });
+    renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
+    // Umbrella title becomes the honest "Wins we called" instead of "What we shipped".
+    expect(screen.getByText('Wins we called')).toBeInTheDocument();
+    expect(screen.queryByText('What we shipped')).not.toBeInTheDocument();
+    // The row carries the "implemented on your side" qualifier so we never claim execution.
+    expect(screen.getByText('We flagged this — implemented on your side.')).toBeInTheDocument();
+  });
+
+  // A platform_executed win must NOT carry the external qualifier.
+  it('does not show the external qualifier for platform_executed wins', () => {
+    (useClientOutcomeWins as ReturnType<typeof vi.fn>).mockReturnValue({ data: [mockWin()], isLoading: false, isError: false });
+    renderWithQuery(<WinsSurface workspaceId="ws-1" effectiveTier="growth" />);
+    expect(screen.queryByText('We flagged this — implemented on your side.')).not.toBeInTheDocument();
   });
 
   it('renders the resolved source title as the row heading (E5 — real titles, not fabricated strings)', () => {

@@ -417,6 +417,12 @@ export interface TopWin {
   score: OutcomeScore;
   /** Realized dollar value of the win outcome (action_outcomes.attributed_value). NULL when no CPC data was available. */
   attributedValue: number | null;
+  /** Reconcile C4 — the honest execution attribution carried through from the tracked
+   *  action so client-facing surfaces can frame the win truthfully (e.g.
+   *  `externally_executed` must NOT read as "we shipped it"). `not_acted_on` never
+   *  reaches a wins surface (getTopWinsFromActions filters it), but the field is on the
+   *  full union so consumers switch exhaustively. Expand-only, mirroring `sourceLabel`. */
+  attribution: Attribution;
   createdAt: string;
   scoredAt: string;
 }
@@ -433,6 +439,11 @@ export interface OutcomeWinEntry {
   score: OutcomeScore;
   /** Realized dollar value of the win outcome. NULL when no CPC data was available. */
   attributedValue: number | null;
+  /** Reconcile C4 — honest execution attribution carried through from the tracked action.
+   *  WinsSurface must NOT claim "we shipped/built" for `externally_executed` rows (work done
+   *  on the client's side that we flagged/called). Only `platform_executed` wins are "what we
+   *  shipped". `not_acted_on` never reaches this surface (filtered upstream). */
+  attribution: Attribution;
   detectedAt: string;
 }
 

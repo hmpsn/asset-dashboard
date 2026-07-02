@@ -86,6 +86,7 @@ const stmts = createStmtCache(() => ({
     JOIN tracked_actions ta ON ta.id = ao.action_id
     WHERE ta.workspace_id = ?
       AND ao.score IN ('strong_win', 'win')
+      AND ta.attribution != 'not_acted_on'
       AND ao.checkpoint_days = (
         SELECT MAX(ao2.checkpoint_days)
         FROM action_outcomes ao2
@@ -857,6 +858,10 @@ export function getTopWinsFromActions(
           delta: outcome.deltaSummary,
           score: outcome.score,
           attributedValue: outcome.attributedValue ?? null,
+          // C4: carry the honest execution attribution so client-facing surfaces can
+          // frame the win truthfully. not_acted_on is already excluded above, so this is
+          // always platform_executed or externally_executed here.
+          attribution: action.attribution,
           createdAt: action.createdAt,
           scoredAt: outcome.measuredAt ?? action.updatedAt,
         });
