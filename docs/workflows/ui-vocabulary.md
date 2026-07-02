@@ -47,6 +47,32 @@ Use these exact labels when creating buttons, badges, tooltips, status text, and
 | Client inbox section — approvals/actions with note + requests | **"Conversations"** | Requests, Messages |
 | Win quality indicator | **"Win"** / **"Strong win"** | "success", "confirmed win" |
 
+### Client-facing outcome/action labels (C2 / R12a)
+
+Every client surface that renders an outcome `ActionType` (win rows, scorecards, monthly
+digest highlights) MUST read its label from `shared/types/client-vocabulary.ts`
+(`CLIENT_ACTION_LABELS` / `clientActionLabel()`) — never hand-roll a parallel
+`Record<ActionType, string>`. This module folds what were four independently-drifting
+maps (`OutcomeSummary.tsx`, `WinsSurface.tsx`, `server/routes/outcomes.ts`, and the
+monthly-digest ROI highlights in `server/outcome-tracking.ts`) into one canonical source,
+modeled on the locked-copy pattern in `src/components/client/the-issue/evergreenCopy.ts`.
+Pinned by `tests/contract/client-vocabulary-map.test.ts`.
+
+**Wording rule:** client copy prefers the fuller narrative sentence over admin nouns —
+e.g. "Published new post", not "Content published"; "Replied to a Google Business
+Profile review", not "GBP reply". `clientActionLabel()` degrades any unrecognized value
+to a humanized fallback (never a raw `snake_case` enum, never a throw).
+
+This is intentionally **separate** from the ADMIN action label source
+(`shared/types/action-catalog.ts` `OUTCOME_CATALOG` labels, consumed by
+`src/components/admin/outcomes/outcomeConstants.ts`) — admin surfaces keep short,
+operator-legible nouns ("Insight Acted On"). Admin and client are allowed to disagree on
+tone; only the four *client* surfaces must agree with each other. The same admin/client
+split applies to archetype labels: `shared/types/strategy-archetype.ts` `ARCHETYPE_LABELS`
+(admin) vs. `IssueAlsoOnPlanSection.tsx` `CLIENT_GROUP_META` (client, paired with a
+one-line description per archetype — richer than a single label, so not folded into the
+same `Record`).
+
 ### ActionQueueStrip Chip Labels (Phase 2B — PR #665)
 
 The briefing page action strip chips emit final `InboxFilter` values as `?tab=` deep-link params. These are the canonical chip labels and their target inbox sections:

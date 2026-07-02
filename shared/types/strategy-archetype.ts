@@ -26,6 +26,21 @@ export const ARCHETYPE_ORDER: Archetype[] = [
   'local',
 ];
 
+// ADMIN-facing labels — used by the admin stance bar / backing-moves queue
+// (StanceBar.tsx, BackingMovesQueue.tsx, TrustLadderPanel.tsx). These are
+// deliberately terse, operator-legible nouns.
+//
+// C2/R12a checked this map against the client-facing archetype grouping
+// (src/components/client/the-issue/IssueAlsoOnPlanSection.tsx `CLIENT_GROUP_META`)
+// for accidental drift and found INTENTIONAL divergence, not drift: the client
+// component already carries its own narrative label + one-line description per
+// archetype (e.g. "Defend cannibalized" → "Protecting your rankings — Resolving
+// overlap so the right page wins"), documented in that file's header as a
+// deliberate client-friendly rewrite of this admin vocabulary. A `Record<Archetype,
+// string>` can't hold the client's paired label+description, so it is NOT folded
+// into this map — kept as two intentionally different, separately-owned label
+// sets (same split as shared/types/action-catalog.ts `outcome` vs.
+// shared/types/client-vocabulary.ts).
 export const ARCHETYPE_LABELS: Record<Archetype, string> = {
   authority_bet: 'New authority bets',
   refresh_reclaim: 'Refresh & reclaim',

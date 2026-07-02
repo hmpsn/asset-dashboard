@@ -9,6 +9,13 @@
 // admin jargon ("Defend cannibalized" → "Protecting your rankings"). The content
 // archetype (authority_bet) is excluded — it lives in the hero IssueContentPlanSection.
 // No purple; teal = the link action, blue/zinc = data counts.
+//
+// C2/R12a: CLIENT_GROUP_META was audited against shared/types/strategy-archetype.ts's
+// ARCHETYPE_LABELS (the admin label map) for drift — confirmed intentional divergence,
+// not accidental drift (this map pairs a narrative label with a one-line description per
+// archetype, which the admin `Record<Archetype, string>` can't represent). Kept as two
+// separately-owned label sets by design; see the cross-reference comment on
+// ARCHETYPE_LABELS.
 
 import { RefreshCw, Wrench, Search, Shield, ArrowRight } from 'lucide-react';
 import { SectionCard, ClickableRow, Icon } from '../../ui';

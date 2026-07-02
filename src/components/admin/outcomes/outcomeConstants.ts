@@ -17,9 +17,13 @@ export function pct(value: number): string {
 // R5-PR2 (B9): admin-facing action labels now read the action catalog
 // (shared/types/action-catalog.ts) instead of carrying a second, independently
 // maintained Record<ActionType, string>. This is admin-only — the catalog's
-// `outcome` context label is the ADMIN label; client-facing label maps
-// (src/components/client/OutcomeSummary.tsx, WinsSurface.tsx) are NOT wired
-// here and keep their own wording pending owner sign-off (C2/R12a).
+// `outcome` context label is the ADMIN label (short noun-form, e.g. "Insight
+// Acted On"). C2/R12a folded the three CLIENT-facing label maps
+// (src/components/client/OutcomeSummary.tsx, WinsSurface.tsx,
+// server/routes/outcomes.ts) into shared/types/client-vocabulary.ts, which
+// intentionally carries different (fuller-sentence) wording — the admin map
+// here is NOT re-pointed at it by design; admin and client surfaces are allowed
+// to disagree on tone (admin = internal ops nouns, client = narrative sentences).
 // `Object.keys` typed via `as ActionType[]` is safe: ACTION_CATALOG.outcome is
 // `satisfies Record<ActionType, ActionCatalogEntry>`, so its keys are exactly
 // the ActionType union.

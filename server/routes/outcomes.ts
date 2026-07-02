@@ -34,6 +34,7 @@ import { getClientAction } from '../client-actions.js';
 import { getBrief } from '../content-brief.js';
 import { getPost } from '../content-posts-db.js';
 import { getContentRequest } from '../content-requests.js';
+import { clientActionLabel } from '../../shared/types/client-vocabulary.js';
 import type {
   ActionType,
   Attribution,
@@ -453,43 +454,17 @@ router.get('/api/public/outcomes/:workspaceId/summary', requireClientPortalAuth(
 
 // Honest generic per-action-type labels for win entries whose source title cannot be
 // resolved (E5, audit #5). Replaces the fabricated `"<action_type> action"` string,
-// which implied a recommendation title that never existed. Record<ActionType, string>
-// keeps this exhaustive — adding an ActionType without a label is a compile error.
+// which implied a recommendation title that never existed.
 //
-// R5-PR2 (B9) scope note: deliberately NOT re-sourced from the action catalog
-// (shared/types/action-catalog.ts). This map is served by the CLIENT-visible
-// GET /api/public/outcomes/:workspaceId/wins endpoint (WinsSurface.tsx renders
-// `entry.recommendation` — this fallback text — directly), and the catalog's
-// `outcome` context carries short admin-style nouns ("Content Published") rather
-// than these full-sentence client-facing phrases ("Published new content"). Folding
-// client-visible wording into the catalog needs an owner wording sign-off pass
-// (C2/R12a), not a behavior-preserving admin cutover. Pinned by
-// tests/integration/outcomes-client-routes.test.ts ("WIN_FALLBACK_LABELS text is
-// unchanged by the R5 catalog cutover").
-const WIN_FALLBACK_LABELS: Record<ActionType, string> = {
-  insight_acted_on: 'Acted on a site insight',
-  content_published: 'Published new content',
-  brief_created: 'Created a content brief',
-  strategy_keyword_added: 'Added a keyword to the strategy',
-  schema_deployed: 'Deployed structured data',
-  audit_fix_applied: 'Applied a technical fix',
-  content_refreshed: 'Refreshed existing content',
-  internal_link_added: 'Added internal links',
-  meta_updated: 'Updated page metadata',
-  voice_calibrated: 'Calibrated brand voice',
-  competitor_gap_closed: 'Closed a competitor keyword gap',
-  cluster_published: 'Filled a topic cluster',
-  cannibalization_resolved: 'Resolved keyword cannibalization',
-  local_visibility_won: 'Won local pack visibility',
-  local_service_added: 'Started targeting a local service',
-  // Strategy redesign P2 pre-commit — managed-set keep markers (internal curation, never a
-  // scored win; present only to keep this Record<ActionType,…> exhaustive).
-  topic_cluster_keep: 'Prioritized a topic cluster',
-  content_gap_keep: 'Prioritized a content opportunity',
-  // Reconcile R8-PR1 (B13) — ships dark; see shared/types/outcome-tracking.ts.
-  gbp_review_reply: 'Replied to a Google Business Profile review',
-};
-
+// C2/R12a: this fallback now reads the single canonical client vocabulary map
+// (shared/types/client-vocabulary.ts) instead of carrying its own
+// Record<ActionType, string> — folded together with WinsSurface.tsx's ACTION_LABELS
+// and OutcomeSummary.tsx's ACTION_TYPE_LABELS after the owner wording sign-off pass.
+// The admin action catalog (`shared/types/action-catalog.ts`, `outcome` context)
+// remains a SEPARATE, shorter admin-style label set — this endpoint is CLIENT-visible
+// (GET /api/public/outcomes/:workspaceId/wins; WinsSurface.tsx renders
+// `entry.recommendation` — this fallback text — directly) and must keep the fuller
+// client-facing phrasing, not the admin nouns.
 /**
  * Resolve the REAL source title for a win entry.
  *
@@ -509,7 +484,7 @@ const WIN_FALLBACK_LABELS: Record<ActionType, string> = {
  * doesn't re-read the recommendation set 10 times.
  */
 function resolveWinTitle(workspaceId: string, win: TopWin, getRecSet: () => RecommendationSet | null): string {
-  const fallback = WIN_FALLBACK_LABELS[win.actionType] ?? win.actionType.replace(/_/g, ' ');
+  const fallback = clientActionLabel(win.actionType);
   // 1. Snapshot-first: the write-time captured title, immune to source regeneration.
   const snapshotTitle = win.sourceLabel?.trim();
   if (snapshotTitle) return snapshotTitle;

@@ -261,13 +261,14 @@ describe('Suite 2: Public client wins endpoint', () => {
     }
   });
 
-  // R5-PR2 (B9) behavior-parity pin: WIN_FALLBACK_LABELS (server/routes/outcomes.ts) is
-  // CLIENT-VISIBLE (WinsSurface.tsx renders `entry.recommendation` directly) and is
-  // therefore explicitly OUT OF SCOPE for the action-catalog cutover in this PR — client
-  // wording changes need an owner sign-off pass (C2/R12a). This pin proves the fallback
-  // title text is byte-identical to the pre-cutover string when the source can't resolve
-  // (sourceType with no matching switch case in resolveWinTitle).
-  it('WIN_FALLBACK_LABELS text is unchanged by the R5 catalog cutover (client-visible, out of scope)', async () => {
+  // C2/R12a: the owner wording sign-off pass folded WIN_FALLBACK_LABELS into the single
+  // canonical shared/types/client-vocabulary.ts map. content_published's three drifted
+  // client-facing variants ("Published new content" here, "Published new post" in
+  // WinsSurface.tsx, "Content published" in OutcomeSummary.tsx) unified to WinsSurface's
+  // fuller sentence per the prefer-client-facing wording rule. This pin now proves the
+  // fallback title text matches the NEW canonical wording, not the pre-cutover string —
+  // still full-sentence client copy, NOT the catalog's short admin label ("Content Published").
+  it('the client-vocabulary fallback label is the canonical C2/R12a wording (client-visible)', async () => {
     const r = await postJson(`/api/outcomes/${wsId}/actions`, {
       actionType: 'content_published',
       sourceType: 'wins-fallback-parity-test',
@@ -285,9 +286,7 @@ describe('Suite 2: Public client wins endpoint', () => {
     const wins = await res.json();
     const win = wins.find((w: { actionId: string }) => w.actionId === actionId);
     expect(win).toBeDefined();
-    // Pre-cutover WIN_FALLBACK_LABELS.content_published value — must stay exactly this
-    // full-sentence client copy, NOT the catalog's short admin label ("Content Published").
-    expect(win.recommendation).toBe('Published new content');
+    expect(win.recommendation).toBe('Published new post');
   });
 });
 

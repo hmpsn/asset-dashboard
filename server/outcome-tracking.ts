@@ -9,6 +9,7 @@ import { createLogger } from './logger.js';
 import { rowToTrackedAction, rowToActionOutcome } from './db/outcome-mappers.js';
 import type { TrackedActionRow, ActionOutcomeRow } from './db/outcome-mappers.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { clientActionLabel } from '../shared/types/client-vocabulary.js';
 import type {
   TrackedAction,
   ActionOutcome,
@@ -908,25 +909,14 @@ export function getROIHighlightsFromOutcomes(workspaceId: string, limit = 10): R
           .split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
       : 'Site';
 
-    const actionLabel: Record<string, string> = {
-      content_published: 'Content published',
-      content_refreshed: 'Content refresh',
-      meta_updated: 'Meta update applied',
-      schema_deployed: 'Schema markup added',
-      audit_fix_applied: 'SEO fix applied',
-      internal_link_added: 'Internal link added',
-      brief_created: 'Brief created',
-      strategy_keyword_added: 'Keyword strategy update',
-      insight_acted_on: 'Insight acted on',
-      voice_calibrated: 'Voice calibrated',
-      // Reconcile R8-PR1 (B13) — ships dark. This is a LOOSE Record<string,string> with a
-      // `?? row.action_type` fallback (no compile guard), so gbp_review_reply must be added
-      // by hand or a scored GBP win would render the raw string in the CLIENT-FACING monthly
-      // digest (server/monthly-digest.ts). Label matches the client-facing exhaustive maps
-      // (WIN_FALLBACK_LABELS / WinsSurface) so all client surfaces read consistently.
-      gbp_review_reply: 'Replied to a Google Business Profile review',
-    };
-    const action = actionLabel[row.action_type] ?? row.action_type;
+    // C2/R12a: this CLIENT-FACING monthly digest (server/monthly-digest.ts) now reads the
+    // single canonical client vocabulary map (shared/types/client-vocabulary.ts) instead of
+    // carrying its own drifted Record<string,string> — folded together with OutcomeSummary.tsx,
+    // WinsSurface.tsx, and the outcomes route's win-fallback labels. `clientActionLabel`
+    // tolerates any unrecognized `row.action_type` gracefully (humanized fallback), so a
+    // future ActionType addition without an explicit vocabulary entry degrades safely instead
+    // of leaking a raw enum into the email.
+    const action = clientActionLabel(row.action_type);
 
     const scoreLabel: Record<string, string> = {
       strong_win: 'Strong win',
