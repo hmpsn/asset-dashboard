@@ -5,10 +5,13 @@
  * and summary; recommendation_items owns addressable per-rec payloads.
  */
 import db from '../../db/index.js';
-import { parseJsonSafe, parseJsonSafeArray } from '../../db/json-validation.js';
+import { parseJsonFallback, parseJsonSafe, parseJsonSafeArray } from '../../db/json-validation.js';
 import { createStmtCache } from '../../db/stmt-cache.js';
+import { createLogger } from '../../logger.js';
 import { recommendationSchema, recommendationSummarySchema } from '../../schemas/workspace-schemas.js';
 import type { Recommendation, RecommendationSet, RecStatus } from '../../../shared/types/recommendations.js';
+
+const backfillLog = createLogger('recommendation-backfill');
 
 interface RecSetRow {
   workspace_id: string;
@@ -50,6 +53,9 @@ const emptySummaryFallback: RecommendationSet['summary'] = {
 const stmts = createStmtCache(() => ({
   selectSet: db.prepare<[workspaceId: string]>(
     `SELECT * FROM recommendation_sets WHERE workspace_id = ?`,
+  ),
+  listSetWorkspaceIds: db.prepare(
+    `SELECT workspace_id FROM recommendation_sets ORDER BY workspace_id ASC`,
   ),
   upsertSet: db.prepare(`
     INSERT INTO recommendation_sets (workspace_id, generated_at, recommendations, summary)
@@ -224,6 +230,119 @@ export function materializeRecommendationItems(workspaceId: string): Recommendat
   });
   run();
   return set;
+}
+
+/**
+ * Result of a full blob → rows backfill sweep.
+ * - `workspaces`: number of recommendation_sets rows visited (whether skipped or backfilled).
+ * - `blobRecs`: total valid recs read from legacy blobs of workspaces that WERE backfilled
+ *   (skipped/already-populated workspaces contribute nothing — their blob is never read).
+ * - `rowsWritten`: total recommendation_items rows inserted across all backfilled workspaces.
+ * - `dropped`: every rec that could not be materialized, with a reason (schema violation or
+ *   a per-workspace transaction failure). Never silently discarded.
+ */
+export interface RecommendationBackfillResult {
+  workspaces: number;
+  blobRecs: number;
+  rowsWritten: number;
+  dropped: Array<{ workspaceId: string; recId: string; reason: string }>;
+}
+
+/** Best-effort id extraction for a raw (possibly malformed) blob rec, for drop reporting. */
+function rawRecId(item: unknown): string {
+  if (item && typeof item === 'object' && 'id' in item) {
+    const id = (item as { id?: unknown }).id;
+    if (typeof id === 'string' && id.length > 0) return id;
+  }
+  return '(unknown)';
+}
+
+/**
+ * ADDITIVE backfill sweep (Reconcile R7-PR1): materialize every workspace's legacy
+ * recommendation_sets.recommendations blob into normalized recommendation_items rows.
+ *
+ * Idempotent & mixed-prod-safe: any workspace whose recommendation_items table already
+ * has rows is SKIPPED (count>0 guard) and its blob is NOT re-read — prod may already carry
+ * post-158 regens that wrote rows, and those authoritative rows must never be clobbered.
+ *
+ * Per-item validation uses the same per-item semantics as the read path
+ * (`legacyRecommendations` → `parseJsonSafeArray`): the written set is exactly the VALID
+ * recs, and any malformed/unknown rec is recorded in `dropped` with a reason (and a Pino
+ * warn) rather than dropping the whole set or being silently discarded.
+ *
+ * Each workspace's write is wrapped in its own transaction and try/catch, so one bad
+ * workspace never aborts the sweep. Readers are unaffected: the items-win fallback in
+ * loadRecommendationSet still serves a workspace that fails backfill from its blob.
+ */
+export function materializeAllRecommendationItems(): RecommendationBackfillResult {
+  const rows = stmts().listSetWorkspaceIds.all() as Array<{ workspace_id: string }>;
+  const result: RecommendationBackfillResult = {
+    workspaces: 0,
+    blobRecs: 0,
+    rowsWritten: 0,
+    dropped: [],
+  };
+
+  for (const { workspace_id: workspaceId } of rows) {
+    result.workspaces += 1;
+
+    // count>0 guard: authoritative rows already exist — skip WITHOUT reading the blob.
+    const count = (stmts().countItems.get(workspaceId) as { cnt: number }).cnt;
+    if (count > 0) continue;
+
+    const setRow = stmts().selectSet.get(workspaceId) as RecSetRow | undefined;
+    if (!setRow) continue;
+
+    // Valid recs come from the same per-item read path the fallback uses. Then walk the
+    // raw blob array to attribute each dropped item to a recId + reason.
+    const validRecs = legacyRecommendations(setRow, workspaceId);
+    const validIds = new Set(validRecs.map(rec => rec.id));
+
+    // Unparseable blob → parseJsonFallback returns the [] fallback (legacyRecommendations
+    // already logged the parse failure); a valid-JSON-non-array blob (e.g. '{}') fails the
+    // Array.isArray guard and maps to "no recs to backfill" — never a throw.
+    let rawItems: unknown[] = [];
+    const parsed = parseJsonFallback<unknown>(setRow.recommendations, []);
+    if (Array.isArray(parsed)) rawItems = parsed;
+
+    for (const raw of rawItems) {
+      const parsedItem = recommendationSchema.safeParse(raw);
+      if (parsedItem.success && validIds.has(parsedItem.data.id)) continue;
+      const recId = rawRecId(raw);
+      const reason = parsedItem.success
+        ? 'valid rec dropped by read-path validation'
+        : parsedItem.error.issues.slice(0, 3).map(i => `${i.path.join('.')}: ${i.message}`).join('; ') || 'schema validation failed';
+      result.dropped.push({ workspaceId, recId, reason });
+      backfillLog.warn({ workspaceId, recId, reason }, 'Dropped malformed recommendation during backfill');
+    }
+
+    if (validRecs.length === 0) continue;
+
+    try {
+      const run = db.transaction(() => {
+        writeItems(workspaceId, validRecs);
+      });
+      run();
+      result.blobRecs += validRecs.length;
+      result.rowsWritten += validRecs.length;
+      backfillLog.info(
+        { workspaceId, blobRecs: validRecs.length, rowsWritten: validRecs.length, dropped: rawItems.length - validRecs.length },
+        'Backfilled recommendation blob → rows for workspace',
+      );
+    } catch (err) {
+      // One bad workspace must not abort the sweep. Record the failure and continue.
+      for (const rec of validRecs) {
+        result.dropped.push({
+          workspaceId,
+          recId: rec.id,
+          reason: `backfill transaction failed: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+      backfillLog.error({ workspaceId, err }, 'Recommendation backfill transaction failed for workspace');
+    }
+  }
+
+  return result;
 }
 
 export function replaceRecommendationItems(
