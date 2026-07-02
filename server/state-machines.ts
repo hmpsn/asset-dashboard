@@ -213,20 +213,6 @@ export const CLIENT_DELIVERABLE_TRANSITIONS: Record<string, readonly string[]> =
   completed:         [],
 };
 
-export type DeliverableStateStatus =
-  | 'draft'
-  | 'awaiting_client'
-  | 'changes_requested'
-  | 'partial'
-  | 'approved'
-  | 'declined'
-  | 'applied'
-  | 'expired'
-  | 'cancelled'
-  | 'ordered'
-  | 'in_progress'
-  | 'completed';
-
 // Per-type transition overrides (design §4.2). Each entry is MERGED onto the base map
 // (override keys replace the base key wholesale). Returned by getDeliverableTransitions.
 //   copy_section: approve is terminal (no →applied; the side-effect is voice-sample

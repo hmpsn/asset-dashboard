@@ -11,7 +11,7 @@ import { listExtractions } from './discovery-ingestion.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import type {
-  BrandDeliverable, DeliverableType, DeliverableTier,
+  BrandDeliverable, BrandDeliverableType, DeliverableTier,
   VoiceSampleContext,
 } from '../shared/types/brand-engine.js';
 import { DEFAULT_TIER_MAP } from '../shared/types/brand-engine.js';
@@ -80,8 +80,8 @@ function buildBrandContext(workspaceId: string): string {
   return parts.join('\n\n');
 }
 
-export function getDeliverableInstructions(type: DeliverableType): string {
-  const instructions: Partial<Record<DeliverableType, string>> = {
+export function getDeliverableInstructions(type: BrandDeliverableType): string {
+  const instructions: Partial<Record<BrandDeliverableType, string>> = {
     mission: 'Write a mission statement: 1-2 sentences explaining why this business exists. Start with an action verb. Specific to this business.',
     vision: 'Write a vision statement: 1-2 sentences describing where this business is headed in 5-10 years. Aspirational but grounded.',
     values: 'Write 3-5 core values. For each: value name (2-3 words), one sentence description that shows it in action. Format as a numbered list.',
@@ -103,7 +103,7 @@ export function getDeliverableInstructions(type: DeliverableType): string {
   return instructions[type] || `Write a ${type.replace(/_/g, ' ')} for this brand. Be specific, not generic.`;
 }
 
-export async function generateDeliverable(workspaceId: string, deliverableType: DeliverableType): Promise<BrandDeliverable> {
+export async function generateDeliverable(workspaceId: string, deliverableType: BrandDeliverableType): Promise<BrandDeliverable> {
   const fullContext = await buildIntelPrompt(workspaceId, ['seoContext']);
   const brandContext = buildBrandContext(workspaceId);
   const instructions = getDeliverableInstructions(deliverableType);
@@ -320,7 +320,7 @@ export function setDeliverableStatus(
     log.info({ workspaceId, deliverableType: row.deliverable_type, status }, 'deliverable status updated');
 
     if (status !== 'approved') {
-      return { row, now, autoSampleFrom: null as DeliverableType | null };
+      return { row, now, autoSampleFrom: null as BrandDeliverableType | null };
     }
 
     // Re-approval of an already-approved deliverable must NOT duplicate the
@@ -330,7 +330,7 @@ export function setDeliverableStatus(
     // this check race-free: two concurrent callers are serialized and only
     // one sees `priorStatus === 'draft'`.
     if (priorStatus === 'approved') {
-      return { row, now, autoSampleFrom: null as DeliverableType | null };
+      return { row, now, autoSampleFrom: null as BrandDeliverableType | null };
     }
 
     // Spec Addendum §5: auto-create voice sample for approved identity
@@ -338,15 +338,15 @@ export function setDeliverableStatus(
     // nested SAVEPOINT here; if it throws we catch, log, and let the outer
     // transaction commit — approval is the primary effect and must succeed
     // even if the downstream sample insert fails.
-    const type = row.deliverable_type as DeliverableType;
-    const voiceSampleMap: Partial<Record<DeliverableType, VoiceSampleContext>> = {
+    const type = row.deliverable_type as BrandDeliverableType;
+    const voiceSampleMap: Partial<Record<BrandDeliverableType, VoiceSampleContext>> = {
       tagline: 'headline',
       elevator_pitch: 'body',
       tone_examples: 'body',
     };
     const contextTag = voiceSampleMap[type];
     if (!contextTag) {
-      return { row, now, autoSampleFrom: null as DeliverableType | null };
+      return { row, now, autoSampleFrom: null as BrandDeliverableType | null };
     }
 
     try {
@@ -355,7 +355,7 @@ export function setDeliverableStatus(
       return { row, now, autoSampleFrom: type };
     } catch (err) {
       log.error({ err, workspaceId, deliverableType: type }, 'failed to auto-create voice sample');
-      return { row, now, autoSampleFrom: null as DeliverableType | null };
+      return { row, now, autoSampleFrom: null as BrandDeliverableType | null };
     }
   }).immediate();
 

@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Sparkles, Check, Download, Pencil, Save, X } from 'lucide-react';
 import { identity } from '../../api/brand-engine';
-import type { BrandDeliverable, DeliverableType, DeliverableTier } from '../../../shared/types/brand-engine';
+import type { BrandDeliverable, BrandDeliverableType, DeliverableTier } from '../../../shared/types/brand-engine';
 import { SectionCard, EmptyState, Skeleton, Button, cn, FormInput, FormTextarea } from '../ui';
 import { useToast } from '../Toast';
 import { queryKeys } from '../../lib/queryKeys';
@@ -10,7 +10,7 @@ import { RenderMarkdown } from '../client/helpers';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const DELIVERABLE_LABELS: Record<DeliverableType, string> = {
+const DELIVERABLE_LABELS: Record<BrandDeliverableType, string> = {
   mission: 'Mission Statement',
   vision: 'Vision Statement',
   values: 'Core Values',
@@ -38,7 +38,7 @@ const TIER_LABELS: Record<DeliverableTier, string> = {
   premium: 'Premium',
 };
 
-const TIER_TYPES: Record<DeliverableTier, DeliverableType[]> = {
+const TIER_TYPES: Record<DeliverableTier, BrandDeliverableType[]> = {
   essentials: ['mission', 'vision', 'values', 'tagline', 'voice_guidelines'],
   professional: ['elevator_pitch', 'archetypes', 'personality_traits', 'messaging_pillars', 'differentiators', 'tone_examples'],
   premium: ['positioning_matrix', 'brand_story', 'personas', 'customer_journey', 'objection_handling', 'emotional_triggers'],
@@ -48,7 +48,7 @@ const TIER_TYPES: Record<DeliverableTier, DeliverableType[]> = {
 
 interface DeliverableCardProps {
   workspaceId: string;
-  deliverableType: DeliverableType;
+  deliverableType: BrandDeliverableType;
   deliverable: BrandDeliverable | undefined;
   onChanged: () => void;
 }
@@ -306,7 +306,7 @@ function DeliverableCard({ workspaceId, deliverableType, deliverable, onChanged 
 interface TierSectionProps {
   tier: DeliverableTier;
   workspaceId: string;
-  deliverableMap: Map<DeliverableType, BrandDeliverable>;
+  deliverableMap: Map<BrandDeliverableType, BrandDeliverable>;
   onChanged: () => void;
 }
 
@@ -352,7 +352,7 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
 
   // Build a fast-lookup map: deliverableType → BrandDeliverable
   const { deliverableMap, approvedCount } = useMemo(() => {
-    const map = new Map<DeliverableType, BrandDeliverable>();
+    const map = new Map<BrandDeliverableType, BrandDeliverable>();
     let count = 0;
     if (deliverables) {
       for (const d of deliverables) {

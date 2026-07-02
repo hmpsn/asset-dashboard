@@ -558,20 +558,6 @@ const ANALYTICS_MIRROR_RATIONALE =
   'Server data-fetcher shape mirrored into shared/types for the client. The 18-name GA4/GSC + PerformanceTrend block is intentionally duplicated by design; consolidating is a separate ticket with its own read-path risk (audit risk #3).';
 
 export const DUPLICATE_NAME_ALLOWLIST: readonly DuplicateNameAllowEntry[] = [
-  // ── Deliverable* — resolved by R2 (rename to BrandDeliverable*) ──
-  {
-    name: 'DeliverableType',
-    files: ['shared/types/brand-engine.ts', 'shared/types/client-deliverable.ts'],
-    resolvingTicket: 'R2',
-    rationale:
-      'brand-engine (brand-artifact context) collides with the client-deliverable send-to-client spine. R2 renames the brand-engine pair to BrandDeliverableType and burns this entry off the allowlist. Barrel exports brand-engine but NOT client-deliverable, so barrel importers silently get the brand shape (core rationale for the name-collision rule).',
-  },
-  {
-    name: 'DeliverableStatus',
-    files: ['shared/types/brand-engine.ts', 'shared/types/client-deliverable.ts'],
-    resolvingTicket: 'R2',
-    rationale: 'See DeliverableType. R2 renames the brand-engine pair to BrandDeliverableStatus.',
-  },
   // ── GA4/GSC analytics mirror block (18) — permanent by design ──
   { name: 'GA4Overview', files: [ANALYTICS_MIRROR], resolvingTicket: 'permanent', rationale: ANALYTICS_MIRROR_RATIONALE },
   { name: 'GA4OrganicOverview', files: [ANALYTICS_MIRROR], resolvingTicket: 'permanent', rationale: ANALYTICS_MIRROR_RATIONALE },
