@@ -1198,6 +1198,34 @@ function migrateRankTracking(): number {
 
 // ── Tier 3 — Per-site snapshots + config/admin ──
 
+/**
+ * Resolve a legacy `site_id` (webflow_site_id) to the owning workspace's id, for
+ * populating the additive `workspace_id` column added to audit_snapshots /
+ * redirect_snapshots / performance_snapshots by migration 167
+ * (server/db/migrations/167-audit-snapshots-workspace-id.sql).
+ *
+ * Resolution is provably 1:1 — matching migration 167's CV-1 fix. workspaces.webflow_site_id
+ * has NO UNIQUE constraint, so a site_id can map to zero, one, or MANY workspaces. Only an
+ * EXACTLY-ONE match resolves; a zero-match (unresolvable) OR a >1-match (ambiguous) returns
+ * null so the imported row lands with a NULL workspace_id rather than fabricating or guessing
+ * an attribution. This mirrors the migration's own quarantine logic and never blocks the import.
+ *
+ * Cached per migrate-json.ts run since the same site_id repeats across many
+ * snapshot files, and workspaces don't change mid-import.
+ */
+const _siteIdToWorkspaceIdCache = new Map<string, string | null>();
+function resolveWorkspaceIdBySiteId(siteId: string | undefined | null): string | null {
+  if (!siteId) return null;
+  if (_siteIdToWorkspaceIdCache.has(siteId)) return _siteIdToWorkspaceIdCache.get(siteId)!;
+  // COUNT + MIN in one pass: resolve only when EXACTLY ONE workspace owns this site_id.
+  const row = db.prepare(
+    `SELECT COUNT(*) AS n, MIN(id) AS id FROM workspaces WHERE webflow_site_id = ?`,
+  ).get(siteId) as { n: number; id: string | null } | undefined;
+  const resolved = row && row.n === 1 ? row.id : null;
+  _siteIdToWorkspaceIdCache.set(siteId, resolved);
+  return resolved;
+}
+
 function migrateAuditSnapshots(): number {
   const reportsDir = getDataDir('reports');
   if (!fs.existsSync(reportsDir)) {
@@ -1207,8 +1235,8 @@ function migrateAuditSnapshots(): number {
 
   const insert = db.prepare(`
     INSERT OR IGNORE INTO audit_snapshots
-      (id, site_id, site_name, created_at, audit, logo_url, action_items, previous_score)
-    VALUES (@id, @site_id, @site_name, @created_at, @audit, @logo_url, @action_items, @previous_score)
+      (id, site_id, workspace_id, site_name, created_at, audit, logo_url, action_items, previous_score)
+    VALUES (@id, @site_id, @workspace_id, @site_name, @created_at, @audit, @logo_url, @action_items, @previous_score)
   `);
 
   let total = 0;
@@ -1223,9 +1251,11 @@ function migrateAuditSnapshots(): number {
       for (const file of files) {
         try {
           const data = JSON.parse(fs.readFileSync(path.join(siteDir, file), 'utf-8'));
+          const resolvedSiteId = data.siteId || siteId;
           const info = insert.run({
             id: data.id || file.replace('.json', ''),
-            site_id: data.siteId || siteId,
+            site_id: resolvedSiteId,
+            workspace_id: resolveWorkspaceIdBySiteId(resolvedSiteId),
             site_name: data.siteName || siteId,
             created_at: data.createdAt || new Date().toISOString(),
             audit: JSON.stringify(data.audit || {}),
@@ -1294,8 +1324,8 @@ function migrateRedirectSnapshots(): number {
 
   const insert = db.prepare(`
     INSERT OR IGNORE INTO redirect_snapshots
-      (id, site_id, created_at, result)
-    VALUES (@id, @site_id, @created_at, @result)
+      (id, site_id, workspace_id, created_at, result)
+    VALUES (@id, @site_id, @workspace_id, @created_at, @result)
   `);
 
   let total = 0;
@@ -1304,9 +1334,11 @@ function migrateRedirectSnapshots(): number {
     for (const file of files) {
       try {
         const data = JSON.parse(fs.readFileSync(path.join(redirectsDir, file), 'utf-8'));
+        const resolvedSiteId = data.siteId || file.replace('.json', '');
         const info = insert.run({
           id: data.id || `redirect-${file.replace('.json', '')}-${Date.now()}`,
-          site_id: data.siteId || file.replace('.json', ''),
+          site_id: resolvedSiteId,
+          workspace_id: resolveWorkspaceIdBySiteId(resolvedSiteId),
           created_at: data.createdAt || new Date().toISOString(),
           result: JSON.stringify(data.result || {}),
         });
@@ -1331,8 +1363,8 @@ function migratePerformanceSnapshots(): number {
 
   const insert = db.prepare(`
     INSERT OR REPLACE INTO performance_snapshots
-      (sub, site_id, created_at, result)
-    VALUES (@sub, @site_id, @created_at, @result)
+      (sub, site_id, workspace_id, created_at, result)
+    VALUES (@sub, @site_id, @workspace_id, @created_at, @result)
   `);
 
   let total = 0;
@@ -1348,9 +1380,16 @@ function migratePerformanceSnapshots(): number {
       for (const file of files) {
         try {
           const data = JSON.parse(fs.readFileSync(path.join(subDir, file), 'utf-8'));
+          const resolvedSiteId = data.siteId || file.replace('.json', '');
+          // site_id is an overloaded composite key for some `sub` values
+          // (pagespeed-single: `${webflowSiteId}_${pageKey}`; competitor: a
+          // URL-derived key) — see docs/rules/snapshot-envelope.md. Exact-match
+          // resolution only; a composite key simply resolves to null here, same
+          // as migration 167's own quarantine logic (never guessed via prefix).
           const info = insert.run({
             sub,
-            site_id: data.siteId || file.replace('.json', ''),
+            site_id: resolvedSiteId,
+            workspace_id: resolveWorkspaceIdBySiteId(resolvedSiteId),
             created_at: data.createdAt || new Date().toISOString(),
             result: JSON.stringify(data.result ?? data),
           });

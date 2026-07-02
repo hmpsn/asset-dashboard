@@ -2472,6 +2472,63 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // C1 (Reconcile R11-T5): server/db/snapshot-registry.ts is the machine-readable
+    // census of every `*_snapshots` table (see docs/rules/snapshot-envelope.md +
+    // tests/contract/snapshot-envelope-registry.test.ts). A new migration that creates
+    // a `_snapshots` table without also registering it in the same PR is the exact
+    // failure mode that let audit_snapshots / performance_snapshots / redirect_snapshots
+    // silently accumulate as site_id-only, unregistered, un-workspace-scoped tables for
+    // years before migration 167 retrofitted them. Catch it at PR time instead of
+    // relying on the runtime contract test to be run (or a future author to remember).
+    name: 'New migration creates a _snapshots table without a matching registry entry',
+    pattern: '',
+    fileGlobs: ['*.sql'],
+    pathFilter: 'server/db/migrations/',
+    message: 'A migration that CREATEs a `*_snapshots` table must add a matching entry to SNAPSHOT_TABLE_REGISTRY in server/db/snapshot-registry.ts in the same PR (name, workspaceScoped: true, hasForeignKeyCascade, captureColumn, writerModule, note). See docs/rules/snapshot-envelope.md. Add `-- snapshot-registry-ok: <reason>` on the CREATE TABLE line if this is a migration-bookkeeping table (an `_orphaned` quarantine copy or `_r11_old` rename-aside original) that is deliberately excluded from the registry.',
+    severity: 'warn',
+    rationale: 'An unregistered snapshot table is invisible to the workspace-scoping contract test and can silently ship without workspace_id / FK CASCADE, repeating the exact gap migration 167 closed for the three legacy tables.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const createSnapshotTableRe = /^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["'`]?(\w*_snapshots)["'`]?\s*\(/i;
+
+      // Read the registry's table names directly from source text (not via import —
+      // pr-check runs as a standalone script over changed files, not inside the
+      // TS module graph). Matches each `name: '<table>'` entry in
+      // SNAPSHOT_TABLE_REGISTRY.
+      const registryPath = path.join(ROOT, 'server/db/snapshot-registry.ts');
+      const registrySource = readFileOrEmpty(registryPath);
+      const registeredNames = new Set(
+        Array.from(registrySource.matchAll(/name:\s*'([a-z0-9_]+)'/g)).map(m => m[1]),
+      );
+
+      for (const file of files) {
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const match = line.match(createSnapshotTableRe);
+          if (!match) continue;
+          if (line.includes('snapshot-registry-ok')) continue;
+          // Bookkeeping tables (orphan quarantine copies, rename-aside originals) are
+          // deliberately excluded from the registry — see docs/rules/snapshot-envelope.md.
+          if (/_orphaned$/i.test(match[1]) || /_r11_old$/i.test(match[1])) continue;
+
+          const tableName = match[1].toLowerCase();
+          if (registeredNames.has(tableName)) continue;
+
+          hits.push({
+            file,
+            line: i + 1,
+            text: `CREATE TABLE "${tableName}" (matches *_snapshots) has no entry in SNAPSHOT_TABLE_REGISTRY (server/db/snapshot-registry.ts)`,
+          });
+        }
+      }
+      return hits;
+    },
+  },
+  {
     // FM-5: Direct SET status without a validation function.
     // State machine transitions should use validateTransition() to reject invalid transitions.
     // FM-5: Direct SET <status-column> = <value> without a state-machine guard.

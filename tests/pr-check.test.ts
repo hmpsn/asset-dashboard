@@ -5953,6 +5953,10 @@ describe('Meta: customCheck rule name registry', () => {
     // customCheck to close three structural escape classes (literal writes,
     // mid-clause `, status =`, and lifecycle columns like resolution_status).
     'Unguarded SET status = ? (state machine transition)',
+    // Reconcile C1/R11-T5 (2026-07-02) — a migration that CREATEs a *_snapshots
+    // table must register it in server/db/snapshot-registry.ts in the same PR;
+    // see docs/rules/snapshot-envelope.md.
+    'New migration creates a _snapshots table without a matching registry entry',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -12143,6 +12147,121 @@ describe('Rule: Live+twin ALTER lockstep (tracked_actions / action_outcomes arch
       uniqPath('rule-twin-lockstep-no-alter', 'server/db/migrations/999-no-alter.sql'),
       lines(
         'CREATE TABLE IF NOT EXISTS fresh_table (',
+        '  id TEXT PRIMARY KEY',
+        ');',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// Rule: New migration creates a _snapshots table without a matching registry entry
+// ════════════════════════════════════════════════════════════════════════════
+//
+// C1 (Reconcile R11-T5): server/db/snapshot-registry.ts is the machine-readable
+// census of every *_snapshots table (docs/rules/snapshot-envelope.md). A migration
+// that CREATEs a new _snapshots table without registering it repeats the exact gap
+// that let audit_snapshots/performance_snapshots/redirect_snapshots silently
+// accumulate as unregistered, unscoped tables for years before migration 167.
+//
+// This rule reads the REAL server/db/snapshot-registry.ts from the repo root (not a
+// fixture) to build its registered-name set, so these tests assert against whatever
+// is actually registered right now — 'audit_snapshots' et al. are expected to be
+// registered (real, unaffected fixtures), while synthetic '*_snapshots' table names
+// are guaranteed NOT to be registered.
+
+describe('Rule: New migration creates a _snapshots table without a matching registry entry', () => {
+  const RULE = 'New migration creates a _snapshots table without a matching registry entry';
+
+  it('flags a CREATE TABLE for a new, unregistered _snapshots table', () => {
+    const file = write(
+      uniqPath('rule-snapshot-registry', 'server/db/migrations/999-fixture-unregistered.sql'),
+      lines(
+        'CREATE TABLE IF NOT EXISTS totally_fake_pr_check_fixture_snapshots (',
+        '  id TEXT PRIMARY KEY,',
+        '  workspace_id TEXT NOT NULL',
+        ');',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+    expect(hits[0].text).toContain('totally_fake_pr_check_fixture_snapshots');
+    expect(hits[0].text).toContain('SNAPSHOT_TABLE_REGISTRY');
+  });
+
+  it('does not flag a CREATE TABLE for a table that IS registered (audit_snapshots, real registry entry)', () => {
+    const file = write(
+      uniqPath('rule-snapshot-registry-registered', 'server/db/migrations/999-fixture-registered.sql'),
+      lines(
+        'CREATE TABLE IF NOT EXISTS audit_snapshots (',
+        '  id TEXT PRIMARY KEY',
+        ');',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('allows an unregistered table with an inline hatch comment on the CREATE TABLE line', () => {
+    const file = write(
+      uniqPath('rule-snapshot-registry-hatch', 'server/db/migrations/999-fixture-hatched.sql'),
+      lines(
+        'CREATE TABLE IF NOT EXISTS pr_check_fixture_bookkeeping_snapshots ( -- snapshot-registry-ok: test-only bookkeeping table',
+        '  id TEXT PRIMARY KEY',
+        ');',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a _snapshots table ending in _orphaned (migration-bookkeeping exclusion)', () => {
+    const file = write(
+      uniqPath('rule-snapshot-registry-orphaned', 'server/db/migrations/999-fixture-orphaned.sql'),
+      lines(
+        'CREATE TABLE pr_check_fixture_snapshots_orphaned (',
+        '  id TEXT PRIMARY KEY',
+        ');',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a _snapshots table ending in _r11_old (migration-bookkeeping exclusion)', () => {
+    const file = write(
+      uniqPath('rule-snapshot-registry-r11old', 'server/db/migrations/999-fixture-r11old.sql'),
+      lines(
+        'ALTER TABLE pr_check_fixture_snapshots RENAME TO pr_check_fixture_snapshots_r11_old;',
+        'CREATE TABLE pr_check_fixture_snapshots_r11_old (',
+        '  id TEXT PRIMARY KEY',
+        ');',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a CREATE TABLE for a non-snapshot table (negative control)', () => {
+    const file = write(
+      uniqPath('rule-snapshot-registry-negative', 'server/db/migrations/999-fixture-unrelated.sql'),
+      lines(
+        'CREATE TABLE IF NOT EXISTS totally_unrelated_widgets (',
+        '  id TEXT PRIMARY KEY',
+        ');',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('matches the real migration 167 shape (rename-to-_r11_old + rebuilt live table + _orphaned bookkeeping table) with zero hits', () => {
+    const file = write(
+      uniqPath('rule-snapshot-registry-167-shape', 'server/db/migrations/999-fixture-167-shape.sql'),
+      lines(
+        'ALTER TABLE audit_snapshots RENAME TO audit_snapshots_r11_old;',
+        'CREATE TABLE audit_snapshots (',
+        '  id TEXT PRIMARY KEY,',
+        '  workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE',
+        ');',
+        'CREATE TABLE audit_snapshots_orphaned (',
         '  id TEXT PRIMARY KEY',
         ');',
       ),

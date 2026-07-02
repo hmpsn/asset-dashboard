@@ -68,6 +68,9 @@ function insertSnapshotStmt() {
 let _updateSnapshot: ReturnType<typeof db.prepare> | null = null;
 function updateSnapshotStmt() {
   if (!_updateSnapshot) {
+    // id is crypto.randomBytes(8).toString('hex') — a 16-char random primary key,
+    // already workspace-unique (see saveSnapshot() below).
+    // ws-scope-ok
     _updateSnapshot = db.prepare(`
       UPDATE audit_snapshots SET action_items = @action_items WHERE id = @id
     `);
@@ -131,6 +134,10 @@ function latestSnapshotBeforeStmt() {
 let _cleanupOldSnapshots: ReturnType<typeof db.prepare> | null = null;
 function cleanupOldSnapshotsStmt() {
   if (!_cleanupOldSnapshots) {
+    // Intentional global age-based retention sweep across every workspace
+    // (server/data-retention.ts cleanupOldSnapshots), not a per-request mutation —
+    // same pattern as cleanupOldSends / pruneOldest / deleteExpiredTokens.
+    // ws-scope-ok
     _cleanupOldSnapshots = db.prepare(`
       DELETE FROM audit_snapshots WHERE created_at < datetime('now', ? || ' days')
     `);
