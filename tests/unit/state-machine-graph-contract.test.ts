@@ -11,6 +11,7 @@ import {
   WORK_ORDER_TRANSITIONS,
   validateTransition,
 } from '../../server/state-machines.js';
+import { LIFECYCLE_REGISTRY } from '../../shared/types/lifecycle.js';
 
 type TransitionMap = Record<string, readonly string[]>;
 
@@ -50,6 +51,19 @@ function assertGraphShape(name: string, graph: TransitionMap): void {
 }
 
 describe('state-machine graph contracts', () => {
+  // The lifecycle envelope (R3-PR1) is a typed VIEW over these tables — registering a
+  // table must never change its edges. Prove each pinned graph is wrapped by a registry
+  // entry whose transition object is IDENTITY-equal to the table (no copy, no drift).
+  it('each pinned graph is registered in the lifecycle envelope by object identity', () => {
+    const registeredMaps = new Set(LIFECYCLE_REGISTRY.map((def) => def.transitions));
+    for (const spec of TRANSITION_GRAPHS) {
+      expect(
+        registeredMaps.has(spec.map),
+        `${spec.name} transition table is not registered by identity in LIFECYCLE_REGISTRY`,
+      ).toBe(true);
+    }
+  });
+
   for (const spec of TRANSITION_GRAPHS) {
     it(`${spec.name}: transition map remains internally consistent`, () => {
       assertGraphShape(spec.name, spec.map);

@@ -2,8 +2,19 @@
  * Centralized state machine transition guards.
  *
  * Every entity with a status column should define its valid transitions here.
- * Call validateTransition() before mutating status in DB layer functions.
+ * Call validateTransition(entity, transitions, from, to) before mutating status
+ * in DB layer functions — it THROWS InvalidTransitionError on an illegal move
+ * and returns the new status on success.
+ *
+ * Each `*_TRANSITIONS` table below is also wrapped by the shared lifecycle
+ * envelope (`registerLifecycle`, see the "Lifecycle envelope registration" block
+ * near the bottom). Registration is a typed view over these tables — it never
+ * changes their vocabulary or edges. `shared/types/lifecycle.ts` holds the
+ * contract types; census + verdicts live in
+ * `docs/rules/lifecycle-state-machines.md`.
  */
+
+import { registerLifecycle } from '../shared/types/lifecycle.js';
 
 // ── Approval Item ──
 // pending ↔ approved ↔ applied
@@ -353,6 +364,43 @@ export const TRACKED_KEYWORD_TRANSITIONS: Record<string, readonly string[]> = {
 };
 
 export type TrackedKeywordTransitionStatus = 'active' | 'paused' | 'deprecated' | 'replaced';
+
+// ── Lifecycle envelope registration ──
+// A typed VIEW over the transition tables above — never a second source of truth.
+// Each entry's `states` is derived from the table keys, so it can never drift from
+// the map `validateTransition` actually reads. Adding a new table above WITHOUT a
+// registration here fails the lifecycle-envelope contract test. Classification /
+// derived-projection unions are intentionally absent (see the census doc).
+//
+// NOTE (R4 boundary): RECOMMENDATION_TRANSITIONS and CLIENT_REC_TRANSITIONS are the
+// two-axis recommendation model. They are registered here as a FAITHFUL VIEW of the
+// existing single-writer edges only — this envelope does not formalize, collapse, or
+// otherwise pre-empt the two-axis shape (owner decision R4: keep the two-axis model).
+
+/** Wrap an existing transition table as a lifecycle definition, deriving states from its keys. */
+function registerTransitionTable(
+  entity: string,
+  transitions: Record<string, readonly string[]>,
+): void {
+  registerLifecycle({ entity, states: Object.keys(transitions), transitions });
+}
+
+registerTransitionTable('approval_item', APPROVAL_ITEM_TRANSITIONS);
+registerTransitionTable('content_request', CONTENT_REQUEST_TRANSITIONS);
+registerTransitionTable('post', POST_STATUS_TRANSITIONS);
+registerTransitionTable('work_order', WORK_ORDER_TRANSITIONS);
+registerTransitionTable('content_subscription', CONTENT_SUB_TRANSITIONS);
+registerTransitionTable('client_action', CLIENT_ACTION_TRANSITIONS);
+registerTransitionTable('recommendation', RECOMMENDATION_TRANSITIONS);
+registerTransitionTable('client_recommendation', CLIENT_REC_TRANSITIONS);
+registerTransitionTable('briefing_draft', BRIEFING_DRAFT_TRANSITIONS);
+registerTransitionTable('background_job', BACKGROUND_JOB_TRANSITIONS);
+registerTransitionTable('gbp_review_response', GBP_REVIEW_RESPONSE_TRANSITIONS);
+registerTransitionTable('client_deliverable', CLIENT_DELIVERABLE_TRANSITIONS);
+registerTransitionTable('matrix_cell', MATRIX_CELL_TRANSITIONS);
+registerTransitionTable('client_request', REQUEST_TRANSITIONS);
+registerTransitionTable('schema_plan', SCHEMA_PLAN_TRANSITIONS);
+registerTransitionTable('tracked_keyword', TRACKED_KEYWORD_TRANSITIONS);
 
 // ── Generic validator ──
 
