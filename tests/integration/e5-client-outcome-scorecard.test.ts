@@ -60,6 +60,10 @@ function insertOutcomeRow(opts: {
 async function recordActionViaApi(wsId: string, body: Record<string, unknown>): Promise<string> {
   const r = await postJson(`/api/outcomes/${wsId}/actions`, {
     baselineSnapshot: { position: 8, clicks: 10, impressions: 200 },
+    // B14: default to platform_executed — these tests seed platform-executed wins that must
+    // surface in the client scorecard/wins feed. Since B14 a missing attribution stores the
+    // honest 'not_acted_on', which is EXCLUDED from win surfaces. Tests can override.
+    attribution: 'platform_executed',
     ...body,
   });
   expect(r.status).toBe(200);

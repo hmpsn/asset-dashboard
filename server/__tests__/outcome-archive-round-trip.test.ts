@@ -56,6 +56,7 @@ describe('archiveOldActions — attributed_value / value_basis round-trip in arc
     seedWorkspace(ws);
 
     const action = recordAction({ // recordAction-ok
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: ws,
       actionType: 'insight_acted_on',
       sourceType: 'archive-rt-test',

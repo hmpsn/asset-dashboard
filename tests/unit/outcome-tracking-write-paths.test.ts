@@ -175,6 +175,7 @@ describe('outcome-tracking write paths', () => {
 
     it('can be read back via getAction', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'content_published',
         sourceType: 'brief',
@@ -187,12 +188,16 @@ describe('outcome-tracking write paths', () => {
       expect(readBack!.workspaceId).toBe(ws.workspaceId);
     });
 
-    it('applies defaults: attribution=platform_executed, measurementWindow=90, sourceFlag=live, baselineConfidence=exact', () => {
+    it('applies defaults: measurementWindow=90, sourceFlag=live, baselineConfidence=exact (attribution is REQUIRED, not defaulted — B14)', () => {
+      // R8-PR2 (B14): attribution NO LONGER defaults to 'platform_executed' — the caller
+      // must pass it explicitly (compile-time required). Only the optional operational
+      // fields still default. attribution is passed here to reflect that it's now required.
       const action = recordAction({
         workspaceId: ws.workspaceId,
         actionType: 'schema_deployed',
         sourceType: 'audit',
         baselineSnapshot: BASELINE,
+        attribution: 'platform_executed',
       });
 
       expect(action.attribution).toBe('platform_executed');
@@ -203,6 +208,7 @@ describe('outcome-tracking write paths', () => {
 
     it('returns measurementComplete=false on a fresh action', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'internal_link_added',
         sourceType: 'audit',
@@ -214,6 +220,7 @@ describe('outcome-tracking write paths', () => {
 
     it('injects seasonalTag with valid month (1-12) and quarter (1-4) when no context is passed', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'audit_fix_applied',
         sourceType: 'audit',
@@ -235,6 +242,7 @@ describe('outcome-tracking write paths', () => {
       };
 
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'meta_updated',
         sourceType: 'insight',
@@ -250,6 +258,7 @@ describe('outcome-tracking write paths', () => {
 
     it('seasonalTag quarter is mathematically consistent with month', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'voice_calibrated',
         sourceType: 'system',
@@ -263,6 +272,7 @@ describe('outcome-tracking write paths', () => {
 
     it('workspace isolation: actions recorded in ws are not visible from ws2', () => {
       recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'content_refreshed',
         sourceType: 'brief',
@@ -275,6 +285,7 @@ describe('outcome-tracking write paths', () => {
 
     it('workspace isolation: actions from ws2 are not included in ws results', () => {
       recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'strategy_keyword_added',
         sourceType: 'strategy',
@@ -282,6 +293,7 @@ describe('outcome-tracking write paths', () => {
         baselineSnapshot: BASELINE,
       });
       recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws2.workspaceId,
         actionType: 'strategy_keyword_added',
         sourceType: 'strategy',
@@ -301,11 +313,49 @@ describe('outcome-tracking write paths', () => {
     });
   });
 
+  // ── R8-PR2 (B14): attribution is REQUIRED at the write layer ──────────────────
+
+  describe('recordAction attribution contract (B14)', () => {
+    // NOTE: the COMPILE-TIME assertion (omitting attribution is a type error) lives in
+    // server/__tests__/outcome-attribution-required-typecontract.test.ts, because only
+    // server/__tests__ is inside the `tsc -b` typecheck scope — tests/ is not. This block
+    // covers the RUNTIME half: the stored value is exactly what the caller passed.
+
+    it('stores the exact attribution value passed (no silent rewrite)', () => {
+      const platform = recordAction({
+        workspaceId: ws.workspaceId,
+        actionType: 'content_published',
+        sourceType: 'post',
+        baselineSnapshot: BASELINE,
+        attribution: 'platform_executed',
+      });
+      const notActed = recordAction({
+        workspaceId: ws.workspaceId,
+        actionType: 'content_refreshed',
+        sourceType: 'content_decay',
+        baselineSnapshot: BASELINE,
+        attribution: 'not_acted_on',
+      });
+      const external = recordAction({
+        workspaceId: ws.workspaceId,
+        actionType: 'audit_fix_applied',
+        sourceType: 'audit',
+        baselineSnapshot: BASELINE,
+        attribution: 'externally_executed',
+      });
+
+      expect(getAction(platform.id)!.attribution).toBe('platform_executed');
+      expect(getAction(notActed.id)!.attribution).toBe('not_acted_on');
+      expect(getAction(external.id)!.attribution).toBe('externally_executed');
+    });
+  });
+
   // ── updateAttribution ────────────────────────────────────────────────────────
 
   describe('updateAttribution', () => {
     it('updates attribution and persists the change', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'meta_updated',
         sourceType: 'insight',
@@ -362,6 +412,7 @@ describe('outcome-tracking write paths', () => {
   describe('markActionComplete', () => {
     it('sets measurementComplete=true and persists the change', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'audit_fix_applied',
         sourceType: 'audit',
@@ -383,12 +434,14 @@ describe('outcome-tracking write paths', () => {
 
     it('does not affect a different action with a different ID', () => {
       const actionA = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'internal_link_added',
         sourceType: 'audit',
         baselineSnapshot: BASELINE,
       });
       const actionB = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'content_published',
         sourceType: 'brief',
@@ -406,12 +459,14 @@ describe('outcome-tracking write paths', () => {
 
     it('marking an action from ws2 does not affect ws1 action with different ID', () => {
       const ws1Action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'schema_deployed',
         sourceType: 'schema',
         baselineSnapshot: BASELINE,
       });
       const ws2Action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws2.workspaceId,
         actionType: 'schema_deployed',
         sourceType: 'schema',
@@ -430,6 +485,7 @@ describe('outcome-tracking write paths', () => {
   describe('updateActionContext', () => {
     it('persists new context values — read back with getAction', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'content_published',
         sourceType: 'brief',
@@ -453,6 +509,7 @@ describe('outcome-tracking write paths', () => {
 
     it('replaces existing context (not merges)', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'voice_calibrated',
         sourceType: 'system',
@@ -471,6 +528,7 @@ describe('outcome-tracking write paths', () => {
 
     it('broadcasts learnings invalidation when context changes', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'voice_calibrated',
         sourceType: 'system',
@@ -488,6 +546,7 @@ describe('outcome-tracking write paths', () => {
 
     it('does not affect actions from other workspaces', () => {
       const ws1Action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'strategy_keyword_added',
         sourceType: 'strategy',
@@ -495,6 +554,7 @@ describe('outcome-tracking write paths', () => {
         context: { notes: 'ws1 context' },
       });
       const ws2Action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws2.workspaceId,
         actionType: 'strategy_keyword_added',
         sourceType: 'strategy',
@@ -515,6 +575,7 @@ describe('outcome-tracking write paths', () => {
   describe('updateBaselineSnapshot', () => {
     it('persists the new baseline snapshot — read back with getAction', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'meta_updated',
         sourceType: 'insight',
@@ -542,12 +603,14 @@ describe('outcome-tracking write paths', () => {
 
     it('does not affect actions from another workspace', () => {
       const ws1Action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'content_refreshed',
         sourceType: 'brief',
         baselineSnapshot: makeBaseline({ clicks: 50 }),
       });
       const ws2Action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws2.workspaceId,
         actionType: 'content_refreshed',
         sourceType: 'brief',
@@ -567,6 +630,7 @@ describe('outcome-tracking write paths', () => {
   describe('recordOutcome', () => {
     it('inserts an outcome row and returns an ActionOutcome with correct checkpointDays', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'content_published',
         sourceType: 'brief',
@@ -596,6 +660,7 @@ describe('outcome-tracking write paths', () => {
 
     it('90-day checkpoint marks the action complete', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'schema_deployed',
         sourceType: 'schema',
@@ -619,6 +684,7 @@ describe('outcome-tracking write paths', () => {
 
     it('30-day checkpoint does NOT mark the action complete', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'meta_updated',
         sourceType: 'insight',
@@ -638,6 +704,7 @@ describe('outcome-tracking write paths', () => {
 
     it('60-day checkpoint does NOT mark the action complete', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'internal_link_added',
         sourceType: 'audit',
@@ -657,6 +724,7 @@ describe('outcome-tracking write paths', () => {
 
     it('7-day checkpoint does NOT mark the action complete', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'content_published',
         sourceType: 'brief',
@@ -677,6 +745,7 @@ describe('outcome-tracking write paths', () => {
 
     it('OR REPLACE semantics: second outcome for same actionId+checkpointDays replaces the first', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'content_refreshed',
         sourceType: 'brief',
@@ -711,6 +780,7 @@ describe('outcome-tracking write paths', () => {
 
     it('multiple distinct checkpoints for the same action all persist', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'strategy_keyword_added',
         sourceType: 'strategy',
@@ -729,6 +799,7 @@ describe('outcome-tracking write paths', () => {
 
     it('earlySignal is stored and returned correctly', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'content_published',
         sourceType: 'brief',
@@ -749,6 +820,7 @@ describe('outcome-tracking write paths', () => {
 
     it('null score is stored and returned as null', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'audit_fix_applied',
         sourceType: 'audit',
@@ -780,18 +852,21 @@ describe('outcome-tracking write paths', () => {
     it('counts total=3, scored=1, pending=2 correctly', () => {
       // Create 3 actions: 2 pending, 1 complete
       const a1 = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'meta_updated',
         sourceType: 'insight',
         baselineSnapshot: BASELINE,
       });
       const a2 = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'content_published',
         sourceType: 'brief',
         baselineSnapshot: BASELINE,
       });
       const a3 = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'schema_deployed',
         sourceType: 'schema',
@@ -811,6 +886,7 @@ describe('outcome-tracking write paths', () => {
 
     it('does not count actions from other workspaces', () => {
       recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws2.workspaceId,
         actionType: 'meta_updated',
         sourceType: 'insight',
@@ -827,6 +903,7 @@ describe('outcome-tracking write paths', () => {
   describe('getTopWinsFromActions', () => {
     it('returns empty array when no actions have WIN_SCORES outcomes', () => {
       const action = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'content_published',
         sourceType: 'brief',
@@ -848,18 +925,21 @@ describe('outcome-tracking write paths', () => {
 
     it('returns wins sorted by absolute delta_percent descending', () => {
       const a1 = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'content_published',
         sourceType: 'brief',
         baselineSnapshot: BASELINE,
       });
       const a2 = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'meta_updated',
         sourceType: 'insight',
         baselineSnapshot: BASELINE,
       });
       const a3 = recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'internal_link_added',
         sourceType: 'audit',
@@ -889,6 +969,7 @@ describe('outcome-tracking write paths', () => {
       // Create 5 winning actions
       for (let i = 0; i < 5; i++) {
         const a = recordAction({
+          attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
           workspaceId: ws.workspaceId,
           actionType: 'meta_updated',
           sourceType: 'insight',
@@ -915,6 +996,7 @@ describe('outcome-tracking write paths', () => {
       const allActions: TrackedAction[] = [];
       for (let i = 0; i < 55; i++) {
         allActions.push(recordAction({
+          attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
           workspaceId: ws.workspaceId,
           actionType: 'content_published',
           sourceType: 'brief',

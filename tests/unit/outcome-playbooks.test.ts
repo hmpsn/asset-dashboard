@@ -145,6 +145,7 @@ function createAction(
   actionType: Parameters<typeof recordAction>[0]['actionType'] = 'meta_updated',
 ) {
   return recordAction({
+    attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
     workspaceId,
     actionType,
     sourceType: 'test',
@@ -385,6 +386,7 @@ describe('detectPlaybookPatterns — threshold: < 3 multi-action pages → { dis
     // Actions without pageUrl are skipped in grouping
     for (let i = 0; i < 5; i++) {
       recordAction({
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
         actionType: 'meta_updated',
         sourceType: 'test',

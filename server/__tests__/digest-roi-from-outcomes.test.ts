@@ -49,6 +49,7 @@ describe('getROIHighlightsFromOutcomes', () => {
     seedWorkspace(ws);
 
     const action = recordAction({ // recordAction-ok
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: ws,
       actionType: 'content_published',
       sourceType: 'test',
@@ -106,6 +107,7 @@ describe('getROIHighlightsFromOutcomes', () => {
 
     for (let i = 0; i < 4; i++) {
       const action = recordAction({ // recordAction-ok
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws,
         actionType: 'content_published',
         sourceType: 'test',
@@ -135,6 +137,7 @@ describe('getROIHighlightsFromOutcomes', () => {
     seedWorkspace(ws);
 
     const action = recordAction({ // recordAction-ok
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: ws,
       actionType: 'content_published',
       sourceType: 'test',

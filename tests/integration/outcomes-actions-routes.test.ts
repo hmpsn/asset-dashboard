@@ -154,6 +154,40 @@ describe('POST /api/outcomes/:workspaceId/actions — valid creation', () => {
     expect(body.action).toBeDefined();
   });
 
+  it('B14 tolerate-old: a POST omitting attribution is accepted and stored as the HONEST not_acted_on (never the old silent platform_executed)', async () => {
+    // The write layer now REQUIRES attribution internally, but this external HTTP surface
+    // stays non-breaking for programmatic/MCP callers: a missing attribution defaults to the
+    // honest `not_acted_on` (+ a server-side deprecation warn), NOT `platform_executed`.
+    const res = await postJson(`/api/outcomes/${wsId}/actions`, {
+      actionType: 'content_refreshed',
+      sourceType: 'tolerate-old',
+      sourceId: `tolerate-old-${RUN_ID}`,
+      baselineSnapshot: { position: 12.0 },
+    });
+    expect(res.status).toBe(200);
+    const { action } = await res.json();
+    expect(action.attribution).toBe('not_acted_on');
+
+    // Durable: re-read via GET confirms the stored honest default.
+    const getRes = await api(`/api/outcomes/${wsId}/actions/${action.id}`);
+    expect(getRes.status).toBe(200);
+    const retrieved = await getRes.json();
+    expect(retrieved.attribution).toBe('not_acted_on');
+  });
+
+  it('B14: a POST WITH explicit attribution stores exactly that value', async () => {
+    const res = await postJson(`/api/outcomes/${wsId}/actions`, {
+      actionType: 'content_published',
+      sourceType: 'explicit-attr',
+      sourceId: `explicit-attr-${RUN_ID}`,
+      baselineSnapshot: { position: 6.0 },
+      attribution: 'externally_executed',
+    });
+    expect(res.status).toBe(200);
+    const { action } = await res.json();
+    expect(action.attribution).toBe('externally_executed');
+  });
+
   it('created action has expected shape', async () => {
     const res = await postJson(`/api/outcomes/${wsId}/actions`, {
       actionType: 'content_published',

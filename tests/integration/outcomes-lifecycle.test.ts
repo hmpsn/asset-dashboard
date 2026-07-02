@@ -86,6 +86,13 @@ function actionBody(overrides: Record<string, unknown> = {}): Record<string, unk
     actionType: 'meta_updated',
     sourceType: 'lifecycle-test',
     baselineSnapshot: { position: 5, clicks: 10, impressions: 100 },
+    // B14: attribution defaults to 'platform_executed' here because these lifecycle tests
+    // seed actions that represent genuinely platform-executed work (they exercise win
+    // surfaces, dedup, filtering, broadcasts). Since B14 the HTTP route defaults a MISSING
+    // attribution to the honest 'not_acted_on', which is correctly EXCLUDED from win
+    // surfaces — so a win-surface test must seed an executed action explicitly. Individual
+    // tests can override via `overrides`.
+    attribution: 'platform_executed',
     ...overrides,
   };
 }

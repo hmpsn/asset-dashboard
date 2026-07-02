@@ -40,6 +40,7 @@ afterAll(() => {
 
 function makeAction(wsId: string) {
   return recordAction({ // recordAction-ok
+    attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
     workspaceId: wsId,
     actionType: 'content_published',
     sourceType: 'test',

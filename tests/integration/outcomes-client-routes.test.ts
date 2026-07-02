@@ -200,6 +200,9 @@ describe('Suite 2: Public client wins endpoint', () => {
       pageUrl: 'https://example.com/great-post',
       targetKeyword: 'test keyword',
       baselineSnapshot: { position: 8, clicks: 20, impressions: 400 },
+      // B14: a genuine platform-executed win — must be attributed so it surfaces in /wins
+      // (a missing attribution now stores the honest 'not_acted_on', which is excluded).
+      attribution: 'platform_executed',
     });
     expect(r.status).toBe(200);
     const actionId = (await r.json()).action.id;
@@ -270,6 +273,8 @@ describe('Suite 2: Public client wins endpoint', () => {
       sourceType: 'wins-fallback-parity-test',
       sourceId: `fallback-parity-${RUN_ID}`,
       baselineSnapshot: { position: 8 },
+      // B14: platform-executed win so it appears in /wins (missing attribution → not_acted_on, excluded).
+      attribution: 'platform_executed',
     });
     expect(r.status).toBe(200);
     const actionId = (await r.json()).action.id;

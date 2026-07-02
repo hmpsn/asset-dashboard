@@ -300,7 +300,19 @@ export interface RecordActionParams {
   targetKeyword?: string | null;
   baselineSnapshot: BaselineSnapshot;
   trailingHistory?: TrailingHistory;
-  attribution?: Attribution;
+  /**
+   * Reconcile R8-PR2 (B14): REQUIRED. The old `attribution?: Attribution` default of
+   * `?? 'platform_executed'` silently claimed the platform executed an action on the
+   * client's behalf whenever a caller omitted it — a false, unverifiable attribution the
+   * audit flagged as a trust hazard (it inflated the platform's apparent contribution).
+   * The default is gone: every caller must now pass the attribution that is ACTUALLY TRUE
+   * for its path (`platform_executed` only where the platform genuinely performed the
+   * external action; `not_acted_on` for proposals/suggestions; `externally_executed` where
+   * the client acted). The external HTTP surface (routes/outcomes.ts) tolerates a missing
+   * attribution by defaulting to the HONEST `not_acted_on` + a deprecation warn — never the
+   * silent `platform_executed`.
+   */
+  attribution: Attribution;
   measurementWindow?: number;
   sourceFlag?: SourceFlag;
   baselineConfidence?: BaselineConfidence;
@@ -343,7 +355,11 @@ export function recordAction(params: RecordActionParams): TrackedAction {
     target_keyword: params.targetKeyword ?? null,
     baseline_snapshot: JSON.stringify(params.baselineSnapshot),
     trailing_history: JSON.stringify(params.trailingHistory ?? { metric: '', dataPoints: [] }),
-    attribution: params.attribution ?? 'platform_executed',
+    // R8-PR2 (B14): attribution is REQUIRED — no `?? 'platform_executed'` fallback. The
+    // inverted default silently over-credited the platform; every caller now passes the
+    // attribution that is true for its path, and the HTTP surface defaults to the honest
+    // `not_acted_on` (never platform_executed) with a deprecation warn.
+    attribution: params.attribution,
     measurement_window: params.measurementWindow ?? 90,
     source_flag: params.sourceFlag ?? 'live',
     baseline_confidence: params.baselineConfidence ?? 'exact',
