@@ -4,38 +4,9 @@ import { SectionCard, Skeleton, Icon, EmptyState } from '../../ui';
 import { TierGate } from '../../ui/TierGate';
 import { useClientOutcomeWins } from '../../../hooks/client/useClientOutcomes';
 import { timeAgo } from '../../../lib/timeAgo';
+import { clientActionLabel } from '../../../../shared/types/client-vocabulary';
 import type { Tier } from '../../ui/TierGate';
-import type { ActionType, OutcomeWinEntry, OutcomeScore } from '../../../../shared/types/outcome-tracking';
-
-// ── Action type → human label ───────────────────────────────────────────────
-
-const ACTION_LABELS: Record<ActionType, string> = {
-  meta_updated:           'Updated meta description',
-  content_published:      'Published new post',
-  content_refreshed:      'Refreshed existing content',
-  schema_deployed:        'Added structured data',
-  internal_link_added:    'Added internal links',
-  audit_fix_applied:      'Fixed audit issue',
-  brief_created:          'Created content brief',
-  strategy_keyword_added: 'Added keyword to strategy',
-  voice_calibrated:       'Calibrated brand voice',
-  insight_acted_on:       'Acted on a recommendation',
-  competitor_gap_closed:  'Closed a competitor keyword gap',
-  cluster_published:      'Filled a topic cluster',
-  cannibalization_resolved: 'Resolved keyword cannibalization',
-  local_visibility_won:   'Won local pack visibility',
-  local_service_added:    'Started targeting a local service',
-  // Strategy redesign P2 pre-commit — managed-set keep markers (internal curation, never
-  // recorded as a client-facing outcome; present only to keep this Record exhaustive).
-  topic_cluster_keep:     'Prioritized a topic cluster',
-  content_gap_keep:       'Prioritized a content opportunity',
-  // Reconcile R8-PR1 (B13) — ships dark; see shared/types/outcome-tracking.ts.
-  gbp_review_reply:       'Replied to a Google Business Profile review',
-};
-
-function actionLabel(type: ActionType): string {
-  return ACTION_LABELS[type] ?? type.replace(/_/g, ' ');
-}
+import type { OutcomeWinEntry, OutcomeScore } from '../../../../shared/types/outcome-tracking';
 
 // ── Win quality badge ──────────────────────────────────────────────────────
 
@@ -71,7 +42,7 @@ function WinRow({ entry }: { entry: OutcomeWinEntry }) {
   // E5: the server resolves the real source title (recommendation/post/brief) into
   // `recommendation`, falling back to an honest generic. Older cached entries may
   // carry an empty string — fall back to the action-type label locally.
-  const heading = entry.recommendation || actionLabel(entry.actionType);
+  const heading = entry.recommendation || clientActionLabel(entry.actionType);
 
   // Realized dollar attribution (action_outcomes.attributed_value). Blue = data
   // per the Four Laws — this is a read-only metric, not a CTA.

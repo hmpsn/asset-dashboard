@@ -223,7 +223,8 @@ describe('public wins resolve real source titles and surface attributed value', 
     expect(entry).toBeDefined();
     // The legacy fabrication was `${actionType.replace(/_/g, ' ')} action`
     expect(entry!.recommendation).not.toBe('schema deployed action');
-    expect(entry!.recommendation).toBe('Deployed structured data');
+    // C2/R12a: canonical client-vocabulary wording (shared/types/client-vocabulary.ts).
+    expect(entry!.recommendation).toBe('Added structured data');
   });
 
   it('recommendation sourceId that no longer exists falls back honestly', async () => {
@@ -238,7 +239,8 @@ describe('public wins resolve real source titles and surface attributed value', 
     const wins = await res.json() as Array<Record<string, unknown>>;
     const entry = wins.find(w => w.actionId === actionId);
     expect(entry).toBeDefined();
-    expect(entry!.recommendation).toBe('Applied a technical fix');
+    // C2/R12a: canonical client-vocabulary wording (shared/types/client-vocabulary.ts).
+    expect(entry!.recommendation).toBe('Fixed audit issue');
     expect(entry!.recommendation).not.toMatch(/ action$/);
   });
 
@@ -279,6 +281,7 @@ describe('public wins resolve real source titles and surface attributed value', 
     const entry = wins.find(w => w.actionId === actionId);
     expect(entry).toBeDefined();
     // The honest generic per-action-type label is still served — the fallback is NOT deleted.
-    expect(entry!.recommendation).toBe('Updated page metadata');
+    // C2/R12a: canonical client-vocabulary wording (shared/types/client-vocabulary.ts).
+    expect(entry!.recommendation).toBe('Updated meta description');
   });
 });
