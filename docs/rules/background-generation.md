@@ -75,6 +75,58 @@ Every new job type must be added to `shared/types/background-jobs.ts` with:
 - A concise description.
 - Whether cancellation is actually supported.
 - Expected result behavior.
+- Its job class (`'user'` or `'system'` — see System Job Class below).
+
+## System Job Class
+
+Every entry in `BACKGROUND_JOB_METADATA` carries a `class: 'user' | 'system'`
+field. `'system'` means the job type is only ever created by automated
+background triggers with no human in the loop. Today the sole `'system'` type is
+`INTELLIGENCE_RECOMPUTE`, created exclusively through
+`server/intelligence-recompute-job.ts` `enqueueIntelligenceRecompute` (itself
+gated behind the `signal-auto-recompute` flag and `hasActiveJob`-deduped).
+`enqueueIntelligenceRecompute` is invoked from more than one place, so removing
+any single caller does NOT retire the type — the producers are:
+
+- `server/insight-recompute-cron.ts` — the daily activity-gated recompute cron
+  (see `server/cron-registry.ts` `insight-recompute` for the scheduler that ticks it).
+- `server/rank-tracking-scheduler.ts` — the daily rank-tracking cron, which
+  refreshes signals after new rank snapshots land (`server/cron-registry.ts`
+  `rank-tracking`).
+- `server/keyword-strategy-follow-ons.ts` — an on-mutation follow-on fired after a
+  keyword-strategy / content update settles, not a cron.
+
+Every other type defaults to `'user'`. Because the class is a property of the job
+TYPE, all of these producer paths are gated identically by the class filter — the
+type determines client visibility, not which caller enqueued it.
+
+`isSystemJobType(type)` is the single predicate that reads this field (mirrors
+`isBackgroundJobCancellable`). Unknown types default to `false` — the safe
+direction, since hiding an unrecognized job from the admin feed would be a
+silent visibility regression.
+
+**Client-facing job feeds must exclude system-class jobs.** A nightly cron run
+must never appear in a client's task panel. This is enforced at the query
+level, the narrowest correct point:
+
+- `server/routes/jobs.ts` `isClientVisibleJob()` — gates `GET /api/public/jobs/:workspaceId`
+  (consumed by `src/hooks/client/useClientWorkFeed.ts` → `AgencyWorkFeed.tsx`).
+- `server/websocket.ts` `resolveJobDelivery()` — gates the unauthenticated/client
+  WebSocket delivery path for `JOB_CREATED`/`JOB_UPDATED`.
+
+Both call sites already gate on a `CLIENT_VISIBLE_JOB_TYPES` allow-list; the
+`isSystemJobType` check is a second, independent gate that always wins on top
+of it, so a type mistakenly added to the allow-list in the future still can't
+reach a client if it's `class: 'system'`.
+
+**Admin surfaces never filter by class** — `GET /api/jobs`, the authenticated
+admin WebSocket path, `useBackgroundTasks.tsx`, and `NotificationBell.tsx` show
+every job regardless of class. Operators need visibility into cron-originated
+work; only the client-facing surfaces need protecting.
+
+No DB migration is involved: `class` is metadata keyed by job `type`, not a
+column on the `jobs` table, so it works retroactively for every already-persisted
+job row without a backfill.
 
 ## Guardrails
 

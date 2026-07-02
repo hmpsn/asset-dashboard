@@ -116,6 +116,34 @@ describe('resolveJobDelivery', () => {
       },
     })).toBeNull();
   });
+
+  it('sends system/cron-originated jobs to authenticated admins with workspace access (admin bell shows everything)', () => {
+    const job = makeJob({ type: BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE });
+
+    const delivery = resolveJobDelivery({
+      job,
+      auth: {
+        userId: 'user-1',
+        email: 'admin@test.local',
+        role: 'member',
+        workspaceIds: ['ws-1'],
+      },
+    });
+
+    expect(delivery).toEqual({
+      data: job,
+      workspaceId: 'ws-1',
+    });
+  });
+
+  it('does not send system/cron-originated jobs to unauthenticated subscribed clients, even if the type were ever added to the client allow-list', () => {
+    const job = makeJob({ type: BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE });
+
+    expect(resolveJobDelivery({
+      job,
+      subscribedWorkspaces: new Set(['ws-1']),
+    })).toBeNull();
+  });
 });
 
 describe('resolveSocketAuth', () => {

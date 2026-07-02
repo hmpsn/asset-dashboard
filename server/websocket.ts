@@ -12,6 +12,7 @@ import { getUserById } from './users.js';
 import { recoverStuckDiagnosticReports } from './diagnostic-store.js';
 import {
   BACKGROUND_JOB_TYPES,
+  isSystemJobType,
   toPublicBackgroundJob,
   type BackgroundJobRecord,
 } from '../shared/types/background-jobs.js';
@@ -117,7 +118,12 @@ export function resolveJobDelivery({
       : null;
   }
 
-  if (!job.workspaceId || !CLIENT_VISIBLE_JOB_TYPES.has(job.type)) {
+  // The allow-list opts a type IN to client delivery; isSystemJobType (derived from
+  // BACKGROUND_JOB_METADATA[type].class) always wins on top of it — a cron-originated
+  // job must never reach an unauthenticated client socket even if a future edit
+  // mistakenly adds its type to CLIENT_VISIBLE_JOB_TYPES. Mirrors the same guard in
+  // server/routes/jobs.ts isClientVisibleJob (REST /api/public/jobs).
+  if (!job.workspaceId || !CLIENT_VISIBLE_JOB_TYPES.has(job.type) || isSystemJobType(job.type)) {
     return null;
   }
 

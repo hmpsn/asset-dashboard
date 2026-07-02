@@ -28,6 +28,7 @@ const ADMIN_ONLY_TYPE = 'post_ai_review';
 // Job IDs
 let visibleJobId = '';
 let invisibleJobId = '';
+let systemJobId = '';
 
 beforeAll(async () => {
   workspaceId = createWorkspace('Agency Feed Test').id;
@@ -60,6 +61,15 @@ beforeAll(async () => {
     message: 'Analysing pages',
   });
   invisibleJobId = invisibleJob.id;
+
+  // Create a system/cron-originated job (intelligence-recompute — the one type
+  // classified `class: 'system'` in BACKGROUND_JOB_METADATA). A nightly recompute
+  // must never appear in a client's task panel.
+  const systemJob = createJob(BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE, {
+    workspaceId,
+    message: 'Refreshing signals...',
+  });
+  systemJobId = systemJob.id;
 
   await ctx.startServer();
 }, 25_000);
@@ -151,11 +161,34 @@ describe('GET /api/public/jobs/:workspaceId (agency work feed)', () => {
     expect(adminJob).toBeUndefined();
   });
 
+  it('excludes system/cron-originated job types (a nightly recompute must not appear in the client task panel)', async () => {
+    clearCookies();
+    const res = await api(`/api/public/jobs/${workspaceId}`);
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as Array<Record<string, unknown>>;
+    const systemJob = body.find((j) => j.id === systemJobId);
+    expect(systemJob).toBeUndefined();
+  });
+
   it('returns 401 for a protected workspace without a portal session', async () => {
     clearCookies();
     const res = await api(`/api/public/jobs/${protectedWorkspaceId}`, {
       headers: { 'x-no-auto-public-auth': 'true' },
     });
     expect(res.status).toBe(401);
+  });
+});
+
+// ── Admin job feed — system-origin jobs remain fully visible to admins ────────
+
+describe('GET /api/jobs?workspaceId (admin feed keeps system-origin jobs visible)', () => {
+  it('includes the system/cron-originated job (admin bell shows everything)', async () => {
+    const res = await api(`/api/jobs/${systemJobId}`);
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.id).toBe(systemJobId);
+    expect(body.type).toBe(BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE);
   });
 });

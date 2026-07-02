@@ -5,6 +5,7 @@ import {
   getBackgroundJobLabel,
   isBackgroundJobCancellable,
   isBackgroundJobType,
+  isSystemJobType,
 } from '../../shared/types/background-jobs';
 
 describe('background job metadata', () => {
@@ -17,8 +18,24 @@ describe('background job metadata', () => {
       expect(metadata.label.length).toBeGreaterThan(0);
       expect(metadata.description.length).toBeGreaterThan(0);
       expect(typeof metadata.cancellable).toBe('boolean');
+      expect(['user', 'system']).toContain(metadata.class);
       expect(['ephemeral', 'domain-store', 'domain-store-and-result']).toContain(metadata.resultBehavior);
     }
+  });
+
+  it('classifies the single system-originated job type as system, everything else as user', () => {
+    // INTELLIGENCE_RECOMPUTE is the only system-originated type today — created solely
+    // via server/intelligence-recompute-job.ts enqueueIntelligenceRecompute, called from
+    // insight-recompute-cron, rank-tracking-scheduler, and keyword-strategy-follow-ons
+    // (see docs/rules/background-generation.md #System Job Class).
+    expect(isSystemJobType(BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE)).toBe(true);
+    expect(isSystemJobType(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION)).toBe(false);
+    expect(isSystemJobType(BACKGROUND_JOB_TYPES.SEO_AUDIT)).toBe(false);
+    expect(isSystemJobType(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION)).toBe(false);
+  });
+
+  it('defaults unknown job types to user-originated (safe default: never hide an unrecognized job from the admin feed)', () => {
+    expect(isSystemJobType('some-unknown-job-type')).toBe(false);
   });
 
   it('identifies known and unknown job types', () => {
