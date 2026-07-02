@@ -17,6 +17,7 @@ import type * as OutcomeEmvCalibration from './outcome-emv-calibration.js';
 import type * as PlatformLearningsPriors from './platform-learnings-priors.js';
 import type * as RecommendationStaleness from './recommendation-staleness.js';
 import type * as DeliverableDivergenceSweep from './deliverable-divergence-sweep.js';
+import type * as OutcomeSourceIntegritySweepJob from './outcome-source-integrity-sweep-job.js';
 
 const log = createLogger('outcome-crons');
 
@@ -38,6 +39,7 @@ let emvCalibrationInterval: ReturnType<typeof setInterval> | null = null;
 let platformPriorsInterval: ReturnType<typeof setInterval> | null = null;
 let stalenessScanInterval: ReturnType<typeof setInterval> | null = null;
 let divergenceSweepInterval: ReturnType<typeof setInterval> | null = null;
+let integritySweepInterval: ReturnType<typeof setInterval> | null = null;
 
 // Startup timeout handles — stored so stopOutcomeCrons() can cancel them
 // if shutdown is called during the startup warmup window (currently up to ~60s).
@@ -326,6 +328,20 @@ export function startOutcomeCrons() {
     }
   };
 
+  // ── B12 — outcome-source integrity sweep (24h). ──
+  // READ-ONLY, FLEET-WIDE diagnostic: sweeps every workspace's tracked_actions for dangling
+  // source refs and writes the report to job.result. No per-workspace arg — a single sweep
+  // covers all workspaces. Mutates NOTHING (no repair, no broadcast, no activity). Dynamic
+  // import so the cron module doesn't pull the sweep job's transitive deps at startup.
+  const runIntegritySweepJob = async () => {
+    try {
+      const { enqueueOutcomeSourceIntegritySweep }: typeof OutcomeSourceIntegritySweepJob = await import('./outcome-source-integrity-sweep-job.js'); // dynamic-import-ok
+      enqueueOutcomeSourceIntegritySweep();
+    } catch (err) {
+      log.error({ err }, 'Outcome source integrity sweep cron failed');
+    }
+  };
+
   // Run each job once after a short startup delay, then on their normal interval.
   // Store handles so stopOutcomeCrons() can cancel them during early shutdown.
   startupTimeouts = [
@@ -341,6 +357,7 @@ export function startOutcomeCrons() {
     setTimeout(() => void runPlatformPriorsJob(), 60_000),
     setTimeout(() => void runStalenessScanJob(), 65_000),
     setTimeout(() => void runDivergenceSweepJob(), 70_000),
+    setTimeout(() => void runIntegritySweepJob(), 75_000),
   ];
 
   measureInterval = setInterval(() => void runMeasure(), DAILY_MS);
@@ -354,6 +371,7 @@ export function startOutcomeCrons() {
   platformPriorsInterval = setInterval(() => void runPlatformPriorsJob(), WEEKLY_MS);
   stalenessScanInterval = setInterval(() => void runStalenessScanJob(), DAILY_MS);
   divergenceSweepInterval = setInterval(() => void runDivergenceSweepJob(), DAILY_MS);
+  integritySweepInterval = setInterval(() => void runIntegritySweepJob(), DAILY_MS);
 
   playbooksInterval = setInterval(() => void runPlaybooks(), 7 * DAILY_MS);
 
@@ -375,6 +393,7 @@ export function stopOutcomeCrons() {
   if (platformPriorsInterval) clearInterval(platformPriorsInterval);
   if (stalenessScanInterval) clearInterval(stalenessScanInterval);
   if (divergenceSweepInterval) clearInterval(divergenceSweepInterval);
+  if (integritySweepInterval) clearInterval(integritySweepInterval);
   measureInterval = null;
   learningsInterval = null;
   detectionInterval = null;
@@ -387,5 +406,6 @@ export function stopOutcomeCrons() {
   platformPriorsInterval = null;
   stalenessScanInterval = null;
   divergenceSweepInterval = null;
+  integritySweepInterval = null;
   log.info('Outcome crons stopped');
 }
