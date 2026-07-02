@@ -257,6 +257,33 @@ describe('Suite 2: Public client wins endpoint', () => {
       expect(['win', 'strong_win']).toContain(w.score);
     }
   });
+
+  // R5-PR2 (B9) behavior-parity pin: WIN_FALLBACK_LABELS (server/routes/outcomes.ts) is
+  // CLIENT-VISIBLE (WinsSurface.tsx renders `entry.recommendation` directly) and is
+  // therefore explicitly OUT OF SCOPE for the action-catalog cutover in this PR — client
+  // wording changes need an owner sign-off pass (C2/R12a). This pin proves the fallback
+  // title text is byte-identical to the pre-cutover string when the source can't resolve
+  // (sourceType with no matching switch case in resolveWinTitle).
+  it('WIN_FALLBACK_LABELS text is unchanged by the R5 catalog cutover (client-visible, out of scope)', async () => {
+    const r = await postJson(`/api/outcomes/${wsId}/actions`, {
+      actionType: 'content_published',
+      sourceType: 'wins-fallback-parity-test',
+      sourceId: `fallback-parity-${RUN_ID}`,
+      baselineSnapshot: { position: 8 },
+    });
+    expect(r.status).toBe(200);
+    const actionId = (await r.json()).action.id;
+    insertOutcomeRow({ actionId, score: 'strong_win' });
+
+    const res = await api(`/api/public/outcomes/${wsId}/wins`);
+    expect(res.status).toBe(200);
+    const wins = await res.json();
+    const win = wins.find((w: { actionId: string }) => w.actionId === actionId);
+    expect(win).toBeDefined();
+    // Pre-cutover WIN_FALLBACK_LABELS.content_published value — must stay exactly this
+    // full-sentence client copy, NOT the catalog's short admin label ("Content Published").
+    expect(win.recommendation).toBe('Published new content');
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

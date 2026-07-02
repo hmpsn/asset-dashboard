@@ -242,7 +242,7 @@ function seedPremiumHistoryWorkspace(seed: DemoWorkspaceSeed): void {
   `).run(
     'client_action_demo_premium_1',
     seed.id,
-    'content_post',
+    'aeo_change',
     'post_demo_premium_1',
     'Approve final CTA block',
     'Choose between two CTA variants before publishing.',

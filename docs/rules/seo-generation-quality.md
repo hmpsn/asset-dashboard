@@ -54,9 +54,10 @@ real money, until P6 threads GA4 `estimatedRevenue` — its JSDoc must say so. I
   `routes/recommendations.ts` and `outcome-backfill.ts`, SELECTed in `getCalibrationOutcomes`).
   The regenerable rec row is NOT a safe home: P5 regenerates after every scheduled audit and
   `buildMergeKey` does not preserve the old `opportunity`.
-- Client renderers (must never receive raw `$/wk`): `src/components/client/FixRecommendations.tsx`,
-  `src/components/client/Briefing/RecommendedForYou.tsx`,
+- Client renderers (must never receive raw `$/wk`): `src/components/client/Briefing/RecommendedForYou.tsx`,
   `src/components/client/strategy/StrategyContentOpportunitiesSection.tsx`.
+  (`FixRecommendations.tsx` was deleted as verified-dead in the H1 sweep — see the R5
+  action-catalog checklist below for the current stale-reference note.)
 
 ## Contract 2 — the priority-tier source
 
@@ -96,9 +97,7 @@ it to the public strip (no dollarized string may reach a client).
 - `server/recommendations.ts` — `estimatedGain` assignment + `computeRecommendationSummary`.
 - `server/briefing-candidates.ts` — brief-candidate ranking; `server/content-gaps.ts`
   ordering (`opportunity_score`).
-- Gain renderers: `src/components/client/FixRecommendations.tsx` (switch its hand-duplicated
-  `ServerRecommendation` to the shared `Recommendation` type),
-  `src/components/client/InsightsEngine.tsx`, `src/components/client/strategy/*`,
+- Gain renderers: `src/components/client/InsightsEngine.tsx`, `src/components/client/strategy/*`,
   `src/components/client/Briefing/RecommendedForYou.tsx` (its independent `volume × 0.103`
   clicks estimate + the legacy `/100` badge are **flag-gated**, not unconditionally removed —
   see the client-gate contract below).
