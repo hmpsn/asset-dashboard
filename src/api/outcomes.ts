@@ -6,6 +6,7 @@ import type {
   ActionPlaybook,
   Attribution,
   OutcomeScorecard,
+  OutcomeCoverage,
   TopWin,
   WorkspaceLearnings,
   WorkspaceOutcomeOverview,
@@ -38,6 +39,11 @@ export const outcomesApi = {
 
   getScorecard: (wsId: string, signal?: AbortSignal) =>
     getSafe<OutcomeScorecard | null>(`/api/outcomes/${wsId}/scorecard`, null, signal),
+
+  // R9 (B15): admin-only coverage funnel (tracked/measured/reconciled). Never exposed to a
+  // client-facing consumer.
+  getCoverage: (wsId: string, signal?: AbortSignal) =>
+    getSafe<OutcomeCoverage | null>(`/api/outcomes/${wsId}/coverage`, null, signal),
 
   getTopWins: (wsId: string, signal?: AbortSignal) =>
     getSafe<TopWin[]>(`/api/outcomes/${wsId}/top-wins`, [], signal),

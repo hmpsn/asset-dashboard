@@ -137,6 +137,30 @@ export type OutcomeProvenance =
                           //      figure stays estimate-banded (still count × lead value).
   | 'actual_reconciled';  // P3: reconciled to call-tracking / CRM closed-won. Renders "actual".
 
+/**
+ * Reconcile R9 (Task B15) — ADMIN-ONLY per-row coverage/provenance signal on `action_outcomes`,
+ * recording how far THIS outcome's value got / how it was derived. Powers the admin coverage
+ * funnel (server/outcome-coverage.ts: computeOutcomeCoverage → tracked/measured/reconciled
+ * counts) and is DISTINCT from `OutcomeProvenance` above: `OutcomeProvenance` is a
+ * workspace-level, computed-at-read-time confidence tier for The Issue's client-facing GA4
+ * conversion-tracking maturity and is never persisted. `OutcomeCoverageProvenance` is a
+ * PERSISTED, per-outcome-row column consumed only by admin surfaces (OutcomesOverview /
+ * OutcomeDashboard) — never rendered client-side. The two intentionally share the
+ * 'estimate_ga4' legacy-default vocabulary (the audit's naming), but must not be conflated:
+ * do not import one where the other is expected.
+ *
+ * Funnel stages (weakest → strongest, matching computeOutcomeCoverage's tracked/measured/
+ * reconciled buckets):
+ */
+export type OutcomeCoverageProvenance =
+  | 'estimate_ga4'   // Legacy default AND the read-fallback for a NULL provenance column (a row
+                     // recorded before this column existed). Counts as the base tracked/measured
+                     // funnel stage — never dropped, never promoted to 'reconciled'.
+  | 'measured_action' // The outcome's value was derived from a real measured action (not a bare
+                      // GA4 estimate). Counts as 'measured' in the funnel.
+  | 'actual_reconciled'; // The outcome's value has been reconciled to closed/actual records.
+                        // Counts as 'reconciled' in the funnel — the top of the stack.
+
 /** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */
 export interface BaselineSnapshot {
   captured_at: string;
@@ -253,6 +277,26 @@ export interface ActionOutcome {
   attributedValue: number | null;
   /** Describes how attributedValue was computed (e.g. 'clicks_delta_x_cpc'). NULL when attributedValue is NULL. */
   valueBasis: string | null;
+  /**
+   * Reconcile R9 (Task B15) — ADMIN-ONLY coverage-funnel signal: how far this outcome's value
+   * got / how it was derived (see OutcomeCoverageProvenance doc). NULL for rows recorded before
+   * this column existed (or when the write site did not thread a value) — computeOutcomeCoverage()
+   * treats NULL as the 'estimate_ga4' read-fallback. Never rendered client-side.
+   */
+  provenance: OutcomeCoverageProvenance | null;
+}
+
+/**
+ * Reconcile R9 (Task B15) — ADMIN-ONLY outcome coverage funnel response shape, shared between
+ * server/outcome-coverage.ts (computeOutcomeCoverage) and src/api/outcomes.ts. `tracked` is the
+ * total outcome row count for the workspace (every row reaches at least this stage); `measured`
+ * and `reconciled` are inclusive of the stronger stage they gate (reconciled rows also count as
+ * measured). Never rendered on a client-facing surface.
+ */
+export interface OutcomeCoverage {
+  tracked: number;
+  measured: number;
+  reconciled: number;
 }
 
 export interface PlaybookStep {
@@ -443,4 +487,10 @@ export interface WorkspaceOutcomeOverview {
   topWin: TopWin | null;
   attentionNeeded: boolean;
   attentionReason?: string;
+  /**
+   * Reconcile R9 (Task B15) — ADMIN-ONLY coverage funnel summary for this workspace. Optional
+   * so existing consumers of WorkspaceOutcomeOverview are unaffected; OutcomesOverview.tsx is
+   * the only renderer. Never surfaced client-side.
+   */
+  coverage?: OutcomeCoverage;
 }

@@ -212,6 +212,9 @@ export const queryKeys = {
       ['admin-outcome-actions', wsId, type ?? '', score ?? ''] as const,
     outcomeAction: (wsId: string, actionId: string) => ['admin-outcome-actions', wsId, actionId] as const,
     outcomeScorecard: (wsId: string) => ['admin-outcome-scorecard', wsId] as const,
+    // R9 (B15): admin-only coverage funnel (tracked/measured/reconciled). Never consumed by a
+    // client-facing hook.
+    outcomeCoverage: (wsId: string) => ['admin-outcome-coverage', wsId] as const,
     outcomeTimeline: (wsId: string) => ['admin-outcome-timeline', wsId] as const,
     outcomeLearnings: (wsId: string) => ['admin-outcome-learnings', wsId] as const,
     outcomePlaybooks: (wsId: string) => ['admin-outcome-playbooks', wsId] as const,

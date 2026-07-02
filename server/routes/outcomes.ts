@@ -26,6 +26,7 @@ import {
   getActionIdsByWorkspace,
   getWinRateForActionIds,
 } from '../outcome-tracking.js';
+import { computeOutcomeCoverage } from '../outcome-coverage.js';
 import { getPlaybooks } from '../outcome-playbooks.js';
 import { getWorkspaceLearnings } from '../workspace-learnings.js';
 import { loadRecommendations } from '../recommendations.js';
@@ -213,6 +214,9 @@ router.get('/api/outcomes/overview', (_req, res) => {
         topWin: topWins[0] ?? null,
         attentionNeeded,
         attentionReason,
+        // R9 (B15): admin-only coverage funnel summary — cheap indexed aggregate, same shape
+        // as the per-workspace endpoint. Never surfaced client-side.
+        coverage: computeOutcomeCoverage(ws.id),
       });
     }
 
@@ -231,6 +235,18 @@ router.get('/api/outcomes/:workspaceId/scorecard', requireWorkspaceAccess('works
   } catch (err) {
     log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get scorecard');
     res.status(500).json({ error: 'Failed to get outcome scorecard' });
+  }
+});
+
+// GET /api/outcomes/:workspaceId/coverage — Reconcile R9 (B15): admin-only outcome
+// coverage funnel (tracked → measured → reconciled). Never exposed on a public/client route.
+router.get('/api/outcomes/:workspaceId/coverage', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  try {
+    const coverage = computeOutcomeCoverage(req.params.workspaceId);
+    res.json(coverage);
+  } catch (err) {
+    log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get outcome coverage');
+    res.status(500).json({ error: 'Failed to get outcome coverage' });
   }
 });
 

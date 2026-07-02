@@ -19,6 +19,16 @@ export function useOutcomeScorecard(wsId: string) {
   });
 }
 
+// ── Coverage funnel (R9 / B15, admin-only) ─────────────────────────────────
+
+export function useOutcomeCoverage(wsId: string) {
+  return useQuery({
+    queryKey: queryKeys.admin.outcomeCoverage(wsId),
+    queryFn: ({ signal }) => outcomesApi.getCoverage(wsId, signal),
+    enabled: !!wsId,
+  });
+}
+
 // ── Action list (filterable by type / score) ───────────────────────────────
 
 export function useOutcomeActions(wsId: string, type?: string, score?: string) {
