@@ -18,7 +18,7 @@ import {
   type Job,
 } from '../jobs.js';
 import { APP_PASSWORD, requireClientPortalAuth, signAdminToken } from '../middleware.js';
-import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied, workspaceOwnsWebflowSite } from '../auth.js';
+import { requestUserCanAccessWorkspace, requestUserCanOmitWorkspaceScope, sendWorkspaceAccessDenied, workspaceOwnsWebflowSite } from '../auth.js';
 import { startLegacyJob } from '../legacy-jobs-runner-registry.js';
 import { runRecommendationGenerationJob } from '../recommendation-generation-job.js';
 import { getBrief } from '../content-brief.js';
@@ -155,7 +155,11 @@ router.get('/api/jobs', (_req, res) => {
 router.get('/api/jobs/:id', (req, res) => {
   const job = getJob(req.params.id);
   if (!job) return res.status(404).json({ error: 'Job not found' });
-  if (job.workspaceId && !requestUserCanAccessWorkspace(req, job.workspaceId)) return sendWorkspaceAccessDenied(res);
+  if (job.workspaceId) {
+    if (!requestUserCanAccessWorkspace(req, job.workspaceId)) return sendWorkspaceAccessDenied(res);
+  } else if (!requestUserCanOmitWorkspaceScope(req)) {
+    return sendWorkspaceAccessDenied(res);
+  }
   res.json(job);
 });
 
@@ -196,7 +200,11 @@ router.delete('/api/jobs/completed', (_req, res) => {
 router.delete('/api/jobs/:id', (req, res) => {
   const existing = getJob(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Job not found' });
-  if (existing.workspaceId && !requestUserCanAccessWorkspace(req, existing.workspaceId)) return sendWorkspaceAccessDenied(res);
+  if (existing.workspaceId) {
+    if (!requestUserCanAccessWorkspace(req, existing.workspaceId)) return sendWorkspaceAccessDenied(res);
+  } else if (!requestUserCanOmitWorkspaceScope(req)) {
+    return sendWorkspaceAccessDenied(res);
+  }
   const cancellationError = getJobCancellationError(existing);
   if (cancellationError) return res.status(409).json({ error: cancellationError, jobId: existing.id });
   const job = cancelJob(req.params.id);

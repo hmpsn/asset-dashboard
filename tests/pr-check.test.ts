@@ -11923,10 +11923,18 @@ describe('Rule: ActivityType minting guard', () => {
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('does not flag an unrelated activity-log.ts edit (no union touched)', () => {
+  it('does not flag an unrelated activity-log.ts edit (union present, unchanged; only a function edited)', () => {
+    // customCheck reads the full current file off disk (not a diff), so
+    // modeling "an unrelated edit" means the union anchor and its registered
+    // members are still present and untouched — unlike a fixture that omits
+    // the union entirely, which (correctly, post-fix) now reads as a format
+    // drift and is covered by the dedicated "missing anchor" test below.
     const file = write(
       uniqPath('rule-activity-type-mint', 'server/activity-log.ts'),
       lines(
+        "export type ActivityType =",
+        "  | 'audit_completed';",
+        "",
         "export function addActivity(workspaceId: string) {",
         "  return workspaceId;",
         "}",
@@ -11954,6 +11962,51 @@ describe('Rule: ActivityType minting guard', () => {
     const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(1);
     expect(hits[0].line).toBe(3);
+  });
+
+  it('flags BOTH unregistered members when two share a single union line', () => {
+    // Regression guard: the extraction regex used to be non-global, so
+    // `line.match(...)` only ever returned the FIRST `| 'x'` on a line —
+    // a second member sharing that line (e.g. `| 'a' | 'b';`) was silently
+    // never inspected, even though it's a genuine new mint. The regex is now
+    // global and the rule uses matchAll so every member on the line is
+    // checked independently.
+    const file = write(
+      uniqPath('rule-activity-type-mint', 'server/activity-log.ts'),
+      lines(
+        "export type ActivityType =",
+        "  | 'audit_completed'",
+        "  | 'brand_new_unregistered_a' | 'brand_new_unregistered_b';",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
+    expect(hits[0].line).toBe(3);
+    expect(hits[1].line).toBe(3);
+    expect(hits.map((h) => h.text)).toEqual([
+      "| 'brand_new_unregistered_a' | 'brand_new_unregistered_b';",
+      "| 'brand_new_unregistered_a' | 'brand_new_unregistered_b';",
+    ]);
+  });
+
+  it('fails loudly when the union anchor is not found in a changed activity-log.ts (no silent pass)', () => {
+    // "No match must mean unknown, skip" — but only when the FILE itself is
+    // out of scope. Here server/activity-log.ts IS the changed file being
+    // scanned; if the `export type ActivityType =` anchor line is missing
+    // (renamed, reformatted, reindented), the rule must not silently return
+    // zero hits — that would let every future mint in this file pass
+    // uninspected. It must emit a hit forcing the guard itself to be fixed.
+    const file = write(
+      uniqPath('rule-activity-type-mint', 'server/activity-log.ts'),
+      lines(
+        "export type ActivityType",           // anchor format drifted — no trailing ' ='
+        "  = | 'audit_completed'",
+        "  | 'brand_new_unregistered_activity_type_member';",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits[0].text).toMatch(/anchor not found/i);
   });
 });
 
@@ -11989,12 +12042,15 @@ describe('Meta: ActivityType minting-guard baseline parity', () => {
     const unionMembers: string[] = [];
     for (let i = unionStart + 1; i < srcLines.length; i++) {
       const line = srcLines[i];
-      const match = line.match(ACTIVITY_TYPE_MEMBER_LINE_RE);
       // Mirror the rule's terminal detection exactly: strip the trailing
       // `//…` comment before the `;`-at-end-of-code test.
       const codePortion = line.replace(/\/\/.*$/, '');
       const terminal = /;\s*$/.test(codePortion);
-      if (match) unionMembers.push(match[1]);
+      // Mirror the rule's extraction exactly: global regex + matchAll so every
+      // member on the line is captured, not just the first.
+      for (const match of line.matchAll(ACTIVITY_TYPE_MEMBER_LINE_RE)) {
+        unionMembers.push(match[1]);
+      }
       if (terminal) break;
     }
 

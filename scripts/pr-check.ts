@@ -1477,10 +1477,12 @@ export const ACTIVITY_TYPE_LEXICON_BASELINE = new Set<string>([
  *  already use (see loadClientVisibleTypes above): `| 'member_name'` at any
  *  indent, one member per line — matching server/activity-log.ts's actual
  *  formatting. Captures the member name only; trailing inline comments
- *  (`// admin-only: ...`) are not part of the match. Exported so the baseline
- *  parity meta-test in tests/pr-check.test.ts reuses the exact same extraction
- *  the rule does. */
-export const ACTIVITY_TYPE_MEMBER_LINE_RE = /^\s*\|\s*'([^']+)'/;
+ *  (`// admin-only: ...`) are not part of the match. GLOBAL so `matchAll`
+ *  finds every member on a line — a non-global `match()` only returns the
+ *  first hit, silently skipping any additional member sharing the same line
+ *  (e.g. `| 'a' | 'b'`). Exported so the baseline parity meta-test in
+ *  tests/pr-check.test.ts reuses the exact same extraction the rule does. */
+export const ACTIVITY_TYPE_MEMBER_LINE_RE = /\|\s*'([^']+)'/g;
 
 export const CHECKS: Check[] = [
   {
@@ -9394,11 +9396,24 @@ export const CHECKS: Check[] = [
       const lines = content.split('\n');
 
       const unionStart = lines.findIndex((line) => line.trim() === 'export type ActivityType =');
-      if (unionStart === -1) return hits;
+      if (unionStart === -1) {
+        // "No match" must mean "unknown, skip" only when the file itself isn't
+        // in scope. Here server/activity-log.ts IS in the changed set (it's
+        // `target`), so a missing anchor means the union declaration format
+        // drifted (renamed, reformatted, moved) — the loop below would silently
+        // scan zero lines and pass every mint uninspected. Fail loudly instead
+        // of returning an empty hits array, per the "no-match-must-mean-unknown"
+        // rule (see docs/rules/pr-check-rule-authoring.md).
+        hits.push({
+          file: target,
+          line: 1,
+          text: 'export type ActivityType = anchor not found — ActivityType minting guard cannot scan this file. Update the guard in scripts/pr-check.ts if the declaration format changed.',
+        });
+        return hits;
+      }
 
       for (let i = unionStart + 1; i < lines.length; i++) {
         const line = lines[i];
-        const match = line.match(ACTIVITY_TYPE_MEMBER_LINE_RE);
         // The union's terminal line is the one whose CODE portion ends in the
         // closing `;` — stop scanning after it so declarations further down the
         // file (other unions, functions) are never mistaken for ActivityType
@@ -9409,7 +9424,12 @@ export const CHECKS: Check[] = [
         // — exactly the silent-false-negative class this rule exists to catch.
         const codePortion = line.replace(/\/\/.*$/, '');
         const terminal = /;\s*$/.test(codePortion);
-        if (match) {
+        // GLOBAL regex + matchAll so every member on the line is checked, not
+        // just the first — a non-global match() previously only inspected the
+        // first `| 'x'` on a line, silently passing a second member sharing
+        // that line (e.g. `| 'a' | 'b'`).
+        const lineMatches = [...line.matchAll(ACTIVITY_TYPE_MEMBER_LINE_RE)];
+        for (const match of lineMatches) {
           const member = match[1];
           // Inline-only hatch by design (Reconcile R1-PR2 task contract) —
           // deliberately not using hasHatch()'s line-above lookbehind here.
