@@ -214,6 +214,13 @@ router.patch('/api/public/recommendations/:workspaceId/:recId', requireAuthentic
           // null when this rec carries no opportunity (legacy row / OV not yet attached).
           predictedEmv: rec.opportunity?.predictedEmv ?? null,
           attribution: 'platform_executed',
+          // R6 (B11): recommendations are the PRIMARY ephemeral source — the set is rebuilt on
+          // every audit (buildMergeKey drops the old title), so without this snapshot a completed
+          // rec's win degrades to a generic label after the next regen. Snapshot rec.title from
+          // scope (same field the addActivity calls on this path use); guarded (FM-2).
+          ...(rec.title?.trim()
+            ? { source: { label: rec.title.trim(), snapshot: { title: rec.title.trim(), type: 'recommendation', page: rec.affectedPages?.[0] ?? undefined } } }
+            : {}),
         });
         if (pageUrl) void captureBaselineFromGsc(action.id, workspaceId, pageUrl);
       }
@@ -397,6 +404,11 @@ router.post(
           baselineSnapshot: { captured_at: new Date().toISOString() },
           predictedEmv: rec.opportunity?.predictedEmv ?? null,
           attribution: 'platform_executed',
+          // R6 (B11): snapshot the greenlit rec's title (same field the addActivity below uses)
+          // so the client win survives the next audit regenerating the rec set. Guarded (FM-2).
+          ...(rec.title?.trim()
+            ? { source: { label: rec.title.trim(), snapshot: { title: rec.title.trim(), type: 'recommendation', page: rec.affectedPages?.[0] ?? undefined } } }
+            : {}),
         });
       }
     } catch (err) {
@@ -957,6 +969,11 @@ router.patch('/api/recommendations/:workspaceId/:recId/fix', requireWorkspaceAcc
         baselineSnapshot: { captured_at: new Date().toISOString() },
         predictedEmv: rec.opportunity?.predictedEmv ?? null,
         attribution: 'platform_executed',
+        // R6 (B11): snapshot the silently-fixed rec's title (same field the addActivity below
+        // uses) so a "we handled this" win survives the next audit regen. Guarded (FM-2).
+        ...(rec.title?.trim()
+          ? { source: { label: rec.title.trim(), snapshot: { title: rec.title.trim(), type: 'recommendation', page: rec.affectedPages?.[0] ?? undefined } } }
+          : {}),
       });
     }
   } catch (err) {

@@ -298,6 +298,9 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
       targetKeyword: null,
       baselineSnapshot: { captured_at: now },
       attribution: 'platform_executed',
+      // R6 (B11): no `source` — a strategy-regeneration event is a workspace SELF-ref
+      // with no single ephemeral titled producer. The generic label is honest here
+      // (FM-2). The per-keyword sites below DO snapshot their keyword identity.
     });
 
     // A3 (audit #14): per-keyword outcome actions for net-new pageMap primaries.
@@ -341,6 +344,12 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
         },
         baselineConfidence: hasBaselineMetrics ? 'exact' : 'estimated',
         attribution: 'platform_executed',
+        // R6 (B11): identity of a per-keyword strategy action IS its primary keyword on
+        // its mapped page — snapshot both so the win title reads the keyword.
+        source: {
+          label: pm.primaryKeyword.trim(),
+          snapshot: { title: pm.primaryKeyword.trim(), type: STRATEGY_PAGE_KEYWORD_SOURCE_TYPE, page: normalizedPath },
+        },
       });
     }
   });

@@ -249,6 +249,11 @@ export async function publishPostToWebflow(
           captured_at: new Date().toISOString(),
         },
         attribution: 'platform_executed',
+        // R6 (B11): the published post's title is its identity — snapshot it so the "We
+        // Called It" win reads the real headline even if the post is later edited/deleted.
+        ...(post.title?.trim()
+          ? { source: { label: post.title.trim(), snapshot: { title: post.title.trim(), type: 'post', page: publishedPagePath ?? undefined } } }
+          : {}),
       });
       if (publishedPagePath) {
         void captureBaselineFromGsc(postAction.id, workspaceId, publishedPagePath);

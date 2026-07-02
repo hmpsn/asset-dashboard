@@ -265,6 +265,9 @@ router.get('/api/webflow/internal-links/:siteId', requireWorkspaceSiteAccessFrom
             targetKeyword: null,
             baselineSnapshot: { captured_at: new Date().toISOString() },
             attribution: 'not_acted_on',
+            // R6 (B11): no `source` — an internal-link suggestion is a PAGE-URL ref (sourceId =
+            // toPage path) with no ephemeral titled producer, and it is recorded `not_acted_on`
+            // (a suggestion, never a win). Generic label is honest here (FM-2).
           });
         }
       } catch (err) {

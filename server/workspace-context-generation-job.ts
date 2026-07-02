@@ -245,6 +245,10 @@ function recordBrandVoiceOutcome(workspaceId: string): void {
         targetKeyword: null,
         baselineSnapshot: { captured_at: new Date().toISOString() },
         attribution: 'platform_executed',
+        // R6 (B11): no `source` — brand-voice calibration is a workspace SELF-ref with no
+        // ephemeral titled producer to snapshot. The honest generic label ("Calibrated
+        // brand voice") is the correct display (FM-2: never fabricate a title). Columns
+        // stay NULL; the site still records a valid action.
       });
       broadcastToWorkspace(workspaceId, WS_EVENTS.OUTCOME_ACTION_RECORDED, { actionId: action.id });
     }
