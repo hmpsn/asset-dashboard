@@ -212,6 +212,7 @@ import {
   getBackgroundJobMetadata,
   getBackgroundJobLabel,
   isBackgroundJobCancellable,
+  isSystemJobType,
 } from '../../shared/types/background-jobs.js';
 
 describe('BACKGROUND_JOB_TYPES constants', () => {
@@ -304,6 +305,21 @@ describe('isBackgroundJobCancellable', () => {
   });
 });
 
+describe('isSystemJobType', () => {
+  it('returns true only for the cron-originated intelligence-recompute type', () => {
+    expect(isSystemJobType(BACKGROUND_JOB_TYPES.INTELLIGENCE_RECOMPUTE)).toBe(true);
+  });
+
+  it('returns false for user-originated job types', () => {
+    expect(isSystemJobType(BACKGROUND_JOB_TYPES.RECOMMENDATIONS_GENERATION)).toBe(false);
+    expect(isSystemJobType(BACKGROUND_JOB_TYPES.SEO_AUDIT)).toBe(false);
+  });
+
+  it('returns false (safe default) for unknown job types', () => {
+    expect(isSystemJobType('totally-unknown')).toBe(false);
+  });
+});
+
 describe('BACKGROUND_JOB_METADATA completeness', () => {
   it('has a metadata entry for every defined job type', () => {
     for (const value of Object.values(BACKGROUND_JOB_TYPES)) {
@@ -316,6 +332,7 @@ describe('BACKGROUND_JOB_METADATA completeness', () => {
       expect(typeof meta.label, `${key}.label`).toBe('string');
       expect(typeof meta.description, `${key}.description`).toBe('string');
       expect(typeof meta.cancellable, `${key}.cancellable`).toBe('boolean');
+      expect(['user', 'system'], `${key}.class`).toContain(meta.class);
       expect(['ephemeral', 'domain-store', 'domain-store-and-result']).toContain(meta.resultBehavior);
     }
   });

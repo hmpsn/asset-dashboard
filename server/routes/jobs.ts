@@ -68,7 +68,7 @@ import { getInsights } from '../analytics-insights-store.js';
 import { createDiagnosticReport, markDiagnosticFailed } from '../diagnostic-store.js';
 import { runDiagnostic } from '../diagnostic-orchestrator.js';
 import type { AnalyticsInsight, AnomalyDigestData } from '../../shared/types/analytics.js';
-import { BACKGROUND_JOB_TYPES, toPublicBackgroundJob } from '../../shared/types/background-jobs.js';
+import { BACKGROUND_JOB_TYPES, isSystemJobType, toPublicBackgroundJob } from '../../shared/types/background-jobs.js';
 import { CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
 import type { ContentGenerationStyle } from '../../shared/types/content.js';
 import { isProgrammingError } from '../errors.js';
@@ -123,7 +123,14 @@ function keywordStrategyJobResultSummary(
 }
 
 function isClientVisibleJob(job: Job, workspaceId: string): boolean {
-  return job.workspaceId === workspaceId && CLIENT_VISIBLE_JOB_TYPES.has(job.type);
+  // The allow-list opts a type IN to the client feed; isSystemJobType (derived from
+  // BACKGROUND_JOB_METADATA[type].class) is a second, independent gate that always
+  // wins — a cron-originated job (e.g. intelligence-recompute) must never reach a
+  // client's task panel even if a future edit mistakenly adds its type to the
+  // allow-list above. See docs/rules/background-generation.md #System Job Class.
+  return job.workspaceId === workspaceId
+    && CLIENT_VISIBLE_JOB_TYPES.has(job.type)
+    && !isSystemJobType(job.type);
 }
 
 function parseContentGenerationStyle(value: unknown): ContentGenerationStyle | undefined {
