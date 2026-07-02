@@ -317,3 +317,10 @@ export function startBackupScheduler(): void {
 
   log.info(`Backup scheduler started (every 24h, retain ${RETENTION_DAYS} days)`);
 }
+
+/** Stop the daily backup scheduler. Cancels both the startup delay timeout
+ * (if the first backup hasn't fired yet) and the recurring 24h interval. */
+export function stopBackupScheduler(): void {
+  if (backupStartupTimeout) { clearTimeout(backupStartupTimeout); backupStartupTimeout = null; }
+  if (backupInterval) { clearInterval(backupInterval); backupInterval = null; }
+}
