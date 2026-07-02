@@ -2949,13 +2949,15 @@ When the user asks to update this document with recent features, follow this pro
 **Mutual:** Reduces the friction of maintaining AI context, which means it actually gets maintained. Better context → better AI outputs → fewer revision cycles.
 
 ### 69. Storage Monitor & Pruning Tools
-**What it does:** `server/storage-stats.ts` scans all 25+ data directories (chat sessions, backups, reports, uploads, optimized images, etc.) and returns a per-category size breakdown via `GET /api/admin/storage-stats`. Three POST pruning endpoints: `/prune-chat` (delete sessions >90 days), `/prune-backups` (reduce retention to 3 days), `/prune-activity` (trim log entries >6 months). Storage Monitor UI panel in Settings: colored stacked bar chart showing top-6 categories, per-row breakdown with file count/size/percentage, quick stats (chat session count, backup retention, oldest chat), and one-click prune buttons with loading states and toast feedback.
+**What it does:** `server/storage-stats.ts` scans all 25+ data directories (chat sessions, backups, reports, uploads, optimized images, etc.) and returns a per-category size breakdown via `GET /api/admin/storage-stats`. Three POST pruning endpoints: `/prune-chat` (delete sessions >90 days), `/prune-backups` (reduce retention to the shared `BACKUP_RETENTION_DAYS` default), `/prune-activity` (trim log entries >6 months). The storage-stats payload also surfaces backup posture: `lastBackupAt` (ISO timestamp of the most recent successful backup, read from disk so it survives restarts) and `offsiteConfigured` (`true` when `BACKUP_S3_BUCKET` is set) — checkable via HTTP without SSH. `backupRetentionDays` (report) and the `/prune-backups` route default now read from one shared source of truth (`DEFAULT_BACKUP_RETENTION_DAYS` in `server/backup.ts`, default 3) instead of three independently-drifting literals (previously the report fallback said 7, the prune default said 3, and `.env.example` documented 7 — all three now agree). Storage Monitor UI panel in Settings: colored stacked bar chart showing top-6 categories, per-row breakdown with file count/size/percentage, quick stats (chat session count, backup retention, oldest chat), and one-click prune buttons with loading states and toast feedback.
 
-**Agency value:** Visibility into what's consuming disk on Render persistent storage. One-click cleanup when approaching limits instead of manual SSH. Prevents surprise downtime from full disk.
+**Agency value:** Visibility into what's consuming disk on Render persistent storage. One-click cleanup when approaching limits instead of manual SSH. Prevents surprise downtime from full disk. Backup posture (last successful backup, off-site configured or not) is now answerable from a single API call.
 
 **Client value:** N/A — admin-only infrastructure tool.
 
-**Mutual:** Platform stability. Proactive monitoring prevents data loss from disk exhaustion.
+**Mutual:** Platform stability. Proactive monitoring prevents data loss from disk exhaustion. A single retention-days source of truth prevents the "runtime prunes 3-day-old backups while the docs claim 7 days" class of drift bug.
+
+**Files (A1 update):** `server/backup.ts`; `server/storage-stats.ts`; `server/routes/health.ts`; `tests/unit/backup.test.ts`; `tests/unit/storage-stats-prune.test.ts`.
 
 ---
 
@@ -7279,15 +7281,15 @@ Bug hardening included:
 ---
 
 ### 414. Data Integrity & Recovery Drills
-**What it does:** Adds a repeatable platform integrity-and-recovery verification surface for SQLite-backed state. New command `npm run verify:data-integrity` runs quick/full SQLite integrity checks, reports foreign-key violations, detects workspace-orphaned rows across workspace-scoped tables, and performs explicit cross-table consistency scans from declared FK relationships. It also emits a canonical preserve-vs-rebuild artifact classification map so incident response can triage what must be restored versus what can be recomputed.
+**What it does:** Adds a repeatable platform integrity-and-recovery verification surface for SQLite-backed state. New command `npm run verify:data-integrity` runs quick/full SQLite integrity checks, reports foreign-key violations, detects workspace-orphaned rows across workspace-scoped tables, and performs explicit cross-table consistency scans from declared FK relationships. It also emits a canonical preserve-vs-rebuild artifact classification map so incident response can triage what must be restored versus what can be recomputed. **A1 update:** the backup/restore drill described in this doc is now automated — `npm run backup:restore-drill` (`scripts/restore-drill.ts`) restores the latest available backup (local backup dir → S3/R2 tar → `/api/admin/db-export` fallback, in that precedence order) to a scratch path, runs the same integrity report engine against it, and diffs every table's restored row count against the backup manifest's recorded counts (`diffManifestCounts` — pure, unit-tested), exiting non-zero on any mismatch. Off-site (S3-compatible) backups now support Cloudflare R2 via `BACKUP_S3_ENDPOINT`, and off-site retention (`BACKUP_S3_RETENTION_DAYS`, default 30) is tracked independently of local on-disk retention (`BACKUP_RETENTION_DAYS`, default 3) — previously one constant drove both prunes. A new pr-check rule (`New migration DROP TABLE without rename-to-archive contract`) mechanically enforces the rename-to-archive-then-drop contract documented in `docs/rules/destructive-migrations.md` for all new migrations.
 
-**Agency value:** Gives operators a concrete pre/post-deploy integrity signal and a structured incident-recovery starting point instead of ad hoc SQL checks.
+**Agency value:** Gives operators a concrete pre/post-deploy integrity signal and a structured incident-recovery starting point instead of ad hoc SQL checks. The restore drill turns "we have backups" into a verified, automatable claim instead of an assumption.
 
 **Client value:** Reduces risk of silent data drift and shortens recovery time when a migration or runtime issue impacts stored customer state.
 
 **Mutual:** Documents a consistent backup/restore drill and restore-based rollback workflow, improving operational confidence without changing product-facing behavior.
 
-**Files:** `scripts/platform-data-integrity-recovery.ts`; `scripts/report-data-integrity-recovery.ts`; `docs/workflows/data-integrity-recovery.md`; `tests/unit/data-integrity-recovery-report.test.ts`; `package.json`; `data/roadmap.json`.
+**Files:** `scripts/platform-data-integrity-recovery.ts`; `scripts/report-data-integrity-recovery.ts`; `scripts/restore-drill.ts`; `docs/workflows/data-integrity-recovery.md`; `docs/workflows/deploy.md`; `docs/workflows/release-safety.md`; `docs/workflows/staging-environment.md`; `docs/rules/destructive-migrations.md`; `tests/unit/data-integrity-recovery-report.test.ts`; `tests/unit/restore-drill.test.ts`; `server/backup.ts`; `server/storage-stats.ts`; `server/routes/health.ts`; `scripts/pr-check.ts`; `data/drop-table-migration-baseline.json`; `render.yaml`; `.env.example`; `package.json`; `data/roadmap.json`.
 
 ---
 

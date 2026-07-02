@@ -279,6 +279,8 @@ as quick guidance plus links to the canonical rule docs.
 - **Long-running admin generation** — use the background job platform (`server/jobs.ts`, `/api/jobs`, `useBackgroundTasks`, `NotificationBell`) for crawls, bulk processing, repeated AI calls, or post-response work. Full contract: [background-generation.md](./docs/rules/background-generation.md).
 - **Admin send convention** — use one "Send to client" button plus optional inline note. Canonical wording: `docs/workflows/ui-vocabulary.md`; anti-pattern guarded by pr-check.
 - **Inbox section routing** — route note-free decisions to Decisions, noted items to Conversations, and static review artifacts to Reviews. Canonical contract: [inbox-section-routing.md](./docs/rules/inbox-section-routing.md).
+- **Destructive migrations** — a migration must never `DROP TABLE` directly. Rename-to-archive (or copy-to-archive) in PR N; the actual `DROP` ships in PR N+1 only after staging verify + one backup retention window. Guarded by pr-check (`New migration DROP TABLE without rename-to-archive contract`, inline-only `-- drop-table-ok: <reason>` hatch). Full contract + migration-runner semantics (forward-only, lexicographic, single IMMEDIATE transaction, `MIGRATION_RENAMES` bridge): [destructive-migrations.md](./docs/rules/destructive-migrations.md). Run `npm run backup:restore-drill` before any destructive migration wave merges.
+- **Backup retention is split by tier** — `BACKUP_RETENTION_DAYS` (local disk, default 3) and `BACKUP_S3_RETENTION_DAYS` (off-site, default 30) are independent; both read from the shared `DEFAULT_BACKUP_RETENTION_DAYS`/`DEFAULT_BACKUP_S3_RETENTION_DAYS` constants in `server/backup.ts` — never hard-code a retention-days literal elsewhere. `BACKUP_S3_ENDPOINT` (optional) enables S3-compatible off-site providers (e.g. Cloudflare R2). Backup posture (`lastBackupAt`, `offsiteConfigured`) is surfaced on `GET /api/admin/storage-stats` so it's checkable via HTTP without SSH.
 
 > **Mechanized enforcement.** Many rules above (and every silent-failure rule removed from this section during the pr-check audit) are now enforced by `scripts/pr-check.ts`. The canonical list with escape hatches lives in [docs/rules/automated-rules.md](./docs/rules/automated-rules.md) — do not duplicate them here.
 
@@ -338,6 +340,8 @@ as quick guidance plus links to the canonical rule docs.
 | `docs/rules/lexicon.md` | Lexicon contract — word-class semantics, PROPOSED intake, duplicate-name allowlist burn-down, relationship to ui-vocabulary + the pr-check rules |
 | `docs/rules/background-generation.md` | Full background job platform contract — when to use it, worker patterns, pr-check escape hatch |
 | `docs/rules/inbox-section-routing.md` | Inbox section routing rules — Decisions vs Conversations vs Reviews routing logic |
+| `docs/rules/destructive-migrations.md` | Destructive migration contract (rename-to-archive → delayed drop), migration-runner semantics, pr-check DROP TABLE rule |
+| `docs/workflows/data-integrity-recovery.md` | Integrity report + automated backup/restore drill (`npm run backup:restore-drill`), backup posture via HTTP |
 | `docs/rules/seo-editor-write-targets.md` | SEO Editor static/CMS/manual write-target contract |
 | `docs/rules/brand-engine.md` | Copy & Brand Engine contracts — voice profile, brandscript, prompt assembly patterns |
 | `docs/rules/intelligence-consumer-builders.md` | Allowed patterns for server-side AI/recommendation consumers of workspace intelligence |

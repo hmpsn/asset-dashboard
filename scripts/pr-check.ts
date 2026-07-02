@@ -496,6 +496,32 @@ type StyleExceptionEntry = {
 
 const STYLE_EXCEPTIONS_PATH = path.join(ROOT, 'data/style-exceptions.json');
 const JSON_ARRAY_COLUMN_BASELINE_PATH = path.join(ROOT, 'data/json-array-column-baseline.json');
+const DROP_TABLE_MIGRATION_BASELINE_PATH = path.join(ROOT, 'data/drop-table-migration-baseline.json');
+
+/**
+ * Load the baseline of pre-existing migrations that DROP TABLE directly (all shipped
+ * table-rebuild patterns from before the destructive-migrations contract existed — see
+ * docs/rules/destructive-migrations.md). Matched by filename BASENAME rather than full
+ * relative-to-ROOT path: the pr-check test harness writes rule fixtures under a tmpdir,
+ * never under the real repo ROOT, so a basename match is what makes the "baselined
+ * filename" test scenario exercisable without polluting server/db/migrations.
+ * Migration filenames are unique across the whole migrations directory, so basename
+ * matching carries no collision risk in production use either.
+ */
+function loadDropTableMigrationBaseline(): Set<string> {
+  try {
+    const raw = readFileSync(DROP_TABLE_MIGRATION_BASELINE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw) as { allowedMigrationFiles?: unknown };
+    if (!Array.isArray(parsed.allowedMigrationFiles)) return new Set();
+    return new Set(
+      parsed.allowedMigrationFiles
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map(entry => path.basename(entry)),
+    );
+  } catch {
+    return new Set();
+  }
+}
 
 let _styleExceptionsCache: StyleExceptionEntry[] | null = null;
 function loadStyleExceptions(): StyleExceptionEntry[] {
@@ -2156,6 +2182,51 @@ export const CHECKS: Check[] = [
             file,
             line: i + 1,
             text: `JSON-array TEXT column "${columnName}" uses DEFAULT '[]'`,
+          });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // A1 (Reconcile R0): a migration must never DROP TABLE directly. The
+    // destructive-migrations contract (docs/rules/destructive-migrations.md) requires
+    // rename-to-archive (or copy-to-archive) in PR N, actual DROP only in PR N+1 after
+    // staging verify + one retention window. Baselines the 6 pre-existing DROP
+    // migrations (019, 029, 037, 049, 091, 119 — all shipped table-rebuild patterns
+    // from before this contract existed).
+    name: 'New migration DROP TABLE without rename-to-archive contract',
+    pattern: '',
+    fileGlobs: ['*.sql'],
+    pathFilter: 'server/db/migrations/',
+    excludeLines: ['drop-table-ok'],
+    message: 'New migrations must not DROP TABLE directly — rename-to-archive in this PR, DROP in a follow-up PR after staging verify + one retention window (see docs/rules/destructive-migrations.md). Add an INLINE `-- drop-table-ok: <reason>` comment on the DROP TABLE line itself if this is a pre-approved delayed drop (a hatch on the line above is NOT honoured).',
+    severity: 'error',
+    rationale: 'An unguarded DROP TABLE in a new migration is an irreversible data-loss risk with no staging-verify or retention-window safety net.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      const allowedFiles = loadDropTableMigrationBaseline();
+      const hits: CustomCheckMatch[] = [];
+      const dropTableRe = /^\s*DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?["'`]?(\w+)["'`]?/i;
+      for (const file of files) {
+        if (allowedFiles.has(path.basename(file))) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const match = line.match(dropTableRe);
+          if (!match) continue;
+          // Inline-only hatch: unlike hasHatch()-based rules elsewhere in this file, a
+          // destructive DROP TABLE hatch must live on the exact statement line so it
+          // cannot be silently separated from the DROP by a later edit. Do NOT add a
+          // line-above lookback here.
+          if (line.includes('drop-table-ok')) continue;
+          const tableName = match[1];
+          hits.push({
+            file,
+            line: i + 1,
+            text: `DROP TABLE "${tableName}" without rename-to-archive contract`,
           });
         }
       }

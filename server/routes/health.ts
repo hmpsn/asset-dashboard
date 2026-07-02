@@ -12,6 +12,7 @@ import { isStripeConfigured } from '../stripe.js';
 import { getStripeConfigSafe } from '../stripe-config.js';
 import { listWorkspaces, getTokenForSite, getWorkspace } from '../workspaces.js';
 import { getStorageReport, pruneChatSessions, pruneBackups, pruneReportSnapshots, pruneActivityLogs } from '../storage-stats.js';
+import { DEFAULT_BACKUP_RETENTION_DAYS } from '../backup.js';
 import { getDataForSeoUsage } from '../providers/dataforseo-provider.js';
 import { evaluateCreditBudget } from '../credit-budget-gate.js';
 import { listProviders } from '../seo-data-provider.js';
@@ -388,7 +389,7 @@ router.post('/api/admin/storage/prune-chat', (req, res) => {
 });
 
 router.post('/api/admin/storage/prune-backups', (req, res) => {
-  const retainDays = parsePositiveIntBody(req.body?.retainDays, 3);
+  const retainDays = parsePositiveIntBody(req.body?.retainDays, DEFAULT_BACKUP_RETENTION_DAYS);
   if (retainDays == null) return res.status(400).json({ error: 'retainDays must be a positive integer' });
   try {
     const result = pruneBackups(retainDays);

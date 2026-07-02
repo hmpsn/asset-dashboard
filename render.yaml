@@ -170,9 +170,21 @@ envVarGroups:
         sync: false
   - name: shared-s3-backups
     envVars:
+      # Local on-disk backup retention in days (default 3 when unset). Kept tight because
+      # local backups share the same disk as the live DB — see server/backup.ts.
+      - key: BACKUP_RETENTION_DAYS
+        sync: false
       - key: BACKUP_S3_BUCKET
         sync: false
       - key: BACKUP_S3_REGION
+        sync: false
+      # Optional — set for S3-compatible providers (e.g. Cloudflare R2). When set, the
+      # S3Client is constructed with this endpoint + forcePathStyle: true.
+      - key: BACKUP_S3_ENDPOINT
+        sync: false
+      # Off-site retention in days (default 30 when unset). Independent of
+      # BACKUP_RETENTION_DAYS, which controls local on-disk retention — see server/backup.ts.
+      - key: BACKUP_S3_RETENTION_DAYS
         sync: false
       - key: AWS_ACCESS_KEY_ID
         sync: false

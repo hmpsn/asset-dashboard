@@ -20,6 +20,7 @@
     "db:sync-local-parity": "bash scripts/sync-local-parity.sh",
     "db:pull-render-backup": "bash scripts/pull-render-latest-backup.sh",
     "db:pull-render-backup:force": "FORCE_PULL=1 bash scripts/pull-render-latest-backup.sh",
+    "backup:restore-drill": "tsx scripts/restore-drill.ts",
     "test": "vitest run",
     "test:quiet": "vitest run --reporter=dot --silent=passed-only",
     "test:unit": "vitest run --project unit",
