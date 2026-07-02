@@ -155,10 +155,22 @@ const stmts = createStmtCache(() => ({
   ),
   // Global retention sweep paired with archiveOld; intentionally
   // operates across all workspaces to enforce the 24-month archive policy.
+  //
+  // D5 — key the DELETE on ARCHIVE MEMBERSHIP, not a re-evaluated cutoff time. The
+  // previous `updated_at < datetime('now','-24 months')` re-derived the boundary
+  // INDEPENDENTLY of archiveOld's own `datetime('now','-24 months')`, so a row whose
+  // updated_at sat right on the 24-month edge could pass archiveOld's cutoff (getting
+  // copied into tracked_actions_archive) and then, microseconds later, fall on the wrong
+  // side of THIS statement's freshly-re-evaluated cutoff — OR the reverse: be deleted here
+  // while archiveOld had NOT copied it, permanently losing the row and CASCADE-losing its
+  // outcomes with no archive copy. Deleting exactly the rows that archiveOld just placed in
+  // the twin removes the boundary race entirely: a live row is deleted IFF it was archived.
+  // measurement_complete = 1 is preserved as a defensive guard (archiveOld only ever copies
+  // measurement_complete = 1 rows, so this never widens the delete set).
   // ws-scope-ok
   deleteArchived: db.prepare(`
     DELETE FROM tracked_actions
-    WHERE measurement_complete = 1 AND updated_at < datetime('now', '-24 months')
+    WHERE measurement_complete = 1 AND id IN (SELECT id FROM tracked_actions_archive)
   `),
   // R11-T7: generated column list — see archiveOld comment above for the full
   // rationale (same positional-corruption hazard migration 106 first fixed).

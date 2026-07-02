@@ -23,6 +23,9 @@
 //                               records the REQUEST-sourced brief under sourceType 'content_request',
 //                               sourceId = brief.id — confirmed by reading the call site)
 //        client_action       -> client_actions.id
+//        gbp_review_response -> google_business_review_responses.id (B13 seam, added after this
+//                               census was first written; verified table name via migration 161,
+//                               workspace-scoped w/ FK ON DELETE CASCADE)
 //
 //   2. SELF-REF    — source_id is the workspace's own id (a workspace-level event, not a
 //      sub-entity). Only "dangling" if the WORKSPACE itself was deleted, which cascades the
@@ -43,6 +46,9 @@
 //        schema                -> Webflow page id, not a local DB row.
 //        approval               -> id of an item inside approval_batches.items JSON array; no
 //                                  indexed per-item table exists to check existence against.
+//        audit                  -> synthetic `${pageId}-${check}` bulk-accept-fix dedup key (B13
+//                                  seam, added after this census; see recordBulkAcceptFixOutcomeAction
+//                                  in server/webflow-seo-bulk-accept-fixes-job.ts). No backing row.
 //
 // Ticket B12 also names `strategy_page_keyword`, `approval`, `internal_link`, `content_decay`,
 // `brand_voice`, `strategy`, `brief`, `recommendation` as "the ~8 source tables" — read-before-write
@@ -76,6 +82,10 @@ const stmts = createStmtCache(() => ({
   existsPost: db.prepare(`SELECT 1 FROM content_posts WHERE workspace_id = ? AND id = ?`),
   existsBrief: db.prepare(`SELECT 1 FROM content_briefs WHERE workspace_id = ? AND id = ?`),
   existsClientAction: db.prepare(`SELECT 1 FROM client_actions WHERE workspace_id = ? AND id = ?`),
+  // B13: gbp_review_response's sourceId is a real google_business_review_responses.id
+  // (verified table name — migration 161). The table is workspace-scoped (workspace_id
+  // FK to workspaces ON DELETE CASCADE), so this mirrors the other row-backed probes.
+  existsGbpReviewResponse: db.prepare(`SELECT 1 FROM google_business_review_responses WHERE workspace_id = ? AND id = ?`),
 }));
 
 interface SourceRefRow {
@@ -97,6 +107,12 @@ const ROW_BACKED_CHECKS: Record<string, (workspaceId: string, sourceId: string) 
   // GENERATED BRIEF's id as source_id, not a content_requests row id.
   content_request: (workspaceId, sourceId) => !!stmts().existsBrief.get(workspaceId, sourceId),
   client_action: (workspaceId, sourceId) => !!stmts().existsClientAction.get(workspaceId, sourceId),
+  // B13 (D2): the GBP review-response publish seam records sourceType 'gbp_review_response'
+  // with sourceId = the published google_business_review_responses.id (see
+  // server/google-business-profile-review-response-publish-job.ts:recordGbpReviewReplyOutcomeAction).
+  // A dangling ref here means the review-response row was deleted/regenerated after the
+  // action was recorded — a genuine orphan, so it belongs in the row-backed bucket.
+  gbp_review_response: (workspaceId, sourceId) => !!stmts().existsGbpReviewResponse.get(workspaceId, sourceId),
 };
 
 /** SELF-REF source_type -> its source_id is always the owning workspace's id. */
@@ -106,8 +122,13 @@ const SELF_REF_TYPES = new Set(['strategy', 'brand_voice']);
  * Not row-checkable: source_id is a synthetic composite key, a page path/URL, or an id
  * addressable only inside a JSON blob column with no indexed lookup. Reporting these as
  * "dangling" would be a false positive, so they're tracked in their own bucket instead.
+ *
+ * B13 (D2): 'audit' is here because the bulk-accept-fixes seam records sourceType 'audit'
+ * with a SYNTHETIC composite sourceId `${pageId}-${check}` (the applied-fix dedup key — see
+ * server/webflow-seo-bulk-accept-fixes-job.ts:recordBulkAcceptFixOutcomeAction). No backing
+ * row exists to check that key against, so it is not-checkable, not dangling.
  */
-const NOT_CHECKABLE_TYPES = new Set(['strategy_page_keyword', 'content_decay', 'internal_link', 'schema', 'approval']);
+const NOT_CHECKABLE_TYPES = new Set(['strategy_page_keyword', 'content_decay', 'internal_link', 'schema', 'approval', 'audit']);
 
 export interface DanglingRef {
   sourceType: string;
@@ -305,6 +326,22 @@ export async function runOutcomeSourceIntegritySweepJob(jobId: string): Promise<
       );
     } else {
       log.info({ workspaceCount: results.length }, 'Outcome source integrity sweep found zero dangling refs');
+    }
+
+    // D2: surface ANY unclassified sourceType (neither row-backed, self-ref, nor
+    // known-not-checkable) at warn level. Without this, a newly-minted recordAction()
+    // sourceType silently falls into `unclassifiedTypes` — which emits NO warning on its
+    // own (only totalDangling>0 does) — so the fleet could read "zero danglers" while a
+    // whole unexamined ref-kind (potentially with real orphans) sits unchecked. This is
+    // exactly how B13's gbp_review_response/audit seams went unclassified until D2.
+    const unclassifiedFleetwide = [
+      ...new Set(results.flatMap(r => r.unclassifiedTypes)),
+    ].sort();
+    if (unclassifiedFleetwide.length > 0) {
+      log.warn(
+        { unclassifiedTypes: unclassifiedFleetwide, workspaceCount: results.length },
+        'Outcome source integrity sweep saw source types it does not classify — add them to ROW_BACKED_CHECKS / SELF_REF_TYPES / NOT_CHECKABLE_TYPES',
+      );
     }
 
     // A racing cancel between the loop's last check and here leaves the job terminal-cancelled;

@@ -81,7 +81,14 @@ export type KnownSourceType =
   | 'strategy_page_keyword'
   | 'brand_voice'
   | 'content_decay'
-  | 'internal_link';
+  | 'internal_link'
+  // Reconcile R8-PR1 (Task B13) recordAction seams — minted AFTER B12 wrote the
+  // integrity sweep's classification, so both are added here + classified in
+  // server/outcome-source-integrity-sweep-job.ts (D2). `gbp_review_response` is
+  // ROW-BACKED (sourceId is a google_business_review_responses.id); `audit` is
+  // NOT ROW-CHECKABLE (sourceId is the synthetic `${pageId}-${check}` fix key).
+  | 'gbp_review_response'
+  | 'audit';
 
 /**
  * Advisory source-ref type. `KnownSourceType | (string & {})` keeps editor

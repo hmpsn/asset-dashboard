@@ -26,6 +26,12 @@ interface AnalyticsInsightRow {
   id: string;
   workspace_id: string;
   page_id: string | null;
+  // D4: title columns the live insight seam (recordInsightResolutionOutcome in
+  // server/outcome-tracking.ts) uses to snapshot the source label — threaded here so a
+  // backfilled insight win renders the real headline instead of the generic per-action
+  // label forever (backfill is skip-if-exists, so it is never re-snapshotted).
+  page_title: string | null;
+  strategy_keyword: string | null;
   resolution_status: string | null;
   resolved_at: string | null;
 }
@@ -44,7 +50,7 @@ const stmts = createStmtCache(() => ({
     WHERE workspace_id = ? AND published_at IS NOT NULL
   `),
   resolvedInsights: db.prepare(`
-    SELECT id, workspace_id, page_id, resolution_status, resolved_at
+    SELECT id, workspace_id, page_id, page_title, strategy_keyword, resolution_status, resolved_at
     FROM analytics_insights
     WHERE workspace_id = ? AND resolution_status = 'resolved'
   `),
@@ -150,6 +156,18 @@ export function backfillResolvedInsights(workspaceId: string): number {
           sourceFlag: 'backfill',
           baselineConfidence: 'estimated',
           attribution: 'platform_executed',
+          // D4: snapshot the insight's identity using the SAME title-preference the live
+          // seam uses (recordInsightResolutionOutcome: pageTitle -> strategyKeyword). Only
+          // pass a source when a real title exists (FM-2: never fabricate). Without this a
+          // backfilled insight win falls through resolveWinTitle's snapshot->live->generic
+          // chain — and there is NO `insight` live-lookup case in resolveWinTitle, so it
+          // degrades to the generic label permanently.
+          ...(() => {
+            const title = insight.page_title?.trim() || insight.strategy_keyword?.trim() || null;
+            return title
+              ? { source: { label: title, snapshot: { title, type: 'insight' as const, page: insight.page_id ?? undefined } } }
+              : {};
+          })(),
         });
         count++;
       }

@@ -21,13 +21,31 @@ export interface RedirectSnapshot {
 let _upsert: ReturnType<typeof db.prepare> | null = null;
 function upsertStmt() {
   if (!_upsert) {
+    // C1 (D3): write workspace_id forward on every snapshot. Migration 167 backfilled it
+    // + advertises an FK ON DELETE CASCADE, but the writer only set site_id, so every
+    // post-167 row landed with workspace_id NULL and the cascade never fired.
     _upsert = db.prepare(`
       INSERT OR REPLACE INTO redirect_snapshots
-        (id, site_id, created_at, result)
-      VALUES (@id, @site_id, @created_at, @result)
+        (id, site_id, workspace_id, created_at, result)
+      VALUES (@id, @site_id, @workspace_id, @created_at, @result)
     `);
   }
   return _upsert;
+}
+
+// C1 (D3): resolve site_id -> workspace_id ONLY on an exact 1:1 (COUNT=1) match; a
+// zero-match or ambiguous >1-match resolves to NULL, never a guessed workspace —
+// mirrors migration 167's quarantine logic (webflow_site_id has no UNIQUE constraint).
+let _resolveWorkspaceIdBySiteId: ReturnType<typeof db.prepare> | null = null;
+function resolveWorkspaceIdForSnapshot(siteId: string): string | null {
+  if (!siteId) return null;
+  if (!_resolveWorkspaceIdBySiteId) {
+    _resolveWorkspaceIdBySiteId = db.prepare(
+      `SELECT COUNT(*) AS n, MIN(id) AS id FROM workspaces WHERE webflow_site_id = ?`,
+    );
+  }
+  const row = _resolveWorkspaceIdBySiteId.get(siteId) as { n: number; id: string | null } | undefined;
+  return row && row.n === 1 ? row.id : null;
 }
 
 let _getBySite: ReturnType<typeof db.prepare> | null = null;
@@ -71,6 +89,8 @@ export function saveRedirectSnapshot(siteId: string, result: RedirectScanResult)
   upsertStmt().run({
     id: snapshot.id,
     site_id: siteId,
+    // C1 (D3): thread the 1:1-resolved workspace_id so the FK CASCADE actually fires.
+    workspace_id: resolveWorkspaceIdForSnapshot(siteId),
     created_at: snapshot.createdAt,
     result: JSON.stringify(result),
   });

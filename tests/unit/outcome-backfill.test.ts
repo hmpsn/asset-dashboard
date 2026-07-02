@@ -107,6 +107,8 @@ describe('outcome-backfill', () => {
         id: 'insight_new',
         workspace_id: 'ws_1',
         page_id: '/services',
+        page_title: 'Our Services',
+        strategy_keyword: null,
         resolution_status: 'resolved',
         resolved_at: '2026-05-20T08:00:00.000Z',
       },
@@ -114,6 +116,8 @@ describe('outcome-backfill', () => {
         id: 'insight_dup',
         workspace_id: 'ws_1',
         page_id: '/pricing',
+        page_title: null,
+        strategy_keyword: null,
         resolution_status: 'resolved',
         resolved_at: null,
       },
@@ -133,6 +137,63 @@ describe('outcome-backfill', () => {
       pageUrl: '/services',
       baselineSnapshot: { captured_at: '2026-05-20T08:00:00.000Z' },
     }));
+  });
+
+  it('backfillResolvedInsights (D4) snapshots the insight source label, preferring page_title over strategy_keyword', () => {
+    mocks.stmts.resolvedInsights.all.mockReturnValue([
+      {
+        id: 'insight_pt',
+        workspace_id: 'ws_1',
+        page_id: '/plumbing-services',
+        page_title: 'How to choose a local plumber',
+        strategy_keyword: 'local plumber',
+        resolution_status: 'resolved',
+        resolved_at: '2026-05-20T08:00:00.000Z',
+      },
+      {
+        id: 'insight_kw',
+        workspace_id: 'ws_1',
+        page_id: null,
+        page_title: '   ', // blank -> falls through to strategy_keyword
+        strategy_keyword: 'emergency electrician',
+        resolution_status: 'resolved',
+        resolved_at: null,
+      },
+      {
+        id: 'insight_none',
+        workspace_id: 'ws_1',
+        page_id: '/no-title',
+        page_title: null,
+        strategy_keyword: null,
+        resolution_status: 'resolved',
+        resolved_at: null,
+      },
+    ]);
+
+    backfillResolvedInsights('ws_1');
+
+    // page_title wins the preference and is captured as label + snapshot.title, with page.
+    expect(mocks.recordAction).toHaveBeenCalledWith(expect.objectContaining({
+      sourceId: 'insight_pt',
+      source: {
+        label: 'How to choose a local plumber',
+        snapshot: { title: 'How to choose a local plumber', type: 'insight', page: '/plumbing-services' },
+      },
+    }));
+    // Blank page_title falls through to strategy_keyword; null page_id -> undefined page.
+    expect(mocks.recordAction).toHaveBeenCalledWith(expect.objectContaining({
+      sourceId: 'insight_kw',
+      source: {
+        label: 'emergency electrician',
+        snapshot: { title: 'emergency electrician', type: 'insight', page: undefined },
+      },
+    }));
+    // No title in scope (FM-2) -> no source threaded at all.
+    const noneCall = mocks.recordAction.mock.calls.find(
+      ([params]) => (params as { sourceId?: string }).sourceId === 'insight_none',
+    );
+    expect(noneCall).toBeDefined();
+    expect((noneCall![0] as { source?: unknown }).source).toBeUndefined();
   });
 
   it('backfillCompletedRecommendations tolerates malformed/partial payload entries and only records valid completed recommendations', () => {
