@@ -103,6 +103,47 @@ Because there is no rollback path, the rename-to-archive contract is the only re
 mechanism available for destructive schema changes short of a full restore-from-backup — which is
 why A1 (backup safety) and this contract land together: neither is a complete safety net alone.
 
+## Archive-twin schema generation (R11-T7)
+
+Two tables in this codebase have a hand-maintained "archive twin" that receives rows aged out of
+the live table by a retention sweep: `tracked_actions` → `tracked_actions_archive` and
+`action_outcomes` → `action_outcomes_archive`. A twin's contract is: **exactly the live table's
+columns, in the live table's declared order, plus one trailing `archived_at` column.**
+
+This contract is easy to violate silently. SQLite's `ALTER TABLE ... ADD COLUMN` always appends
+the new column at the END of a table — but the live table and its twin do not necessarily gain
+columns in the same relative order, because the twin already has a trailing `archived_at` column
+the live table lacks. A column added to both tables via `ALTER` in the same migration lands
+*before* `archived_at` on the live table's logical end, but *after* `archived_at` physically on the
+twin. A positional `INSERT ... SELECT *` copy would then silently swap that column's value with the
+archive timestamp — migrations `106-action-outcome-value.sql` and
+`116-tracked-action-predicted-emv.sql` both document a near-miss of exactly this shape.
+
+`server/db/archive-twin.ts` closes this out permanently:
+
+- `getTableColumns(table)` reads the canonical column list via `PRAGMA table_info()`.
+- `assertArchiveTwinParity(liveTable, twinTable)` throws if the twin isn't exactly
+  `[...liveColumns, 'archived_at']`. Called at boot (`server/index.ts`, right after
+  `runMigrations()`) via `assertKnownArchiveTwinsAtBoot()` — a drifted twin crashes boot rather
+  than silently corrupting the next archive sweep.
+- `buildArchiveColumnList()` / `buildArchiveInsertSql()` generate the explicit, name-matched
+  column list `server/outcome-tracking.ts`'s `archiveOld` / `archiveOldOutcomes` statements use —
+  replacing the hand-copied lists that used to be the only thing preventing drift. Because both the
+  live and twin column lists are read from the same PRAGMA call at the same call site, they cannot
+  silently diverge.
+
+**Mechanized rule:** `scripts/pr-check.ts`'s "Live+twin ALTER lockstep" rule fails any migration
+that contains `ALTER TABLE tracked_actions ADD COLUMN` or `ALTER TABLE action_outcomes ADD COLUMN`
+without a matching `ALTER TABLE <table>_archive ADD COLUMN <same column>` in the **same file**.
+Like the `drop-table-ok` hatch above, the escape hatch is **inline-only** —
+`-- twin-alter-ok: <reason>` must sit on the live-table ALTER line itself, for a column that is
+genuinely live-only and must never be archived.
+
+Migration `164-archive-twin-rebuild.sql` is the one-time rename-to-archive rebuild that put both
+twins into the canonical column order this generator assumes: it renames the drifted twins aside to
+`*_r11_old` (not dropped — the delayed drop is a separate follow-up migration per the contract
+above) and recreates them with columns in live-table order plus a trailing `archived_at`.
+
 ## Related
 
 - `docs/workflows/data-integrity-recovery.md` — the integrity report + restore drill this contract

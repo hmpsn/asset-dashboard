@@ -2406,6 +2406,72 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // B10 (Reconcile R11-T7): tracked_actions and action_outcomes each have a
+    // hand-copied archive twin (tracked_actions_archive / action_outcomes_archive
+    // — see server/db/archive-twin.ts). ALTER TABLE always appends the new column
+    // at the end of a table, and the live table and its twin do NOT gain columns
+    // in the same relative physical order (the twin already has a trailing
+    // archived_at column the live table lacks), so a migration that ALTERs the
+    // live table without ALTERing the twin IN THE SAME FILE silently leaves the
+    // twin one column short — the exact drift assertArchiveTwinParity() (called
+    // at boot) is designed to catch, but catching it at boot is much later and
+    // more disruptive than catching it at PR time.
+    name: 'Live+twin ALTER lockstep (tracked_actions / action_outcomes archive twins)',
+    pattern: '',
+    fileGlobs: ['*.sql'],
+    pathFilter: 'server/db/migrations/',
+    message: 'A migration that ALTERs tracked_actions or action_outcomes must ALTER the matching archive twin (tracked_actions_archive / action_outcomes_archive) with an ADD COLUMN of the same name in the SAME migration file, or the twin silently drifts out of parity (see server/db/archive-twin.ts, docs/rules/destructive-migrations.md). Add an inline `-- twin-alter-ok: <reason>` comment on the live-table ALTER line if the twin genuinely does not need this column (e.g. a live-only operational column that must never be archived).',
+    severity: 'error',
+    rationale: 'An ALTER on tracked_actions/action_outcomes without a matching twin ALTER produces a twin that assertArchiveTwinParity() will reject at boot, and — worse, before that boot-time check existed — silently corrupts the archive sweep via positional column misalignment.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Matches `ALTER TABLE tracked_actions ADD COLUMN <name>` but NOT
+      // `ALTER TABLE tracked_actions_archive ADD COLUMN ...` (the negative
+      // lookahead excludes the `_archive` suffix on the table identifier).
+      const liveAlterRe = /^\s*ALTER\s+TABLE\s+(tracked_actions|action_outcomes)(?!_archive)\b\s+ADD\s+COLUMN\s+(\S+)/i;
+      const twinAlterRe = /^\s*ALTER\s+TABLE\s+(tracked_actions_archive|action_outcomes_archive)\s+ADD\s+COLUMN\s+(\S+)/i;
+
+      for (const file of files) {
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+
+        // Collect every twin ALTER ADD COLUMN in this file, keyed by twin table.
+        const twinAlteredColumns: Record<string, Set<string>> = {
+          tracked_actions_archive: new Set(),
+          action_outcomes_archive: new Set(),
+        };
+        for (const line of lines) {
+          const twinMatch = line.match(twinAlterRe);
+          if (twinMatch) {
+            twinAlteredColumns[twinMatch[1].toLowerCase()].add(twinMatch[2].toLowerCase());
+          }
+        }
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const match = line.match(liveAlterRe);
+          if (!match) continue;
+          if (line.includes('twin-alter-ok')) continue;
+
+          const liveTable = match[1].toLowerCase();
+          const columnName = match[2].toLowerCase();
+          const twinTable = `${liveTable}_archive`;
+
+          if (twinAlteredColumns[twinTable]?.has(columnName)) continue;
+
+          hits.push({
+            file,
+            line: i + 1,
+            text: `ALTER TABLE ${liveTable} ADD COLUMN ${columnName} has no matching ALTER TABLE ${twinTable} ADD COLUMN ${columnName} in this file`,
+          });
+        }
+      }
+      return hits;
+    },
+  },
+  {
     // FM-5: Direct SET status without a validation function.
     // State machine transitions should use validateTransition() to reject invalid transitions.
     name: 'Unguarded SET status = ? (state machine transition)',
