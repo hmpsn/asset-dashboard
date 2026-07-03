@@ -78,6 +78,6 @@ export function queueKeywordStrategyPostUpdateFollowOns(options: QueueKeywordStr
   queueDelayedRecommendationRegen(workspaceId, 'keyword_strategy_follow_on', RECOMMENDATION_REFRESH_DELAY_MS);
 
   // Phase 5c: a strategy/content mutation changes the data insights derive from — refresh signals.
-  // No-ops unless the signal-auto-recompute flag is on; deduped via hasActiveJob.
+  // Deduped via hasActiveJob.
   enqueueIntelligenceRecompute(workspaceId);
 }

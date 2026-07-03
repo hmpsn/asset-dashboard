@@ -91,8 +91,8 @@ export async function runRankTrackingSnapshots(workspaceIds?: string[]): Promise
         date,
         queryCount: queries.length,
       });
-      // Phase 5c: fresh rank data lands → refresh signals. No-ops unless the signal-auto-recompute
-      // flag is on; deduped via hasActiveJob (the lost_visibility bridge above owns its own insights).
+      // Phase 5c: fresh rank data lands → refresh signals. Deduped via hasActiveJob
+      // (the lost_visibility bridge above owns its own insights).
       enqueueIntelligenceRecompute(ws.id);
       log.info({ workspaceId: ws.id, count: queries.length, date }, 'Rank snapshot captured');
     } catch (err) {

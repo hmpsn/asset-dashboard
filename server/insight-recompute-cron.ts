@@ -1,16 +1,15 @@
 // server/insight-recompute-cron.ts
 // Phase 5: daily activity-gated insight recompute. For each workspace with recent activity whose
-// signals are stale (>24h), enqueues the INTELLIGENCE_RECOMPUTE background job. Gated behind the
-// `signal-auto-recompute` flag (default OFF — dark-launched so the per-workspace GSC/GA4 cost is
-// validated on staging first). Separate from the 6h LRU-warm cron (intelligence-crons.ts), which
-// does NOT recompute insights.
+// signals are stale (>24h), enqueues the INTELLIGENCE_RECOMPUTE background job. Runs
+// unconditionally (flag-sunset W2a — `signal-auto-recompute` retired, was globally ON in prod;
+// the per-workspace GSC/GA4 cost was validated on staging). Separate from the 6h LRU-warm cron
+// (intelligence-crons.ts), which does NOT recompute insights.
 
 import { createLogger } from './logger.js';
 import { listWorkspaces } from './workspaces.js';
 import { hasRecentActivity } from './activity-log.js';
 import { getInsights } from './analytics-insights-store.js';
 import { isStale } from './domains/analytics-intelligence/computations.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { enqueueIntelligenceRecompute } from './intelligence-recompute-job.js';
 
 const log = createLogger('insight-recompute-cron');
@@ -26,8 +25,6 @@ let isRunning = false;
 
 export async function runDailyInsightRecompute(): Promise<void> {
   if (isRunning) { log.warn('Daily insight recompute already in progress — skipping cycle'); return; }
-  // Kill switch: nothing fires until the flag is enabled (after the cost gate is validated on staging).
-  if (!isFeatureEnabled('signal-auto-recompute')) return;
   isRunning = true;
   try {
     let enqueued = 0;
@@ -61,7 +58,7 @@ export function startInsightRecomputeCron(): void {
   startupTimeout.unref?.();
   interval = setInterval(() => { void runDailyInsightRecompute(); }, DAILY_MS);
   interval.unref?.();
-  log.info('Daily insight recompute cron started (every 24h, signal-auto-recompute-gated)');
+  log.info('Daily insight recompute cron started (every 24h)');
 }
 
 export function stopInsightRecomputeCron(): void {

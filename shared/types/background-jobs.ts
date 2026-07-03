@@ -332,8 +332,8 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     cancellable: false,
     resultBehavior: 'domain-store',
     // The only system-originated job type today: created solely via
-    // server/intelligence-recompute-job.ts enqueueIntelligenceRecompute (gated on the
-    // signal-auto-recompute flag), which is called from three automated paths —
+    // server/intelligence-recompute-job.ts enqueueIntelligenceRecompute, which is
+    // called from three automated paths —
     // insight-recompute-cron, rank-tracking-scheduler, and keyword-strategy-follow-ons
     // (the last is an on-mutation trigger, not a cron). Excluded from client-facing
     // feeds accordingly. See BackgroundJobClass doc comment above.
