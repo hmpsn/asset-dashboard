@@ -108,6 +108,7 @@ Every completed task must include:
 | `npm run verify:platform` | Full platform health verification suite |
 | `npm run verify:platform:quick` | Quick platform checks (skips slow verifiers) |
 | `npm run verify:feature-flags` | Validate feature flag catalog consistency |
+| `npm run verify:deferred-ledger` | Validate the UI-rebuild deferred-work ledger (schema, expiry, roadmap links) |
 | `npm run verify:lexicon` | Validate GLOSSARY ↔ lexicon registry parity + duplicate exported-name allowlist |
 | `npm run verify:coverage-ratchet` | Fail if coverage has regressed below ratchet |
 | `npm run rules:generate` | Regenerate `docs/rules/automated-rules.md` from pr-check CHECKS array |
@@ -286,6 +287,7 @@ as quick guidance plus links to the canonical rule docs.
 - **Inbox section routing** — route note-free decisions to Decisions, noted items to Conversations, and static review artifacts to Reviews. Canonical contract: [inbox-section-routing.md](./docs/rules/inbox-section-routing.md).
 - **Destructive migrations** — a migration must never `DROP TABLE` directly. Rename-to-archive (or copy-to-archive) in PR N; the actual `DROP` ships in PR N+1 only after staging verify + one backup retention window. Guarded by pr-check (`New migration DROP TABLE without rename-to-archive contract`, inline-only `-- drop-table-ok: <reason>` hatch). Full contract + migration-runner semantics (forward-only, lexicographic, single IMMEDIATE transaction, `MIGRATION_RENAMES` bridge): [destructive-migrations.md](./docs/rules/destructive-migrations.md). Run `npm run backup:restore-drill` before any destructive migration wave merges.
 - **Backup retention is split by tier** — `BACKUP_RETENTION_DAYS` (local disk, default 3) and `BACKUP_S3_RETENTION_DAYS` (off-site, default 30) are independent; both read from the shared `DEFAULT_BACKUP_RETENTION_DAYS`/`DEFAULT_BACKUP_S3_RETENTION_DAYS` constants in `server/backup.ts` — never hard-code a retention-days literal elsewhere. `BACKUP_S3_ENDPOINT` (optional) enables S3-compatible off-site providers (e.g. Cloudflare R2). Backup posture (`lastBackupAt`, `offsiteConfigured`) is surfaced on `GET /api/admin/storage-stats` so it's checkable via HTTP without SSH.
+- **UI Rebuild conventions** — files carrying the `@ds-rebuilt` marker opt into strict rebuild gates (tokens-only styling, `var(--dur-*)` motion, lucide-only icons, no raw hex/palette classes, error severity). Full contract: [docs/rules/ui-rebuild-consistency.md](./docs/rules/ui-rebuild-consistency.md). Every quick-win trade-off shipped in a PR adds a `DEF-*` row to `data/ui-rebuild-deferred-ledger.json` in the same PR (`npm run verify:deferred-ledger` enforces schema, expiry, and roadmap links).
 
 > **Mechanized enforcement.** Many rules above (and every silent-failure rule removed from this section during the pr-check audit) are now enforced by `scripts/pr-check.ts`. The canonical list with escape hatches lives in [docs/rules/automated-rules.md](./docs/rules/automated-rules.md) — do not duplicate them here.
 
@@ -326,6 +328,7 @@ as quick guidance plus links to the canonical rule docs.
 | `docs/workflows/deploy.md` | Commit, push, verify deploy (staging → main flow) |
 | `docs/workflows/staging-environment.md` | Staging URLs, DB sync, feature flags, env vars |
 | `docs/rules/automated-rules.md` | **Generated** table of every rule enforced by `scripts/pr-check.ts` |
+| `docs/rules/ui-rebuild-consistency.md` | UI rebuild consistency contract — `@ds-rebuilt` marker + 7 gates, agentic review cadence, deferred-ledger discipline, F2b backlog |
 | `docs/rules/pr-check-rule-authoring.md` | How to add a new mechanized rule (when to do it, how to write the regex/customCheck, how to test it) |
 | `docs/rules/data-flow.md` | Data flow consistency rules (detailed) |
 | `docs/rules/ui-ux-consistency.md` | UI/UX consistency rules (detailed) |
@@ -413,5 +416,6 @@ Work is not done until ALL pass:
 - [ ] All bugs surfaced during review are fixed — never dismiss a fixable bug as "pre-existing", "minor", or "out of scope". If a review agent or manual review finds it and it can be fixed, fix it in this PR.
 - [ ] If multi-phase feature: this PR covers exactly one phase. Phase N+1 is not started until phase N is merged and green.
 - [ ] `npm run verify:feature-flags` — no orphaned or ungrouped feature flag keys
+- [ ] `npm run verify:deferred-ledger` — UI-rebuild deferred ledger valid (schema, no expired open entries, roadmap links) — only if the PR touches rebuild scope
 - [ ] `npm run verify:lexicon` — GLOSSARY ↔ lexicon registry parity holds and no unregistered duplicate exported type name
 - [ ] `npm run verify:coverage-ratchet` — coverage has not regressed below ratchet baseline
