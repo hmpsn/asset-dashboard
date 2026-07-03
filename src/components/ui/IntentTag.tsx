@@ -1,6 +1,7 @@
 // @ds-rebuilt
 import type { CSSProperties, ReactElement } from 'react';
 import type { BadgeTone } from './Badge';
+import { Badge } from './Badge';
 
 export type KeywordIntent = 'commercial' | 'informational' | 'transactional' | 'local';
 
@@ -40,6 +41,34 @@ export interface IntentTagProps {
   style?: CSSProperties;
 }
 
-export function IntentTag(_props: IntentTagProps): ReactElement {
-  throw new Error('F3 stub — IntentTag not yet implemented (Lane A)');
+/** Human-readable full label per intent (title-case, matches the kit's default label). */
+const INTENT_LABEL: Record<KeywordIntent, string> = {
+  commercial: 'Commercial',
+  informational: 'Informational',
+  transactional: 'Transactional',
+  local: 'Local',
+};
+
+export function IntentTag({
+  intent,
+  abbreviate = false,
+  size = 'sm',
+  className,
+  id,
+  style,
+}: IntentTagProps): ReactElement {
+  const tone = INTENT_TONE[intent];
+  const label = abbreviate ? INTENT_ABBREV[intent] : INTENT_LABEL[intent];
+
+  // Badge has no id/style props, so when either is supplied we wrap in a
+  // plain span carrying them — Badge itself stays untouched (out of scope).
+  if (id !== undefined || style !== undefined) {
+    return (
+      <span id={id} style={style}>
+        <Badge label={label} tone={tone} variant="soft" size={size} shape="sm" className={className} />
+      </span>
+    );
+  }
+
+  return <Badge label={label} tone={tone} variant="soft" size={size} shape="sm" className={className} />;
 }
