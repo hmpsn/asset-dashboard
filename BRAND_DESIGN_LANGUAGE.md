@@ -570,7 +570,7 @@ The UI rebuild adds six token families to `src/tokens.css` (the single token sou
 | **Type roles** | `--type-{hero,h1,h2,stat-lg,stat,stat-sm,page,body,ui,label,caption,mono,micro}-{size,line,weight,track}` | Size/weight/line/tracking values the `.t-*` utilities and ported DS components read (the `.t-*` refactor to consume them lands in F3). |
 | **Spacing scale** | `--space-1 … --space-16` (4px rhythm) | Layout/gap/padding at the 4px grid. |
 | **Shell / page layout** | `--shell-{sidebar,sidebar-rail,topbar}`, `--page-max{,-narrow,-wide}`, `--page-pad-{x,y,bottom}`, `--section-gap`, `--grid-gap{,-lg}`, `--bp-{sm,md,lg}` | App-shell + content boundary values (AppShell / PageContainer). |
-| **Motion** | `--ease-out`, `--ease-draw`, `--dur-{fast,base,slow}`, `--stagger-step` | Canonical easing curves + durations. |
+| **Motion** | `--ease-out`, `--ease-draw`, `--dur-{fast,base,slow}`, `--stagger-step` | Canonical easing curves + durations. **Canonical**: all new motion uses `var(--dur-*)`/`var(--ease-*)`. The legacy 120/180/400ms literal standard applies to pre-rebuild code only (migration: DEF-foundation-003). |
 | **Elevation** | `--shadow-{sm,md,lg,glow}` (canonical, both themes) | Canonical elevation family. `--brand-shadow-*` is **deprecated** (kept; migration is a Z-phase item). |
 
 ---

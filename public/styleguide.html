@@ -3839,26 +3839,26 @@ SectionCard: var(--radius-signature-lg)</div>
       <span class="sec-num">07 ·</span>
       <h2>Motion</h2>
       <div class="rule"></div>
-      <p>Three durations. Every animation in the system picks one of the three — no in-between values. <span class="t-mono">Instant</span> for state response, <span class="t-mono">Standard</span> for UI changes, <span class="t-mono">Deliberate</span> for the rare moments that earn the spotlight. Ease is uniformly <span class="t-mono">ease-out</span> unless noted.</p>
+      <p>Three durations, exposed as tokens — every animation picks <span class="t-mono">var(--dur-fast)</span>, <span class="t-mono">var(--dur-base)</span>, or <span class="t-mono">var(--dur-slow)</span>; ease is <span class="t-mono">var(--ease-out)</span> unless noted (<span class="t-mono">var(--ease-draw)</span> for chart draws).</p>
     </div>
 
-    <!-- THE MOTION LAW — 3 durations, full stop -->
+    <!-- THE MOTION LAW — 3 duration tokens, full stop -->
     <div class="motion-law">
       <div class="motion-law-card">
-        <div class="motion-law-num">01 · Instant</div>
-        <div class="motion-law-dur">100<span class="ms">ms</span></div>
+        <div class="motion-law-num">01 · Instant · <span class="t-mono">--dur-fast</span></div>
+        <div class="motion-law-dur">150<span class="ms">ms</span></div>
         <div class="motion-law-use">Hover, focus, toggle, press. The UI should feel like it's responding <em>to</em> you, not performing <em>for</em> you.</div>
         <div class="motion-law-bar"></div>
       </div>
       <div class="motion-law-card">
-        <div class="motion-law-num">02 · Standard</div>
-        <div class="motion-law-dur">240<span class="ms">ms</span></div>
-        <div class="motion-law-use">Card entries, modal open/close, tab switch, toast, number fade-in, stagger step. The workhorse — 90% of animations land here.</div>
+        <div class="motion-law-num">02 · Standard · <span class="t-mono">--dur-base</span></div>
+        <div class="motion-law-dur">250<span class="ms">ms</span></div>
+        <div class="motion-law-use">Card entries, modal open/close, tab switch, toast, stagger step (via <span class="t-mono">--stagger-step</span> 60ms). The workhorse — 90% of animations land here.</div>
         <div class="motion-law-bar"></div>
       </div>
       <div class="motion-law-card">
-        <div class="motion-law-num">03 · Deliberate</div>
-        <div class="motion-law-dur">600<span class="ms">ms</span></div>
+        <div class="motion-law-num">03 · Deliberate · <span class="t-mono">--dur-slow</span></div>
+        <div class="motion-law-dur">500<span class="ms">ms</span></div>
         <div class="motion-law-use">Moments of consequence: ring charge-up, scanner reveal, celebration glow. Use sparingly — once per screen, at most.</div>
         <div class="motion-law-bar"></div>
       </div>

@@ -6092,13 +6092,15 @@ export const CHECKS: Check[] = [
       'public/styleguide.html',
       'public/styleguide.css',
     ],
-    message: 'Use transition-duration-[120ms], transition-duration-[180ms], or transition-duration-[400ms]. Non-standard durations break motion consistency.',
+    message: 'Use var(--dur-fast|base|slow) (canonical motion tokens), or the legacy 120/180/400ms literals in pre-rebuild code. Non-standard durations break motion consistency.',
     // Promoted warn → error in Phase 5 Phase 3 (2026-04-25) after backlog reached zero.
+    // F2a (2026-07-03): var(--dur-*) motion tokens ratified canonical (alongside the
+    // legacy literals, which stay valid outside @ds-rebuilt scope — DEF-foundation-003).
     severity: 'error',
-    rationale: 'Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance).',
+    rationale: 'Enforces the three-speed motion system: canonical var(--dur-fast|base|slow) tokens, or the legacy 120/180/400ms literals in pre-rebuild code.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
     customCheck: (files) => {
-      const ALLOWED = new Set(['120ms', '180ms', '400ms']);
+      const ALLOWED = new Set(['120ms', '180ms', '400ms', 'var(--dur-fast)', 'var(--dur-base)', 'var(--dur-slow)']);
       const violations: Array<{ file: string; line: number; text: string }> = [];
       // files are absolute paths from resolveCheckFileList — use directly
       files.forEach(filePath => {
