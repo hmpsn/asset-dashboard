@@ -54,7 +54,10 @@ function getFiles(dir: string, pattern: string): string[] {
     // throw and the catch would return []. That is itself a Category A
     // silent-failure mode (rule reports ✓ because it received zero files).
     // 50MB is comfortably above any plausible repo-walk output.
-    return execSync(`find "${dir}" -name "${pattern}" -type f 2>/dev/null`, {
+    // Prune the gitignored UI-rebuild kit mirror: reference material whose token
+    // files/docs false-positive repo rules under --all (PR #1473). find has no
+    // gitignore awareness, so the exclusion must be explicit here.
+    return execSync(`find "${dir}" -not -path "*/hmpsn studio Design System/*" -name "${pattern}" -type f 2>/dev/null`, {
       cwd: ROOT,
       encoding: 'utf-8',
       maxBuffer: 50 * 1024 * 1024,
@@ -581,6 +584,14 @@ function hasHatch(lines: string[], i: number, hatch: string): boolean {
   if (i > 0 && lines[i - 1]?.includes(hatch)) return true;
   return false;
 }
+
+/**
+ * True when a file opts into the UI-rebuild strict gates (Phase D, D2). The
+ * `@ds-rebuilt` marker (any occurrence — comment, JSDoc) scopes the seven
+ * `ds-*` rules to rebuilt surfaces so pre-rebuild code is untouched. See
+ * docs/rules/ui-rebuild-consistency.md.
+ */
+const isDsRebuilt = (content: string): boolean => content.includes('@ds-rebuilt');
 
 /**
  * Find the end of a function's return-type annotation region given `tail`
@@ -6092,13 +6103,15 @@ export const CHECKS: Check[] = [
       'public/styleguide.html',
       'public/styleguide.css',
     ],
-    message: 'Use transition-duration-[120ms], transition-duration-[180ms], or transition-duration-[400ms]. Non-standard durations break motion consistency.',
+    message: 'Use var(--dur-fast|base|slow) (canonical motion tokens), or the legacy 120/180/400ms literals in pre-rebuild code. Non-standard durations break motion consistency.',
     // Promoted warn → error in Phase 5 Phase 3 (2026-04-25) after backlog reached zero.
+    // F2a (2026-07-03): var(--dur-*) motion tokens ratified canonical (alongside the
+    // legacy literals, which stay valid outside @ds-rebuilt scope — DEF-foundation-003).
     severity: 'error',
-    rationale: 'Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance).',
+    rationale: 'Enforces the three-speed motion system: canonical var(--dur-fast|base|slow) tokens, or the legacy 120/180/400ms literals in pre-rebuild code.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
     customCheck: (files) => {
-      const ALLOWED = new Set(['120ms', '180ms', '400ms']);
+      const ALLOWED = new Set(['120ms', '180ms', '400ms', 'var(--dur-fast)', 'var(--dur-base)', 'var(--dur-slow)']);
       const violations: Array<{ file: string; line: number; text: string }> = [];
       // files are absolute paths from resolveCheckFileList — use directly
       files.forEach(filePath => {
@@ -6995,6 +7008,201 @@ export const CHECKS: Check[] = [
         });
       }
 
+      return hits;
+    },
+  },
+  // ─── UI Rebuild (F2a) — @ds-rebuilt-scoped strict gates (Phase D, D2/D7) ──────
+  // All seven rules gate on isDsRebuilt(content): they fire ONLY on files carrying
+  // the `@ds-rebuilt` marker, at error severity. Dormant until the first rebuilt
+  // surface lands. Inline hatch only (above-line is silently ignored — house rule).
+  {
+    name: 'ds-raw-hex-anywhere',
+    pattern: '',
+    fileGlobs: ['*.tsx', '*.ts', '*.css'],
+    severity: 'error',
+    excludeLines: ['// raw-hex-ok', '/* raw-hex-ok'],
+    message: 'Raw hex color in a @ds-rebuilt file — use a --* token (src/tokens.css). Add // raw-hex-ok inline if unavoidable (e.g. third-party theme chrome).',
+    rationale: 'Rebuilt surfaces must consume tokens, never inline hex, so theme + brand changes propagate.',
+    claudeMdRef: 'UI Rebuild conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const re = /#[0-9a-fA-F]{3,8}\b/;
+      // Comment starts: //, /*, block-comment continuation `*` — but NOT `://`
+      // (https:// URLs). Hex-shaped PR refs (#1472) live in comments; href="#…"
+      // anchors aren't colors. Review finding, PR #1473.
+      const commentStart = /(?<!:)\/\/|\/\*|^\s*\*/;
+      files.forEach(filePath => {
+        let content: string;
+        try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
+        if (!isDsRebuilt(content)) return;
+        content.split('\n').forEach((line, i) => {
+          const m = re.exec(line);
+          if (!m) return;
+          const c = commentStart.exec(line);
+          if (c && c.index < m.index) return;
+          if (/href=["']#/.test(line)) return;
+          hits.push({ file: filePath, line: i + 1, text: line.trim() });
+        });
+      });
+      return hits;
+    },
+  },
+  {
+    name: 'ds-tailwind-palette-bypass',
+    pattern: '',
+    fileGlobs: ['*.tsx'],
+    severity: 'error',
+    excludeLines: ['// palette-ok'],
+    message: 'Raw Tailwind palette class in a @ds-rebuilt file — use a token-backed class (text-[var(--...)], bg-[var(--surface-N)]). Add // palette-ok inline if unavoidable.',
+    rationale: 'Rebuilt surfaces route color through tokens; raw palette classes fork theme values.',
+    claudeMdRef: 'UI Rebuild conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const re = /(?:text|bg|border|ring|from|to|via)-(?:zinc|slate|gray|neutral|stone|red|amber|emerald|teal|blue|purple|violet|indigo|rose|pink)-\d{2,3}/;
+      files.forEach(filePath => {
+        let content: string;
+        try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
+        if (!isDsRebuilt(content)) return;
+        content.split('\n').forEach((line, i) => {
+          if (re.test(line)) hits.push({ file: filePath, line: i + 1, text: line.trim() });
+        });
+      });
+      return hits;
+    },
+  },
+  {
+    name: 'ds-per-view-css-block',
+    pattern: '',
+    fileGlobs: ['*.tsx'],
+    severity: 'error',
+    excludeLines: ['// view-css-ok'],
+    message: 'Per-view CSS block (const *css*/*styles* = or <style>) in a @ds-rebuilt file — styling belongs in tokens + primitives, not ad hoc per-view CSS. Add // view-css-ok inline if unavoidable.',
+    rationale: 'Rebuilt surfaces compose primitives; inline per-view CSS re-forks the design system per screen.',
+    claudeMdRef: 'UI Rebuild conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const re = /const\s+\w*(?:css|styles?)\w*\s*=\s*[`{]|<style/i;
+      files.forEach(filePath => {
+        let content: string;
+        try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
+        if (!isDsRebuilt(content)) return;
+        content.split('\n').forEach((line, i) => {
+          if (re.test(line)) hits.push({ file: filePath, line: i + 1, text: line.trim() });
+        });
+      });
+      return hits;
+    },
+  },
+  {
+    name: 'ds-token-theme-parity',
+    pattern: '',
+    fileGlobs: ['*.css'],
+    severity: 'error',
+    message: 'Token declared in :root without a .dashboard-light override (or vice versa) in a @ds-rebuilt file. Every themeable token needs both scopes; theme-neutral families (--font-/--type-/--space-/--shell-/--page-/--section-/--grid-/--bp-/--ease-/--dur-/--stagger/--radius/--icon/--z-) are exempt.',
+    rationale: 'A themeable token present in only one scope silently breaks the other theme.',
+    claudeMdRef: 'UI Rebuild conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const NEUTRAL = ['--font-', '--type-', '--space-', '--shell-', '--page-', '--section-', '--grid-', '--bp-', '--ease-', '--dur-', '--stagger', '--radius', '--icon', '--z-'];
+      const isNeutral = (name: string) => NEUTRAL.some(p => name.startsWith(p));
+      const declsIn = (block: string) => new Set((block.match(/--[\w-]+(?=\s*:)/g) ?? []));
+      files.forEach(filePath => {
+        let content: string;
+        try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
+        if (!isDsRebuilt(content)) return;
+        const lines = content.split('\n');
+        const lineOf = (name: string) => (lines.findIndex(l => new RegExp(`${name}\\s*:`).test(l)) + 1) || 1;
+        // Union tokens across ALL :root / .dashboard-light blocks (a file may
+        // split declarations across several). matchAll(/g) — a single match()
+        // would see only the first block and mis-flag tokens in later ones
+        // (review finding, PR #1473). Assumes flat token blocks (no nested {}),
+        // which holds for :root token declarations.
+        const unionDecls = (re: RegExp) => {
+          const set = new Set<string>();
+          for (const m of content.matchAll(re)) for (const t of declsIn(m[1] ?? '')) set.add(t);
+          return set;
+        };
+        const root = unionDecls(/:root\s*\{([^}]*)\}/g);
+        const light = unionDecls(/\.dashboard-light[^{]*\{([^}]*)\}/g);
+        for (const name of root) {
+          if (!isNeutral(name) && !light.has(name)) hits.push({ file: filePath, line: lineOf(name), text: `themeable token ${name} in :root has no .dashboard-light override` });
+        }
+        for (const name of light) {
+          if (!isNeutral(name) && !root.has(name)) hits.push({ file: filePath, line: lineOf(name), text: `token ${name} in .dashboard-light is not declared in :root` });
+        }
+      });
+      return hits;
+    },
+  },
+  {
+    name: 'ds-icon-discipline',
+    pattern: '',
+    fileGlobs: ['*.tsx'],
+    severity: 'error',
+    excludeLines: ['// icon-ok'],
+    message: 'Font Awesome class (fa-*) or emoji glyph in a @ds-rebuilt file — the ratified icon system is lucide-react (D5). Add // icon-ok inline if the glyph is genuine content, not an icon.',
+    rationale: 'D5 ratified lucide-react; Font Awesome + emoji-as-icon fork the icon system.',
+    claudeMdRef: 'UI Rebuild conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Emoji range deliberately excludes U+2600–27BF (dingbats: ✓ ⚠ ★ ✗ —
+      // legitimate string glyphs, not icons). Review finding, PR #1473.
+      const re = /\bfa-[a-z-]+\b|[\u{1F300}-\u{1FAFF}]/u;
+      files.forEach(filePath => {
+        let content: string;
+        try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
+        if (!isDsRebuilt(content)) return;
+        content.split('\n').forEach((line, i) => {
+          if (re.test(line)) hits.push({ file: filePath, line: i + 1, text: line.trim() });
+        });
+      });
+      return hits;
+    },
+  },
+  {
+    name: 'ds-deep-import',
+    pattern: '',
+    fileGlobs: ['*.tsx', '*.ts'],
+    severity: 'error',
+    excludeLines: ['// deep-import-ok'],
+    // Backstop: refine to the real DS internal layout in F3 once components/ui/internal/ exists.
+    message: 'Deep import into components/ui/internal/ from a @ds-rebuilt file — import the public primitive, not its internals. Add // deep-import-ok inline if intentional.',
+    rationale: 'Reaching into a primitive\'s internals couples rebuilt surfaces to private structure.',
+    claudeMdRef: 'UI Rebuild conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const re = /from\s+['"].*components\/ui\/internal\//;
+      files.forEach(filePath => {
+        let content: string;
+        try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
+        if (!isDsRebuilt(content)) return;
+        content.split('\n').forEach((line, i) => {
+          if (re.test(line)) hits.push({ file: filePath, line: i + 1, text: line.trim() });
+        });
+      });
+      return hits;
+    },
+  },
+  {
+    name: 'ds-motion-token',
+    pattern: '',
+    fileGlobs: ['*.tsx', '*.css'],
+    severity: 'error',
+    excludeLines: ['// motion-ok', '/* motion-ok'],
+    message: 'Literal transition/animation duration in a @ds-rebuilt file — use var(--dur-fast|base|slow). Add // motion-ok inline if unavoidable.',
+    rationale: 'Rebuilt surfaces must use the canonical motion tokens so timing stays consistent.',
+    claudeMdRef: 'UI Rebuild conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const re = /transition[^;\n]*\b\d+m?s\b|duration-\[?\d+/;
+      files.forEach(filePath => {
+        let content: string;
+        try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
+        if (!isDsRebuilt(content)) return;
+        content.split('\n').forEach((line, i) => {
+          if (re.test(line)) hits.push({ file: filePath, line: i + 1, text: line.trim() });
+        });
+      });
       return hits;
     },
   },
@@ -9554,8 +9762,11 @@ export function checkFile(file: string, check: Check): string[] {
   return checkFiles([file], check);
 }
 
-// Directories that should never be scanned (vendor code, test fixtures, build output)
-const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', '.worktrees', 'scripts', 'tests'];
+// Directories that should never be scanned (vendor code, test fixtures, build output).
+// 'hmpsn studio Design System' is the gitignored UI-rebuild kit mirror — reference
+// material, not product code; its token files legitimately declare --* tokens and
+// its docs name the studio, which false-positived 3 rules under --all (PR #1473).
+const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', '.worktrees', 'scripts', 'tests', 'hmpsn studio Design System'];
 // Root-level files to skip (--exclude-dir doesn't work on files)
 const EXCLUDED_FILES: string[] = [];
 

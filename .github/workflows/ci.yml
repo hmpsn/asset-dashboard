@@ -143,6 +143,9 @@ jobs:
       - name: Feature flag lifecycle checks
         run: npm run verify:feature-flags
 
+      - name: Verify deferred ledger
+        run: npm run verify:deferred-ledger
+
       - name: Lexicon registry checks
         run: npm run verify:lexicon
 

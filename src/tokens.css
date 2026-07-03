@@ -118,11 +118,12 @@
   --section-gap: 20px;
   --grid-gap: 12px;
   --grid-gap-lg: 16px;
+  /* Breakpoints — reference values for JS/container queries; CSS @media cannot read var() */
   --bp-sm: 640px;
   --bp-md: 900px;
   --bp-lg: 1200px;
 
-  /* ─── Motion ─── */
+  /* ─── Motion (canonical — legacy 120/180/400ms literals migrate per DEF-foundation-003) ─── */
   --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-draw: cubic-bezier(0.2, 0.7, 0.3, 1);
   --dur-fast: 0.15s;

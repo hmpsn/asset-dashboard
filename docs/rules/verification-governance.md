@@ -29,6 +29,7 @@ PR quality CI blocks on:
 - `npm run pr-check`
 - `npm run check:circular-deps`
 - `npm run verify:feature-flags`
+- `npm run verify:deferred-ledger`
 - `npm run verify:governance`
 - `npm run verify:style-drift`
 - `npm run verify:staging-merge-integrity`

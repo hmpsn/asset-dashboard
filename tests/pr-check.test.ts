@@ -5957,6 +5957,14 @@ describe('Meta: customCheck rule name registry', () => {
     // table must register it in server/db/snapshot-registry.ts in the same PR;
     // see docs/rules/snapshot-envelope.md.
     'New migration creates a _snapshots table without a matching registry entry',
+    // UI Rebuild F2a (2026-07-03) — @ds-rebuilt-scoped strict gates (Phase D, D2/D7).
+    'ds-raw-hex-anywhere',
+    'ds-tailwind-palette-bypass',
+    'ds-per-view-css-block',
+    'ds-token-theme-parity',
+    'ds-icon-discipline',
+    'ds-deep-import',
+    'ds-motion-token',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -12438,5 +12446,200 @@ describe('Rule: Unguarded SET status = ? (state machine transition)', () => {
       ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ── UI Rebuild (F2a): @ds-rebuilt-scoped ds-* gates ─────────────────────────
+// Each rule fires ONLY on files carrying the @ds-rebuilt marker (Phase D, D2).
+// Three cases per rule: (a) violation WITH marker → flagged; (b) same WITHOUT
+// marker → not flagged; (c) violation WITH marker + inline hatch → not flagged.
+describe('Rule: UI Rebuild @ds-rebuilt-scoped gates (F2a)', () => {
+  const MARKER = '// @ds-rebuilt';
+
+  // runRule() invokes customCheck directly and (by design) skips the runner's
+  // excludeLines post-filter. This replicates it for the hatch case: the hatch
+  // token lives in hit.text because these rules set text = the source line.
+  function runFiltered(name: string, files: string[]): CustomCheckMatch[] {
+    const check = CHECKS.find(c => c.name === name);
+    if (!check) throw new Error(`Rule not found: "${name}"`);
+    const hatches = check.excludeLines ?? [];
+    return runRule(name, files).filter(h => !hatches.some(tok => h.text.includes(tok)));
+  }
+
+  describe('Rule: ds-raw-hex-anywhere', () => {
+    const RULE = 'ds-raw-hex-anywhere';
+    it('flags a raw hex in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Rebuilt.tsx'),
+        lines(MARKER, "export const c = '#ff0000';"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag the same hex without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Legacy.tsx'),
+        lines("export const c = '#ff0000';"));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a hex carrying the inline // raw-hex-ok hatch', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Hatched.tsx'),
+        lines(MARKER, "export const c = '#ff0000'; // raw-hex-ok"));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a hex-shaped PR reference inside a comment (review, PR #1473)', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Commented.tsx'),
+        lines(MARKER, '// motion unification landed in PR #1472 — see the review'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag an href="#…" anchor (review, PR #1473)', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Anchor.tsx'),
+        lines(MARKER, 'const a = <a href="#abc123">jump</a>;'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('still flags a hex that precedes a trailing comment on the same line', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Trailing.tsx'),
+        lines(MARKER, "export const c = '#ff0000'; // brand red"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+  });
+
+  describe('Rule: ds-tailwind-palette-bypass', () => {
+    const RULE = 'ds-tailwind-palette-bypass';
+    it('flags a raw Tailwind palette class in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-palette', 'src/Rebuilt.tsx'),
+        lines(MARKER, "const cls = 'text-zinc-400 bg-blue-500';"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag the same class without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-palette', 'src/Legacy.tsx'),
+        lines("const cls = 'text-zinc-400 bg-blue-500';"));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a palette class carrying the inline // palette-ok hatch', () => {
+      const file = write(uniqPath('ds-palette', 'src/Hatched.tsx'),
+        lines(MARKER, "const cls = 'text-zinc-400'; // palette-ok"));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+  });
+
+  describe('Rule: ds-motion-token', () => {
+    const RULE = 'ds-motion-token';
+    it('flags a literal duration in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-motion', 'src/Rebuilt.tsx'),
+        lines(MARKER, 'const cls = "transition-all duration-[300ms]";'));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag the same duration without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-motion', 'src/Legacy.tsx'),
+        lines('const cls = "transition-all duration-[300ms]";'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a duration carrying the inline // motion-ok hatch', () => {
+      const file = write(uniqPath('ds-motion', 'src/Hatched.tsx'),
+        lines(MARKER, 'const cls = "duration-[300ms]"; // motion-ok'));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+    it('accepts var(--dur-*) motion tokens (not flagged even with the marker)', () => {
+      const file = write(uniqPath('ds-motion', 'src/Tokened.tsx'),
+        lines(MARKER, 'const cls = "transition-all"; // uses var(--dur-base) in CSS'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+  });
+
+  describe('Rule: ds-per-view-css-block', () => {
+    const RULE = 'ds-per-view-css-block';
+    it('flags a per-view styles object in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-css', 'src/Rebuilt.tsx'),
+        lines(MARKER, "const styles = { color: 'x' };"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag the same block without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-css', 'src/Legacy.tsx'),
+        lines("const styles = { color: 'x' };"));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a block carrying the inline // view-css-ok hatch', () => {
+      const file = write(uniqPath('ds-css', 'src/Hatched.tsx'),
+        lines(MARKER, "const styles = { color: 'x' }; // view-css-ok"));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+  });
+
+  describe('Rule: ds-token-theme-parity', () => {
+    const RULE = 'ds-token-theme-parity';
+    it('flags a themeable :root token with no .dashboard-light override', () => {
+      const file = write(uniqPath('ds-parity', 'src/theme.css'),
+        lines('/* @ds-rebuilt */', ':root { --brand-foo: #111827; }', '.dashboard-light { }'));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag when the token has both scopes', () => {
+      const file = write(uniqPath('ds-parity', 'src/theme.css'),
+        lines('/* @ds-rebuilt */', ':root { --brand-foo: #111827; }', '.dashboard-light { --brand-foo: #ffffff; }'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag theme-neutral families (--space-) or files without the marker', () => {
+      const neutral = write(uniqPath('ds-parity', 'src/neutral.css'),
+        lines('/* @ds-rebuilt */', ':root { --space-99: 4px; }', '.dashboard-light { }'));
+      expect(runRule(RULE, [neutral])).toHaveLength(0);
+      const legacy = write(uniqPath('ds-parity', 'src/legacy.css'),
+        lines(':root { --brand-foo: #111827; }', '.dashboard-light { }'));
+      expect(runRule(RULE, [legacy])).toHaveLength(0);
+    });
+    it('unions tokens across multiple :root / .dashboard-light blocks (review, PR #1473)', () => {
+      // Both tokens are themed across two split blocks each — the single-match
+      // parser wrongly flagged the token in the 2nd :root as light-only.
+      const file = write(uniqPath('ds-parity', 'src/split.css'),
+        lines('/* @ds-rebuilt */',
+          ':root { --brand-teal: #0d9488; }',
+          ':root { --brand-blue: #3b82f6; }',
+          '.dashboard-light { --brand-teal: #0f766e; }',
+          '.dashboard-light { --brand-blue: #2563eb; }'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+  });
+
+  describe('Rule: ds-icon-discipline', () => {
+    const RULE = 'ds-icon-discipline';
+    it('flags a Font Awesome class in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-icon', 'src/Rebuilt.tsx'),
+        lines(MARKER, 'const i = <i className="fa-solid fa-home" />;'));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag fa- without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-icon', 'src/Legacy.tsx'),
+        lines('const i = <i className="fa-home" />;'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag an icon carrying the inline // icon-ok hatch', () => {
+      const file = write(uniqPath('ds-icon', 'src/Hatched.tsx'),
+        lines(MARKER, 'const i = <i className="fa-home" />; // icon-ok'));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag dingbat string glyphs like ✓ ⚠ ★ (review, PR #1473)', () => {
+      const file = write(uniqPath('ds-icon', 'src/Glyphs.tsx'),
+        lines(MARKER, "const label = '✓ Saved — ⚠ pending review ★';"));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('still flags a true emoji used as an icon', () => {
+      const file = write(uniqPath('ds-icon', 'src/Emoji.tsx'),
+        lines(MARKER, "const icon = '🔥';"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+  });
+
+  describe('Rule: ds-deep-import', () => {
+    const RULE = 'ds-deep-import';
+    it('flags a deep import into components/ui/internal/ in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-deep', 'src/Rebuilt.tsx'),
+        lines(MARKER, "import { X } from '../components/ui/internal/Foo';"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag the deep import without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-deep', 'src/Legacy.tsx'),
+        lines("import { X } from '../components/ui/internal/Foo';"));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a deep import carrying the inline // deep-import-ok hatch', () => {
+      const file = write(uniqPath('ds-deep', 'src/Hatched.tsx'),
+        lines(MARKER, "import { X } from '../components/ui/internal/Foo'; // deep-import-ok"));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
   });
 });
