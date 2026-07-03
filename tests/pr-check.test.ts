@@ -12519,4 +12519,83 @@ describe('Rule: UI Rebuild @ds-rebuilt-scoped gates (F2a)', () => {
       expect(runRule(RULE, [file])).toHaveLength(0);
     });
   });
+
+  describe('ds-per-view-css-block', () => {
+    const RULE = 'ds-per-view-css-block';
+    it('flags a per-view styles object in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-css', 'src/Rebuilt.tsx'),
+        lines(MARKER, "const styles = { color: 'x' };"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag the same block without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-css', 'src/Legacy.tsx'),
+        lines("const styles = { color: 'x' };"));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a block carrying the inline // view-css-ok hatch', () => {
+      const file = write(uniqPath('ds-css', 'src/Hatched.tsx'),
+        lines(MARKER, "const styles = { color: 'x' }; // view-css-ok"));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+  });
+
+  describe('ds-token-theme-parity', () => {
+    const RULE = 'ds-token-theme-parity';
+    it('flags a themeable :root token with no .dashboard-light override', () => {
+      const file = write(uniqPath('ds-parity', 'src/theme.css'),
+        lines('/* @ds-rebuilt */', ':root { --brand-foo: #111827; }', '.dashboard-light { }'));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag when the token has both scopes', () => {
+      const file = write(uniqPath('ds-parity', 'src/theme.css'),
+        lines('/* @ds-rebuilt */', ':root { --brand-foo: #111827; }', '.dashboard-light { --brand-foo: #ffffff; }'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag theme-neutral families (--space-) or files without the marker', () => {
+      const neutral = write(uniqPath('ds-parity', 'src/neutral.css'),
+        lines('/* @ds-rebuilt */', ':root { --space-99: 4px; }', '.dashboard-light { }'));
+      expect(runRule(RULE, [neutral])).toHaveLength(0);
+      const legacy = write(uniqPath('ds-parity', 'src/legacy.css'),
+        lines(':root { --brand-foo: #111827; }', '.dashboard-light { }'));
+      expect(runRule(RULE, [legacy])).toHaveLength(0);
+    });
+  });
+
+  describe('ds-icon-discipline', () => {
+    const RULE = 'ds-icon-discipline';
+    it('flags a Font Awesome class in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-icon', 'src/Rebuilt.tsx'),
+        lines(MARKER, 'const i = <i className="fa-solid fa-home" />;'));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag fa- without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-icon', 'src/Legacy.tsx'),
+        lines('const i = <i className="fa-home" />;'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag an icon carrying the inline // icon-ok hatch', () => {
+      const file = write(uniqPath('ds-icon', 'src/Hatched.tsx'),
+        lines(MARKER, 'const i = <i className="fa-home" />; // icon-ok'));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+  });
+
+  describe('ds-deep-import', () => {
+    const RULE = 'ds-deep-import';
+    it('flags a deep import into components/ui/internal/ in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-deep', 'src/Rebuilt.tsx'),
+        lines(MARKER, "import { X } from '../components/ui/internal/Foo';"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag the deep import without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-deep', 'src/Legacy.tsx'),
+        lines("import { X } from '../components/ui/internal/Foo';"));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a deep import carrying the inline // deep-import-ok hatch', () => {
+      const file = write(uniqPath('ds-deep', 'src/Hatched.tsx'),
+        lines(MARKER, "import { X } from '../components/ui/internal/Foo'; // deep-import-ok"));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+  });
 });
