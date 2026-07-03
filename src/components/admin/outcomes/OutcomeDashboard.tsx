@@ -1,6 +1,7 @@
 import { useState, lazy, Suspense } from 'react';
 import { PageHeader, TabBar, Skeleton } from '../../ui';
 import { ErrorBoundary } from '../../ErrorBoundary';
+import RecordPublishedWorkCard from './RecordPublishedWorkCard';
 
 // Lazy load sub-panels
 const OutcomeScorecard = lazy(() => import('./OutcomeScorecard'));
@@ -36,6 +37,7 @@ export default function OutcomeDashboard({ workspaceId }: OutcomeDashboardProps)
         title="Outcomes"
         subtitle="Track what's working across all your SEO actions"
       />
+      <RecordPublishedWorkCard workspaceId={workspaceId} />
       {/* tab-deeplink-ok — outcomes tabs are not navigated to via ?tab= from other components */}
       <TabBar tabs={tabs} active={activeTab} onChange={(t) => setActiveTab(t as OutcomeTab)} />
       <ErrorBoundary>

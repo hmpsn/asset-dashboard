@@ -74,6 +74,12 @@ export const outcomesApi = {
        * typed to the `Attribution` union so callers can't send an arbitrary string.
        */
       attribution?: Attribution;
+      /**
+       * R6 (B11) advisory source-identity snapshot — captures the source's title at write
+       * time so a later win renders the real headline (e.g. a manually-published post's
+       * title) instead of a generic label. `snapshot.type`/`page` are free-form.
+       */
+      source?: { label: string; snapshot?: { title?: string; type?: string; page?: string } };
     },
   ) =>
     post<{ success: boolean; action: TrackedAction; deduplicated?: boolean }>(

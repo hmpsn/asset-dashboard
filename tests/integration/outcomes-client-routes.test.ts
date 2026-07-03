@@ -297,6 +297,46 @@ describe('Suite 2: Public client wins endpoint', () => {
     expect(typeof win.recommendation).toBe('string');
   });
 
+  it('P1 manual ingestion: a manually-recorded platform_executed post surfaces as a client win with its real title', async () => {
+    // The external/manual ingestion path (RecordPublishedWorkCard + the Rinse backfill) records a
+    // manual action with sourceType 'manual', an honest attribution, and a source snapshot. A
+    // platform_executed one that scores a win must (a) surface in the client wins and (b) carry its
+    // REAL title (the snapshot), not a generic fallback — the durable-title path (B11) end to end.
+    const title = `Manually Published ${RUN_ID}`;
+    const page = `https://example.com/manual/${RUN_ID}`;
+    const r = await postJson(`/api/outcomes/${wsId}/actions`, {
+      actionType: 'content_published',
+      sourceType: 'manual',
+      sourceId: `manual-p1-${RUN_ID}`,
+      pageUrl: page,
+      attribution: 'platform_executed',
+      baselineSnapshot: { position: 9, clicks: 5 },
+      source: { label: title, snapshot: { title, type: 'manual', page } },
+    });
+    expect(r.status).toBe(200);
+    const actionId = (await r.json()).action.id;
+    insertOutcomeRow({
+      actionId,
+      score: 'win',
+      deltaSummary: {
+        primary_metric: 'position',
+        baseline_value: 9,
+        current_value: 3,
+        delta_absolute: -6,
+        delta_percent: -66,
+        direction: 'improved',
+      },
+    });
+
+    const res = await api(`/api/public/outcomes/${wsId}/wins`);
+    expect(res.status).toBe(200);
+    const wins = await res.json();
+    const mine = wins.find((w: { pageUrl?: string }) => w.pageUrl === page);
+    expect(mine, 'the manually-recorded win should surface in the client wins').toBeTruthy();
+    // Durable title from the source snapshot — not a generic per-action-type fallback.
+    expect(mine.recommendation).toContain(title);
+  });
+
   it('only returns wins (not losses or no_change)', async () => {
     // Record an action with a loss
     const r = await postJson(`/api/outcomes/${wsId}/actions`, {
