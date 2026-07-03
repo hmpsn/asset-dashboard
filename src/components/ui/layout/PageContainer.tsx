@@ -21,6 +21,41 @@ export interface PageContainerProps {
   style?: CSSProperties;
 }
 
-export function PageContainer(_props: PageContainerProps): ReactElement {
-  throw new Error('F3 stub — PageContainer not yet implemented (Lane D)');
+const WIDTH_TOKENS: Record<'default' | 'narrow' | 'wide' | 'full', string> = {
+  default: 'var(--page-max)',
+  narrow: 'var(--page-max-narrow)',
+  wide: 'var(--page-max-wide)',
+  full: 'none',
+};
+
+export function PageContainer({
+  width = 'default',
+  center = false,
+  gap = true,
+  as = 'div',
+  children,
+  className,
+  id,
+  style,
+}: PageContainerProps): ReactElement {
+  const maxWidth = typeof width === 'number' ? `${width}px` : WIDTH_TOKENS[width];
+  const Component = as;
+
+  return (
+    <Component
+      id={id}
+      className={className}
+      style={{
+        maxWidth,
+        margin: center ? '0 auto' : 0,
+        padding: 'var(--page-pad-y) var(--page-pad-x) var(--page-pad-bottom)',
+        display: gap ? 'flex' : undefined,
+        flexDirection: gap ? 'column' : undefined,
+        gap: gap ? 'var(--section-gap)' : undefined,
+        ...style,
+      }}
+    >
+      {children}
+    </Component>
+  );
 }
