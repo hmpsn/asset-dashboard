@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "updatedAt": "2026-07-03",
+  "entries": [
+    {
+      "id": "DEF-foundation-001",
+      "surface": "foundation",
+      "item": ".t-* utility classes do not yet consume the --type-* role tokens (values duplicated in src/index.css)",
+      "decision": "F1 shipped tokens only to avoid behavioral risk; the .t-* refactor rides the F3 primitive ports where each class is re-verified",
+      "class": "token",
+      "upgradeTrigger": "F3 net-new-primitives PR opens (the ports consume --type-* and prove the values)",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-03",
+      "reviewBy": "2026-08-14",
+      "links": { "pr": "#1472", "kitDoc": "tokens/typography.css" }
+    },
+    {
+      "id": "DEF-foundation-002",
+      "surface": "foundation",
+      "item": "--brand-shadow-* call sites not yet migrated to canonical --shadow-*",
+      "decision": "Two shadow families coexist deliberately; deprecation direction documented in src/tokens.css comment (F1)",
+      "class": "token",
+      "upgradeTrigger": "Phase Z consolidation closeout (per-surface retirement sweep)",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-03",
+      "reviewBy": "2026-09-30",
+      "links": { "pr": "#1472", "kitDoc": "tokens/effects.css" }
+    },
+    {
+      "id": "DEF-foundation-003",
+      "surface": "foundation",
+      "item": "Legacy transition-duration-[120ms|180ms|400ms] literals across src/ not yet migrated to var(--dur-*) motion tokens",
+      "decision": "Motion tokens ratified as canonical (F2a); legacy literals stay valid outside @ds-rebuilt scope to avoid a repo-wide churn PR",
+      "class": "token",
+      "upgradeTrigger": "Phase Z consolidation closeout, or earlier per-surface as each surface is rebuilt",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-03",
+      "reviewBy": "2026-09-30",
+      "links": { "pr": "#1472" }
+    }
+  ]
+}
