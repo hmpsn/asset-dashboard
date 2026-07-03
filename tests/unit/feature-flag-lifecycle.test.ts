@@ -140,14 +140,19 @@ describe('feature-flag lifecycle audit', () => {
       expect(after.pastDoneTargetCount).toBeGreaterThan(0);
     });
 
-    it('assigns no doneTarget to reserved flags', () => {
+    it('assigns no doneTarget to any reserved flag (forward guard — category currently empty)', () => {
       const roadmap = loadRoadmap();
       const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-29');
 
       const reservedRows = report.rows.filter(
         r => FEATURE_FLAG_CATALOG[r.key].lifecycle.status === 'reserved',
       );
-      expect(reservedRows.length).toBeGreaterThan(0);
+      // Reserved flags are currently ZERO: the three that existed (strategy-paid-topics,
+      // the-issue-client-reconciliation, the-issue-client-segment-inserts) were retired in
+      // flag-sunset Wave 1 (delete-then-re-add-when-built). The reserved→null-doneTarget
+      // outcome shares its ternary (`permanentlyExempt || reserved ? null : …`) with the
+      // permanently-exempt case, which the "…never marks…with a doneTarget" test above asserts
+      // non-vacuously. This stays as a forward guard for whenever a reserved flag is re-added.
       for (const row of reservedRows) {
         expect(row.doneTarget).toBeNull();
         expect(row.pastDoneTarget).toBe(false);
