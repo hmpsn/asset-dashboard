@@ -12440,3 +12440,83 @@ describe('Rule: Unguarded SET status = ? (state machine transition)', () => {
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 });
+
+// ── UI Rebuild (F2a): @ds-rebuilt-scoped ds-* gates ─────────────────────────
+// Each rule fires ONLY on files carrying the @ds-rebuilt marker (Phase D, D2).
+// Three cases per rule: (a) violation WITH marker → flagged; (b) same WITHOUT
+// marker → not flagged; (c) violation WITH marker + inline hatch → not flagged.
+describe('Rule: UI Rebuild @ds-rebuilt-scoped gates (F2a)', () => {
+  const MARKER = '// @ds-rebuilt';
+
+  // runRule() invokes customCheck directly and (by design) skips the runner's
+  // excludeLines post-filter. This replicates it for the hatch case: the hatch
+  // token lives in hit.text because these rules set text = the source line.
+  function runFiltered(name: string, files: string[]): CustomCheckMatch[] {
+    const check = CHECKS.find(c => c.name === name);
+    if (!check) throw new Error(`Rule not found: "${name}"`);
+    const hatches = check.excludeLines ?? [];
+    return runRule(name, files).filter(h => !hatches.some(tok => h.text.includes(tok)));
+  }
+
+  describe('ds-raw-hex-anywhere', () => {
+    const RULE = 'ds-raw-hex-anywhere';
+    it('flags a raw hex in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Rebuilt.tsx'),
+        lines(MARKER, "export const c = '#ff0000';"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag the same hex without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Legacy.tsx'),
+        lines("export const c = '#ff0000';"));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a hex carrying the inline // raw-hex-ok hatch', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Hatched.tsx'),
+        lines(MARKER, "export const c = '#ff0000'; // raw-hex-ok"));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+  });
+
+  describe('ds-tailwind-palette-bypass', () => {
+    const RULE = 'ds-tailwind-palette-bypass';
+    it('flags a raw Tailwind palette class in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-palette', 'src/Rebuilt.tsx'),
+        lines(MARKER, "const cls = 'text-zinc-400 bg-blue-500';"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag the same class without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-palette', 'src/Legacy.tsx'),
+        lines("const cls = 'text-zinc-400 bg-blue-500';"));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a palette class carrying the inline // palette-ok hatch', () => {
+      const file = write(uniqPath('ds-palette', 'src/Hatched.tsx'),
+        lines(MARKER, "const cls = 'text-zinc-400'; // palette-ok"));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+  });
+
+  describe('ds-motion-token', () => {
+    const RULE = 'ds-motion-token';
+    it('flags a literal duration in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-motion', 'src/Rebuilt.tsx'),
+        lines(MARKER, 'const cls = "transition-all duration-[300ms]";'));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag the same duration without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-motion', 'src/Legacy.tsx'),
+        lines('const cls = "transition-all duration-[300ms]";'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a duration carrying the inline // motion-ok hatch', () => {
+      const file = write(uniqPath('ds-motion', 'src/Hatched.tsx'),
+        lines(MARKER, 'const cls = "duration-[300ms]"; // motion-ok'));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+    it('accepts var(--dur-*) motion tokens (not flagged even with the marker)', () => {
+      const file = write(uniqPath('ds-motion', 'src/Tokened.tsx'),
+        lines(MARKER, 'const cls = "transition-all"; // uses var(--dur-base) in CSS'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+  });
+});
