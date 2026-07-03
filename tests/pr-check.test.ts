@@ -5957,6 +5957,14 @@ describe('Meta: customCheck rule name registry', () => {
     // table must register it in server/db/snapshot-registry.ts in the same PR;
     // see docs/rules/snapshot-envelope.md.
     'New migration creates a _snapshots table without a matching registry entry',
+    // UI Rebuild F2a (2026-07-03) — @ds-rebuilt-scoped strict gates (Phase D, D2/D7).
+    'ds-raw-hex-anywhere',
+    'ds-tailwind-palette-bypass',
+    'ds-per-view-css-block',
+    'ds-token-theme-parity',
+    'ds-icon-discipline',
+    'ds-deep-import',
+    'ds-motion-token',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -12458,7 +12466,7 @@ describe('Rule: UI Rebuild @ds-rebuilt-scoped gates (F2a)', () => {
     return runRule(name, files).filter(h => !hatches.some(tok => h.text.includes(tok)));
   }
 
-  describe('ds-raw-hex-anywhere', () => {
+  describe('Rule: ds-raw-hex-anywhere', () => {
     const RULE = 'ds-raw-hex-anywhere';
     it('flags a raw hex in a @ds-rebuilt file', () => {
       const file = write(uniqPath('ds-raw-hex', 'src/Rebuilt.tsx'),
@@ -12477,7 +12485,7 @@ describe('Rule: UI Rebuild @ds-rebuilt-scoped gates (F2a)', () => {
     });
   });
 
-  describe('ds-tailwind-palette-bypass', () => {
+  describe('Rule: ds-tailwind-palette-bypass', () => {
     const RULE = 'ds-tailwind-palette-bypass';
     it('flags a raw Tailwind palette class in a @ds-rebuilt file', () => {
       const file = write(uniqPath('ds-palette', 'src/Rebuilt.tsx'),
@@ -12496,7 +12504,7 @@ describe('Rule: UI Rebuild @ds-rebuilt-scoped gates (F2a)', () => {
     });
   });
 
-  describe('ds-motion-token', () => {
+  describe('Rule: ds-motion-token', () => {
     const RULE = 'ds-motion-token';
     it('flags a literal duration in a @ds-rebuilt file', () => {
       const file = write(uniqPath('ds-motion', 'src/Rebuilt.tsx'),
@@ -12520,7 +12528,7 @@ describe('Rule: UI Rebuild @ds-rebuilt-scoped gates (F2a)', () => {
     });
   });
 
-  describe('ds-per-view-css-block', () => {
+  describe('Rule: ds-per-view-css-block', () => {
     const RULE = 'ds-per-view-css-block';
     it('flags a per-view styles object in a @ds-rebuilt file', () => {
       const file = write(uniqPath('ds-css', 'src/Rebuilt.tsx'),
@@ -12539,7 +12547,7 @@ describe('Rule: UI Rebuild @ds-rebuilt-scoped gates (F2a)', () => {
     });
   });
 
-  describe('ds-token-theme-parity', () => {
+  describe('Rule: ds-token-theme-parity', () => {
     const RULE = 'ds-token-theme-parity';
     it('flags a themeable :root token with no .dashboard-light override', () => {
       const file = write(uniqPath('ds-parity', 'src/theme.css'),
@@ -12561,7 +12569,7 @@ describe('Rule: UI Rebuild @ds-rebuilt-scoped gates (F2a)', () => {
     });
   });
 
-  describe('ds-icon-discipline', () => {
+  describe('Rule: ds-icon-discipline', () => {
     const RULE = 'ds-icon-discipline';
     it('flags a Font Awesome class in a @ds-rebuilt file', () => {
       const file = write(uniqPath('ds-icon', 'src/Rebuilt.tsx'),
@@ -12580,7 +12588,7 @@ describe('Rule: UI Rebuild @ds-rebuilt-scoped gates (F2a)', () => {
     });
   });
 
-  describe('ds-deep-import', () => {
+  describe('Rule: ds-deep-import', () => {
     const RULE = 'ds-deep-import';
     it('flags a deep import into components/ui/internal/ in a @ds-rebuilt file', () => {
       const file = write(uniqPath('ds-deep', 'src/Rebuilt.tsx'),

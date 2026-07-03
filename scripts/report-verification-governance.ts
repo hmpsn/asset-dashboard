@@ -126,6 +126,11 @@ export const VERIFICATION_GOVERNANCE_REGISTRY = {
     owner: 'platform-foundation',
     rationale: 'Observability inventory is advisory until its checks are narrowed into deterministic contracts.',
   },
+  'verify:deferred-ledger': {
+    classification: 'pr-ci-blocking',
+    owner: 'platform-foundation',
+    rationale: 'The UI-rebuild deferred-work ledger (schema, expiry, roadmap links) is cheap, deterministic, and required for every rebuild PR.',
+  },
   'verify:feature-flags': {
     classification: 'pr-ci-blocking',
     owner: 'platform-foundation',
