@@ -317,9 +317,12 @@ export function runAutoSendForWorkspace(workspaceId: string, weekOf: string, wsN
 const lastTickRunWeek: Record<string, string> = {};
 
 async function tick(now = new Date()): Promise<void> {
-  // Whole-cron flag gate: skip entirely if the feature is globally off.
-  if (!isFeatureEnabled('strategy-the-issue')) return;
-
+  // No whole-cron GLOBAL flag gate here: per-workspace `isEligible()` (below) is the
+  // authoritative gate — it calls `isFeatureEnabled('strategy-the-issue', ws.id)` and
+  // short-circuits BEFORE any recommendation load, so evaluating every workspace is
+  // cheap even when the flag is globally off. A global early-exit (`isFeatureEnabled`
+  // with no workspaceId) would wrongly skip a workspace that has the flag ON via a
+  // per-workspace override while the global default is OFF (e.g. staging pilots).
   const weekOf = currentWeekOfUTC(now);
   const all = listWorkspaces();
   for (const ws of all) {
