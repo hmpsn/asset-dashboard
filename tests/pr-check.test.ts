@@ -12609,19 +12609,14 @@ describe('Rule: UI Rebuild @ds-rebuilt-scoped gates (F2a)', () => {
 
   describe('Rule: ds-icon-discipline', () => {
     const RULE = 'ds-icon-discipline';
-    it('flags a Font Awesome class in a @ds-rebuilt file', () => {
+    it('does NOT flag a Font Awesome class in a @ds-rebuilt file (D5 reversed — FA Sharp Regular is the icon system)', () => {
       const file = write(uniqPath('ds-icon', 'src/Rebuilt.tsx'),
-        lines(MARKER, 'const i = <i className="fa-solid fa-home" />;'));
-      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
-    });
-    it('does NOT flag fa- without the @ds-rebuilt marker', () => {
-      const file = write(uniqPath('ds-icon', 'src/Legacy.tsx'),
-        lines('const i = <i className="fa-home" />;'));
+        lines(MARKER, 'const i = <i className="fa-sharp fa-regular fa-house" />;'));
       expect(runRule(RULE, [file])).toHaveLength(0);
     });
-    it('does NOT flag an icon carrying the inline // icon-ok hatch', () => {
+    it('does NOT flag an emoji carrying the inline // icon-ok hatch', () => {
       const file = write(uniqPath('ds-icon', 'src/Hatched.tsx'),
-        lines(MARKER, 'const i = <i className="fa-home" />; // icon-ok'));
+        lines(MARKER, "const i = '🔥'; // icon-ok"));
       expect(runFiltered(RULE, [file])).toHaveLength(0);
     });
     it('does NOT flag dingbat string glyphs like ✓ ⚠ ★ (review, PR #1473)', () => {

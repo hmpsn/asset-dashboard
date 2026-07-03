@@ -57,6 +57,34 @@
       "createdAt": "2026-07-03",
       "reviewBy": "2026-09-30",
       "links": { "kitDoc": "components/feedback/Toast.jsx" }
+    },
+    {
+      "id": "DEF-icon-001",
+      "surface": "foundation",
+      "item": "~381 files still import lucide-react directly (or use <Icon as={LucideIcon}>). The icon system of record is now Font Awesome Sharp Regular (<Icon name=...>); lucide is kept as a supported migration path but every surface should migrate to FA glyphs.",
+      "decision": "D5 reversed to Font Awesome Sharp Regular (owner, 2026-07-03). This foundation PR ships the font + Icon component + ICON_NAMES + gate flip; the 381-site migration is explicitly incremental (surface by surface, Keywords pilot first) to keep each PR reviewable rather than one big-bang rewrite.",
+      "class": "primitive",
+      "upgradeTrigger": "Per-surface rebuild PRs migrate their lucide icons to <Icon name=...>; retire the lucide `as` path once the last surface is migrated.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-03",
+      "reviewBy": "2026-10-31",
+      "links": { "kitDoc": "components/icon/Icon.jsx" }
+    },
+    {
+      "id": "DEF-icon-002",
+      "surface": "foundation",
+      "item": "The self-hosted Font Awesome ships the FULL Pro CSS (fontawesome.min.css ~158KB) + the full Sharp Regular woff2 (~288KB, all glyphs) while the app uses only ~52 ICON_NAMES glyphs.",
+      "decision": "Ship the complete CSS + font now for correctness/simplicity (any glyph renders); gzip brings the CSS to ~30KB. Subsetting is a perf optimization, not correctness.",
+      "class": "perf",
+      "upgradeTrigger": "Bundle-budget review, or when the icon migration (DEF-icon-001) settles the final glyph set — then subset the woff2 (pyftsubset) + trim the CSS to the used glyphs.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-03",
+      "reviewBy": "2026-10-31",
+      "links": { "kitDoc": "css/fontawesome.min.css" }
     }
   ]
 }
