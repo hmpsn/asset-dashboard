@@ -13,12 +13,12 @@ interface Props {
  * Conditionally renders children based on a feature flag.
  *
  * Usage:
- *   <FeatureFlag flag="keyword-universe-full">
- *     <KeywordUniversePage />
+ *   <FeatureFlag flag="strategy-the-issue">
+ *     <TheIssuePage />
  *   </FeatureFlag>
  *
- *   <FeatureFlag flag="keyword-universe-full" fallback={<ComingSoon />}>
- *     <KeywordUniversePage />
+ *   <FeatureFlag flag="strategy-the-issue" fallback={<ComingSoon />}>
+ *     <TheIssuePage />
  *   </FeatureFlag>
  */
 export function FeatureFlag({ flag, children, fallback = null }: Props) {

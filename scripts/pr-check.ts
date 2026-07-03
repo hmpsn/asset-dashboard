@@ -1155,6 +1155,26 @@ const RETIRED_FLAG_GROUPS: readonly RetiredFlagGroup[] = [
     ],
     migrationException: 'server/db/migrations/174-retire-w2a-server-cron-flags-overrides.sql',
   },
+  {
+    // Flag-sunset Wave 2b: four admin/data-shaping flags, all globally ON in prod already, so
+    // unconditional-izing their gates is a no-op for behavior. 'smart-placeholders' gated the
+    // admin AdminChat contextual placeholder + suggestion chips (src/hooks/useSmartPlaceholder.ts);
+    // 'keyword-universe-full' gated the uncapped keyword-universe coverage path in the Keyword
+    // Command Center (candidate-boundary.ts, read-model.ts, summary-service.ts) — the
+    // UNIVERSE_SAFETY_CEILING path is now the sole path; 'ai-visibility' gated the LLM-mentions
+    // admin KPI panel + seoContext slice field (seo-context-slice.ts, routes/rank-tracking.ts,
+    // AiVisibilityPanel.tsx); 'geo-targeting' gated workspaceProviderGeo resolving the real
+    // target-geo instead of `{}` (server/seo-target-geo.ts) + the admin TargetGeoEditor
+    // (BusinessFootprintTab.tsx). None have a client-facing surface.
+    label: 'flag-sunset W2b admin/data',
+    keys: [
+      'smart-placeholders',
+      'keyword-universe-full',
+      'ai-visibility',
+      'geo-targeting',
+    ],
+    migrationException: 'server/db/migrations/175-retire-w2b-admin-data-flags-overrides.sql',
+  },
 ];
 
 function escapedAlternation(values: readonly string[]): string {

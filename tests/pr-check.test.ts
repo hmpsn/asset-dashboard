@@ -273,7 +273,7 @@ describe('Rule: Retired feature flag key used in flag API', () => {
     const file = write(
       uniqPath('rule-retired-feature-flags', 'negative.tsx'),
       lines(
-        "const active = isFeatureEnabled('keyword-universe-full');",
+        "const active = isFeatureEnabled('national-serp-tracking');",
         `const historicalNote = '${retiredKey} was retired';`,
         `fireBridge('${bridgeSource}', workspaceId, fn);`,
       ),

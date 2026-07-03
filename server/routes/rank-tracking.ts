@@ -21,7 +21,6 @@ import { WS_EVENTS } from '../ws-events.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
 import { GSC_METRIC_WINDOW_DAYS } from '../../shared/keyword-window.js';
-import { isFeatureEnabled } from '../feature-flags.js';
 import { startTrackedRefresh } from '../seo-refresh-runtime.js';
 import { runNationalSerpRefreshJob } from '../national-serp.js';
 import { runLlmMentionsRefreshJob } from '../llm-mentions.js';
@@ -158,9 +157,9 @@ router.post('/api/rank-tracking/:workspaceId/refresh-national', requireWorkspace
   });
 });
 
-// P8 ai-visibility: start the LLM-mention (AI visibility) refresh job. Gated server-side by the
-// `ai-visibility` flag + Growth/Premium tier. Mirrors the refresh-national route exactly (the
-// READ route — GET /ai-visibility — is added in U4 to this same file).
+// P8 ai-visibility: start the LLM-mention (AI visibility) refresh job. Gated server-side by
+// Growth/Premium tier. Mirrors the refresh-national route exactly (the READ route —
+// GET /ai-visibility — is added in U4 to this same file).
 router.post('/api/rank-tracking/:workspaceId/refresh-ai-visibility', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const workspaceId = req.params.workspaceId;
   startTrackedRefresh({
@@ -173,10 +172,6 @@ router.post('/api/rank-tracking/:workspaceId/refresh-ai-visibility', requireWork
     globalConflictError: 'Another workspace is currently running an AI visibility refresh — please wait for it to complete',
     unexpectedFailureLogMessage: 'ai-visibility refresh: unhandled error escaped job runner — marking failed',
     unexpectedFailureMessage: 'AI visibility refresh failed unexpectedly',
-    featureGate: {
-      flag: 'ai-visibility',
-      disabledError: 'AI visibility tracking is not enabled',
-    },
     tierGate: {
       forbiddenError: 'AI visibility tracking requires a Growth or Premium plan',
     },
@@ -191,16 +186,10 @@ router.post('/api/rank-tracking/:workspaceId/refresh-ai-visibility', requireWork
 // P8 ai-visibility: admin AI-visibility (LLM-mention) KPI readout. Aggregates ONLY — own
 // share-of-voice + mention volume + the dated trend (the before/after AEO proof) + the
 // co-mentioned competitor breakdown + the cited source domains (AEO targets). Never returns
-// raw LLM transcripts/answers (the store holds none). When the `ai-visibility` flag is off,
-// returns an empty payload (not 404) so the panel simply renders nothing — mirrors the P7
-// gbp-reviews read endpoint. `requireWorkspaceAccess` only (HMAC admin auth is covered by the
-// global app gate — never add requireAuth here).
+// raw LLM transcripts/answers (the store holds none). `requireWorkspaceAccess` only (HMAC admin
+// auth is covered by the global app gate — never add requireAuth here).
 router.get('/api/rank-tracking/:workspaceId/ai-visibility', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const workspaceId = req.params.workspaceId;
-
-  if (!isFeatureEnabled('ai-visibility', workspaceId)) {
-    return res.json({ latest: null, trend: [], competitors: [], sourceDomains: [] });
-  }
 
   // chat_gpt is the only platform for v1 (the column leaves room for 'google').
   const latest = getLatestLlmMentions(workspaceId, 'chat_gpt') ?? null;

@@ -1,5 +1,4 @@
 import { computeKeywordValueScore } from '../../scoring/keyword-value-score.js';
-import { isFeatureEnabled } from '../../feature-flags.js';
 import { isStrategyPoolEligibleKeyword } from '../../keyword-intelligence/rules.js';
 import { createLogger } from '../../logger.js';
 import { isSuspiciousPlannerGroupedVolume } from '../../keyword-strategy-helpers.js';
@@ -36,11 +35,8 @@ import type {
   ValueScoringConfig,
 } from './types.js';
 
-export const RAW_EVIDENCE_ROW_LIMIT = 75;
-export const RANK_EVIDENCE_ROW_LIMIT = 50;
 export const LOCAL_CANDIDATE_ROW_LIMIT = 75;
 export const UNIVERSE_SAFETY_CEILING = 2000;
-export const KEYWORD_UNIVERSE_FULL_FLAG = 'keyword-universe-full' as const;
 
 const log = createLogger('keyword-command-center');
 
@@ -82,12 +78,6 @@ export function selectRankEvidence(
   filteredRanks: LatestRank[],
   workspaceId: string | undefined,
 ): { selected: LatestRank[]; total: number } {
-  if (!isFeatureEnabled(KEYWORD_UNIVERSE_FULL_FLAG, workspaceId)) {
-    const selected = [...filteredRanks]
-      .sort((a, b) => (b.impressions ?? 0) - (a.impressions ?? 0))
-      .slice(0, RANK_EVIDENCE_ROW_LIMIT);
-    return { selected, total: Math.min(filteredRanks.length, RANK_EVIDENCE_ROW_LIMIT) };
-  }
   const valued = filteredRanks
     .filter(rank => (rank.clicks ?? 0) > 0 || (rank.impressions ?? 0) > 0)
     .sort((a, b) => {

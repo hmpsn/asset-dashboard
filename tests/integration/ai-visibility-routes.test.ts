@@ -5,85 +5,74 @@
  *   POST /api/rank-tracking/:workspaceId/refresh-ai-visibility
  *   GET  /api/rank-tracking/:workspaceId/ai-visibility
  *
- * The refresh route is triple-gated, mirroring the P7 local-GBP refresh:
- *   1. Feature flag `ai-visibility` (default OFF) → 404 when off.
- *   2. Effective tier — Growth/Premium only → 403 for Free.
- *   3. Budget gate is observe-only (does NOT block) — never asserted here.
+ * The `ai-visibility` feature flag was retired (flag-sunset W2b — it was globally
+ * ON in prod; the feature is now unconditional). The refresh route is now
+ * double-gated:
+ *   1. Effective tier — Growth/Premium only → 403 for Free.
+ *   2. Budget gate is observe-only (does NOT block) — never asserted here.
  *
- * Flag-enable + tier-set both happen IN-PROCESS (setWorkspaceFlagOverride /
- * updateWorkspace) BEFORE startServer(), so the spawned server reads the fresh
- * override/tier from the shared DATA_DIR DB on its first request (10s cache TTL,
- * never stale within a test run). This mirrors tests/integration/local-gbp-routes.
+ * Tier-set happens IN-PROCESS (updateWorkspace) BEFORE startServer(), so the
+ * spawned server reads the fresh tier from the shared DATA_DIR DB on its first
+ * request (10s cache TTL, never stale within a test run). This mirrors
+ * tests/integration/local-gbp-routes.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
-import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import { storeLlmMentionSnapshot } from '../../server/llm-mentions-store.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 
 const ctx = createEphemeralTestContext(import.meta.url, { contextName: 'ai-visibility-routes' });
 const { api, postJson } = ctx;
 
-let wsFlagOff = ''; // flag OFF (default), tier growth → 404 (flag gate fires first)
-let wsFree = '';    // flag ON, tier free → 403
-let wsGrowth = '';  // flag ON, tier growth → 200 { jobId }
+let wsNoSnapshot = ''; // tier growth, no snapshot → GET returns an empty payload
+let wsFree = '';       // tier free → 403
+let wsGrowth = '';     // tier growth → 200 { jobId }
 
 beforeAll(async () => {
-  const off = createWorkspace('AI Visibility — Flag Off');
-  wsFlagOff = off.id;
+  const noSnap = createWorkspace('AI Visibility — No Snapshot');
+  wsNoSnapshot = noSnap.id;
   const free = createWorkspace('AI Visibility — Free Tier');
   wsFree = free.id;
   const growth = createWorkspace('AI Visibility — Growth Tier');
   wsGrowth = growth.id;
 
-  // wsFlagOff: leave the flag at its default (OFF). Tier is growth so the ONLY
-  // thing producing the 404 is the flag gate (proves flag precedence over tier).
-  updateWorkspace(wsFlagOff, { tier: 'growth' });
+  // wsNoSnapshot: tier growth, but no snapshot seeded → the GET readout resolves an
+  // empty payload (latest null, empty trend).
+  updateWorkspace(wsNoSnapshot, { tier: 'growth' });
 
-  // wsFree: flag ON, tier free → 403. createWorkspace() seeds a 14-day trial that
+  // wsFree: tier free → 403. createWorkspace() seeds a 14-day trial that
   // computeEffectiveTier() promotes free→growth while active, so the trial MUST be
   // cleared for the effective tier to resolve to 'free'. Passing trialEndsAt:
   // undefined writes a SQL NULL (the key is present, so the column is updated to
   // `merged.trialEndsAt ?? null`).
-  setWorkspaceFlagOverride('ai-visibility', wsFree, true);
   updateWorkspace(wsFree, { tier: 'free', trialEndsAt: undefined });
 
-  // wsGrowth: flag ON, tier growth → 200 { jobId }. A live domain so the job can
-  // proceed past the domain guard; with no configured LLM-mentions provider (the test
-  // process registers no DataForSEO credentials) the provider-unsupported precondition
-  // fires and the job fails as a user-actionable error.
-  setWorkspaceFlagOverride('ai-visibility', wsGrowth, true);
+  // wsGrowth: tier growth → 200 { jobId }. A live domain so the job can proceed past
+  // the domain guard; with no configured LLM-mentions provider (the test process
+  // registers no DataForSEO credentials) the provider-unsupported precondition fires
+  // and the job fails as a user-actionable error.
   updateWorkspace(wsGrowth, { tier: 'growth', liveDomain: 'https://acme.example' });
 
   await ctx.startServer();
 }, 25_000);
 
 afterAll(async () => {
-  setWorkspaceFlagOverride('ai-visibility', wsFree, null);
-  setWorkspaceFlagOverride('ai-visibility', wsGrowth, null);
-  deleteWorkspace(wsFlagOff);
+  deleteWorkspace(wsNoSnapshot);
   deleteWorkspace(wsFree);
   deleteWorkspace(wsGrowth);
   await ctx.stopServer();
 });
 
 describe('POST /api/rank-tracking/:workspaceId/refresh-ai-visibility — gating', () => {
-  it('flag OFF (default) → 404', async () => {
-    const res = await postJson(`/api/rank-tracking/${wsFlagOff}/refresh-ai-visibility`, {});
-    expect(res.status).toBe(404);
-    const body = await res.json();
-    expect(body.error).toBe('AI visibility tracking is not enabled');
-  });
-
-  it('flag ON + Free tier → 403 (requires a Growth or Premium plan)', async () => {
+  it('Free tier → 403 (requires a Growth or Premium plan)', async () => {
     const res = await postJson(`/api/rank-tracking/${wsFree}/refresh-ai-visibility`, {});
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.error).toMatch(/Growth or Premium plan/);
   });
 
-  it('flag ON + Growth tier → 200 with a jobId string', async () => {
+  it('Growth tier → 200 with a jobId string', async () => {
     const res = await postJson(`/api/rank-tracking/${wsGrowth}/refresh-ai-visibility`, {});
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -116,8 +105,8 @@ describe('POST /api/rank-tracking/:workspaceId/refresh-ai-visibility — gating'
 });
 
 describe('GET /api/rank-tracking/:workspaceId/ai-visibility — KPI readout', () => {
-  it('flag OFF → 200 with an empty payload (renders nothing)', async () => {
-    const res = await api(`/api/rank-tracking/${wsFlagOff}/ai-visibility`);
+  it('no snapshot → 200 with an empty payload (renders nothing)', async () => {
+    const res = await api(`/api/rank-tracking/${wsNoSnapshot}/ai-visibility`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.latest).toBeNull();
@@ -127,7 +116,7 @@ describe('GET /api/rank-tracking/:workspaceId/ai-visibility — KPI readout', ()
     expect(Array.isArray(body.sourceDomains)).toBe(true);
   });
 
-  it('flag ON + a seeded snapshot → 200 with latest populated (no 500)', async () => {
+  it('a seeded snapshot → 200 with latest populated (no 500)', async () => {
     // Seed a chat_gpt snapshot for today so the read path resolves a non-null
     // `latest` aggregate + a non-empty trend.
     const today = new Date().toISOString().slice(0, 10);

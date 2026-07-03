@@ -11,10 +11,10 @@ import {
 } from '../../../shared/types/rank-tracking.js';
 import type { Workspace } from '../../../shared/types/workspace.js';
 import { getLostVisibilityCount, getLostVisibilityKeys, getLostVisibilityQueries } from '../../client-discovered-queries.js';
-import { isFeatureEnabled } from '../../feature-flags.js';
 import { buildKeywordStrategyUxPayload } from '../../keyword-strategy-ux.js';
 import { getLatestSerpSnapshots } from '../../serp-snapshots-store.js';
 import { createLogger } from '../../logger.js';
+import { isFeatureEnabled } from '../../feature-flags.js';
 import {
   computeKeywordValueScore,
   computeKeywordValueComponents,
@@ -23,8 +23,6 @@ import {
 import { buildKeywordValueScoringContext } from '../../scoring/keyword-value-context.js';
 import { keywordDollarValue } from '../../scoring/keyword-value-money.js';
 import {
-  KEYWORD_UNIVERSE_FULL_FLAG,
-  RAW_EVIDENCE_ROW_LIMIT,
   UNIVERSE_SAFETY_CEILING,
   addCandidateKeysFromBundle,
   isTier1JunkKeyword,
@@ -442,13 +440,10 @@ export function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): Ke
 
 export function finalizeDraftRows(rows: Map<string, DraftRow>, context: RowFinalizeContext): FinalizedRows {
   const rawEvidenceRows = [...rows.values()].filter(row => row.rawEvidenceOnly && !row.tracking && !row.feedback && !row.localCandidate);
-  const rawEvidenceLimit = isFeatureEnabled(KEYWORD_UNIVERSE_FULL_FLAG, context.workspaceId)
-    ? UNIVERSE_SAFETY_CEILING
-    : RAW_EVIDENCE_ROW_LIMIT;
   const allowedRawEvidence = new Set(
     rawEvidenceRows
       .sort((a, b) => (b.metrics.volume ?? 0) - (a.metrics.volume ?? 0))
-      .slice(0, rawEvidenceLimit)
+      .slice(0, UNIVERSE_SAFETY_CEILING)
       .map(row => row.normalizedKeyword),
   );
 

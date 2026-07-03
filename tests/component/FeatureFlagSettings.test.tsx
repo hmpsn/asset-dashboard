@@ -20,20 +20,20 @@ vi.mock('@tanstack/react-query', async () => {
         return {
           data: [
             {
-              key: 'smart-placeholders',
+              key: 'national-serp-tracking',
               enabled: true,
               source: 'default',
               default: true,
-              label: 'Smart placeholders (admin chips + client ghost text)',
-              group: 'Platform Intelligence Enhancements',
+              label: 'National SERP rank tracking — keyword position + SERP features in target market',
+              group: 'SEO Decision Engine',
               lifecycle: {
-                owner: 'platform-foundation',
-                createdAt: '2026-05-06',
+                owner: 'analytics-intelligence',
+                createdAt: '2026-06-24',
                 rolloutTarget: 'staging-validation',
-                removalCondition: 'Remove when placeholder behavior is default-on.',
-                linkedRoadmapItemId: 'platform-intelligence-enhancements-phase-1',
-                staleAuditCadence: 'monthly',
-                lastReviewedAt: '2026-05-15',
+                removalCondition: 'Promote to default once validated on staging.',
+                linkedRoadmapItemId: 'seo-engine-p6-national-serp-rank-ai-overview',
+                staleAuditCadence: 'weekly',
+                lastReviewedAt: '2026-06-24',
               },
             },
           ],
@@ -73,38 +73,36 @@ describe('FeatureFlagSettings', () => {
     expect(screen.getByText('Feature Flags')).toBeInTheDocument();
   });
 
-  it('renders Platform Intelligence Enhancements group', () => {
+  it('renders SEO Decision Engine group', () => {
     render(<FeatureFlagSettings />);
-    expect(screen.getByText('Platform Intelligence Enhancements')).toBeInTheDocument();
+    expect(screen.getByText('SEO Decision Engine')).toBeInTheDocument();
   });
 
-  it('renders smart-placeholders flag with human-readable label', () => {
+  it('renders national-serp-tracking flag with human-readable label', () => {
     render(<FeatureFlagSettings />);
-    expect(screen.getByText(/Smart placeholders/i)).toBeInTheDocument();
+    expect(screen.getByText(/National SERP rank tracking/i)).toBeInTheDocument();
   });
 
-  it('displays all platform-enhancement flags under the same group', () => {
+  it('displays all SEO Decision Engine flags under the same group', () => {
     render(<FeatureFlagSettings />);
 
     // Find the group header
-    const groupHeader = screen.getByText('Platform Intelligence Enhancements');
+    const groupHeader = screen.getByText('SEO Decision Engine');
     expect(groupHeader).toBeInTheDocument();
 
-    // Verify both labels are present after the group header
-    expect(screen.getByText(/Smart placeholders/i)).toBeInTheDocument();
-    expect(screen.getByText(/Smart placeholders/i)).toBeInTheDocument();
+    // Verify the label is present after the group header
+    expect(screen.getByText(/National SERP rank tracking/i)).toBeInTheDocument();
   });
 
   it('does not render flags in the Other bucket if all are properly grouped', () => {
     render(<FeatureFlagSettings />);
 
-    // The three new flags should NOT appear in an "Other" section
-    // (they should be in their group)
+    // The flag should NOT appear in an "Other" section (it should be in its group)
     const otherSections = screen.queryAllByText('Other');
-    // There should be no "Other" section, or if there is one, it shouldn't contain our flags
+    // There should be no "Other" section, or if there is one, it shouldn't contain our flag
     if (otherSections.length > 0) {
       const otherSection = otherSections[0];
-      expect(otherSection.parentElement).not.toHaveTextContent('smart-placeholders');
+      expect(otherSection.parentElement).not.toHaveTextContent('national-serp-tracking');
     }
   });
 

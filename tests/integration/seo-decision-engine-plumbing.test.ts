@@ -374,11 +374,11 @@ describe('SEO Decision Engine plumbing — P8 ai-visibility', () => {
 
     // Job gates for runLlmMentionsRefreshJob:
     //   tier growth ✓ · liveDomain ✓ · provider.getLlmMentions ✓ (mock). The seoContext
-    //   aiVisibility summary is flag-gated on 'ai-visibility', so enable it.
-    setWorkspaceFlagOverride('ai-visibility', wsId, true);
-    // P8 reuses P4 target-geo: with geo-targeting ON, the LLM mentions provider request must carry
-    // the non-US market instead of falling back to United States.
-    setWorkspaceFlagOverride('geo-targeting', wsId, true);
+    //   aiVisibility summary is unconditional (the `ai-visibility` flag was retired in
+    //   flag-sunset Wave 2b).
+    // P8 reuses P4 target-geo (also unconditional since flag-sunset Wave 2b retired
+    // `geo-targeting`): the LLM mentions provider request must carry the non-US market
+    // instead of falling back to United States.
     updateWorkspace(wsId, {
       targetGeo: { locationCode: 2124, languageCode: 'fr', countryCode: 'CA', label: 'Canada · French' },
     });
@@ -675,10 +675,12 @@ describe('SEO Decision Engine plumbing — P3 AI-Overview signal', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// P4 — workspace target-geo: targetGeo + flag → threads into the provider request
+// P4 — workspace target-geo: targetGeo threads into the provider request
+// (the `geo-targeting` flag that used to gate this was retired in flag-sunset
+// Wave 2b — it was globally ON in prod, so the resolution is now unconditional.)
 // ═══════════════════════════════════════════════════════════════════════════
 describe('SEO Decision Engine plumbing — P4 target-geo', () => {
-  it('P4 target-geo: a non-US workspace targetGeo (+ geo-targeting flag) threads through workspaceProviderGeo AND into the national-serp provider request', async () => {
+  it('P4 target-geo: a non-US workspace targetGeo threads through workspaceProviderGeo AND into the national-serp provider request', async () => {
     const KEYWORD = 'assurance habitation montreal';
     const wsId = makeGrowthWorkspace('Plumbing P4 — Target Geo', 'https://acme-ca.example');
 
@@ -691,23 +693,14 @@ describe('SEO Decision Engine plumbing — P4 target-geo', () => {
     const CANADA_LANGUAGE = 'fr';
     const US_LOCATION = 2840;
 
-    // ── Contract: flag OFF → {} (provider falls back to its US/'en' default) ──
-    // The flag defaults OFF; with no override set, the helper must return {} even
-    // though targetGeo is about to be set — proving the flag actually gates it.
+    // ── Contract: targetGeo set → the workspace geo (NOT the US default) ──
     updateWorkspace(wsId, { targetGeo: { locationCode: CANADA_LOCATION, languageCode: CANADA_LANGUAGE, countryCode: 'CA', label: 'Canada' } });
-    expect(
-      workspaceProviderGeo(wsId),
-      'P4: geo-targeting flag is OFF but workspaceProviderGeo did not return {} — the flag gate is broken (geo would leak before launch / cache-key churn).',
-    ).toEqual({});
-
-    // ── Contract: flag ON + targetGeo set → the workspace geo (NOT the US default) ──
-    setWorkspaceFlagOverride('geo-targeting', wsId, true);
     const geo = workspaceProviderGeo(wsId);
     expect(
       geo.locationCode,
-      `P4: flag ON + Canada targetGeo set, but workspaceProviderGeo returned locationCode ${geo.locationCode} (expected ${CANADA_LOCATION}) — targetGeo not resolved (still defaulting to US ${US_LOCATION}?).`,
+      `P4: Canada targetGeo set, but workspaceProviderGeo returned locationCode ${geo.locationCode} (expected ${CANADA_LOCATION}) — targetGeo not resolved (still defaulting to US ${US_LOCATION}?).`,
     ).toBe(CANADA_LOCATION);
-    expect(geo.languageCode, 'P4: flag ON but languageCode is not the set fr — targetGeo language not resolved.').toBe(CANADA_LANGUAGE);
+    expect(geo.languageCode, 'P4: languageCode is not the set fr — targetGeo language not resolved.').toBe(CANADA_LANGUAGE);
 
     // ── Real plumbing: the national-serp job must thread that geo into the provider request ──
     // Job gates: tier growth ✓ · liveDomain ✓ · provider.getNationalSerp ✓ (mock) ·
@@ -736,7 +729,7 @@ describe('SEO Decision Engine plumbing — P4 target-geo', () => {
     ).toBeDefined();
     expect(
       req!.locationCode,
-      `P4: provider request locationCode is ${req!.locationCode} (expected Canada ${CANADA_LOCATION}, NOT US ${US_LOCATION}) — targetGeo set + flag on, but the geo threading into the provider request is dark (a non-US client would be queried as US).`,
+      `P4: provider request locationCode is ${req!.locationCode} (expected Canada ${CANADA_LOCATION}, NOT US ${US_LOCATION}) — targetGeo set, but the geo threading into the provider request is dark (a non-US client would be queried as US).`,
     ).toBe(CANADA_LOCATION);
     expect(
       req!.languageCode,

@@ -18,8 +18,8 @@ import {
 import { FEATURE_FLAGS, FEATURE_FLAG_KEYS } from '../../shared/types/feature-flags.js';
 
 // Stable flag keys we can safely toggle in tests without risking real behaviour.
-const TEST_FLAG = 'keyword-universe-full' as const;
-const TEST_FLAG_2 = 'smart-placeholders' as const;
+const TEST_FLAG = 'national-serp-tracking' as const;
+const TEST_FLAG_2 = 'local-gbp' as const;
 
 afterEach(() => {
   // Remove any DB overrides set during tests so subsequent runs start clean.

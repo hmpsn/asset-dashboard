@@ -119,22 +119,22 @@ describe('feature-flag lifecycle audit', () => {
       const roadmap = loadRoadmap();
       const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-29');
 
-      const row = report.rows.find(r => r.key === 'keyword-universe-full');
+      const row = report.rows.find(r => r.key === 'national-serp-tracking');
       expect(row).toBeDefined();
-      // keyword-universe-full: weekly cadence (7 days), lastReviewedAt 2026-06-02.
+      // national-serp-tracking: weekly cadence (7 days), lastReviewedAt 2026-06-24.
       expect(row?.staleAuditCadence).toBe('weekly');
-      expect(row?.doneTarget).toBe(addDaysToIsoDate('2026-06-02', 7 * 3));
+      expect(row?.doneTarget).toBe(addDaysToIsoDate('2026-06-24', 7 * 3));
       expect(typeof row?.pastDoneTarget).toBe('boolean');
     });
 
     it('flags pastDoneTarget=true once asOf passes the computed done-target', () => {
       const roadmap = loadRoadmap();
-      // keyword-universe-full: weekly cadence, reviewed 2026-06-02 → doneTarget = 2026-06-23.
-      const before = buildFeatureFlagLifecycleReport(roadmap, '2026-06-22');
-      const after = buildFeatureFlagLifecycleReport(roadmap, '2026-06-24');
+      // national-serp-tracking: weekly cadence, reviewed 2026-06-24 → doneTarget = 2026-07-15.
+      const before = buildFeatureFlagLifecycleReport(roadmap, '2026-07-14');
+      const after = buildFeatureFlagLifecycleReport(roadmap, '2026-07-16');
 
-      const rowBefore = before.rows.find(r => r.key === 'keyword-universe-full');
-      const rowAfter = after.rows.find(r => r.key === 'keyword-universe-full');
+      const rowBefore = before.rows.find(r => r.key === 'national-serp-tracking');
+      const rowAfter = after.rows.find(r => r.key === 'national-serp-tracking');
       expect(rowBefore?.pastDoneTarget).toBe(false);
       expect(rowAfter?.pastDoneTarget).toBe(true);
       expect(after.pastDoneTargetCount).toBeGreaterThan(0);
