@@ -1,5 +1,6 @@
 // @ds-rebuilt
 import type { CSSProperties, ReactElement, ReactNode } from 'react';
+import { cn } from '../../lib/utils';
 
 /**
  * One label→value row: muted label, bright right-aligned value, optional
@@ -18,8 +19,41 @@ export interface KeyValueRowProps {
   style?: CSSProperties;
 }
 
-export function KeyValueRow(_props: KeyValueRowProps): ReactElement {
-  throw new Error('F3 stub — KeyValueRow not yet implemented (Lane B)');
+export function KeyValueRow({
+  label,
+  value,
+  valueColor,
+  divider = true,
+  mono = false,
+  className,
+  id,
+  style,
+}: KeyValueRowProps): ReactElement {
+  return (
+    <div
+      id={id}
+      className={cn(
+        'flex items-center gap-3 py-[9px] t-caption',
+        divider && 'border-t border-[var(--brand-border)]',
+        className,
+      )}
+      style={style}
+    >
+      <span className="text-[var(--brand-text-dim)] min-w-0">{label}</span>
+      <span
+        className={cn(
+          'ml-auto text-right font-semibold tabular-nums',
+          mono && 'font-mono',
+        )}
+        style={{
+          color: valueColor || 'var(--brand-text-bright)',
+          fontFamily: mono ? 'var(--font-mono)' : undefined,
+        }}
+      >
+        {value}
+      </span>
+    </div>
+  );
 }
 
 export interface DefinitionItem {
@@ -37,6 +71,29 @@ export interface DefinitionListProps {
   style?: CSSProperties;
 }
 
-export function DefinitionList(_props: DefinitionListProps): ReactElement {
-  throw new Error('F3 stub — DefinitionList not yet implemented (Lane B)');
+export function DefinitionList({ items, className, id, style }: DefinitionListProps): ReactElement {
+  return (
+    <dl id={id} className={className} style={style}>
+      {items.map((item, i) => (
+        <div
+          key={i}
+          className={cn(
+            'flex items-center gap-3 py-[9px] t-caption',
+            i !== 0 && 'border-t border-[var(--brand-border)]',
+          )}
+        >
+          <dt className="text-[var(--brand-text-dim)] min-w-0">{item.label}</dt>
+          <dd
+            className={cn('ml-auto text-right font-semibold tabular-nums', item.mono && 'font-mono')}
+            style={{
+              color: item.valueColor || 'var(--brand-text-bright)',
+              fontFamily: item.mono ? 'var(--font-mono)' : undefined,
+            }}
+          >
+            {item.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
