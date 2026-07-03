@@ -92,7 +92,7 @@
   /* ─── Layout ─── */
   .shell{ max-width:1240px; margin:0 auto; padding:48px 40px 120px; }
   .eyebrow{
-    font-family:'JetBrains Mono',ui-monospace,monospace;
+    font-family:var(--font-mono);
     font-size:11px; letter-spacing:.12em; text-transform:uppercase;
     color:var(--brand-text-muted);
   }

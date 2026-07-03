@@ -118,6 +118,7 @@
   --section-gap: 20px;
   --grid-gap: 12px;
   --grid-gap-lg: 16px;
+  /* Breakpoints — reference values for JS/container queries; CSS @media cannot read var() */
   --bp-sm: 640px;
   --bp-md: 900px;
   --bp-lg: 1200px;
