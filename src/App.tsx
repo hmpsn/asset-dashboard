@@ -28,6 +28,9 @@ import type { FixContext } from './types/fix-context';
 const ClientDashboard = lazyWithRetry(() => import('./components/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
 const LandingPage = lazyWithRetry(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
 const PageRewriteChat = lazyWithRetry(() => import('./components/PageRewriteChat').then(m => ({ default: m.PageRewriteChat })));
+// DEV-only design-system harness (F3.2) — mounted only under import.meta.env.DEV
+// (see the /__ds-harness route). Never shipped to production; exempt from nav/registry.
+const DsHarness = lazyWithRetry(() => import('./components/dev/DsHarness'));
 
 // ── Lazy-loaded admin tab chunks ──
 const SettingsPanel = lazyWithRetry(() => import('./components/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
@@ -129,6 +132,19 @@ function App() {
       <Routes>
         <Route path="/welcome" element={<Suspense fallback={<ChunkFallback />}><LandingPage /></Suspense>} />
         <Route path="/styleguide" element={<StyleguideRedirect />} />
+        {/* DEV-only DS harness — the F3.3 keyboard-walk target. Excluded from
+            production builds; import.meta.env.DEV is statically false in prod so
+            this Route (and its lazy chunk) is tree-shaken away. */}
+        {import.meta.env.DEV && (
+          <Route
+            path="/__ds-harness"
+            element={
+              <ToastProvider>
+                <Suspense fallback={<ChunkFallback />}><DsHarness /></Suspense>
+              </ToastProvider>
+            }
+          />
+        )}
         <Route path="/client/beta/:workspaceId/*" element={<ClientRouteShell betaMode />} />
         <Route path="/client/:workspaceId/*" element={<ClientRouteShell />} />
         <Route path="/*" element={<ToastProvider><BackgroundTaskProvider><AdminApp /></BackgroundTaskProvider></ToastProvider>} />

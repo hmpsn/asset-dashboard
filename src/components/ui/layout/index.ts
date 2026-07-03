@@ -8,3 +8,13 @@ export { Grid } from './Grid';
 export type { GridProps, GridCols, GridColCount } from './Grid';
 export { Divider } from './Divider';
 export type { DividerProps, DividerOrientation } from './Divider';
+
+// F3 — net-new layout primitives
+export { AppShell } from './AppShell';
+export type { AppShellProps } from './AppShell';
+export { PageContainer } from './PageContainer';
+export type { PageContainerProps } from './PageContainer';
+export { Toolbar, ToolbarSpacer } from './Toolbar';
+export type { ToolbarProps } from './Toolbar';
+export { GroupBlock } from './GroupBlock';
+export type { GroupBlockProps, GroupStat, GroupFlag } from './GroupBlock';

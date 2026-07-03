@@ -43,6 +43,20 @@
       "createdAt": "2026-07-03",
       "reviewBy": "2026-09-30",
       "links": { "pr": "#1472" }
+    },
+    {
+      "id": "DEF-foundation-004",
+      "surface": "foundation",
+      "item": "The kit Toast visuals are not yet ported onto the existing src/components/Toast.tsx — F3 deliberately did NOT build a second Toast (HEAD's ToastProvider/useToast is the canonical mutation-feedback primitive, mounted in App.tsx with 15+ consumers). The kit Toast's look becomes a tokens-only restyle of the existing component (T1 carry-over-then-reskin).",
+      "decision": "Keep the existing Toast as the single mutation-feedback primitive; restyle its visuals to the kit spec later rather than forking a duplicate during F3 (adversarial review CP1).",
+      "class": "primitive",
+      "upgradeTrigger": "Keywords pilot ships mutations (the first rebuilt surface that fires toasts) — restyle then so the new look lands with real usage.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-03",
+      "reviewBy": "2026-09-30",
+      "links": { "kitDoc": "components/feedback/Toast.jsx" }
     }
   ]
 }

@@ -7076,12 +7076,15 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.tsx'],
     severity: 'error',
     excludeLines: ['// view-css-ok'],
-    message: 'Per-view CSS block (const *css*/*styles* = or <style>) in a @ds-rebuilt file — styling belongs in tokens + primitives, not ad hoc per-view CSS. Add // view-css-ok inline if unavoidable.',
-    rationale: 'Rebuilt surfaces compose primitives; inline per-view CSS re-forks the design system per screen.',
+    message: 'Template-literal CSS block (const *css*/*styles* = `…`) or <style> tag in a @ds-rebuilt file — styling belongs in tokens + primitives, not ad hoc per-view CSS. Add // view-css-ok inline if unavoidable. (A `const xStyles = { … }` React style-map object is NOT flagged — inline style objects are the standard prop-driven pattern.)',
+    rationale: 'Rebuilt surfaces compose primitives; a template-literal CSS string / <style> tag re-forks the design system per screen. React style-map OBJECTS ({…}) are the normal prop pattern (kit props include style?: CSSProperties) and are intentionally excluded — the prior [`{] regex mis-flagged every one (review CP4).',
     claudeMdRef: 'UI Rebuild conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      const re = /const\s+\w*(?:css|styles?)\w*\s*=\s*[`{]|<style/i;
+      // Template-literal CSS (`const fooStyles = ` … ``) or a <style> tag only.
+      // Deliberately NOT `const fooStyles = { … }` — that object-map form is the
+      // standard React inline-style pattern every ported primitive uses.
+      const re = /const\s+\w*(?:css|styles?)\w*\s*=\s*`|<style/i;
       files.forEach(filePath => {
         let content: string;
         try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
@@ -7165,7 +7168,11 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.tsx', '*.ts'],
     severity: 'error',
     excludeLines: ['// deep-import-ok'],
-    // Backstop: refine to the real DS internal layout in F3 once components/ui/internal/ exists.
+    // Backstop for a future components/ui/internal/ layer. As of F3 no internal/
+    // dir exists — the F3 ports deliberately kept shared machinery PUBLIC
+    // (ui/overlay/overlayUtils.ts, ui/useRovingTabindex.ts) rather than under
+    // internal/, precisely so this rule never needs a carve-out. Refine the
+    // regex to the real internal layout only once such a dir is actually created.
     message: 'Deep import into components/ui/internal/ from a @ds-rebuilt file — import the public primitive, not its internals. Add // deep-import-ok inline if intentional.',
     rationale: 'Reaching into a primitive\'s internals couples rebuilt surfaces to private structure.',
     claudeMdRef: 'UI Rebuild conventions',

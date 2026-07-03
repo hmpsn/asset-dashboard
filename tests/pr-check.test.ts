@@ -12545,19 +12545,31 @@ describe('Rule: UI Rebuild @ds-rebuilt-scoped gates (F2a)', () => {
 
   describe('Rule: ds-per-view-css-block', () => {
     const RULE = 'ds-per-view-css-block';
-    it('flags a per-view styles object in a @ds-rebuilt file', () => {
+    it('flags a template-literal CSS block in a @ds-rebuilt file', () => {
       const file = write(uniqPath('ds-css', 'src/Rebuilt.tsx'),
-        lines(MARKER, "const styles = { color: 'x' };"));
+        lines(MARKER, 'const panelCss = `.panel { color: red; }`;'));
       expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
     });
-    it('does NOT flag the same block without the @ds-rebuilt marker', () => {
+    it('flags a <style> tag in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-css', 'src/Styled.tsx'),
+        lines(MARKER, 'const el = <style>{`.x{}`}</style>;'));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag a React style-map OBJECT (review CP4 — the standard inline-style pattern)', () => {
+      // The prior [`{] regex mis-flagged this — every ported primitive writes
+      // `const xStyles = { … }` style maps (kit props include style?: CSSProperties).
+      const file = write(uniqPath('ds-css', 'src/StyleMap.tsx'),
+        lines(MARKER, "const rootStyles = { color: 'var(--brand-text)' };"));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag the template-literal block without the @ds-rebuilt marker', () => {
       const file = write(uniqPath('ds-css', 'src/Legacy.tsx'),
-        lines("const styles = { color: 'x' };"));
+        lines('const panelCss = `.panel { color: red; }`;'));
       expect(runRule(RULE, [file])).toHaveLength(0);
     });
     it('does NOT flag a block carrying the inline // view-css-ok hatch', () => {
       const file = write(uniqPath('ds-css', 'src/Hatched.tsx'),
-        lines(MARKER, "const styles = { color: 'x' }; // view-css-ok"));
+        lines(MARKER, 'const panelCss = `.panel { color: red; }`; // view-css-ok'));
       expect(runFiltered(RULE, [file])).toHaveLength(0);
     });
   });
