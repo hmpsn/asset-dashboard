@@ -150,7 +150,7 @@ Tier badge (client)?         → Teal (all tiers) or zinc (free)
 - **Visual source of truth:** `/styleguide` React route (or `/styleguide.html` static) demos all tokens + primitives.
 - **Verification:** `npm run pr-check` enforces `styleguide-token-parity`, `styleguide-typography-parity`, `styleguide-css-must-import-public-tokens`, and `src-index-css-no-token-declarations`.
 - **Z-index scale (never use raw z-index values):** `--z-sticky: 10`, `--z-dropdown: 20`, `--z-tooltip: 30`, `--z-modal-backdrop: 40`, `--z-modal: 50`, `--z-modal-fullscreen: 55` (full-screen takeover modals above chat widget), `--z-toast: 60`. All defined in `src/tokens.css`.
-- **Token categories in `src/tokens.css`:** Surface, Text, Brand colors, Border, Shadows/overlays, Scrollbar, Border-radius, Icon sizes, Zinc scale, Accent hues, Chart, Z-index, Annotation colors.
+- **Token categories in `src/tokens.css`:** Surface, Text, Brand colors, Font families, Type roles, Border, Shadows/overlays, Elevation (`--shadow-*`, canonical; `--brand-shadow-*` deprecated), Scrollbar, Border-radius, Spacing scale, Shell/page layout, Motion, Icon sizes, Zinc scale, Accent hues, Chart, Z-index, Annotation colors.
 
 ### Forbidden
 

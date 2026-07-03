@@ -45,6 +45,26 @@
   --brand-yellow: #ffb600;
   --brand-yellow-dim: rgba(255, 182, 0, 0.1);
 
+  /* ─── Font families (F1: UI rebuild foundation) ─── */
+  --font-display: 'DIN Pro', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Menlo', 'Courier New', monospace;
+
+  /* ─── Type roles (sizes/weights the .t-* utilities and DS components read) ─── */
+  --type-hero-size: 42px;    --type-hero-line: 1.1;  --type-hero-weight: 700; --type-hero-track: -0.03em;
+  --type-h1-size: 28px;      --type-h1-line: 1.2;    --type-h1-weight: 600;   --type-h1-track: -0.025em;
+  --type-h2-size: 22px;      --type-h2-line: 1.2;    --type-h2-weight: 600;   --type-h2-track: -0.02em;
+  --type-stat-lg-size: 34px; --type-stat-lg-weight: 700; --type-stat-lg-track: -0.03em;
+  --type-stat-size: 24px;    --type-stat-weight: 700;    --type-stat-track: -0.025em;
+  --type-stat-sm-size: 18px; --type-stat-sm-weight: 600; --type-stat-sm-track: -0.02em;
+  --type-page-size: 15.5px;  --type-page-line: 1.5;  --type-page-weight: 400;
+  --type-body-size: 15.5px;  --type-body-line: 1.5;  --type-body-weight: 500;
+  --type-ui-size: 13.5px;    --type-ui-line: 1.4;    --type-ui-weight: 500;
+  --type-label-size: 11.5px; --type-label-weight: 500; --type-label-track: 0.06em;
+  --type-caption-size: 13.5px; --type-caption-weight: 500;
+  --type-mono-size: 12px;    --type-mono-weight: 400; --type-mono-line: 1.5;
+  --type-micro-size: 10px;   --type-micro-track: 0.1em;
+
   /* ─── Border ─── */
   --brand-border: #27272a;
   --brand-border-hover: #3f3f46;
@@ -54,6 +74,13 @@
   --brand-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.22);
   --brand-shadow-md: 0 4px 18px rgba(0, 0, 0, 0.32);
   --brand-overlay: rgba(0, 0, 0, 0.62);
+
+  /* Canonical elevation family (F1). --brand-shadow-* is DEPRECATED — do not use
+     in new code; migration to --shadow-* is a Z-phase deferred item. */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+  --shadow-glow: 0 8px 32px -6px rgba(45, 212, 191, 0.35);
 
   /* ─── Scrollbar ─── */
   --scrollbar-thumb: rgba(165, 186, 201, 0.15);
@@ -73,6 +100,35 @@
 
   /* ─── Legacy alias (deprecated — use --radius-lg) ─── */
   --radius: 10px;
+
+  /* ─── Spacing scale (4px rhythm) ─── */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px; --space-5: 20px;
+  --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px; --space-16: 64px;
+
+  /* ─── App shell + content boundaries (AppShell/PageContainer read these) ─── */
+  --shell-sidebar: 232px;
+  --shell-sidebar-rail: 62px;
+  --shell-topbar: 56px;
+  --page-max: 1180px;
+  --page-max-narrow: 760px;
+  --page-max-wide: 1440px;
+  --page-pad-x: 26px;
+  --page-pad-y: 24px;
+  --page-pad-bottom: 90px;
+  --section-gap: 20px;
+  --grid-gap: 12px;
+  --grid-gap-lg: 16px;
+  --bp-sm: 640px;
+  --bp-md: 900px;
+  --bp-lg: 1200px;
+
+  /* ─── Motion ─── */
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-draw: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --dur-fast: 0.15s;
+  --dur-base: 0.25s;
+  --dur-slow: 0.5s;
+  --stagger-step: 60ms;
 
   /* ─── Icon sizes ─── */
   --icon-sm: 14px;
@@ -185,6 +241,10 @@
   /* Shadows */
   --brand-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
   --brand-shadow-md: 0 4px 16px rgba(15, 23, 42, 0.10);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.10);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.06), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-glow: 0 8px 28px -6px rgba(13, 148, 136, 0.35);
 
   /* Scrollbar */
   --scrollbar-thumb: rgba(148, 163, 184, 0.55);

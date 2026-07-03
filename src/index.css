@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import './tokens.css';
 @import "tailwindcss";
 
@@ -599,7 +599,7 @@ body::after {
 
 /* Monospace */
 .t-mono {
-  font-family: 'Fira Code', 'JetBrains Mono', 'Menlo', 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 400;
   line-height: 1.5;
@@ -608,13 +608,22 @@ body::after {
 
 /* Micro — monospace, uppercase, tracked timestamps + IDs (matches public/styleguide.css) */
 .t-micro {
-  font-family: 'Fira Code', 'JetBrains Mono', 'Menlo', 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 400;
   line-height: 1.4;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
+}
+
+/* Eyebrow — mono kicker label (verbatim copy of public/styleguide.css .eyebrow) */
+.eyebrow {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand-text-muted);
 }
 
 } /* end @layer components — .t-* typography utilities */
