@@ -47,6 +47,8 @@
 
 Action-link nuance: links that initiate user actions (review, open-tool, perform/fix flows) use teal hover/active states; blue link treatment is reserved for informational/data navigation only.
 
+> **"Teal" is the canonical vocabulary for the action color (`#2dd4bf`).** The `--brand-mint*` token names are historical aliases for the same family — do not introduce "mint" in new docs or UI copy. (Ratified Phase D, D6.)
+
 ### Primary Palette
 
 | Role | Dark Mode | Light Mode | Tailwind | Usage |
@@ -557,6 +559,19 @@ The platform's signature shape is an asymmetric diagonal radius — tight top-le
 | Generic panels / nested cards | `--radius-lg` (`10px`) | `rounded-[var(--radius-lg)]` |
 | Buttons, inputs | `--radius-md` (`8px`) | `rounded-[var(--radius-md)]` |
 | Badges, pills | `--radius-sm` (`4px`) or `--radius-pill` | Tokenized primitive styles |
+
+### Foundation token families (F1 — UI rebuild)
+
+The UI rebuild adds six token families to `src/tokens.css` (the single token source). All are consumed via `var(--…)`; never redeclare them elsewhere.
+
+| Family | Tokens | Purpose |
+|--------|--------|---------|
+| **Font families** | `--font-display`, `--font-sans`, `--font-mono` | Canonical font stacks. Display = DIN Pro→Inter; sans = Inter; mono = JetBrains Mono (Fira Code retired, D6/§6). |
+| **Type roles** | `--type-{hero,h1,h2,stat-lg,stat,stat-sm,page,body,ui,label,caption,mono,micro}-{size,line,weight,track}` | Size/weight/line/tracking values the `.t-*` utilities and ported DS components read (the `.t-*` refactor to consume them lands in F3). |
+| **Spacing scale** | `--space-1 … --space-16` (4px rhythm) | Layout/gap/padding at the 4px grid. |
+| **Shell / page layout** | `--shell-{sidebar,sidebar-rail,topbar}`, `--page-max{,-narrow,-wide}`, `--page-pad-{x,y,bottom}`, `--section-gap`, `--grid-gap{,-lg}`, `--bp-{sm,md,lg}` | App-shell + content boundary values (AppShell / PageContainer). |
+| **Motion** | `--ease-out`, `--ease-draw`, `--dur-{fast,base,slow}`, `--stagger-step` | Canonical easing curves + durations. |
+| **Elevation** | `--shadow-{sm,md,lg,glow}` (canonical, both themes) | Canonical elevation family. `--brand-shadow-*` is **deprecated** (kept; migration is a Z-phase item). |
 
 ---
 
