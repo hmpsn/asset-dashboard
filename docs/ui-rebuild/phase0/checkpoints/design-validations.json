@@ -1,0 +1,188 @@
+[
+  {
+    "claim": "Business-fit craft (blocker): Client-side monetization machinery (TierGate, 14-day trial, Plans/ROI, cart-checkout, per-item purchase, upgrade moments) has no designed home anywhere in the kit.",
+    "verdict": "CONFIRMED",
+    "evidence": "grep -i 'tiergate|trial|checkout|cart' across mockup/*.js and 'Client Dashboard Mockup.html' returns only one irrelevant FAQ fixture string (draft-workspace.js:407). The only monetization designs are admin-side: pipeline.js content-subscription drawer ($600/$1,200/$2,400 plans) and business.js Revenue tab. Client-side artifacts are a static 'Growth plan' badge and the 'Request this…before any work or charge' gesture in Client Dashboard Mockup.html — no tier gating, trial, or purchase flow.",
+    "note": "In-scope: MONETIZATION.md's 3-tier + trial model is existing platform capability, so its absence violates the kit's own additive-only 're-presentation, not reduction' mandate."
+  },
+  {
+    "claim": "Visual/a11y craft (blocker): D-DIN-PRO OTFs have no tnum feature and proportional digit widths, so every tabular-nums request on DIN-set values is a silent no-op.",
+    "verdict": "CONFIRMED",
+    "evidence": "Parsed all 6 assets/fonts/D-DIN-PRO-*.otf with fontTools: GSUB features are dlig/frac/liga/rtla-or-ordn/sups — no tnum. Digit advances: Regular '1'=329 vs '8'=512; Bold '1'=348 vs '8'=525 (proportional). MetricTile.jsx:31, GroupBlock.jsx:43, DataTable.jsx:53 request fontVariantNumeric tabular-nums on var(--font-display).",
+    "note": "Craft agent's numbers reproduce exactly; only trivial drift is Regular's 4th feature being rtla not ordn."
+  },
+  {
+    "claim": "Visual/a11y craft (blocker): Purple reaches client-facing surfaces through the spec itself — portal.js hard-codes #7c3aed for next-step dots/pills/rec icons, IntentTag maps 'local' to purple, Badge reintroduces the purple tone the platform removed.",
+    "verdict": "CONFIRMED",
+    "evidence": "mockup/portal.js lines 23, 155, 158, 201, 203, 207 (C.purple #7c3aed styling client-visible .pt-next and .pt-recsec/.pt-rec elements); components/feedback/IntentTag.jsx:14 (local → tone 'purple'); components/feedback/Badge.jsx:10 (purple tone in union). Repo CLAUDE.md Four Laws: purple is admin-AI only, removed from Badge color union."
+  },
+  {
+    "claim": "Visual/a11y craft (blocker): Flagship row→drawer interaction is keyboard-inaccessible in core primitives — DataTable rows are div onClick with no tabIndex/role/key handler; Drawer/Modal have no focus trap, Escape, or focus return; closed Drawer content stays tabbable inside aria-hidden.",
+    "verdict": "CONFIRMED",
+    "evidence": "components/data/DataTable.jsx:35-48 — rows are <div> with onClick/onMouseEnter only; no tabIndex, role, or onKeyDown anywhere in file. components/layout/Drawer.jsx — role=dialog aria-modal but closes via translateX only, aria-hidden={!open} while children remain in DOM; no Escape handler, no .focus() call in Drawer.jsx or Modal.jsx."
+  },
+  {
+    "claim": "Flows craft (blocker): The product's central ritual — 'Send update to {client}' — is a dead primary topbar button on 6+ views with no composer, preview, confirm, sent-state, or history.",
+    "verdict": "CONFIRMED",
+    "evidence": "mockup/app.js lines 7, 11, 15, 31, 41, 51: six 'Send update to {first}' primary buttons rendered with no onclick attribute (adjacent buttons like 'Strategy inputs' do have onclick). No send-composer flow exists in any module; grep 'confirm(' across mockup/*.js returns zero."
+  },
+  {
+    "claim": "Flows craft (blocker): 'Stage into Insights Engine' from the keyword drawer stages nothing — stageIntoIssue() only calls gotoView('issue') with no state or feedback.",
+    "verdict": "CONFIRMED",
+    "evidence": "mockup/keywords.js:408 wires the CTA to window.stageIntoIssue(); mockup/strategy.js:475 defines it as `window.stageIntoIssue=function(){ window.gotoView('issue'); }` — pure navigation, no state carried, no toast."
+  },
+  {
+    "claim": "Flows craft (blocker): Client-originated intake requests can be dismissed silently — no confirm, no toast, no undo, no record.",
+    "verdict": "CONFIRMED",
+    "evidence": "mockup/pipeline.js dismissIntake(id): finds the item and `arr.splice(idx,1); render();` with nothing else — while the sibling addIntake path fires an hmToast. Intake fixtures include client-sourced asks ('Dana asked in the portal', pipeline.js ~461)."
+  },
+  {
+    "claim": "IA/nav craft (blocker): The ratified two-zone rail is not implemented — the BOOK zone is empty (const book = []), Command Center reachable only via logo click, Inbox demoted to footer icon, book Site Health / Action Results have no rail affordance.",
+    "verdict": "CONFIRMED",
+    "evidence": "mockup/nav.js:14 `const book = [];`. workspace.js:1-7 comment even describes book-zone views (Today, Requests, Site Health, Action Results) as sitting above the client block — the rail never renders them. Digest §2 confirms reachability is logo click, ⌘K palette, or Command Center cross-links only."
+  },
+  {
+    "claim": "IA/nav craft (blocker): The Handoff Brief's '18-surface map — the full front end' silently omits ~10 shipped views, so fan-out has no tickets/ledgers/DoD for them; five HEAD global-admin surfaces are 'untouched' with no home in the new shell.",
+    "verdict": "CONFIRMED",
+    "evidence": "mockup/app.js VIEWS registers 28 views (home, requests, sitehealth, outcomes, onboard, roadmap, business, settings, wsettings, diagnostics… beyond the 18 client-zone surfaces); digest §1 independently confirms the 18-surface map excludes book-level, admin, and drill-in views.",
+    "note": "First half fully confirmed (28 vs 18 = 10 omitted). The 'no home' sub-claim is overstated for 4 of the 5 named surfaces: mockup/business.js:264-267 ships Revenue/Usage/Features/Prospects as sub-tabs; only Team Outcomes has no visible home. The ticket-coverage gap is still real — business.js is outside the 18-surface map."
+  },
+  {
+    "claim": "Benchmark craft (blocker): No background-job/notification affordance anywhere in the new shell — a regression against HEAD's NotificationBell/useBackgroundTasks on a heavily async platform.",
+    "verdict": "CONFIRMED",
+    "evidence": "grep for bell/notification across mockup/*.js finds only decorative section-header icons (cockpit.js:244, home.js:326), a 'Nudge client' button (local-reviews.js:317), and an icon definition — no job tray or bell in app.js setTopbar() or nav.js foot. HEAD mounts BackgroundTaskProvider (src/App.tsx) and topbar actions like Re-crawl start long jobs."
+  },
+  {
+    "claim": "Content/copy craft (blocker): Purple is used throughout the client portal (What's-next dots/chips, entire 'Opportunities we spotted' section), violating both the repo Four Laws and the kit's own 'never reaches a client-facing view' rule.",
+    "verdict": "CONFIRMED",
+    "evidence": "Same evidence as the visual-craft purple blocker: mockup/portal.js:23,155,158,201,203,207 — C.purple #7c3aed styles .pt-next status dots/stat pills and the .pt-recsec/.pt-rec section icons and reach chips, all inside the client-visible card."
+  },
+  {
+    "claim": "Marketing lead (consulting firm) distrust: The portal's verdict template hardcodes trajectory-led-by-traffic — 'You're climbing — traffic's up 34%' is the rule, not just placeholder copy.",
+    "verdict": "CONFIRMED",
+    "evidence": "mockup/portal.js:382-388 — `const growing=d.dir>0;` then the H1 template literally interpolates the sessions delta: `You're climbing — traffic's up ${d.sessD}% this quarter.` The headline metric is structurally sessions, not an outcome noun; changing fixtures cannot fix it.",
+    "note": "Minor nuance: the trajectory flag itself is a fixture field (d.dir), but the positive-branch headline is hardwired to traffic. Not placeholder-copy hyperbole — the Handoff Brief declares copy indicative but flows/hierarchy are spec, and this is template structure."
+  },
+  {
+    "claim": "Marketing lead (consulting firm) distrust: Two competing client-facing designs ship in the same kit with the decision unresolved, and indispensable features are split between them (one-pager export + named leads only in the tabbed dashboard; approve/reply loop + story spine only in the portal).",
+    "verdict": "CONFIRMED",
+    "evidence": "Digest §4.6/§4.7/§8.1 documents both designs and the ungated decision. grep: 'one-pager' appears 4× in Client Dashboard Mockup.html and 0× in portal.js (portal has zero export/history/archive strings); 'Sarah K' named leads only in the dashboard; the conversation/approve loop and valueBand story only in portal.js. Handoff Brief Phase-0 gate leaves the choice open."
+  },
+  {
+    "claim": "Account manager (40 workspaces) distrust: The BOOK zone rail is literally empty — Command Center, book Site Health, Action Results reachable only via logo click or ⌘K, signalling book-level triage was designed second.",
+    "verdict": "CONFIRMED",
+    "evidence": "mockup/nav.js:14 `const book = [];` — the factual core is verified; the palette's 'Your book' group and logo-click path (digest §2) are the only routes. The inference about design priority is opinion but grounded in a real structural gap."
+  },
+  {
+    "claim": "Account manager (40 workspaces) distrust: Everything is dollarized as 'estimate' — headline dollar figures unverifiable on day one; in the fixtures nearly everything carries the 'e' chip.",
+    "verdict": "CONFIRMED",
+    "evidence": "mockup/home.js: all 5 provenance chips in fixtures are prov:'e' (grep uniq count), zero 'm'/'a'. Digest §8 tension 5 confirms dollar estimates lead nearly every surface.",
+    "note": "The '40 clients × 3 Propose rows = pitch spam' arithmetic is extrapolation (fixtures have 4 clients), but the underlying pattern — estimate-provenance dollars as the default queue currency — is real."
+  },
+  {
+    "claim": "Churned skeptical ex-client distrust: Dollar fog replacing chart fog — nearly every line item across every surface carries an agency-authored dollar estimate; twenty stacked unverifiable estimates feel like the old wall of charts.",
+    "verdict": "CONFIRMED",
+    "evidence": "Verified across surfaces: cockpit.js work-queue rows ('-$1,500/mo · estimate'), strategy.js hero '$14,200/mo … ≈ 9,600 missed visits × 2.1% × $705 avg order', portal.js valueBand '$4,900/mo recovered', Client Dashboard Mockup '~$18,400/mo' + per-move '≈$2,900/mo' chips. Digest §8 tension 5 records this as a kit-wide pattern including client-facing hero positions.",
+    "note": "The emotional equivalence to 'chart fog' is persona judgment, but the density-of-estimates fact is real and kit-wide."
+  },
+  {
+    "claim": "Churned skeptical ex-client distrust: False precision on estimated data — '$18,400/mo' and '4.6×' to a decimal while the methodology itself says the number is banded.",
+    "verdict": "CONFIRMED",
+    "evidence": "Client Dashboard Mockup.html contains both '18,400' and '4.6×' as the hero, and its own methodology text reads 'banded while it's an estimate, exact once reconciled against your booked revenue' — the hero formatting contradicts the disclosed banding rule on the same screen."
+  },
+  {
+    "claim": "VC/board distrust: A client-facing 94/100 site-health ring sits in the portal's PROOF column — an invented 0-100 composite the agency controls, back after P0 buried it.",
+    "verdict": "CONFIRMED",
+    "evidence": "mockup/portal.js:249 `health:94` fixture feeding the Site health ring rendered in the PROOF section's right column (digest §4.6: 'Site health ring (94/100) + humanized fix list')."
+  },
+  {
+    "claim": "VC/board distrust: The portal's PROOF section leads with impressions/clicks vitals, sparklines, and rank-gain rows — rankings-and-impressions-as-results.",
+    "verdict": "CONFIRMED",
+    "evidence": "Digest §4.6 PROOF layout: left column opens with 'Found in Google' (impressions) and 'Visits from search' (clicks) vitals with sparklines, then 'Where you're climbing' rank rows ('was #24 · now #12'); portal.js:527 renders those rank-gain rows. Outcome/lead evidence (bonus leads tile) sits lower and only-when-provable."
+  },
+  {
+    "claim": "Junior SEO distrust: Logo-click-only access to book-level views — pure tribal knowledge; wouldn't find Command Center for weeks.",
+    "verdict": "CONFIRMED",
+    "evidence": "mockup/nav.js:14 empty book array; digest §2: Command Center/sitehealth/outcomes 'reachable only via the logo click, the ⌘K palette … or cross-links inside the Command Center'. The host HTML wires the logo to gotoView('home')."
+  },
+  {
+    "claim": "Junior SEO distrust: One-click client sends with no confirm dialog and unclear recall semantics (does recall work after the client's email went out?).",
+    "verdict": "CONFIRMED",
+    "evidence": "grep 'confirm(' across all mockup/*.js returns zero — every send/share/publish is one click + toast. Recall exists only in recs.js:159 ('Waiting on Acme to approve · recall') with no statement of whether the client was already notified; 'Send update' has no flow at all (app.js dead buttons)."
+  },
+  {
+    "claim": "Solo founder-operator distrust: Logo-click as the only rail path to the Command Center adds a hidden hop to the loop run twenty times a day.",
+    "verdict": "CONFIRMED",
+    "evidence": "Same structural fact: nav.js:14 empty BOOK zone; home view reached via logo or ⌘K only. For the operator persona this is their primary landing surface (home.js header: cross-client work queue)."
+  },
+  {
+    "claim": "Solo founder-operator distrust: Cockpit 'Fix' buttons ALL route to the Content Pipeline, including dead-link fixes that belong in Links.",
+    "verdict": "CONFIRMED",
+    "evidence": "mockup/cockpit.js:198 — the Technicals rail renders one shared `<button class=\"ck-tfix\" onclick=\"window.gotoView('pipeline')\">Fix</button>` for every technical item (dead links, alt text, FAQ schema fixtures). Work-queue action buttons (line 153) also route only to recs/issue by stream, never to Links/Assets/Schema. Digest §4.1 records the same."
+  },
+  {
+    "claim": "Owner-dentist distrust: Dollar signs on everything — projected-$ chips on nearly every card including work not yet done ('est. added value ≈ $2,900/mo · confidence: High') cheapen the one real number.",
+    "verdict": "CONFIRMED",
+    "evidence": "Client Dashboard Mockup content-plan moves each carry 'est. added value' ≈-tags and confidence chips (digest §4.7 item 2); portal.js recs carry bare '~2.4k/mo' reach chips; cockpit/strategy dollarize every queue row. Kit-wide pattern per digest tension 5."
+  },
+  {
+    "claim": "Owner-dentist distrust: The two client surfaces tell different money stories — portal says 'revenue recovered $4,900/mo of $14.2k targeted', dashboard says 'worth ~$18,400/mo, 4.6× your retainer' — a shifting methodology.",
+    "verdict": "CONFIRMED",
+    "evidence": "portal.js valueBand renders 'Revenue recovered {v.recovered}/mo … of {v.target}/mo targeted' ($4,900 / $14.2k fixtures); Client Dashboard Mockup.html hero is '~$18,400/mo · 4.6× your retainer' with an ROI ledger. Two genuinely different value framings for the same client relationship; the kit gates but does not make the choice (Handoff Brief Phase-0 gate)."
+  },
+  {
+    "claim": "HVAC SMB owner distrust: The portal's verdict is a TRAFFIC sentence ('You're climbing — traffic's up 34% this quarter') — traffic back in the verdict slot undoes the June fix.",
+    "verdict": "CONFIRMED",
+    "evidence": "mockup/portal.js:387 — positive-trajectory H1 template is hardwired to the sessions delta. Same structural finding as the consulting-firm persona; multiple personas independently converged on it."
+  },
+  {
+    "claim": "HVAC SMB owner distrust: The portal's PROOF section leads with impressions ('Found in Google') and clicks sparklines, plus a 94/100 site-health ring — both on the explicit bury list, promoted to 'the proof'.",
+    "verdict": "CONFIRMED",
+    "evidence": "Digest §4.6: PROOF opens on impressions/clicks vitals; portal.js:249 health:94 ring in the proof right column. Contrast: the Client Dashboard Mockup correctly collapses the same metrics 'Under the hood' — the two designs disagree exactly as claimed."
+  },
+  {
+    "claim": "B2B SaaS marketing lead distrust: The kit ships two competing client designs and the wrong one leads with the fired-an-agency-over pattern — portal verdict is traffic-led and its PROOF opens on impressions; if the gate picks the portal this rebuild is a regression.",
+    "verdict": "CONFIRMED",
+    "evidence": "Composite of verified facts: portal.js:387 traffic-led verdict template; PROOF-leads-with-impressions (digest §4.6); two-design fork ungated (Handoff Brief Phase-0 gate; digest §8.1). Conditional conclusion is sound given those facts."
+  },
+  {
+    "claim": "B2B SaaS marketing lead distrust: The trajectory-flip copy rebrands a bad period as 'We're defending your rankings — here's the plan' — a euphemism engine instead of 'flat month, honest plan'.",
+    "verdict": "CONFIRMED",
+    "evidence": "mockup/portal.js:388 — the negative-branch H1 is 'We're defending your rankings — here's the plan', with no number in the headline.",
+    "note": "Partially contested by design: the lede directly beneath (portal.js:391) does disclose the number honestly ('Traffic softened -6% this quarter… here's what moved'), and the benchmark reviewer praised the negative branch. The verified defect is narrower than 'euphemism engine': the H1 slot avoids the down number while the positive H1 celebrates its up number — an asymmetry in the headline rule, not total spin."
+  },
+  {
+    "claim": "Multi-location operator (22 clinics): Zero multi-location anything in either client-facing design — no portfolio, no location roll-up, no franchise handling, no portfolio headline; both designs are single-front-door stories.",
+    "verdict": "CONFIRMED",
+    "evidence": "grep -i 'franchise|multi-location|location' returns 0 hits in mockup/portal.js and Client Dashboard Mockup.html; no file in mockup/ mentions franchise. Local Presence (local.js) and local-setup 'markets' are single-client GBP/geo-keyword tooling, not location roll-ups. Both client designs render one business, one story.",
+    "note": "In-scope caveat: the kit's mandate is re-presentation of existing capability, and HEAD has no multi-location either (IA v2 'P5 (multi-location) deferred', docs/ui-rebuild/phase0/cross-client-dashboard.md:42,148). Absence is a deliberate standing deferral surfaced as open question Q7, not a silent kit oversight — but for the 'is this the RIGHT build' question the absence is real."
+  },
+  {
+    "claim": "Multi-location operator (22 clinics): The ranked 'needs attention' triage (3-5 slipping locations, plain-English reason, dollar impact) is absent; it has now been designed AROUND twice (June 'this IS the product to me', prior review deferred to P2).",
+    "verdict": "CONFIRMED",
+    "evidence": "No such surface exists in any of the 41 mockup views (verified via location greps + digest full-view inventory §4-5). Deferral history is documented: docs/ui-rebuild/phase0/cross-client-dashboard.md:42 records 'P5 (multi-location) deferred' and :148 poses it as open question Q7 ('schedule inside this rebuild or keep deferred?').",
+    "note": "The count 'twice' rests on the persona's own June prior-spec (referenced in its panel prompt) plus this kit — plausible and consistent with the recorded deferral; the operator-side book views (home.js work queue, sitehealth.js client×issue matrix) triage across CLIENTS, not locations within one client."
+  },
+  {
+    "claim": "Multi-location operator (22 clinics): Top-3 overperformers + why (copy-the-winner) and the 'X of 22 clean' consistency roll-up are absent.",
+    "verdict": "CONFIRMED",
+    "evidence": "Nothing location-scoped exists (location greps return 0 in client-facing designs). The nearest analogs are operator-side and client-granular: outcomes.js 'winners vs laggards' and sitehealth.js by-client grid roll up across the agency's clients, not across one client's locations — invisible to any client persona regardless."
+  },
+  {
+    "claim": "Multi-location operator (22 clinics): The sortable 22-location drill-down table does not exist at all, so there is nowhere to drill.",
+    "verdict": "CONFIRMED",
+    "evidence": "No location-dimension table exists in any mockup view or in either client-facing design (grep + digest inventory). Related fact from the benchmark craft review: even the flagship Keywords table has no column sorting, so a sortable N-row drill-down has no primitive precedent in the kit either."
+  },
+  {
+    "claim": "Multi-location operator (22 clinics): Per-location spelunking is architecturally baked in — the nav model is one-client-one-workspace-one-story-page; 22 clinics would mean 22 workspaces/portals, and retrofitting a location dimension later is the expensive path.",
+    "verdict": "CONFIRMED",
+    "evidence": "mockup/workspace.js:1-16 — the entire scope model is a flat CLIENTS array with one active client; everything below the client block is scoped to that single client (file's own comment). portal.js renders one scrolling story per client; Client Dashboard Mockup is one business. No location dimension exists anywhere in the data fixtures or nav model, so a 22-clinic client maps to either 1 blended workspace or 22 siblings.",
+    "note": "The 'expensive to retrofit' judgment is opinion but structurally reasonable: the scope chip, rail, portal, and verdict templates all assume client==site==story."
+  },
+  {
+    "claim": "Multi-location operator (22 clinics): Aggressive dollarization of ESTIMATES as the headline everywhere ('$14,200/mo at stake ≈ 9,600 visits × 2.1% × $705 AOV') — across 22 locations that is 22 monthly chances for 'that's not what my phones show'; one bad reconciliation kills trust in the whole instrument.",
+    "verdict": "CONFIRMED",
+    "evidence": "mockup/strategy.js renders exactly '$14,200/mo' with the spelled-out '≈ 9,600 missed visits × 2.1% × $705 avg order' arithmetic; portal.js and Client Dashboard Mockup lead with estimated dollar heroes ($4,900 recovered / ~$18,400 worth). Digest §8 tension 5 records estimate arithmetic as the headline 'nearly everywhere, including client-facing hero positions'. The chips are honest (provenance ladder exists) — the claim correctly concedes this.",
+    "note": "The ×22 exposure math is extrapolation (no multi-location client can exist in the current model), but the underlying design posture — estimate-derived dollars as the default headline — is verified and echoed independently by 5+ other personas."
+  }
+]

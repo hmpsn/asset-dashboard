@@ -1,0 +1,504 @@
+[
+ {
+  "agentId": "a08b897693dc24ff4",
+  "ident": "Recommendations \u2014 zone: Client-facing",
+  "size": 215794,
+  "structuredOutput": null
+ },
+ {
+  "agentId": "a0ce1dfac3cfa7383",
+  "ident": "47-year-old owner-dentist, single-location family practice",
+  "size": 204774,
+  "structuredOutput": {
+   "persona": "47-year-old owner-dentist, single-location family practice. Chairside 8\u20135, not a marketer. I pay a retainer to fill empty chairs and want proof in plain English \u2014 calls, bookings, reviews, dollars \u2014 that matches what my front desk actually saw.",
+   "resolved": [
+    "The verdict is finally MY number in MY units: the Client Dashboard hero leads with '59 new-patient actions this month, up from 21' broken into 41 calls / 12 form fills / 6 bookings \u2014 that's slots 1 and 2 of the spine I dictated, word for word.",
+    "The money frame sits right where I asked: '~$18,400/mo \u00b7 4.6\u00d7 your retainer' up top, and an ROI ledger that puts 'your monthly investment $4,000/mo' on the same card as the value \u2014 the read-it-aloud-to-my-spouse sentence I asked for, with the estimate methodology disclosed instead of dressed up as booked revenue.",
+    "NAMED LEADS \u2014 my #1 trust test, previously deferred: 'Sarah K. \u2014 called from the emergency dentist page, 2h ago', 'Ana R. booked a cleaning', marked 'Only you can see this'. And when tracking isn't connected it honestly shows a dash plus 'Names available with call & CRM tracking \u2014 ask your strategist' instead of faking it. That's the reconcile-to-my-front-desk mechanic I said I'd trust everything else more for.",
+    "The 'Your turn' strip leads the page with approval chips and there's an explicit nothing-waiting empty state \u2014 the ball-in-my-court queue all seven of us demanded.",
+    "The kitchen is hidden: impressions, clicks, visitors, avg position, site health all collapsed 'Under the hood'. No confetti, no keyword grids up top, provenance chips (estimate/measured/actual) everywhere. The anti-feature discipline held.",
+    "The review-reply pipeline lets ME approve the reply to a Google review before it posts under my practice's name \u2014 that's a real action I can take between patients, and it even handles publish failures honestly.",
+    "The work log is outcome-tagged and BELOW results ('What we did this month' with plain-language what/why), and there's a 'Share this as a one-pager' export. Activity is reassurance, not the headline \u2014 exactly the placement law we set."
+   ],
+   "stillMissing": [
+    "The map pack and my Google reviews status are STILL not on my first screen. I said the map pack is 90% of how patients find me and reviews are the one thing I can act on today; this was 'deferred-P1' in the last review and in the new design it's an OPERATOR view (Local Presence) \u2014 on my side, reviews only show up as a competitor jab buried under the hood. Second consecutive review where my #1 local ask is missing.",
+    "The return hook doesn't exist. Section F of our spec said nobody builds a login habit \u2014 text/email me when there's a new 2-star review or missed calls, plus a monthly 2-minute recap. The mockup has a decorative bell icon and nothing else. This whole design still assumes I'll remember to visit.",
+    "The missed-call flag \u2014 'you missed 6 callable new patients, ~$X lost' \u2014 the one upsell I said I'd pay for immediately. Nothing anywhere.",
+    "No junk filter shown on the call count. 41 calls with no note about spam, robocalls, or existing-patient reschedules being excluded. My front desk will say 12; the gap is where trust dies.",
+    "There are TWO client-facing designs (the portal story page and the tabbed dashboard) with different money framings, and the kit doesn't pick one. Which one do I get?",
+    "4 of the dashboard's 5 tabs are placeholders \u2014 including Inbox, which is where my 'Your turn' chips route. My decision queue points at a 'building this next' sign."
+   ],
+   "distrustTriggers": [
+    "Dollar signs on everything. Nearly every card carries a projected-$ chip ('est. added value \u2248 $2,900/mo \u00b7 confidence: High') including work you haven't done yet. One honest estimated number I can check is trust; a dollar figure on every row reads like a timeshare brochure and cheapens the real one.",
+    "The two client surfaces tell me different money stories \u2014 portal says 'revenue recovered $4,900/mo of $14.2k targeted', the dashboard says 'worth ~$18,400/mo, 4.6\u00d7 your retainer'. If both framings ever reach me, that's a shifting methodology, and I stop believing both.",
+    "The portal's headline verdict flips on TRAFFIC ('You're climbing \u2014 traffic's up 34% this quarter'). Traffic is the metric I trust least \u2014 I've watched it go up while my phone stayed quiet. The dashboard gets the verdict right (patient actions); the portal gets it wrong.",
+    "A 94/100 site-health ring sits on the portal's first scroll \u2014 an invented score the agency controls, which our spec named an instant trust kill, and here it isn't even buried.",
+    "An unfiltered '41 calls' the day my front desk counted a dozen \u2014 the single fastest way to lose me, and nothing in the design shows me what's being excluded."
+   ],
+   "builtToMySpec": "partially",
+   "matters": "a lot",
+   "wouldImprove": [
+    "Pick ONE client design and make it the tabbed dashboard's Overview \u2014 it matches my spine (verdict \u2192 patient actions \u2192 money-vs-retainer \u2192 your turn \u2192 work log \u2192 under the hood). Retire or rewrite the portal's traffic-led hook so the verdict is always patients, never traffic.",
+    "Put a map-pack + reviews card above the fold for local clients: 'dentist near me' map position with movement, star rating, new reviews this month, unanswered/negative flagged with a Respond button wired to the review-approval flow you already built operator-side. It's one card and it's my whole world.",
+    "Design the push layer before launch: SMS/email for new negative review, missed-call cluster, decision waiting on me, plus a monthly plain-English recap. Never 'your report is ready'.",
+    "Label the call count's hygiene: '41 calls (9 spam/robocalls and 6 existing-patient reschedules excluded)' \u2014 say what's counted even before call tracking is connected.",
+    "One money number, one methodology. Keep the hero and the ROI ledger; strip the per-card dollar chips on proposals, or at minimum make projected visually unmistakable from measured.",
+    "Add the dollarized missed-call loss card as the call-tracking upsell moment \u2014 that's the transparent ROI-math upsell we all said works.",
+    "Don't ship my dashboard while Inbox is a placeholder \u2014 the 'Your turn' strip deep-links into it."
+   ],
+   "verbatim": "You finally built the top of the page I asked for \u2014 now put my map pack and my reviews on it, text me when something needs me, and make sure your 41 calls survives a conversation with my front desk, because that's the day I decide whether to keep paying you."
+  }
+ },
+ {
+  "agentId": "a131e6cf336919d5c",
+  "ident": "Brand & AI \u2014 zone: Optimization",
+  "size": 342829,
+  "structuredOutput": null
+ },
+ {
+  "agentId": "a1bfa986ec83e7bec",
+  "ident": "Non-marketing SMB owner-operator (commercial HVAC, ~18 emplo",
+  "size": 262743,
+  "structuredOutput": {
+   "persona": "Non-marketing SMB owner-operator \u2014 commercial HVAC + facilities maintenance, ~18 employees, ~$3M revenue. The check-signer, not the daily user. Revenue-literate, jargon-illiterate by choice, burned once by a beautiful-PDF agency. Distrust triggers: a number with no baseline; activity dressed up as results.",
+   "resolved": [
+    "My verdict-first spine is now platform DOCTRINE, not a one-off fix: every client-facing narrative opens VERDICT -> VALUE -> PROOF. The thing I begged for in June is baked into the design system itself.",
+    "The tabbed Client Dashboard Mockup is nearly my spec verbatim: 'What your SEO is worth ~$18,400/mo, 4.6x your retainer' up top, '59 actions this month, up from 21' (a real baseline!), a calls/forms/bookings breakdown in units my office understands, and the SEO kitchen collapsed 'Under the hood'.",
+    "NAMED LEADS. 'Sarah K. \u2014 called from the emergency dentist page.' That is the sanity-check-against-my-front-desk half of my indispensable ask \u2014 the thing P0 punted to P1 \u2014 and it's designed onto the first screen. If it ships real (not fixture), this is what makes me never cancel.",
+    "The 'only when provable' leads tile in the portal: shows '18 enquiries from search' only when tracking is wired, otherwise a dash and an honest 'connects once your form is wired up'. That's the exact believe-it-or-don't-show-it discipline I demanded \u2014 apply it everywhere.",
+    "The provenance ladder (estimate -> measured -> actual chips) plus 'agency estimate' badges on dollar heroes \u2014 the honest-labeling posture that earned my trust in P0 survives the rebuild.",
+    "'Your turn' strip with the nothing-needed empty state, and a one-pager export row \u2014 my homework surfaced, my close-the-tab permission kept.",
+    "The upsell is finally ROI math, not a pitch: 'Request this' shows est. added value and 'your strategist scopes and confirms before any work or charge'. That's how you get expansion dollars out of me.",
+    "Clients approve review replies before they hit Google, and the content plan sits below the money \u2014 activity stayed demoted where it belongs (in the dashboard version, anyway)."
+   ],
+   "stillMissing": [
+    "The push/text hook \u2014 STILL nowhere, in either client design. I told you in June I open this once a month when the invoice hits; the portal's 'Since your last visit' hook only works if I visit. You rebuilt the whole destination and still didn't build the thing that brings me to it. 'Leads up 35%' or 'leads dipped, here's why' in my texts is the product for me.",
+    "Real call tracking, recording, and junk filtering. 'Sarah K.' is a hand-typed fixture; the actions count is still estimate-provenance underneath. 20 real in-area jobs beats 200 tire-kickers \u2014 the quality gate that makes the count believable is still an IOU from the last review.",
+    "The bad-month state. The portal verdict flips between two flavors of good news ('You're climbing' vs 'We're defending your rankings \u2014 here's the plan'). Where's the mockup of a genuinely down month with an honest number and a plan? A dashboard that can't render bad news is a marketing artifact \u2014 show me the red state before I trust the green ones.",
+    "Closed-loop 'these 6 leads became $40K' attribution \u2014 my biggest expansion lever, still not designed anywhere I can see.",
+    "A decision. The kit ships TWO different client-facing designs with different value framings, and the brief admits the choice is ungated. Until you pick, I don't actually know what I'll be looking at \u2014 and one of the two options backslides on my spec."
+   ],
+   "distrustTriggers": [
+    "The portal's verdict is a TRAFFIC sentence: 'You're climbing \u2014 traffic's up 34% this quarter.' Traffic is the metric I trust LEAST \u2014 I fired my last agency while traffic went up and my phones stayed dead. Putting traffic back in the verdict slot undoes the single most important thing the June rebuild fixed.",
+    "The portal's 'PROOF' section leads with impressions ('Found in Google') and clicks with sparklines, plus a 94/100 site-health ring in the right rail. Impressions are not proof of anything I can bill, and a 94/100 score is an invented number the agency controls \u2014 both were on my explicit bury list, and here they are promoted to 'the proof'.",
+    "'Revenue recovered $4,900/mo of $14.2k/mo targeted' \u2014 who set the $14.2k? You did. Grading your own homework against a denominator you invented, then celebrating 35% of it, is exactly the shape of the beautiful PDF that burned me.",
+    "Dollarization everywhere. Nearly every surface leads with a revenue estimate built from visits x conversion-rate x order-value. One honest labeled estimate bought my trust in P0; a dollar guess on every card of every page spends it. Stacked estimates start reading as manufactured money.",
+    "'3 improvements shipped' sitting in the since-you-last-visited chips, and 'Fixed 3 broken links' inside the proof column \u2014 activity is creeping back up toward the headline. Activity is reassurance BELOW results, never evidence beside them.",
+    "The 'defending' verdict variant has no number and no baseline at all \u2014 a vibes sentence. A number with no baseline is a number I can't judge; a sentence with no number is worse."
+   ],
+   "builtToMySpec": "partially",
+   "matters": "somewhat",
+   "wouldImprove": [
+    "Pick the tabbed Client Dashboard and ratify it as THE client surface \u2014 it's my spec within arm's reach. Retire the portal's traffic-led framing entirely; the verdict slot must always be leads-or-dollars vs a dated baseline, never a traffic percentage.",
+    "Rewrite the portal 'PROOF' section: proof = calls, form fills, named leads, and dollars vs retainer. Impressions, clicks, sparklines, and the health ring go under the hood with the rest of the kitchen.",
+    "Make the leads-tile rule ('only shown when provable, dash otherwise') the governing law for EVERY dollar figure on a client surface. One money frame per page; everything else shows its provenance chip or doesn't show a dollar.",
+    "If you keep 'recovered $X of $Y targeted', show me where $Y came from and when it was set \u2014 a dated, locked target with its arithmetic \u2014 or drop the framing.",
+    "Design the bad-month portal state now, in the mockup, with real honest-dip copy \u2014 prove the instrument can say 'down, here's why, here's the plan' before you polish another green state.",
+    "Build the SMS/email push (verdict line + the one thing you need from me) before any more surface polish \u2014 it's worth more to my renewal than all 18 operator screens combined.",
+    "Ship 'Sarah K.' for real: call tracking + in-area/junk flagging so the named-lead list reconciles to what my office actually answered."
+   ],
+   "verbatim": "Half this kit is the dashboard I asked for and the other half is the beautiful PDF that burned me \u2014 pick the right half, wire the phone that rings to the number on the screen, and text me when it moves, because I sign checks for leads, not for 'traffic's up 34%.'"
+  }
+ },
+ {
+  "agentId": "a264403bda3b92df3",
+  "ident": "Build-consistency enforcement + deferred-work tracking \u2014 des",
+  "size": 168144,
+  "structuredOutput": null
+ },
+ {
+  "agentId": "a32b77c6686f5321a",
+  "ident": "Cross-cutting platform readiness \u2014 shell, nav, URL state, th",
+  "size": 231299,
+  "structuredOutput": null
+ },
+ {
+  "agentId": "a387d9cae0dbf8d90",
+  "ident": "Global & Ops pages (NOT in the surface map \u2014 parit",
+  "size": 258836,
+  "structuredOutput": null
+ },
+ {
+  "agentId": "a7b994922ada5823e",
+  "ident": "Busy in-house B2B SaaS marketing lead",
+  "size": 287125,
+  "structuredOutput": {
+   "persona": "Busy in-house B2B SaaS marketing lead \u2014 I own the demand number, live in GA4/HubSpot/Ahrefs, and hired this agency for pipeline capacity without headcount. I open the dashboard about once a month, before a review, to grab one defensible number. Allergic to vanity metrics and to being managed by dashboard.",
+   "resolved": [
+    "The headline ROI line I asked for finally exists as the hero: the Client Dashboard Mockup opens on '~$18,400/mo \u00b7 4.6\u00d7 your retainer' with an outcome count ('59 actions, up from 21'), a methodology disclosure, and a 'Curated by your strategist' byline \u2014 money first, screenshot-able, exactly my slot 1.",
+    "The board one-pager export \u2014 my literal return hook and the biggest P0 gap from my last review \u2014 is now designed: a 'Share this as a one-pager' PDF row sits right under the hero. Even as a gesture, it's finally on the surface instead of a defined-but-unused type.",
+    "Dollarized next bets, the P0 item I flagged as 'quietly dropped' last time, is back: the content plan shows three recommended moves each with an est. added value (\u2248$2,900/mo), a confidence chip, and 'Request this' with 'strategist scopes and confirms before any charge' \u2014 that's the transparent-ROI-math upsell all seven of us asked for.",
+    "'What needs me' survives the rebuild: a 'Your turn' strip at slot 0 (with a stale-item chip \u2014 '3 pages, 9d pending' \u2014 that's honest pressure on THEM, which I like), plus an Inbox tab for decisions/reviews/conversations.",
+    "The vanity exile is preserved: raw visitors/clicks/impressions/position/health all live in a collapsed 'Under the hood,' and the ROI ledger shows my monthly investment ($4,000/mo) in the same table as the value \u2014 the denominator is visible, which is the honest-money framing I demanded.",
+    "Named records appear for the first time: 'Sarah K. \u2014 called from the emergency dentist page,' marked private, with 'Names available with call & CRM tracking \u2014 ask your strategist to connect it' when unprovable. Wrong segment noun (calls, not deals) but the clickable-to-actual-humans pattern I said would make me trust everything else is now in the design.",
+    "The provenance ladder (estimate \u2192 measured \u2192 actual chips on every dollar figure) is a real trust structure \u2014 it's the scaffolding my HubSpot-reconciled number will eventually hang on, and it stops anyone from quietly implying booked revenue.",
+    "AI-answer visibility \u2014 the pay-more frontier I volunteered \u2014 now exists as a full operator surface (AI Answer Monitor, per-model citation tracking), so the capability is being built even if I can't see it yet.",
+    "A 90-day scorecard (win rate 68%, 37 scored, 9 still in measurement) that admits some work is unscored \u2014 the anti-all-green discipline is holding."
+   ],
+   "stillMissing": [
+    "HubSpot/CRM reconciliation \u2014 my indispensable ask, the number that survives a CFO \u2014 is still absent everywhere. The 4.6\u00d7 hero is traffic-value-and-estimated-conversion math, not pipeline $ or influenced revenue. The provenance ladder reserves 'measured/actual' but nothing in the kit wires a CRM. This is now two reviews running where my expand trigger is signposted rather than built.",
+    "The push return hook is still nowhere. I told you verbatim: I'm a once-a-month user, the dashboard is where I land from a notification. There is no monthly email/Slack with the ROI line + 'X items need your approval' anywhere in this kit. A beautiful dashboard I forget to open is a half-win, again.",
+    "The segment layer isn't demonstrated. Every client fixture is dental/local \u2014 my B2B altitude (pipeline noun, commercial-intent keyword movement with a so-what, share-of-voice vs the 2-3 competitors I name) never appears on a client surface. The under-the-hood competitor stack-up is 'they have 3\u00d7 your Google reviews' \u2014 a local framing that means nothing to me.",
+    "4 of 5 client dashboard tabs are placeholders \u2014 including Performance, which is the merged search+analytics surface where my GA4 reconciliation would actually live, and Inbox, where my two-minute approval clearing happens. The one built tab sets a good pattern; the shell is mostly intent statements.",
+    "No client-visible 'counted how' \u2014 which events/definitions feed the hero dollar. If my CFO asks 'counted how?' I still can't answer from the surface, and a wrong-but-confident estimate is scarier than an honest gap.",
+    "AI-answer visibility has no client-facing expression \u2014 it's operator-only, so the premium I said I'd pay isn't sellable to me from my own portal yet."
+   ],
+   "distrustTriggers": [
+    "The kit ships TWO competing client designs and the wrong one leads with the exact pattern I fired an agency over: portal.js's verdict is literally 'You're climbing \u2014 traffic's up 34% this quarter,' and its PROOF band opens on impressions ('Found in Google') with sparklines. Traffic-up-while-pipeline-flat is the number I have to apologize for. If the decision gate picks the portal, this rebuild is a regression for me.",
+    "The portal's trajectory-flip copy \u2014 a bad period gets rebranded as 'We're defending your rankings \u2014 here's the plan' \u2014 is spin-adjacent. I asked for 'flat month, honest plan,' not a euphemism engine. Show me the down arrow.",
+    "Aggressive dollarization everywhere: visits \u00d7 2.1% CVR \u00d7 $705 AOV as the headline arithmetic on nearly every surface. The 'agency estimate' chips are honest, but a wall of projected dollars I cannot reconcile against my own GA4/HubSpot is its own kind of being managed by dashboard \u2014 one bad reconciliation and I stop believing every chip.",
+    "A 94/100 site-health ring sits on the client portal's first screen \u2014 an invented composite the agency controls, the thing the spec (and I) said must never be a client-facing citizen.",
+    "The 4.6\u00d7 ratio is computed off an ad-spend-equivalent traffic proxy dressed as ROI. I'll forward an honestly-labeled estimate; I will not forward a proxy ratio my CFO can unpick in one question.",
+    "Internal inconsistencies (Site Audit '3\u21921' while Performance and Links still ship separately; purple tinting a whole nav group against their own color law) \u2014 none client-facing, but sloppiness in the spec makes me wonder what else drifts between claim and build."
+   ],
+   "wouldImprove": [
+    "Kill the fork now, in my favor: adopt the Client Dashboard Mockup's spine as THE client surface, and if portal.js survives as the microsite, its verdict must be outcome-led ('pipeline/leads up X since baseline'), never 'traffic's up 34%' \u2014 and pull the health ring off it.",
+    "Build one B2B SaaS fixture client before writing any client-facing code: pipeline $ as the outcome noun, a HubSpot-reconciled (even manually-entered) pipeline line on the hero, and commercial-intent SOV vs named competitors as a real above-the-fold secondary section \u2014 prove the segment dictionary works, don't just assert it.",
+    "Wire the one-pager export to a real PDF in the first client-facing phase \u2014 it's currently a toast. That single feature is my monthly reason to log in; treat it as P0, not polish.",
+    "Ship the push in the same phase as the dashboard: monthly email/Slack with the one ROI line, the trend, and 'N items need your approval' one-click deep-linked to the Your-turn strip. The kit designed the destination and skipped the doorbell, again.",
+    "Add a client-visible 'counted how' affordance on the hero dollar \u2014 which events, which values, which window \u2014 so the number I forward is one I can defend.",
+    "Rename the hero honestly until CRM lands: '~$18,400/mo estimated value' beats a 4.6\u00d7 ratio built on a traffic proxy; graduate to the ratio when the provenance chip says 'measured.'",
+    "Lock the comparison windows (vs last period AND vs baseline, always the same) \u2014 'since your last visit' chips are cute but a moving window is how spin starts."
+   ],
+   "builtToMySpec": "partially",
+   "matters": "a lot",
+   "verbatim": "You finally put the money, the export, and the priced next-bets on my first screen \u2014 now pick the dashboard over that traffic-verdict microsite, wire the number to my HubSpot and the summary to my inbox, and I'll stop auditing you and start expanding."
+  }
+ },
+ {
+  "agentId": "a88856b5ce13a80a6",
+  "ident": "\u2014 reconstruction on",
+  "size": 134463,
+  "structuredOutput": {
+   "surface": "Schema",
+   "zone": "Optimization",
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/schema.md",
+   "prototypeViewRead": "hmpsn studio Design System/mockup/schema.js (271 lines \u2014 Generator + Workflow Guide sub-tabs; mirrors only the generator core, ~40% of the surface)",
+   "currentRoutes": [
+    "Page 'seo-schema' (src/routes.ts:7; navRegistry.tsx:147-148; App.tsx:407)",
+    "Retired ClientTab 'schema-review' alias \u2192 /inbox?tab=reviews (src/routes.ts:27-33)",
+    "server/routes/webflow-schema.ts (29 endpoints)",
+    "server/routes/competitor-schema.ts:18",
+    "server/routes/seo-change-tracker.ts:59 (/api/schema-impact/:workspaceId)",
+    "MCP server/mcp/tools/schema-actions.ts:52-71 (generate_schema/validate_schema/publish_schema)"
+   ],
+   "capabilityCount": 69,
+   "statusCounts": {
+    "preserved": 35,
+    "improved": 3,
+    "new_proposed": 5,
+    "at_risk": 31
+   },
+   "atRisk": [
+    {
+     "capability": "Row 8: Schema-type recommendations deep-link + per-page banners + count badge",
+     "evidence": "src/lib/recTypeTab.ts:17; SchemaSuggester.tsx:89,561; SchemaPageCard.tsx:136-138; SchemaPageCardDetails.tsx",
+     "why": "No recommendation affordance anywhere in schema.js"
+    },
+    {
+     "capability": "Row 11: Pre-scan setup screen (hero CTA, page inventory search, per-page type select, per-page Generate, 24-role Page Type Guide)",
+     "evidence": "SchemaGeneratorSetup.tsx:69-215; SchemaSuggester.tsx:293-350",
+     "why": "Prototype starts at the results view; no pre-scan per-page type setup"
+    },
+    {
+     "capability": "Row 20: 'Already on page' existing-schemas section",
+     "evidence": "SchemaPageCardDetails.tsx:27-42",
+     "why": "Existing-schema awareness also feeds diff (row 25) and coverage math; absent from mockup"
+    },
+    {
+     "capability": "Row 21 (detail): Per-field validation findings drill-down (grouped by field, severity-sorted, expandable)",
+     "evidence": "SchemaPageCardDetails.tsx:49-130",
+     "why": "Badge carries in mockup (schema.js:154) but the per-field findings drill-down has no home"
+    },
+    {
+     "capability": "Row 22: Generation diagnostics section (per-page generation provenance)",
+     "evidence": "SchemaPageCard.tsx:95,178; SchemaPageCardDetails.tsx (GenerationDiagnosticsSection)",
+     "why": "No mockup home"
+    },
+    {
+     "capability": "Row 24: Rich-results eligibility section (per rich-result type)",
+     "evidence": "SchemaPageCard.tsx:94,179; SchemaPageCardDetails.tsx (RichResultsEligibilitySection)",
+     "why": "No mockup home"
+    },
+    {
+     "capability": "Row 25: Side-by-side diff of current on-page schema vs suggested",
+     "evidence": "SchemaPageCard.tsx:186-199,247-265",
+     "why": "No mockup home; requires existingSchemaJson capture (already in snapshot)"
+    },
+    {
+     "capability": "Row 26: Inline JSON editor with live parse validation, per-page edited-JSON override (getEffectiveSchema), edited publish-confirm copy, parse errors block publish",
+     "evidence": "SchemaEditor.tsx; useSchemaSuggesterPublishingWorkflow.ts:75-80,142-173; SchemaPageCard.tsx:203-216,266-278,320,336",
+     "why": "Stepper's 'Edit' step exists in mockup but no editor UI does; dropping it silently breaks the effective-schema contract"
+    },
+    {
+     "capability": "Row 27 (script variant): Copy script (<script type=application/ld+json> wrapper) as distinct target from raw Copy JSON-LD",
+     "evidence": "useSchemaSuggesterPublishingWorkflow.ts:175-189; SchemaPageCard.tsx:217-243; SchemaSuggester.tsx:630-635",
+     "why": "Mockup has Copy JSON-LD only; the two-target distinction (custom code vs Page Settings field) is user-facing guidance at HEAD"
+    },
+    {
+     "capability": "Row 31: Whole-site @graph validation status chip; errors block bulk publish",
+     "evidence": "useSchemaValidation.ts:24-31; BulkPublishPanel.tsx:31-62; SchemaSuggester.tsx:142-144; webflow-schema.ts:691-705; server/schema/whole-site-graph-validator.ts",
+     "why": "Cross-page @id reference integrity is the core 'unified @graph' guarantee; mockup has no site-graph element"
+    },
+    {
+     "capability": "Row 33: Stale-schema detection (published >90d badge + regenerate warning)",
+     "evidence": "SchemaPageCard.tsx:97-101,130-132,516-523",
+     "why": "No mockup home"
+    },
+    {
+     "capability": "Row 35: CMS-page publishing to mapped CMS field (delivery statuses ready/blocked/failed/written/unchanged, 'publish unavailable' notices, distinct flow + badge)",
+     "evidence": "SchemaPageCard.tsx:296-330; useSchemaSuggesterPublishingWorkflow.ts:246-249; server/domains/schema/publish-schema-to-cms-field.ts; FEATURE_AUDIT.md:668",
+     "why": "Whole CMS delivery pipeline invisible in mockup (with rows 36, 47)"
+    },
+    {
+     "capability": "Row 36: CMS retract restriction ('Clear via Webflow CMS to retract' notice; CMS rollback excluded in history)",
+     "evidence": "SchemaPageCard.tsx:411-419; SchemaVersionHistory.tsx:135-142",
+     "why": "Part of the invisible CMS pipeline"
+    },
+    {
+     "capability": "Row 37: Manual-delivery fallback ('manual-required' publish result \u2192 paste instructions + char-count vs API limit + Copy JSON-LD)",
+     "evidence": "useSchemaSuggesterPublishingWorkflow.ts:124-127; SchemaPageCard.tsx:426-459; SchemaDeliveryDecision type",
+     "why": "Webflow API char-limit reality; silently dropping this bricks large schemas"
+    },
+    {
+     "capability": "Row 38: Retract published schema per page (strips JSON-LD via API, optional site publish, snapshot removal, state reset, activity, Retracted badge)",
+     "evidence": "SchemaPageCard.tsx:398-422; useSchemaSuggesterPublishingWorkflow.ts:263-275; webflow-schema.ts:528-560; FEATURE_AUDIT.md:2630",
+     "why": "Undo safety net; no mockup home"
+    },
+    {
+     "capability": "Row 39: Per-page publish version history + rollback (static pages only, 'current' marker)",
+     "evidence": "SchemaVersionHistory.tsx; SchemaPageCard.tsx:497-540; webflow-schema.ts:564-607",
+     "why": "No mockup home"
+    },
+    {
+     "capability": "Row 40: Save as Site Template (homepage Org+WebSite nodes; auto-save on homepage publish; GET/PUT/PATCH template endpoints)",
+     "evidence": "useSchemaSuggesterPublishingWorkflow.ts:219-240; SchemaPageCard.tsx:369-397; webflow-schema.ts:379-461",
+     "why": "Template also seeds subpage generation (getOrSeedSiteTemplate); no mockup home"
+    },
+    {
+     "capability": "Row 42/43 (note field): Optional note textarea on bulk + per-page send-to-client",
+     "evidence": "useSchemaSuggesterPublishingWorkflow.ts:82-105,191-217; BulkPublishPanel.tsx:78-101; SchemaPageCard.tsx:460-496",
+     "why": "Mockup send actions carry no note field \u2014 admin-send convention requires one (CLAUDE.md)"
+    },
+    {
+     "capability": "Row 45: PendingApprovals panel filtered to 'Schema' batches with batch retract + refresh key",
+     "evidence": "SchemaSuggester.tsx:541-549; src/components/PendingApprovals.tsx:2,19-27,46",
+     "why": "Only place the admin sees/retracts open schema batches from this surface; absent from mockup"
+    },
+    {
+     "capability": "Row 47: Generate site-wide schema plan as background job (SCHEMA_PLAN_GENERATION) from inventory + keyword strategy + competitor crawl",
+     "evidence": "SchemaPlanPanel.tsx:164-183; server/schema-plan.ts:38,123-128; server/schema-plan-generation-job.ts; FEATURE_AUDIT.md:8345",
+     "proposedHome": "Q1 options: re-mount SchemaPlanPanel as bridge, or design a plan sub-view",
+     "why": "Entire Schema Site Plan subsystem (rows 47-55) absent from schema.js"
+    },
+    {
+     "capability": "Row 48: Review/edit page roles (24-role taxonomy, color/tone map, role change auto-manages primaryType + entityRefs, dirty-state + Save)",
+     "evidence": "SchemaPlanPanel.tsx:185-224,458-572; shared/types/schema-plan.ts (SCHEMA_ROLE_*)",
+     "proposedHome": "Q1",
+     "why": "Plan subsystem absent from prototype"
+    },
+    {
+     "capability": "Row 49: Plan status lifecycle draft \u2192 sent_to_client \u2192 client_approved/changes_requested \u2192 active (state machine)",
+     "evidence": "server/state-machines.ts:233,585; server/schema-store.ts:457-469; SchemaPlanPanel.tsx:258-260",
+     "proposedHome": "Q1",
+     "why": "Plan subsystem absent from prototype"
+    },
+    {
+     "capability": "Row 50: Send plan to client (status flip + email + unified-inbox schema_plan dual-write + SCHEMA_PLAN_SENT broadcast + activity)",
+     "evidence": "SchemaPlanPanel.tsx:226-240; server/domains/schema/schema-plan-admin-mutations.ts:111-130; server/domains/inbox/schema-plan-dual-write.ts",
+     "proposedHome": "Q1",
+     "why": "Plan subsystem absent from prototype"
+    },
+    {
+     "capability": "Row 51: Activate plan (generation follows plan roles; whole-site validator checks against active plan)",
+     "evidence": "SchemaPlanPanel.tsx:242-256; webflow-schema.ts:514-518,698",
+     "proposedHome": "Q1",
+     "why": "Active plan FEEDS generation and graph validation \u2014 cannot be silently dropped"
+    },
+    {
+     "capability": "Row 52: Retract/delete plan with inline confirm + activity log",
+     "evidence": "SchemaPlanPanel.tsx:408-455; webflow-schema.ts:521-525; schema-plan-admin-mutations.ts:174",
+     "proposedHome": "Q1",
+     "why": "Plan subsystem absent from prototype"
+    },
+    {
+     "capability": "Row 53: Plan mutations locked while regeneration job runs (banner + disabled controls; 409s carry jobId)",
+     "evidence": "SchemaPlanPanel.tsx:120-121,349-353; webflow-schema.ts:496,638-644",
+     "proposedHome": "Q1",
+     "why": "Plan subsystem absent from prototype"
+    },
+    {
+     "capability": "Row 54: Canonical entities viewer + Page Type Guide + role-count summary chips",
+     "evidence": "SchemaPlanPanel.tsx:459-530",
+     "proposedHome": "Q1",
+     "why": "Plan subsystem absent from prototype"
+    },
+    {
+     "capability": "Row 55: CLIENT plan review via unified-inbox schema_plan deliverable (read-only roles + entities; Approve/Request-changes propagates via respondToSchemaPlanFeedback; guarded against active regeneration)",
+     "evidence": "src/components/client/DeliverableDetailModal.tsx:96-160; server/domains/inbox/send-to-client.ts:204-206; server/domains/schema/schema-plan-feedback.ts:73-80; webflow-schema.ts:631-652",
+     "proposedHome": "Client dashboard rebuild (separate sign-off per Handoff Brief)",
+     "why": "Client-facing; schema.js is admin-only"
+    },
+    {
+     "capability": "Row 57: Business-profile completeness callout (LocalBusiness intent inference, per-workspace localStorage dismiss, deep link to brand?tab=business-footprint)",
+     "evidence": "SchemaSuggester.tsx:60-79,150-159; SchemaGeneratorSetup.tsx:20-63",
+     "why": "Drives the highest-value schema type for local businesses; no mockup home"
+    },
+    {
+     "capability": "Row 58: CMS field-mapping panel (auto-detect collections, map 12 field targets per collection max 4, optimistic save, error surface; broadcasts SCHEMA_CMS_MAPPING_UPDATED)",
+     "evidence": "SchemaGeneratorSetup.tsx:230-288; useSchemaSuggesterCmsWorkflow.ts:12-121; webflow-schema.ts:155-270",
+     "proposedHome": "Q2: same-surface advanced panel, settings-level config, or sequenced later",
+     "why": "CMS pipeline invisible in mockup"
+    },
+    {
+     "capability": "Row 59: Schema completeness widget (% pages without actionable missing-field findings, progress bar, missing-field groups with 'Fix \u2192' deep-links to workspace-settings/brand)",
+     "evidence": "SchemaCompletenessWidget.tsx:27-139; fieldTargets.ts",
+     "why": "Cross-surface fix routing (business-footprint / intelligence-profile / eeat-assets); no mockup home"
+    },
+    {
+     "capability": "Row 60: Schema Impact panel (GSC 28-day before/after per deployment, clicks/impressions/CTR/position deltas, <7d pending, hidden when GSC absent)",
+     "evidence": "SchemaImpactPanel.tsx; src/api/schema.ts:101-103; server/routes/seo-change-tracker.ts:59; FEATURE_AUDIT.md:3805",
+     "proposedHome": "Prototype hints 'graduates into the Insights Engine' (schema.js:224) \u2014 related but NOT equivalent (Q4)",
+     "why": "Only proof-of-value loop on this surface; graduation (single wins) vs aggregate deltas are different capabilities"
+    },
+    {
+     "capability": "Row 66: Competitor schema intelligence endpoint (GET /api/competitor-schema/:workspaceId; also feeds plan generation)",
+     "evidence": "server/routes/competitor-schema.ts:18-81; server/schema-plan.ts:123-128; FEATURE_AUDIT.md:4306",
+     "proposedHome": "Q7: surface in rebuild (Schema? Competitors?) or leave internal-only",
+     "why": "Zero UI consumers at HEAD \u2014 dark for UI but tested + used by plan generation"
+    },
+    {
+     "capability": "Row 69: Orphaned SchemaHealthDashboard (aggregated validation rows + re-validate) \u2014 mounted nowhere",
+     "evidence": "src/components/schema/SchemaHealthDashboard.tsx:139; only tests/component/SchemaHealthDashboard.test.tsx imports it",
+     "proposedHome": "Q8: confirm delete vs port",
+     "why": "Its data IS surfaced via row-30 badges; likely dead code but retirement needs sign-off"
+    }
+   ],
+   "stopAndAsk": [
+    {
+     "question": "Q1 \u2014 Schema Site Plan has no home in the prototype (rows 47-55).",
+     "context": "Entire plan subsystem (generation, role editing, lifecycle, activate, client approval propagation) absent from schema.js; the active plan also feeds generation and graph validation.",
+     "options": "(a) re-mount SchemaPlanPanel as a bridge; (b) design a plan sub-view into the new Schema surface; (c) intentionally retire \u2014 a functionality loss, hard stop without sign-off."
+    },
+    {
+     "question": "Q2 \u2014 Where does the CMS-field publishing pipeline live (rows 35-36, 58)?",
+     "context": "Mapping panel + delivery statuses + cms-publish path are invisible in the mockup.",
+     "options": "Same-surface advanced panel, settings-level config, or sequenced later."
+    },
+    {
+     "question": "Q3 \u2014 Do all five publish-safety affordances carry (rows 31, 33, 37-40)?",
+     "context": "Graph-validation gate, manual-delivery fallback, retract, version history/rollback, site template \u2014 mockup's one-click publish covers none.",
+     "options": "Confirm all five carry into the rebuilt page card / bulk bar."
+    },
+    {
+     "question": "Q4 \u2014 Impact measurement home (row 60): does 'graduates into the Insights Engine' REPLACE or complement the GSC before/after impact panel?",
+     "context": "Graduation (single wins) and aggregate deltas are different capabilities; replacing one with the other loses the aggregate view."
+    },
+    {
+     "question": "Q5 \u2014 Coverage % definition for the new coverage ring.",
+     "context": "Pages with existing schema? generated? published? Mockup ring implies 'generated' while the summary card says 'live in Webflow'.",
+     "options": "One signed-off definition for client-facing numbers."
+    },
+    {
+     "question": "Q6 \u2014 'Missing schema \u2014 from Site Audit' stat is a new data dependency.",
+     "context": "Requires piping audit schema findings into this surface or a shared coverage service.",
+     "options": "Confirm scope + owner; it is a data ticket, not a UI one."
+    },
+    {
+     "question": "Q7 \u2014 Competitor schema endpoint (row 66): surface it in the rebuild or leave internal-only?",
+     "context": "GET /api/competitor-schema/:workspaceId has zero UI consumers at HEAD; internally feeds plan generation.",
+     "options": "Surface under Schema or Competitors, or keep internal-only."
+    },
+    {
+     "question": "Q8 \u2014 Dead/orphaned components: OK to retire rather than port?",
+     "context": "SchemaHealthDashboard (never mounted); SchemaReviewTab/SchemaReviewModal (route-orphaned since unified inbox; legacy public feedback endpoint still shared via respondToSchemaPlanFeedback).",
+     "options": "Retire in the rebuild vs port (deleting code is out of Phase 0 scope \u2014 rebuild-plan decision)."
+    },
+    {
+     "question": "Q9 \u2014 Purple accent: prototype styles Schema purple, HEAD uses teal.",
+     "context": "Admin-AI law technically satisfied since generation is AI, but confirm the hue assignment with the design-system owner so the Four Laws mapping stays deliberate."
+    }
+   ],
+   "quickWinTradeoffs": [
+    {
+     "item": "Generator core",
+     "quickWin": "Ship the mockup's card list (publish/send/copy/regenerate + validation badge + pub tag) backed by existing endpoints",
+     "fullVersion": "Add diff view, JSON editor, per-field findings drill-down, diagnostics, rich-results sections (rows 20-26)",
+     "risk": "Operators can publish AI schema they cannot inspect or correct \u2014 the Edit step becomes a lie; edited-schema contract (getEffectiveSchema) silently drops"
+    },
+    {
+     "item": "Coverage ring + summary strip",
+     "quickWin": "Compute client-side from the existing snapshot (existingSchemas + suggestedSchemas + publishDates)",
+     "fullVersion": "Server-side coverage metric shared with Site Audit + Links (single definition), incl. the 'missing from Site Audit' count",
+     "risk": "Two surfaces showing different 'coverage' numbers violates the never-change-a-number rule; define once (Q5/Q6)"
+    },
+    {
+     "item": "Publish safety rail",
+     "quickWin": "Keep validation-gate + confirm step (server enforces 422s) with mockup's one-click UI catching 422 as an error toast",
+     "fullVersion": "Carry confirm step, graph-validation chip + bulk gate, manual-delivery fallback, retract, history/rollback (rows 29-39)",
+     "risk": "A 422-toast-only flow strands manual-required pages and leaves no undo; retract/rollback loss is a hard regression for a publish-to-production tool"
+    },
+    {
+     "item": "Schema Site Plan",
+     "quickWin": "Re-mount the existing SchemaPlanPanel unchanged inside the new shell (self-contained: own queries + job wiring)",
+     "fullVersion": "Redesign plan review as a first-class sub-view in the new design system",
+     "risk": "Visual inconsistency (old primitives in new shell); acceptable as a bridge \u2014 invisible-by-omission is NOT acceptable (Q1)"
+    },
+    {
+     "item": "CMS pipeline",
+     "quickWin": "Show CMS pages read-only ('publish unavailable') while shipping static-page publish first",
+     "fullVersion": "Full mapping panel + cms-field publish + delivery statuses (rows 35-36, 58)",
+     "risk": "Sites whose money pages are CMS items lose ALL publish capability they have today \u2014 only safe if sequenced within one release train"
+    },
+    {
+     "item": "Impact & completeness",
+     "quickWin": "Defer both panels; keep server endpoints warm",
+     "fullVersion": "Rebuilt impact module (or Insights Engine graduation if signed off) + completeness deep-link widget",
+     "risk": "Impact is the only proof-of-value loop this surface has; losing it undercuts the agency's 'schema worked' story (Q4)"
+    },
+    {
+     "item": "Client plan review",
+     "quickWin": "Keep the unified-inbox schema_plan deliverable renderer exactly as-is (post-Reconcile, already live)",
+     "fullVersion": "Client-dashboard rebuild decides its final form",
+     "risk": "None \u2014 do not touch; newest part of the stack"
+    }
+   ],
+   "parityLedgerGaps": [
+    "Schema row (home:'schema.js', status:'improved') lists only three funcs \u2014 generate structured data, per-page review + apply, schema error detection \u2014 all verified at HEAD; NO Gap/Partial rows exist for Schema in the ledger",
+    "The ledger's 'improved' verdict covers only the generator core; it does NOT enumerate the plan/CMS/history/impact subsystems \u2014 this Phase 0 ledger is the authoritative capability inventory",
+    "'Schema issues \u2192 Schema (deep-link)' (Site Audit row) resolves: sender exists at HEAD (SeoAudit.tsx:551; fixContext plumbing); prototype deepens it with the 'Missing schema' stat (Q6)",
+    "Site Architecture row 'Schema coverage per page' \u2192 moves to Links surface audit; noted only because coverage-% overlaps Q5"
+   ]
+  }
+ },
+ {
+  "agentId": "a9de7bcd864bdb2f8",
+  "ident": "Multi-location/franchise operator (15-40 clinics, one P&L, o",
+  "size": 179595,
+  "structuredOutput": null
+ },
+ {
+  "agentId": "ab5bec3b4702dc2ca",
+  "ident": "verifier",
+  "size": 158503,
+  "structuredOutput": null
+ },
+ {
+  "agentId": "ac0583af8add1df99",
+  "ident": "Design-system wiring readiness \u2014 can the kit components actu",
+  "size": 189435,
+  "structuredOutput": null
+ },
+ {
+  "agentId": "ac818275cc2b43555",
+  "ident": "Client portal \u2014 zone: Client-facing",
+  "size": 224125,
+  "structuredOutput": null
+ },
+ {
+  "agentId": "af7e67d79dca3c7eb",
+  "ident": "verifier",
+  "size": 99575,
+  "structuredOutput": null
+ }
+]
