@@ -94,6 +94,35 @@
   /* ─── Legacy alias (deprecated — use --radius-lg) ─── */
   --radius: 10px;
 
+  /* ─── Spacing scale (4px rhythm) ─── */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px; --space-5: 20px;
+  --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px; --space-16: 64px;
+
+  /* ─── App shell + content boundaries (AppShell/PageContainer read these) ─── */
+  --shell-sidebar: 232px;
+  --shell-sidebar-rail: 62px;
+  --shell-topbar: 56px;
+  --page-max: 1180px;
+  --page-max-narrow: 760px;
+  --page-max-wide: 1440px;
+  --page-pad-x: 26px;
+  --page-pad-y: 24px;
+  --page-pad-bottom: 90px;
+  --section-gap: 20px;
+  --grid-gap: 12px;
+  --grid-gap-lg: 16px;
+  --bp-sm: 640px;
+  --bp-md: 900px;
+  --bp-lg: 1200px;
+
+  /* ─── Motion ─── */
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-draw: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --dur-fast: 0.15s;
+  --dur-base: 0.25s;
+  --dur-slow: 0.5s;
+  --stagger-step: 60ms;
+
   /* ─── Icon sizes ─── */
   --icon-sm: 14px;
   --icon-md: 18px;
