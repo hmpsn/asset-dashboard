@@ -7076,12 +7076,15 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.tsx'],
     severity: 'error',
     excludeLines: ['// view-css-ok'],
-    message: 'Per-view CSS block (const *css*/*styles* = or <style>) in a @ds-rebuilt file — styling belongs in tokens + primitives, not ad hoc per-view CSS. Add // view-css-ok inline if unavoidable.',
-    rationale: 'Rebuilt surfaces compose primitives; inline per-view CSS re-forks the design system per screen.',
+    message: 'Template-literal CSS block (const *css*/*styles* = `…`) or <style> tag in a @ds-rebuilt file — styling belongs in tokens + primitives, not ad hoc per-view CSS. Add // view-css-ok inline if unavoidable. (A `const xStyles = { … }` React style-map object is NOT flagged — inline style objects are the standard prop-driven pattern.)',
+    rationale: 'Rebuilt surfaces compose primitives; a template-literal CSS string / <style> tag re-forks the design system per screen. React style-map OBJECTS ({…}) are the normal prop pattern (kit props include style?: CSSProperties) and are intentionally excluded — the prior [`{] regex mis-flagged every one (review CP4).',
     claudeMdRef: 'UI Rebuild conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      const re = /const\s+\w*(?:css|styles?)\w*\s*=\s*[`{]|<style/i;
+      // Template-literal CSS (`const fooStyles = ` … ``) or a <style> tag only.
+      // Deliberately NOT `const fooStyles = { … }` — that object-map form is the
+      // standard React inline-style pattern every ported primitive uses.
+      const re = /const\s+\w*(?:css|styles?)\w*\s*=\s*`|<style/i;
       files.forEach(filePath => {
         let content: string;
         try { content = readFileSync(filePath, 'utf-8'); } catch { return; }

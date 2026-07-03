@@ -134,7 +134,7 @@ advisory but tracked.
 | 116 | src-index-css-no-token-declarations | error | custom | `src/index.css` | — | Token authority requires one canonical declaration source. Local declarations in src/index.css silently fork theme values from src/tokens.css. |
 | 117 | ds-raw-hex-anywhere | error | custom | `*.tsx, *.ts, *.css` | `// raw-hex-ok` / `/* raw-hex-ok` | Rebuilt surfaces must consume tokens, never inline hex, so theme + brand changes propagate. |
 | 118 | ds-tailwind-palette-bypass | error | custom | `*.tsx` | `// palette-ok` | Rebuilt surfaces route color through tokens; raw palette classes fork theme values. |
-| 119 | ds-per-view-css-block | error | custom | `*.tsx` | `// view-css-ok` | Rebuilt surfaces compose primitives; inline per-view CSS re-forks the design system per screen. |
+| 119 | ds-per-view-css-block | error | custom | `*.tsx` | `// view-css-ok` | Rebuilt surfaces compose primitives; a template-literal CSS string / <style> tag re-forks the design system per screen. React style-map OBJECTS ({…}) are the normal prop pattern (kit props include style?: CSSProperties) and are intentionally excluded — the prior [`{] regex mis-flagged every one (review CP4). |
 | 120 | ds-token-theme-parity | error | custom | `*.css` | — | A themeable token present in only one scope silently breaks the other theme. |
 | 121 | ds-icon-discipline | error | custom | `*.tsx` | `// icon-ok` | D5 ratified lucide-react; Font Awesome + emoji-as-icon fork the icon system. |
 | 122 | ds-deep-import | error | custom | `*.tsx, *.ts` | `// deep-import-ok` | Reaching into a primitive's internals couples rebuilt surfaces to private structure. |

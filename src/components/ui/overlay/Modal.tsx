@@ -11,33 +11,7 @@ import {
 import { createPortal } from 'react-dom';
 import { cn } from '../../../lib/utils';
 import { prefersReducedMotion } from './reducedMotion';
-
-// ─── Body-scroll lock coordination across stacked modals ──────────────────
-// Simple reference counter: each open modal increments; each close
-// decrements. The lock is applied only when the counter transitions 0→1
-// and released only when it transitions 1→0. Prevents the "outer modal
-// closes → scroll re-enabled while inner modal still open" bug and the
-// inverse where the inner modal's cleanup leaves the body permanently
-// locked.
-let activeModalCount = 0;
-let originalBodyOverflow = '';
-
-function acquireScrollLock(): void {
-  if (typeof document === 'undefined') return;
-  if (activeModalCount === 0) {
-    originalBodyOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-  }
-  activeModalCount++;
-}
-
-function releaseScrollLock(): void {
-  if (typeof document === 'undefined') return;
-  activeModalCount = Math.max(0, activeModalCount - 1);
-  if (activeModalCount === 0) {
-    document.body.style.overflow = originalBodyOverflow;
-  }
-}
+import { getFocusable, acquireScrollLock, releaseScrollLock } from './overlayUtils';
 
 /* ──────────────────────────────────────────────────────────────────────────
  * <Modal> — centered portal dialog with focus trap, escape, outside-click,
@@ -75,27 +49,6 @@ interface ModalComponent {
   Header: typeof ModalHeader;
   Body: typeof ModalBody;
   Footer: typeof ModalFooter;
-}
-
-/** Selector matching every element that can receive keyboard focus. */
-const FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'area[href]',
-  'button:not([disabled])',
-  'input:not([disabled]):not([type="hidden"])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  'iframe',
-  'object',
-  'embed',
-  '[tabindex]:not([tabindex="-1"])',
-  '[contenteditable="true"]',
-].join(',');
-
-function getFocusable(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-    (el) => !el.hasAttribute('disabled') && el.tabIndex !== -1,
-  );
 }
 
 function ModalInner({

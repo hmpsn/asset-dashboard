@@ -55,6 +55,31 @@ export { TrendBadge, type TrendBadgeProps } from './TrendBadge';
 export { OutcomeReadbackChip, type OutcomeReadbackChipProps } from './OutcomeReadbackChip';
 export { ChartCard, type ChartCardProps } from './ChartCard';
 
+// ─── F3 — net-new design-system primitives ───────────────────────────────────
+export { Avatar } from './Avatar';
+export type { AvatarProps } from './Avatar';
+export { IntentTag, INTENT_TONE, INTENT_ABBREV, type KeywordIntent } from './IntentTag';
+export type { IntentTagProps } from './IntentTag';
+export { DataTable } from './DataTable';
+export type { DataTableProps, DataColumn } from './DataTable';
+export { MetricTile } from './MetricTile';
+export type { MetricTileProps } from './MetricTile';
+export { Sparkline } from './Sparkline';
+export type { SparklineProps } from './Sparkline';
+export { Meter } from './Meter';
+export type { MeterProps } from './Meter';
+export { KeyValueRow, DefinitionList } from './KeyValueRow';
+export type { KeyValueRowProps, DefinitionListProps, DefinitionItem } from './KeyValueRow';
+export { BoardColumn, BoardCard } from './BoardColumn';
+export type { BoardColumnProps, BoardCardProps } from './BoardColumn';
+export { useRovingTabindex } from './useRovingTabindex';
+export type {
+  RovingTabindex,
+  RovingTabindexOptions,
+  RovingItemProps,
+  RovingOrientation,
+} from './useRovingTabindex';
+
 // ─── Phase 1 primitives (pre-committed stubs; Phase 1 agents fill implementations) ───
 
 // Typography
@@ -77,6 +102,15 @@ export type { FormSelectProps, SelectOption } from './forms/FormSelect';
 export type { FormTextareaProps } from './forms/FormTextarea';
 export type { CheckboxProps } from './forms/Checkbox';
 export type { ToggleProps } from './forms/Toggle';
+// F3 net-new forms
+export { Segmented, LensSwitcher, FilterChip, SearchField, RadioGroup } from './forms';
+export type {
+  SegmentedProps,
+  LensSwitcherProps, LensOption,
+  FilterChipProps,
+  SearchFieldProps,
+  RadioGroupProps, RadioOption,
+} from './forms';
 
 // Layout
 export { Row, Stack, Column, Grid, Divider } from './layout';
@@ -87,9 +121,21 @@ export type {
   GridProps, GridCols, GridColCount,
   DividerProps, DividerOrientation,
 } from './layout';
+// F3 net-new layout
+export { AppShell, PageContainer, Toolbar, ToolbarSpacer, GroupBlock } from './layout';
+export type {
+  AppShellProps,
+  PageContainerProps,
+  ToolbarProps,
+  GroupBlockProps, GroupStat, GroupFlag,
+} from './layout';
 
 // Overlays
 export { Modal, Popover, Tooltip } from './overlay';
+// F3 net-new overlay + shared machinery
+export { Drawer } from './overlay';
+export type { DrawerProps } from './overlay';
+export { getFocusable, acquireScrollLock, releaseScrollLock, FOCUSABLE_SELECTOR } from './overlay';
 export { Menu } from './Menu';
 export type { MenuItem, MenuProps } from './Menu';
 
