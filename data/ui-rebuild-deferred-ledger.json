@@ -33,10 +33,10 @@
     {
       "id": "DEF-foundation-003",
       "surface": "foundation",
-      "item": "Legacy transition-duration-[120ms|180ms|400ms] literals across src/ not yet migrated to var(--dur-*) motion tokens",
-      "decision": "Motion tokens ratified as canonical (F2a); legacy literals stay valid outside @ds-rebuilt scope to avoid a repo-wide churn PR",
+      "item": "pr-check 'Non-standard transition duration' rule still allows the legacy 120/180/400ms literal set alongside var(--dur-*) — zero legacy call sites exist repo-wide (verified by adversarial review 2026-07-03), so the allowance + rule message should be retired to make motion tokens the sole standard",
+      "decision": "Motion tokens ratified as canonical (F2a). The legacy literal allowance is kept only so pre-rebuild code additions stay possible during the transition; this is a policy retirement, NOT a call-site migration (none exist)",
       "class": "token",
-      "upgradeTrigger": "Phase Z consolidation closeout, or earlier per-surface as each surface is rebuilt",
+      "upgradeTrigger": "Phase Z consolidation closeout — remove the legacy ALLOWED set from the rule and update its message so var(--dur-*) is the only standard",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,

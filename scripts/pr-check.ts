@@ -54,7 +54,10 @@ function getFiles(dir: string, pattern: string): string[] {
     // throw and the catch would return []. That is itself a Category A
     // silent-failure mode (rule reports ✓ because it received zero files).
     // 50MB is comfortably above any plausible repo-walk output.
-    return execSync(`find "${dir}" -name "${pattern}" -type f 2>/dev/null`, {
+    // Prune the gitignored UI-rebuild kit mirror: reference material whose token
+    // files/docs false-positive repo rules under --all (PR #1473). find has no
+    // gitignore awareness, so the exclusion must be explicit here.
+    return execSync(`find "${dir}" -not -path "*/hmpsn studio Design System/*" -name "${pattern}" -type f 2>/dev/null`, {
       cwd: ROOT,
       encoding: 'utf-8',
       maxBuffer: 50 * 1024 * 1024,
@@ -7024,12 +7027,21 @@ export const CHECKS: Check[] = [
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
       const re = /#[0-9a-fA-F]{3,8}\b/;
+      // Comment starts: //, /*, block-comment continuation `*` — but NOT `://`
+      // (https:// URLs). Hex-shaped PR refs (#1472) live in comments; href="#…"
+      // anchors aren't colors. Review finding, PR #1473.
+      const commentStart = /(?<!:)\/\/|\/\*|^\s*\*/;
       files.forEach(filePath => {
         let content: string;
         try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
         if (!isDsRebuilt(content)) return;
         content.split('\n').forEach((line, i) => {
-          if (re.test(line)) hits.push({ file: filePath, line: i + 1, text: line.trim() });
+          const m = re.exec(line);
+          if (!m) return;
+          const c = commentStart.exec(line);
+          if (c && c.index < m.index) return;
+          if (/href=["']#/.test(line)) return;
+          hits.push({ file: filePath, line: i + 1, text: line.trim() });
         });
       });
       return hits;
@@ -7125,7 +7137,9 @@ export const CHECKS: Check[] = [
     claudeMdRef: 'UI Rebuild conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      const re = /\bfa-[a-z-]+\b|[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
+      // Emoji range deliberately excludes U+2600–27BF (dingbats: ✓ ⚠ ★ ✗ —
+      // legitimate string glyphs, not icons). Review finding, PR #1473.
+      const re = /\bfa-[a-z-]+\b|[\u{1F300}-\u{1FAFF}]/u;
       files.forEach(filePath => {
         let content: string;
         try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
@@ -9740,8 +9754,11 @@ export function checkFile(file: string, check: Check): string[] {
   return checkFiles([file], check);
 }
 
-// Directories that should never be scanned (vendor code, test fixtures, build output)
-const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', '.worktrees', 'scripts', 'tests'];
+// Directories that should never be scanned (vendor code, test fixtures, build output).
+// 'hmpsn studio Design System' is the gitignored UI-rebuild kit mirror — reference
+// material, not product code; its token files legitimately declare --* tokens and
+// its docs name the studio, which false-positived 3 rules under --all (PR #1473).
+const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', '.worktrees', 'scripts', 'tests', 'hmpsn studio Design System'];
 // Root-level files to skip (--exclude-dir doesn't work on files)
 const EXCLUDED_FILES: string[] = [];
 

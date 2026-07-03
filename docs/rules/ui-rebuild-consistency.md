@@ -25,6 +25,8 @@ Adding the marker opts a file into **seven pr-check rules at error severity (D7)
 
 **Hatch discipline:** inline only (the same-line hatch; above-line is silently ignored for these rules — house memory). Every hatch needs a justifying comment; a bare hatch is a review reject.
 
+**Overlap with pre-rebuild rules (double-hatch cost):** the repo-wide legacy rules (`Raw text-zinc-N`/`bg-zinc-N`/`border-zinc-N`, `Hardcoded dark hex in inline styles`, `Raw hex chart color`) still fire on `@ds-rebuilt` files — their guidance agrees with the `ds-*` rules (both say "use tokens"), so overlap is harmless, but a genuinely-exempt line needs **both** hatches on the same line (e.g. `// palette-ok raw-zinc-ok`). Known cost, accepted: honoring sibling hatches across rules would couple rule implementations. Noise-trimming already applied (review, PR #1473): `ds-raw-hex-anywhere` skips comment contexts (PR refs like `#1472`) and `href="#…"` anchors; `ds-icon-discipline` excludes the dingbat range (✓ ⚠ ★ are string glyphs, not icons).
+
 The F2b lint lane (`lint:ds-adherence`, below) will later attach to the same `@ds-rebuilt` scope once the DS import root exists.
 
 ---

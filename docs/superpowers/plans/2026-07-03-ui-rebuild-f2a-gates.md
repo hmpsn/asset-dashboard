@@ -1,5 +1,7 @@
 # UI Rebuild F2a — Consistency Gates + Deferred Ledger Implementation Plan
 
+> **⛔ STATUS: EXECUTED (2026-07-03, PR #1473, commits 75f14d5db…f3474ea5b + review fixes). DO NOT RE-EXECUTE.** This plan was valid from baseline `436b8f109` only. Post-execution adversarial review (agent ae4a…) confirmed the implementation and found 3 hidden repo gates the plan omitted (customCheck registry, verified-clean allowlist, verification-governance row — all repaired in-run) plus a phantom DEF-foundation-003 premise (fixed in the ledger). Kept for the record; F2b scope lives in docs/rules/ui-rebuild-consistency.md §4.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship the rebuild's consistency machinery that is enforceable *today*: the deferred-work ledger + CI verifier, the motion-vocabulary unification (PR #1472 review finding #1), the styleguide reconciliation (findings #3–#6), seven rebuild-scoped pr-check rules, and the agentic-review process doc.

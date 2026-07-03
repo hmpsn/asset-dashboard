@@ -12483,6 +12483,21 @@ describe('Rule: UI Rebuild @ds-rebuilt-scoped gates (F2a)', () => {
         lines(MARKER, "export const c = '#ff0000'; // raw-hex-ok"));
       expect(runFiltered(RULE, [file])).toHaveLength(0);
     });
+    it('does NOT flag a hex-shaped PR reference inside a comment (review, PR #1473)', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Commented.tsx'),
+        lines(MARKER, '// motion unification landed in PR #1472 — see the review'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag an href="#…" anchor (review, PR #1473)', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Anchor.tsx'),
+        lines(MARKER, 'const a = <a href="#abc123">jump</a>;'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('still flags a hex that precedes a trailing comment on the same line', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Trailing.tsx'),
+        lines(MARKER, "export const c = '#ff0000'; // brand red"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
   });
 
   describe('Rule: ds-tailwind-palette-bypass', () => {
@@ -12585,6 +12600,16 @@ describe('Rule: UI Rebuild @ds-rebuilt-scoped gates (F2a)', () => {
       const file = write(uniqPath('ds-icon', 'src/Hatched.tsx'),
         lines(MARKER, 'const i = <i className="fa-home" />; // icon-ok'));
       expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag dingbat string glyphs like ✓ ⚠ ★ (review, PR #1473)', () => {
+      const file = write(uniqPath('ds-icon', 'src/Glyphs.tsx'),
+        lines(MARKER, "const label = '✓ Saved — ⚠ pending review ★';"));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('still flags a true emoji used as an icon', () => {
+      const file = write(uniqPath('ds-icon', 'src/Emoji.tsx'),
+        lines(MARKER, "const icon = '🔥';"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
     });
   });
 
