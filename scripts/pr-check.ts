@@ -1125,6 +1125,22 @@ const RETIRED_FLAG_GROUPS: readonly RetiredFlagGroup[] = [
     envPattern: /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_CLIENT_LOCATIONS\b/,
     migrationException: 'server/db/migrations/170-retire-client-locations-flag-overrides.sql',
   },
+  {
+    // Flag-sunset Wave 1: three reserved-but-never-wired phantom flags. Each had
+    // FEATURE_FLAGS / FEATURE_FLAG_CATALOG / group entries but ZERO isFeatureEnabled /
+    // useFeatureFlag / <FeatureFlag> readers — reserved for future features that were
+    // never built (Strategy paid-topic monetization; The Issue P3 named-record
+    // reconciliation; The Issue P1 segment-inserts — whose described behavior already
+    // ships unflagged under the-issue-client-spine). Delete-then-re-add-when-built;
+    // zero behavior change on retirement.
+    label: 'flag-sunset W1 phantoms',
+    keys: [
+      'strategy-paid-topics',
+      'the-issue-client-reconciliation',
+      'the-issue-client-segment-inserts',
+    ],
+    migrationException: 'server/db/migrations/173-retire-phantom-flags-overrides.sql',
+  },
 ];
 
 function escapedAlternation(values: readonly string[]): string {
