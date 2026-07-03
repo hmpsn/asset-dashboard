@@ -37,7 +37,16 @@ import {
   Tooltip,
   Menu,
   ConfirmDialog,
+  FormField,
   FormInput,
+  FormSelect,
+  FormTextarea,
+  Toggle,
+  Checkbox,
+  TabBar,
+  Disclosure,
+  ClickableRow,
+  DateRangeSelector,
   Button,
 } from '../ui';
 import { useToast } from '../Toast';
@@ -75,6 +84,13 @@ export default function DsHarness() {
   const [search, setSearch] = useState('');
   const [chipActive, setChipActive] = useState(true);
   const [modalField, setModalField] = useState('');
+  const [toggleOn, setToggleOn] = useState(true);
+  const [checkOn, setCheckOn] = useState(false);
+  const [formVal, setFormVal] = useState('');
+  const [selectVal, setSelectVal] = useState('growth');
+  const [textareaVal, setTextareaVal] = useState('');
+  const [tab, setTab] = useState('overview');
+  const [days, setDays] = useState(28);
 
   return (
     <PageContainer width="wide" center>
@@ -137,6 +153,62 @@ export default function DsHarness() {
           options={[{ value: 'draft', label: 'Draft' }, { value: 'review', label: 'In review' }, { value: 'live', label: 'Live' }]}
           value={radio}
           onChange={setRadio}
+        />
+      </Section>
+
+      <Section title="Form controls — focus · validation · keyboard">
+        <div style={{ width: 240 }}>
+          <FormField label="Email" hint="We never share it">
+            <FormInput value={formVal} onChange={setFormVal} placeholder="you@example.com" />
+          </FormField>
+        </div>
+        <div style={{ width: 240 }}>
+          <FormField label="Plan">
+            <FormSelect
+              options={[{ value: 'free', label: 'Free' }, { value: 'growth', label: 'Growth' }, { value: 'premium', label: 'Premium' }]}
+              value={selectVal}
+              onChange={setSelectVal}
+            />
+          </FormField>
+        </div>
+        <div style={{ width: 240 }}>
+          <FormField label="Notes" error={textareaVal.length > 40 ? 'Keep it under 40 characters' : undefined}>
+            <FormTextarea value={textareaVal} onChange={setTextareaVal} placeholder="Type to trigger the error state…" />
+          </FormField>
+        </div>
+        <Toggle checked={toggleOn} onChange={setToggleOn} label="Auto-send" />
+        <Checkbox checked={checkOn} onChange={setCheckOn} label="I agree to the terms" />
+      </Section>
+
+      <Section title="Navigation & disclosure — keyboard tabs · expand/collapse · clickable rows">
+        <div style={{ width: '100%', maxWidth: 420 }}>
+          {/* tab-deeplink-ok — dev harness demo, not a routed surface; local state is intentional */}
+          <TabBar
+            tabs={[{ id: 'overview', label: 'Overview' }, { id: 'details', label: 'Details' }, { id: 'activity', label: 'Activity' }]}
+            active={tab}
+            onChange={setTab}
+            ariaLabel="Demo tabs"
+          />
+        </div>
+        <div style={{ width: '100%', maxWidth: 420 }}>
+          <Disclosure summary="Advanced options">
+            <p className="t-body" style={{ color: 'var(--brand-text)' }}>
+              Hidden until expanded — native &lt;details&gt;, so Space/Enter toggles it.
+            </p>
+          </Disclosure>
+        </div>
+        <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <ClickableRow onClick={() => toast('Row one', 'info')}>
+            <span className="t-ui" style={{ color: 'var(--brand-text-bright)' }}>Clickable row — Enter/Space activates</span>
+          </ClickableRow>
+          <ClickableRow active onClick={() => toast('Row two', 'info')}>
+            <span className="t-ui" style={{ color: 'var(--brand-text-bright)' }}>Active clickable row</span>
+          </ClickableRow>
+        </div>
+        <DateRangeSelector
+          options={[{ label: '7d', value: 7 }, { label: '28d', value: 28 }, { label: '90d', value: 90 }]}
+          selected={days}
+          onChange={setDays}
         />
       </Section>
 
