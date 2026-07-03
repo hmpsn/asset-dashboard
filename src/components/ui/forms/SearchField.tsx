@@ -96,7 +96,9 @@ export function SearchField({
       className={cn(
         'flex items-center gap-2 rounded-[var(--radius-md)] px-3 py-2',
         'bg-[var(--surface-1)] border transition-[border-color,box-shadow] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
-        focused ? 'border-[var(--teal)] shadow-[0_0_0_3px_var(--brand-mint-glow)]' : 'border-[var(--brand-border)]',
+        // Focus ring matches FormInput's convention (2px --brand-mint-glow) — a
+        // 3px ring read as a "double" ring outside the solid border (review).
+        focused ? 'border-[var(--teal)] shadow-[0_0_0_2px_var(--brand-mint-glow)]' : 'border-[var(--brand-border)]',
         className,
       )}
     >
