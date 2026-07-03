@@ -485,7 +485,7 @@ describe('FeatureFlag', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(true);
     render(
       withQueryClient(
-        <FeatureFlag flag="keyword-universe-full">
+        <FeatureFlag flag="national-serp-tracking">
           <span>Feature content</span>
         </FeatureFlag>,
       ),
@@ -497,7 +497,7 @@ describe('FeatureFlag', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(false);
     const { container } = render(
       withQueryClient(
-        <FeatureFlag flag="keyword-universe-full">
+        <FeatureFlag flag="national-serp-tracking">
           <span>Feature content</span>
         </FeatureFlag>,
       ),
@@ -511,7 +511,7 @@ describe('FeatureFlag', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(false);
     render(
       withQueryClient(
-        <FeatureFlag flag="keyword-universe-full" fallback={<span>Coming soon</span>}>
+        <FeatureFlag flag="national-serp-tracking" fallback={<span>Coming soon</span>}>
           <span>Feature content</span>
         </FeatureFlag>,
       ),
@@ -524,7 +524,7 @@ describe('FeatureFlag', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(true);
     render(
       withQueryClient(
-        <FeatureFlag flag="keyword-universe-full" fallback={<span>Coming soon</span>}>
+        <FeatureFlag flag="national-serp-tracking" fallback={<span>Coming soon</span>}>
           <span>Feature content</span>
         </FeatureFlag>,
       ),
@@ -537,19 +537,19 @@ describe('FeatureFlag', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(false);
     render(
       withQueryClient(
-        <FeatureFlag flag="keyword-universe-full">
+        <FeatureFlag flag="national-serp-tracking">
           <span>X</span>
         </FeatureFlag>,
       ),
     );
-    expect(useFeatureFlag).toHaveBeenCalledWith('keyword-universe-full');
+    expect(useFeatureFlag).toHaveBeenCalledWith('national-serp-tracking');
   });
 
   it('renders multiple children when enabled', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(true);
     render(
       withQueryClient(
-        <FeatureFlag flag="keyword-universe-full">
+        <FeatureFlag flag="national-serp-tracking">
           <span>First</span>
           <span>Second</span>
         </FeatureFlag>,

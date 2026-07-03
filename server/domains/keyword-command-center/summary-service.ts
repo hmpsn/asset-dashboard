@@ -10,10 +10,7 @@ import { isSuspiciousPlannerGroupedVolume } from '../../keyword-strategy-helpers
 import { countLocalSeoKeywordCandidates } from '../local-seo/candidate-service.js';
 import { getPrimaryMarketLocationCode } from '../local-seo/configuration-service.js';
 import { createLogger } from '../../logger.js';
-import { isFeatureEnabled } from '../../feature-flags.js';
 import {
-  KEYWORD_UNIVERSE_FULL_FLAG,
-  RAW_EVIDENCE_ROW_LIMIT,
   UNIVERSE_SAFETY_CEILING,
   selectRankEvidence,
   trackedKeywordMatchesFilter,
@@ -233,9 +230,7 @@ export async function buildKeywordCommandCenterSummary(
   }
 
   const droppedRankEvidenceTail = Math.max(0, rankEvidenceTotal - rankEvidence.selected.length);
-  const rawEvidenceReturnedCap = isFeatureEnabled(KEYWORD_UNIVERSE_FULL_FLAG, workspace.id)
-    ? UNIVERSE_SAFETY_CEILING
-    : RAW_EVIDENCE_ROW_LIMIT;
+  const rawEvidenceReturnedCap = UNIVERSE_SAFETY_CEILING;
 
   return {
     counts,

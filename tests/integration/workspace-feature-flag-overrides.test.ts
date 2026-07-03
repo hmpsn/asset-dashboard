@@ -25,7 +25,7 @@ import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-s
 import type { WorkspaceFeatureFlagMeta } from '../../shared/types/feature-flags.js';
 
 // Probe flag must default to false: keyword-hub was retired at the Phase C cutover.
-const FLAG = 'keyword-universe-full';
+const FLAG = 'national-serp-tracking';
 const RETIRED_PRODUCT_UI_FLAGS = [
   'copy-engine',
   'copy-engine-voice',
@@ -84,7 +84,7 @@ describe('GET /api/admin/workspaces/:id/feature-flags', () => {
     expect(flag.inheritedEnabled).toBe(false);
     expect(flag.inheritedSource).toBe('default');
     expect(typeof flag.label).toBe('string');
-    expect(flag.group).toBe('Keyword Hub');
+    expect(flag.group).toBe('SEO Decision Engine');
   });
 
   it('returns 404 for a non-existent workspace', async () => {

@@ -5,14 +5,11 @@
  *   Server: FEATURE_<FLAG_NAME_UPPERCASED_WITH_UNDERSCORES>=true
  *   Frontend: VITE_FEATURE_<FLAG_NAME_UPPERCASED_WITH_UNDERSCORES>=true
  *
- * Example: to enable 'keyword-universe-full' in production, set:
- *   FEATURE_KEYWORD_UNIVERSE_FULL=true  (server)
- *   VITE_FEATURE_KEYWORD_UNIVERSE_FULL=true  (Vite build)
+ * Example: to enable 'national-serp-tracking' in production, set:
+ *   FEATURE_NATIONAL_SERP_TRACKING=true  (server)
+ *   VITE_FEATURE_NATIONAL_SERP_TRACKING=true  (Vite build)
  */
 export const FEATURE_FLAGS = {
-  // Platform Intelligence Enhancements
-  'smart-placeholders': false,
-
   // Client Insights Briefing (5-phase feature)
   // NOTE: the CLIENT magazine overview variant (InsightsBriefingPage + sub-components)
   // was removed (2026-06-20). These flags are RETAINED because the SERVER briefing
@@ -28,21 +25,10 @@ export const FEATURE_FLAGS = {
 
   // Keyword Hub (Wave 4). The `keyword-hub` umbrella flag was RETIRED at the Phase C
   // cutover (2026-06-11): the Hub is now the only keyword surface (KCC + Rank Tracker
-  // deleted, seo-ranks redirected), so no kill-switch remains. The two sub-flags below
-  // gate independent coverage/scoring overhauls and keep their own removal conditions.
-  // Keyword universe overhaul: gates the COVERAGE EXPANSION — remove the row caps,
-  // include every GSC-clicked/impressed query (full ranking coverage), keep all
-  // not-yet-ranking discovery — behind a flag so old-vs-new is comparable on
-  // staging and rollback is one switch. Junk gate + sort + window fixes ship
-  // unflagged. OFF = today's capped behavior, byte-identical.
-  // See docs/superpowers/plans/2026-06-05-keyword-universe-overhaul.md.
-  'keyword-universe-full': false,
-
-  // SEO Decision Engine P4: geo-targeting — thread the workspace target-geo (locationCode +
-  // languageCode) through the DataForSEO domain-analysis + keyword methods so non-US clients
-  // are queried in their own market, not the US/English SERP. OFF = today's US/'en' defaults,
-  // byte-identical (callers pass no geo; discoveryGeoToken keeps the legacy cache keys).
-  'geo-targeting': false,
+  // deleted, seo-ranks redirected), so no kill-switch remains. The keyword universe
+  // coverage overhaul (`keyword-universe-full`) and geo-targeting (`geo-targeting`) were
+  // retired in flag-sunset Wave 2b (2026-07-02): both were globally ON in prod, so their
+  // gates are now unconditional (byte-identical behavior, dead OFF-branch code deleted).
 
   // SEO Decision Engine P6: national-serp-tracking — first PAID Group C phase. Adds a true
   // advanced-SERP rank + SERP-feature (AI Overview / featured snippet) time series per tracked
@@ -75,9 +61,9 @@ export const FEATURE_FLAGS = {
   // SEO Decision Engine P8 (FINAL): ai-visibility — the LLM-citation measurement layer. Reads
   // DataForSEO's LLM-mentions database for the client's domain → an AI-visibility KPI (share-of-
   // voice vs co-mentioned competitors + mention volume + before/after trend + source domains LLMs
-  // cite) on admin + client. KPI-only (no new rec/insight). Growth+; budget observe-only.
-  // OFF = no LLM-mentions fetch, no snapshot, no UI (byte-identical).
-  'ai-visibility': false,
+  // cite) on the admin panel. KPI-only (no new rec/insight). Growth+; budget observe-only.
+  // Retired in flag-sunset Wave 2b (2026-07-02): was globally ON in prod, so the fetch/snapshot/UI
+  // are now unconditional (byte-identical behavior, dead OFF-branch code deleted).
 
   // Strategy v2 "SEO command center" — decision-first IA (Orient → Act → Evidence) + interior
   // tabs. Dark-launches the rebuilt admin Strategy page; replaces the retired decision-bands
@@ -202,19 +188,6 @@ export const LEGACY_FEATURE_FLAG_ROADMAP_IDS = Object.values(LEGACY_ROADMAP) as 
 const REVIEWED_AT = '2026-05-15';
 
 export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntry> = {
-  'smart-placeholders': {
-    label: 'Smart placeholders (admin chips + client ghost text)',
-    group: 'Platform Intelligence Enhancements',
-    lifecycle: {
-      owner: 'platform-foundation',
-      createdAt: '2026-05-06',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove when placeholder behavior has no fallback branch and is default-on for all supported paths.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.platformIntelligenceEnhancements,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
-    },
-  },
   'client-briefing-v2': {
     label: 'Client insights briefing — v2 layout',
     group: 'Client Insights Briefing',
@@ -252,32 +225,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       linkedRoadmapItemId: 'cda-sc5-work-feed',
       staleAuditCadence: 'monthly',
       lastReviewedAt: '2026-06-12',
-    },
-  },
-  'keyword-universe-full': {
-    label: 'Keyword Universe — full coverage (uncap, all GSC-clicked/impressed + discovery)',
-    group: 'Keyword Hub',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-02',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after the full keyword universe (uncapped coverage + junk gate) is validated on staging and becomes the default; the cap-based path is then deleted.',
-      linkedRoadmapItemId: 'keyword-universe-overhaul',
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: '2026-06-02',
-    },
-  },
-  'geo-targeting': {
-    label: 'Geo targeting — query non-US clients in their own market (domain/keyword/competitor SERP)',
-    group: 'SEO Decision Engine',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-24',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after workspace target-geo threading is validated on staging and becomes the default; non-US clients are then always queried in their own market (US/en only as the last-resort fallback).',
-      linkedRoadmapItemId: 'seo-engine-p4-geo-correctness-target-geo',
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: '2026-06-24',
     },
   },
   'national-serp-tracking': {
@@ -343,19 +290,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       linkedRoadmapItemId: 'gbp-review-response-approval-phase-2c',
       staleAuditCadence: 'weekly',
       lastReviewedAt: '2026-06-29',
-    },
-  },
-  'ai-visibility': {
-    label: 'AI visibility — LLM citation share-of-voice vs competitors',
-    group: 'SEO Decision Engine',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-24',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Promote to default once LLM-mention snapshots + the AI-visibility KPI (share-of-voice, trend, source domains) are validated on staging and per-workspace cost is acceptable; the flag is then removed and the KPI runs for all Growth+ workspaces.',
-      linkedRoadmapItemId: 'seo-engine-p8-ai-visibility-llm-citation',
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: '2026-06-24',
     },
   },
   'strategy-command-center': {
@@ -523,7 +457,7 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
   {
     label: 'Platform Intelligence Enhancements',
-    keys: ['smart-placeholders'],
+    keys: [],
   },
   {
     label: 'Client Insights Briefing',
@@ -531,11 +465,11 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Keyword Hub',
-    keys: ['keyword-universe-full'],
+    keys: [],
   },
   {
     label: 'SEO Decision Engine',
-    keys: ['geo-targeting', 'national-serp-tracking', 'local-gbp', 'gbp-auth-connection', 'gbp-auth-reviews', 'gbp-review-responses', 'ai-visibility'],
+    keys: ['national-serp-tracking', 'local-gbp', 'gbp-auth-connection', 'gbp-auth-reviews', 'gbp-review-responses'],
   },
   {
     label: 'Strategy',

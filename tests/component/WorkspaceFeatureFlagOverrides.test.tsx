@@ -19,22 +19,22 @@ import { WorkspaceFeatureFlagOverrides } from '../../src/components/settings/Wor
 
 function flag(overrides: Partial<WorkspaceFeatureFlagMeta>): WorkspaceFeatureFlagMeta {
   return {
-    key: 'keyword-universe-full',
+    key: 'national-serp-tracking',
     enabled: false,
     source: 'default',
     inheritedEnabled: false,
     inheritedSource: 'default',
     default: false,
-    label: 'Keyword Hub — unified keyword surface (KCC + Rank Tracker consolidation)',
-    group: 'Keyword Hub',
+    label: 'National SERP rank tracking — keyword position + SERP features in target market',
+    group: 'SEO Decision Engine',
     lifecycle: {
       owner: 'analytics-intelligence',
-      createdAt: '2026-06-02',
+      createdAt: '2026-06-24',
       rolloutTarget: 'staging-validation',
       removalCondition: 'Remove after rollout.',
-      linkedRoadmapItemId: 'keyword-universe-overhaul',
+      linkedRoadmapItemId: 'seo-engine-p6-national-serp-rank-ai-overview',
       staleAuditCadence: 'weekly',
-      lastReviewedAt: '2026-06-02',
+      lastReviewedAt: '2026-06-24',
     },
     ...overrides,
   };
@@ -51,10 +51,10 @@ describe('WorkspaceFeatureFlagOverrides', () => {
     expect(screen.getByText('Per-Workspace Feature Flags')).toBeInTheDocument();
   });
 
-  it('renders the keyword-universe-full flag with its inherited state and Default source', () => {
+  it('renders the national-serp-tracking flag with its inherited state and Default source', () => {
     useWorkspaceFeatureFlagsMock.mockReturnValue({ data: [flag({})], isLoading: false, isError: false, error: null });
     render(<WorkspaceFeatureFlagOverrides workspaceId="ws-1" />);
-    expect(screen.getByText('keyword-universe-full')).toBeInTheDocument();
+    expect(screen.getByText('national-serp-tracking')).toBeInTheDocument();
     expect(screen.getByText('Default')).toBeInTheDocument();
     expect(screen.getByText(/Inherited OFF from default/i)).toBeInTheDocument();
   });
@@ -77,7 +77,7 @@ describe('WorkspaceFeatureFlagOverrides', () => {
     const toggle = screen.getByRole('switch');
     fireEvent.click(toggle);
     expect(mutateMock).toHaveBeenCalledWith(
-      { key: 'keyword-universe-full', enabled: true },
+      { key: 'national-serp-tracking', enabled: true },
       expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
     );
   });
@@ -93,7 +93,7 @@ describe('WorkspaceFeatureFlagOverrides', () => {
     const toggle = screen.getByRole('switch');
     fireEvent.click(toggle);
     expect(mutateMock).toHaveBeenCalledWith(
-      { key: 'keyword-universe-full', enabled: false },
+      { key: 'national-serp-tracking', enabled: false },
       expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
     );
   });
@@ -107,10 +107,10 @@ describe('WorkspaceFeatureFlagOverrides', () => {
       error: null,
     });
     render(<WorkspaceFeatureFlagOverrides workspaceId="ws-1" />);
-    const clearButton = screen.getByRole('button', { name: /Clear keyword-universe-full workspace override/i });
+    const clearButton = screen.getByRole('button', { name: /Clear national-serp-tracking workspace override/i });
     fireEvent.click(clearButton);
     expect(mutateMock).toHaveBeenCalledWith(
-      { key: 'keyword-universe-full', enabled: null },
+      { key: 'national-serp-tracking', enabled: null },
       expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
     );
   });

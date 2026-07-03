@@ -16,7 +16,6 @@ import { addTrackedKeyword, getTrackedKeywords, storeRankSnapshot } from '../../
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { createJob, clearCompletedJobs } from '../../server/jobs.js';
 import { buildLocalSeoKeywordCandidates, updateLocalSeoConfiguration, runLocalSeoRefreshJob } from '../../server/local-seo.js';
-import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import { LOCAL_CANDIDATE_ROW_LIMIT } from '../../server/domains/keyword-command-center/candidate-boundary.js';
 import { FakeSeoProvider } from '../../server/providers/fake-seo-provider.js';
 import { _resetRegistryForTest, registerProvider } from '../../server/seo-data-provider.js';
@@ -367,7 +366,11 @@ describe('buildKeywordCommandCenter', () => {
     expect(firstPage?.rows[0]?.explanation).toBeUndefined();
   });
 
-  it('caps unselected rank evidence in all rows to match summary counts', async () => {
+  it('includes all unselected rank evidence with impressions>0 in all rows to match summary counts (keyword-universe-full coverage is unconditional)', async () => {
+    // The keyword-universe-full flag was retired in flag-sunset Wave 2b (2026-07-02): the
+    // uncapped, value-ordered rank-evidence coverage (UNIVERSE_SAFETY_CEILING) is now the
+    // sole path — the old top-50-by-impressions cap no longer applies. Every ranked-untracked
+    // query with impressions>0 (or clicks>0) is kept, up to the 2000-row safety ceiling.
     storeRankSnapshot(workspaceId, '2026-05-21', Array.from({ length: 120 }, (_, index) => ({
       query: `untracked gsc query ${index}`,
       position: index + 1,
@@ -377,16 +380,24 @@ describe('buildKeywordCommandCenter', () => {
     })));
 
     const summary = await buildKeywordCommandCenterSummary(workspaceId);
-    const rows = await buildKeywordCommandCenterRows(workspaceId, {
+    // pageSize is capped at MAX_PAGE_SIZE (100); fetch page 2 to see the remaining 20 rows.
+    const firstPage = await buildKeywordCommandCenterRows(workspaceId, {
       filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
       page: 1,
       pageSize: 100,
     });
+    const secondPage = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      page: 2,
+      pageSize: 100,
+    });
 
-    expect(summary?.counts.total).toBe(50);
-    expect(rows?.pageInfo.totalRows).toBe(50);
-    expect(rows?.rows).toHaveLength(50);
-    expect(rows?.rows.some(row => row.normalizedKeyword === 'untracked gsc query 119')).toBe(false);
+    expect(summary?.counts.total).toBe(120);
+    expect(firstPage?.pageInfo.totalRows).toBe(120);
+    expect(firstPage?.rows).toHaveLength(100);
+    expect(secondPage?.rows).toHaveLength(20);
+    const allKeywords = [...(firstPage?.rows ?? []), ...(secondPage?.rows ?? [])].map(row => row.normalizedKeyword);
+    expect(allKeywords).toContain(normalizeKeywordForComparison('untracked gsc query 119'));
   });
 
   it('supports server-side search and lazy detail reads for one keyword', async () => {
@@ -1705,19 +1716,19 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
       expect(row.localSeoState?.lifecycle).toBe(KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE);
     }
 
-    setWorkspaceFlagOverride('keyword-universe-full', workspaceId, true);
-    try {
-      const fullUniversePayload = await buildKeywordCommandCenterRows(
-        workspaceId,
-        { filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES, pageSize: 200 },
-        { includeLocalSeo: true },
-      );
-      expect(fullUniversePayload).not.toBeNull();
-      expect(fullUniversePayload!.rows.length).toBeLessThanOrEqual(LOCAL_CANDIDATE_ROW_LIMIT);
-      expect(fullUniversePayload!.pageInfo.totalRows).toBeLessThanOrEqual(LOCAL_CANDIDATE_ROW_LIMIT);
-    } finally {
-      setWorkspaceFlagOverride('keyword-universe-full', workspaceId, null);
-    }
+    // The keyword-universe-full flag was retired in flag-sunset Wave 2b (2026-07-02): the
+    // uncapped keyword-universe coverage path is now unconditional. Re-assert the same
+    // LOCAL_CANDIDATES cap holds under that (now permanent) full-universe behavior — the
+    // `local_candidates` filter's own LOCAL_CANDIDATE_ROW_LIMIT is a separate, independent
+    // cap that the universe uncap does NOT lift (see docs/rules/keyword-hub.md).
+    const fullUniversePayload = await buildKeywordCommandCenterRows(
+      workspaceId,
+      { filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES, pageSize: 200 },
+      { includeLocalSeo: true },
+    );
+    expect(fullUniversePayload).not.toBeNull();
+    expect(fullUniversePayload!.rows.length).toBeLessThanOrEqual(LOCAL_CANDIDATE_ROW_LIMIT);
+    expect(fullUniversePayload!.pageInfo.totalRows).toBeLessThanOrEqual(LOCAL_CANDIDATE_ROW_LIMIT);
   });
 });
 

@@ -358,8 +358,8 @@ describe('FEATURE_FLAGS constants', () => {
   });
 
   it('contains expected flag keys', () => {
-    expect('keyword-universe-full' in FEATURE_FLAGS).toBe(true);
-    expect('smart-placeholders' in FEATURE_FLAGS).toBe(true);
+    expect('national-serp-tracking' in FEATURE_FLAGS).toBe(true);
+    expect('local-gbp' in FEATURE_FLAGS).toBe(true);
     expect('client-briefing-v2' in FEATURE_FLAGS).toBe(true);
   });
 });
