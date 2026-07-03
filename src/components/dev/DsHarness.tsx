@@ -1,14 +1,14 @@
 // DEV-ONLY design-system harness — NOT a shipped surface.
 // Exempt from nav/registry/route-removal conventions: mounted only behind
 // `import.meta.env.DEV` at /__ds-harness (see App.tsx) so it never ships to
-// production. Its job is to render the real F3 React primitives interactively
-// for the F3.3 keyboard-walk smoke (Drawer open/close/Escape, DataTable sort +
-// Enter/Space rows, Segmented/RadioGroup/LensSwitcher arrow-nav, Toolbar) —
-// the static styleguide cannot exercise behavior (review CP5). Kept for the
-// Keywords pilot / F4. Deliberately NOT marked @ds-rebuilt: it is a scratch
-// host, not a design-system primitive.
+// production. Its job is to render the real interactive DS primitives so their
+// BEHAVIOR can be exercised by hand (the static styleguide only shows
+// appearance — review CP5): overlays (focus trap · Escape · outside-click ·
+// portal layering · focus restore), keyboard-nav bars (Segmented/RadioGroup/
+// LensSwitcher/Toolbar arrow-nav), and DataTable sort + Enter/Space rows.
+// Deliberately NOT marked @ds-rebuilt: it is a scratch host, not a primitive.
 import { useState } from 'react';
-import { Filter, LayoutGrid, List, Rocket, Activity } from 'lucide-react';
+import { Filter, LayoutGrid, List, Rocket, Activity, Copy, Pencil, Trash2 } from 'lucide-react';
 import {
   Avatar,
   IntentTag,
@@ -32,6 +32,12 @@ import {
   ToolbarSpacer,
   GroupBlock,
   Drawer,
+  Modal,
+  Popover,
+  Tooltip,
+  Menu,
+  ConfirmDialog,
+  FormInput,
   Button,
 } from '../ui';
 import { useToast } from '../Toast';
@@ -61,21 +67,47 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function DsHarness() {
   const { toast } = useToast();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [seg, setSeg] = useState('28d');
   const [lens, setLens] = useState('table');
   const [radio, setRadio] = useState('draft');
   const [search, setSearch] = useState('');
   const [chipActive, setChipActive] = useState(true);
+  const [modalField, setModalField] = useState('');
 
   return (
     <PageContainer width="wide" center>
-      <h1 className="t-h1" style={{ color: 'var(--brand-text-bright)' }}>F3 DS Harness</h1>
+      <h1 className="t-h1" style={{ color: 'var(--brand-text-bright)' }}>DS Harness</h1>
       <p className="t-body" style={{ color: 'var(--brand-text-muted)' }}>
-        Dev-only interactive specimens — tab in and keyboard-walk each control.
+        Dev-only behavior bench — open the overlays, tab in, and keyboard-walk each
+        control. Appearance lives in the styleguide; this is where behavior gets poked.
       </p>
 
-      <Section title="Overlay & feedback">
-        <Button onClick={() => setDrawerOpen(true)}>Open Drawer</Button>
+      <Section title="Overlays — focus trap · Escape · outside-click · keyboard">
+        <Button onClick={() => setDrawerOpen(true)}>Drawer</Button>
+        <Button onClick={() => setModalOpen(true)}>Modal</Button>
+        <Button variant="secondary" onClick={() => setConfirmOpen(true)}>ConfirmDialog</Button>
+        <Popover trigger={<Button variant="secondary">Popover ▾</Button>}>
+          <Popover.Item onClick={() => toast('Item one', 'info')}>Item one</Popover.Item>
+          <Popover.Item onClick={() => toast('Item two', 'info')}>Item two</Popover.Item>
+          <Popover.Separator />
+          <Popover.Item onClick={() => toast('Item three', 'info')}>Item three</Popover.Item>
+        </Popover>
+        <Menu
+          trigger={<Button variant="secondary">Menu ▾</Button>}
+          items={[
+            { label: 'Copy', icon: Copy, onSelect: () => toast('Copied', 'success') },
+            { label: 'Edit', icon: Pencil, onSelect: () => toast('Editing', 'info') },
+            { label: 'Delete', icon: Trash2, onSelect: () => toast('Deleted', 'error') },
+          ]}
+        />
+        <Tooltip content="Shows on hover + focus; hides on Escape/blur">
+          <Button variant="ghost">Hover / focus me</Button>
+        </Tooltip>
+      </Section>
+
+      <Section title="Feedback">
         <Avatar initials="JH" tone="teal" />
         <Avatar icon={Rocket} tone="zinc" />
         <IntentTag intent="commercial" />
@@ -195,6 +227,33 @@ export default function DsHarness() {
           restores to the trigger button.
         </p>
       </Drawer>
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
+        <Modal.Header title="Modal title" onClose={() => setModalOpen(false)} />
+        <Modal.Body>
+          <p className="t-body">
+            Centered dialog — focus trapped, Escape closes, backdrop-click closes, focus
+            restores. Tab cycles the field and buttons.
+          </p>
+          <div style={{ marginTop: 12 }}>
+            <FormInput value={modalField} onChange={setModalField} placeholder="A focusable field" />
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
+          <Button onClick={() => { setModalOpen(false); toast('Confirmed', 'success'); }}>Confirm</Button>
+        </Modal.Footer>
+      </Modal>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete this item?"
+        message="This can't be undone. Escape or Cancel backs out; Enter or Confirm proceeds."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => { setConfirmOpen(false); toast('Deleted', 'error'); }}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </PageContainer>
   );
 }
