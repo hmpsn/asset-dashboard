@@ -239,7 +239,7 @@ export function InsightsEngine({ workspaceId, tier, compact, onNavigate, onNotif
       map.get(rec.priority)?.push(rec);
     }
     return map;
-  }, [data]);
+  }, [data, competitorSendEnabled]);
 
   // Counts for summary badges
   const activeCount = data ? data.recommendations.filter(r => r.status !== 'dismissed' && r.status !== 'completed').length : 0;
