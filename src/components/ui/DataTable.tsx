@@ -107,8 +107,13 @@ export function DataTable({
   const isEmpty = sortedRows.length === 0 && !loading;
 
   return (
+    // role="grid" — an interactive tabular widget (sortable headers +
+    // keyboard-activatable rows). Without it the role="row"/"columnheader"/
+    // "gridcell" descendants would be orphaned (invalid ARIA containment) and
+    // aria-sort would not be reliably announced (review finding).
     <div
       id={id}
+      role="grid"
       className={cn(
         'bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] overflow-hidden',
         className,
@@ -189,7 +194,7 @@ export function DataTable({
           return (
             <div
               key={key}
-              role={onRowClick ? 'button' : 'row'}
+              role="row"
               tabIndex={rowProps ? rowProps.tabIndex : undefined}
               ref={rowProps ? (rowProps.ref as (el: HTMLDivElement | null) => void) : undefined}
               onClick={onRowClick ? () => onRowClick(row, i) : undefined}
@@ -208,6 +213,7 @@ export function DataTable({
               {columns.map((col) => (
                 <div
                   key={col.key}
+                  role="gridcell"
                   className={cn(
                     'flex items-center min-w-0',
                     cellAlignClass(col.align),

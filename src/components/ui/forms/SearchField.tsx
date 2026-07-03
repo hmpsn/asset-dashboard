@@ -52,6 +52,10 @@ export function SearchField({
 
   useEffect(() => {
     setDraft(value);
+    // Cancel any pending debounce when the value is synced externally — otherwise
+    // a stale timer would fire onChange(oldDraft) and silently revert the value
+    // the parent just pushed (review finding).
+    if (timerRef.current) clearTimeout(timerRef.current);
   }, [value]);
 
   // Clean up any in-flight debounce timer on unmount so a late fire never

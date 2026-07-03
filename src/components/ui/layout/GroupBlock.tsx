@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { CSSProperties, ReactElement, ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { ChevronDown } from 'lucide-react';
@@ -57,7 +57,10 @@ export function GroupBlock({
 }: GroupBlockProps): ReactElement {
   const [open, setOpen] = useState(defaultOpen);
   const Heading = headingLevel;
-  const bodyId = id ? `${id}-body` : undefined;
+  // Always wire aria-controls ↔ body id, even when no `id` prop is passed
+  // (review finding — a bare collapsible lost the disclosure→content link).
+  const reactId = useId();
+  const bodyId = `${id ?? reactId}-body`;
 
   const header = (
     <>

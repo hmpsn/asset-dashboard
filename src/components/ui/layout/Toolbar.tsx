@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import type {
   CSSProperties,
   FocusEvent as ReactFocusEvent,
@@ -7,13 +7,12 @@ import type {
   ReactElement,
   ReactNode,
 } from 'react';
-import { useRovingTabindex } from '../useRovingTabindex';
 
 /**
  * Controls row above tables/boards/lists. A wrapping flex row on one spacing
  * rhythm; separate left controls (search/filters/lens) from right actions with
- * a `<ToolbarSpacer/>`. role="toolbar" + arrow-key focus movement between
- * controls (useRovingTabindex).
+ * a `<ToolbarSpacer/>`. role="toolbar" + arrow-key focus movement (roving
+ * tabindex) between the focusable controls.
  */
 export interface ToolbarProps {
   children?: ReactNode;
@@ -27,8 +26,17 @@ export interface ToolbarProps {
   style?: CSSProperties;
 }
 
-const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]';
+// Focusable toolbar controls. Deliberately LOCAL and distinct from
+// ui/overlay/overlayUtils.ts's FOCUSABLE_SELECTOR: Toolbar re-scans its controls
+// AFTER roving has set the non-active ones to tabindex="-1", so the selector must
+// match bare `[tabindex]` (including -1) rather than excluding `[tabindex="-1"]`
+// the way the overlay trap selector does. Only the control types a toolbar
+// actually holds are listed — importing the overlay selector here would silently
+// drop every roved-out control from the re-scan (review finding).
+const TOOLBAR_FOCUSABLE =
+  'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]';
+
+const NAV_KEYS = ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
 
 export function Toolbar({
   children,
@@ -41,45 +49,50 @@ export function Toolbar({
   style,
 }: ToolbarProps): ReactElement {
   const containerRef = useRef<HTMLDivElement>(null);
-  const itemsRef = useRef<HTMLElement[]>([]);
-  const [itemCount, setItemCount] = useState(0);
-  const roving = useRovingTabindex(itemCount);
 
-  // Re-scan the focusable descendants whenever the rendered controls change.
-  // Runs before paint so tabIndex is correct on first render (no flash of
-  // every control being tabbable).
-  useLayoutEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const items = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-    itemsRef.current = items;
-    setItemCount(items.length);
-    items.forEach((el, index) => {
-      const itemProps = roving.getItemProps(index);
-      el.tabIndex = itemProps.tabIndex;
-      itemProps.ref(el);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-scan on children only; roving.getItemProps is recreated each render and including it would loop
-  }, [children]);
+  const getItems = (): HTMLElement[] =>
+    Array.from(containerRef.current?.querySelectorAll<HTMLElement>(TOOLBAR_FOCUSABLE) ?? []);
 
-  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const items = itemsRef.current;
-    if (items.length === 0) return;
-    const target = event.target as HTMLElement;
-    const index = items.indexOf(target);
-    if (index === -1) return;
-    roving.getItemProps(index).onKeyDown(event);
-    const nextIndex = roving.activeIndex;
+  const applyRoving = (activeIndex: number, items: HTMLElement[]) => {
     items.forEach((el, i) => {
-      el.tabIndex = i === nextIndex ? 0 : -1;
+      el.tabIndex = i === activeIndex ? 0 : -1;
     });
   };
 
-  const handleFocus = (event: ReactFocusEvent<HTMLDivElement>) => {
-    const items = itemsRef.current;
-    const index = items.indexOf(event.target as HTMLElement);
-    if (index === -1) return;
-    roving.getItemProps(index).onFocus();
+  // Roving tabindex: exactly one control is tabbable (the first, until focus
+  // moves). Re-applied before paint whenever the rendered controls change, so
+  // there is no flash of every control being tabbable.
+  useLayoutEffect(() => {
+    applyRoving(0, getItems());
+  }, [children]);
+
+  // Arrow/Home/End move focus AND the roving marker together, computed LOCALLY
+  // from the pressed key — never from a lagging state read. Enter/Space are left
+  // untouched so the focused control activates natively (a toolbar button's
+  // click must not be preventDefault-ed).
+  const handleKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!NAV_KEYS.includes(e.key)) return;
+    const items = getItems();
+    if (items.length === 0) return;
+    const current = items.indexOf(e.target as HTMLElement);
+    if (current === -1) return;
+    e.preventDefault();
+    let next = current;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (current + 1) % items.length;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (current - 1 + items.length) % items.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = items.length - 1;
+    applyRoving(next, items);
+    items[next].focus();
+  };
+
+  // Keep the roving marker on whichever control the user tabs or clicks into,
+  // so a subsequent Tab-out/Shift-Tab-back returns to the last-focused control.
+  const handleFocus = (e: ReactFocusEvent<HTMLDivElement>) => {
+    const items = getItems();
+    const idx = items.indexOf(e.target as HTMLElement);
+    if (idx === -1) return;
+    applyRoving(idx, items);
   };
 
   return (

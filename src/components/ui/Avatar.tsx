@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { useState, type CSSProperties, type ReactElement } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactElement } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -67,6 +67,11 @@ export function Avatar({
   style,
 }: AvatarProps): ReactElement {
   const [imgFailed, setImgFailed] = useState(false);
+  // Retry the image when the src changes — otherwise a prior load error would
+  // stick and a new, valid src would never be attempted (review finding).
+  useEffect(() => {
+    setImgFailed(false);
+  }, [src]);
 
   const px = typeof size === 'number' ? size : SIZE_PX[size] ?? SIZE_PX.md;
   const radius = shape === 'circle' ? '9999px' : 'var(--radius-md)';

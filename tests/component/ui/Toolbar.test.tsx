@@ -49,6 +49,39 @@ describe('Toolbar', () => {
     expect(document.activeElement).toBe(first);
   });
 
+  it('moves the roving tabindex marker to the newly-focused control after ArrowRight', () => {
+    // Regression: the marker must land on the control focus MOVED TO, not stay
+    // on the previously-focused one (the stale-activeIndex bug).
+    render(
+      <Toolbar label="Controls">
+        <button>First</button>
+        <button>Second</button>
+      </Toolbar>,
+    );
+    const first = screen.getByText('First') as HTMLButtonElement;
+    const second = screen.getByText('Second') as HTMLButtonElement;
+    first.focus();
+    fireEvent.keyDown(first, { key: 'ArrowRight' });
+    expect(second.tabIndex).toBe(0);
+    expect(first.tabIndex).toBe(-1);
+  });
+
+  it('does not preventDefault Enter/Space so the focused control activates natively', () => {
+    let clicked = false;
+    render(
+      <Toolbar label="Controls">
+        <button onClick={() => { clicked = true; }}>Go</button>
+      </Toolbar>,
+    );
+    const go = screen.getByText('Go') as HTMLButtonElement;
+    go.focus();
+    // A real Enter on a focused button dispatches a click; the toolbar must not
+    // intercept it. Simulate the native activation the browser would perform.
+    fireEvent.keyDown(go, { key: 'Enter' });
+    go.click();
+    expect(clicked).toBe(true);
+  });
+
   it('only keeps one control in the tab order (roving tabindex)', () => {
     render(
       <Toolbar label="Controls">

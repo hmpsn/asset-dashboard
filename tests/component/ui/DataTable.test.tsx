@@ -37,7 +37,9 @@ describe('DataTable', () => {
     const onRowClick = vi.fn();
     render(<DataTable columns={columns} rows={rows} onRowClick={onRowClick} />);
 
-    const firstRow = screen.getAllByRole('button')[0];
+    // role="grid" ⇒ getAllByRole('row')[0] is the header row; [1] is the first
+    // data row (rows stay role="row" for valid grid containment, not role="button").
+    const firstRow = screen.getAllByRole('row')[1];
     firstRow.focus();
     await user.keyboard('{Enter}');
     expect(onRowClick).toHaveBeenCalledWith(rows[0], 0);
@@ -45,6 +47,14 @@ describe('DataTable', () => {
     onRowClick.mockClear();
     await user.keyboard(' ');
     expect(onRowClick).toHaveBeenCalledWith(rows[0], 0);
+  });
+
+  it('exposes valid grid semantics (role="grid" container with rows + gridcells)', () => {
+    render(<DataTable columns={columns} rows={rows} />);
+    expect(screen.getByRole('grid')).toBeInTheDocument();
+    // header row + 3 data rows
+    expect(screen.getAllByRole('row').length).toBe(4);
+    expect(screen.getAllByRole('gridcell').length).toBeGreaterThan(0);
   });
 
   it('renders the empty slot when rows is empty and not loading', () => {
