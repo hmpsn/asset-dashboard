@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/png" href="/favicon.png" />
+    <!-- Font Awesome Sharp Regular (Pro 7, self-hosted). fontawesome = base + glyph
+         codepoint vars; sharp-regular = @font-face + family binding. Preload the
+         woff2 so first-paint icons don't flash. Icon system of record (D5, reversed). -->
+    <link rel="preload" href="/fonts/fa-sharp-regular-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/vendor/fontawesome/fontawesome.min.css" />
+    <link rel="stylesheet" href="/vendor/fontawesome/sharp-regular.min.css" />
     <title>Insights Engine — hmpsn studio</title>
     <meta name="description" content="Your site's performance insights, SEO opportunities, and growth recommendations — all in one place." />
     <meta property="og:title" content="Insights Engine — hmpsn studio" />

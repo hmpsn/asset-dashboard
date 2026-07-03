@@ -6951,6 +6951,10 @@ export const CHECKS: Check[] = [
         if (!file.endsWith('.css')) continue;
         const normalized = file.replaceAll('\\', '/');
         if (normalized.endsWith('src/tokens.css') || normalized.endsWith('public/tokens.css')) continue;
+        // Vendored third-party CSS (Font Awesome Pro) legitimately declares its
+        // own namespaced --fa-* custom properties; it is not part of our token
+        // authority. Exempt the whole vendor dir.
+        if (normalized.includes('/public/vendor/')) continue;
 
         let css: string;
         try {
@@ -7143,14 +7147,15 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.tsx'],
     severity: 'error',
     excludeLines: ['// icon-ok'],
-    message: 'Font Awesome class (fa-*) or emoji glyph in a @ds-rebuilt file — the ratified icon system is lucide-react (D5). Add // icon-ok inline if the glyph is genuine content, not an icon.',
-    rationale: 'D5 ratified lucide-react; Font Awesome + emoji-as-icon fork the icon system.',
+    message: 'Emoji glyph used as an icon in a @ds-rebuilt file — go through the <Icon> component (Font Awesome Sharp Regular via `name`, or lucide via `as` during the migration). Add // icon-ok inline if the glyph is genuine content, not an icon.',
+    rationale: 'Font Awesome Sharp Regular is the icon system of record (D5, reversed 2026-07-03 from lucide-react); emoji-as-icon forks it. Font Awesome fa-* classes are now allowed (self-hosted Pro kit) — the prior fa-* prohibition was removed with the D5 reversal.',
     claudeMdRef: 'UI Rebuild conventions',
     customCheck: (files) => {
       const hits: CustomCheckMatch[] = [];
-      // Emoji range deliberately excludes U+2600–27BF (dingbats: ✓ ⚠ ★ ✗ —
-      // legitimate string glyphs, not icons). Review finding, PR #1473.
-      const re = /\bfa-[a-z-]+\b|[\u{1F300}-\u{1FAFF}]/u;
+      // Only emoji-as-icon is flagged now (fa-* is the sanctioned icon system as
+      // of the D5 reversal). Emoji range deliberately excludes U+2600–27BF
+      // (dingbats: ✓ ⚠ ★ ✗ — legitimate string glyphs, not icons). Review finding, PR #1473.
+      const re = /[\u{1F300}-\u{1FAFF}]/u;
       files.forEach(filePath => {
         let content: string;
         try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
