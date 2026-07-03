@@ -119,6 +119,8 @@ Action-link nuance: links that initiate user actions (review, open-tool, perform
 
 All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM.md`.
 
+**F3 net-new primitives (UI rebuild, `@ds-rebuilt`, tokens-only, both themes):** `Drawer` (`overlay/`, portal slide-over — one replacement for the app's five bespoke drawers), `Avatar`, `IntentTag` (canonical keyword-intent→hue via `INTENT_TONE`; `local`→orange, never purple), `DataTable` (grid table, sortable `aria-sort` headers, keyboard-activatable rows), `MetricTile` (composes `TrendBadge`), `Sparkline` (dependency-free SVG), `Meter` (`role="meter"`), `KeyValueRow`/`DefinitionList`, `BoardColumn`/`BoardCard`, `Segmented`, `LensSwitcher`, `FilterChip`, `SearchField`, `RadioGroup`, `AppShell` (shell frame, `sidebar`/`topbar`/`rail` slots — F4 wires nav), `PageContainer`, `Toolbar`/`ToolbarSpacer`, `GroupBlock`. Action color is **teal** throughout (D6); selected/active states use `--brand-mint-dim`/`--teal`. Keyboard bars use the shared `useRovingTabindex` hook; overlay focus-trap/scroll-lock comes from `ui/overlay/overlayUtils.ts`. Live specimens: `/styleguide.html` §05f and the DEV-only `/__ds-harness` route.
+
 | Primitive | File | Key Colors | Notes |
 |-----------|------|------------|-------|
 | **StatCard** | `StatCard.tsx` | Sparkline default: `#2dd4bf` (teal); value: `text-zinc-100` or passed color | Also exports `CompactStatBar` for inline metric rows |

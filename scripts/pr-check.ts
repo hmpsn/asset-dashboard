@@ -7168,7 +7168,11 @@ export const CHECKS: Check[] = [
     fileGlobs: ['*.tsx', '*.ts'],
     severity: 'error',
     excludeLines: ['// deep-import-ok'],
-    // Backstop: refine to the real DS internal layout in F3 once components/ui/internal/ exists.
+    // Backstop for a future components/ui/internal/ layer. As of F3 no internal/
+    // dir exists — the F3 ports deliberately kept shared machinery PUBLIC
+    // (ui/overlay/overlayUtils.ts, ui/useRovingTabindex.ts) rather than under
+    // internal/, precisely so this rule never needs a carve-out. Refine the
+    // regex to the real internal layout only once such a dir is actually created.
     message: 'Deep import into components/ui/internal/ from a @ds-rebuilt file — import the public primitive, not its internals. Add // deep-import-ok inline if intentional.',
     rationale: 'Reaching into a primitive\'s internals couples rebuilt surfaces to private structure.',
     claudeMdRef: 'UI Rebuild conventions',
