@@ -4,6 +4,11 @@
 > Inputs: 20 surface ledgers (`docs/ui-rebuild/phase0/surfaces/`), 4 cross-cutting audits (`cross-*.md`), design review (`design-review/`), the UI Rebuild Handoff Brief + kit `CLAUDE.md` sequence, and the Parallelization Map's governing principle ("parallelize the audit aggressively; parallelize execution conservatively").
 > Evidence base: 396 at-risk claims verified, 0 refuted; ~700 capabilities cataloged across 20 surfaces; ~150 stop-and-ask questions raised.
 
+> **Amendments since Phase 0 sign-off** (read these before building — they supersede the tables below):
+> - **D5 REVERSED → Font Awesome Sharp Regular** (owner, 2026-07-03). The icon system of record is now self-hosted FA Sharp Regular (`public/vendor/fontawesome/` + `public/fonts/`). Use `<Icon name="…">` (semantic keys in `src/components/ui/iconNames.ts` → `fa-sharp fa-regular fa-…`); never hard-code `fa-` at call sites. **lucide-react is now only the `<Icon as={…}>` migration bridge** for not-yet-rebuilt surfaces (~381 sites migrate incrementally). The `ds-icon-discipline` gate now **allows** `fa-*` and flags only emoji-as-icon. This supersedes every "lucide" statement in the D5 rows and cross-doc icon sections below. Canonical: `PHASE_D_DECISIONS.md` D5 + PR #1475.
+> - **Phase F3 shipped** — the 18 net-new primitives (Drawer, DataTable, MetricTile, Sparkline, Meter, KeyValueRow, BoardColumn, Avatar, IntentTag, Segmented, LensSwitcher, FilterChip, SearchField, RadioGroup, AppShell, PageContainer, Toolbar, GroupBlock) are in `src/components/ui/` (PR #1474; see the CLAUDE.md primitive list). `AppShell`'s `sidebar`/`topbar`/`rail` slots are the frozen F4 nav-wiring surface.
+> - **DS harness** (`/__ds-harness`, dev-only) is the interaction **behavior bench** (overlays + form controls + nav) for hand-verifying real keyboard/focus behavior; the styleguide stays the **appearance** reference (PR #1476).
+
 ---
 
 ## 0. The shape of the problem (what the audits proved)
@@ -31,7 +36,7 @@ Consolidate the ~150 stop-and-asks into one triage doc with two tiers:
 | D2 | Rebuild root path (in-place-behind-flags vs new dir) — gates every scoped lint/pr-check rule | cross-consistency §7 Q1 | In-place per owner's incremental-behind-flags direction, with a per-file `@ds-rebuilt` marker (or file manifest) as the rule scope |
 | D3 | Page Intelligence's single home (SEO Editor Research mode vs Keywords) | cross-platform Q1 | Ledger says SEO Editor; confirm — this is the pilot's scope boundary |
 | D4 | Client dashboard gate = **Option C** (finish cutover → re-skin ratified 4-tab IA → additive portal ideas) + Q2–Q7 sign-offs | cross-client-dashboard §5 | Approve C |
-| D5 | Icon system: lucide-react (HEAD, hundreds of call sites, kit leaf `.d.ts` already lucide-shaped) vs Font Awesome (kit readme, paid external script) | cross-design-system §6 Q3, cross-platform Q8 | lucide; restyle kit `Icon`/`ICON_NAMES` contract onto lucide names |
+| D5 | Icon system: lucide-react (HEAD, hundreds of call sites, kit leaf `.d.ts` already lucide-shaped) vs Font Awesome (kit readme, paid external script) | cross-design-system §6 Q3, cross-platform Q8 | ~~lucide; restyle kit `Icon`/`ICON_NAMES` onto lucide names~~ **REVERSED → Font Awesome Sharp Regular, self-hosted (see Amendments above + PHASE_D_DECISIONS D5).** |
 | D6 | Canonical action-color word: "mint" vs "teal" (same hex) | cross-design-system §6 Q2 | Pick one; update CLAUDE.md/BRAND_DESIGN_LANGUAGE/pr-check messages in the tokens PR |
 | D7 | Rule severity on rebuild-scoped code: error from day one | cross-consistency §7 Q3 | Approve error-severity (nothing exists to backfill) |
 | D8 | URL scheme + redirect map policy for consolidated surfaces (`/business`, `aivis`, cockpit-vs-home, book views) | cross-platform Q5 | Redirect map is a required deliverable per consolidation, per route-removal checklist |
