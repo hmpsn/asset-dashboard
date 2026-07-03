@@ -97,10 +97,6 @@ export const FEATURE_FLAGS = {
   // recommendation:<id> deliverable mirror and reports pairs that DISAGREE (the two named
   // divergence-by-construction paths). OFF = no sweep. It mutates NOTHING — reporting only.
   'strategy-divergence-sweep': false,
-  // Strategy v3 — DEFERRED paid-topic monetization spine (generic strategy_addon SKU +
-  // rec→cart bridge for keyword/topic rec types). OFF until the roadmap item lands; v3 renders
-  // Add-to-plan ONLY where rec.productType already resolves a SKU (decision 1 / spec §2 / §11).
-  'strategy-paid-topics': false,
   // Strategy redesign (child flags under strategy-command-center) — declared once in the P2
   // pre-commit, activated in later phases. P3 activates managed-set; P4 activates the other two.
   // Strategy redesign — managed keyword working set (add/remove/keep/replenish). Activated P3.
@@ -132,13 +128,8 @@ export const FEATURE_FLAGS = {
   'the-issue-client-measured-capture': false,
   // P1 children — DECLARED OFF + unread in P0 so the flag family/group is stable. Do not start P1
   // until P0 is merged + green on staging.
-  // P3: named-record reconciliation (call-tracking + CRM closed-won → actual_reconciled). RESERVED
-  // for P3 — NOT P1a website capture (P1a uses the-issue-client-measured-capture).
-  'the-issue-client-reconciliation': false,
   // P1: event-driven SMS/email push + forwardable one-pager export (the return hook).
   'the-issue-client-return-hook': false,
-  // P1: segment-conditional competitor/authority + local map-pack/reviews + portfolio inserts.
-  'the-issue-client-segment-inserts': false,
   // P1: "next bets" $-forecast reframe from existing recommendation estimatedGain.
   'the-issue-client-next-bets': false,
   // Client IA v2 — master flag for the verdict-first Overview reframe (P1) → 4-tab shell (P2+).
@@ -431,20 +422,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-29',
     },
   },
-  'strategy-paid-topics': {
-    label: 'Strategy v3 — paid-topic monetization spine (DEFERRED roadmap)',
-    group: 'Strategy',
-    lifecycle: {
-      status: 'reserved',
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-17',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Enable + remove once the generic strategy_addon SKU + rec→cart bridge + keyword/topic product map ship (deferred roadmap item D8). Until then v3 renders Add-to-plan only where rec.productType already resolves.',
-      linkedRoadmapItemId: 'strategy-paid-topic-monetization-spine',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: '2026-06-17',
-    },
-  },
   'strategy-keywords-managed-set': {
     label: 'Strategy redesign — managed keyword working set (add/remove/keep/replenish)',
     group: 'Strategy',
@@ -536,20 +513,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-20',
     },
   },
-  'the-issue-client-reconciliation': {
-    label: 'The Issue (Client) — named-record reconciliation (P3, actual_reconciled)',
-    group: 'The Issue (Client)',
-    lifecycle: {
-      status: 'reserved',
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-20',
-      rolloutTarget: 'pilot-clients',
-      removalCondition: 'Reserved for CRM/call-tracking reconciliation → actual_reconciled (P3); NOT P1a website capture. Enable + remove once call-tracking + CRM closed-won graduates provenance to actual_reconciled and the count becomes clickable to named records.',
-      linkedRoadmapItemId: 'the-issue-client-redesign-p1-reconciliation',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: '2026-06-20',
-    },
-  },
   'the-issue-client-return-hook': {
     label: 'The Issue (Client) — push/export return hook (P1)',
     group: 'The Issue (Client)',
@@ -559,20 +522,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       rolloutTarget: 'staging-validation',
       removalCondition: 'Promote to default once the event-driven push + forwardable one-pager export delivery cost is validated on staging.',
       linkedRoadmapItemId: 'the-issue-client-redesign-p1-return-hook',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: '2026-06-20',
-    },
-  },
-  'the-issue-client-segment-inserts': {
-    label: 'The Issue (Client) — segment-conditional inserts (P1)',
-    group: 'The Issue (Client)',
-    lifecycle: {
-      status: 'reserved',
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-20',
-      rolloutTarget: 'pilot-clients',
-      removalCondition: 'Promote to default once segment-conditional competitor/authority + local map-pack/reviews + portfolio inserts are validated with pilot clients on staging.',
-      linkedRoadmapItemId: 'the-issue-client-redesign-p1-segments',
       staleAuditCadence: 'monthly',
       lastReviewedAt: '2026-06-20',
     },
@@ -624,11 +573,11 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Strategy',
-    keys: ['signal-auto-recompute', 'strategy-command-center', 'strategy-staleness-scan', 'strategy-divergence-sweep', 'strategy-paid-topics', 'strategy-keywords-managed-set', 'strategy-competitor-send', 'strategy-signal-fold', 'strategy-the-issue', 'strategy-trust-ladder-autosend'],
+    keys: ['signal-auto-recompute', 'strategy-command-center', 'strategy-staleness-scan', 'strategy-divergence-sweep', 'strategy-keywords-managed-set', 'strategy-competitor-send', 'strategy-signal-fold', 'strategy-the-issue', 'strategy-trust-ladder-autosend'],
   },
   {
     label: 'The Issue (Client)',
-    keys: ['the-issue-client-spine', 'the-issue-client-measured-capture', 'the-issue-client-reconciliation', 'the-issue-client-return-hook', 'the-issue-client-segment-inserts', 'the-issue-client-next-bets', 'client-ia-v2'],
+    keys: ['the-issue-client-spine', 'the-issue-client-measured-capture', 'the-issue-client-return-hook', 'the-issue-client-next-bets', 'client-ia-v2'],
   },
 ];
 

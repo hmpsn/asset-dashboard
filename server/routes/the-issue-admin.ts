@@ -5,8 +5,9 @@
  * low-confidence { valuePerOutcome, unitLabel } estimate and NEVER persists it — the admin's
  * confirm is the standard PATCH /api/workspaces/:id carrying outcomeValue with basis: 'ai_enriched'.
  *
- * The non-local segment-derivation AI op + endpoint are P1 (flag the-issue-client-segment-inserts
- * is declared OFF) and are intentionally NOT built here. The P0 segment UI is a manual FormSelect.
+ * The non-local segment-derivation AI op + endpoint were a planned P1 feature that was never
+ * built; its reserved flag (the-issue-client-segment-inserts) was retired as a phantom in
+ * flag-sunset Wave 1. The P0 segment UI is a manual FormSelect.
  *
  * Auth: requireWorkspaceAccess (NOT requireAuth) per Auth Conventions — the admin panel
  * authenticates via the HMAC token validated by the global APP_PASSWORD gate.
