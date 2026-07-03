@@ -12582,6 +12582,17 @@ describe('Rule: UI Rebuild @ds-rebuilt-scoped gates (F2a)', () => {
         lines(':root { --brand-foo: #111827; }', '.dashboard-light { }'));
       expect(runRule(RULE, [legacy])).toHaveLength(0);
     });
+    it('unions tokens across multiple :root / .dashboard-light blocks (review, PR #1473)', () => {
+      // Both tokens are themed across two split blocks each — the single-match
+      // parser wrongly flagged the token in the 2nd :root as light-only.
+      const file = write(uniqPath('ds-parity', 'src/split.css'),
+        lines('/* @ds-rebuilt */',
+          ':root { --brand-teal: #0d9488; }',
+          ':root { --brand-blue: #3b82f6; }',
+          '.dashboard-light { --brand-teal: #0f766e; }',
+          '.dashboard-light { --brand-blue: #2563eb; }'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
   });
 
   describe('Rule: ds-icon-discipline', () => {

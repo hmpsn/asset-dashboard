@@ -7112,10 +7112,18 @@ export const CHECKS: Check[] = [
         if (!isDsRebuilt(content)) return;
         const lines = content.split('\n');
         const lineOf = (name: string) => (lines.findIndex(l => new RegExp(`${name}\\s*:`).test(l)) + 1) || 1;
-        const rootBlock = (content.match(/:root\s*\{([^}]*)\}/) ?? [, ''])[1] ?? '';
-        const lightBlock = (content.match(/\.dashboard-light[^{]*\{([^}]*)\}/) ?? [, ''])[1] ?? '';
-        const root = declsIn(rootBlock);
-        const light = declsIn(lightBlock);
+        // Union tokens across ALL :root / .dashboard-light blocks (a file may
+        // split declarations across several). matchAll(/g) — a single match()
+        // would see only the first block and mis-flag tokens in later ones
+        // (review finding, PR #1473). Assumes flat token blocks (no nested {}),
+        // which holds for :root token declarations.
+        const unionDecls = (re: RegExp) => {
+          const set = new Set<string>();
+          for (const m of content.matchAll(re)) for (const t of declsIn(m[1] ?? '')) set.add(t);
+          return set;
+        };
+        const root = unionDecls(/:root\s*\{([^}]*)\}/g);
+        const light = unionDecls(/\.dashboard-light[^{]*\{([^}]*)\}/g);
         for (const name of root) {
           if (!isNeutral(name) && !light.has(name)) hits.push({ file: filePath, line: lineOf(name), text: `themeable token ${name} in :root has no .dashboard-light override` });
         }
