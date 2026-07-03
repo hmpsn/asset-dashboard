@@ -79,19 +79,11 @@ export const FEATURE_FLAGS = {
   // OFF = no LLM-mentions fetch, no snapshot, no UI (byte-identical).
   'ai-visibility': false,
 
-  // Phase 5: automated signal recompute — the daily activity-gated cron + the on-mutation enqueues
-  // that refresh analytics insights. OFF = signals refresh only on view (24h-throttled) + the manual
-  // "Recompute now" button. Dark-launched so the per-workspace GSC/GA4 cost is watched on staging first.
-  'signal-auto-recompute': false,
-
   // Strategy v2 "SEO command center" — decision-first IA (Orient → Act → Evidence) + interior
   // tabs. Dark-launches the rebuilt admin Strategy page; replaces the retired decision-bands
   // layout. OFF = the legacy sequential layout, byte-identical.
   // See docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md.
   'strategy-command-center': false,
-  // Strategy v3 — staleness scan child flag. Dark-launches the runSentRecStalenessScan cron
-  // pass (sent-rec "no response 14d" nudges + supersession flags). OFF = no nudge engine.
-  'strategy-staleness-scan': false,
   // Reconcile R4-PR1 — deliverable divergence sweep child flag. Dark-launches the READ-ONLY
   // runDeliverableDivergenceSweep cron pass that compares each rec's clientStatus against its
   // recommendation:<id> deliverable mirror and reports pairs that DISAGREE (the two named
@@ -366,19 +358,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-24',
     },
   },
-  'signal-auto-recompute': {
-    label: 'Strategy signals — automated recompute (daily cron + on-mutation)',
-    group: 'Strategy',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-17',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Promote to default once the daily-cron + on-mutation provider (GSC/GA4) cost is validated acceptable on staging; the flag is then removed and the recompute paths run unconditionally.',
-      linkedRoadmapItemId: 'strategy-redesign-phase-5c-auto-recompute',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: '2026-06-17',
-    },
-  },
   'strategy-command-center': {
     label: 'Strategy v2 — SEO command center (Orient/Act/Evidence + interior tabs)',
     group: 'Strategy',
@@ -388,19 +367,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       rolloutTarget: 'staging-validation',
       removalCondition: 'Promote to default once the v2 command-center IA is validated on staging and becomes the default; the legacy sequential Strategy layout is then deleted.',
       linkedRoadmapItemId: 'strategy-redesign-v2-command-center',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: '2026-06-17',
-    },
-  },
-  'strategy-staleness-scan': {
-    label: 'Strategy v3 — sent-rec staleness scan (nudge + supersession cron)',
-    group: 'Strategy',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-17',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Promote to default once the on-read throttle resurface + nudge cron cost is validated on staging; flag removed and the scan runs unconditionally in the 24h outcome tick.',
-      linkedRoadmapItemId: 'strategy-v3-curation-cockpit',
       staleAuditCadence: 'monthly',
       lastReviewedAt: '2026-06-17',
     },
@@ -573,7 +539,7 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Strategy',
-    keys: ['signal-auto-recompute', 'strategy-command-center', 'strategy-staleness-scan', 'strategy-divergence-sweep', 'strategy-keywords-managed-set', 'strategy-competitor-send', 'strategy-signal-fold', 'strategy-the-issue', 'strategy-trust-ladder-autosend'],
+    keys: ['strategy-command-center', 'strategy-divergence-sweep', 'strategy-keywords-managed-set', 'strategy-competitor-send', 'strategy-signal-fold', 'strategy-the-issue', 'strategy-trust-ladder-autosend'],
   },
   {
     label: 'The Issue (Client)',

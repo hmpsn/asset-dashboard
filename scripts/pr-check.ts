@@ -1141,6 +1141,20 @@ const RETIRED_FLAG_GROUPS: readonly RetiredFlagGroup[] = [
     ],
     migrationException: 'server/db/migrations/173-retire-phantom-flags-overrides.sql',
   },
+  {
+    // Flag-sunset Wave 2a: two pure-server-cron flags, both globally ON in prod already, so
+    // unconditional-izing their gates is a no-op for behavior. 'strategy-staleness-scan' gated
+    // the runSentRecStalenessScan nudge/supersession pass (server/recommendation-staleness.ts);
+    // 'signal-auto-recompute' gated the daily activity-gated insight-recompute cron
+    // (server/insight-recompute-cron.ts) and the shared enqueueIntelligenceRecompute helper
+    // (server/intelligence-recompute-job.ts). Both crons now run unconditionally.
+    label: 'flag-sunset W2a server crons',
+    keys: [
+      'strategy-staleness-scan',
+      'signal-auto-recompute',
+    ],
+    migrationException: 'server/db/migrations/174-retire-w2a-server-cron-flags-overrides.sql',
+  },
 ];
 
 function escapedAlternation(values: readonly string[]): string {

@@ -265,7 +265,7 @@ export const CRON_METADATA: Record<CronId, CronMetadataEntry> = {
     module: 'server/insight-recompute-cron.js',
     intervalMs: DAY_MS,
     description:
-      'Daily activity-gated insight recompute (signal-auto-recompute flag-gated). ' +
+      'Daily activity-gated insight recompute. ' +
       'The only cron that enqueues real background jobs.',
     stopHook: true,
     start: startInsightRecomputeCron,

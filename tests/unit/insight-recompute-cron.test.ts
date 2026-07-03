@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
-  flagEnabled: false,
   workspaces: [] as { id: string }[],
   recentActivity: new Map<string, boolean>(),
   insights: new Map<string, { computedAt: string }[]>(),
@@ -10,7 +9,6 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('../../server/logger.js', () => ({ createLogger: () => ({ info: vi.fn(), warn: vi.fn(), debug: vi.fn() }) }));
-vi.mock('../../server/feature-flags.js', () => ({ isFeatureEnabled: () => state.flagEnabled }));
 vi.mock('../../server/workspaces.js', () => ({ listWorkspaces: () => state.workspaces }));
 vi.mock('../../server/activity-log.js', () => ({ hasRecentActivity: (ws: string) => state.recentActivity.get(ws) ?? false }));
 vi.mock('../../server/analytics-insights-store.js', () => ({ getInsights: (ws: string) => state.insights.get(ws) ?? [] }));
@@ -22,17 +20,10 @@ import { runDailyInsightRecompute } from '../../server/insight-recompute-cron.js
 describe('runDailyInsightRecompute (Phase 5c daily cron)', () => {
   beforeEach(() => {
     state.enqueue.mockReset();
-    state.flagEnabled = true;
     state.workspaces = [{ id: 'ws1' }];
     state.recentActivity = new Map([['ws1', true]]);
     state.insights = new Map([['ws1', [{ computedAt: '2026-06-15T00:00:00.000Z' }]]]);
     state.stale = true;
-  });
-
-  it('kill switch: enqueues nothing when the flag is OFF', async () => {
-    state.flagEnabled = false;
-    await runDailyInsightRecompute();
-    expect(state.enqueue).not.toHaveBeenCalled();
   });
 
   it('skips workspaces without recent activity (cost gate)', async () => {

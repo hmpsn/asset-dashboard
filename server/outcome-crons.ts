@@ -293,9 +293,9 @@ export function startOutcomeCrons() {
   // ── Strategy v3 P3 — sent-rec staleness scan (24h). ──
   // Thin cron wrapper around runSentRecStalenessScan: derives stale_sent / superseded nudges
   // from the persisted rec sets (no crawl, no AI) and writes deduplicated admin-only activity.
-  // Per-workspace flag-gated INSIDE the scan ('strategy-staleness-scan') — flag OFF = no-op for
-  // that workspace. Loaded via dynamic import so the cron module doesn't pull recommendation
-  // transitive deps at startup.
+  // Runs unconditionally for every workspace (flag-sunset W2a — 'strategy-staleness-scan'
+  // retired, was globally ON in prod). Loaded via dynamic import so the cron module doesn't
+  // pull recommendation transitive deps at startup.
   const runStalenessScanJob = async () => {
     try {
       const { runSentRecStalenessScan }: typeof RecommendationStaleness = await import('./recommendation-staleness.js'); // dynamic-import-ok

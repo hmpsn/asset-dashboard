@@ -7,7 +7,6 @@ const state = vi.hoisted(() => ({
   hasActiveJob: vi.fn(),
   getOrComputeInsights: vi.fn(),
   broadcast: vi.fn(),
-  flagEnabled: false,
 }));
 
 vi.mock('../../server/jobs.js', () => ({
@@ -19,10 +18,6 @@ vi.mock('../../server/jobs.js', () => ({
 
 vi.mock('../../server/broadcast.js', () => ({
   broadcastToWorkspace: state.broadcast,
-}));
-
-vi.mock('../../server/feature-flags.js', () => ({
-  isFeatureEnabled: () => state.flagEnabled,
 }));
 
 vi.mock('../../server/domains/analytics-intelligence/orchestrator.js', () => ({
@@ -46,29 +41,20 @@ describe('INTELLIGENCE_RECOMPUTE job registration', () => {
   });
 });
 
-describe('enqueueIntelligenceRecompute (flag gate + dedup)', () => {
+describe('enqueueIntelligenceRecompute (dedup)', () => {
   beforeEach(() => {
     state.createJob.mockReset();
     state.hasActiveJob.mockReset();
     state.createJob.mockReturnValue({ id: 'job-x' });
     state.hasActiveJob.mockReturnValue(undefined);
-    state.flagEnabled = false;
   });
 
-  it('no-ops when the signal-auto-recompute flag is OFF', () => {
-    state.flagEnabled = false;
-    enqueueIntelligenceRecompute('ws-1');
-    expect(state.createJob).not.toHaveBeenCalled();
-  });
-
-  it('creates a recompute job when the flag is ON and no job is active', () => {
-    state.flagEnabled = true;
+  it('creates a recompute job when no job is active', () => {
     enqueueIntelligenceRecompute('ws-1');
     expect(state.createJob).toHaveBeenCalledWith('intelligence-recompute', expect.objectContaining({ workspaceId: 'ws-1' }));
   });
 
   it('dedupes — does not create a second job when one is already active', () => {
-    state.flagEnabled = true;
     state.hasActiveJob.mockReturnValue({ id: 'existing' });
     enqueueIntelligenceRecompute('ws-1');
     expect(state.createJob).not.toHaveBeenCalled();

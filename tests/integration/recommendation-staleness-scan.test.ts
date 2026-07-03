@@ -17,15 +17,12 @@ import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { saveRecommendations } from '../../server/recommendations.js';
 import { runSentRecStalenessScan } from '../../server/recommendation-staleness.js';
 import { countActivityByType } from '../../server/activity-log.js';
-import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import db from '../../server/db/index.js';
 import type { Recommendation } from '../../shared/types/recommendations.js';
 
-// NOTE: server/feature-flags.ts exposes setWorkspaceFlagOverride(key, workspaceId, enabled)
-// (verified before authoring — there is no setFeatureFlagOverride/clearFeatureFlagOverride).
-// runSentRecStalenessScan iterates listWorkspaces() and checks the per-workspace flag, so a
-// per-workspace override is the correct path to flag the seeded workspace ON.
+// runSentRecStalenessScan iterates listWorkspaces() and processes every workspace
+// unconditionally (flag-sunset W2a — 'strategy-staleness-scan' retired).
 describe('runSentRecStalenessScan', () => {
   let wsId: string;
   let cleanup: () => void;
@@ -51,11 +48,9 @@ describe('runSentRecStalenessScan', () => {
       fixNow: 0, fixSoon: 0, fixLater: 0, ongoing: 0, totalImpactScore: 0, trafficAtRisk: 0,
       totalOpportunityValue: 0, actionableOpportunityValue: 0, topRecommendationId: null,
     } });
-    setWorkspaceFlagOverride('strategy-staleness-scan', wsId, true);
   });
 
   afterAll(() => {
-    setWorkspaceFlagOverride('strategy-staleness-scan', wsId, null);
     db.prepare('DELETE FROM activity_log WHERE workspace_id = ?').run(wsId);
     db.prepare('DELETE FROM recommendation_sets WHERE workspace_id = ?').run(wsId);
     cleanup();
