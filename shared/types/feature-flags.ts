@@ -113,6 +113,11 @@ export const FEATURE_FLAGS = {
   // Client IA v2 — master flag for the verdict-first Overview reframe (P1) → 4-tab shell (P2+).
   // Gates every new IA-v2 render; flag-OFF the client dashboard is byte-identical to today's spine.
   'client-ia-v2': false,
+
+  // UI Rebuild F4 — DS-native admin shell chrome. Additive/pilot-mounted only:
+  // App.tsx stays on the legacy shell, and rebuilt surfaces opt into
+  // RebuiltAppChrome at their own mount point. OFF = today's admin chrome.
+  'ui-rebuild-shell': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -168,6 +173,7 @@ export const FEATURE_FLAG_GROUP_LABELS = [
   'SEO Decision Engine',
   'Strategy',
   'The Issue (Client)',
+  'UI Rebuild',
 ] as const;
 
 export type FeatureFlagGroupLabel = (typeof FEATURE_FLAG_GROUP_LABELS)[number];
@@ -310,10 +316,9 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
     group: 'Strategy',
     lifecycle: {
       owner: 'analytics-intelligence',
-      // Aligned to the feature-flag-lifecycle audit anchor (2026-06-29); every existing flag is ≤ that
-      // date, so the audit never reports this entry as "in the future". The lifecycle-meaningful field
-      // is the removalCondition ("Re-audit by 2026-10-02"), which is unaffected by the slightly-earlier
-      // createdAt.
+      // Historical alignment note: this flag was reviewed against the 2026-06-29 lifecycle anchor.
+      // The lifecycle-meaningful field is the removalCondition ("Re-audit by 2026-10-02"), which is
+      // unaffected by the slightly earlier createdAt.
       createdAt: '2026-06-29',
       rolloutTarget: 'staging-validation',
       removalCondition: 'Remove after the R4-PR2 DB trigger makes struck≠completed + rec↔mirror lockstep UNbypassable AND a full staging soak shows the sweep reports zero divergent pairs; the read-only sweep then runs unconditionally in the 24h outcome tick (or is retired once the trigger guarantees zero drift). Re-audit by 2026-10-02.',
@@ -452,6 +457,19 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-20',
     },
   },
+  'ui-rebuild-shell': {
+    label: 'UI rebuild — DS-native admin shell chrome',
+    group: 'UI Rebuild',
+    lifecycle: {
+      owner: 'ui-platform',
+      createdAt: '2026-07-05',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Retire once the rebuilt admin shell ships unflagged after the Keywords pilot and Phase A admin fan-out validate the shell chrome.',
+      linkedRoadmapItemId: 'ui-rebuild-f4-shell',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-07-05',
+    },
+  },
 };
 
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
@@ -478,6 +496,10 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   {
     label: 'The Issue (Client)',
     keys: ['the-issue-client-spine', 'the-issue-client-measured-capture', 'the-issue-client-return-hook', 'the-issue-client-next-bets', 'client-ia-v2'],
+  },
+  {
+    label: 'UI Rebuild',
+    keys: ['ui-rebuild-shell'],
   },
 ];
 

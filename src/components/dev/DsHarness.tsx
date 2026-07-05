@@ -7,8 +7,11 @@
 // portal layering · focus restore), keyboard-nav bars (Segmented/RadioGroup/
 // LensSwitcher/Toolbar arrow-nav), and DataTable sort + Enter/Space rows.
 // Deliberately NOT marked @ds-rebuilt: it is a scratch host, not a primitive.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Filter, LayoutGrid, List, Rocket, Activity, Copy, Pencil, Trash2 } from 'lucide-react';
+import { FEATURE_FLAGS } from '../../../shared/types/feature-flags';
+import { queryKeys } from '../../lib/queryKeys';
 import {
   Avatar,
   IntentTag,
@@ -50,6 +53,8 @@ import {
   Button,
 } from '../ui';
 import { useToast } from '../Toast';
+import { RebuiltAppChrome } from '../layout/RebuiltAppChrome';
+import type { Workspace } from '../WorkspaceSelector';
 
 const TABLE_COLUMNS: DataColumn[] = [
   { key: 'keyword', label: 'Keyword', width: '1.6fr', sortable: true },
@@ -64,6 +69,11 @@ const TABLE_ROWS = [
   { keyword: 'schema markup guide', volume: 1300, position: 7 },
 ];
 
+const SHELL_WORKSPACES: Workspace[] = [
+  { id: 'demo-linked', name: 'Acme Dental', webflowSiteId: 'site-demo', webflowSiteName: 'acme.example', folder: 'acme', createdAt: '2026-07-05' },
+  { id: 'demo-nosite', name: 'No-site Workspace', folder: 'nosite', createdAt: '2026-07-05' },
+];
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -75,6 +85,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function DsHarness() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -91,6 +102,13 @@ export default function DsHarness() {
   const [textareaVal, setTextareaVal] = useState('');
   const [tab, setTab] = useState('overview');
   const [days, setDays] = useState(28);
+  const [shellTheme, setShellTheme] = useState<'dark' | 'light'>('dark');
+  const [shellSelectedId, setShellSelectedId] = useState(SHELL_WORKSPACES[0].id);
+  const shellSelected = SHELL_WORKSPACES.find((workspace) => workspace.id === shellSelectedId) ?? SHELL_WORKSPACES[0];
+
+  useEffect(() => {
+    queryClient.setQueryData(queryKeys.shared.featureFlags(), FEATURE_FLAGS);
+  }, [queryClient]);
 
   return (
     <PageContainer width="wide" center>
@@ -283,6 +301,52 @@ export default function DsHarness() {
           >
             <div style={{ padding: 16 }} className="t-body">AppShell content (miniature)</div>
           </AppShell>
+        </div>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <Toolbar label="Rebuilt shell demo controls">
+            <Button variant="secondary" onClick={() => setShellTheme((value) => value === 'dark' ? 'light' : 'dark')}>
+              {shellTheme === 'dark' ? 'Light' : 'Dark'}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShellSelectedId((value) => value === SHELL_WORKSPACES[0].id ? SHELL_WORKSPACES[1].id : SHELL_WORKSPACES[0].id)}
+            >
+              {shellSelected.webflowSiteId ? 'No site' : 'Linked site'}
+            </Button>
+          </Toolbar>
+          <div
+            className={shellTheme === 'light' ? 'dashboard-light' : undefined}
+            style={{
+              width: '100%',
+              maxWidth: 960,
+              height: 560,
+              border: '1px solid var(--brand-border)',
+              borderRadius: 'var(--radius-lg)',
+              overflow: 'hidden',
+              background: 'var(--surface-1)',
+            }}
+          >
+            <RebuiltAppChrome
+              workspaces={SHELL_WORKSPACES}
+              selected={shellSelected}
+              tab="seo-keywords"
+              theme={shellTheme}
+              pendingContentRequests={3}
+              onCreate={(name) => toast(`Create ${name}`, 'info')}
+              onDelete={(id) => toast(`Delete ${id}`, 'error')}
+              onLinkSite={(workspaceId) => toast(`Link ${workspaceId}`, 'info')}
+              onUnlinkSite={(workspaceId) => toast(`Unlink ${workspaceId}`, 'info')}
+              toggleTheme={() => setShellTheme((value) => value === 'dark' ? 'light' : 'dark')}
+            >
+              <GroupBlock title="Keyword pilot body" meta="Harness specimen" collapsible>
+                <p className="t-body" style={{ color: 'var(--brand-text)' }}>
+                  The rebuilt shell is mounted here as a real composition: collapse groups,
+                  arrow-key through nav items, and toggle the selected workspace to verify
+                  needs-site gating.
+                </p>
+              </GroupBlock>
+            </RebuiltAppChrome>
+          </div>
         </div>
       </Section>
 

@@ -6,6 +6,20 @@ A comprehensive value assessment of every feature in the platform — **541 feat
 
 ---
 
+### 614. UI Rebuild F4 — additive DS-native admin shell chrome 2026-07-05
+
+**What it does:** Adds the F4 shell layer on top of the F3 layout primitives without changing the live admin app. New `NavItem` and `NavGroup` primitives provide token-only, roving-keyboard-ready navigation building blocks. `RebuiltSidebar` consumes `NAV_REGISTRY` for identity, route, disabled, and flag behavior; `RebuiltBreadcrumb` resolves registry labels plus `?tab=` sub-state; `RebuiltAppChrome` composes both into `AppShell` behind `ui-rebuild-shell`. `App.tsx`, legacy `Sidebar.tsx`, legacy `Breadcrumbs.tsx`, and `src/lib/navRegistry.tsx` remain untouched so the Keywords pilot can opt in without destabilizing the existing shell.
+
+**Why it matters to the agency:** This gives the rebuild a real admin frame to pilot surfaces inside while preserving the current operator workflow. It also catches trust-sensitive shell issues early: disabled no-site destinations, active group expansion, breadcrumb deep links, theme switching, and keyboard traversal are testable before any broad admin replacement.
+
+**Why it matters to clients:** Indirect but important — operators can validate the redesigned admin shell safely before it powers client-impacting workflows, reducing the chance that navigation or deep-link regressions slow delivery work.
+
+**Deferred decisions:** ledger rows `DEF-shell-001` (footer utilities carried over before a DS restyle) and `DEF-shell-002` (registry icons continue through `<Icon as={LucideIcon}>` until the incremental FA migration reaches navRegistry).
+
+**Tests:** 23 focused component tests cover `NavItem`, `NavGroup`, `RebuiltSidebar`, `RebuiltBreadcrumb`, and `RebuiltAppChrome`, including real feature-flag loading→enabled transition behavior. `/__ds-harness` and `/styleguide.html` both include F4 shell specimens for keyboard/visual smoke. Closeout gates: typecheck, Vite build, pr-check, hooks lint, feature-flag verification, deferred-ledger verification, coverage ratchet, and full Vitest run.
+
+**Files:** `shared/types/feature-flags.ts`; `src/components/ui/layout/NavItem.tsx`; `src/components/ui/layout/NavGroup.tsx`; `src/components/layout/RebuiltSidebar.tsx`; `src/components/layout/RebuiltBreadcrumb.tsx`; `src/components/layout/RebuiltAppChrome.tsx`; `src/components/dev/DsHarness.tsx`; `tests/component/ui/NavItem.test.tsx`; `tests/component/ui/NavGroup.test.tsx`; `tests/component/layout/RebuiltSidebar.test.tsx`; `tests/component/layout/RebuiltBreadcrumb.test.tsx`; `tests/component/layout/RebuiltAppChrome.test.tsx`; `public/styleguide.html`; `data/ui-rebuild-deferred-ledger.json`; `data/roadmap.json`; `CLAUDE.md`; `BRAND_DESIGN_LANGUAGE.md`; `FEATURE_AUDIT.md`.
+
 ### 613. External / manual outcome ingestion — P1 (record published work + Rinse backfill)
 
 **What it does:** Lets the operator bring work published *outside* the platform (a manually-posted blog, an edit made directly on the live site) into the outcome ledger, so it can become a measured client win instead of being invisible to the outcome engine. Two pieces on top of the already-hardened manual-record route (`POST /api/outcomes/:workspaceId/actions`, idempotent on `(sourceType, sourceId)`): (1) a **"Record published work"** admin card at the top of the Outcomes dashboard (`RecordPublishedWorkCard`) — fields for page URL, title, type of work, and **"Who published it?"** (Agency → `platform_executed` / Client → `externally_executed`), which records the action with a durable source snapshot (title captured at write time so a later win shows the real headline, B11) via the existing `useRecordOutcomeAction` hook; (2) a one-off `scripts/backfill-rinse-outcomes.ts` that records a workspace's already-published posts (`listPosts` → those with a `publishedAt`) as `platform_executed` manual actions — idempotent (dedups on `manual-backfill:<postId>`), `--dry-run`-able, operator-run only (not CI). The client wrapper `outcomesApi.recordAction` gained the optional `source` field the route already accepted.

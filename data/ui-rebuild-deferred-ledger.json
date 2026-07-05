@@ -59,6 +59,32 @@
       "links": { "kitDoc": "components/feedback/Toast.jsx" }
     },
     {
+      "id": "DEF-shell-001",
+      "surface": "foundation",
+      "item": "RebuiltSidebar footer utilities (NotificationBell, WorkspaceSelector, Revenue/Settings/theme/logout IconButtons) carry over from the legacy Sidebar; a fully DS-native restyle is deferred.",
+      "decision": "T1 carry-over — machinery-dense, zero capability loss; the visual seam is accepted for F4 so the pilot can validate the registry-driven shell first.",
+      "class": "primitive",
+      "upgradeTrigger": "Phase A admin fan-out reaches the shell chrome.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-05",
+      "reviewBy": "2026-09-30"
+    },
+    {
+      "id": "DEF-shell-002",
+      "surface": "foundation",
+      "item": "NAV_REGISTRY icons render as lucide via <Icon as>; FA-name mapping of registry entries is deferred.",
+      "decision": "D5 keeps <Icon as={LucideIcon}> during the incremental lucide-to-FA migration; remapping the registry icons now is out of F4 scope.",
+      "class": "token",
+      "upgradeTrigger": "The lucide-to-FA call-site migration reaches navRegistry.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-05",
+      "reviewBy": "2026-09-30"
+    },
+    {
       "id": "DEF-icon-001",
       "surface": "foundation",
       "item": "~381 files still import lucide-react directly (or use <Icon as={LucideIcon}>). The icon system of record is now Font Awesome Sharp Regular (<Icon name=...>); lucide is kept as a supported migration path but every surface should migrate to FA glyphs.",
