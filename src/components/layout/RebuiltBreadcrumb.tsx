@@ -8,6 +8,7 @@ import { adminPath, type Page } from '../../routes';
 import { resolveNavLabelById } from '../../lib/navRegistry';
 import { queryKeys } from '../../lib/queryKeys';
 import { FEATURE_FLAGS, type FeatureFlagKey } from '../../../shared/types/feature-flags';
+import { KEYWORD_COMMAND_CENTER_FILTERS } from '../../../shared/types/keyword-command-center';
 import type { Workspace } from '../WorkspaceSelector';
 import { Badge, Button, Icon } from '../ui';
 
@@ -22,20 +23,81 @@ const LEGACY_TAB_LABELS: Record<string, string> = {
   'workspace-settings': 'Workspace Settings',
 };
 
-const SUB_TAB_LABELS: Record<string, string> = {
-  briefs: 'Briefs',
-  posts: 'Posts',
-  calendar: 'Calendar',
-  publish: 'Publish',
-  subscriptions: 'Subscriptions',
-  tracked: 'Tracked',
-  striking_distance: 'Striking Distance',
-  context: 'Context',
-  'business-footprint': 'Business Footprint',
-  locations: 'Locations',
-  reviews: 'Reviews',
-  setup: 'Setup',
-  guide: 'Guide',
+const SUB_TAB_LABELS_BY_PAGE: Partial<Record<Page, Record<string, string>>> = {
+  home: {
+    overview: 'Overview',
+    'meeting-brief': 'Meeting Brief',
+  },
+  'content-pipeline': {
+    planner: 'Planner',
+    calendar: 'Calendar',
+    briefs: 'Briefs',
+    posts: 'Posts',
+    publish: 'Publish',
+    subscriptions: 'Publish',
+  },
+  'seo-keywords': {
+    [KEYWORD_COMMAND_CENTER_FILTERS.ALL]: 'All',
+    [KEYWORD_COMMAND_CENTER_FILTERS.IN_STRATEGY]: 'In Strategy',
+    [KEYWORD_COMMAND_CENTER_FILTERS.TRACKED]: 'Tracked',
+    [KEYWORD_COMMAND_CENTER_FILTERS.NEEDS_REVIEW]: 'Needs Review',
+    [KEYWORD_COMMAND_CENTER_FILTERS.RETIRED]: 'Retired',
+    [KEYWORD_COMMAND_CENTER_FILTERS.LOCAL]: 'Local',
+    [KEYWORD_COMMAND_CENTER_FILTERS.STRIKING_DISTANCE]: 'Striking Distance',
+  },
+  links: {
+    redirects: 'Redirects',
+    internal: 'Internal Links',
+    'dead-links': 'Dead Links',
+  },
+  brand: {
+    overview: 'Overview',
+    context: 'Context',
+    brandscript: 'Brandscript',
+    discovery: 'Discovery',
+    voice: 'Voice',
+    identity: 'Identity',
+    'business-footprint': 'Business Footprint',
+    'business-profile': 'Business Footprint',
+    locations: 'Business Footprint',
+    'eeat-assets': 'E-E-A-T Assets',
+    'intelligence-profile': 'Intelligence Profile',
+  },
+  'seo-schema': {
+    generator: 'Generator',
+    guide: 'Workflow Guide',
+  },
+  'local-seo': {
+    overview: 'Overview',
+    visibility: 'Visibility',
+    reviews: 'Reviews',
+    setup: 'Setup',
+  },
+  performance: {
+    weight: 'Page Weight',
+    speed: 'Page Speed',
+  },
+  'workspace-settings': {
+    connections: 'Connections',
+    features: 'Features',
+    flags: 'Feature Flags',
+    dashboard: 'Client Dashboard',
+    publishing: 'Publishing',
+    export: 'Data Export',
+    'llms-txt': 'LLMs.txt',
+  },
+  requests: {
+    deliverables: 'Client Deliverables',
+    signals: 'Signals',
+    requests: 'Requests',
+    actions: 'Client Actions',
+  },
+  'seo-strategy': {
+    overview: 'Overview',
+    content: 'Content',
+    rankings: 'Rankings',
+    competitive: 'Competitive',
+  },
 };
 
 interface BreadcrumbItem {
@@ -75,7 +137,7 @@ export function RebuiltBreadcrumb({
   const workspaceLabel = selected ? (selected.webflowSiteName || selected.name) : null;
   const workspaceTitle = workspaces.length === 1 ? '1 workspace' : `${workspaces.length} workspaces`;
   const subTab = searchParams.get('tab');
-  const subTabLabel = subTab ? SUB_TAB_LABELS[subTab] : undefined;
+  const subTabLabel = subTab ? SUB_TAB_LABELS_BY_PAGE[tab]?.[subTab] : undefined;
 
   const items = useMemo<BreadcrumbItem[]>(() => {
     const next: BreadcrumbItem[] = [
@@ -147,6 +209,7 @@ export function RebuiltBreadcrumb({
             </Button>
           ) : (
             <span
+              aria-current={item.current ? 'page' : undefined}
               title={item.label === workspaceLabel ? workspaceTitle : undefined}
               style={{
                 minWidth: 0,

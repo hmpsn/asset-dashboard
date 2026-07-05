@@ -155,4 +155,19 @@ describe('RebuiltSidebar', () => {
 
     expect(mockNavigate).toHaveBeenCalledWith('/ws/ws-1/analytics-hub');
   });
+
+  it('keyboard-walk skips disabled needsSite rows for no-site workspaces', async () => {
+    const user = userEvent.setup();
+    renderSidebar({ selected: WORKSPACES[1] });
+
+    const home = screen.getByRole('button', { name: 'Home' });
+    home.focus();
+    await user.keyboard('{ArrowDown}');
+
+    expect(document.activeElement).toHaveTextContent('Action Results');
+
+    await user.keyboard('{Enter}');
+
+    expect(mockNavigate).toHaveBeenCalledWith('/ws/ws-2/outcomes');
+  });
 });

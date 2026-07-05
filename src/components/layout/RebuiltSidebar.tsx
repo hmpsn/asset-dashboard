@@ -81,6 +81,11 @@ function buildNavGroups(isFlagEnabled: (flag: FeatureFlagKey) => boolean): Rebui
   }));
 }
 
+function isNavItemDisabled(item: RebuiltNavItem, selected: Workspace | null): boolean {
+  if (GLOBAL_TABS.has(item.id)) return false;
+  return !selected || (!!item.needsSite && !selected.webflowSiteId);
+}
+
 function readCollapsedGroups(): Set<string> {
   try {
     const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
@@ -148,22 +153,24 @@ export function RebuiltSidebar({
     };
   }), [collapsedGroups, navGroups]);
 
-  const visibleItems = useMemo(() => visibleGroups.flatMap((group) =>
-    group.visibleItems.map((item) => ({ group, item })),
-  ), [visibleGroups]);
+  const enabledVisibleItems = useMemo(() => visibleGroups.flatMap((group) =>
+    group.visibleItems
+      .filter((item) => !isNavItemDisabled(item, selected))
+      .map((item) => ({ group, item })),
+  ), [selected, visibleGroups]);
 
   const activateItem = (item: RebuiltNavItem) => {
     const isGlobal = GLOBAL_TABS.has(item.id);
-    const disabled = isGlobal ? false : (!selected || (item.needsSite && !selected.webflowSiteId));
+    const disabled = isNavItemDisabled(item, selected);
     if (disabled) return;
     if (isGlobal) navigate('/' + item.id);
     else if (selected) navigate(adminPath(selected.id, item.id));
   };
 
-  const roving = useRovingTabindex(visibleItems.length, {
+  const roving = useRovingTabindex(enabledVisibleItems.length, {
     orientation: 'vertical',
     onActivate: (index) => {
-      const model = visibleItems[index];
+      const model = enabledVisibleItems[index];
       if (model) activateItem(model.item);
     },
   });
@@ -233,11 +240,10 @@ export function RebuiltSidebar({
           >
             {group.visibleItems.map((item) => {
               const index = navIndex;
-              navIndex += 1;
-              const isGlobal = GLOBAL_TABS.has(item.id);
               const active = tab === item.id;
-              const disabled = isGlobal ? false : (!selected || (item.needsSite && !selected.webflowSiteId));
-              const rovingProps = roving.getItemProps(index);
+              const disabled = isNavItemDisabled(item, selected);
+              const rovingProps = disabled ? null : roving.getItemProps(index);
+              if (!disabled) navIndex += 1;
               const disabledTitle = !selected ? 'Select a workspace first' : 'Connect a site first';
               return (
                 <NavItem
@@ -250,10 +256,10 @@ export function RebuiltSidebar({
                   accent={group.accent}
                   title={disabled ? disabledTitle : item.desc}
                   onClick={() => activateItem(item)}
-                  itemRef={rovingProps.ref}
-                  tabIndex={rovingProps.tabIndex}
-                  onFocus={rovingProps.onFocus}
-                  onKeyDown={rovingProps.onKeyDown}
+                  itemRef={rovingProps?.ref}
+                  tabIndex={rovingProps?.tabIndex}
+                  onFocus={rovingProps?.onFocus}
+                  onKeyDown={rovingProps?.onKeyDown}
                 />
               );
             })}

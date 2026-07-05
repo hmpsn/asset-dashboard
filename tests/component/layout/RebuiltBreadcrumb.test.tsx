@@ -43,7 +43,7 @@ describe('RebuiltBreadcrumb', () => {
 
     expect(screen.getByText('Command Center')).toBeInTheDocument();
     expect(screen.getByText('acme.com')).toBeInTheDocument();
-    expect(screen.getByText('Site Audit')).toBeInTheDocument();
+    expect(screen.getByText('Site Audit')).toHaveAttribute('aria-current', 'page');
   });
 
   it('uses the legacy fallback label for redirect-only pages', () => {
@@ -63,6 +63,29 @@ describe('RebuiltBreadcrumb', () => {
 
     expect(screen.getByText('Pipeline')).toBeInTheDocument();
     expect(screen.getByText('Briefs')).toBeInTheDocument();
+  });
+
+  it('renders current sub-segments for routed content and settings deep links', () => {
+    const { unmount } = renderBreadcrumb('content-pipeline', '/ws/ws-1/content-pipeline?tab=planner');
+
+    expect(screen.getByText('Planner')).toHaveAttribute('aria-current', 'page');
+
+    unmount();
+    renderBreadcrumb('workspace-settings', '/ws/ws-1/workspace-settings?tab=dashboard');
+
+    expect(screen.getByText('Client Dashboard')).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('only renders Keyword Hub sub-segments the receiver actually honors', () => {
+    const { unmount } = renderBreadcrumb('seo-keywords', '/ws/ws-1/seo-keywords?tab=striking_distance');
+
+    expect(screen.getByText('Striking Distance')).toHaveAttribute('aria-current', 'page');
+
+    unmount();
+    renderBreadcrumb('seo-keywords', '/ws/ws-1/seo-keywords?tab=local_candidates');
+
+    expect(screen.queryByText('Local Candidates')).not.toBeInTheDocument();
+    expect(screen.getByText('Keyword Hub')).toHaveAttribute('aria-current', 'page');
   });
 
   it('navigates to the command center when the root crumb is clicked', async () => {
