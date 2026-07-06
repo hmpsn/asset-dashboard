@@ -19,7 +19,7 @@ Adding the marker opts a file into **seven pr-check rules at error severity (D7)
 | `ds-tailwind-palette-bypass` | raw Tailwind palette class (`text-zinc-400`, `bg-blue-500`, …) — use token-backed classes | `// palette-ok` |
 | `ds-per-view-css-block` | `const *css*/*styles* =` or `<style>` — compose primitives, don't fork CSS per view | `// view-css-ok` |
 | `ds-token-theme-parity` | a themeable `--*` in `:root` without a `.dashboard-light` override (or vice versa); theme-neutral families exempt | none (structural) |
-| `ds-icon-discipline` | Font Awesome `fa-*` or emoji-as-icon — lucide-react is the ratified system (D5) | `// icon-ok` |
+| `ds-icon-discipline` | raw Font Awesome `fa-*` classes or emoji-as-icon — use `<Icon name="…">`; `<Icon as={LucideIcon}>` remains a migration path (D5) | `// icon-ok` |
 | `ds-deep-import` | import into `components/ui/internal/` — import the public primitive (backstop; refined in F3) | `// deep-import-ok` |
 | `ds-motion-token` | literal transition/animation duration — use `var(--dur-fast\|base\|slow)` | `// motion-ok` |
 
@@ -27,7 +27,9 @@ Adding the marker opts a file into **seven pr-check rules at error severity (D7)
 
 **Overlap with pre-rebuild rules (double-hatch cost):** the repo-wide legacy rules (`Raw text-zinc-N`/`bg-zinc-N`/`border-zinc-N`, `Hardcoded dark hex in inline styles`, `Raw hex chart color`) still fire on `@ds-rebuilt` files — their guidance agrees with the `ds-*` rules (both say "use tokens"), so overlap is harmless, but a genuinely-exempt line needs **both** hatches on the same line (e.g. `// palette-ok raw-zinc-ok`). Known cost, accepted: honoring sibling hatches across rules would couple rule implementations. Noise-trimming already applied (review, PR #1473): `ds-raw-hex-anywhere` skips comment contexts (PR refs like `#1472`) and `href="#…"` anchors; `ds-icon-discipline` excludes the dingbat range (✓ ⚠ ★ are string glyphs, not icons).
 
-The F2b lint lane (`lint:ds-adherence`, below) will later attach to the same `@ds-rebuilt` scope once the DS import root exists.
+F2b deliberately retired the proposed `lint:ds-adherence` lane: F2a's seven
+`ds-*` rules cover token purity, TypeScript catches invalid direct props, and
+the remaining raw-px signal is accepted for rebuilt inline-style components.
 
 ---
 
@@ -64,16 +66,19 @@ Deliberately not mechanized (no grep-able symptom): mutation-contract classing, 
 
 ---
 
-## 4. F2b backlog (deferred with triggers)
+## 4. F2b gate status
 
-Deliberately NOT in F2a — each waits on a concrete trigger so it lands against real surfaces, not speculation:
+F2b closes the remaining CI-native gates that do not require a deploy or
+secrets. Visual regression stays component-isolated and lands on the Keywords
+pilot, not in the dormant deploy-coupled snapshot suite.
 
-| Item | Trigger |
+| Item | Status |
 |---|---|
-| `lint:ds-adherence` ESLint-wrapper lane + adherence-config drift-sync gate | F3 DS import root exists + prop allow-lists regenerated from the merged TS prop types |
-| `ds-state-matrix-presence` rule (require Skeleton/EmptyState/error refs per surface) | Keywords pilot (first real rebuild surface) |
-| Snapshot theme×state matrix (surface × {dark, light} × {loading, empty, error, locked, populated}) | Keywords pilot |
-| `verify:bundle-budget` ratchet from the vite manifest | Keywords pilot |
-| `@axe-core/playwright` in the state-matrix run | **Owner dependency approval** — until then the a11y DoD box is REVIEW, never silently AUTO-passed |
-| `ds-reinvented-primitive` drift-scanner categories (extend `scripts/report-style-drift.ts` — never a second scanner) | Keywords pilot |
-| Hatch-reconciliation in `verify-deferred-ledger.ts` (cross-check `-ok` hatches ↔ ledger rows) | First `-ok` hatch lands in a rebuilt surface |
+| `verify:bundle-budget` ratchet from the Vite manifest | **DONE in F2b.** `npx vite build --manifest` emits `dist/.vite/manifest.json`; `npm run verify:bundle-budget` compares gzip sizes for all manifest JS chunks plus manifest/index-linked CSS and font assets (including self-hosted Font Awesome) to `data/bundle-budget-baseline.json` with 5% tolerance and runs in PR quality CI. |
+| Component-level accessibility | **DONE in F2b.** `tests/component/a11y.ts` exposes `expectNoA11yViolations(container)` via `vitest-axe`; every `@ds-rebuilt` component/surface test must call it on the primary render. **Enforced** by `tests/contract/ds-rebuilt-a11y-coverage.test.ts` — a ratchet that fails if any `@ds-rebuilt` primitive with a test file omits the a11y assertion (so the floor can't rot as Phase A fans out); genuine, unfixable violations go in that file's `KNOWN_A11Y_GAPS` allowlist with a DEF-* row, and the allowlist is burn-down-checked. The helper disables only axe's `color-contrast` rule because jsdom lacks canvas `getContext`; browser visual/manual review still owns contrast. |
+| `lint:ds-adherence` ESLint-wrapper lane | **RETIRED-REDUNDANT (D-F2b-1).** F2a `ds-*` rules + TypeScript prop checking cover the useful parts; the raw-px gap is accepted for inline-style DS components and tracked as `DEF-lint-001` in the deferred ledger. |
+| Browser-level axe via `@axe-core/playwright` | **MOVED OUT.** Would attach to the dormant deploy-coupled snapshot suite; component-level `vitest-axe` is the CI floor. Browser-level axe can be added later as an explicit surface smoke, not F2b. |
+| Snapshot theme×state matrix | **MOVED TO PILOT.** The Keywords pilot builds Playwright Component Testing visual regression (component-isolated states × themes) and becomes the Phase A template. |
+| `ds-state-matrix-presence` rule (require Skeleton/EmptyState/error refs per surface) | Deferred until the Keywords pilot proves the real state matrix. |
+| `ds-reinvented-primitive` drift-scanner categories (extend `scripts/report-style-drift.ts` — never a second scanner) | Deferred until the Keywords pilot gives real duplication categories. |
+| Hatch-reconciliation in `verify-deferred-ledger.ts` (cross-check `-ok` hatches ↔ ledger rows) | Deferred until the first `-ok` hatch lands in a rebuilt surface. |

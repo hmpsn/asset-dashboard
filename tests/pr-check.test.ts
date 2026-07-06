@@ -6097,7 +6097,7 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
       out = execFileSync(tsxBin, ['scripts/pr-check.ts', '--all'], {
         cwd: repoRoot,
         encoding: 'utf-8',
-        timeout: 360_000,
+        timeout: 600_000,
         maxBuffer: 10 * 1024 * 1024,
       });
     } catch (err: unknown) {
@@ -6105,8 +6105,26 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
       // still attached to the error object. pr-check exits 1 when errors
       // exist — swallow that; we only care about the status lines in
       // stdout.
-      const e = err as { stdout?: Buffer | string; stderr?: Buffer | string; status?: number; message?: string };
+      const e = err as {
+        stdout?: Buffer | string;
+        stderr?: Buffer | string;
+        status?: number;
+        signal?: NodeJS.Signals | null;
+        killed?: boolean;
+        message?: string;
+      };
       out = e.stdout ? e.stdout.toString() : '';
+      if (e.signal || e.killed || /timed out/i.test(e.message ?? '')) {
+        const stderrStr = e.stderr ? e.stderr.toString() : '';
+        throw new Error(
+          `pr-check --all timed out before producing a complete status table.\n` +
+          `  signal: ${e.signal ?? 'none'}\n` +
+          `  killed: ${String(e.killed ?? false)}\n` +
+          `  message: ${e.message}\n` +
+          `  stdout tail:\n${out.split('\n').slice(-30).join('\n')}\n` +
+          `  stderr tail:\n${stderrStr.split('\n').slice(-30).join('\n')}`,
+        );
+      }
       if (!out.trim()) {
         const stderrStr = e.stderr ? e.stderr.toString() : '';
         throw new Error(
@@ -6219,7 +6237,7 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
     if (errors.length > 0) {
       throw new Error(errors.join('\n\n─────\n\n'));
     }
-  }, 390_000);
+  }, 660_000);
 });
 
 // ════════════════════════════════════════════════════════════════════════════

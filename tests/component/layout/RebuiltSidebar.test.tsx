@@ -7,6 +7,7 @@ import { RebuiltSidebar } from '../../../src/components/layout/RebuiltSidebar';
 import { NAV_REGISTRY, NAV_REGISTRY_BY_ID } from '../../../src/lib/navRegistry';
 import type { Workspace } from '../../../src/components/WorkspaceSelector';
 import type { FeatureFlagKey } from '../../../shared/types/feature-flags';
+import { expectNoA11yViolations } from '../a11y';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -74,8 +75,8 @@ describe('RebuiltSidebar', () => {
     NAV_REGISTRY_BY_ID.features.flagBehavior = undefined;
   });
 
-  it('renders registry groups in the legacy sidebar order', () => {
-    renderSidebar();
+  it('renders registry groups in the legacy sidebar order', async () => {
+    const { container } = renderSidebar();
 
     const monitoring = screen.getByRole('button', { name: 'MONITORING' });
     const siteHealth = screen.getByRole('button', { name: 'SITE HEALTH' });
@@ -94,7 +95,8 @@ describe('RebuiltSidebar', () => {
     const nonUtilityGroups = new Set(NAV_REGISTRY.map((entry) => entry.group).filter((group) => group !== 'utility'));
     expect(nonUtilityGroups).toEqual(new Set(['home', 'monitoring', 'site-health', 'seo-strategy', 'optimization', 'content', 'admin']));
     for (const label of renderedLabels) expect(screen.getByText(label)).toBeInTheDocument();
-  });
+    await expectNoA11yViolations(container);
+  }, 15_000);
 
   it('disables needsSite items without a linked site and enables them once a site exists', () => {
     const { rerender } = renderSidebar({ selected: WORKSPACES[1] });
@@ -110,7 +112,7 @@ describe('RebuiltSidebar', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Search & Traffic' })).not.toHaveAttribute('aria-disabled');
-  });
+  }, 15_000);
 
   it('auto-expands the group containing the active tab and marks the item current', async () => {
     localStorage.setItem('admin-sidebar-collapsed', JSON.stringify(['MONITORING']));

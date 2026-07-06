@@ -109,6 +109,7 @@ Every completed task must include:
 | `npm run verify:platform:quick` | Quick platform checks (skips slow verifiers) |
 | `npm run verify:feature-flags` | Validate feature flag catalog consistency |
 | `npm run verify:deferred-ledger` | Validate the UI-rebuild deferred-work ledger (schema, expiry, roadmap links) |
+| `npm run verify:bundle-budget` | Validate the frontend JS/CSS/font gzip size ratchet |
 | `npm run verify:lexicon` | Validate GLOSSARY ↔ lexicon registry parity + duplicate exported-name allowlist |
 | `npm run verify:coverage-ratchet` | Fail if coverage has regressed below ratchet |
 | `npm run rules:generate` | Regenerate `docs/rules/automated-rules.md` from pr-check CHECKS array |
@@ -331,7 +332,7 @@ as quick guidance plus links to the canonical rule docs.
 | `docs/workflows/deploy.md` | Commit, push, verify deploy (staging → main flow) |
 | `docs/workflows/staging-environment.md` | Staging URLs, DB sync, feature flags, env vars |
 | `docs/rules/automated-rules.md` | **Generated** table of every rule enforced by `scripts/pr-check.ts` |
-| `docs/rules/ui-rebuild-consistency.md` | UI rebuild consistency contract — `@ds-rebuilt` marker + 7 gates, agentic review cadence, deferred-ledger discipline, F2b backlog |
+| `docs/rules/ui-rebuild-consistency.md` | UI rebuild consistency contract — `@ds-rebuilt` marker + 7 gates, F2b gate status, agentic review cadence, deferred-ledger discipline |
 | `docs/rules/pr-check-rule-authoring.md` | How to add a new mechanized rule (when to do it, how to write the regex/customCheck, how to test it) |
 | `docs/rules/data-flow.md` | Data flow consistency rules (detailed) |
 | `docs/rules/ui-ux-consistency.md` | UI/UX consistency rules (detailed) |
@@ -420,5 +421,6 @@ Work is not done until ALL pass:
 - [ ] If multi-phase feature: this PR covers exactly one phase. Phase N+1 is not started until phase N is merged and green.
 - [ ] `npm run verify:feature-flags` — no orphaned or ungrouped feature flag keys
 - [ ] `npm run verify:deferred-ledger` — UI-rebuild deferred ledger valid (schema, no expired open entries, roadmap links) — only if the PR touches rebuild scope
+- [ ] `npm run verify:bundle-budget` — frontend JS/CSS/font gzip size ratchet holds — only if frontend bundle assets changed or the PR touches rebuild scope
 - [ ] `npm run verify:lexicon` — GLOSSARY ↔ lexicon registry parity holds and no unregistered duplicate exported type name
 - [ ] `npm run verify:coverage-ratchet` — coverage has not regressed below ratchet baseline

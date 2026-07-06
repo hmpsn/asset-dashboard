@@ -2,10 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NavGroup } from '../../../src/components/ui/layout/NavGroup';
+import { expectNoA11yViolations } from '../a11y';
 
 describe('NavGroup', () => {
-  it('renders a collapsible header with aria-expanded tied to collapsed', () => {
-    render(
+  it('renders a collapsible header with aria-expanded tied to collapsed', async () => {
+    const { container } = render(
       <NavGroup label="MONITORING" collapsed>
         <button>Search & Traffic</button>
       </NavGroup>,
@@ -14,6 +15,7 @@ describe('NavGroup', () => {
     const header = screen.getByRole('button', { name: 'MONITORING' });
     expect(header).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('region', { hidden: true })).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 
   it('calls onToggleCollapse from the header button', async () => {

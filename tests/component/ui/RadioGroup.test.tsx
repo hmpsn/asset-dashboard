@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RadioGroup } from '../../../src/components/ui/forms/RadioGroup';
 import { FormField } from '../../../src/components/ui/forms/FormField';
+import { expectNoA11yViolations } from '../a11y';
 
 const options = [
   { value: 'a', label: 'Option A' },
@@ -69,8 +70,8 @@ describe('RadioGroup', () => {
     expect(onChange).toHaveBeenCalledWith('b');
   });
 
-  it('renders inside a FormField and reflects aria-invalid when the field has an error', () => {
-    render(
+  it('renders inside a FormField and reflects aria-invalid when the field has an error', async () => {
+    const { container } = render(
       <FormField label="Choose one" error="Required">
         <RadioGroup options={options} value="a" onChange={vi.fn()} />
       </FormField>,
@@ -78,5 +79,6 @@ describe('RadioGroup', () => {
 
     expect(screen.getByRole('radiogroup')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByRole('radiogroup')).toHaveAttribute('aria-describedby');
+    await expectNoA11yViolations(container);
   });
 });

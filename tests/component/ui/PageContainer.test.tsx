@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { PageContainer } from '../../../src/components/ui/layout/PageContainer';
+import { expectNoA11yViolations } from '../a11y';
 
 afterEach(() => {
   cleanup();
@@ -71,4 +72,9 @@ describe('PageContainer', () => {
     expect(el.style.display).not.toBe('flex');
     expect(el.style.gap).toBe('');
   });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<PageContainer>content</PageContainer>);
+    await expectNoA11yViolations(container);
+  }, 15_000);
 });

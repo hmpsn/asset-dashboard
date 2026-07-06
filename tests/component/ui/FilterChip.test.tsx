@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FilterChip } from '../../../src/components/ui/forms/FilterChip';
+import { expectNoA11yViolations } from '../a11y';
 
 describe('FilterChip', () => {
   it('clicking the chip fires onClick', async () => {
@@ -13,9 +14,10 @@ describe('FilterChip', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it('aria-pressed reflects the active prop', () => {
-    const { rerender } = render(<FilterChip label="Commercial" active={false} onClick={vi.fn()} />);
+  it('aria-pressed reflects the active prop', async () => {
+    const { container, rerender } = render(<FilterChip label="Commercial" active={false} onClick={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'Commercial' })).toHaveAttribute('aria-pressed', 'false');
+    await expectNoA11yViolations(container);
 
     rerender(<FilterChip label="Commercial" active onClick={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'Commercial' })).toHaveAttribute('aria-pressed', 'true');

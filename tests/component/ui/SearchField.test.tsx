@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { SearchField } from '../../../src/components/ui/forms/SearchField';
+import { expectNoA11yViolations } from '../a11y';
 
 describe('SearchField', () => {
   beforeEach(() => {
@@ -76,4 +77,13 @@ describe('SearchField', () => {
 
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it('has no accessibility violations', async () => {
+    // axe schedules work on real timers; run this one assertion off fake timers,
+    // then restore them so the shared afterEach timer teardown still applies.
+    vi.useRealTimers();
+    const { container } = render(<SearchField value="hello" onChange={vi.fn()} />);
+    await expectNoA11yViolations(container);
+    vi.useFakeTimers();
+  }, 15_000);
 });

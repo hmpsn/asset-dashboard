@@ -3,14 +3,16 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Globe } from 'lucide-react';
 import { NavItem } from '../../../src/components/ui/layout/NavItem';
+import { expectNoA11yViolations } from '../a11y';
 
 describe('NavItem', () => {
-  it('renders label and lucide icon through the shared Icon wrapper', () => {
-    render(<NavItem icon={Globe} label="Site Audit" />);
+  it('renders label and lucide icon through the shared Icon wrapper', async () => {
+    const { container } = render(<NavItem icon={Globe} label="Site Audit" />);
 
     expect(screen.getByRole('button', { name: 'Site Audit' })).toBeInTheDocument();
     expect(screen.getByText('Site Audit')).toBeInTheDocument();
     expect(document.querySelector('svg')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 
   it('marks active items as the current page and renders the accent bar', () => {

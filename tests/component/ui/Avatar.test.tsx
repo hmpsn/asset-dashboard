@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Avatar } from '../../../src/components/ui/Avatar';
+import { expectNoA11yViolations } from '../a11y';
 
 describe('Avatar', () => {
   it('renders initials when no src or icon is given', () => {
@@ -39,4 +40,9 @@ describe('Avatar', () => {
     const span = container.querySelector('span');
     expect(span).toHaveAttribute('aria-hidden', 'true');
   });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<Avatar initials="JH" label="Josh Hampson" />);
+    await expectNoA11yViolations(container);
+  }, 15_000);
 });

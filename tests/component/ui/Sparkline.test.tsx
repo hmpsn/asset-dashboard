@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import { Sparkline } from '../../../src/components/ui/Sparkline';
+import { expectNoA11yViolations } from '../a11y';
 
 describe('Sparkline', () => {
   it('renders a polyline for a multi-point series', () => {
@@ -26,4 +27,9 @@ describe('Sparkline', () => {
     expect(line?.getAttribute('y1')).not.toBe('NaN');
     expect(container.innerHTML).not.toContain('NaN');
   });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<Sparkline data={[1, 5, 2, 8, 4]} label="Weekly clicks trend" />);
+    await expectNoA11yViolations(container);
+  }, 15_000);
 });

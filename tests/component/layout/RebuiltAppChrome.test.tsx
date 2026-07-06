@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RebuiltAppChrome, useRebuildShellEnabled } from '../../../src/components/layout/RebuiltAppChrome';
 import type { Workspace } from '../../../src/components/WorkspaceSelector';
 import { FEATURE_FLAGS } from '../../../shared/types/feature-flags';
+import { expectNoA11yViolations } from '../a11y';
 
 vi.mock('../../../src/hooks/admin/useNotifications', () => ({
   useNotifications: () => ({ data: [] }),
@@ -82,4 +83,16 @@ describe('RebuiltAppChrome', () => {
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument();
     expect(screen.getAllByText('Keyword Hub').length).toBeGreaterThanOrEqual(2);
   });
+
+  it('has no accessibility violations once the rebuilt shell is mounted', async () => {
+    const { container } = renderProbe();
+
+    // Wait for the flag query to resolve ON so we audit the rebuilt shell, not
+    // the legacy-shell fallback.
+    await waitFor(() => {
+      expect(screen.getByText('Keyword pilot body')).toBeInTheDocument();
+    });
+
+    await expectNoA11yViolations(container);
+  }, 15_000);
 });
