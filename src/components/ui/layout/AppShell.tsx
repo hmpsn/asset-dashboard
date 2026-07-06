@@ -1,5 +1,6 @@
 // @ds-rebuilt
-import type { CSSProperties, ReactElement, ReactNode } from 'react';
+import { useEffect, type CSSProperties, type ReactElement, type ReactNode } from 'react';
+import { isEditableKeyTarget } from '../../../lib/keyboardGuards';
 
 /**
  * The application frame: a sidebar column + a main column (optional top bar over
@@ -15,6 +16,10 @@ export interface AppShellProps {
   topbar?: ReactNode;
   /** Collapse the sidebar to --shell-sidebar-rail. */
   rail?: boolean;
+  /** Controlled focus mode: collapses the sidebar rail while true. */
+  focusMode?: boolean;
+  /** Called with false when focus mode should exit, such as a non-editing Escape press. */
+  onFocusModeChange?: (focusMode: boolean) => void;
   children?: ReactNode;
   className?: string;
   id?: string;
@@ -23,14 +28,46 @@ export interface AppShellProps {
 
 const MAIN_CONTENT_ID = 'app-shell-main-content';
 
-export function AppShell({ sidebar, topbar, rail = false, children, className, id, style }: AppShellProps): ReactElement {
+function hasOpenOverlay(): boolean {
+  if (typeof document === 'undefined') return false;
+  // Modal/Drawer/Popover own Escape while open; focus mode exits only after they are gone.
+  return document.querySelector('[aria-modal="true"], [data-modal-backdrop="true"], [data-drawer-backdrop="true"], [data-popover-menu="true"]') !== null;
+}
+
+export function AppShell({
+  sidebar,
+  topbar,
+  rail = false,
+  focusMode,
+  onFocusModeChange,
+  children,
+  className,
+  id,
+  style,
+}: AppShellProps): ReactElement {
+  const collapsedRail = rail || focusMode === true;
+
+  useEffect(() => {
+    if (focusMode !== true) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (isEditableKeyTarget(event.target)) return;
+      if (hasOpenOverlay()) return;
+      onFocusModeChange?.(false);
+    };
+
+    document.addEventListener('keydown', handleKeyDown); // keydown-ok — guarded for editable targets and only active while focusMode is true.
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [focusMode, onFocusModeChange]);
+
   return (
     <div
       id={id}
       className={className}
       style={{
         display: 'grid',
-        gridTemplateColumns: `${rail ? 'var(--shell-sidebar-rail)' : 'var(--shell-sidebar)'} 1fr`,
+        gridTemplateColumns: `${collapsedRail ? 'var(--shell-sidebar-rail)' : 'var(--shell-sidebar)'} 1fr`,
         height: '100vh',
         background: 'var(--surface-1)',
         color: 'var(--brand-text)',

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { Button } from './Button';
 
 interface ConfirmDialogProps {
@@ -22,6 +22,8 @@ export function ConfirmDialog({
   onCancel,
   variant = 'default',
 }: ConfirmDialogProps) {
+  const titleId = useId();
+  const messageId = useId();
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -42,11 +44,15 @@ export function ConfirmDialog({
       onClick={onCancel}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={messageId}
         className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] p-6 w-full max-w-sm mx-4 shadow-xl"
         onClick={e => e.stopPropagation()}
       >
-        <h3 className="text-[var(--brand-text-bright)] font-semibold text-base mb-2">{title}</h3>
-        <p className="text-[var(--brand-text)] t-body mb-6">{message}</p>
+        <h3 id={titleId} className="text-[var(--brand-text-bright)] font-semibold text-base mb-2">{title}</h3>
+        <p id={messageId} className="text-[var(--brand-text)] t-body mb-6">{message}</p>
         <div className="flex gap-3 justify-end">
           <Button
             onClick={onCancel}
