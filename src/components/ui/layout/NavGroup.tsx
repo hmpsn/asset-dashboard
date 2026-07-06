@@ -7,6 +7,9 @@ export interface NavGroupProps {
   accent?: string;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  /** Icon-rail rendering: drop the text header and stack the icon items, with a
+   *  hairline divider marking the group boundary. */
+  rail?: boolean;
   /** Count/indicator shown on the group header — stays visible when the group is
    *  collapsed and its items (which carry their own badges) are hidden. */
   badge?: ReactNode;
@@ -23,6 +26,7 @@ export function NavGroup({
   accent = 'var(--brand-text-dim)',
   collapsed = false,
   onToggleCollapse,
+  rail = false,
   badge,
   children,
   className,
@@ -37,6 +41,23 @@ export function NavGroup({
     margin: '0 0 4px',
     ...style,
   };
+
+  // Rail: no header — just the icon items, with a hairline marking the group
+  // boundary (skipped for the label-less home group so it sits flush at the top).
+  if (rail) {
+    return (
+      <div
+        id={id}
+        className={className}
+        style={{
+          ...rootStyle,
+          ...(label ? { borderTop: '1px solid var(--brand-border)', paddingTop: 6, marginTop: 6 } : null),
+        }}
+      >
+        {children}
+      </div>
+    );
+  }
 
   if (!label) {
     return (

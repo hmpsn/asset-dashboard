@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import type { ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { Page } from '../../routes';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import type { Workspace } from '../WorkspaceSelector';
@@ -30,6 +30,16 @@ export function useRebuildShellEnabled(): boolean {
   return useFeatureFlag('ui-rebuild-shell');
 }
 
+const SIDEBAR_RAIL_KEY = 'admin-sidebar-rail';
+
+function readRail(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_RAIL_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function RebuiltAppChrome({
   workspaces,
   selected,
@@ -44,8 +54,19 @@ export function RebuiltAppChrome({
   onLogout,
   children,
 }: RebuiltAppChromeProps) {
+  const [rail, setRail] = useState(readRail);
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_RAIL_KEY, rail ? '1' : '0');
+    } catch {
+      /* localStorage unavailable — rail state stays in-memory only */
+    }
+  }, [rail]);
+  const toggleRail = useCallback(() => setRail((prev) => !prev), []);
+
   return (
     <AppShell
+      rail={rail}
       sidebar={
         <RebuiltSidebar
           workspaces={workspaces}
@@ -59,6 +80,8 @@ export function RebuiltAppChrome({
           onUnlinkSite={onUnlinkSite}
           toggleTheme={toggleTheme}
           onLogout={onLogout}
+          rail={rail}
+          onToggleRail={toggleRail}
         />
       }
       topbar={

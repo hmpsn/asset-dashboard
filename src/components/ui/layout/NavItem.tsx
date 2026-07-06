@@ -13,6 +13,9 @@ import { Icon } from '../Icon';
 export interface NavItemProps {
   icon?: LucideIcon;
   label: string;
+  /** Icon-only rail rendering: hides the label/meta, centers the icon, and shows
+   *  the badge as a corner dot. The `title` still supplies the hover tooltip. */
+  collapsed?: boolean;
   active?: boolean;
   disabled?: boolean;
   badge?: ReactNode;
@@ -35,6 +38,7 @@ type NavItemStyle = CSSProperties & { '--nav-accent'?: string };
 export function NavItem({
   icon,
   label,
+  collapsed = false,
   active = false,
   disabled = false,
   badge,
@@ -59,13 +63,14 @@ export function NavItem({
     position: 'relative',
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: collapsed ? 'center' : undefined,
+    gap: collapsed ? 0 : 10,
     width: '100%',
     minHeight: 44,
     boxSizing: 'border-box',
     textAlign: 'left',
     textDecoration: 'none',
-    padding: '8px 10px',
+    padding: collapsed ? '8px 0' : '8px 10px',
     margin: '1px 0',
     borderRadius: 'var(--radius-md)',
     border: 'none',
@@ -102,6 +107,9 @@ export function NavItem({
     className,
     title,
     style: mergedStyle,
+    // In the rail the visible text label is hidden, so the icon-only control needs
+    // an explicit accessible name (title alone is not a reliable one).
+    'aria-label': collapsed ? label : undefined,
     'aria-current': active ? 'page' as const : undefined,
     'aria-disabled': disabled ? 'true' as const : undefined,
     onMouseEnter: () => setIsInteractive(true),
@@ -151,18 +159,34 @@ export function NavItem({
           }}
         />
       )}
-      <span
-        style={{
-          flex: 1,
-          minWidth: 0,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {label}
-      </span>
-      {badge != null && (
+      {!collapsed && (
+        <span
+          style={{
+            flex: 1,
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {label}
+        </span>
+      )}
+      {badge != null && (collapsed ? (
+        // No room for the pill in the rail — surface the badge as a corner dot.
+        <span
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: 6,
+            right: 8,
+            width: 7,
+            height: 7,
+            borderRadius: 'var(--radius-pill)',
+            background: 'var(--brand-yellow)',
+          }}
+        />
+      ) : (
         <span
           style={{
             flexShrink: 0,
@@ -179,8 +203,8 @@ export function NavItem({
         >
           {badge}
         </span>
-      )}
-      {meta && (
+      ))}
+      {!collapsed && meta && (
         <span
           style={{
             flexShrink: 0,

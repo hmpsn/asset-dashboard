@@ -15,6 +15,15 @@ describe('NavItem', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('keeps an accessible name in the icon-only rail (collapsed) with the label visually hidden', async () => {
+    const { container } = render(<NavItem icon={Globe} label="Site Audit" collapsed title="Site Audit" />);
+
+    // Accessible name survives (via aria-label) even though the visible label text is dropped.
+    expect(screen.getByRole('button', { name: 'Site Audit' })).toBeInTheDocument();
+    expect(screen.queryByText('Site Audit')).not.toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
   it('marks active items as the current page and renders the accent bar', () => {
     render(<NavItem icon={Globe} label="Site Audit" active accent="var(--emerald)" />);
 
