@@ -161,10 +161,20 @@ export function GroupBlock({
     gap: 12,
     padding: '13px 16px',
     background: 'var(--surface-1)',
+    // Per-side border longhands instead of the `border: 'none'` shorthand. Toggling
+    // `borderBottom` (a longhand) on `open` while the all-sides `border` shorthand was
+    // also set fired React's "conflicting property" dev warning on every collapsible
+    // re-render — GroupBlock renders once per grouped-lens block, so it fired in bulk.
+    // `borderTop/Right/Left: 'none'` zeroes those sides' width AND style (same as
+    // `border: 'none'`) but shares no shorthand ancestor with the updating `borderBottom`,
+    // so no warning. (The CT baselines are regenerated alongside this change — the CSS
+    // shift nudges the header height by 1px on the runner's font stack.)
+    borderTop: 'none',
+    borderRight: 'none',
+    borderLeft: 'none',
     borderBottom: open ? '1px solid var(--brand-border)' : 'none',
     width: '100%',
     textAlign: 'left',
-    border: 'none',
     font: 'inherit',
     cursor: collapsible ? 'pointer' : 'default',
   };
