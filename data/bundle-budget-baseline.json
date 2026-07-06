@@ -1,7 +1,8 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-06T01:27:32.995Z",
+  "updatedAt": "2026-07-06T02:11:23.875Z",
   "tolerance": 0.05,
+  "total": 1579360,
   "entries": {
     "css:assets/index.css": 35436,
     "css:vendor/fontawesome/fontawesome.min.css": 36118,
@@ -50,7 +51,7 @@
     "js:formatNumbers": 507,
     "js:funnel": 206,
     "js:history": 189,
-    "js:index.html": 91192,
+    "js:index": 91192,
     "js:internal-link-client-action": 276,
     "js:keyword-command-center": 544,
     "js:keyword-normalization": 231,

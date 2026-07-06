@@ -137,6 +137,20 @@
       "roadmapItemId": null,
       "createdAt": "2026-07-05",
       "reviewBy": "2026-10-31"
+    },
+    {
+      "id": "DEF-lint-001",
+      "surface": "foundation",
+      "item": "Retiring lint:ds-adherence (D-F2b-1) drops the only check that flagged raw-px literals in inline-style DS components. The F2a ds-* gates cover hex/palette/motion/icon purity but NOT raw pixel values, so raw-px in inline-style primitives is now unenforced.",
+      "decision": "The kit adherence config was redundant with the F2a ds-* gates plus TypeScript prop-checking for everything except raw-px. Rather than keep a whole lint pass alive for one signal, the raw-px gap is accepted now and re-addressed as a focused rule when inline-style primitives settle.",
+      "class": "token",
+      "upgradeTrigger": "Phase Z consolidation closeout (or when inline-style DS primitives stabilize) — add a focused raw-px pr-check rule, or migrate inline px to the --space-* scale.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-05",
+      "reviewBy": "2026-10-31",
+      "links": { "pr": "#1479" }
     }
   ]
 }
