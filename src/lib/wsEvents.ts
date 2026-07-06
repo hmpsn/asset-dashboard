@@ -63,8 +63,6 @@ export const WS_EVENTS = {
   DELIVERABLE_SENT: 'deliverable:sent',
   DELIVERABLE_UPDATED: 'deliverable:updated',
 
-  MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
-
   // The Issue — strategy POV (Lane B). Broadcast on generate/regenerate/operator-edit; handled by
   // src/hooks/admin/useStrategyPov.ts (useWorkspaceEvents → invalidate queryKeys.admin.strategyPov).
   STRATEGY_POV_GENERATED: 'strategy:pov-generated',

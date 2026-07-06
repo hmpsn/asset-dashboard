@@ -17,7 +17,6 @@ describe('ws-events constants', () => {
 
   it('uses expected namespace format for representative events', () => {
     expect(WS_EVENTS.WORKSPACE_UPDATED).toBe('workspace:updated');
-    expect(WS_EVENTS.MEETING_BRIEF_GENERATED).toBe('meeting-brief:generated');
     expect(WS_EVENTS.BULK_OPERATION_FAILED).toBe('bulk-operation:failed');
     expect(ADMIN_EVENTS.QUEUE_UPDATE).toBe('queue:update');
   });

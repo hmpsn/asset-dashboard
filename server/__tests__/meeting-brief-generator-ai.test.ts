@@ -101,7 +101,7 @@ describe('generateMeetingBrief structured output handling', () => {
     }));
     expect(result.situationSummary).toBe('Momentum is positive.');
     expect(upsertMeetingBriefMock).toHaveBeenCalled();
-    expect(broadcastToWorkspaceMock).toHaveBeenCalledWith('ws_test', 'meeting-brief:generated', {});
+    expect(broadcastToWorkspaceMock).not.toHaveBeenCalled(); // retirement: generation no longer broadcasts — no client listens
   });
 
   it('throws after retry when structured output is still invalid', async () => {

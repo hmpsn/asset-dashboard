@@ -209,7 +209,7 @@ describe('meeting-brief-generator', () => {
       criticalIssues: 0,
     });
     expect(mocks.upsertMeetingBrief).toHaveBeenCalledTimes(1);
-    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws_1', 'meeting-brief:generated', {});
+    expect(mocks.broadcastToWorkspace).not.toHaveBeenCalled();
   });
 
   it('throws BRIEF_UNCHANGED when hash matches cached brief hash', async () => {
@@ -279,7 +279,7 @@ describe('meeting-brief-generator', () => {
     expect(mocks.parseStructuredAIOutput).toHaveBeenCalledTimes(2);
     expect(brief.situationSummary).toBe('Retry path summary.');
     expect(mocks.upsertMeetingBrief).toHaveBeenCalledTimes(1);
-    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws_1', 'meeting-brief:generated', {});
+    expect(mocks.broadcastToWorkspace).not.toHaveBeenCalled();
   });
 
   it('throws explicit error after retry also returns invalid structured output', async () => {

@@ -5,8 +5,6 @@ import { withActiveLocalSeoSlice } from './intelligence/generation-context-build
 import { buildSystemPrompt, getCustomPromptNotes } from './prompt-assembly.js';
 import { getMeetingBriefHash, upsertMeetingBrief } from './meeting-brief-store.js';
 import { loadRecommendations } from './recommendations.js';
-import { broadcastToWorkspace } from './broadcast.js';
-import { WS_EVENTS } from './ws-events.js';
 import { createLogger } from './logger.js';
 import { callNarrativeAI, withContentHashCache } from './narrative-ai.js';
 import type { WorkspaceIntelligence, IntelligenceSlice } from '../shared/types/intelligence.js';
@@ -252,7 +250,6 @@ Avoid: "Your site health score is 78. You have 12 open insights."
       };
 
       upsertMeetingBrief(brief, hash);
-      broadcastToWorkspace(workspaceId, WS_EVENTS.MEETING_BRIEF_GENERATED, {});
 
       log.info({ workspaceId }, 'Meeting brief generated and stored');
       return brief;
