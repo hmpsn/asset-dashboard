@@ -1,5 +1,6 @@
 // @ds-rebuilt
 import { useEffect, type CSSProperties, type ReactElement, type ReactNode } from 'react';
+import { isEditableKeyTarget } from '../../../lib/keyboardGuards';
 
 /**
  * The application frame: a sidebar column + a main column (optional top bar over
@@ -26,15 +27,6 @@ export interface AppShellProps {
 }
 
 const MAIN_CONTENT_ID = 'app-shell-main-content';
-
-function isEditableKeyTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement ||
-    (target instanceof HTMLElement && (target.isContentEditable || target.closest('[contenteditable="true"]') !== null))
-  );
-}
 
 function hasOpenOverlay(): boolean {
   if (typeof document === 'undefined') return false;
