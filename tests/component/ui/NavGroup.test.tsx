@@ -70,4 +70,37 @@ describe('NavGroup', () => {
     expect(header).toHaveStyle({ color: 'var(--nav-group-accent)' });
     expect(header.parentElement?.style.getPropertyValue('--nav-group-accent')).toBe('var(--teal)');
   });
+
+  it('programmatically links the header to its region (aria-controls ↔ id, aria-labelledby ↔ header id)', () => {
+    render(
+      <NavGroup label="MONITORING">
+        <button>Search & Traffic</button>
+      </NavGroup>,
+    );
+
+    const header = screen.getByRole('button', { name: 'MONITORING' });
+    const region = screen.getByRole('region');
+    // The expand/collapse association screen readers rely on — assert the linkage, not just presence.
+    expect(header).toHaveAttribute('aria-controls', region.id);
+    expect(region).toHaveAttribute('aria-labelledby', header.id);
+  });
+
+  it('renders a header badge that stays visible when the group is collapsed (review PR #1478)', () => {
+    const { rerender } = render(
+      <NavGroup label="CONTENT" badge={3}>
+        <button>Pipeline</button>
+      </NavGroup>,
+    );
+    expect(screen.getByText('3')).toBeInTheDocument();
+
+    // Collapsed: the item badge is hidden with the children, but the header count must remain.
+    rerender(
+      <NavGroup label="CONTENT" badge={3} collapsed>
+        <button>Pipeline</button>
+      </NavGroup>,
+    );
+    const badge = screen.getByText('3');
+    expect(badge).toBeInTheDocument();
+    expect(badge.closest('[hidden]')).toBeNull();
+  });
 });

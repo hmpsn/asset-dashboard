@@ -154,6 +154,34 @@ describe('RebuiltSidebar', () => {
     await user.keyboard('{ArrowDown}{Enter}');
 
     expect(mockNavigate).toHaveBeenCalledWith('/ws/ws-1/analytics-hub');
+    // Single-fire: roving onKeyDown preventDefaults, so the native button click must NOT
+    // also fire — a regression that drops preventDefault would double-navigate (review PR #1478).
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+  });
+
+  it('mounts the carried-over footer utilities + workspace switcher (additive-parity lock)', () => {
+    renderSidebar();
+
+    // The switcher (WorkspaceSelector) surfaces the selected workspace by name.
+    expect(screen.getByText('Acme')).toBeInTheDocument();
+    // Footer-only utility buttons (their labels don't collide with nav items).
+    expect(screen.getByRole('button', { name: 'Switch to light mode' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
+  });
+
+  it('shows the pending-content count on the CONTENT group header when it is collapsed', async () => {
+    const user = userEvent.setup();
+    renderSidebar({ pendingContentRequests: 4 });
+
+    await user.click(screen.getByRole('button', { name: 'CONTENT' }));
+
+    // The content-pipeline item (with its own badge) is now hidden — the count must survive
+    // on the collapsed group header (review PR #1478).
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Pipeline' })).not.toBeInTheDocument();
+    });
+    const header = screen.getByRole('button', { name: /CONTENT/ });
+    expect(header).toHaveTextContent('4');
   });
 
   it('keyboard-walk skips disabled needsSite rows for no-site workspaces', async () => {

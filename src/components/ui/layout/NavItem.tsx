@@ -117,10 +117,13 @@ export function NavItem({
     tabIndex,
   };
 
+  // Disabled state is expressed via aria-disabled + a guarded onClick (see handleClick),
+  // NOT the native `disabled` attribute — so a disabled item stays keyboard-focusable and its
+  // explanatory `title` ("Connect a site first") is reachable by keyboard/AT users. Review PR #1478.
   return (
     <Component
       {...commonProps}
-      {...(href ? { href: disabled ? undefined : href } : { type: 'button' as const, disabled })}
+      {...(href ? { href: disabled ? undefined : href } : { type: 'button' as const })}
     >
       {active && (
         <span

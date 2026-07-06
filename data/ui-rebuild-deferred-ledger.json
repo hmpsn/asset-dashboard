@@ -111,6 +111,32 @@
       "createdAt": "2026-07-03",
       "reviewBy": "2026-10-31",
       "links": { "kitDoc": "css/fontawesome.min.css" }
+    },
+    {
+      "id": "DEF-shell-003",
+      "surface": "foundation",
+      "item": "The rebuilt shell has no way to express focus mode — legacy Sidebar takes hidden/onExitHidden and collapses to a slim exit strip (App.tsx effectiveFocusMode, fires on the rewrite surface). RebuiltSidebar/AppShell omit it.",
+      "decision": "Not a pilot regression — focus mode only fires on Page Rewriter and the pilot is Keywords-only. Ledgered so it is closed before the rebuilt shell expands to cover the Page Rewriter surface (review PR #1478).",
+      "class": "behavior",
+      "upgradeTrigger": "The rebuild reaches the Page Rewriter surface (Phase A) — add a hidden/collapsed shell state to AppShell + RebuiltSidebar before the shell replaces the legacy one there.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-05",
+      "reviewBy": "2026-10-31"
+    },
+    {
+      "id": "DEF-shell-004",
+      "surface": "foundation",
+      "item": "The rebuilt breadcrumb/topbar drops the visible ⌘K search IconButton and the breadcrumb workspace-switcher dropdown that legacy Breadcrumbs render. The ⌘K keyboard shortcut still works (global listener) and workspace switching is covered by the sidebar selector — this is a secondary/discoverability affordance loss, not a capability loss.",
+      "decision": "Accepted for F4 (shortcut + sidebar switcher preserve the underlying capability). Re-add the visible top-bar search affordance before the rebuilt shell replaces the legacy one platform-wide (review PR #1478).",
+      "class": "behavior",
+      "upgradeTrigger": "Phase A shell-expansion, or the first mouse-user report of the missing search button — add a ⌘K IconButton to the rebuilt Toolbar/breadcrumb.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-05",
+      "reviewBy": "2026-10-31"
     }
   ]
 }

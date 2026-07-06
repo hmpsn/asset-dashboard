@@ -7,6 +7,9 @@ export interface NavGroupProps {
   accent?: string;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  /** Count/indicator shown on the group header — stays visible when the group is
+   *  collapsed and its items (which carry their own badges) are hidden. */
+  badge?: ReactNode;
   children: ReactNode;
   className?: string;
   id?: string;
@@ -20,6 +23,7 @@ export function NavGroup({
   accent = 'var(--brand-text-dim)',
   collapsed = false,
   onToggleCollapse,
+  badge,
   children,
   className,
   id,
@@ -71,6 +75,25 @@ export function NavGroup({
         }}
       >
         <span>{label}</span>
+        {badge != null && (
+          <span
+            style={{
+              flexShrink: 0,
+              fontSize: 10,
+              fontWeight: 700,
+              minWidth: 18,
+              textAlign: 'center',
+              padding: '1px 6px',
+              borderRadius: 'var(--radius-pill)',
+              background: 'var(--brand-yellow-dim)',
+              color: 'var(--brand-yellow)',
+              lineHeight: 1.2,
+              letterSpacing: 0,
+            }}
+          >
+            {badge}
+          </span>
+        )}
         <span
           aria-hidden="true"
           style={{

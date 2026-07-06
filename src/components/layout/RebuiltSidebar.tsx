@@ -141,8 +141,8 @@ export function RebuiltSidebar({
         return next;
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- tab changes intentionally reopen only the active group
-  }, [tab, navGroups]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- ONLY a tab change reopens the active group (legacy Sidebar parity, deps [tab]). `navGroups` is intentionally omitted: it gets a fresh identity when the flag query resolves, and including it would re-run this effect and re-expand a group the user just manually collapsed (review PR #1478). navGroups is read as a live closure — correct because a stale read only matters across a tab change, which retriggers the effect anyway.
+  }, [tab]);
 
   const visibleGroups = useMemo(() => navGroups.map((group) => {
     const collapsed = !!group.label && collapsedGroups.has(group.label);
@@ -236,6 +236,12 @@ export function RebuiltSidebar({
             accent={group.accent}
             collapsed={group.collapsed}
             onToggleCollapse={group.label ? () => toggleGroup(group.label) : undefined}
+            // When collapsed, the content-pipeline item (which carries the pending badge) is
+            // hidden, so surface the count on the group header instead — parity with legacy
+            // Sidebar's collapsed-group badge (review PR #1478). Expanded → the item shows it.
+            badge={group.collapsed && pendingContentRequests > 0 && group.items.some((item) => item.id === 'content-pipeline')
+              ? pendingContentRequests
+              : undefined}
             style={{ marginTop: group.label ? 8 : 0 }}
           >
             {group.visibleItems.map((item) => {
