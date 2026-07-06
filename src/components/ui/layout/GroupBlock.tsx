@@ -161,17 +161,16 @@ export function GroupBlock({
     gap: 12,
     padding: '13px 16px',
     background: 'var(--surface-1)',
-    // Longhand-only borders: toggling the bottom rule on `open` must not update a
-    // longhand (borderBottom*) while the `border` shorthand is also present — that
-    // shorthand/longhand mix triggers React's "conflicting property" dev warning on
-    // every re-render, and GroupBlock renders once per grouped-lens block so it fired
-    // in bulk on the Keywords surface.
-    borderTopWidth: 0,
-    borderRightWidth: 0,
-    borderLeftWidth: 0,
-    borderBottomWidth: open ? 1 : 0,
-    borderBottomStyle: 'solid',
-    borderBottomColor: 'var(--brand-border)',
+    // Per-side border longhands instead of the `border: 'none'` shorthand: toggling
+    // `borderBottom` while the all-sides `border` shorthand was also set triggered
+    // React's "conflicting property" dev warning on every re-render (GroupBlock renders
+    // once per grouped-lens block, so it fired in bulk). `borderTop/Right/Left: 'none'`
+    // is pixel-identical to the old `border: 'none'` (both zero those sides' width AND
+    // style) but shares no shorthand ancestor with `borderBottom`, so no warning.
+    borderTop: 'none',
+    borderRight: 'none',
+    borderLeft: 'none',
+    borderBottom: open ? '1px solid var(--brand-border)' : 'none',
     width: '100%',
     textAlign: 'left',
     font: 'inherit',
