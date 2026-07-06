@@ -8,7 +8,7 @@ import { ToastProvider } from '../../../src/components/Toast';
 import { KeywordsSurface } from '../../../src/components/keywords-rebuilt/KeywordsSurface';
 import { queryKeys } from '../../../src/lib/queryKeys';
 import { WS_EVENTS } from '../../../src/lib/wsEvents';
-import { KEYWORD_COMMAND_CENTER_ACTIONS } from '../../../shared/types/keyword-command-center';
+import { KEYWORD_COMMAND_CENTER_ACTIONS, KEYWORD_COMMAND_CENTER_FILTERS } from '../../../shared/types/keyword-command-center';
 import type {
   KeywordCommandCenterFilterMeta,
   KeywordCommandCenterRow,
@@ -23,6 +23,7 @@ const mockCreate = vi.fn();
 const mockDelete = vi.fn();
 const mockLink = vi.fn();
 const mockUnlink = vi.fn();
+const initialHookMock = vi.fn();
 const summaryHookMock = vi.fn();
 const rowsHookMock = vi.fn();
 const detailHookMock = vi.fn();
@@ -75,6 +76,7 @@ vi.mock('../../../src/hooks/admin/useNotifications', () => ({
 }));
 
 vi.mock('../../../src/hooks/admin/useKeywordCommandCenter', () => ({
+  useKeywordCommandCenterInitialView: (...args: unknown[]) => initialHookMock(...args),
   useKeywordCommandCenterSummary: (...args: unknown[]) => summaryHookMock(...args),
   useKeywordCommandCenterRows: (...args: unknown[]) => rowsHookMock(...args),
   useKeywordCommandCenterBulkAction: () => ({ mutate: bulkMutateMock, isPending: false }),
@@ -389,9 +391,9 @@ function setupKeywordHooks() {
     isError: false,
     error: null,
   });
-  rowsHookMock.mockImplementation((_workspaceId: string, query: KeywordCommandCenterRowsQuery) => {
+  const rowsResponse = (query: KeywordCommandCenterRowsQuery): KeywordCommandCenterRowsResponse => {
     const page = query.page ?? 1;
-    const response: KeywordCommandCenterRowsResponse = {
+    return {
       rows,
       pageInfo: {
         page,
@@ -402,6 +404,19 @@ function setupKeywordHooks() {
         hasPreviousPage: page > 1,
       },
     };
+  };
+  initialHookMock.mockImplementation((_workspaceId: string, query: KeywordCommandCenterRowsQuery) => ({
+    data: {
+      summary: summaryPayload,
+      rows: rowsResponse(query),
+    },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  }));
+  rowsHookMock.mockImplementation((_workspaceId: string, query: KeywordCommandCenterRowsQuery) => {
+    const response = rowsResponse(query);
     return {
       data: response,
       isLoading: false,
@@ -503,7 +518,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByRole('radio', { name: /Lifecycle/ })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: 'Tracked' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('searchbox')).toHaveValue('cosmetic');
-    expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: 'tracked', search: 'cosmetic', page: 3 });
+    expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: 'tracked', search: 'cosmetic', page: 3 });
     expect(screen.getByRole('button', { name: 'emergency dentist' })).toBeInTheDocument();
 
     await expectNoA11yViolations(container);
@@ -517,6 +532,14 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByRole('button', { name: 'cosmetic dentistry' })).toBeInTheDocument();
   });
 
+  it('uses the combined initial view except for the local-candidates full-model exception', () => {
+    renderSurface(`/ws/ws-1/seo-keywords?filter=${KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES}`);
+
+    expect(initialHookMock.mock.calls.at(-1)?.[2]).toMatchObject({ enabled: false });
+    expect(summaryHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ enabled: true });
+    expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES });
+  });
+
   it('renders keyword rows, provenance, opportunity, and money empty states without fabricating dollars', () => {
     renderSurface('/ws/ws-1/seo-keywords');
 
@@ -526,6 +549,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getAllByText('$1,234').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('700')).toBeInTheDocument();
     expect(screen.getByText('29')).toBeInTheDocument();
+    expect(screen.getByText('42')).toBeInTheDocument();
     expect(screen.getByText('Tracked locally')).toBeInTheDocument();
     expect(screen.getByText('From gap')).toBeInTheDocument();
     expect(screen.getByText('Auto-managed')).toBeInTheDocument();
@@ -537,16 +561,16 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
   it('threads sort and pagination controls into the rows query', async () => {
     renderSurface('/ws/ws-1/seo-keywords');
 
-    expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'rank', direction: 'asc' });
+    expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'rank', direction: 'asc' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Clicks' }));
     await waitFor(() => {
-      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'clicks', direction: 'asc' });
+      expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'clicks', direction: 'asc' });
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => {
-      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ page: 2 });
+      expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ page: 2 });
     });
   });
 
@@ -560,7 +584,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
 
     fireEvent.change(screen.getByLabelText('Advanced keyword filter'), { target: { value: 'requested' } });
     await waitFor(() => {
-      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: 'requested' });
+      expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: 'requested' });
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Select visible 2' }));
@@ -584,7 +608,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
 
     fireEvent.click(screen.getByRole('radio', { name: /Opportunities/ }));
     await waitFor(() => {
-      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'opportunity', direction: 'desc' });
+      expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'opportunity', direction: 'desc' });
     });
     await expectNoA11yViolations(container);
 
@@ -664,6 +688,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
   });
 
   it('renders loading shimmers without fabricating zero-value metrics', () => {
+    initialHookMock.mockReturnValue({ data: undefined, isLoading: true, isError: false, error: null, refetch: vi.fn() });
     summaryHookMock.mockReturnValue({ data: undefined, isLoading: true, isError: false, error: null });
     rowsHookMock.mockReturnValue({ data: undefined, isLoading: true, isError: false, error: null, refetch: vi.fn() });
 
@@ -675,6 +700,19 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
   });
 
   it('renders an action-oriented empty state for a workspace with no keyword data', () => {
+    initialHookMock.mockReturnValue({
+      data: {
+        summary: { ...summaryPayload, counts: { ...summaryPayload.counts, total: 0 }, rawEvidenceTotal: 0, rawEvidenceReturned: 0 },
+        rows: {
+          rows: [],
+          pageInfo: { page: 1, pageSize: 50, totalRows: 0, totalPages: 1, hasNextPage: false, hasPreviousPage: false },
+        },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
     summaryHookMock.mockReturnValue({
       data: { ...summaryPayload, counts: { ...summaryPayload.counts, total: 0 }, rawEvidenceTotal: 0, rawEvidenceReturned: 0 },
       isLoading: false,
@@ -699,6 +737,19 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
   });
 
   it('renders a filtered empty state with a clear action', () => {
+    initialHookMock.mockReturnValue({
+      data: {
+        summary: summaryPayload,
+        rows: {
+          rows: [],
+          pageInfo: { page: 1, pageSize: 50, totalRows: 0, totalPages: 1, hasNextPage: false, hasPreviousPage: false },
+        },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
     rowsHookMock.mockReturnValue({
       data: {
         rows: [],
@@ -721,16 +772,19 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
 
   it('renders row errors inline while preserving stale row data and retry', () => {
     const refetch = vi.fn();
-    rowsHookMock.mockImplementation((_workspaceId: string, query: KeywordCommandCenterRowsQuery) => ({
+    initialHookMock.mockImplementation((_workspaceId: string, query: KeywordCommandCenterRowsQuery) => ({
       data: {
-        rows,
-        pageInfo: {
-          page: query.page ?? 1,
-          pageSize: query.pageSize ?? 50,
-          totalRows: rows.length,
-          totalPages: 1,
-          hasNextPage: false,
-          hasPreviousPage: false,
+        summary: summaryPayload,
+        rows: {
+          rows,
+          pageInfo: {
+            page: query.page ?? 1,
+            pageSize: query.pageSize ?? 50,
+            totalRows: rows.length,
+            totalPages: 1,
+            hasNextPage: false,
+            hasPreviousPage: false,
+          },
         },
       },
       isLoading: false,
@@ -748,6 +802,13 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
   });
 
   it('renders locked keyword access as a permission state', () => {
+    initialHookMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new ApiError(403, 'Upgrade required'),
+      refetch: vi.fn(),
+    });
     summaryHookMock.mockReturnValue({
       data: undefined,
       isLoading: false,

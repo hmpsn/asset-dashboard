@@ -139,6 +139,34 @@
       "reviewBy": "2026-10-31"
     },
     {
+      "id": "DEF-kw-001",
+      "surface": "keywords",
+      "item": "Inline list-row rank sparkline and 7-day delta pill from the mockup are deferred; the drawer sparkline remains because it uses the existing per-keyword history endpoint.",
+      "decision": "Avoid an N+1 history fetch in the pilot table. Ship the DS-native row without inline trend graphics until a batched history-by-keyword read model exists.",
+      "class": "data",
+      "upgradeTrigger": "Add a batched rank-history read model for visible keyword rows, then render the row sparkline/delta through the DataTable cell without client-side data fabrication.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-06",
+      "reviewBy": "2026-10-31",
+      "links": { "source": "docs/ui-rebuild/pilot/keywords-data-source-ledger.md#3-platform-build-backlog--build-vs-defer-recommendation" }
+    },
+    {
+      "id": "DEF-kw-002",
+      "surface": "keywords",
+      "item": "Avg-position and period-over-period delta KPI variants are deferred; the pilot renders existing count and traffic-value tiles only.",
+      "decision": "Do not compute new summary rollups or deltas in the client. The KPI variants need a server-owned rollup/snapshot-diff contract before they can be trusted.",
+      "class": "data",
+      "upgradeTrigger": "Server summary exposes average-position and comparison-period deltas with tests that define the date window and empty-state semantics.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-06",
+      "reviewBy": "2026-10-31",
+      "links": { "source": "docs/ui-rebuild/pilot/keywords-data-source-ledger.md#3-platform-build-backlog--build-vs-defer-recommendation" }
+    },
+    {
       "id": "DEF-lint-001",
       "surface": "foundation",
       "item": "Retiring lint:ds-adherence (D-F2b-1) drops the only check that flagged raw-px literals in inline-style DS components. The F2a ds-* gates cover hex/palette/motion/icon purity but NOT raw pixel values, so raw-px in inline-style primitives is now unenforced.",

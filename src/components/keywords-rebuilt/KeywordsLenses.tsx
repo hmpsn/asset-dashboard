@@ -8,13 +8,14 @@ import type {
 } from '../../../shared/types/keyword-command-center';
 import { KEYWORD_LIFECYCLE_STAGES } from '../../../shared/types/keyword-command-center';
 import { Badge, BoardCard, BoardColumn, Button, GroupBlock, InlineBanner, Skeleton } from '../ui';
-import { KeywordsTable } from './KeywordsTable';
+import { KeywordsTable, type KeywordRowsQueryResult } from './KeywordsTable';
 import type { KeywordsSurfaceLens, UseKeywordsSurfaceStateReturn } from './useKeywordsSurfaceState';
 
 interface KeywordsLensesProps {
   workspaceId: string;
   state: UseKeywordsSurfaceStateReturn;
   summary?: KeywordCommandCenterSummaryResponse;
+  initialRowsResult?: KeywordRowsQueryResult;
 }
 
 interface KeywordGroup {
@@ -228,9 +229,12 @@ function rowsQueryForLens(state: UseKeywordsSurfaceStateReturn, lens: KeywordsSu
   return state.rowsQuery;
 }
 
-export function KeywordsLenses({ workspaceId, state, summary }: KeywordsLensesProps) {
+export function KeywordsLenses({ workspaceId, state, summary, initialRowsResult }: KeywordsLensesProps) {
   const rowsQuery = rowsQueryForLens(state, state.lens);
-  const rowsResult = useKeywordCommandCenterRows(workspaceId, rowsQuery);
+  const ownedRowsResult = useKeywordCommandCenterRows(workspaceId, rowsQuery, {
+    enabled: initialRowsResult == null,
+  });
+  const rowsResult = initialRowsResult ?? ownedRowsResult;
   const rows = rowsResult.data?.rows ?? [];
 
   if (rowsResult.isLoading && !rowsResult.data) {

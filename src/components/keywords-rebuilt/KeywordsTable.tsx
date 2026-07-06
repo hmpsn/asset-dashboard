@@ -37,14 +37,21 @@ import {
 } from '../ui';
 import type { DataColumn } from '../ui';
 import type { UseKeywordsSurfaceStateReturn } from './useKeywordsSurfaceState';
-import type { UseQueryResult } from '@tanstack/react-query';
 import type { KeywordCommandCenterRowsResponse } from '../../../shared/types/keyword-command-center';
 
 interface KeywordsTableProps {
   workspaceId: string;
   state: UseKeywordsSurfaceStateReturn;
   summary?: KeywordCommandCenterSummaryResponse;
-  rowsResult?: UseQueryResult<KeywordCommandCenterRowsResponse, Error>;
+  rowsResult?: KeywordRowsQueryResult;
+}
+
+export interface KeywordRowsQueryResult {
+  data?: KeywordCommandCenterRowsResponse;
+  isLoading: boolean;
+  isError: boolean;
+  error: Error | null;
+  refetch: () => unknown;
 }
 
 type KeywordsTableRecord = Record<string, unknown> & {
@@ -255,6 +262,16 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
         return <span>{row.metrics.currentPosition != null ? `#${row.metrics.currentPosition}` : 'No rank'}</span>;
+      },
+    },
+    {
+      key: 'clicks',
+      label: 'Clicks',
+      width: '92px',
+      align: 'right',
+      render: (_value, record) => {
+        const row = (record as KeywordsTableRecord).source;
+        return <span>{formatNumber(row.metrics.clicks)}</span>;
       },
     },
     {

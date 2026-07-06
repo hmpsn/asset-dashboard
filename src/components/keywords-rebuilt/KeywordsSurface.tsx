@@ -4,13 +4,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
 import {
   useKeywordCommandCenterAction,
+  useKeywordCommandCenterInitialView,
   useKeywordCommandCenterSummary,
   useRankTrackingAddKeyword,
 } from '../../hooks/admin/useKeywordCommandCenter';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { queryKeys } from '../../lib/queryKeys';
 import { WS_EVENTS } from '../../lib/wsEvents';
-import { KEYWORD_COMMAND_CENTER_ACTIONS } from '../../../shared/types/keyword-command-center';
+import { KEYWORD_COMMAND_CENTER_ACTIONS, KEYWORD_COMMAND_CENTER_FILTERS } from '../../../shared/types/keyword-command-center';
+import type { KeywordCommandCenterSummaryResponse } from '../../../shared/types/keyword-command-center';
 import type { AdminKeywordFeedbackListRow } from '../../../shared/types/keyword-feedback';
 import { useKeywordFeedback } from '../strategy/hooks/useKeywordFeedback';
 import { useToast } from '../Toast';
@@ -18,6 +20,7 @@ import { mutationErrorMessage } from './keywordMutationFeedback';
 import { Badge, Button, ErrorState, PageHeader, LensSwitcher, SearchField, Toolbar, ToolbarSpacer, FilterChip, InlineBanner, MetricTile, Skeleton, FormInput, FormSelect, GroupBlock } from '../ui';
 import { KeywordDrawer } from './KeywordDrawer';
 import { KeywordsLenses } from './KeywordsLenses';
+import type { KeywordRowsQueryResult } from './KeywordsTable';
 import {
   KEYWORDS_SURFACE_FILTERS,
   KEYWORDS_SURFACE_LENSES,
@@ -46,7 +49,7 @@ function isLockedError(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 402 || error.status === 403);
 }
 
-function lensCount(summary: ReturnType<typeof useKeywordCommandCenterSummary>['data'], lens: KeywordsSurfaceLens): number | undefined {
+function lensCount(summary: KeywordCommandCenterSummaryResponse | undefined, lens: KeywordsSurfaceLens): number | undefined {
   if (!summary) return undefined;
   if (lens === 'clusters') return summary.topicClusters?.length;
   if (lens === 'lifecycle') return summary.counts.total;
@@ -96,21 +99,39 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const state = useKeywordsSurfaceState();
-  const summary = useKeywordCommandCenterSummary(workspaceId);
+  const canUseInitialView = state.rowsQuery.filter !== KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES;
+  const initialView = useKeywordCommandCenterInitialView(workspaceId, state.rowsQuery, {
+    enabled: canUseInitialView,
+  });
+  const summaryFallback = useKeywordCommandCenterSummary(workspaceId, {
+    enabled: !canUseInitialView,
+  });
   const addKeyword = useRankTrackingAddKeyword(workspaceId);
   const feedback = useKeywordFeedback(workspaceId);
   const feedbackAction = useKeywordCommandCenterAction(workspaceId);
   const [addKeywordValue, setAddKeywordValue] = useState('');
-  const counts = summary.data?.counts;
-  const trafficValue = summary.data?.trafficValueMonthly;
-  const activeFilterLabel = summary.data?.filters.find((filter) => filter.id === state.filter)?.label
+  const summary = canUseInitialView ? initialView.data?.summary : summaryFallback.data;
+  const summaryIsLoading = canUseInitialView ? initialView.isLoading : summaryFallback.isLoading;
+  const summaryIsError = canUseInitialView ? initialView.isError : summaryFallback.isError;
+  const summaryError = canUseInitialView ? initialView.error : summaryFallback.error;
+  const refetchSummary = canUseInitialView ? initialView.refetch : summaryFallback.refetch;
+  const initialRowsResult: KeywordRowsQueryResult | undefined = canUseInitialView ? {
+    data: initialView.data?.rows,
+    isLoading: initialView.isLoading,
+    isError: initialView.isError,
+    error: initialView.error,
+    refetch: () => initialView.refetch(),
+  } : undefined;
+  const counts = summary?.counts;
+  const trafficValue = summary?.trafficValueMonthly;
+  const activeFilterLabel = summary?.filters.find((filter) => filter.id === state.filter)?.label
     ?? KEYWORDS_SURFACE_FILTERS.find((filter) => filter.id === state.filter)?.label
     ?? 'All';
   const advancedFilterOptions = useMemo(() => (
-    summary.data?.filters
+    summary?.filters
       .filter((filter) => !PRIMARY_FILTER_IDS.has(filter.id))
       .map((filter) => ({ value: filter.id, label: `${filter.label} (${filter.count})` })) ?? []
-  ), [summary.data?.filters]);
+  ), [summary?.filters]);
   const feedbackData = useMemo(() => feedbackGroups(feedback.rows), [feedback.rows]);
   const invalidateKeywordCommandCenter = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordCommandCenter(workspaceId) });
@@ -151,7 +172,7 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
     [WS_EVENTS.STRATEGY_UPDATED]: invalidateKeywordCommandCenter,
   });
 
-  if (isLockedError(summary.error)) {
+  if (isLockedError(summaryError)) {
     return (
       <div className="flex min-h-full flex-col gap-5">
         <PageHeader
@@ -197,7 +218,7 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
           options={KEYWORDS_SURFACE_LENSES.map((lens) => ({
             value: lens.id,
             label: lens.label,
-            count: lensCount(summary.data, lens.id),
+            count: lensCount(summary, lens.id),
           }))}
           value={state.lens}
           onChange={(value) => state.setLens(value as typeof state.lens)}
@@ -236,19 +257,19 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
         ))}
       </div>
 
-      {summary.isError && !summary.data ? (
+      {summaryIsError && !summary ? (
         <ErrorState
           title="Keyword summary did not load"
           message="The keyword table is still available below if row data is cached. Retry the summary when the connection is healthy."
-          action={{ label: 'Retry summary', onClick: () => summary.refetch() }}
+          action={{ label: 'Retry summary', onClick: () => refetchSummary() }}
           type="data"
         />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {summary.isLoading && !summary.data ? (
-          Array.from({ length: 5 }).map((_, index) => (
-            <Skeleton key={index} className="h-[92px] w-full" />
-          ))
+          {summaryIsLoading && !summary ? (
+            Array.from({ length: 5 }).map((_, index) => (
+              <Skeleton key={index} className="h-[92px] w-full" />
+            ))
           ) : (
             <>
               <MetricTile label="Total" value={counts?.total ?? 0} sub={activeFilterLabel} accent="var(--blue)" />
@@ -266,11 +287,11 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
         </div>
       )}
 
-      {summary.isError && summary.data && (
+      {summaryIsError && summary && (
         <InlineBanner tone="warning" title="Summary may be stale">
           <div className="flex flex-wrap items-center gap-2">
             <span>Keyword summary data did not refresh, so the last loaded numbers are still shown.</span>
-            <Button size="sm" variant="secondary" onClick={() => summary.refetch()}>
+            <Button size="sm" variant="secondary" onClick={() => refetchSummary()}>
               Retry summary
             </Button>
           </div>
@@ -285,7 +306,7 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
         </div>
       )}
 
-      <KeywordsLenses workspaceId={workspaceId} state={state} summary={summary.data} />
+      <KeywordsLenses workspaceId={workspaceId} state={state} summary={summary} initialRowsResult={initialRowsResult} />
 
       <GroupBlock
         title="Client keyword feedback"
