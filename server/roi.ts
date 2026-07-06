@@ -19,6 +19,7 @@ import { loadGa4SnapshotHistory } from './ga4-snapshots.js';
 import { aggregatePinnedOutcomes, computeOutcomeBaseline, selectOutcomeProvenance } from './the-issue-outcome.js';
 import { countFormSubmissions } from './form-submissions.js';
 import type { Ga4ConversionSnapshot, OutcomeBaseline, OutcomeProvenance, OutcomeTypeBreakdown } from '../shared/types/the-issue.js';
+import type { PageKeywordMap } from '../shared/types/workspace.js';
 
 
 const log = createLogger('roi');
@@ -193,6 +194,35 @@ export interface ContentItemROI {
   source?: 'request' | 'matrix';
 }
 
+function resolveRoiPages(workspaceId: string, ws: NonNullable<ReturnType<typeof getWorkspace>>): PageKeywordMap[] {
+  const pageKeywordRows = listPageKeywords(workspaceId);
+  const legacyPageMap = ws.keywordStrategy?.pageMap ?? [];
+  return pageKeywordRows.length > 0 ? pageKeywordRows : legacyPageMap;
+}
+
+function computeOrganicTrafficValueFromPages(pages: PageKeywordMap[]): number {
+  let totalValue = 0;
+  for (const page of pages) {
+    totalValue += keywordDollarValue({
+      clicks: page.clicks || 0,
+      cpc: page.cpc || 0,
+    }).currentMonthly;
+  }
+  return Math.round(totalValue * 100) / 100;
+}
+
+/**
+ * Snapshot-free organic traffic value read for hot summary surfaces.
+ * computeROI() persists roi_snapshots; this helper intentionally does not.
+ */
+export function computeOrganicTrafficValue(workspaceId: string): number | null {
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return null;
+  const pages = resolveRoiPages(workspaceId, ws);
+  if (pages.length === 0) return null;
+  return computeOrganicTrafficValueFromPages(pages);
+}
+
 /**
  * Compute ROI data for a workspace.
  * Pulls normalized page_keywords rows (with clicks, CPC) for the workspace,
@@ -202,9 +232,7 @@ export function computeROI(workspaceId: string): ROIData | null {
   const ws = getWorkspace(workspaceId);
   if (!ws) return null;
 
-  const pageKeywordRows = listPageKeywords(workspaceId);
-  const legacyPageMap = ws.keywordStrategy?.pageMap ?? [];
-  const pages = pageKeywordRows.length > 0 ? pageKeywordRows : legacyPageMap;
+  const pages = resolveRoiPages(workspaceId, ws);
   if (pages.length === 0) return null;
 
   // Build page breakdown

@@ -329,6 +329,11 @@ export interface KeywordCommandCenterSummaryResponse {
   generatedAt?: string | null;
   summarizedAt: string;
   geoLabel?: string;
+  /**
+   * Monthly organic traffic value from the ROI page-keyword read path.
+   * Display-only; null when no page-keyword or legacy page-map source exists.
+   */
+  trafficValueMonthly?: number | null;
 }
 
 export interface KeywordCommandCenterRowsQuery {

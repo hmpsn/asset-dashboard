@@ -10,6 +10,7 @@ import { isSuspiciousPlannerGroupedVolume } from '../../keyword-strategy-helpers
 import { countLocalSeoKeywordCandidates } from '../local-seo/candidate-service.js';
 import { getPrimaryMarketLocationCode } from '../local-seo/configuration-service.js';
 import { createLogger } from '../../logger.js';
+import { computeOrganicTrafficValue } from '../../roi.js';
 import {
   UNIVERSE_SAFETY_CEILING,
   selectRankEvidence,
@@ -229,6 +230,13 @@ export async function buildKeywordCommandCenterSummary(
     log.debug({ err, workspaceId }, 'KCC summary geo label lookup failed; omitting');
   }
 
+  let trafficValueMonthly: number | null = null;
+  try {
+    trafficValueMonthly = computeOrganicTrafficValue(workspace.id);
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'KCC summary traffic value lookup failed; omitting');
+  }
+
   const droppedRankEvidenceTail = Math.max(0, rankEvidenceTotal - rankEvidence.selected.length);
   const rawEvidenceReturnedCap = UNIVERSE_SAFETY_CEILING;
 
@@ -240,5 +248,6 @@ export async function buildKeywordCommandCenterSummary(
     generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
     summarizedAt: new Date().toISOString(),
     geoLabel,
+    trafficValueMonthly,
   };
 }
