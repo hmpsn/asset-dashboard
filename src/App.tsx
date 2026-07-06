@@ -19,6 +19,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { CommandPalette } from './components/CommandPalette';
 import { Sidebar } from './components/layout/Sidebar';
 import { Breadcrumbs } from './components/layout/Breadcrumbs';
+import { RebuiltAppChrome, useRebuildShellEnabled } from './components/layout/RebuiltAppChrome';
 import { ScannerReveal } from './components/ui/ScannerReveal';
 import { TabBar } from './components/ui/TabBar';
 import { Clipboard, Globe } from 'lucide-react';
@@ -50,6 +51,7 @@ const WorkspaceHome = lazyWithRetry(() => import('./components/WorkspaceHome').t
 const SeoEditorWrapper = lazyWithRetry(() => import('./components/SeoEditorWrapper').then(m => ({ default: m.SeoEditorWrapper })));
 const KeywordStrategyPanel = lazyWithRetry(() => import('./components/KeywordStrategy').then(m => ({ default: m.KeywordStrategyPanel })));
 const KeywordHub = lazyWithRetry(() => import('./components/KeywordHub').then(m => ({ default: m.KeywordHub })));
+const KeywordsSurface = lazyWithRetry(() => import('./components/keywords-rebuilt/KeywordsSurface').then(m => ({ default: m.KeywordsSurface })));
 const LocalPresencePage = lazyWithRetry(() => import('./components/local-seo/LocalPresencePage').then(m => ({ default: m.LocalPresencePage })));
 const CompetitorsPage = lazyWithRetry(() => import('./components/competitors/CompetitorsPage').then(m => ({ default: m.CompetitorsPage })));
 const PageIntelligence = lazyWithRetry(() => import('./components/PageIntelligence').then(m => ({ default: m.PageIntelligence })));
@@ -179,6 +181,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const rebuildShellEnabled = useRebuildShellEnabled();
 
   // ── Server state via React Query ──
   const { data: workspaces = [] } = useWorkspaces();
@@ -456,6 +459,30 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
 
     return <Navigate to={adminPath(selected.id, 'home')} replace />;
   };
+
+  if (rebuildShellEnabled && selected && tab === 'seo-keywords') {
+    return (
+      <RebuiltAppChrome
+        workspaces={workspaces}
+        selected={selected}
+        tab={tab}
+        theme={theme}
+        pendingContentRequests={pendingContentRequests}
+        onCreate={handleCreate}
+        onDelete={handleDelete}
+        onLinkSite={handleLinkSite}
+        onUnlinkSite={handleUnlinkSite}
+        toggleTheme={toggleTheme}
+        onLogout={onLogout}
+      >
+        <ErrorBoundary label="seo-keywords">
+          <Suspense fallback={<ChunkFallback />}>
+            <KeywordsSurface workspaceId={selected.id} />
+          </Suspense>
+        </ErrorBoundary>
+      </RebuiltAppChrome>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-[var(--surface-1)] text-[var(--brand-text)]">
