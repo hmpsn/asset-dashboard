@@ -17,7 +17,7 @@ After owner ratification this document is **LAW for all ticket-cuts** (read orde
 ### C-2 Branded-demand split (ai-visibility Q10 vs search-traffic)
 - **Question:** Which surface owns the branded vs non-branded demand split (ai-visibility row N5)?
 - **Claimants:** ai-visibility (`capabilityClassification[48]` N5 = open-question; Q10; `crossSurfaceDeps[4]` "contested ownership … and shared GA4 AI-referrer work (sn-ai-visibility-2)"); search-traffic (implicit owner per ai-visibility Q10's own proposedDefault: "Search & Traffic owns it; omit here").
-- **DEFAULT (ratify or override):** **ai-visibility owns** the branded-demand split (plan W0.6 default — it powers the AI-demand narrative); **search-traffic links** to it and builds no duplicate split. ⚠ Note: this *inverts* the ai-visibility surface-doc default (which ceded to Search & Traffic) — owner is explicitly choosing between the two here; whichever wins, sn-ai-visibility-6 rides the owning ticket only.
+- **RATIFIED 2026-07-06 — Search & Traffic owns (overrides the plan's ai-visibility default):** Search & Traffic **owns the server computation + the canonical field** (sn-ai-visibility-6 rides the **search-traffic** ticket, W2); ai-visibility **reads and displays** it (W3) and builds no duplicate split. Rationale: branded/non-branded is a GSC query-data metric whose source data already assembles in the Search & Traffic context (data locality), and the W2→W3 wave order means S&T computes it a wave before ai-visibility needs to render it. Ownership of the field ≠ where it is shown. Supersedes the plan W0.6 "ai-visibility owns" default and restores the ai-visibility surface-doc's own cede to Search & Traffic.
 - **Consequence if unresolved:** double-build of the same GA4 split with two divergent numbers (a score-authority/trust landmine under AD-016).
 
 ### C-3 AnomalyAlerts (search-traffic vs cockpit)
@@ -76,16 +76,16 @@ After owner ratification this document is **LAW for all ticket-cuts** (read orde
 
 ## Ratification
 
-`Status: DRAFT — awaiting owner walk`
+`Status: RATIFIED — 2026-07-06 (owner walk-through)`
 
-- [ ] C-1 InsightsEngine rec-set mount — engine owns operator mount; C-lane keeps Health-slot carry-over
-- [ ] C-2 Branded-demand split — ai-visibility owns; search-traffic links *(inverts surface-doc default — decide deliberately)*
-- [ ] C-3 AnomalyAlerts — search-traffic keeps; cockpit hand-off card
-- [ ] C-4 Insight-feed home — engine is the 21-type feed home; search-traffic filtered reuse only
-- [ ] C-5 Competitor-set editing — Workspace Settings single home (AD-014)
-- [ ] C-6 Page Strategy / Copy Pipeline — T1 drill-ins on brand-ai now; relocation = C3-later ticket
-- [ ] C-7 Diagnostics — keep nav entry + reports-list lens (AD-022)
-- [ ] C-8 Meeting Brief — retired (acknowledge; already ratified 2026-07-05)
-- [ ] Frozen Contracts register 1–11 — acknowledged as binding on every ticket-cut
+- [x] C-1 InsightsEngine rec-set mount — engine owns operator mount; C-lane keeps Health-slot carry-over
+- [x] C-2 Branded-demand split — **Search & Traffic owns compute + field (W2); ai-visibility reads/displays (W3)** — OVERRIDES the plan's ai-visibility default (data locality + wave order)
+- [x] C-3 AnomalyAlerts — search-traffic keeps the actionable panel; cockpit hand-off card
+- [x] C-4 Insight-feed home — engine is the 21-type feed home; search-traffic filtered reuse only
+- [x] C-5 Competitor-set editing — Workspace Settings single home (AD-014)
+- [x] C-6 Page Strategy / Copy Pipeline — T1 drill-ins on brand-ai now; relocation = C3-later ticket
+- [x] C-7 Diagnostics — keep nav entry + reports-list lens (AD-022)
+- [x] C-8 Meeting Brief — retired (ratified 2026-07-05; executed in #1487 + #1490)
+- [x] Frozen Contracts register 1–11 — acknowledged as binding on every ticket-cut
 
-On full tick-through, flip Status to `RATIFIED — <date>` and record it in `owner-decisions.json`.
+**One override from the pre-filled defaults: C-2** (owner chose Search & Traffic as the compute owner, inverting the plan W0.6 ai-visibility default). All other items ratified as pre-filled. This walk is the last gate before Wave 1 dispatch.

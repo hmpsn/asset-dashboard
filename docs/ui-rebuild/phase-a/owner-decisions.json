@@ -1,4 +1,20 @@
 {
+  "crossSurfaceRatification": {
+    "ratifiedOn": "2026-07-06",
+    "method": "owner walk-through (CROSS_SURFACE_CONTRACTS.md)",
+    "status": "RATIFIED",
+    "acceptedAsPrefilled": ["C-1", "C-3", "C-4", "C-5", "C-6", "C-7", "C-8", "frozen-contracts-1-11"],
+    "overrides": [
+      {
+        "item": "C-2",
+        "topic": "branded vs non-branded demand split",
+        "prefilledDefault": "ai-visibility owns (plan W0.6)",
+        "ratifiedDecision": "Search & Traffic owns the server computation + canonical field (sn-ai-visibility-6 rides the search-traffic W2 ticket); ai-visibility reads/displays in W3",
+        "rationale": "GSC query-data metric with source data already in the Search & Traffic context (data locality); W2 computes a wave before ai-visibility W3 renders; ownership of the field is separate from where it is displayed"
+      }
+    ],
+    "note": "This walk is the last gate before Wave 1 dispatch. See docs/ui-rebuild/phase-a/CROSS_SURFACE_CONTRACTS.md."
+  },
   "decisions": [
     {
       "id": "AD-001",

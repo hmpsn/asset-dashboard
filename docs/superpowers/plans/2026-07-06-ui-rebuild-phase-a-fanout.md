@@ -87,7 +87,7 @@ One page the owner ratifies in a single sitting, pre-filled with defaults:
 | Contested item | Default to ratify |
 |---|---|
 | InsightsEngine rec-set mount (insights↔recommendations B1) | engine owns the operator mount; recommendations admin desk links to it |
-| Branded-demand split (ai-visibility Q10 vs search-traffic) | ai-visibility owns; search-traffic links |
+| Branded-demand split (ai-visibility Q10 vs search-traffic) | **RATIFIED 2026-07-06 — Search & Traffic owns compute + field (sn-ai-visibility-6 rides the search-traffic W2 ticket); ai-visibility reads/displays in W3.** Overrides this table's original "ai-visibility owns" default for data locality + W2→W3 wave order. |
 | AnomalyAlerts (search-traffic vs cockpit) | search-traffic keeps; cockpit consumes via hand-off card |
 | Insight-feed home (insights Q6 / search-traffic I1–I6) | operator Insights Engine (engine surface) is the 21-type feed home |
 | Competitor-set editing | Workspace Settings single home (AD-014 default) |
