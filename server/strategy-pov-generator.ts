@@ -13,7 +13,6 @@ import { strategyPovAIOutputSchema } from './schemas/strategy-pov-schemas.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { createLogger } from './logger.js';
-import { assembleMeetingBriefMetrics } from './meeting-brief-generator.js';
 import { callNarrativeAI, withContentHashCache } from './narrative-ai.js';
 import type { WorkspaceIntelligence, IntelligenceSlice } from '../shared/types/intelligence.js';
 import type { Recommendation } from '../shared/types/recommendations.js';
@@ -21,7 +20,7 @@ import type { StrategyPov, StrategyPovAIOutput, StrategyPovVariant } from '../sh
 
 const log = createLogger('strategy-pov-generator');
 
-/** Reuse the same slice budget as the meeting brief (audit §2 "clone, re-point"). */
+/** Slice budget inherited from the retired meeting-brief generator (audit §2 "clone, re-point"). */
 const POV_SLICES: IntelligenceSlice[] = [
   'seoContext', 'insights', 'learnings', 'siteHealth', 'contentPipeline', 'clientSignals',
 ];
@@ -41,7 +40,7 @@ export const POV_UNCHANGED = 'POV_UNCHANGED';
  *     discussing}). The client reads the POV over what the operator has actually put in front of
  *     them.
  *
- * NOT topRecommendationId (that is the meeting-brief's INVERSE signal). Read-only; never triggers
+ * NOT topRecommendationId (that was the retired meeting-brief's INVERSE signal). Read-only; never triggers
  * generation. Returns [] when no rec set is cached. The hash already folds in `variant`, so the
  * admin/client caches are distinct even though they draw from different sets.
  */
@@ -228,9 +227,6 @@ export async function generateStrategyPov(
       const slices = await withActiveLocalSeoSlice(workspaceId, POV_SLICES);
       const intel = await buildWorkspaceIntelligence(workspaceId, { slices });
       const customPromptNotes = getCustomPromptNotes(workspaceId);
-      // assembleMeetingBriefMetrics reused verbatim (audit §2) — kept warm so the at-a-glance metrics
-      // are available to the cockpit even though the POV body itself is AI-drafted.
-      void assembleMeetingBriefMetrics(intel);
 
       const systemPrompt = buildSystemPrompt(workspaceId, `
 You are a strategic SEO advisor drafting a curated point of view for ${variant === 'client' ? 'the client' : 'the operator review'}. Your output must be valid JSON matching the StrategyPovAIOutput interface exactly.

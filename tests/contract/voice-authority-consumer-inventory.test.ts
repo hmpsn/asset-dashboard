@@ -42,7 +42,6 @@ const VOICE_AUTHORITY_INVENTORY: Array<{
   { file: 'server/keyword-recommendations.ts', classification: 'builder-backed' },
   { file: 'server/keyword-strategy-ai-synthesis.ts', classification: 'correct' },
   { file: 'server/llms-txt-generator.ts', classification: 'documented-exception' },
-  { file: 'server/meeting-brief-generator.ts', classification: 'correct' },
   { file: 'server/strategy-pov-generator.ts', classification: 'correct' },
   { file: 'server/the-issue-lead-value-ai.ts', classification: 'documented-exception' },
   { file: 'server/monthly-digest.ts', classification: 'correct' },

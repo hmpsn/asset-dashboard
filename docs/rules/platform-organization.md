@@ -193,7 +193,7 @@ Owns insight generation/hydration, intelligence slices, anomaly/recommendation e
 Owns discovery, voice calibration, brand identity, brandscripts, page strategy/blueprints, and copy/brand steering experiences.
 
 - Owned routes/modules:
-  `server/routes/brandscript.ts`, `brand-identity.ts`, `voice-calibration.ts`, `brand-docs.ts`, `page-strategy.ts`, `rewrite-chat.ts`, `aeo-review.ts`, `server/brandscript.ts`, `server/voice-calibration.ts`, `server/page-strategy.ts`, `server/prompt-assembly.ts`, `server/prompt-rich-blocks.ts`, `server/meeting-brief-generator.ts`
+  `server/routes/brandscript.ts`, `brand-identity.ts`, `voice-calibration.ts`, `brand-docs.ts`, `page-strategy.ts`, `rewrite-chat.ts`, `aeo-review.ts`, `server/brandscript.ts`, `server/voice-calibration.ts`, `server/page-strategy.ts`, `server/prompt-assembly.ts`, `server/prompt-rich-blocks.ts`
 - Owned components/hooks/API wrappers/shared types:
   `src/components/BrandHub.tsx`, `src/components/brand/`, `src/components/brand/voice-tab/`, `src/components/PageRewriteChat.tsx`, `src/hooks/admin/useBlueprints.ts`, `useBriefingDrafts.ts`, `src/api/brand-engine.ts`, `shared/types/brand-engine.ts`, `shared/types/page-strategy.ts`, `shared/types/briefing.ts`, `shared/types/aeo.ts`
 - WebSocket/events:

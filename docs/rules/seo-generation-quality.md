@@ -76,9 +76,10 @@ reserved for genuine `CRITICAL_CHECKS`).
   `impactScore`, keeping the legacy tier, so the canary is **blind to cross-tier reorder**.
   P4 must make `ovClone` apply the OV-derived tier too (G1).
 - `src/components/admin/OvDivergencePanel.tsx` — must surface tier-level divergence.
-- `server/meeting-brief-generator.ts` — the brief cache hash keys on top-10 insights +
-  first-5 site keywords, **no rec/tier signal** → serves a stale "#1" after re-tiering (G8).
-  P4 must add a rec/tier/gap signal to the cache hash.
+- ~~`server/meeting-brief-generator.ts`~~ — RETIRED (2026-07): the Meeting Brief surface and
+  its generator/cache were removed with the feature. The G8 cache-hash fix shipped and lived
+  in it until retirement; the strategy POV's equivalent contract is `buildStrategyPovHash`
+  (`server/strategy-pov-generator.ts`).
 - Client #1 card + `topRecommendationId` consumers (Health tab ordering).
 
 ## Contract 3 — the `estimatedGain` string
@@ -257,13 +258,12 @@ gives briefing-candidates, the upsell badge, and the rec layer ONE basis while k
 valid and the column in range. Recomputed in `keyword-strategy-enrichment.ts` when `relaxConservatism`
 (the same `seo-generation-quality` flag); flag-OFF keeps `computeOpportunityScore`.
 
-**Part F — brief cache (G8): HASH-FIX ONLY (decision).** `buildPromptHash`
-(`server/meeting-brief-generator.ts`) now keys on a tier-aware `BriefRecSignal`
-(`topRecommendationId` + `topTier`) read from the CACHED rec set, so a re-tier busts the brief
-cache. We deliberately did NOT surface the engine's `topRecommendationId`/title into the brief
-prompt: the brief is a **distinct, insight-sourced narrative surface** (it does not read the rec
-set), and threading the rec set into its prompt would be disproportionate. The §5.2 "#1 brief == #1
-client" invariant is therefore scoped to the rec/client surfaces, not the brief narrative.
+**Part F — brief cache (G8): RETIRED with the Meeting Brief (2026-07).** The hash-fix decision
+(key `buildPromptHash` on a tier-aware `BriefRecSignal` read from the CACHED rec set) shipped
+and held until the Meeting Brief surface was retired and its generator deleted. The analogous
+live contract is the strategy POV's `buildStrategyPovHash` (`server/strategy-pov-generator.ts`),
+which keys on rec content + order + variant + regenerate-nonce. The §5.2 "#1 brief == #1
+client" invariant remains scoped to the rec/client surfaces.
 
 **§5.2 one-liner.** The client #1 card AND AdminChat both read `summary.topRecommendationId`
 (shared basis ✅). `mcp/tools/clients.ts get_pending_work` is intentionally OUT-OF-SCOPE of the #1

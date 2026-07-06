@@ -5,7 +5,6 @@ const structuredOperationIds = [
   'content-post-seo-meta',
   'content-post-unify',
   'voice-scoring',
-  'meeting-brief',
   'voice-feedback-suggest',
   'intelligence-profile-autofill',
   'copy-generation',
