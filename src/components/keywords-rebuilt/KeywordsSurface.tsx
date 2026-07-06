@@ -241,9 +241,6 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
             className="w-[220px]"
           />
         )}
-        <span className="t-caption text-[var(--brand-text-muted)]" data-testid="keywords-workspace-id">
-          {workspaceId}
-        </span>
       </Toolbar>
 
       <div className="flex flex-wrap gap-2" aria-label="Keyword filters">

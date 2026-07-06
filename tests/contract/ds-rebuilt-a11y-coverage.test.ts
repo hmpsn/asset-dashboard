@@ -14,8 +14,11 @@ import { describe, expect, it } from 'vitest';
 const ROOT = join(__dirname, '../..');
 const DS_MARKER = '@ds-rebuilt';
 const A11Y_HELPER = 'expectNoA11yViolations';
-const COMPONENT_ROOTS = ['src/components/ui', 'src/components/layout'];
-const TEST_ROOTS = ['tests/component/ui', 'tests/component/layout'];
+// Scan ALL of src/components (recursive) so the floor covers not just the F3/F4 primitives
+// (ui/, layout/) but every rebuilt SURFACE dir too (keywords-rebuilt/, and each Phase A
+// fan-out surface) — a per-surface component is exactly where the a11y floor must not rot.
+const COMPONENT_ROOTS = ['src/components'];
+const TEST_ROOTS = ['tests/component'];
 
 // @ds-rebuilt primitives that have a test file but are intentionally exempt from the a11y
 // floor. MUST stay empty unless a primitive surfaces a genuinely-hard axe violation that

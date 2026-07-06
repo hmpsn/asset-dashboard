@@ -12,6 +12,7 @@ import {
 } from '../../lib/keywordHubDeepLink';
 import { keywordTrackingKey } from '../../lib/keywordTracking';
 import {
+  KEYWORD_HUB_SORT_KEYS,
   hubSortToKccSort,
   type KeywordHubSortKey,
   type KeywordHubSortState,
@@ -40,16 +41,7 @@ export const KEYWORDS_SURFACE_FILTERS = [
 
 const LENS_VALUES = new Set<string>(KEYWORDS_SURFACE_LENSES.map((lens) => lens.id));
 const FILTER_VALUES = new Set<string>(Object.values(KEYWORD_COMMAND_CENTER_FILTERS));
-const SORT_VALUES = new Set<string>([
-  'opportunity',
-  'keyword',
-  'position',
-  'change',
-  'clicks',
-  'volume',
-  'difficulty',
-  'date',
-]);
+const SORT_VALUES = new Set<string>(KEYWORD_HUB_SORT_KEYS);
 
 const DEFAULT_LENS: KeywordsSurfaceLens = 'rankings';
 // The rebuilt surface's own lens lives in its OWN param — NOT the shared 'tab' segment,

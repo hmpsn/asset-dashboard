@@ -1,14 +1,20 @@
 import type { KeywordCommandCenterSort } from '../../shared/types/keyword-command-center';
 
-export type KeywordHubSortKey =
-  | 'opportunity'
-  | 'keyword'
-  | 'position'
-  | 'change'
-  | 'clicks'
-  | 'volume'
-  | 'difficulty'
-  | 'date';
+// Single source of truth for the Hub sort keys — the type DERIVES from this array so the
+// runtime membership check (SORT_VALUES) can never drift from the union (a 9th key added to
+// one but not the other would silently drop a valid ?sort= deep-link).
+export const KEYWORD_HUB_SORT_KEYS = [
+  'opportunity',
+  'keyword',
+  'position',
+  'change',
+  'clicks',
+  'volume',
+  'difficulty',
+  'date',
+] as const;
+
+export type KeywordHubSortKey = (typeof KEYWORD_HUB_SORT_KEYS)[number];
 
 export interface KeywordHubSortState {
   key: KeywordHubSortKey;

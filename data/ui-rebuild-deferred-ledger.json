@@ -207,6 +207,34 @@
       "createdAt": "2026-07-06",
       "reviewBy": "2026-10-31",
       "links": { "pr": "#1480" }
+    },
+    {
+      "id": "DEF-kw-004",
+      "surface": "keywords",
+      "item": "hubSortToKccSort was extracted to the shared src/lib/keywordHubSort.ts (the rebuilt surface consumes it), but the legacy KeywordHub.tsx still keeps its own byte-identical copy + HubSortKey type. Two mappings can drift.",
+      "decision": "Do NOT touch the legacy KeywordHub during the pilot (a deliberate Task 8.4 constraint — it is the surface being replaced). The drift window is transient: KeywordHub is retired when ui-rebuild-shell covers Keywords, and the duplicate dies with it. Unifying now risks destabilizing legacy for no lasting benefit.",
+      "class": "primitive",
+      "upgradeTrigger": "KeywordHub retirement (the rebuilt Keywords surface goes global / legacy branch removed) — delete the legacy hubSortToKccSort + HubSortKey and import from src/lib/keywordHubSort.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-06",
+      "reviewBy": "2026-10-31",
+      "links": { "pr": "#1480" }
+    },
+    {
+      "id": "DEF-kw-005",
+      "surface": "keywords",
+      "item": "The rebuilt surface fetches summary+rows as ONE initial-view query keyed on the full rowsQuery, so the summary (counts + topicClusters + cannibalization + computeOrganicTrafficValue) rebuilds on every sort/page/lens/filter change though it is invariant to sort/page; computeOrganicTrafficValue also re-SELECT*s page_keywords despite the lite sourceSnapshot already being in memory. A standalone summary hook keyed WITHOUT query already exists.",
+      "decision": "Efficiency, not correctness — the surface is right, just does redundant work per interaction. Deferred rather than rushed: decoupling the summary from rowsQuery + threading the snapshot into computeOrganicTrafficValueFromPages needs careful type alignment (lite vs full PageKeywordMap) and is a template pattern worth getting right, not fast.",
+      "class": "perf",
+      "upgradeTrigger": "Before Phase A fan-out leans on the initial-view pattern — split the summary into its own query keyed without sort/page (reuse the existing summary hook), and feed computeOrganicTrafficValueFromPages the in-memory sourceSnapshot.pageMap instead of re-reading page_keywords.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-06",
+      "reviewBy": "2026-10-31",
+      "links": { "pr": "#1480" }
     }
   ]
 }
