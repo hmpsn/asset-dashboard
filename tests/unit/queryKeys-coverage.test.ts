@@ -262,9 +262,6 @@ describe('queryKeys.admin intelligence keys', () => {
     expect(queryKeys.admin.insightFeed(WS)).toEqual(['admin-insight-feed', WS]);
   });
 
-  it('meetingBrief key shape', () => {
-    expect(queryKeys.admin.meetingBrief(WS)).toEqual(['admin-meeting-brief', WS]);
-  });
 });
 
 // ── Admin — Outcomes ───────────────────────────────────────────────────────────

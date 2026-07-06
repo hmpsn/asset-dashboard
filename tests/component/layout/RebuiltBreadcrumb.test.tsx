@@ -48,12 +48,6 @@ describe('RebuiltBreadcrumb', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('uses the legacy fallback label for redirect-only pages', () => {
-    renderBreadcrumb('brief', '/ws/ws-1/brief');
-
-    expect(screen.getByText('Meeting Brief')).toBeInTheDocument();
-  });
-
   it('renders Font Awesome separator icons between trail segments', () => {
     renderBreadcrumb('seo-keywords', '/ws/ws-1/seo-keywords');
 

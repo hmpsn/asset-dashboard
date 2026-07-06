@@ -14,7 +14,6 @@ export {
   jobs, roadmap, features, notifications, workspaceOverview,
   workspaceHome, workspaceBadges, integrationHealth, observability,
 } from './platform';
-export { meetingBriefApi } from './meetingBrief';
 export { briefingApi } from './briefing';
 export { competitorGapsApi } from './competitorGaps';
 export { diagnostics } from './diagnostics.js';

@@ -84,7 +84,6 @@ import suggestedBriefsRouter from './routes/suggested-briefs.js';
 import clientSignalsRouter from './routes/client-signals.js';
 import clientActionsRouter from './routes/client-actions.js';
 import deliverablesRoutes from './routes/deliverables.js';
-import meetingBriefRouter from './routes/meeting-brief.js';
 import { theIssueAdminRouter } from './routes/the-issue-admin.js';
 import { theIssueConversionTrackingRouter } from './routes/the-issue-conversion-tracking.js';
 import { theIssueExportRouter } from './routes/the-issue-export.js';
@@ -388,7 +387,6 @@ export function createApp(): express.Express {
   app.use(clientSignalsRouter);
   app.use(clientActionsRouter);
   app.use(deliverablesRoutes);
-  app.use(meetingBriefRouter);
   app.use(theIssueAdminRouter);
   app.use(theIssueConversionTrackingRouter);
   app.use(theIssueExportRouter);

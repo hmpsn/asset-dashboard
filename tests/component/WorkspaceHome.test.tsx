@@ -66,11 +66,6 @@ vi.mock('../../src/components/ui/FeatureFlag', () => ({
   FeatureFlag: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-// ── Lazy component ────────────────────────────────────────────────────────────
-vi.mock('../../src/lib/lazyWithRetry', () => ({
-  lazyWithRetry: () => () => <div data-testid="meeting-brief-page" />,
-}));
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 async function getAdminHooks() {
   return import('../../src/hooks/admin');
@@ -225,12 +220,12 @@ describe('WorkspaceHome', () => {
     expect(screen.getByText('Traffic Value')).toBeInTheDocument();
   });
 
-  it('shows tab bar with Overview and Meeting Brief tabs', () => {
+  it('shows workspace section tabs without the retired Meeting Brief tab', () => {
     renderWorkspaceHome();
-    // Wave 2: two TabBars rendered (HOME_TABS + SECTION_TABS), both have "Overview" — use getAllByText
-    const overviewTabs = screen.getAllByText('Overview');
-    expect(overviewTabs.length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Meeting Brief')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /overview/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /pipeline/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /activity/i })).toBeInTheDocument();
+    expect(screen.queryByText('Meeting Brief')).not.toBeInTheDocument();
   });
 
   it('shows Refresh button', () => {
