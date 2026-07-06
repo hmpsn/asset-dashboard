@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RebuiltSidebar } from '../../../src/components/layout/RebuiltSidebar';
 import { NAV_REGISTRY, NAV_REGISTRY_BY_ID } from '../../../src/lib/navRegistry';
+import { queryKeys } from '../../../src/lib/queryKeys';
 import type { Workspace } from '../../../src/components/WorkspaceSelector';
 import type { FeatureFlagKey } from '../../../shared/types/feature-flags';
 import { expectNoA11yViolations } from '../a11y';
@@ -51,6 +52,13 @@ const defaultProps = {
 
 function renderSidebar(overrides: Partial<typeof defaultProps> = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // Pre-seed the feature-flag query so RebuiltSidebar's `useQuery` (staleTime: Infinity)
+  // reads the flags SYNCHRONOUSLY from render 1 — no loading→loaded transition to race.
+  // The old test waited on that async resolution with waitFor's default 1000ms timeout,
+  // which flaked under CI's resource-constrained component shard. Seeding matches the
+  // resolved-flag state each test declares via `featureFlagResponse` (empty = the same
+  // FEATURE_FLAGS defaults the loading fallback used, so unrelated tests are unaffected).
+  queryClient.setQueryData(queryKeys.shared.featureFlags(), featureFlagResponse);
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
@@ -136,15 +144,18 @@ describe('RebuiltSidebar', () => {
     expect(screen.queryByRole('button', { name: 'Pipeline' })).not.toBeInTheDocument();
   });
 
-  it('does not render registry entries hidden by a resolved feature flag', async () => {
+  it('does not render registry entries hidden by a resolved feature flag', () => {
     NAV_REGISTRY_BY_ID.features.flagBehavior = { flag: 'ui-rebuild-shell', hideWhenOn: true };
     featureFlagResponse = { 'ui-rebuild-shell': true };
 
+    // The seeded flag query resolves synchronously (see renderSidebar), so the hide takes
+    // effect on the first render — assert directly, no flaky async wait.
     renderSidebar();
 
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'Features' })).not.toBeInTheDocument();
-    });
+    expect(screen.queryByRole('button', { name: 'Features' })).not.toBeInTheDocument();
+    // Control: a sibling ADMIN-group entry with no flag behavior still renders, so a
+    // blanket render failure can't masquerade as "the flag hid the entry".
+    expect(screen.getByRole('button', { name: 'Diagnostics' })).toBeInTheDocument();
   });
 
   it('keyboard-walks nav items with roving tabindex and activates the focused item', async () => {
