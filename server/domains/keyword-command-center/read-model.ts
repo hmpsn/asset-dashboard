@@ -411,7 +411,10 @@ export function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): Ke
       intent: finalized.metrics.intent,
     };
     const { score, components } = computeKeywordValueComponents(input, context.valueScoring.ctx);
-    if (score !== undefined) setKeywordCommandCenterRowValueScore(finalized, score);
+    if (score !== undefined) {
+      setKeywordCommandCenterRowValueScore(finalized, score);
+      finalized.opportunityScore = score;
+    }
     if (components !== undefined) {
       finalized.valueReasons = keywordValueReasons(components, {
         cpc: finalized.metrics.cpc,

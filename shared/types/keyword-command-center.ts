@@ -260,6 +260,8 @@ export interface KeywordCommandCenterRow {
    * Absent when the keyword has no value signal (signal gate fails).
    */
   valueReasons?: string[];
+  /** 0-100, server-computed; display-only. */
+  opportunityScore?: number;
   /**
    * Realized monthly dollar value of the keyword: clicks × cpc (Task 3.3).
    * Built in finalizeDraftRow via the single keywordDollarValue helper (one $
