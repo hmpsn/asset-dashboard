@@ -519,7 +519,9 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByRole('button', { name: 'Tracked' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('searchbox')).toHaveValue('cosmetic');
     expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: 'tracked', search: 'cosmetic', page: 3 });
-    expect(screen.getByRole('button', { name: 'emergency dentist' })).toBeInTheDocument();
+    // The keyword deep-link opens the detail drawer (the stray keyword-labeled button
+    // above the lenses was removed as dead UI); the drawer's title carries the keyword.
+    expect(screen.getByRole('dialog', { name: /emergency dentist/i })).toBeInTheDocument();
 
     await expectNoA11yViolations(container);
   }, 15_000);
@@ -529,7 +531,8 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
 
     expect(screen.getByRole('radio', { name: /Rankings/ })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: 'Tracked' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'cosmetic dentistry' })).toBeInTheDocument();
+    // Keyword deep-link opens the detail drawer, titled with the keyword.
+    expect(screen.getByRole('dialog', { name: /cosmetic dentistry/i })).toBeInTheDocument();
   });
 
   it('keeps an inbound ?tab filter when the user switches lens (review PR #1480)', () => {
@@ -566,8 +569,11 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByText('Tracked locally')).toBeInTheDocument();
     expect(screen.getByText('From gap')).toBeInTheDocument();
     expect(screen.getByText('Auto-managed')).toBeInTheDocument();
-    expect(screen.getByText('No CPC')).toBeInTheDocument();
+    // Empty money/number cells render a quiet em-dash placeholder — never a word
+    // ("No CPC") in the bright numeric column, and never a fabricated $0.
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
     expect(screen.queryByText('$0')).not.toBeInTheDocument();
+    expect(screen.queryByText('No CPC')).not.toBeInTheDocument();
     expect(screen.getByRole('status', { name: /45 more keywords hidden/i })).toBeInTheDocument();
   });
 

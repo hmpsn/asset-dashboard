@@ -161,10 +161,19 @@ export function GroupBlock({
     gap: 12,
     padding: '13px 16px',
     background: 'var(--surface-1)',
-    borderBottom: open ? '1px solid var(--brand-border)' : 'none',
+    // Longhand-only borders: toggling the bottom rule on `open` must not update a
+    // longhand (borderBottom*) while the `border` shorthand is also present — that
+    // shorthand/longhand mix triggers React's "conflicting property" dev warning on
+    // every re-render, and GroupBlock renders once per grouped-lens block so it fired
+    // in bulk on the Keywords surface.
+    borderTopWidth: 0,
+    borderRightWidth: 0,
+    borderLeftWidth: 0,
+    borderBottomWidth: open ? 1 : 0,
+    borderBottomStyle: 'solid',
+    borderBottomColor: 'var(--brand-border)',
     width: '100%',
     textAlign: 'left',
-    border: 'none',
     font: 'inherit',
     cursor: collapsible ? 'pointer' : 'default',
   };

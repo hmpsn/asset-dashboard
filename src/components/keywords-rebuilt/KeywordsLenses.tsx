@@ -9,7 +9,7 @@ import type {
 import { KEYWORD_LIFECYCLE_STAGES } from '../../../shared/types/keyword-command-center';
 import { Badge, BoardCard, BoardColumn, Button, GroupBlock, InlineBanner, Skeleton } from '../ui';
 import { KeywordsTable, type KeywordRowsQueryResult } from './KeywordsTable';
-import type { KeywordsSurfaceLens, UseKeywordsSurfaceStateReturn } from './useKeywordsSurfaceState';
+import type { UseKeywordsSurfaceStateReturn } from './useKeywordsSurfaceState';
 
 interface KeywordsLensesProps {
   workspaceId: string;
@@ -38,11 +38,15 @@ const LIFECYCLE_META: Array<{
   { stage: KEYWORD_LIFECYCLE_STAGES.WINNING, title: 'Winning', accent: 'var(--emerald)' },
 ];
 
-function opportunityTraffic(rows: KeywordCommandCenterRow[]): string {
+// Sum of the group's last-window Search Console impressions. Labeled honestly as
+// "Impressions" — this is realized search exposure, NOT projected opportunity/upside
+// traffic (the platform has no per-row estimated-gain field, so a mislabel here would
+// present delivered impressions as future upside — see the design-parity audit).
+function impressionsTotal(rows: KeywordCommandCenterRow[]): string {
   const impressions = rows
     .map((row) => row.metrics.impressions)
     .filter((value): value is number => typeof value === 'number');
-  if (impressions.length === 0) return 'No data';
+  if (impressions.length === 0) return '—';
   const total = impressions.reduce((sum, value) => sum + value, 0);
   return new Intl.NumberFormat('en-US', { notation: total >= 10_000 ? 'compact' : 'standard' }).format(total);
 }
@@ -168,8 +172,8 @@ function GroupedLens({
           title={group.title}
           meta={group.meta}
           stats={[
-            { label: 'Rows', value: group.rows.length },
-            { label: 'Opp traffic', value: opportunityTraffic(group.rows) },
+            { label: 'Keywords', value: group.rows.length },
+            { label: 'Impressions', value: impressionsTotal(group.rows) },
           ]}
           flag={group.flag ? { label: group.flag } : undefined}
           collapsible
@@ -209,18 +213,12 @@ function LifecycleLens({
   );
 }
 
-function rowsQueryForLens(state: UseKeywordsSurfaceStateReturn, lens: KeywordsSurfaceLens) {
-  if (lens === 'opportunities') {
-    return { ...state.rowsQuery, sort: 'opportunity' as const, direction: 'desc' as const };
-  }
-  if (lens === 'rankings') {
-    return { ...state.rowsQuery, sort: 'rank' as const, direction: 'asc' as const };
-  }
-  return state.rowsQuery;
-}
-
 export function KeywordsLenses({ workspaceId, state, summary, initialRowsResult }: KeywordsLensesProps) {
-  const rowsQuery = rowsQueryForLens(state, state.lens);
+  // state.rowsQuery already carries the lens-appropriate default sort (setLens applies
+  // it on every lens switch) AND the user's sort-chip choice. Do NOT re-force a per-lens
+  // sort here — that override was silently ignoring the sort chips in the owned-query
+  // (local_candidates) path, leaving them dead. Use the state query in both paths.
+  const rowsQuery = state.rowsQuery;
   const ownedRowsResult = useKeywordCommandCenterRows(workspaceId, rowsQuery, {
     enabled: initialRowsResult == null,
   });
@@ -229,14 +227,16 @@ export function KeywordsLenses({ workspaceId, state, summary, initialRowsResult 
 
   // Pages/Clusters/Lifecycle group the CURRENT PAGE of rows, not the whole workspace.
   // Be honest when that is a subset — never present a page-1 board as the full universe
-  // (review PR #1480). Full server-side grouping over all keywords is DEF-kw-003.
-  const totalCount = summary?.counts?.total ?? rows.length;
+  // (review PR #1480). Full server-side grouping over all keywords is a tracked follow-up.
+  // Use the FILTER/SEARCH-scoped total (pageInfo.totalRows) so "N more hidden" is correct
+  // when a filter or search narrows the set — the workspace-global counts.total would
+  // overstate the hidden figure whenever a filter is active.
+  const totalCount = rowsResult.data?.pageInfo?.totalRows ?? summary?.counts?.total ?? rows.length;
   const hiddenFromGroups = Math.max(0, totalCount - rows.length);
   const truncationBanner = hiddenFromGroups > 0 ? (
     <InlineBanner tone="warning" title={`Grouped from the first ${rows.length} keywords`}>
       {hiddenFromGroups} more keywords are not shown here — these lenses group the current
-      page, not the full set (server-side grouping is tracked as DEF-kw-003). Use the
-      Rankings lens to page through every keyword.
+      page, not the full set. Use the Rankings lens to page through every keyword.
     </InlineBanner>
   ) : null;
 
