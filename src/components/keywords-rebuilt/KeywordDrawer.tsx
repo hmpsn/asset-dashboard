@@ -36,6 +36,7 @@ import {
   DefinitionList,
   Drawer,
   InlineBanner,
+  IntentTag,
   MetricTile,
   OutcomeReadbackChip,
   Skeleton,
@@ -43,6 +44,7 @@ import {
   StatusBadge,
   Toolbar,
   ToolbarSpacer,
+  type KeywordIntent,
 } from '../ui';
 
 interface KeywordDrawerProps {
@@ -86,8 +88,24 @@ function labelize(value: string | undefined): string {
   return value?.replace(/_/g, ' ') ?? 'No data';
 }
 
+const NUMBER_FORMAT = new Intl.NumberFormat('en-US');
+const INTENTS = new Set<KeywordIntent>(['commercial', 'informational', 'transactional', 'local']);
+
+function asIntent(value: string | undefined): KeywordIntent | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase() as KeywordIntent;
+  return INTENTS.has(normalized) ? normalized : null;
+}
+
+function searchVolumeLabel(value: number | undefined): string {
+  return typeof value === 'number' ? `${NUMBER_FORMAT.format(value)} / mo` : '—';
+}
+
 function detailItems(row: KeywordCommandCenterRow) {
   const items = [
+    // Search volume — the "how big is this" demand signal the drawer was missing
+    // (also a HEAD-parity restore: the legacy drawer surfaced it).
+    { label: 'Search volume', value: searchVolumeLabel(row.metrics.volume) },
     { label: 'Tracking', value: labelize(row.tracking.status) },
     { label: 'Source', value: labelize(row.tracking.source) },
     { label: 'Page', value: row.assignment?.pageTitle ?? row.assignment?.pagePath ?? 'No page assigned' },
@@ -263,6 +281,7 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
           <div className="flex flex-col gap-5">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={row.lifecycleStatus} domain="keyword-command-center" variant="soft" shape="pill" />
+              {asIntent(row.metrics.intent) && <IntentTag intent={asIntent(row.metrics.intent)!} />}
               {row.isProtected && <Badge label="Protected" tone="amber" variant="soft" shape="pill" />}
               {row.isLostVisibility && <Badge label="Lost visibility" tone="amber" variant="outline" shape="pill" />}
               {row.tracking.pinned && <Badge label="Pinned" tone="teal" variant="soft" shape="pill" />}
