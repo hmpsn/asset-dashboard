@@ -105,8 +105,6 @@ export const WS_EVENTS = {
   DELIVERABLE_SENT: 'deliverable:sent',
   DELIVERABLE_UPDATED: 'deliverable:updated',
 
-  // Meeting Brief
-  MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
 
   // The Issue — strategy POV (Lane B). Broadcast on generate/regenerate and on every operator
   // edit (PATCH bumps the version) so the cockpit's useStrategyPov handler invalidates its cache.

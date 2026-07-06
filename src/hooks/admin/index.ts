@@ -31,7 +31,6 @@ export { useWorkspaceIntelligence } from './useWorkspaceIntelligence';
 export { useAiSuggestedBriefs } from './useAiSuggestedBriefs';
 export { useClientSignals, useUpdateSignalStatus, useCreateClientSignal } from './useClientSignals';
 export { useNotifications, type NotificationItem } from './useNotifications';
-export { useAdminMeetingBrief } from './useAdminMeetingBrief';
 export { useOvDivergence } from './useOvDivergence';
 export { useLocalSeo, useLocalSeoLocationLookup, useLocalSeoRefresh, useLocalSeoUpdate, useSetPrimaryMarket, useGbpReviews, useLocalGbpRefresh } from './useLocalSeo';
 export { useLocalSeoLocations, useCreateLocation, useUpdateLocation, useDeleteLocation } from './useLocalSeoLocations';

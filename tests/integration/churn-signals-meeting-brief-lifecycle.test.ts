@@ -1,12 +1,10 @@
 // @vitest-environment node
 /**
- * Integration tests for churn-signals and meeting-brief lifecycle.
+ * Integration tests for churn-signals lifecycle.
  *
  * Covers:
  * - Churn signals: dismiss, workspace-specific reads, admin global reads,
  *   field persistence, workspace isolation, multiple signals
- * - Meeting brief: full lifecycle (create via generate, read GET)
- *   with workspace isolation and broadcast assertions
  *
  * Architecture: in-process server with dynamic port (listen(0)) so vi.mock works.
  */
@@ -16,7 +14,6 @@ import type { AddressInfo } from 'node:net';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import db from '../../server/db/index.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
-import { upsertMeetingBrief } from '../../server/meeting-brief-store.js';
 
 // ─── Hoisted broadcast capture ────────────────────────────────────────────────
 
@@ -47,37 +44,6 @@ vi.mock('../../server/email.js', () => ({
   notifyTeamContentRequest: vi.fn(),
   notifyTeamChurnSignal: vi.fn(),
 }));
-
-// ─── Meeting brief generator mock ─────────────────────────────────────────────
-
-const BASE_BRIEF = {
-  workspaceId: '',
-  generatedAt: '2026-05-26T00:00:00.000Z',
-  situationSummary: 'Site performing well with consistent organic growth.',
-  wins: ['Keyword "agency pricing" moved to position 3', 'Traffic up 18%'],
-  attention: ['Core Web Vitals degraded on /contact'],
-  recommendations: [
-    { action: 'Fix /contact CWV issues', rationale: 'Affects click-through rate' },
-  ],
-  blueprintProgress: null,
-  metrics: {
-    siteHealthScore: 84,
-    openRankingOpportunities: 5,
-    contentInPipeline: 2,
-    overallWinRate: 71,
-    criticalIssues: 1,
-  },
-};
-
-vi.mock('../../server/meeting-brief-generator.js', () => ({
-  assembleMeetingBriefMetrics: vi.fn(),
-  buildBriefPrompt: vi.fn(),
-  // Default: returns brief without DB persistence.
-  // Tests that need persistence should use mockImplementation to also call upsertMeetingBrief.
-  generateMeetingBrief: vi.fn(async (workspaceId: string) => ({ ...BASE_BRIEF, workspaceId })),
-}));
-
-import { generateMeetingBrief as mockGenerateMeetingBrief } from '../../server/meeting-brief-generator.js';
 
 // ─── Test server helpers ───────────────────────────────────────────────────────
 
@@ -345,213 +311,6 @@ describe('integration: churn signals', () => {
       const body = await res.json();
       expect(body).toHaveProperty('error');
       expect(typeof body.error).toBe('string');
-    });
-  });
-});
-
-// ─── Meeting Brief ────────────────────────────────────────────────────────────
-
-describe('integration: meeting brief lifecycle', () => {
-  let seeded: SeededFullWorkspace;
-  let baseUrl = '';
-  let closeServer: () => Promise<void>;
-
-  beforeAll(async () => {
-    const server = await startTestServer();
-    baseUrl = server.baseUrl;
-    closeServer = server.close;
-  }, REQUEST_TIMEOUT_MS);
-
-  afterAll(async () => {
-    await closeServer?.();
-  }, REQUEST_TIMEOUT_MS);
-
-  beforeEach(() => {
-    seeded = seedWorkspace();
-    broadcastState.calls = [];
-    vi.clearAllMocks();
-    // Restore default mock behaviour
-    vi.mocked(mockGenerateMeetingBrief).mockImplementation(async (workspaceId: string) => ({
-      ...BASE_BRIEF,
-      workspaceId,
-    }));
-  });
-
-  afterEach(() => {
-    db.prepare('DELETE FROM meeting_briefs WHERE workspace_id = ?').run(seeded.workspaceId);
-    seeded.cleanup();
-  });
-
-  // ── GET (fetch stored brief) ──────────────────────────────────────────────
-
-  describe('GET /api/workspaces/:workspaceId/meeting-brief', () => {
-    it('returns null brief for a fresh workspace with no stored brief', async () => {
-      const res = await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/meeting-brief`);
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body).toEqual({ brief: null });
-    });
-
-    it('returns stored brief after upsert', async () => {
-      upsertMeetingBrief({ ...BASE_BRIEF, workspaceId: seeded.workspaceId });
-
-      const res = await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/meeting-brief`);
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.brief).toMatchObject({
-        workspaceId: seeded.workspaceId,
-        situationSummary: BASE_BRIEF.situationSummary,
-      });
-    });
-
-    it('returned brief has all expected fields', async () => {
-      upsertMeetingBrief({ ...BASE_BRIEF, workspaceId: seeded.workspaceId });
-
-      const res = await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/meeting-brief`);
-      const { brief } = await res.json();
-      expect(brief).toHaveProperty('workspaceId');
-      expect(brief).toHaveProperty('generatedAt');
-      expect(brief).toHaveProperty('situationSummary');
-      expect(brief).toHaveProperty('wins');
-      expect(brief).toHaveProperty('attention');
-      expect(brief).toHaveProperty('recommendations');
-      expect(brief).toHaveProperty('blueprintProgress');
-      expect(brief).toHaveProperty('metrics');
-      expect(Array.isArray(brief.wins)).toBe(true);
-      expect(Array.isArray(brief.attention)).toBe(true);
-      expect(Array.isArray(brief.recommendations)).toBe(true);
-    });
-  });
-
-  // ── POST generate ─────────────────────────────────────────────────────────
-
-  describe('POST /api/workspaces/:workspaceId/meeting-brief/generate', () => {
-    it('returns 200 with the generated brief', async () => {
-      const res = await fetch(
-        `${baseUrl}/api/workspaces/${seeded.workspaceId}/meeting-brief/generate`,
-        { method: 'POST' },
-      );
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.brief).toBeDefined();
-      expect(body.brief.workspaceId).toBe(seeded.workspaceId);
-    });
-
-    it('generated brief has expected shape including metrics and wins', async () => {
-      const res = await fetch(
-        `${baseUrl}/api/workspaces/${seeded.workspaceId}/meeting-brief/generate`,
-        { method: 'POST' },
-      );
-      const { brief } = await res.json();
-      expect(brief.situationSummary).toBe(BASE_BRIEF.situationSummary);
-      expect(brief.wins).toEqual(BASE_BRIEF.wins);
-      expect(brief.attention).toEqual(BASE_BRIEF.attention);
-      expect(brief.recommendations).toEqual(BASE_BRIEF.recommendations);
-      expect(brief.metrics).toMatchObject(BASE_BRIEF.metrics);
-    });
-
-    it('generated brief is retrievable via GET immediately after', async () => {
-      // Override the mock to also persist to DB (matching real generator behaviour)
-      vi.mocked(mockGenerateMeetingBrief).mockImplementationOnce(async (workspaceId: string) => {
-        const brief = { ...BASE_BRIEF, workspaceId };
-        upsertMeetingBrief(brief);
-        return brief;
-      });
-
-      await fetch(
-        `${baseUrl}/api/workspaces/${seeded.workspaceId}/meeting-brief/generate`,
-        { method: 'POST' },
-      );
-
-      const res = await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/meeting-brief`);
-      const { brief } = await res.json();
-      expect(brief).not.toBeNull();
-      expect(brief.workspaceId).toBe(seeded.workspaceId);
-      expect(brief.situationSummary).toBe(BASE_BRIEF.situationSummary);
-    });
-
-    it('records meeting_brief_generated activity', async () => {
-      // The route calls addActivity — verify the round-trip by checking brief is stored
-      // (Activity logging is fire-and-forget; we confirm generate succeeded)
-      const res = await fetch(
-        `${baseUrl}/api/workspaces/${seeded.workspaceId}/meeting-brief/generate`,
-        { method: 'POST' },
-      );
-      expect(res.status).toBe(200);
-      const { brief } = await res.json();
-      expect(brief.workspaceId).toBe(seeded.workspaceId);
-    });
-
-    it('returns 500 when generator throws a generic error', async () => {
-      vi.mocked(mockGenerateMeetingBrief).mockRejectedValueOnce(new Error('AI service unavailable'));
-
-      const res = await fetch(
-        `${baseUrl}/api/workspaces/${seeded.workspaceId}/meeting-brief/generate`,
-        { method: 'POST' },
-      );
-      expect(res.status).toBe(500);
-      const body = await res.json();
-      expect(body).toEqual({ error: 'Failed to generate meeting brief' });
-    });
-
-    it('returns cached brief with unchanged:true when BRIEF_UNCHANGED and cache exists', async () => {
-      // Pre-seed a cached brief
-      upsertMeetingBrief({
-        ...BASE_BRIEF,
-        workspaceId: seeded.workspaceId,
-        situationSummary: 'Previously cached summary',
-      });
-      vi.mocked(mockGenerateMeetingBrief).mockRejectedValueOnce(new Error('BRIEF_UNCHANGED'));
-
-      const res = await fetch(
-        `${baseUrl}/api/workspaces/${seeded.workspaceId}/meeting-brief/generate`,
-        { method: 'POST' },
-      );
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.unchanged).toBe(true);
-      expect(body.brief.situationSummary).toBe('Previously cached summary');
-    });
-
-    it('returns 500 when BRIEF_UNCHANGED but no cache exists', async () => {
-      vi.mocked(mockGenerateMeetingBrief).mockRejectedValueOnce(new Error('BRIEF_UNCHANGED'));
-
-      const res = await fetch(
-        `${baseUrl}/api/workspaces/${seeded.workspaceId}/meeting-brief/generate`,
-        { method: 'POST' },
-      );
-      expect(res.status).toBe(500);
-      const body = await res.json();
-      expect(body).toEqual({ error: 'Failed to generate meeting brief' });
-    });
-  });
-
-  // ── Workspace isolation ───────────────────────────────────────────────────
-
-  describe('workspace isolation', () => {
-    let wsB: SeededFullWorkspace;
-
-    beforeEach(() => {
-      wsB = seedWorkspace();
-    });
-
-    afterEach(() => {
-      db.prepare('DELETE FROM meeting_briefs WHERE workspace_id = ?').run(wsB.workspaceId);
-      wsB.cleanup();
-    });
-
-    it('brief from wsA is not returned for wsB', async () => {
-      // Generate brief for wsA
-      await fetch(
-        `${baseUrl}/api/workspaces/${seeded.workspaceId}/meeting-brief/generate`,
-        { method: 'POST' },
-      );
-
-      // wsB should still have null brief
-      const res = await fetch(`${baseUrl}/api/workspaces/${wsB.workspaceId}/meeting-brief`);
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.brief).toBeNull();
     });
   });
 });

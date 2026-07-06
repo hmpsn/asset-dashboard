@@ -6,13 +6,12 @@ import { Button, ClickableRow, Icon, IconButton } from '../ui';
 import { ArrowLeft, ChevronRight, Search, MessageSquare } from 'lucide-react';
 
 // nav-registry-ok — fallback labels for redirect-only / legacy-folded Page
-// values (brief, seo-briefs, content, calendar, subscriptions,
+// values (seo-briefs, content, calendar, subscriptions,
 // workspace-settings) that intentionally have no registry entry. A breadcrumb
 // can still land on one of these via a stale bookmark, so we keep a label here
 // to avoid rendering a raw slug. Identity/label/needsSite/description for all
 // real nav surfaces comes from the registry (NAV_REGISTRY_BY_ID).
 const LEGACY_TAB_LABELS: Record<string, string> = {
-  brief: 'Meeting Brief',
   'seo-briefs': 'Content Briefs',
   content: 'Content',
   calendar: 'Calendar',

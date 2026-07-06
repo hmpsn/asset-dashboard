@@ -137,7 +137,6 @@ export const queryKeys = {
     insightFeed: (wsId: string) => ['admin-insight-feed', wsId] as const,
     intelligenceSignals: (wsId: string) => ['admin-intelligence-signals', wsId] as const,
     aiSuggestedBriefs: (wsId: string) => ['admin-ai-suggested-briefs', wsId] as const,
-    meetingBrief: (wsId: string) => ['admin-meeting-brief', wsId] as const,
     strategyPov: (wsId: string) => ['admin-strategy-pov', wsId] as const,
     autoSendPolicy: (wsId: string) => ['admin-auto-send-policy', wsId] as const,
     issueLenses: (wsId: string) => ['admin-issue-lenses', wsId] as const,

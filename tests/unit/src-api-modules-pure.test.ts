@@ -937,30 +937,6 @@ describe('src/api/outcomes — clientOutcomesApi', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// src/api/meetingBrief.ts
-// ═══════════════════════════════════════════════════════════════════════════
-
-import { meetingBriefApi } from '../../src/api/meetingBrief';
-
-describe('src/api/meetingBrief', () => {
-  it('meetingBriefApi.get uses getSafe with null brief fallback', async () => {
-    await meetingBriefApi.get('ws-1');
-    const [url, fallback] = mockedGetSafe.mock.calls[0];
-    expect(url).toBe('/api/workspaces/ws-1/meeting-brief');
-    expect(fallback).toEqual({ brief: null });
-  });
-
-  it('meetingBriefApi.generate calls post with empty body', async () => {
-    mockedPost.mockResolvedValueOnce({ brief: null });
-    await meetingBriefApi.generate('ws-1');
-    expect(mockedPost).toHaveBeenCalledWith(
-      '/api/workspaces/ws-1/meeting-brief/generate',
-      {},
-    );
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
 // src/api/localSeo.ts
 // ═══════════════════════════════════════════════════════════════════════════
 

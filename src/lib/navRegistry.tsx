@@ -96,7 +96,6 @@ export interface NavEntry {
  * through without a documented decision.
  */
 export const NON_REGISTRY_PAGES: Page[] = [
-  'brief',          // backward-compat alias; WorkspaceHome is the primary discovery path
   'seo-briefs',     // folded into content-pipeline (Briefs sub-tab) — W3.3
   'content',        // folded into content-pipeline (Posts sub-tab) — W3.3
   'calendar',       // redirect → content-pipeline?tab=calendar

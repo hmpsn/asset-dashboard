@@ -68,7 +68,6 @@ const OutcomesOverview = lazyWithRetry(() => import('./components/admin/outcomes
 const AdminInbox = lazyWithRetry(() => import('./components/admin/AdminInbox').then(m => ({ default: m.AdminInbox })));
 const ClientActionsTab = lazyWithRetry(() => import('./components/admin/ClientActionsTab').then(m => ({ default: m.ClientActionsTab })));
 const ClientDeliverablesPane = lazyWithRetry(() => import('./components/admin/ClientDeliverablesPane').then(m => ({ default: m.ClientDeliverablesPane })));
-const MeetingBriefPage = lazyWithRetry(() => import('./components/admin/MeetingBrief/MeetingBriefPage').then(m => ({ default: m.MeetingBriefPage })));
 const DiagnosticReportPage = lazyWithRetry(() => import('./components/admin/DiagnosticReport/DiagnosticReportPage').then(m => ({ default: m.DiagnosticReportPage })));
 
 function ChunkFallback() {
@@ -409,8 +408,6 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     }
 
     if (tab === 'home') return <WorkspaceHome key={`home-${selected.id}`} workspaceId={selected.id} workspaceName={selected.webflowSiteName || selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
-    // 'brief' kept for backward compat — WorkspaceHome tab is the primary discovery path
-    if (tab === 'brief') return <MeetingBriefPage key={`brief-${selected.id}`} workspaceId={selected.id} onNavigate={navigate} />;
     if (tab === 'diagnostics') return <DiagnosticReportPage key={`diagnostics-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceId={selected.id} workspaceFolder={selected.folder} queue={workspaceQueue} />;
     if (tab === 'seo-audit') return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} />;

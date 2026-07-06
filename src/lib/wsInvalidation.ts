@@ -376,8 +376,6 @@ function adminInvalidationKeys(
         queryKeys.admin.workspaceHome(workspaceId),
         queryKeys.admin.notifications(),
       ] as const;
-    case WS_EVENTS.MEETING_BRIEF_GENERATED:
-      return [queryKeys.admin.meetingBrief(workspaceId)] as const;
     case WS_EVENTS.COPY_METADATA_UPDATED:
       return [queryKeys.admin.copyMetadataAll(workspaceId)] as const;
     case WS_EVENTS.COPY_BATCH_PROGRESS:

@@ -154,10 +154,6 @@ vi.mock('../../src/components/admin/ClientActionsTab', () => ({
   ClientActionsTab: () => <div data-testid="client-actions-tab" />,
 }));
 
-vi.mock('../../src/components/admin/MeetingBrief/MeetingBriefPage', () => ({
-  MeetingBriefPage: () => <div data-testid="meeting-brief-page" />,
-}));
-
 vi.mock('../../src/components/admin/DiagnosticReport/DiagnosticReportPage', () => ({
   DiagnosticReportPage: () => <div data-testid="diagnostic-report-page" />,
 }));

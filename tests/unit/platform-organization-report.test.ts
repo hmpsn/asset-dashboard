@@ -65,7 +65,6 @@ const SYNTHETIC_FILES = [
   'src/hooks/client/useClientOutcomes.ts',
   'src/hooks/client/useClientQueries.ts',
   'src/hooks/useBackgroundTasks.tsx',
-  'src/components/admin/MeetingBrief/MeetingBriefPage.tsx',
   'src/components/admin/outcomes/OutcomeScoreCard.tsx',
   'src/components/brand/BrandHub.tsx',
   'src/components/client/DecisionCard.tsx',

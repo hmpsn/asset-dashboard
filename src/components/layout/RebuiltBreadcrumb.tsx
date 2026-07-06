@@ -14,7 +14,6 @@ import { Badge, Button, Icon } from '../ui';
 
 // nav-registry-ok — fallback for redirect-only/legacy-folded Pages, mirrors Breadcrumbs.tsx:14
 const LEGACY_TAB_LABELS: Record<string, string> = {
-  brief: 'Meeting Brief',
   'seo-briefs': 'Content Briefs',
   content: 'Content',
   calendar: 'Calendar',
@@ -24,10 +23,6 @@ const LEGACY_TAB_LABELS: Record<string, string> = {
 };
 
 const SUB_TAB_LABELS_BY_PAGE: Partial<Record<Page, Record<string, string>>> = {
-  home: {
-    overview: 'Overview',
-    'meeting-brief': 'Meeting Brief',
-  },
   'content-pipeline': {
     planner: 'Planner',
     calendar: 'Calendar',
