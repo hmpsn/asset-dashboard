@@ -1,5 +1,6 @@
 // @ds-rebuilt
 import { useCallback, useMemo, useState } from 'react';
+import { BarChart3, Clock, FileText, Network, Target, type LucideIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
 import {
@@ -40,6 +41,15 @@ const MONEY_FORMAT = new Intl.NumberFormat('en-US', {
 
 const PRIMARY_FILTER_IDS = new Set<string>(KEYWORDS_SURFACE_FILTERS.map((filter) => filter.id));
 
+// Per-lens icon anchors for the LensSwitcher (parity with the prototype's lens tabs).
+const LENS_ICONS: Record<KeywordsSurfaceLens, LucideIcon> = {
+  rankings: BarChart3,
+  opportunities: Target,
+  pages: FileText,
+  clusters: Network,
+  lifecycle: Clock,
+};
+
 function isLockedError(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 402 || error.status === 403);
 }
@@ -64,6 +74,26 @@ function feedbackGroups(rows: AdminKeywordFeedbackListRow[]) {
   };
 }
 
+// Status → accent hue + Badge tone for the client-feedback rows (parity with the
+// prototype's status-tinted rows: teal=requested, emerald=approved, red=declined).
+const FEEDBACK_ACCENT: Record<AdminKeywordFeedbackListRow['status'], string> = {
+  requested: 'var(--teal)',
+  approved: 'var(--emerald)',
+  declined: 'var(--red)',
+};
+const FEEDBACK_TONE: Record<AdminKeywordFeedbackListRow['status'], 'teal' | 'emerald' | 'red'> = {
+  requested: 'teal',
+  approved: 'emerald',
+  declined: 'red',
+};
+const FEEDBACK_DATE_FORMAT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+
+function formatFeedbackDate(value: string | null): string | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : FEEDBACK_DATE_FORMAT.format(parsed);
+}
+
 function FeedbackRow({
   row,
   onAdd,
@@ -73,13 +103,21 @@ function FeedbackRow({
   onAdd?: (keyword: string) => void;
   disabled?: boolean;
 }) {
-  const tone = row.status === 'requested' ? 'teal' : row.status === 'approved' ? 'emerald' : 'red';
+  const accent = FEEDBACK_ACCENT[row.status];
+  const date = formatFeedbackDate(row.created_at);
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-3 py-2">
+    <div
+      className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] border px-3 py-2"
+      style={{
+        borderColor: `color-mix(in srgb, ${accent} 25%, transparent)`,
+        background: `color-mix(in srgb, ${accent} 7%, transparent)`,
+      }}
+    >
       <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <Badge label={row.status} tone={tone} variant="soft" size="sm" />
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge label={row.status} tone={FEEDBACK_TONE[row.status]} variant="soft" size="sm" />
           <span className="t-caption font-semibold text-[var(--brand-text-bright)]">{row.keyword}</span>
+          {date && <span className="t-mono text-[var(--brand-text-dim)]">{date}</span>}
         </div>
         {row.reason && <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">{row.reason}</p>}
       </div>
@@ -88,6 +126,29 @@ function FeedbackRow({
           Add to strategy
         </Button>
       )}
+    </div>
+  );
+}
+
+function FeedbackGroup({
+  label,
+  rows,
+  onAdd,
+  disabled,
+}: {
+  label: string;
+  rows: AdminKeywordFeedbackListRow[];
+  onAdd?: (keyword: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div>
+      <div className="mb-2 t-label text-[var(--brand-text-muted)]">{label}</div>
+      <div className="grid gap-2 lg:grid-cols-2">
+        {rows.slice(0, 12).map((row) => (
+          <FeedbackRow key={`${row.status}-${row.keyword}`} row={row} onAdd={onAdd} disabled={disabled} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -215,6 +276,7 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
           options={KEYWORDS_SURFACE_LENSES.map((lens) => ({
             value: lens.id,
             label: lens.label,
+            icon: LENS_ICONS[lens.id],
             count: lensCount(summary, lens.id),
           }))}
           value={state.lens}
@@ -245,6 +307,7 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
           <FilterChip
             key={filter.id}
             label={filter.label}
+            count={summary?.filters.find((meta) => meta.id === filter.id)?.count}
             active={state.filter === filter.id}
             onClick={() => state.setFilter(filter.id)}
           />
@@ -307,15 +370,21 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
         {feedback.rows.length === 0 ? (
           <p className="t-caption-sm text-[var(--brand-text-muted)]">No client keyword feedback submitted yet.</p>
         ) : (
-          <div className="grid gap-2 lg:grid-cols-2">
-            {[...feedbackData.requested, ...feedbackData.declined, ...feedbackData.approved].slice(0, 12).map((row) => (
-              <FeedbackRow
-                key={`${row.status}-${row.keyword}`}
-                row={row}
-                disabled={feedbackAction.isPending}
+          <div className="flex flex-col gap-4">
+            {feedbackData.requested.length > 0 && (
+              <FeedbackGroup
+                label="Requested by client"
+                rows={feedbackData.requested}
                 onAdd={handleAddRequestedKeyword}
+                disabled={feedbackAction.isPending}
               />
-            ))}
+            )}
+            {feedbackData.declined.length > 0 && (
+              <FeedbackGroup label="Declined by client" rows={feedbackData.declined} />
+            )}
+            {feedbackData.approved.length > 0 && (
+              <FeedbackGroup label="Approved" rows={feedbackData.approved} />
+            )}
           </div>
         )}
       </GroupBlock>

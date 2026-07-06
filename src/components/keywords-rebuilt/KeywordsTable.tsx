@@ -5,6 +5,7 @@ import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
   KEYWORD_COMMAND_CENTER_FILTERS,
   type KeywordCommandCenterBulkActionType,
+  type KeywordCommandCenterNextAction,
   type KeywordCommandCenterRow,
   type KeywordCommandCenterSummaryResponse,
 } from '../../../shared/types/keyword-command-center';
@@ -104,6 +105,17 @@ function formatMoney(value: number | undefined): string {
 
 function formatNumber(value: number | undefined): string {
   return typeof value === 'number' ? NUMBER_FORMAT.format(value) : '—';
+}
+
+// Estimated monthly upside ("+$X") for the Opportunities-lens Est-gain column.
+function formatUpside(value: number | undefined): string {
+  return typeof value === 'number' ? `+${MONEY_FORMAT.format(value)}` : '—';
+}
+
+// The primary recommended move for the Opportunities-lens "Fix" column: the first
+// actionable next-step, skipping the passive "view rankings" pseudo-action.
+function fixAction(row: KeywordCommandCenterRow): KeywordCommandCenterNextAction | null {
+  return row.nextActions.find((action) => action.type !== 'view_rankings') ?? null;
 }
 
 function toRecord(row: KeywordCommandCenterRow): KeywordsTableRecord {
@@ -356,6 +368,95 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     },
   ], [selectedKeys, toggleKey]);
 
+  // The Opportunities lens gets its own upside-focused shape (parity with the design
+  // prototype's Opportunities view) instead of the wide Rankings grid re-sorted: the
+  // triage question is "what do I fix next and what's it worth", so it leads with
+  // Opportunity + Est. gain + the recommended Fix, and drops rank/clicks/KD noise.
+  const opportunityColumns = useMemo<DataColumn[]>(() => [
+    {
+      key: 'select',
+      label: 'Select',
+      width: '52px',
+      render: (_value, record) => {
+        const row = (record as KeywordsTableRecord).source;
+        return (
+          <div onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+            <Checkbox
+              checked={selectedKeys.has(row.normalizedKeyword)}
+              onChange={() => toggleKey(row.normalizedKeyword)}
+              label={`Select ${row.keyword}`}
+              srOnlyLabel
+            />
+          </div>
+        );
+      },
+    },
+    {
+      key: 'keyword',
+      label: 'Keyword',
+      width: 'minmax(220px, 1.6fr)',
+      render: (_value, record) => {
+        const row = (record as KeywordsTableRecord).source;
+        const rankMeta = row.metrics.currentPosition != null ? `#${row.metrics.currentPosition}` : 'Not ranking';
+        const kdMeta = typeof row.metrics.difficulty === 'number' ? ` · KD ${row.metrics.difficulty}` : '';
+        return (
+          <div className="min-w-0">
+            <span className="block truncate font-semibold text-[var(--brand-text-bright)]">{row.keyword}</span>
+            <span className="block truncate t-caption-sm text-[var(--brand-text-muted)]">{rankMeta}{kdMeta}</span>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'intent',
+      label: 'Intent',
+      width: '118px',
+      render: (_value, record) => {
+        const row = (record as KeywordsTableRecord).source;
+        const intent = asIntent(row.metrics.intent);
+        return intent ? <IntentTag intent={intent} /> : <Badge label="Unknown" tone="zinc" variant="outline" size="sm" />;
+      },
+    },
+    {
+      key: 'opportunity',
+      label: 'Opp',
+      width: 'minmax(150px, 1fr)',
+      render: (_value, record) => {
+        const row = (record as KeywordsTableRecord).source;
+        const score = row.opportunityScore;
+        return typeof score === 'number'
+          ? <Meter value={score} showValue ariaLabel={`${row.keyword} opportunity score`} gradient />
+          : <span className="t-caption-sm text-[var(--brand-text-muted)]">—</span>;
+      },
+    },
+    {
+      key: 'upside',
+      label: 'Est. gain',
+      width: '104px',
+      align: 'right',
+      render: (_value, record) => {
+        const row = (record as KeywordsTableRecord).source;
+        return typeof row.upsideMonthly === 'number'
+          ? <span className="tabular-nums font-semibold text-[var(--emerald)]">{formatUpside(row.upsideMonthly)}</span>
+          : <span className="t-caption-sm text-[var(--brand-text-muted)]">—</span>;
+      },
+    },
+    {
+      key: 'fix',
+      label: 'Fix',
+      width: 'minmax(160px, 1.1fr)',
+      render: (_value, record) => {
+        const row = (record as KeywordsTableRecord).source;
+        const action = fixAction(row);
+        return action
+          ? <Badge label={action.label} tone={action.tone} variant="soft" size="sm" />
+          : <span className="t-caption-sm text-[var(--brand-text-muted)]">No action</span>;
+      },
+    },
+  ], [selectedKeys, toggleKey]);
+
+  const activeColumns = state.lens === 'opportunities' ? opportunityColumns : columns;
+
   return (
     <div className="flex flex-col gap-3">
       <Toolbar label="Keyword table controls" className="w-full">
@@ -458,7 +559,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
       )}
 
       <DataTable
-        columns={columns}
+        columns={activeColumns}
         rows={tableRows}
         loading={rowsResult.isLoading && tableRows.length === 0}
         getRowKey={(record) => (record as KeywordsTableRecord).source.normalizedKeyword}

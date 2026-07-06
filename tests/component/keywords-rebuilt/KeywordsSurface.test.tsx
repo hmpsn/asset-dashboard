@@ -516,7 +516,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     const { container } = renderSurface('/ws/ws-1/seo-keywords?lens=lifecycle&filter=tracked&search=cosmetic&page=3&q=emergency+dentist');
 
     expect(screen.getByRole('radio', { name: /Lifecycle/ })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('button', { name: 'Tracked' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^Tracked/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('searchbox')).toHaveValue('cosmetic');
     expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: 'tracked', search: 'cosmetic', page: 3 });
     // The keyword deep-link opens the detail drawer (the stray keyword-labeled button
@@ -530,14 +530,14 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     renderSurface('/ws/ws-1/seo-keywords?tab=tracked&q=cosmetic+dentistry');
 
     expect(screen.getByRole('radio', { name: /Rankings/ })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('button', { name: 'Tracked' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^Tracked/ })).toHaveAttribute('aria-pressed', 'true');
     // Keyword deep-link opens the detail drawer, titled with the keyword.
     expect(screen.getByRole('dialog', { name: /cosmetic dentistry/i })).toBeInTheDocument();
   });
 
   it('keeps an inbound ?tab filter when the user switches lens (review PR #1480)', () => {
     renderSurface('/ws/ws-1/seo-keywords?tab=tracked');
-    expect(screen.getByRole('button', { name: 'Tracked' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^Tracked/ })).toHaveAttribute('aria-pressed', 'true');
 
     // Switching lens must NOT clobber the inbound filter: the lens now owns its own
     // `?lens=` param, not the shared `?tab=` segment that carries the filter. Previously
@@ -545,7 +545,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     fireEvent.click(screen.getByRole('radio', { name: /Opportunities/ }));
 
     expect(screen.getByRole('radio', { name: /Opportunities/ })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('button', { name: 'Tracked' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^Tracked/ })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('uses the combined initial view except for the local-candidates full-model exception', () => {
@@ -575,6 +575,18 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.queryByText('$0')).not.toBeInTheDocument();
     expect(screen.queryByText('No CPC')).not.toBeInTheDocument();
     expect(screen.getByRole('status', { name: /45 more keywords hidden/i })).toBeInTheDocument();
+  });
+
+  it('gives the Opportunities lens its own upside-focused shape (Est. gain + Fix, not the Rankings grid)', () => {
+    renderSurface('/ws/ws-1/seo-keywords?lens=opportunities');
+
+    const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
+    // Distinct triage columns…
+    expect(headers).toContain('Est. gain');
+    expect(headers).toContain('Fix');
+    // …and NOT the wide Rankings grid re-sorted.
+    expect(headers).not.toContain('Clicks');
+    expect(headers).not.toContain('KD');
   });
 
   it('threads sort and pagination controls into the rows query', async () => {
