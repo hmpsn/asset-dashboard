@@ -115,7 +115,11 @@ export function DataTable({
       id={id}
       role="grid"
       className={cn(
-        'bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] overflow-hidden',
+        // overflow-x-auto (not -hidden): a wide column set (e.g. the 11-col
+        // Keywords table, ~1480px) must stay reachable via horizontal scroll on
+        // narrow content areas instead of being clipped. Any non-visible overflow
+        // still clips rows to the rounded corners, so the card chrome is intact.
+        'bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] overflow-x-auto',
         className,
       )}
       style={style}

@@ -59,6 +59,16 @@ describe('DataTable', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('keeps a wide column set reachable via horizontal scroll (overflow-x-auto, never clipped)', () => {
+    // Regression: a wide table (e.g. the 11-col Keywords surface, ~1480px) was
+    // clipped by `overflow-hidden` on narrow content areas with no way to scroll
+    // to the rightmost columns. The container must allow horizontal scroll.
+    render(<DataTable columns={columns} rows={rows} />);
+    const grid = screen.getByRole('grid');
+    expect(grid.className).toContain('overflow-x-auto');
+    expect(grid.className).not.toContain('overflow-hidden');
+  });
+
   it('renders the empty slot when rows is empty and not loading', () => {
     render(<DataTable columns={columns} rows={[]} empty="No rows found" />);
     expect(screen.getByText('No rows found')).toBeInTheDocument();

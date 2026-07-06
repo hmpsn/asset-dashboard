@@ -395,6 +395,14 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
       )}
 
       {selectedKeys.size > 0 && (
+        <div className="sticky top-0 z-[var(--z-dropdown)] bg-[var(--surface-1)] pb-1">
+          {/* Sticky so the bulk-action bar stays reachable while scrolling a long
+              selection. The AppShell scroll container is #app-shell-main-content, so
+              top-0 pins it just under the topbar; the solid surface backdrop stops
+              scrolled rows bleeding through the translucent InlineBanner. z-dropdown
+              (above the DataTable's own z-sticky header) keeps the pinned bar — and its
+              buttons — clickable over the sticky column header they share the top edge
+              with. pb-1 gives the overlay a clean lower edge over the header. */}
         <InlineBanner tone="info" size="sm" title={`${selectedKeys.size} selected`}>
           <Toolbar label="Selected keyword bulk actions" className="mt-2">
             <Button size="sm" variant="primary" disabled={bulkAction.isPending} onClick={() => handleBulkAction(KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY)}>
@@ -418,6 +426,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
             </Button>
           </Toolbar>
         </InlineBanner>
+        </div>
       )}
 
       {rowsResult.isError && (

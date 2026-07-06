@@ -2,7 +2,7 @@
 import { useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, LogOut, Moon, Settings, Sun } from 'lucide-react';
+import { DollarSign, LogOut, Moon, PanelLeftClose, PanelLeftOpen, Settings, Sun } from 'lucide-react';
 import { auth } from '../../api';
 import { featureFlags } from '../../api/misc';
 import { GLOBAL_TABS, adminPath, type Page } from '../../routes';
@@ -50,6 +50,9 @@ export interface RebuiltSidebarProps {
   onUnlinkSite: (workspaceId: string) => void;
   toggleTheme: () => void;
   onLogout?: () => void;
+  /** Whole-sidebar icon-rail collapse (distinct from per-group accordion collapse). */
+  rail: boolean;
+  onToggleRail: () => void;
 }
 
 const SIDEBAR_COLLAPSED_KEY = 'admin-sidebar-collapsed';
@@ -107,6 +110,8 @@ export function RebuiltSidebar({
   onUnlinkSite,
   toggleTheme,
   onLogout,
+  rail,
+  onToggleRail,
 }: RebuiltSidebarProps) {
   const navigate = useNavigate();
   const { data: flagValues } = useQuery({
@@ -145,13 +150,15 @@ export function RebuiltSidebar({
   }, [tab]);
 
   const visibleGroups = useMemo(() => navGroups.map((group) => {
-    const collapsed = !!group.label && collapsedGroups.has(group.label);
+    // In the icon rail there are no group headers to toggle, so every group is
+    // fully expanded regardless of the per-group accordion state.
+    const collapsed = !rail && !!group.label && collapsedGroups.has(group.label);
     return {
       ...group,
       collapsed,
       visibleItems: collapsed ? [] : group.items.filter((item) => !item.hidden),
     };
-  }), [collapsedGroups, navGroups]);
+  }), [collapsedGroups, navGroups, rail]);
 
   const enabledVisibleItems = useMemo(() => visibleGroups.flatMap((group) =>
     group.visibleItems
@@ -189,35 +196,84 @@ export function RebuiltSidebar({
         color: 'var(--brand-text)',
       }}
     >
-      <ClickableRow
-        onClick={() => navigate('/')}
-        title="Command Center"
+      <div
         style={{
-          display: 'block',
-          padding: '16px 16px 12px',
-          background: 'transparent',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: rail ? 'center' : 'space-between',
+          gap: 6,
+          padding: '16px 12px 12px',
         }}
       >
-        <img
-          src={theme === 'light' ? '/hmpsn-studio-logo-wordmark-navy.svg' : '/logo.svg'}
-          alt="Studio logo"
-          style={{ height: 28 }}
+        {!rail && (
+          <ClickableRow
+            onClick={() => navigate('/')}
+            title="Command Center"
+            style={{ background: 'transparent', padding: 4, borderRadius: 'var(--radius-md)' }}
+          >
+            <img
+              src={theme === 'light' ? '/hmpsn-studio-logo-wordmark-navy.svg' : '/logo.svg'}
+              alt="Studio logo"
+              style={{ height: 28, display: 'block' }}
+            />
+          </ClickableRow>
+        )}
+        <IconButton
+          onClick={onToggleRail}
+          icon={rail ? PanelLeftOpen : PanelLeftClose}
+          label={rail ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={rail ? 'Expand sidebar' : 'Collapse sidebar'}
+          size="md"
+          style={{ color: 'var(--brand-text-muted)', background: 'transparent' }}
         />
-      </ClickableRow>
+      </div>
 
-      <div style={{ padding: '0 12px 10px', borderBottom: '1px solid var(--brand-border)' }}>
-        <WorkspaceSelector
-          workspaces={workspaces}
-          selected={selected}
-          onSelect={(workspace) => {
-            if (GLOBAL_TABS.has(tab)) navigate(adminPath(workspace.id));
-            else navigate(adminPath(workspace.id, tab));
-          }}
-          onCreate={onCreate}
-          onDelete={onDelete}
-          onLinkSite={onLinkSite}
-          onUnlinkSite={onUnlinkSite}
-        />
+      <div
+        style={{
+          padding: rail ? '0 8px 10px' : '0 12px 10px',
+          borderBottom: '1px solid var(--brand-border)',
+          display: rail ? 'flex' : 'block',
+          justifyContent: 'center',
+        }}
+      >
+        {rail ? (
+          // No room for the full selector in the rail — a workspace initial that
+          // expands the sidebar so the user can switch (parity escape hatch).
+          <ClickableRow
+            onClick={onToggleRail}
+            title={selected ? `${selected.name} — expand to switch workspace` : 'Expand to select a workspace'}
+            aria-label={selected ? `Workspace ${selected.name}. Expand to switch.` : 'Expand to select a workspace'}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--brand-border)',
+              background: 'var(--surface-2)',
+              color: 'var(--brand-text-bright)',
+              fontFamily: 'var(--font-sans)',
+              fontSize: 14,
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {(selected?.name || '?').charAt(0).toUpperCase()}
+          </ClickableRow>
+        ) : (
+          <WorkspaceSelector
+            workspaces={workspaces}
+            selected={selected}
+            onSelect={(workspace) => {
+              if (GLOBAL_TABS.has(tab)) navigate(adminPath(workspace.id));
+              else navigate(adminPath(workspace.id, tab));
+            }}
+            onCreate={onCreate}
+            onDelete={onDelete}
+            onLinkSite={onLinkSite}
+            onUnlinkSite={onUnlinkSite}
+          />
+        )}
       </div>
 
       <nav
@@ -234,6 +290,7 @@ export function RebuiltSidebar({
             key={group.key}
             label={group.label}
             accent={group.accent}
+            rail={rail}
             collapsed={group.collapsed}
             onToggleCollapse={group.label ? () => toggleGroup(group.label) : undefined}
             // When collapsed, the content-pipeline item (which carries the pending badge) is
@@ -256,6 +313,7 @@ export function RebuiltSidebar({
                   key={item.id}
                   icon={item.icon}
                   label={item.label}
+                  collapsed={rail}
                   active={active}
                   disabled={disabled}
                   badge={item.id === 'content-pipeline' && pendingContentRequests > 0 ? pendingContentRequests : undefined}
@@ -276,11 +334,12 @@ export function RebuiltSidebar({
       <div
         style={{
           borderTop: '1px solid var(--brand-border)',
-          padding: '10px 12px',
+          padding: rail ? '10px 8px' : '10px 12px',
           display: 'flex',
+          flexDirection: rail ? 'column' : 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 4,
+          gap: rail ? 6 : 4,
         }}
       >
         <NotificationBell
