@@ -1,15 +1,25 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Dashboard } from '../../../src/App';
 import { KeywordsSurface } from '../../../src/components/keywords-rebuilt/KeywordsSurface';
+import { KEYWORD_COMMAND_CENTER_ACTIONS } from '../../../shared/types/keyword-command-center';
+import type {
+  KeywordCommandCenterRow,
+  KeywordCommandCenterRowsQuery,
+  KeywordCommandCenterRowsResponse,
+  KeywordCommandCenterSummaryResponse,
+} from '../../../shared/types/keyword-command-center';
 import { expectNoA11yViolations } from '../a11y';
 
 const mockCreate = vi.fn();
 const mockDelete = vi.fn();
 const mockLink = vi.fn();
 const mockUnlink = vi.fn();
+const summaryHookMock = vi.fn();
+const rowsHookMock = vi.fn();
+const bulkMutateMock = vi.fn();
 
 const workspace = {
   id: 'ws-1',
@@ -47,6 +57,12 @@ vi.mock('../../../src/hooks/admin', () => ({
 
 vi.mock('../../../src/hooks/admin/useNotifications', () => ({
   useNotifications: () => ({ data: [] }),
+}));
+
+vi.mock('../../../src/hooks/admin/useKeywordCommandCenter', () => ({
+  useKeywordCommandCenterSummary: (...args: unknown[]) => summaryHookMock(...args),
+  useKeywordCommandCenterRows: (...args: unknown[]) => rowsHookMock(...args),
+  useKeywordCommandCenterBulkAction: () => ({ mutate: bulkMutateMock, isPending: false }),
 }));
 
 vi.mock('../../../src/hooks/useGlobalAdminEvents', () => ({
@@ -91,6 +107,89 @@ vi.mock('../../../src/components/AdminChat', () => ({
   AdminChat: () => <div data-testid="admin-chat" />,
 }));
 
+const summaryPayload: KeywordCommandCenterSummaryResponse = {
+  counts: {
+    total: 2,
+    inStrategy: 1,
+    tracked: 1,
+    needsReview: 0,
+    evidence: 0,
+    local: 1,
+    localCandidates: 0,
+    retired: 0,
+    declined: 0,
+  },
+  filters: [],
+  rawEvidenceTotal: 120,
+  rawEvidenceReturned: 75,
+  summarizedAt: '2026-07-05T12:00:00.000Z',
+  trafficValueMonthly: 1234,
+};
+
+const rows: KeywordCommandCenterRow[] = [
+  {
+    keyword: 'cosmetic dentistry',
+    normalizedKeyword: 'cosmetic dentistry',
+    lifecycleStatus: 'in_strategy',
+    statusLabel: 'In Strategy',
+    sourceLabels: [],
+    metrics: { intent: 'commercial', currentPosition: 6, clicks: 42, impressions: 900, volume: 700, difficulty: 29 },
+    assignment: { pagePath: '/cosmetic-dentistry', pageTitle: 'Cosmetic Dentistry' },
+    tracking: { status: 'active', source: 'strategy_primary', sourceGapKey: 'gap-1', strategyOwned: true },
+    nextActions: [],
+    isProtected: false,
+    opportunityScore: 84,
+    currentMonthly: 1234,
+  },
+  {
+    keyword: 'emergency dentist',
+    normalizedKeyword: 'emergency dentist',
+    lifecycleStatus: 'tracked',
+    statusLabel: 'Tracked',
+    sourceLabels: [],
+    metrics: { intent: 'local', currentPosition: 14, clicks: 5, impressions: 240, volume: 300, difficulty: 18 },
+    assignment: { pagePath: '/emergency-dentist' },
+    tracking: { status: 'active', source: 'manual', strategyOwned: false },
+    nextActions: [],
+    isProtected: true,
+    protectionReason: 'Tracked client keyword',
+    opportunityScore: 66,
+  },
+];
+
+function setupKeywordHooks() {
+  summaryHookMock.mockReturnValue({
+    data: summaryPayload,
+    isLoading: false,
+    isError: false,
+    error: null,
+  });
+  rowsHookMock.mockImplementation((_workspaceId: string, query: KeywordCommandCenterRowsQuery) => {
+    const page = query.page ?? 1;
+    const response: KeywordCommandCenterRowsResponse = {
+      rows,
+      pageInfo: {
+        page,
+        pageSize: query.pageSize ?? 50,
+        totalRows: rows.length,
+        totalPages: 3,
+        hasNextPage: page < 3,
+        hasPreviousPage: page > 1,
+      },
+    };
+    return {
+      data: response,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+  });
+  bulkMutateMock.mockImplementation((_body: unknown, options?: { onSuccess?: (result: { message: string }) => void }) => {
+    options?.onSuccess?.({ message: 'Bulk action complete' });
+  });
+}
+
 function renderSurface(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -111,13 +210,18 @@ function renderDashboard(path = '/ws/ws-1/seo-keywords?tab=lifecycle') {
 }
 
 describe('KeywordsSurface rebuilt pilot scaffold', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupKeywordHooks();
+  });
+
   it('receives rebuilt lens, filter, search, page, and keyword deep-link params', async () => {
     const { container } = renderSurface('/ws/ws-1/seo-keywords?tab=lifecycle&filter=tracked&search=cosmetic&page=3&q=emergency+dentist');
 
     expect(screen.getByRole('radio', { name: 'Lifecycle' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: 'Tracked' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('searchbox')).toHaveValue('cosmetic');
-    expect(screen.getByText(/page 3/i)).toBeInTheDocument();
+    expect(screen.getByText(/page 3 of 3/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'emergency dentist' })).toBeInTheDocument();
 
     await expectNoA11yViolations(container);
@@ -129,6 +233,70 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByRole('radio', { name: 'Rankings' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: 'Tracked' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'cosmetic dentistry' })).toBeInTheDocument();
+  });
+
+  it('renders keyword rows, provenance, opportunity, and money empty states without fabricating dollars', () => {
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    expect(screen.getByText('cosmetic dentistry')).toBeInTheDocument();
+    expect(screen.getByText('Commercial')).toBeInTheDocument();
+    expect(screen.getByText('#6')).toBeInTheDocument();
+    expect(screen.getAllByText('$1,234').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('From gap')).toBeInTheDocument();
+    expect(screen.getByText('Auto-managed')).toBeInTheDocument();
+    expect(screen.getByText('No CPC')).toBeInTheDocument();
+    expect(screen.queryByText('$0')).not.toBeInTheDocument();
+    expect(screen.getByRole('status', { name: /45 more keywords hidden/i })).toBeInTheDocument();
+  });
+
+  it('threads sort and pagination controls into the rows query', async () => {
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rank' }));
+    await waitFor(() => {
+      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'rank', direction: 'asc' });
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await waitFor(() => {
+      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ page: 2 });
+    });
+  });
+
+  it('shows the bulk bar on selection and fires non-protected bulk actions immediately', () => {
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    fireEvent.click(screen.getByLabelText('Select cosmetic dentistry'));
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Track' }));
+    expect(bulkMutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: KEYWORD_COMMAND_CENTER_ACTIONS.TRACK,
+        keywords: ['cosmetic dentistry'],
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('gates protected bulk actions behind confirmation before sending force', () => {
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    fireEvent.click(screen.getByLabelText('Select emergency dentist'));
+    fireEvent.click(screen.getByRole('button', { name: 'Retire' }));
+
+    expect(bulkMutateMock).not.toHaveBeenCalled();
+    expect(screen.getByText(/protected keyword/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Retire' }).at(-1)!);
+    expect(bulkMutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE,
+        keywords: ['emergency dentist'],
+        force: true,
+      }),
+      expect.anything(),
+    );
   });
 
   it('mounts at the app shell root after the real feature-flag query resolves ON', async () => {

@@ -1,5 +1,7 @@
 // @ds-rebuilt
-import { Button, PageHeader, LensSwitcher, SearchField, Toolbar, ToolbarSpacer, FilterChip } from '../ui';
+import { useKeywordCommandCenterSummary } from '../../hooks/admin/useKeywordCommandCenter';
+import { Button, PageHeader, LensSwitcher, SearchField, Toolbar, ToolbarSpacer, FilterChip, MetricTile, Skeleton } from '../ui';
+import { KeywordsTable } from './KeywordsTable';
 import {
   KEYWORDS_SURFACE_FILTERS,
   KEYWORDS_SURFACE_LENSES,
@@ -10,9 +12,18 @@ interface KeywordsSurfaceProps {
   workspaceId: string;
 }
 
+const MONEY_FORMAT = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+});
+
 export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
   const state = useKeywordsSurfaceState();
   const activeFilterLabel = KEYWORDS_SURFACE_FILTERS.find((filter) => filter.id === state.filter)?.label ?? 'All';
+  const summary = useKeywordCommandCenterSummary(workspaceId);
+  const counts = summary.data?.counts;
+  const trafficValue = summary.data?.trafficValueMonthly;
 
   return (
     <div className="flex min-h-full flex-col gap-5">
@@ -52,28 +63,36 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
         ))}
       </div>
 
-      <section
-        aria-label="Keyword surface scaffold"
-        className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-5"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="t-h2 text-[var(--brand-text-bright)]">{activeFilterLabel}</h2>
-            <p className="t-caption-sm text-[var(--brand-text-muted)]">
-              Sort {state.sort.key} {state.sort.direction}; page {state.page}
-            </p>
-          </div>
-          {state.selectedKeyword && (
-            <Button
-              onClick={state.closeKeyword}
-              variant="secondary"
-              size="sm"
-            >
-              {state.selectedKeyword}
-            </Button>
-          )}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {summary.isLoading && !summary.data ? (
+          Array.from({ length: 5 }).map((_, index) => (
+            <Skeleton key={index} className="h-[92px] w-full" />
+          ))
+        ) : (
+          <>
+            <MetricTile label="Total" value={counts?.total ?? 0} sub={activeFilterLabel} accent="var(--blue)" />
+            <MetricTile label="In Strategy" value={counts?.inStrategy ?? 0} accent="var(--teal)" />
+            <MetricTile label="Tracked" value={counts?.tracked ?? 0} accent="var(--blue)" />
+            <MetricTile label="Needs Review" value={counts?.needsReview ?? 0} accent="var(--amber)" />
+            <MetricTile
+              label="Monthly Value"
+              value={typeof trafficValue === 'number' ? MONEY_FORMAT.format(trafficValue) : 'No source'}
+              sub="Display-only"
+              accent="var(--emerald)"
+            />
+          </>
+        )}
+      </div>
+
+      {state.selectedKeyword && (
+        <div className="flex justify-end">
+          <Button onClick={state.closeKeyword} variant="secondary" size="sm">
+            {state.selectedKeyword}
+          </Button>
         </div>
-      </section>
+      )}
+
+      <KeywordsTable workspaceId={workspaceId} state={state} summary={summary.data} />
     </div>
   );
 }
