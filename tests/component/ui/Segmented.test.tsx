@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Segmented } from '../../../src/components/ui/forms/Segmented';
+import { expectNoA11yViolations } from '../a11y';
 
 const options = [
   { value: 'list', label: 'List' },
@@ -19,11 +20,12 @@ describe('Segmented', () => {
     expect(onChange).toHaveBeenCalledWith('board');
   });
 
-  it('marks only the selected segment as aria-checked', () => {
-    render(<Segmented options={options} value="board" onChange={vi.fn()} />);
+  it('marks only the selected segment as aria-checked', async () => {
+    const { container } = render(<Segmented options={options} value="board" onChange={vi.fn()} />);
     expect(screen.getByRole('radio', { name: 'List' })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('radio', { name: 'Board' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: 'Grid' })).toHaveAttribute('aria-checked', 'false');
+    await expectNoA11yViolations(container);
   });
 
   it('arrow key moves roving focus, and activating the focused segment selects it', async () => {

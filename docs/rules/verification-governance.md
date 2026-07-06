@@ -32,6 +32,7 @@ PR quality CI blocks on:
 - `npm run verify:deferred-ledger`
 - `npm run verify:governance`
 - `npm run verify:style-drift`
+- `npm run verify:bundle-budget`
 - `npm run verify:staging-merge-integrity`
 
 Manual release coverage verification blocks on:

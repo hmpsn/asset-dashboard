@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DataTable, type DataColumn } from '../../../src/components/ui/DataTable';
+import { expectNoA11yViolations } from '../a11y';
 
 const columns: DataColumn[] = [
   { key: 'name', label: 'Name' },
@@ -49,12 +50,13 @@ describe('DataTable', () => {
     expect(onRowClick).toHaveBeenCalledWith(rows[0], 0);
   });
 
-  it('exposes valid grid semantics (role="grid" container with rows + gridcells)', () => {
-    render(<DataTable columns={columns} rows={rows} />);
+  it('exposes valid grid semantics (role="grid" container with rows + gridcells)', async () => {
+    const { container } = render(<DataTable columns={columns} rows={rows} />);
     expect(screen.getByRole('grid')).toBeInTheDocument();
     // header row + 3 data rows
     expect(screen.getAllByRole('row').length).toBe(4);
     expect(screen.getAllByRole('gridcell').length).toBeGreaterThan(0);
+    await expectNoA11yViolations(container);
   });
 
   it('renders the empty slot when rows is empty and not loading', () => {

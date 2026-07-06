@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MetricTile } from '../../../src/components/ui/MetricTile';
+import { expectNoA11yViolations } from '../a11y';
 
 describe('MetricTile', () => {
-  it('renders label and value', () => {
-    render(<MetricTile label="Sessions" value="1,204" />);
+  it('renders label and value', async () => {
+    const { container } = render(<MetricTile label="Sessions" value="1,204" />);
     expect(screen.getByText('Sessions')).toBeInTheDocument();
     expect(screen.getByText('1,204')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 
   it('shows an up-trend indicator for a positive delta', () => {

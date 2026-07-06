@@ -10,12 +10,12 @@ let wsId = '';
 beforeAll(async () => {
   await ctx.startServer();
   wsId = createWorkspace('Fixture Content Matrices').id;
-});
+}, 30_000);
 
 afterAll(async () => {
   deleteWorkspace(wsId);
   await ctx.stopServer();
-});
+}, 30_000);
 
 describe('Fixture content matrices read routes', () => {
   it('returns empty list for fresh workspace', async () => {

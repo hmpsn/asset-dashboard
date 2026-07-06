@@ -6,6 +6,18 @@ A comprehensive value assessment of every feature in the platform — **541 feat
 
 ---
 
+### 615. UI Rebuild F2b — CI-native bundle and accessibility gates 2026-07-06
+
+**What it does:** Adds the two remaining CI-native UI-rebuild consistency gates. `npm run verify:bundle-budget` reads `dist/.vite/manifest.json` from `npx vite build --manifest`, gzips all manifest JS chunks plus manifest/index-linked CSS and font assets (including the self-hosted Font Awesome payload), and ratchets them against `data/bundle-budget-baseline.json` with a 5% tolerance in PR quality CI. `vitest-axe` is now the component-suite accessibility floor via `tests/component/a11y.ts` and `expectNoA11yViolations(container)`, seeded across the shipped F3/F4 primitives and shell tests.
+
+**Why it matters to the agency:** The rebuild now has automated guardrails for two failure modes that token-purity checks cannot catch: quietly growing frontend chunks and accessibility regressions in rebuilt primitives. This also retires the redundant `lint:ds-adherence` idea before it adds friction, and keeps deploy-coupled visual snapshots out of CI until the Keywords pilot builds component-isolated Playwright CT.
+
+**Why it matters to clients:** Indirect but important — the surfaces operators and clients will rely on are now checked for baseline accessibility semantics and performance drift before merge, reducing the chance that a visual rebuild ships slower or harder to use.
+
+**Tests:** Focused F3/F4 component axe coverage passes across `NavItem`, `NavGroup`, `RebuiltSidebar`, `RebuiltBreadcrumb`, `DataTable`, `Drawer`, `Segmented`, `RadioGroup`, `FilterChip`, and `MetricTile`. Bundle baseline generated from a manifest build; tamper-test verifies regressions fail with the offending bundle asset named.
+
+**Files:** `scripts/verify-bundle-budget.ts`; `data/bundle-budget-baseline.json`; `tests/component/a11y.ts`; `tests/component/setup.ts`; selected `tests/component/ui/*.test.tsx`; selected `tests/component/layout/*.test.tsx`; `.github/workflows/ci.yml`; `package.json`; `package-lock.json`; `scripts/report-verification-governance.ts`; `docs/rules/verification-governance.md`; `docs/rules/ui-rebuild-consistency.md`; `docs/superpowers/plans/2026-07-05-ui-rebuild-pilot-keywords.md`; `data/ui-rebuild-deferred-ledger.json`; `data/roadmap.json`; `CLAUDE.md`.
+
 ### 614. UI Rebuild F4 — additive DS-native admin shell chrome 2026-07-05
 
 **What it does:** Adds the F4 shell layer on top of the F3 layout primitives without changing the live admin app. New `NavItem` and `NavGroup` primitives provide token-only, roving-keyboard-ready navigation building blocks. `RebuiltSidebar` consumes `NAV_REGISTRY` for identity, route, disabled, and flag behavior; `RebuiltBreadcrumb` resolves registry labels plus `?tab=` sub-state; `RebuiltAppChrome` composes both into `AppShell` behind `ui-rebuild-shell`. `App.tsx`, legacy `Sidebar.tsx`, legacy `Breadcrumbs.tsx`, and `src/lib/navRegistry.tsx` remain untouched so the Keywords pilot can opt in without destabilizing the existing shell.

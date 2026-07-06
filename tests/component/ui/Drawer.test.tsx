@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { Drawer } from '../../../src/components/ui/overlay/Drawer';
+import { expectNoA11yViolations } from '../a11y';
 
 afterEach(() => {
   cleanup();
@@ -22,11 +23,12 @@ describe('Drawer', () => {
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
-  it('renders the dialog with title when open', () => {
+  it('renders the dialog with title when open', async () => {
     render(<Drawer open title="My Drawer" />);
     const dialog = screen.getByRole('dialog');
     expect(dialog).toBeInTheDocument();
     expect(screen.getByText('My Drawer')).toBeInTheDocument();
+    await expectNoA11yViolations(dialog);
   });
 
   it('sets aria-modal and aria-labelledby wired to the title', () => {

@@ -171,6 +171,11 @@ export const VERIFICATION_GOVERNANCE_REGISTRY = {
     owner: 'platform-foundation',
     rationale: 'Style drift checks are already cheap deterministic PR quality gates.',
   },
+  'verify:bundle-budget': {
+    classification: 'pr-ci-blocking',
+    owner: 'platform-foundation',
+    rationale: 'Frontend JS/CSS/font size ratchet is cheap, deterministic, and runs against the Vite manifest plus built index links emitted by the PR quality build.',
+  },
   'verify:coverage-campaign': {
     classification: 'manual-advisory',
     owner: 'platform-foundation',

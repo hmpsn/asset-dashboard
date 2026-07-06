@@ -1822,7 +1822,7 @@
     },
     {
       "id": "sprint-ui-rebuild-2026-07-05",
-      "name": "✅ SHIPPED — UI Rebuild — DS-native admin shell foundations",
+      "name": "✅ SHIPPED — UI Rebuild — foundation gates + DS-native admin shell",
       "hours": "TBD — phased, one PR per foundation surface, staging-first",
       "rationale": "Phase D decisions are locked. This sprint tracks the additive design-system rebuild foundation work that wires F3 primitives into real shell compositions without changing live admin chrome until a pilot explicitly opts in.",
       "items": [
@@ -1837,9 +1837,21 @@
           "completedAt": "2026-07-05",
           "owner": "ui-platform",
           "notes": "Completed 2026-07-05: built the additive @ds-rebuilt shell layer with NavItem/NavGroup primitives, registry-driven RebuiltSidebar, RebuiltBreadcrumb, and RebuiltAppChrome composed into the F3 AppShell. The `ui-rebuild-shell` flag defaults OFF; App.tsx, legacy Sidebar/Breadcrumbs, and navRegistry remain untouched; the Keywords pilot is the first intended mount. Verification: 23 focused component tests, full Vitest suite, typecheck, Vite build, pr-check, hooks lint, feature-flag lifecycle, deferred ledger, coverage ratchet, and Playwright smoke on `/__ds-harness`."
+        },
+        {
+          "id": "ui-rebuild-f2b-gates",
+          "title": "F2b gates — Vite bundle-budget ratchet + vitest-axe component accessibility",
+          "source": "docs/superpowers/plans/2026-07-05-ui-rebuild-f2b-gates.md",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-06",
+          "completedAt": "2026-07-06",
+          "owner": "ui-platform",
+          "notes": "Completed 2026-07-06: added `verify:bundle-budget` as a CI-native Vite-manifest gzip chunk-size ratchet with a committed baseline and governance wiring; added `vitest-axe` plus shared `expectNoA11yViolations` component helper seeded across shipped F3/F4 primitives. D-F2b-1 retired `lint:ds-adherence` as redundant; D-F2b-2 selected component-level `vitest-axe` over dormant deploy-coupled Playwright axe. Pilot DoD and UI rebuild consistency docs reconciled; visual regression remains the Keywords pilot's Playwright CT task."
         }
       ],
-      "shippedAt": "2026-07-05"
+      "shippedAt": "2026-07-06"
     },
     {
       "id": "sprint-reconcile-migration-2026-07-01",

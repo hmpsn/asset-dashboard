@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { RebuiltBreadcrumb } from '../../../src/components/layout/RebuiltBreadcrumb';
 import type { Workspace } from '../../../src/components/WorkspaceSelector';
+import { expectNoA11yViolations } from '../a11y';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -38,12 +39,13 @@ function renderBreadcrumb(tab: Parameters<typeof RebuiltBreadcrumb>[0]['tab'], i
 }
 
 describe('RebuiltBreadcrumb', () => {
-  it('resolves a real Page label from the nav registry', () => {
-    renderBreadcrumb('seo-audit', '/ws/ws-1/seo-audit');
+  it('resolves a real Page label from the nav registry', async () => {
+    const { container } = renderBreadcrumb('seo-audit', '/ws/ws-1/seo-audit');
 
     expect(screen.getByText('Command Center')).toBeInTheDocument();
     expect(screen.getByText('acme.com')).toBeInTheDocument();
     expect(screen.getByText('Site Audit')).toHaveAttribute('aria-current', 'page');
+    await expectNoA11yViolations(container);
   });
 
   it('uses the legacy fallback label for redirect-only pages', () => {
