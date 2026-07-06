@@ -28,7 +28,7 @@
 | D2 | Rebuild root path | In-place-behind-flags with `@ds-rebuilt` file markers as lint scope |
 | D3 | Page Intelligence's single home | SEO Editor Research mode (ledger's answer) — confirm; this bounds the pilot |
 | D4 | Client dashboard gate | **Option C — finish cutover → re-skin ratified 4-tab IA → additive portal ideas** (+ Q2–Q7 below) |
-| D5 | Icon system | lucide-react (HEAD); restyle kit Icon contract onto lucide names |
+| D5 | Icon system | ~~lucide-react (HEAD)~~ **REVERSED 2026-07-03 → Font Awesome Sharp Regular, self-hosted; `<Icon name>`; lucide is the migration bridge only (PHASE_D_DECISIONS D5, PR #1475)** |
 | D6 | Canonical action-color word | Pick "mint" or "teal" (same hex) — updates CLAUDE.md/BRAND_DESIGN_LANGUAGE/pr-check in the tokens PR |
 | D7 | Rule severity on rebuild-scoped code | Error from day one |
 | D8 | URL scheme + redirect map policy | Redirect map is a required deliverable per consolidation |
