@@ -1,0 +1,363 @@
+{
+  "gather": {
+    "capabilityClassification": [
+      {
+        "capability": "Row 1 — List Webflow assets grid",
+        "resolution": "ui-only",
+        "note": "useWebflowAssets → GET /api/webflow/assets/:siteId (server/routes/webflow.ts:60); card grid via GroupBlock/DataTable."
+      },
+      {
+        "capability": "Row 2 — Stats bar (total/missing-alt/oversized/unused/CMS counts)",
+        "resolution": "ui-only",
+        "note": "All counts computed client-side from existing hooks today (AssetBrowser.tsx:494-540); render as MetricTile row; carry unused+CMS counts the prototype drops."
+      },
+      {
+        "capability": "Row 3 — Search by filename/alt",
+        "resolution": "ui-only",
+        "note": "Client-side filter (AssetBrowser.tsx:170-175) → SearchField; must be carried despite prototype omission."
+      },
+      {
+        "capability": "Row 4 — Filter pills with counts",
+        "resolution": "ui-only",
+        "note": "FilterChip set; keep HEAD multi-select OR (useToggleSet), not prototype single-select."
+      },
+      {
+        "capability": "Row 5 — images/svg/used filters + multi-filter OR",
+        "resolution": "ui-only",
+        "note": "Pure client logic (AssetBrowser.tsx:119-138); carry into FilterChip bar."
+      },
+      {
+        "capability": "Row 6 — Sort newest/name/size",
+        "resolution": "ui-only",
+        "note": "Client sort (AssetBrowser.tsx:199-203) → Toolbar sort control or DataTable header sort."
+      },
+      {
+        "capability": "Row 7 — Multi-select + select-all + sticky bulk bar",
+        "resolution": "ui-only",
+        "note": "Toolbar-based bulk bar; select-all-shown semantics already match prototype."
+      },
+      {
+        "capability": "Row 8 — Inline manual alt-text edit",
+        "resolution": "ui-only",
+        "note": "PATCH /api/webflow/assets/:assetId exists (server/routes/webflow.ts:71); needs a card affordance the prototype lacks — carry."
+      },
+      {
+        "capability": "Row 9 — Single AI alt-text generation",
+        "resolution": "ui-only",
+        "note": "Endpoint exists (server/routes/webflow-alt-text.ts:38-121); quota-locked presentation is row 40/OQ7."
+      },
+      {
+        "capability": "Row 10 — Bulk AI alt-text NDJSON stream + progress",
+        "resolution": "ui-only",
+        "note": "Keep existing stream (webflow-alt-text.ts:139-213); live progress UI must survive, toast-only is a regression."
+      },
+      {
+        "capability": "Row 11 — Single compress with CMS ref patch",
+        "resolution": "ui-only",
+        "note": "Existing endpoint (webflow-alt-text.ts:274-325); SVG exclusion preserved."
+      },
+      {
+        "capability": "Row 12 — Bulk compress background job",
+        "resolution": "ui-only",
+        "note": "Stays on useBackgroundTasks + server/webflow-bulk-compress-background-job.ts; do not resynchronize."
+      },
+      {
+        "capability": "Rows 13-14 — AI smart rename single + bulk",
+        "resolution": "ui-only",
+        "note": "Endpoints exist (server/routes/misc.ts:86, webflow-organize.ts:202); keep editable-draft confirm step."
+      },
+      {
+        "capability": "Rows 15+33 — Delete: single, bulk, delete-all-unused",
+        "resolution": "open-question",
+        "note": "OQ6 — endpoints exist (webflow.ts:81,116); prototype has zero delete. Proposed: keep all three, migrate window.confirm → ConfirmDialog."
+      },
+      {
+        "capability": "Row 16 — Unused-asset flag/badge",
+        "resolution": "ui-only",
+        "note": "From useAssetAudit unused-ID set (useAdminAssets.ts:39)."
+      },
+      {
+        "capability": "Row 17 — Organize into Folders (preview → execute)",
+        "resolution": "open-question",
+        "note": "OQ3 — shipped feature (webflow-organize.ts:27,143) absent from prototype+ledger; keep vs retire is an owner call."
+      },
+      {
+        "capability": "Rows 18-19 — CMS image scan + CMS filters",
+        "resolution": "ui-only",
+        "note": "useCmsImages → GET /api/webflow/cms-images/:siteId (webflow-cms-images.ts:66); carry filters + mutual-exclusion logic."
+      },
+      {
+        "capability": "Row 20 — CMS field selector gating filter + compression scope",
+        "resolution": "open-question",
+        "note": "OQ4 — quick-win deferral risks OG-image clobbering; proposed default: ship full selector (safety feature) or defer CMS-aware compression entirely with it."
+      },
+      {
+        "capability": "Row 21 — CMS usage badges + RichText compress-disable",
+        "resolution": "ui-only",
+        "note": "Data already in useCmsImages; card badge + disabled state with explanation."
+      },
+      {
+        "capability": "Row 22 — Open asset in new tab",
+        "resolution": "ui-only",
+        "note": "Trivial card action; carry."
+      },
+      {
+        "capability": "Row 23 — Error banner + partial-failure messaging",
+        "resolution": "ui-only",
+        "note": "Mutation feedback via existing useToast + inline banner; must carry per-item N-saved/M-failed."
+      },
+      {
+        "capability": "Rows 24+35 — Loading/empty/showing-X-of-Y states",
+        "resolution": "ui-only",
+        "note": "Four-states rule; Skeleton grid + EmptyState with clear-filter CTA."
+      },
+      {
+        "capability": "Row 25 — 'Link a Webflow site' locked state",
+        "resolution": "ui-only",
+        "note": "Maps to the locked state of the new state matrix (MediaTab.tsx:72-92)."
+      },
+      {
+        "capability": "Rows 26-28 — Audit scan + health score + summary/secondary issue-class cards",
+        "resolution": "open-question",
+        "note": "OQ1 — endpoint exists (webflow-audit.ts:20, 8 issue classes) but prototype has no audit mode; home (tab vs merged filters vs Site Audit) is an owner call. Never drop the 5 extra issue classes."
+      },
+      {
+        "capability": "Row 29 — Used-on page names (not just count)",
+        "resolution": "ui-only",
+        "note": "usedIn already returned by audit endpoint; page names must survive in card/drawer."
+      },
+      {
+        "capability": "Row 30 — Lightbox preview with inline actions",
+        "resolution": "ui-only",
+        "note": "Recompose as Drawer asset-detail panel; all actions are existing endpoints."
+      },
+      {
+        "capability": "Row 31 — Filter-aware one-click bulk category ops",
+        "resolution": "ui-only",
+        "note": "Client composition over existing bulk endpoints; delete-all-unused half rides on OQ6."
+      },
+      {
+        "capability": "Row 32 — Audit search + sort (issues/largest/name)",
+        "resolution": "ui-only",
+        "note": "Client-side (AssetAudit.tsx:384-409); SearchField + sort control."
+      },
+      {
+        "capability": "Row 34 — CSV export of audit",
+        "resolution": "ui-only",
+        "note": "Fully client-side today (AssetAudit.tsx:127-148); hard floor forbids export drops — carry."
+      },
+      {
+        "capability": "Rows 36-38 — Upload pipeline (asset/meta drop zones, ⌘V paste, processing queue)",
+        "resolution": "open-question",
+        "note": "OQ2 — prototype's direct-to-Webflow stub is a behavior change vs HEAD's local optimize-then-upload pipeline (server/processor.ts, useQueue). Proposed default: T1 carry-over-then-reskin as Upload mode."
+      },
+      {
+        "capability": "Row 39 — Auth on all endpoints",
+        "resolution": "ui-only",
+        "note": "Rebuild is UI-only; keep requireWorkspaceSiteAccess* param shapes exactly."
+      },
+      {
+        "capability": "Row 40 — AI quota 429 locked-state UI",
+        "resolution": "open-question",
+        "note": "OQ7 — server gate exists (webflow-alt-text.ts:47-49); presentation (disabled buttons + tooltip vs banner) undefined in prototype. Proposed default: disabled AI actions with tooltip + one banner on first 429."
+      },
+      {
+        "capability": "Row 41 — Workspace switch resets view",
+        "resolution": "ui-only",
+        "note": "Keep key={siteId} remount pattern."
+      },
+      {
+        "capability": "Row 42 — React Query optimistic-update discipline",
+        "resolution": "ui-only",
+        "note": "Carry the 8 setQueryData mutation paths + job-completion invalidation."
+      },
+      {
+        "capability": "Row 43 — Deep-link receiver from Site Audit/Performance",
+        "resolution": "ui-only",
+        "note": "New frontend contract only: ?tab=/?filter= receiver on media per two-halves rule + tests/contract/tab-deep-link-wiring.test.ts pattern; no server change."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-asset-manager-1",
+        "kind": "field",
+        "description": "Map image width/height onto GET /api/webflow/assets/:siteId rows so cards can show w×h (kit proposal #2). Add to WebflowAsset + client Asset types.",
+        "existsToday": "no",
+        "evidence": "WebflowAsset (server/webflow-assets.ts:19-31) and client Asset (src/hooks/admin/useAdminAssets.ts:7-17) have no width/height; grep 'width|height' in server/webflow.ts and webflow-assets.ts list path is empty.",
+        "whereItLives": "server/webflow-assets.ts (listAssets mapping + WebflowAsset) + src/hooks/admin/useAdminAssets.ts",
+        "effort": "S",
+        "likelySharedWith": [
+          "site-audit",
+          "performance"
+        ]
+      },
+      {
+        "id": "sn-asset-manager-2",
+        "kind": "derivation",
+        "description": "'Graduation' insight write when a compression pass measurably moves CWV (kit proposal #4): new InsightType + typed data + Zod schema + renderer per the 4-part registration rule, triggered from the bulk-compress job or a Performance/CWV bridge. Blocked on OQ5 (which system owns measurement).",
+        "existsToday": "no",
+        "evidence": "grep 'compress' across shared/types/analytics.ts + server/intelligence/*.ts returns nothing; no insight/outcome reference in server/webflow-bulk-compress-background-job.ts or webflow-alt-text.ts.",
+        "whereItLives": "shared/types/analytics.ts + server/schemas/ + an insight bridge (server/intelligence/ or outcome-tracking per OQ5)",
+        "effort": "M",
+        "likelySharedWith": [
+          "performance",
+          "insights-engine"
+        ]
+      },
+      {
+        "id": "sn-asset-manager-3",
+        "kind": "derivation",
+        "description": "OPTIONAL full-version only: server-computed potential-savings estimate (sharp dry-run) replacing the client 55% heuristic. Quick-win path is client-side from the already-fetched asset list, so this ships only if the heuristic is rejected.",
+        "existsToday": "no",
+        "evidence": "No savings-estimate endpoint: grep 'savings' in server/routes/webflow*.ts empty; compression savings only computed post-hoc per asset in webflow-alt-text.ts:274-325.",
+        "whereItLives": "server/routes/webflow-audit.ts or webflow-alt-text.ts",
+        "effort": "M",
+        "likelySharedWith": [
+          "performance"
+        ]
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "OQ1: Where does Audit mode (scan, health score, 8 issue classes, CSV, lightbox) live in the new Asset Manager?",
+        "proposedDefault": "Option (a)/(b) hybrid: Audit as a lens inside Asset Manager with score header (Meter) + issue-class FilterChips; keep all 8 classes.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ2: Upload pipeline home — mode of Asset Manager, global affordance, or own surface? Prototype's direct-upload stub is a behavior change.",
+        "proposedDefault": "T1 carry-over-then-reskin: keep Upload as a lens with both drop zones + queue + ⌘V hint; no behavior change.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ3: Organize into Folders — keep (where?) or deliberately retire?",
+        "proposedDefault": "Keep as a Toolbar action on Browse opening the preview in a Drawer; retirement needs explicit sign-off.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ4: CMS field selector — launch requirement or deferrable? Deferring while keeping CMS-aware compression risks clobbering intentionally-sized OG images.",
+        "proposedDefault": "Ship the full selector at launch (it is a safety gate, not polish); if cut, defer CMS-aware compression with it.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ5: 'Graduation' → Insights Engine — define trigger + data contract; which system owns the CWV-delta measurement (Performance, insight bridges, outcome tracking)?",
+        "proposedDefault": "Defer to a C3-style follow-up (sn-asset-manager-2); not a rebuild-parity item.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ6: Confirm single delete, bulk delete, and Delete-All-Unused all return, and window.confirm → ConfirmDialog?",
+        "proposedDefault": "Yes to all three; migrate to ConfirmDialog.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ7: How should the AI-quota 429 render (disabled buttons + tooltip? banner?) — required by four-states rule, undefined in prototype.",
+        "proposedDefault": "Disabled AI actions with quota tooltip + dismissible banner on first 429; bulk stream shows partial-run tally.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "NEW: Does the Webflow v2 list-assets API response actually include dimensions, or does sn-asset-manager-1 need per-asset fetches/image probing?",
+        "proposedDefault": "Verify one live API response before committing sn-asset-manager-1; if absent from the list payload, omit dimensions initially (doc's quick-win) rather than N+1 fetching.",
+        "needsOwner": false,
+        "source": "newly-found"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "Total media weight + potential savings (~55% heuristic) stat cards",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Computable client-side from the existing asset list (sum sizes); label savings as an estimate to satisfy the no-fabricated-numbers floor. Full sharp dry-run = sn-asset-manager-3, deferred."
+      },
+      {
+        "proposal": "Image dimensions (w×h) on cards",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Additive data ticket sn-asset-manager-1; omit gracefully until the field lands (see newly-found OQ on API availability)."
+      },
+      {
+        "proposal": "Site Audit → Asset Manager deep-link with pre-set filter",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Pure frontend two-halves contract (?filter=/?tab= receiver + contract test); no server work."
+      },
+      {
+        "proposal": "'Graduation' note → Insights Engine on CWV improvement",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "New cross-system functionality (sn-asset-manager-2) blocked on OQ5 ownership; not rebuild parity."
+      },
+      {
+        "proposal": "Card-grid layout replacing row layout",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Fine iff every row affordance (manual alt edit, rename draft, CMS badges, open-in-new-tab, delete) gets a card/drawer home."
+      },
+      {
+        "proposal": "Purple styling for AI actions",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Admin-only surface — consistent with Four Laws law 4."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Browse (default grid lens)",
+        "Audit (pending OQ1 — score + issue-class lens)",
+        "Upload (pending OQ2 — drop zones + processing queue)"
+      ],
+      "primitives": [
+        "LensSwitcher or Segmented (sub-modes, replaces local-useState tabs)",
+        "MetricTile (stat row incl. new weight/savings)",
+        "FilterChip (filter pills, multi-select)",
+        "SearchField (filename/alt + audit search)",
+        "Toolbar + ToolbarSpacer (sticky bulk bar, sort, Organize/Upload/Export actions)",
+        "GroupBlock/DataTable (asset grid/list)",
+        "Drawer (asset detail replacing lightbox; Organize preview)",
+        "Meter (health score, if OQ1 keeps it)",
+        "IntentTag/Badge (issue-class, UNUSED, CMS badges)",
+        "PageContainer + AppShell (F4 mount)",
+        "Avatar n/a; KeyValueRow (asset metadata in drawer)"
+      ],
+      "dataHooks": [
+        "useWebflowAssets / useAssetAudit / useCmsImages (src/hooks/admin/useAdminAssets.ts) → GET /api/webflow/assets/:siteId, /api/webflow/audit/:siteId, /api/webflow/cms-images/:siteId",
+        "useQueue (src/hooks/admin/useQueue.ts) + WS queue:update/files:uploaded",
+        "useBackgroundTasks (bulk-compress job)",
+        "mutations: PATCH/DELETE /api/webflow/assets/*, bulk-alt/bulk-delete (server/routes/webflow.ts), alt-text + compress (server/routes/webflow-alt-text.ts), organize (server/routes/webflow-organize.ts), rename (server/routes/misc.ts:86)"
+      ],
+      "statesPlan": "locked = no siteId 'Link a Webflow site' CTA + AI-quota-429 disabled actions; loading = Skeleton grid; empty = no assets / no-filter-match with clear-filter CTA; error = dismissible banner with per-item partial-failure tally.",
+      "mountNote": "Admin Page 'media' inside F4 RebuiltAppChrome behind ui-rebuild-shell; add ?tab= + ?filter= deep-link receiver (none exists at HEAD — grep useSearchParams in MediaTab/AssetBrowser/AssetAudit is empty) with contract test."
+    },
+    "crossSurfaceDeps": [
+      "site-audit surface — sender half of the AssetsView.open(filter) deep-link (and OQ1 option c would relocate audit-y classes there)",
+      "performance surface — Page Weight → Asset Manager compression hand-off (Performance.tsx:32) needs the same deep-link receiver",
+      "insights-engine/outcome-tracking — graduation insight (OQ5, sn-asset-manager-2)",
+      "background-job platform + NotificationBell — bulk-compress job and any future bulk-alt migration (docs/rules/background-generation.md)"
+    ],
+    "unknowns": [
+      "Whether the Webflow v2 list-assets API payload includes width/height (the untyped passthrough in listAssets means it may already arrive but be dropped by typing) — not verifiable from repo; gates sn-asset-manager-1 effort.",
+      "Final audit-mode home (OQ1) changes lens count and whether Meter/score ships — composition above assumes 3 lenses pending sign-off."
+    ],
+    "effortEstimate": "L",
+    "surface": "asset-manager"
+  },
+  "verify": {
+    "surface": "asset-manager",
+    "verdicts": [
+      {
+        "needId": "sn-asset-manager-1",
+        "verdict": "CONFIRMED",
+        "evidence": "server/webflow-assets.ts:18-31 (WebflowAsset interface) has no width/height/dimension fields; src/hooks/admin/useAdminAssets.ts:6-17 (client Asset interface) likewise lacks them; rg -i 'width|height|dimension' across server/webflow-assets.ts, server/webflow.ts, server/routes/webflow*.ts returns zero hits, and none in shared/types/cms-images.ts. GET /api/webflow/assets/:siteId (server/routes/webflow.ts:60-68) is a straight passthrough of listAssets() output — no dimension mapping exists. Effort 'S' is correct: this is an in-memory Webflow-API passthrough shape, NOT a DB column, so the DB-column+mapper+serialization lockstep rule does not apply (no migration). NOTE for the fan-out: whether it stays trivially S depends on OQ — if Webflow's /assets response already carries dimensions it is mapping-only; if not, the field must be populated by image introspection (extra fetch/sharp), which is still endpoint-shape work but larger. The claim's 'no' + 'S' both stand."
+      },
+      {
+        "needId": "sn-asset-manager-2",
+        "verdict": "CONFIRMED",
+        "evidence": "InsightType union (shared/types/analytics.ts:190-211) contains no 'graduation', compression, or CWV-move insight type; rg -i 'graduat' across shared/types/ and server/ returns only unrelated fuzzy matches ('ne'-truncated words in outcome-tracking.ts/roi.ts, none an insight). rg -i 'compress' across shared/types/analytics.ts and server/intelligence/ returns nothing. server/webflow-bulk-compress-background-job.ts (123 lines) contains no insight/outcome/recordAction/CWV reference — it does not write any insight. The 4-part registration path the claim names is real (InsightType union line 190, InsightDataMap line 558, plus Zod schema + renderer). Effort 'M' and the OQ5 measurement-ownership blocker are accurate. Claim stands as written."
+      },
+      {
+        "needId": "sn-asset-manager-3",
+        "verdict": "ADJUSTED",
+        "evidence": "The 'exists=no' verdict is CORRECT — no potential-savings / dry-run estimate endpoint exists: rg -i 'savings|potential|estimate|dry.?run|heuristic' across server/routes/webflow-audit.ts, webflow-alt-text.ts, webflow-pagespeed.ts returns nothing. BUT the cited evidence 'compression savings only computed post-hoc per asset in webflow-alt-text.ts:274-325' is wrong on two counts: (1) lines 274-325 of server/routes/webflow-alt-text.ts are the bulk-alt error handler + the POST /api/webflow/:workspaceId/compress/:assetId endpoint body — not a savings computation; the actual byte comparison happens inside compressImageBuffer/replaceCompressedAsset (server/webflow-alt-text.ts service module, a different file from the route module server/routes/webflow-alt-text.ts). (2) The gatherer conflated the route file and the service file of the same name. The conclusion (no server savings-estimate endpoint; quick-win is client-side; effort M for the optional sharp dry-run path) is sound — only the file:line citation needs correcting to point at the compressImageBuffer result shape in the webflow-alt-text SERVICE module rather than route lines 274-325."
+      }
+    ]
+  }
+}

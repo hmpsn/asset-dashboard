@@ -1,0 +1,578 @@
+{
+  "gather": {
+    "surface": "ai-visibility",
+    "capabilityClassification": [
+      {
+        "capability": "A1 manual refresh → LLM_MENTIONS_REFRESH job",
+        "resolution": "ui-only",
+        "note": "POST refresh-ai-visibility exists (server/routes/rank-tracking.ts:163-184); rewire button + useBackgroundTasks."
+      },
+      {
+        "capability": "A2 Growth/Premium tier gate + locked state",
+        "resolution": "ui-only",
+        "note": "Gate exists server-side (rank-tracking.ts:176-178); rebuild must DESIGN the missing locked state with TierGate."
+      },
+      {
+        "capability": "A3 credit-budget gate (observe-only)",
+        "resolution": "ui-only",
+        "note": "Backend invariant, untouched (server/llm-mentions.ts:121-136)."
+      },
+      {
+        "capability": "A4 provider-capability error (DataForSEO getLlmMentions)",
+        "resolution": "ui-only",
+        "note": "Error message produced server-side (llm-mentions.ts:101-106); carry error state in UI."
+      },
+      {
+        "capability": "A5 geo-targeted read",
+        "resolution": "ui-only",
+        "note": "Backend, unchanged (llm-mentions.ts:113-116)."
+      },
+      {
+        "capability": "A6 owner-brand resolution",
+        "resolution": "ui-only",
+        "note": "Backend, unchanged (llm-mentions.ts:60-70)."
+      },
+      {
+        "capability": "A7 dated snapshot store llm_mention_snapshots",
+        "resolution": "ui-only",
+        "note": "Backend store unchanged (server/llm-mentions-store.ts, migration 155)."
+      },
+      {
+        "capability": "A8 SoV headline as 0-100 score",
+        "resolution": "open-question",
+        "note": "Blocked on Q5 score definition; quick-win default = SoV×100 from existing shareOfVoice field. See sn-ai-visibility-5 if composite chosen."
+      },
+      {
+        "capability": "A9 explicit 'not measured' SoV state",
+        "resolution": "ui-only",
+        "note": "Server already returns shareOfVoice undefined for not-measured (llm-mentions.ts:41-42); UI must design the state the prototype omits."
+      },
+      {
+        "capability": "A10 raw mention-volume KPI",
+        "resolution": "ui-only",
+        "note": "latest.mentions in GET ai-visibility response; use as interim KPI slot since 'prompts cited' needs N1."
+      },
+      {
+        "capability": "A11 mention trend sparkline over dated snapshots",
+        "resolution": "ui-only",
+        "note": "trend array (date/mentions/shareOfVoice) already serialized (rank-tracking.ts:196-200); render with F3 Sparkline."
+      },
+      {
+        "capability": "A12 co-mentioned competitor breakdown → % bars",
+        "resolution": "ui-only",
+        "note": "Counts already in response; % share is a plain client-side ratio (not money/verdict) — see newly-found denominator question."
+      },
+      {
+        "capability": "A13 aggregate cited source-domain list",
+        "resolution": "ui-only",
+        "note": "sourceDomains already serialized (rank-tracking.ts:206); prototype omitted it — must render."
+      },
+      {
+        "capability": "A14 refresh error band (403/409 surfaced)",
+        "resolution": "ui-only",
+        "note": "Route returns distinct conflict/tier errors (rank-tracking.ts:170-181); carry the error band prototype omits."
+      },
+      {
+        "capability": "A15 empty/bootstrap state with visible refresh trigger",
+        "resolution": "ui-only",
+        "note": "Self-gating-panel lesson; pure UI state."
+      },
+      {
+        "capability": "A16 WS invalidation llm-mentions:snapshots_refreshed",
+        "resolution": "ui-only",
+        "note": "Event + wsInvalidation exist; rebuild re-points useWorkspaceEvents to new query keys if keys change."
+      },
+      {
+        "capability": "A17 activity-log entry per refresh",
+        "resolution": "ui-only",
+        "note": "Backend, unchanged."
+      },
+      {
+        "capability": "A18 cancel-safe job",
+        "resolution": "ui-only",
+        "note": "Backend, unchanged (llm-mentions.ts cancel checks)."
+      },
+      {
+        "capability": "A19 SeoContextSlice.aiVisibility intelligence wiring",
+        "resolution": "ui-only",
+        "note": "Backend, unchanged."
+      },
+      {
+        "capability": "A20 useAiVisibility hooks + typed API client",
+        "resolution": "ui-only",
+        "note": "Reuse as-is (src/hooks/admin/useAiVisibility.ts:15-45); scrub stale retired-flag doc-comments in the same PR."
+      },
+      {
+        "capability": "A21 admin-only exposure (no client leak)",
+        "resolution": "ui-only",
+        "note": "Stays admin; client graduation is N6 (open question). Purple accent legal admin-side only."
+      },
+      {
+        "capability": "A22 single platform chat_gpt",
+        "resolution": "ui-only",
+        "note": "Engine legend must show ChatGPT only — never render fake 4-engine chips (llm-mentions.ts:35)."
+      },
+      {
+        "capability": "B1 generate as LLMS_TXT_GENERATION job + theater",
+        "resolution": "ui-only",
+        "note": "Job + useJobProgress exist; wire prototype's 5-step theater to REAL job progress, not timers."
+      },
+      {
+        "capability": "B2 stored-result read (no re-crawl, 404 never-generated)",
+        "resolution": "ui-only",
+        "note": "GET /api/llms-txt/:ws exists (routes/llms-txt.ts:72-78)."
+      },
+      {
+        "capability": "B3 freshness endpoint + color stamp",
+        "resolution": "ui-only",
+        "note": "Endpoint exists (routes/llms-txt.ts:41-50); thresholds mirrored by prototype."
+      },
+      {
+        "capability": "B4 download both artifacts as real attachments",
+        "resolution": "ui-only",
+        "note": "Both download routes exist (routes/llms-txt.ts:52-70); prototype's toast stub must become real download."
+      },
+      {
+        "capability": "B5 copy-to-clipboard mode-aware",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "B6 two-tier preview toggle + syntax highlighting",
+        "resolution": "ui-only",
+        "note": "Port + adopt kit highlighting (client-side rendering only)."
+      },
+      {
+        "capability": "B7 stats strip",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "B8 empty/loading/error states",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "B9 educational 'What is LLMs.txt' card",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "B10 generator engine (two-tier, AI summaries, cache, URL validation)",
+        "resolution": "ui-only",
+        "note": "Backend untouched."
+      },
+      {
+        "capability": "B11 auto-regeneration triggers (strategy/schema/matrix/MCP)",
+        "resolution": "ui-only",
+        "note": "Invisible plumbing, must survive untouched; optionally surface 'regenerated after X' later."
+      },
+      {
+        "capability": "B12 summary-cache 90-day retention",
+        "resolution": "ui-only",
+        "note": "Backend, unchanged."
+      },
+      {
+        "capability": "B13 workspace-settings?tab=llms-txt deep link / tab retirement",
+        "resolution": "open-question",
+        "note": "Q9: confirm tab retirement + redirect; redirect map is a required deliverable per D8. UI-only once approved."
+      },
+      {
+        "capability": "B14 bulk re-run via jobs route",
+        "resolution": "ui-only",
+        "note": "Backend, unchanged (server/routes/jobs.ts:600-604)."
+      },
+      {
+        "capability": "C1 8 aeo-* checks → AI Search Ready readiness card + score",
+        "resolution": "needs-server-work",
+        "note": "sn-ai-visibility-1: readiness rows + score are a verdict — must be server-derived from existing audit-page.ts checks; no such projection exists today."
+      },
+      {
+        "capability": "C2 AEO checks feed Recommendation Engine (aeo RecType)",
+        "resolution": "ui-only",
+        "note": "Backend unchanged; verify with Recommendations surface auditor (cross-surface dep)."
+      },
+      {
+        "capability": "C3 AEO site review background job",
+        "resolution": "open-question",
+        "note": "Q4: home for the drill-in; endpoint exists (routes/aeo-review.ts:104+). Proposed: keep behind 'Improve' as a Drawer drill-in."
+      },
+      {
+        "capability": "C4 single-page on-demand AEO review",
+        "resolution": "open-question",
+        "note": "Q4; endpoint exists (routes/aeo-review.ts:40-92). Same drill-in home decision."
+      },
+      {
+        "capability": "C5 per-page change recs (12 types, effort/priority, quick-wins, score)",
+        "resolution": "open-question",
+        "note": "Q4; shared/types/aeo.ts AeoPageReview.overallScore verified. Depth absent from prototype — must not drop."
+      },
+      {
+        "capability": "C6 effort + priority filters on change list",
+        "resolution": "open-question",
+        "note": "Q4; pure UI once home decided (FilterChip)."
+      },
+      {
+        "capability": "C7 send AEO recs to client (aeo_change action, research gating)",
+        "resolution": "open-question",
+        "note": "Q4; pipeline is real and wide (aeo_change in 9 server files incl. deliverable-adapters/aeo-change.ts) — losing it breaks client inbox. Must survive wherever AeoReview lands."
+      },
+      {
+        "capability": "C8 seo-audit?tab=aeo-review deep link",
+        "resolution": "ui-only",
+        "note": "Redirect map per D8 once Q4 fixes the destination."
+      },
+      {
+        "capability": "N1 AI Answer Monitor (prompts + raw answer transcripts)",
+        "resolution": "open-question",
+        "note": "Q1 stance reversal (aggregates-only comment at rank-tracking.ts:190-193) + Q2 prompt CRUD; sn-ai-visibility-4 if approved."
+      },
+      {
+        "capability": "N2 4-engine coverage",
+        "resolution": "open-question",
+        "note": "Q3; HEAD is chat_gpt only. Ship single-engine honestly at launch."
+      },
+      {
+        "capability": "N3 per-prompt 'Brief this page' CTA",
+        "resolution": "open-question",
+        "note": "Blocked on N1/Q1; pattern itself is good (mirrors decay→brief)."
+      },
+      {
+        "capability": "N4 AI referral sessions KPI",
+        "resolution": "defer-candidate",
+        "note": "Quick win = omit the 4th KPI (3 real > 1 fake); full version is sn-ai-visibility-2. DEF-* row if deferred."
+      },
+      {
+        "capability": "N5 branded vs non-branded demand split",
+        "resolution": "open-question",
+        "note": "Q10 surface ownership (here vs Search & Traffic); sn-ai-visibility-6 if adopted here."
+      },
+      {
+        "capability": "N6 graduation rule to client Insights Engine",
+        "resolution": "open-question",
+        "note": "Q6 product rule + cross-surface contract; no purple client-side."
+      },
+      {
+        "capability": "N7 weekly scheduled scans",
+        "resolution": "open-question",
+        "note": "Q8 cost/budget decision; sn-ai-visibility-3 if approved. Copy must not claim 'scanned weekly' while manual."
+      },
+      {
+        "capability": "N8 composite AI visibility score /100 with MoM",
+        "resolution": "open-question",
+        "note": "Q5 metric definition (prototype 58 vs SoV 22% is incoherent); default SoV×100. sn-ai-visibility-5 if composite."
+      },
+      {
+        "capability": "N9 authority-signals 'why' rows",
+        "resolution": "defer-candidate",
+        "note": "Partially derivable but no assembled read exists (sn-ai-visibility-7); defer to follow-up rather than block the port."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-ai-visibility-1",
+        "kind": "derivation",
+        "description": "AI Search Ready readiness projection: map the 8 aeo-* audit checks into the readiness rows + a server-computed readiness score (verdict → never client-side), served on a new GET (e.g. /api/aeo-review/:ws/readiness) reading the latest audit snapshot.",
+        "existsToday": "partial",
+        "evidence": "Checks exist: server/audit-page.ts:59-62,335-452; per-page AeoPageReview.overallScore exists (shared/types/aeo.ts:38-52) but no site-level readiness rows/score projection — rg 'readiness' in server/routes/aeo-review.ts + shared/types/aeo.ts: only the per-page score at aeo-review.ts:84.",
+        "whereItLives": "server/routes/aeo-review.ts + a small derivation module beside server/audit-page.ts consumers",
+        "effort": "S",
+        "likelySharedWith": [
+          "site-audit"
+        ]
+      },
+      {
+        "id": "sn-ai-visibility-2",
+        "kind": "derivation",
+        "description": "GA4 AI-referral sessions segmentation (chatgpt.com / perplexity.ai / gemini referrers) + MoM delta for the 4th KPI (N4). Owner-gated; quick win omits the KPI.",
+        "existsToday": "no",
+        "evidence": "rg -c 'chatgpt\\.com|perplexity|gemini' server src → zero matches (exit 1).",
+        "whereItLives": "GA4 fetch layer (server analytics module) + new field on the ai-visibility read",
+        "effort": "M",
+        "likelySharedWith": [
+          "search-traffic"
+        ]
+      },
+      {
+        "id": "sn-ai-visibility-3",
+        "kind": "job",
+        "description": "Weekly LLM_MENTIONS_REFRESH cron with credit-budget enforcement (N7). Conditional on Q8.",
+        "existsToday": "no",
+        "evidence": "rg 'LLM_MENTIONS|llm-mentions' server/cron-registry.ts → no matches (exit 1); refresh is route-triggered only (rank-tracking.ts:163).",
+        "whereItLives": "server/cron-registry.ts (CRON_METADATA entry) + server/llm-mentions.ts",
+        "effort": "S"
+      },
+      {
+        "id": "sn-ai-visibility-4",
+        "kind": "migration",
+        "description": "AI Answer Monitor backing (N1/N2): tracked-prompt table + per-prompt answer-transcript snapshots + DataForSEO ChatGPT-scraper provider method + read/CRUD endpoints. Conditional on Q1-Q3 — reverses the aggregates-only stance.",
+        "existsToday": "no",
+        "evidence": "Aggregates-only is explicit in code comment at server/routes/rank-tracking.ts:190-193 ('Never returns raw LLM transcripts/answers (the store holds none)'); llm_mention_snapshots stores counts/domains only (server/llm-mentions-store.ts).",
+        "whereItLives": "new migration + server/llm-mentions*.ts extension + server/seo-data-provider.ts capability",
+        "effort": "L",
+        "likelySharedWith": [
+          "insights-engine"
+        ]
+      },
+      {
+        "id": "sn-ai-visibility-5",
+        "kind": "derivation",
+        "description": "Composite 'AI visibility score /100' + MoM delta, server-computed, IF Q5 chooses a composite over SoV×100. Serialize onto the existing GET ai-visibility response.",
+        "existsToday": "partial",
+        "evidence": "shareOfVoice 0..1 exists (server/llm-mentions.ts:41-42) and trend is serialized (rank-tracking.ts:196-200); no composite metric exists anywhere.",
+        "whereItLives": "server/llm-mentions.ts + rank-tracking.ts GET route",
+        "effort": "S"
+      },
+      {
+        "id": "sn-ai-visibility-6",
+        "kind": "derivation",
+        "description": "Branded vs non-branded demand split + branded search volume/mo (N5). Conditional on Q10 ownership.",
+        "existsToday": "no",
+        "evidence": "rg -n 'branded' server/routes/*.ts → only branded-HTML export naming hits (public-content.ts:555, content-posts.ts:442, content-briefs.ts:228); no demand-split KPI.",
+        "whereItLives": "search/keyword domain (likely alongside GSC read paths), not this surface's routes",
+        "effort": "M",
+        "likelySharedWith": [
+          "search-traffic"
+        ]
+      },
+      {
+        "id": "sn-ai-visibility-7",
+        "kind": "projection",
+        "description": "Authority-signals assembled read (owned-content-cited, NAP/reviews, roundup presence) for N9 'why' rows, joining existing sourceDomains + GBP data.",
+        "existsToday": "partial",
+        "evidence": "Inputs exist (sourceDomains serialized at rank-tracking.ts:206; GBP review data elsewhere) but no assembled read — no such join in server/llm-mentions.ts or intelligence slices per doc A19 aggregate list (shared/types/intelligence.ts:243-258).",
+        "whereItLives": "server/intelligence/ or a small assembler beside llm-mentions",
+        "effort": "M"
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "Q1 raw answer capture (N1): approve reversing the aggregates-only stance + pick a data source, or descope to aggregates for v1?",
+        "proposedDefault": "Descope to aggregates for v1; AI Answer Monitor as an individually-flagged follow-up.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q2 prompt-set curation: who defines/edits the tracked prompt list?",
+        "proposedDefault": "Admin-curated, seeded from keyword strategy; spec with N1.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q3 multi-engine (N2): which engines are procurable?",
+        "proposedDefault": "Ship single-engine (ChatGPT) honestly; no fake engine chips.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q4 AeoReview home (C3-C7): drill-in behind 'Improve', stay in Site Audit, or redesign?",
+        "proposedDefault": "Keep as a Drawer drill-in behind the AI Search Ready 'Improve' action, preserving the full job + filters + send-to-client pipeline.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q5 score definition (N8/A8/A9): SoV×100 or a new composite, and where does 'not measured' render?",
+        "proposedDefault": "SoV×100 with an explicit 'not measured' state (server already distinguishes undefined SoV).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q6 graduation rule (N6) threshold + mechanics into client Insights Engine.",
+        "proposedDefault": "Defer entirely; define as a C3-era cross-surface contract.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q7 zone assignment: Search & Site Health (Handoff Brief) vs Brand & AI (Parity Ledger + prototype banner).",
+        "proposedDefault": "Search & Site Health (matches the Handoff Brief 18-surface map and this ledger's header).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q8 weekly scheduled scans (N7): approve cron + budget enforcement or keep manual?",
+        "proposedDefault": "Manual refresh at launch with honest freshness copy; cron as follow-up (sn-ai-visibility-3).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q9 Workspace Settings LLMs.txt tab retirement + deep-link redirect (B13).",
+        "proposedDefault": "Retire the tab; redirect workspace-settings?tab=llms-txt → this surface's manifest section (D8 redirect map).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q10 branded-demand split (N5): this surface or Search & Traffic?",
+        "proposedDefault": "Search & Traffic owns it; omit here.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "SoV % bar denominator (A12): counts→% mapping needs a definition.",
+        "proposedDefault": "share = brand mentions ÷ (owner + all co-mentioned competitor mentions), computed client-side (not money/verdict).",
+        "needsOwner": false,
+        "source": "newly-found"
+      },
+      {
+        "question": "Exact aeo-* check → 5 readiness-row mapping for the AI Search Ready card (8 checks, 5 prototype rows).",
+        "proposedDefault": "Define the grouping in sn-ai-visibility-1's derivation module at build time; render all 8 (grouped) rather than dropping 3.",
+        "needsOwner": false,
+        "source": "newly-found"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "Consolidated single AI Visibility surface (3 HEAD homes → 1)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Core value of the rebuild; all three read paths already exist. Redirects per D8."
+      },
+      {
+        "proposal": "llms.txt generation theater (5-step progress)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Wire to real useJobProgress messages, never fake timers."
+      },
+      {
+        "proposal": "Syntax-highlighted llms.txt preview",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Pure client-side rendering upgrade, low risk."
+      },
+      {
+        "proposal": "SoV as % bars with 'you' highlighted",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Client-side ratio over existing counts; denominator defined per newly-found question."
+      },
+      {
+        "proposal": "AI Search Ready readiness card + score",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Friendlier framing of existing aeo-* checks; requires sn-ai-visibility-1 and must keep the AeoReview drill-in (Q4)."
+      },
+      {
+        "proposal": "N1 AI Answer Monitor (prompt transcripts)",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Reverses the aggregates-only data stance; product + cost + data-source decision (Q1-Q2), not a UI port."
+      },
+      {
+        "proposal": "N2 4-engine coverage chips",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Only chat_gpt is procurable today; fake chips violate the no-fabricated-numbers floor."
+      },
+      {
+        "proposal": "N3 per-prompt 'Brief this page' CTA",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Good handoff pattern but hard-depends on N1."
+      },
+      {
+        "proposal": "N4 AI referral sessions KPI",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "No GA4 AI-referrer segmentation exists (sn-ai-visibility-2); ship 3 real KPIs, not 1 fake one."
+      },
+      {
+        "proposal": "N5 branded vs non-branded demand split",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Ownership contested with Search & Traffic (Q10); no data at HEAD."
+      },
+      {
+        "proposal": "N6 graduation rule to client Insights Engine",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Product rule needing owner definition + cross-surface contract."
+      },
+      {
+        "proposal": "N7 weekly scheduled scans",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Cost/budget decision (Q8); small job once approved (sn-ai-visibility-3)."
+      },
+      {
+        "proposal": "N8 composite AI visibility score distinct from SoV",
+        "recommendation": "reject",
+        "rationale": "Undefined metric (prototype shows 58 alongside 22% SoV); default to honest SoV×100 unless the owner defines a composite."
+      },
+      {
+        "proposal": "N9 authority-signals 'why' rows",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Partially derivable (sn-ai-visibility-7) but no assembled read; not worth blocking the port."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Visibility (KPI strip + SoV bars + trend + competitors + source domains)",
+        "AI Search Ready (readiness card → AeoReview drill-in Drawer, pending Q4)",
+        "AI Site Manifest (llms.txt generator)"
+      ],
+      "primitives": [
+        "PageContainer",
+        "Toolbar (refresh action + freshness stamp)",
+        "MetricTile (KPI strip)",
+        "Sparkline (mention trend)",
+        "Meter (SoV % bars)",
+        "GroupBlock (three sections)",
+        "DataTable or KeyValueRow (competitors, source domains)",
+        "Drawer (AeoReview per-page drill-in)",
+        "Segmented (index vs full preview toggle)",
+        "FilterChip (effort/priority filters in drill-in)",
+        "TierGate (locked state)",
+        "Skeleton/EmptyState/ErrorState"
+      ],
+      "dataHooks": [
+        "useAiVisibility / useAiVisibilityRefresh (src/hooks/admin/useAiVisibility.ts)",
+        "queryKeys.admin.aiVisibility / llmsTxtResult / llmsTxtFreshness (src/lib/queryKeys.ts:123 + LlmsTxtGenerator.tsx:35,44)",
+        "rankTracking.aiVisibility + refreshAiVisibility (src/api/seo.ts:202-210)",
+        "llmsTxt api (src/api/content.ts:388)",
+        "aeoReview api (src/api/seo.ts:376-391)",
+        "useJobProgress + useBackgroundTasks",
+        "useWorkspaceEvents → llm-mentions:snapshots_refreshed invalidation"
+      ],
+      "statesPlan": "Empty keeps the refresh CTA visible (PR #1306 lesson); loading = contextual Skeleton; error band surfaces 403 tier / 409 conflict / provider-missing distinctly; locked = TierGate for Free tier; SoV renders explicit 'not measured' when shareOfVoice is undefined.",
+      "mountNote": "Admin page in the F4 shell behind ui-rebuild-shell; zone pending Q7; consolidation PR must ship the D8 redirect map for workspace-settings?tab=llms-txt and seo-audit?tab=aeo-review."
+    },
+    "crossSurfaceDeps": [
+      "site-audit: produces the aeo-* checks and its ledger note splits 'AI Search Ready' out to this surface (3-to-1 merge coordination)",
+      "recommendations: aeo RecType consumes the same checks (C2) — verify with the Recommendations auditor",
+      "client-inbox: aeo_change client-action renderers (DecisionDetailModal + server deliverable-adapters/aeo-change.ts) depend on C7 surviving",
+      "workspace-settings: LLMs.txt tab retirement + redirect (Q9, D8)",
+      "search-traffic: contested ownership of branded-demand split (Q10) and shared GA4 AI-referrer work (sn-ai-visibility-2)",
+      "insights-engine: N6 graduation rule cross-surface contract; no purple may cross to client side",
+      "D8: redirect map is a required deliverable of the consolidation PR; Q7 zone decision affects nav/breadcrumbs"
+    ],
+    "unknowns": [
+      "N2 engine procurability: whether DataForSEO (or any provider) can supply Perplexity/AI-Overview/Gemini mentions was not verifiable from the repo — needs a provider capability audit",
+      "B11 auto-regen trigger call sites and C2 recommendation-rules line refs taken from the surface doc, not independently re-read (spot-checks of neighboring claims all held)",
+      "Whether the stored AEO review file format (JSON file per workspace, routes/aeo-review.ts loadReview) is durable enough for the drill-in rebuild or needs a store migration — not assessed"
+    ],
+    "effortEstimate": "M"
+  },
+  "verify": {
+    "surface": "ai-visibility",
+    "verdicts": [
+      {
+        "needId": "sn-ai-visibility-1",
+        "verdict": "CONFIRMED",
+        "evidence": "Exactly 8 aeo-* checks exist (server/audit-page.ts:59-62; distinct literals aeo-author/date/answer-first/faq-no-schema/hidden-content/citations/dark-patterns/trust-pages). Per-page AeoPageReview.overallScore exists (shared/types/aeo.ts:41) but the type has NO site-level readiness-rows/score field; AeoSiteReview (shared/types/aeo.ts:47) aggregates page counts only, no readiness rows. Routes are POST /page (aeo-review.ts:40), GET / (aeo-review.ts:96), POST /site (aeo-review.ts:104) — no /readiness GET exists. 'partial' + effort S stands. Adjacent note: an unrelated assembleSetupReadiness (server/the-issue-readiness.ts:36) exists for The-Issue client setup gates — NOT reusable for AEO readiness; don't cross-wire it."
+      },
+      {
+        "needId": "sn-ai-visibility-2",
+        "verdict": "CONFIRMED",
+        "evidence": "grep -c 'chatgpt\\.com|perplexity|gemini' server src → exit 1 (zero matches). The only 'chatgpt/perplexity' hits are the word 'ChatGPT' in AEO prose (server/aeo-page-review.ts prompt) and the platform id 'chat_gpt' (server/llm-mentions.ts:35) — neither is a GA4 referrer-domain segmentation. No AI-referral session segmentation or MoM delta exists. 'no' + effort M stands; caller correctly gates it owner-decision (N4)."
+      },
+      {
+        "needId": "sn-ai-visibility-3",
+        "verdict": "CONFIRMED",
+        "evidence": "server/cron-registry.ts CRON_METADATA (lines 150-378) enumerates 24 crons; none is LLM_MENTIONS/llm-mentions/ai-visibility (nearest is 'rank-tracking' at :274, a separate national-SERP job). The LLM refresh is route-triggered only: BACKGROUND_JOB_TYPES.LLM_MENTIONS_REFRESH is used solely at server/routes/rank-tracking.ts:169 (POST /refresh-ai-visibility), with no scheduler wiring. 'no' + effort S stands. Caveat for the plan: adding to CRON_METADATA also requires the tests/contract/cron-registry-census.test.ts anti-drift update — S is fair but not zero."
+      },
+      {
+        "needId": "sn-ai-visibility-4",
+        "verdict": "CONFIRMED",
+        "evidence": "Aggregates-only is explicit: server/routes/rank-tracking.ts:190-193 comment 'Never returns raw LLM transcripts/answers (the store holds none).' The GET /ai-visibility response (rank-tracking.ts:196-207) serializes only latest/trend/competitors/sourceDomains. llm-mentions-store header (server/llm-mentions-store.ts:2-8) confirms the llm_mention_snapshots table stores counts/domains/share-of-voice JSON only — no per-prompt transcript or tracked-prompt table. No DataForSEO ChatGPT-scraper capability on the provider interface. 'no' + effort L stands (new migration + row-mapper lockstep + provider capability = genuinely L)."
+      },
+      {
+        "needId": "sn-ai-visibility-5",
+        "verdict": "CONFIRMED",
+        "evidence": "shareOfVoice 0..1 exists (server/llm-mentions.ts:37-38 interface) and the dated trend is serialized (rank-tracking.ts:198-200). grep for composite|visibility.?score|aiVisibilityScore over server/llm-mentions.ts + rank-tracking.ts → exit 1 (no composite metric anywhere). The intelligence slice (shared/types/intelligence.ts:243-258) also exposes only mentions/shareOfVoice/topCompetitor/topSourceDomain — no /100 composite. 'partial' + effort S stands; it is a pure server-side derivation on the existing GET, consistent with S."
+      },
+      {
+        "needId": "sn-ai-visibility-6",
+        "verdict": "CONFIRMED",
+        "evidence": "grep 'branded' in server/routes/*.ts hits only branded-HTML export naming (public-content.ts:555, content-briefs.ts:228, content-posts.ts:442). A broader branded.?(search|demand|volume|split) grep finds only competitor-brand-FILTER logic (server/competitor-brand-filter.ts:105; keyword-strategy-synthesis/prompts.ts:278) — that's 'exclude competitor brand tokens', NOT a branded-vs-nonbranded DEMAND split KPI. No branded search-volume/mo metric exists. 'no' + effort M stands; whereItLives (GSC/keyword domain, not this surface) is accurate."
+      },
+      {
+        "needId": "sn-ai-visibility-7",
+        "verdict": "CONFIRMED",
+        "evidence": "Inputs exist: sourceDomains is serialized (server/routes/rank-tracking.ts:206) and GBP review data lives in the google_business_review_responses table (referenced server/outcome-source-integrity-sweep-job.ts:88,115). But no assembled authority-signals read joining owned-content-cited + NAP/reviews + roundup-presence exists — the aiVisibility intelligence slice (shared/types/intelligence.ts:243-258) surfaces only mentions/shareOfVoice/topCompetitor/topSourceDomain, and server/llm-mentions.ts performs no such join. 'partial' + effort M stands; it is genuinely a net-new projection/assembler over existing inputs."
+      }
+    ]
+  }
+}

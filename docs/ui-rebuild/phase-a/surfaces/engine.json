@@ -1,0 +1,565 @@
+{
+  "gather": {
+    "capabilityClassification": [
+      {
+        "capability": "A1 generate strategy job",
+        "resolution": "ui-only",
+        "note": "POST /api/webflow/keyword-strategy/:ws exists (keyword-strategy.ts:139); job progress rides the rebuilt shell's job rail."
+      },
+      {
+        "capability": "A2 full-vs-incremental modes",
+        "resolution": "open-question",
+        "note": "Doc Q8 — collapse or keep; both modes exist in useStrategyGeneration.ts:60,84."
+      },
+      {
+        "capability": "A3 RefreshOrderingPrompt",
+        "resolution": "open-question",
+        "note": "Doc Q8 — guards a real data-ordering hazard; component exists, keep-by-default proposed."
+      },
+      {
+        "capability": "A4 strategy inputs → wsettings",
+        "resolution": "ui-only",
+        "note": "PATCH keyword-strategy.ts:475 + workspace PATCH exist; relocation only — Workspace Settings surface must confirm pickup."
+      },
+      {
+        "capability": "A5 local market drawer",
+        "resolution": "ui-only",
+        "note": "Delegated to Local Presence surface."
+      },
+      {
+        "capability": "A6 flag-OFF LocalSeoVisibilityPanel",
+        "resolution": "ui-only",
+        "note": "Already de-duped at HEAD; delegated Keywords/Local Presence."
+      },
+      {
+        "capability": "A7 freshness subtitle",
+        "resolution": "ui-only",
+        "note": "generatedAt already on strategy read; render as 'What changed since' chip."
+      },
+      {
+        "capability": "A8 how-it-works explainer",
+        "resolution": "ui-only",
+        "note": "Carry StrategyHowItWorks over as a tooltip; trivial, no server change."
+      },
+      {
+        "capability": "A9 AIContextIndicator",
+        "resolution": "ui-only",
+        "note": "Existing primitive; mount pre-generation."
+      },
+      {
+        "capability": "A10 four states",
+        "resolution": "ui-only",
+        "note": "State kit mandatory; StrategyEmptyState carries over."
+      },
+      {
+        "capability": "A11 ?tab= deep-link continuity",
+        "resolution": "open-question",
+        "note": "Doc Q3, but D8 mandates a redirect map in the consolidation PR — proposed default is redirect to Keywords/Pipeline/Competitors."
+      },
+      {
+        "capability": "B1 OrientZone metrics",
+        "resolution": "ui-only",
+        "note": "Delegated to Cockpit surface; visibility score must not drop in the split."
+      },
+      {
+        "capability": "B2 admin verdict headline",
+        "resolution": "needs-server-work",
+        "note": "sn-engine-2 — must be drafted server-side from StrategyPov, never hardcoded."
+      },
+      {
+        "capability": "B3 money frame",
+        "resolution": "needs-server-work",
+        "note": "sn-engine-1 — hard floor: UI never computes money; also owner sign-off Q6."
+      },
+      {
+        "capability": "C1 unified rec-set read",
+        "resolution": "ui-only",
+        "note": "GET /api/recommendations/:ws (recommendations.ts:509) + useRecommendations."
+      },
+      {
+        "capability": "C2 lifecycle facets",
+        "resolution": "ui-only",
+        "note": "Data already in rec-set read; home pending Q2 (T1 carry-over default)."
+      },
+      {
+        "capability": "C3 category chips + sort",
+        "resolution": "ui-only",
+        "note": "Client-side over existing rows; FilterChip/Segmented; home pending Q2."
+      },
+      {
+        "capability": "C4 fix-now pin",
+        "resolution": "ui-only",
+        "note": "cockpitRowModel.ts FIX_NOW_CAP is client logic; carry over."
+      },
+      {
+        "capability": "C5 NeedsAttentionStrip nudges",
+        "resolution": "ui-only",
+        "note": "strategy-staleness-scan cron keeps writing; UI consumer must be re-mounted."
+      },
+      {
+        "capability": "C6 CurationMeter",
+        "resolution": "ui-only",
+        "note": "Pure derivation from rec set; carry over."
+      },
+      {
+        "capability": "C7 bulk bar send/throttle/strike",
+        "resolution": "ui-only",
+        "note": "POST /bulk exists (recommendations.ts:594); also the Send-issue spine — no verb dropped."
+      },
+      {
+        "capability": "C8 per-row verbs",
+        "resolution": "ui-only",
+        "note": "All endpoints live: send/strike/unstrike/throttle/fix/undismiss (recommendations.ts:884-984,543); needs Drawer detail per Q2."
+      },
+      {
+        "capability": "C9 per-rec discussion thread",
+        "resolution": "ui-only",
+        "note": "GET/POST discussion (recommendations.ts:1031,1038); Recommendations/Inbox audit must claim it explicitly."
+      },
+      {
+        "capability": "C10 wording override",
+        "resolution": "ui-only",
+        "note": "PATCH /wording exists (recommendations.ts:850); regen-durable server-side."
+      },
+      {
+        "capability": "C11 manual add-rec",
+        "resolution": "ui-only",
+        "note": "POST /manual-rec exists (recommendations.ts:806); re-mount AddRecommendationModal."
+      },
+      {
+        "capability": "C12 client running-order reorder",
+        "resolution": "open-question",
+        "note": "Endpoint-only at HEAD (recommendations.ts:756); revive or formally retire — owner call."
+      },
+      {
+        "capability": "C13 archetype-grouped queue",
+        "resolution": "ui-only",
+        "note": "BackingMovesQueue maps to GroupBlock + DataTable."
+      },
+      {
+        "capability": "C14 local staging set",
+        "resolution": "ui-only",
+        "note": "Carry isCuratedForClient predicate verbatim (shared/recommendation-predicates.ts)."
+      },
+      {
+        "capability": "C15 Send-issue commit",
+        "resolution": "open-question",
+        "note": "Doc Q1 — prototype has NO commit control; proposed default = reuse HEAD docked send bar over /bulk."
+      },
+      {
+        "capability": "C16 cut→sentence contract",
+        "resolution": "ui-only",
+        "note": "Client-side contract between queue and DraftedPovEditor; re-wire, logic exists."
+      },
+      {
+        "capability": "C17 competitor-rec send",
+        "resolution": "ui-only",
+        "note": "POST /competitor-rec (recommendations.ts:691); delegated to Competitors surface."
+      },
+      {
+        "capability": "D1 POV get/generate/edit",
+        "resolution": "ui-only",
+        "note": "strategy-pov.ts:36-114 + useStrategyPov; explicit Regenerate affordance must survive."
+      },
+      {
+        "capability": "D2 POV-staleness nudge",
+        "resolution": "ui-only",
+        "note": "Client-side divergence check; carry over."
+      },
+      {
+        "capability": "D3 StanceBar % weights",
+        "resolution": "ui-only",
+        "note": "Percent = archetype count share of curated set, not money; derive from rec rows."
+      },
+      {
+        "capability": "D4 StrategyDiff why-cards",
+        "resolution": "ui-only",
+        "note": "GET /diff exists (keyword-strategy.ts:323); new CTAs are deep-links to pipeline/editor — wire, don't fake."
+      },
+      {
+        "capability": "D5 staleness nudges",
+        "resolution": "ui-only",
+        "note": "Both kinds in prototype; StrategyStalenessNudges carries over."
+      },
+      {
+        "capability": "D6 IntelligenceSignals",
+        "resolution": "open-question",
+        "note": "Endpoints exist (keyword-strategy.ts:703,742) but decide strategy-signal-fold BEFORE build (build-once)."
+      },
+      {
+        "capability": "D7 lost-visibility recovery",
+        "resolution": "ui-only",
+        "note": "LostQueryRecoveryCard + useLostVisibility exist but unmounted at HEAD; mounting is an additive win."
+      },
+      {
+        "capability": "E1 weekly-push doorbell target",
+        "resolution": "open-question",
+        "note": "Doc Q4 — cron survives (strategy-issue-cron.ts); bell deep-link needs a named home in the new shell."
+      },
+      {
+        "capability": "E2 client-request→backing-move promotion",
+        "resolution": "needs-server-work",
+        "note": "sn-engine-3; scope pending Q9 (feedback-approve rebrand vs new promotion path)."
+      },
+      {
+        "capability": "E3 trust ladder",
+        "resolution": "open-question",
+        "note": "Doc Q4 home — GET/PATCH auto-send-policy.ts:45,59 + useAutoSendPolicy exist; safety-gate flag is permanent."
+      },
+      {
+        "capability": "E4 IssueSetupReadiness",
+        "resolution": "open-question",
+        "note": "Doc Q4 home — readiness served on the-issue-conversion-tracking.ts:75; it gates every money number."
+      },
+      {
+        "capability": "E5 AdminLeadsReadout",
+        "resolution": "open-question",
+        "note": "Doc Q4 home — paginated leads endpoint (the-issue-conversion-tracking.ts:103-113) + useAdminLeads exist."
+      },
+      {
+        "capability": "E6 outcome-value AI enrich",
+        "resolution": "open-question",
+        "note": "Doc Q4 home — endpoint exists (the-issue-admin.ts:27-46, never persists); wsettings home unverified."
+      },
+      {
+        "capability": "E7 issue lenses",
+        "resolution": "ui-only",
+        "note": "GET /issue-lenses (strategy-issue-lenses.ts:12) + useIssueLenses (src/api/issueLenses.ts:16); prototype restores KeywordTargetsLens — additive."
+      },
+      {
+        "capability": "E8 per-move deep-diagnostic",
+        "resolution": "open-question",
+        "note": "Doc Q7 — trigger exists (POST /api/jobs type 'deep-diagnostic', jobs.ts:522-542) but Diagnostics is a ledger Gap; confirm its fate first."
+      },
+      {
+        "capability": "E9 client trust-spine preview",
+        "resolution": "open-question",
+        "note": "new_proposed needing sign-off; if adopted, sn-engine-4 (mostly reusable via the-issue-export assembler)."
+      },
+      {
+        "capability": "F1 Content tab folds",
+        "resolution": "ui-only",
+        "note": "Delegated Pipeline/Editor; folds must keep per-item CTAs incl. DecayingPages send-to-client."
+      },
+      {
+        "capability": "F2 Rankings tab",
+        "resolution": "ui-only",
+        "note": "Delegated Keywords/Traffic."
+      },
+      {
+        "capability": "F3 managed keyword set",
+        "resolution": "ui-only",
+        "note": "keyword-set endpoints (keyword-strategy.ts:775-812) + useStrategyKeywordSet; delegated Keywords — verbs must land there."
+      },
+      {
+        "capability": "F4 KeywordOpportunities",
+        "resolution": "ui-only",
+        "note": "Delegated Keywords; enableSend affordance must not drop."
+      },
+      {
+        "capability": "F5 ClientKeywordFeedback",
+        "resolution": "ui-only",
+        "note": "Feedback CRUD/bulk (keyword-strategy.ts:615-687); delegated Keywords."
+      },
+      {
+        "capability": "F6 feedback-newer nudge",
+        "resolution": "defer-candidate",
+        "note": "Small nudge with no prototype home; ship-later with a DEF-* row or fold into D5 nudge stack."
+      },
+      {
+        "capability": "F7 Competitive tab",
+        "resolution": "ui-only",
+        "note": "Delegated Competitors surface."
+      },
+      {
+        "capability": "F8 cannibalization fold sub-verbs",
+        "resolution": "open-question",
+        "note": "Doc Q5 — fold names the card, not KeeperSelector/resolve/fix/send; homes must be named."
+      },
+      {
+        "capability": "F9 QuickWins/LHF fallback",
+        "resolution": "ui-only",
+        "note": "Fallback-when-rec-set-empty behavior must survive (delegated Cockpit/Competitors folds)."
+      },
+      {
+        "capability": "F10 AiVisibilityPanel",
+        "resolution": "ui-only",
+        "note": "Delegated AI Visibility surface."
+      },
+      {
+        "capability": "G1 WS event handlers",
+        "resolution": "ui-only",
+        "note": "Re-wire useWorkspaceEvents invalidations for the 7 events (ws-events.ts:111-167) per panel."
+      },
+      {
+        "capability": "G2 flag family",
+        "resolution": "ui-only",
+        "note": "Rebuild retires UI-shell flags; backend flags stay on lifecycle (owner P2 direction)."
+      },
+      {
+        "capability": "G3 predicates/state machines",
+        "resolution": "ui-only",
+        "note": "Reuse isActiveRec/isCuratedForClient verbatim; struck ≠ completed hard floor."
+      },
+      {
+        "capability": "G4 client/public rec surface",
+        "resolution": "ui-only",
+        "note": "Owned by Recommendations/Client-portal audits; listed only for the send-spine dependency."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-engine-1",
+        "kind": "projection",
+        "description": "Admin money-frame read: pipeline-value-at-stake, recovered-so-far, and basis pill served server-computed for the Engine header. Must be read-safe — computeROI writes a snapshot, so precompute via cron/snapshot (return-hook pattern) rather than compute-on-GET.",
+        "existsToday": "partial",
+        "evidence": "computeROI exists (server/roi.ts) but 'computeROI writes a snapshot (not pure-read), so it must not run inside this read-only assembler' (server/the-issue-return-hook.ts:6-7); per-rec estimatedGain is a human-readable string, not summable (shared/types/recommendations.ts:33); rg 'recovered' server/routes/recommendations.ts = 0 hits.",
+        "whereItLives": "server/routes/the-issue-admin.ts (or new strategy-engine read) + server/workspace-metrics-snapshots.ts / return-hook-cron precompute",
+        "effort": "M",
+        "likelySharedWith": [
+          "cockpit",
+          "outcomes",
+          "client-portal"
+        ]
+      },
+      {
+        "id": "sn-engine-2",
+        "kind": "derivation",
+        "description": "Short admin verdict headline field derived during POV generation (drafted from StrategyPov, never hardcoded); additive field on the POV payload.",
+        "existsToday": "partial",
+        "evidence": "POV generate/store pipeline exists (server/strategy-pov-generator.ts, server/strategy-pov-store.ts; routes server/routes/strategy-pov.ts:36-114) but no verdict/headline field — rg 'verdict' strategy-pov files hits only client-spine types.",
+        "whereItLives": "server/strategy-pov-generator.ts (+ shared/types POV shape)",
+        "effort": "S",
+        "likelySharedWith": [
+          "client-portal"
+        ]
+      },
+      {
+        "id": "sn-engine-3",
+        "kind": "endpoint",
+        "description": "Generic client-request→backing-move promotion (mint a rec from an inbox/client request with source provenance). Scope contingent on Q9 — may reduce to reusing manual-rec + feedback-approve.",
+        "existsToday": "partial",
+        "evidence": "Nearest paths: POST /manual-rec (server/routes/recommendations.ts:806) and keyword-feedback approve (server/routes/keyword-strategy.ts:623,656); rg -i 'client request|promote' server/routes/recommendations.ts = 0 promotion hits.",
+        "whereItLives": "server/routes/recommendations.ts (manual-rec generalization) + shared/types/recommendations.ts source union",
+        "effort": "M",
+        "likelySharedWith": [
+          "inbox",
+          "client-portal"
+        ]
+      },
+      {
+        "id": "sn-engine-4",
+        "kind": "endpoint",
+        "description": "Admin-auth 'what the client sees' spine preview — serialize the client-safe issue payload for admin render. Only if E9 is adopted.",
+        "existsToday": "partial",
+        "evidence": "Client-safe assembler exists and is admin-reusable (server/the-issue-export.ts:61 computeROI + curated topMoves; admin export routes server/routes/the-issue-export.ts:37,56); no full-spine admin preview endpoint found.",
+        "whereItLives": "server/routes/the-issue-export.ts or the-issue-admin.ts, reusing the export assembler",
+        "effort": "S",
+        "likelySharedWith": [
+          "client-portal"
+        ]
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "Q1: where is the Send-issue commit in the new Engine? Prototype stages but has no send control (C15).",
+        "proposedDefault": "Reuse HEAD's docked send bar verbatim over POST /bulk (doc's own quick-win row rates this zero-risk).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q2: does the Engine absorb the full curation machinery (C2–C11) or does curation live elsewhere?",
+        "proposedDefault": "Move-row Drawer on the Engine exposing all verbs (T1 carry-over-then-reskin); hard floor: no verb dropped.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q3: redirect policy for old seo-strategy?tab= URLs.",
+        "proposedDefault": "Redirect map to Keywords/Pipeline/Competitors per D8 (required deliverable anyway).",
+        "needsOwner": false,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q4: homes for trust ladder (E3), setup readiness (E4), leads readout (E5), doorbell target (E1), outcome-value enrich (E6).",
+        "proposedDefault": "Engine collapsed 'Operations' Disclosure section; E6 to wsettings next to outcomeValue.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q5: where do the 4 cannibalization sub-verbs (keeper override / resolve / fix-in-editor / send) land when the card folds into a backing move?",
+        "proposedDefault": "Inside the move-row Drawer for cannibalization-archetype moves.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q6: sign off the money-frame + verdict data contract (which server fields, which basis pill) before any admin dollar figure renders.",
+        "proposedDefault": "sn-engine-1 fields with provenance pill mirroring the client Measured/Estimate pill.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q7: Diagnostics' fate (ledger Gap) before wiring the per-move deep-diagnostic hook (E8).",
+        "proposedDefault": "Keep Diagnostics as an admin surface; wire E8 to existing POST /api/jobs 'deep-diagnostic'.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q8: keep full-vs-incremental generation + RefreshOrderingPrompt, or collapse to one Regenerate + cadence?",
+        "proposedDefault": "Keep both (collapsing silently changes cost/latency and drops the local-data-ordering guard).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q9: is E2 promotion ClientKeywordFeedback-approve rebranded, or a new inbox-request→rec path (sn-engine-3)?",
+        "proposedDefault": "Rebrand feedback-approve + manual-rec for v1; new generic path only if inbox requests must promote.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q10: confirm Keywords/SEO Editor audits claim pageMap so the Engine can drop page↔keyword mapping without loss.",
+        "proposedDefault": "Yes per D3 (Page Intelligence → SEO Editor Research mode); verify at those audits' outputs.",
+        "needsOwner": false,
+        "source": "surface-doc"
+      },
+      {
+        "question": "NEW: strategy-signal-fold (D6) — signals stay a panel or fold into recs? Building then folding is double work.",
+        "proposedDefault": "Keep the panel; retire the fold flag as not-pursued.",
+        "needsOwner": true,
+        "source": "newly-found"
+      },
+      {
+        "question": "NEW: money-frame read-safety — computeROI writes a snapshot on call; the Engine header must not snapshot per render.",
+        "proposedDefault": "Cron-precomputed value (return-hook-cron pattern) read by sn-engine-1.",
+        "needsOwner": false,
+        "source": "newly-found"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "B2 admin verdict headline opening the Engine",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "High narrative value; cheap once sn-engine-2 adds a server-drafted field (never hardcoded)."
+      },
+      {
+        "proposal": "B3 money frame (pipeline at stake / recovered / basis pill)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "The redesign's core framing, but gated on Q6 sign-off + sn-engine-1; quick-win subset (avg position, live-moves count, estimatedGain labeled 'Agency estimate') acceptable interim."
+      },
+      {
+        "proposal": "D4 what-changed why-cards with Create-brief / Refresh-page CTAs",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Additive deep-links to existing pipeline/editor targets; can follow the base diff panel."
+      },
+      {
+        "proposal": "E2 client-request→backing-move promotion",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Needs Q9 scope decision + possible new server path (sn-engine-3); not parity-blocking."
+      },
+      {
+        "proposal": "E8 per-move 'Run deep diagnostic'",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Trigger endpoint exists (jobs.ts:522) but Diagnostics itself is an unresolved ledger Gap (Q7)."
+      },
+      {
+        "proposal": "E9 client trust-spine preview in admin Engine",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "HEAD deliberately removed a preview toggle as dead; reintroduce only once the client spine is stable (sn-engine-4 is small when ready)."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Engine spine (single page): Verdict + money header",
+        "What changed (diff)",
+        "Signals & lost visibility",
+        "POV + stance bar",
+        "Backing moves (archetype groups, staging, move-row drawer)",
+        "Lens tabs: Keyword targets | Content work orders",
+        "Operations disclosure (readiness / trust ladder / leads — pending Q4)"
+      ],
+      "primitives": [
+        "PageContainer",
+        "Toolbar",
+        "GroupBlock",
+        "DataTable",
+        "Drawer",
+        "MetricTile",
+        "Meter",
+        "IntentTag",
+        "FilterChip",
+        "Segmented",
+        "LensSwitcher",
+        "KeyValueRow",
+        "Sparkline"
+      ],
+      "dataHooks": [
+        "useKeywordStrategy",
+        "useStrategyGeneration",
+        "useRecommendations",
+        "useStrategyPov",
+        "useIntelligenceSignals",
+        "useRecomputeSignals",
+        "useLostVisibility",
+        "useIssueLenses (src/api/issueLenses.ts)",
+        "useAutoSendPolicy",
+        "useAdminLeads",
+        "useStrategyKeywordSet",
+        "useWorkspaceEvents",
+        "GET /api/recommendations/:ws",
+        "GET /api/webflow/keyword-strategy/:ws (+/diff,/signals)",
+        "GET /api/workspaces/:ws/issue-lenses",
+        "POST /api/recommendations/:ws/bulk"
+      ],
+      "statesPlan": "Four-state kit per section; StrategyEmptyState when no strategy; IssueSetupReadiness gates every money number; loading via Skeleton; locked = ui-rebuild-shell flag OFF renders HEAD branch.",
+      "mountNote": "Rebuild in place at Page 'seo-strategy' behind ui-rebuild-shell with @ds-rebuilt markers; interior ?tab= tabs dissolve with a D8 redirect map; rebuild retires strategy-command-center/strategy-the-issue UI flags, backend flags stay."
+    },
+    "crossSurfaceDeps": [
+      "Cockpit surface must claim OrientZone/QuickWins/NeedsAttention (B1, F9)",
+      "Keywords surface: F2–F5 managed-set verbs, opportunity send, feedback panel, pageMap (Q10)",
+      "Competitors surface: C17 competitor-rec send, F7 gaps/intel",
+      "Content Pipeline: F1 folds + D4 Create-brief CTA targets",
+      "SEO Editor: D3 decision (Page Intelligence Research mode) + pageMap claim",
+      "Local Presence: A5/A6",
+      "AI Visibility: F10",
+      "Recommendations/Client-portal audits: G4 public spine + C9 discussion threads",
+      "Workspace Settings: A4 strategy inputs relocation + E6 outcome-value home",
+      "Diagnostics fate (ledger Gap) gates E8",
+      "D8: redirect map is a required deliverable of the consolidation PR"
+    ],
+    "unknowns": [
+      "Whether the admin export routes (server/routes/the-issue-export.ts:37,56) serialize the FULL client spine or only the one-pager subset — affects sn-engine-4 sizing; not verified.",
+      "Exact wsettings field home for E6 outcome-value enrich (the surface doc itself marks it unverified).",
+      "Whether the ledger's optimistic 'StrategyCockpit present' is design intent or omission — treated as Q2, cannot be resolved from code."
+    ],
+    "effortEstimate": "XL",
+    "surface": "engine"
+  },
+  "verify": {
+    "surface": "engine",
+    "verdicts": [
+      {
+        "needId": "sn-engine-1",
+        "verdict": "ADJUSTED",
+        "evidence": "server/roi.ts:411 (saveSnapshot inside computeROI, confirming write-on-read); server/roi.ts:123 + shared/types/roi.ts:37 (revenueAtStake already computed); server/routes/the-issue-admin.ts (46 lines, no money read); server/the-issue-return-hook.ts:6-7 + server/return-hook-cron.ts:119-122 (return-hook precompute pattern is real)",
+        "correction": "Direction and read-safety concern are CORRECT — computeROI writes a snapshot (server/roi.ts:411) so it must not run on a hot GET, and the return-hook cron is the proven precompute pattern. But the claim understates what exists: the 'pipeline-value-at-stake' number ALREADY exists as ROIData.revenueAtStake (server/roi.ts:123, shared/types/roi.ts:37, rendered in src/components/client/ROIDashboard.tsx:265). Only 'recovered-so-far' and the 'basis pill' are genuinely absent (rg confirms zero hits repo-wide). So the header needs a read-safe money PROJECTION that surfaces the already-computed revenueAtStake plus two new derived fields — not a from-scratch value-at-stake computation. Effort M still fair given the cron/snapshot precompute plumbing, but the value-at-stake half is a reuse, not a build."
+      },
+      {
+        "needId": "sn-engine-2",
+        "verdict": "CONFIRMED",
+        "evidence": "shared/types/strategy-pov.ts:13-29 (StrategyPov: situation/leadMoveRecId/leadSentence/wins/flags/version — no verdict/headline); shared/types/strategy-pov.ts:31-37 (StrategyPovAIOutput likewise lacks it); server/strategy-pov-store.ts:18,36-41,106 (stored as pov_json JSON blob, not columns — additive field needs no migration); routes exist at server/routes/strategy-pov.ts",
+        "correction": "Stands as written. POV generate/store/route pipeline exists; no verdict/headline field. Because POV persists as a pov_json blob (server/strategy-pov-store.ts:106), the additive field needs NO migration/mapper lockstep — effort S is correct. Multi-touch caveat for the plan: the field must be added to StrategyPov, StrategyPovAIOutput, the strategyPovSchema Zod schema + fallback object (server/strategy-pov-store.ts:51-53,60), and the generator prompt — but all in one file-cluster, still S."
+      },
+      {
+        "needId": "sn-engine-3",
+        "verdict": "ADJUSTED",
+        "evidence": "shared/types/recommendations.ts:29 (source is a free-form `string`, NOT a union); server/domains/recommendations/route-mutations.ts:122 mintManualRecommendation mints source:'manual:<hex>'; server/routes/recommendations.ts:806 POST /manual-rec; shared/types/client-actions.ts:8-13 ClientActionSourceType is a 5-member union with none for client-request-promotion; server/routes/keyword-strategy.ts:623 keyword-feedback approves keywords into rank tracking, not a rec mint",
+        "correction": "Right direction, one wrong detail. mintManualRecommendation (server/domains/recommendations/route-mutations.ts:122) IS the correct reusable base — the 'reduce to reusing manual-rec' hedge is well-founded. BUT the whereItLives claim of a 'shared/types/recommendations.ts source union' to widen is WRONG: Recommendation.source is a free-form string (shared/types/recommendations.ts:29), so there is no union to extend — a promotion just passes a distinct source string (e.g. 'client_request:<id>'). No existing client-request→rec provenance link exists anywhere. Effort M holds because honest attribution needs the ephemeral-source snapshot-ref pattern (CLAUDE.md rule) to record which inbox request minted the rec, not because of any union migration."
+      },
+      {
+        "needId": "sn-engine-4",
+        "verdict": "ADJUSTED",
+        "evidence": "server/the-issue-export.ts:57-60 assembleOnePagerExport calls computeROI (which WRITES — server/roi.ts:411); server/routes/the-issue-export.ts:39,58 BOTH routes use requireAuthenticatedClientPortalAuth() (confirmed at those lines), NOT admin auth; src/components/client/the-issue/TheIssueClientPage.tsx already has a previewMode prop that mounts read-only; src/components/strategy/issue/IssueHeader.tsx:20-21 notes the preview-as-client toggle was REMOVED as a dead control awaiting a client surface; client spine reads via public endpoint /api/public/recommendations/:workspaceId?clientStatus=sent (src/api/theIssue.ts:50)",
+        "correction": "Direction right (an admin spine preview does not exist and the export assembler is the reuse candidate), but two evidence errors and a missed hazard. (1) The cited lines server/routes/the-issue-export.ts:37,56 are NOT 'admin export routes' — both are requireAuthenticatedClientPortalAuth() (client-portal auth), so they cannot serve an admin render as-is. (2) The reusable assembler assembleOnePagerExport calls computeROI (server/the-issue-export.ts:60), which writes a snapshot (server/roi.ts:411) — so reusing it for a hot admin preview GET hits the SAME read-safety landmine as sn-engine-1; the claim calls it 'admin-reusable' without flagging this. Partial groundwork already exists frontend-side: TheIssueClientPage supports previewMode, and IssueHeader documents the removed toggle — the real gap is an admin-AUTH data source (read-safe, not the write-path assembler) to feed that preview. Effort S optimistic if the read must be made write-free; realistically S→M."
+      }
+    ]
+  }
+}

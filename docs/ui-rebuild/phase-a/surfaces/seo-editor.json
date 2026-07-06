@@ -1,0 +1,541 @@
+{
+  "gather": {
+    "capabilityClassification": [
+      {
+        "capability": "A1 unified source model (static/CMS/manual, counts, source filter)",
+        "resolution": "ui-only",
+        "note": "Existing resolver seoWriteTargetResolver.ts + shared type; compose with Segmented + GroupBlock."
+      },
+      {
+        "capability": "A2 per-target capability matrix (canSave/canPublish/etc)",
+        "resolution": "ui-only",
+        "note": "Resolver output drives row enable/disable; manual all-false preserved."
+      },
+      {
+        "capability": "A3 manual CMS URLs awareness section + reasons",
+        "resolution": "ui-only",
+        "note": "Richer remediation copy is UI; the Add-redirect CTA is N9 (sn-seo-editor-4)."
+      },
+      {
+        "capability": "A4 CMS collection filter dropdown with counts",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "A5 unified search across sources",
+        "resolution": "ui-only",
+        "note": "Keyword/collection matching is client-side over already-joined data; SearchField."
+      },
+      {
+        "capability": "A6 loading states",
+        "resolution": "ui-only",
+        "note": "Standard state matrix per Build Conventions."
+      },
+      {
+        "capability": "A7 empty states",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "A8 data reads (all-pages, cms-seo, approval batches)",
+        "resolution": "ui-only",
+        "note": "Same APIs; useSeoEditor.ts:29 / useCmsEditor.ts:69-70 verified."
+      },
+      {
+        "capability": "A9 refresh pages from Webflow",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "B1 expandable per-page row with flags/badges",
+        "resolution": "ui-only",
+        "note": "Becomes DataTable row + Drawer detail."
+      },
+      {
+        "capability": "B2 title/meta editing with CharacterCounter",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "B3 save to Webflow with mirrored openGraph write",
+        "resolution": "ui-only",
+        "note": "PUT /api/webflow/pages/:pageId/seo (server/routes/webflow.ts:192) accepts {seo, openGraph, title}; rebuild must reuse useSeoEditorPageWorkflow payload so OG mirroring survives."
+      },
+      {
+        "capability": "B4 localStorage draft save",
+        "resolution": "open-question",
+        "note": "Q6 decides persistence tier; server-side upgrade = sn-seo-editor-5."
+      },
+      {
+        "capability": "B5 per-field inline error states",
+        "resolution": "ui-only",
+        "note": "Carry hook error logic into mutation-feedback contract; prototype omitted it."
+      },
+      {
+        "capability": "B6 AI rewrite per field via POST /api/webflow/seo-rewrite",
+        "resolution": "ui-only",
+        "note": "Endpoint verified server/routes/webflow-seo-rewrite.ts:32."
+      },
+      {
+        "capability": "B7 AI 3-variation + paired picker",
+        "resolution": "ui-only",
+        "note": "Existing response already returns variations; rebuild must render a picker (prototype writes single value directly — parity floor)."
+      },
+      {
+        "capability": "B8 SERP + Facebook previews",
+        "resolution": "ui-only",
+        "note": "Existing SerpPreview/SocialPreview primitives; make live-updating in Drawer."
+      },
+      {
+        "capability": "B9 Analyze Page + auto-persist to keywordStrategy.pageMap",
+        "resolution": "open-question",
+        "note": "Q2 ownership under D3 Research-mode merge; APIs exist (keywords.analyze + persistAnalysis, src/api/seo.ts:77) — zero server work either way."
+      },
+      {
+        "capability": "B10 target keywords on row via usePageJoin",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "B11 recommendations-engine flags per page",
+        "resolution": "open-question",
+        "note": "Q3: where useRecommendations flags render in new IA; no server change."
+      },
+      {
+        "capability": "B12 recommendation-weighted sort",
+        "resolution": "open-question",
+        "note": "Tied to Q3/N2 sort-key decision (rec-priority vs score-ascending)."
+      },
+      {
+        "capability": "B13 per-page send-to-client (single approval batch)",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "B14 fixContext inbound deep-link (auto-expand + scroll)",
+        "resolution": "ui-only",
+        "note": "Contract exists src/types/fix-context.ts; rebuild must wire the receiver — every platform 'Fix in editor' CTA depends on it."
+      },
+      {
+        "capability": "B15 session persistence (edits/variations/expanded rows)",
+        "resolution": "ui-only",
+        "note": "Carry seoEditorPersistence.ts wholesale (T1); Q6 may later upgrade tier."
+      },
+      {
+        "capability": "C1 missing-titles/descs one-click bulk AI fix (BULK_SEO_FIX)",
+        "resolution": "ui-only",
+        "note": "POST /api/webflow/seo-bulk-fix/:siteId verified webflow-seo-apply.ts:29."
+      },
+      {
+        "capability": "C2 multi-select + select-all",
+        "resolution": "ui-only",
+        "note": "Row checkboxes must keep driving existing bulk hooks."
+      },
+      {
+        "capability": "C3 bulk send-to-client",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "C4 pattern apply (append/prepend + diff preview)",
+        "resolution": "ui-only",
+        "note": "Endpoint exists (webflow-seo-apply.ts:40); prototype omitted it — needs a bulk-bar/overflow home, not deletion."
+      },
+      {
+        "capability": "C5 bulk AI rewrite job with progress + cancel",
+        "resolution": "ui-only",
+        "note": "POST /api/seo/:workspaceId/bulk-rewrite verified webflow-seo-jobs.ts:62; T1 carry-over of job mechanics."
+      },
+      {
+        "capability": "C6 persistent SEO suggestions review panel",
+        "resolution": "ui-only",
+        "note": "GET/POST-apply/DELETE verified webflow-seo-suggestions.ts:35,76,175; UI home is Q6-adjacent but server layer exists."
+      },
+      {
+        "capability": "C7 analyze-all background job",
+        "resolution": "open-question",
+        "note": "Q2 ownership; endpoint exists (webflow-seo-jobs.ts:27)."
+      },
+      {
+        "capability": "C8 background-job lifecycle (WS progress, mount recovery, NotificationBell)",
+        "resolution": "ui-only",
+        "note": "Platform contract; carry useSeoEditorBulkWorkflow WS + job-id cache wholesale."
+      },
+      {
+        "capability": "C9 sequential apply of bulk-rewrite rows with per-page progress",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "C10 site-wide Publish Site",
+        "resolution": "open-question",
+        "note": "Q5 placement; POST /api/webflow/publish/:siteId verified webflow.ts:250."
+      },
+      {
+        "capability": "D1 collections list, expand, per-collection select-all",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "D2 CMS item name/title/desc edit, save as draft",
+        "resolution": "ui-only",
+        "note": "PATCH items endpoint + field detection preserved; slug stays locked."
+      },
+      {
+        "capability": "D3 publish collection (batch of saved item ids)",
+        "resolution": "ui-only",
+        "note": "Per-collection batch publish must remain alongside prototype per-item flow."
+      },
+      {
+        "capability": "D4 CMS AI rewrite single/paired",
+        "resolution": "ui-only",
+        "note": "Same B7 variation-picker obligation."
+      },
+      {
+        "capability": "D5 CMS bulk AI rewrite, 4 target modes incl. Names",
+        "resolution": "ui-only",
+        "note": "Carry useCmsEditorPublishBulkWorkflow.bulkAiRewrite; Name mode needs an explicit bulk-bar mode selector."
+      },
+      {
+        "capability": "D6 CMS send-to-client approvals",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "D7 per-item approval history",
+        "resolution": "ui-only",
+        "note": "buildItemApprovalMap derives from already-fetched batches; render in Drawer."
+      },
+      {
+        "capability": "D8 CMS issue highlighting/badges/counts",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "D9 missing-SEO-fields tip",
+        "resolution": "defer-candidate",
+        "note": "Small guidance callout; if not in v1 rebuild PR, ship DEF-* row rather than drop."
+      },
+      {
+        "capability": "D10 CMS slug/name write guards + static-only endpoint protections",
+        "resolution": "ui-only",
+        "note": "Server-enforced already; rebuild just respects it."
+      },
+      {
+        "capability": "E1 pending-approvals panel with Retract",
+        "resolution": "open-question",
+        "note": "Q7 placement (editor panel vs global approvals view); PendingApprovals.tsx machinery exists — zero server work."
+      },
+      {
+        "capability": "E2 7-state page edit-state model + tracking summary",
+        "resolution": "open-question",
+        "note": "Q4 canonical state machine; union verified shared/types/workspace.ts:288."
+      },
+      {
+        "capability": "E3 clear/reset tracking",
+        "resolution": "ui-only",
+        "note": "Per-page clear needs a row affordance in the new grid."
+      },
+      {
+        "capability": "E4 live WS approval updates",
+        "resolution": "ui-only",
+        "note": "useWorkspaceEvents wiring per data-flow rules."
+      },
+      {
+        "capability": "E5 SEO change tracking log powering SeoChangeImpact",
+        "resolution": "ui-only",
+        "note": "Server-side; preserved iff rebuild writes through the same endpoints (mount note)."
+      },
+      {
+        "capability": "E6 unsaved-changes banner",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "E7 permissions/auth (admin HMAC, requireWorkspaceSiteAccess)",
+        "resolution": "ui-only",
+        "note": "Unchanged server contracts."
+      },
+      {
+        "capability": "E8 no ?tab= deep link today",
+        "resolution": "ui-only",
+        "note": "Edit/Research mode toggle adds a NEW mode param — must follow the two-halves contract + contract test."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-seo-editor-1",
+        "kind": "field",
+        "description": "Per-page index/noindex status on the all-pages row payload for the N5 Noindex quick-filter chip.",
+        "existsToday": "no",
+        "evidence": "PageMeta interface (src/hooks/admin/useSeoEditor.ts:13-24) has only id/title/slug/publishedPath/seo/source/collectionId — no index field; likely sourced from audit/crawl data.",
+        "whereItLives": "server/routes/webflow.ts all-pages assembly (or join from seo-audit crawl store)",
+        "effort": "M",
+        "likelySharedWith": [
+          "site-audit",
+          "page-intelligence"
+        ]
+      },
+      {
+        "id": "sn-seo-editor-2",
+        "kind": "endpoint",
+        "description": "H1 + URL-slug write endpoints plus automatic redirect on slug change (N3/Q1). Gated on owner approval; recommend read-only v1.",
+        "existsToday": "no",
+        "evidence": "updatePageSeo (server/webflow-pages.ts:73) writes seo/openGraph/title only; grep for slug/H1 writes across server/routes/webflow*.ts empty; no redirect-write route exists (see sn-seo-editor-4).",
+        "whereItLives": "server/webflow-pages.ts + new route in server/routes/webflow.ts",
+        "effort": "L",
+        "likelySharedWith": []
+      },
+      {
+        "id": "sn-seo-editor-3",
+        "kind": "projection",
+        "description": "Per-page rank position + monthly organic traffic joined onto editor rows (N6), avoiding N-per-row API fan-out.",
+        "existsToday": "partial",
+        "evidence": "Workspace-level GA4 top-pages exists (server/routes/google.ts:356 /api/google/analytics-top-pages) and rank lives in keyword strategy, but no per-page projection onto the all-pages payload.",
+        "whereItLives": "server/routes/webflow.ts all-pages assembly or a new editor-rows projection module",
+        "effort": "M",
+        "likelySharedWith": [
+          "keywords",
+          "page-intelligence"
+        ]
+      },
+      {
+        "id": "sn-seo-editor-4",
+        "kind": "endpoint",
+        "description": "Webflow redirect-create endpoint backing the N9 'Add redirect' CTA on manual rows (also prerequisite for sn-seo-editor-2's auto-redirect).",
+        "existsToday": "no",
+        "evidence": "Client wrappers redirects.list/save (src/api/misc.ts:250-256) target /api/webflow/redirects/:siteId, but grep 'webflow/redirects' across server/ returns nothing — orphaned wrappers, no server route; RedirectManager.tsx never calls them.",
+        "whereItLives": "server/routes/webflow-analysis.ts (alongside redirect-scan) or a new redirects route",
+        "effort": "M",
+        "likelySharedWith": [
+          "links-panel"
+        ]
+      },
+      {
+        "id": "sn-seo-editor-5",
+        "kind": "migration",
+        "description": "Server-persisted per-page drafts replacing localStorage drafts — CONTINGENT on Q6 choosing server-side tier.",
+        "existsToday": "partial",
+        "evidence": "Drafts are localStorage-only (useSeoEditorPageWorkflow.ts:62); server persistence exists only for bulk suggestions (server/routes/webflow-seo-suggestions.ts:35,76,175), not per-page drafts.",
+        "whereItLives": "new seo_drafts table + endpoints near webflow-seo-suggestions.ts",
+        "effort": "M",
+        "likelySharedWith": []
+      },
+      {
+        "id": "sn-seo-editor-6",
+        "kind": "derivation",
+        "description": "Serialize the persisted analysis optimizationScore onto all-pages rows so the N2 on-page score is analysis-backed, not a duplicate client heuristic.",
+        "existsToday": "partial",
+        "evidence": "optimizationScore exists in persisted page analysis (keywords.persistAnalysis src/api/seo.ts:77; carried in src/types/fix-context.ts) but is not on the GET /api/webflow/all-pages/:siteId row payload (PageMeta lacks it, useSeoEditor.ts:13-24).",
+        "whereItLives": "server/routes/webflow.ts all-pages assembly, reading keywordStrategy.pageMap",
+        "effort": "S",
+        "likelySharedWith": [
+          "page-intelligence"
+        ]
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "Q1: H1 + slug editing with auto-redirect (N3) — approve new Webflow write scope or render read-only in v1?",
+        "proposedDefault": "Read-only in v1 ('edit in Webflow'); sn-seo-editor-2 as a follow-up ticket.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q2: Does the rebuilt editor's Research mode own Analyze/persist, Analyze-All, and 'analysis on file' (Page Intelligence merge, D3)?",
+        "proposedDefault": "Yes — D3 is locked; carry all three (APIs already exist) and coordinate route retirement with the page-intelligence audit.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q3: Where do recommendations-engine flags/priority sort render — score fold-in, row flag, or Research drawer?",
+        "proposedDefault": "Row flag + rec-first sort preserved; score stays separate until analysis-backed.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q4: Canonical state machine — HEAD 7-state (client sets approved/rejected) vs prototype 4-state with admin Approve (N4/N12).",
+        "proposedDefault": "Keep HEAD 7-state; reject admin Approve; queue ships Send/Publish/Skip only.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q5: Site-wide Publish Site button — keep on editor, globalize, or drop?",
+        "proposedDefault": "Keep on editor topbar (only path that flushes pending static changes site-wide).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q6: Persistence tier for drafts + AI suggestions — localStorage carry-over vs server-side draft status; does the suggestions panel survive as-is?",
+        "proposedDefault": "Carry localStorage + server suggestions panel as-is (T1); server drafts (sn-seo-editor-5) as follow-up.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q7: Where does the Sent-to-Client batch panel with Retract live in the new IA?",
+        "proposedDefault": "Keep as a collapsible editor panel in v1; global approvals view is a separate surface decision.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q8: Approve the per-page index/noindex data addition (sn-seo-editor-1) or drop the Noindex chip?",
+        "proposedDefault": "Drop the chip in v1; add with sn-seo-editor-1 when audit-data join is scoped.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q9: May the editor write target keywords (assign/track) given Keyword Hub single-writer ownership?",
+        "proposedDefault": "No direct write in v1 — deep-link to Keyword Hub; endpoints exist (keyword-strategy.ts:782-812) if owner grants shared-writer later.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "NEW: src/api/misc.ts redirects.list/save wrappers target a nonexistent server route and have no call sites — delete as dead code, or adopt as the sn-seo-editor-4 client contract?",
+        "proposedDefault": "Adopt the wrapper shape when building sn-seo-editor-4; otherwise delete in the rebuild PR.",
+        "needsOwner": false,
+        "source": "newly-found"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "N1 worksheet spreadsheet layout with Enter/Shift-Enter cell nav",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Pure UX upgrade over the same data contract; maps to DataTable + roving tabindex."
+      },
+      {
+        "proposal": "N2 live on-page optimization score (0-100 ring + checklist + Fix jumps)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Adopt only analysis-backed via sn-seo-editor-6; a second client heuristic disagreeing with Page Intelligence is a trust landmine."
+      },
+      {
+        "proposal": "N3 H1 + slug editing with automatic redirect",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "No write API at HEAD (sn-seo-editor-2); shipping the input without the write path is a data-loss illusion."
+      },
+      {
+        "proposal": "N4 Review Queue keyboard triage (A/R/S/P)",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Blocked on Q4; a reduced Send/Publish/Skip queue could ship, full triage follows the state-machine decision."
+      },
+      {
+        "proposal": "N5 quick-filter chips (Need work / Missing tags / Keyword gap / In progress / Noindex)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "All but Noindex compute from existing row data; Noindex gated on Q8/sn-seo-editor-1."
+      },
+      {
+        "proposal": "N6 per-row rank + monthly traffic + last-edited",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Needs sn-seo-editor-3 projection to avoid per-row API fan-out; show strategy keyword + persisted score in v1."
+      },
+      {
+        "proposal": "N7 inline title rename via double-click",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Thin UI over the existing title write in PUT pages/:pageId/seo."
+      },
+      {
+        "proposal": "N8 assign/track target keyword from the editor",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Blocked on Q9 single-writer decision; endpoints already exist in keyword-strategy routes."
+      },
+      {
+        "proposal": "N9 'Add redirect' CTA on manual rows",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Needs sn-seo-editor-4 (no redirect-write route exists today); additive once built."
+      },
+      {
+        "proposal": "N10 Edit-Research mode toggle folding in Page Intelligence",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "D3 is LOCKED ratifying exactly this; follow route-removal checklist + D8 redirect map when retiring the standalone Page."
+      },
+      {
+        "proposal": "N11 graduation note (publish shows in cockpit until ranking moves)",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "New cross-surface narrative contract requiring Insights-Engine support."
+      },
+      {
+        "proposal": "N12 bulk-bar admin Approve",
+        "recommendation": "reject",
+        "rationale": "Corrupts the client-approval state machine — approved/rejected are client actions at HEAD (Q4)."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Edit mode (worksheet: All/Static/CMS/Manual scope segments + quick-filter chips)",
+        "Research mode (Page Intelligence merge per D3, pinned research drawer)",
+        "Detail drawer per row (fields, counters, previews, AI variations, send/publish)",
+        "Sent-to-Client approvals panel (home pending Q7)"
+      ],
+      "primitives": [
+        "DataTable",
+        "Segmented",
+        "LensSwitcher",
+        "SearchField",
+        "FilterChip",
+        "Drawer",
+        "Toolbar",
+        "GroupBlock",
+        "MetricTile",
+        "Meter",
+        "KeyValueRow",
+        "IntentTag",
+        "AppShell/PageContainer"
+      ],
+      "dataHooks": [
+        "useSeoEditor (GET /api/webflow/all-pages/:siteId)",
+        "useCmsEditor (GET /api/webflow/cms-seo/:siteId)",
+        "usePageEditStates",
+        "useRecommendations",
+        "usePageJoin",
+        "useWorkspaceEvents",
+        "useSeoEditorPageWorkflow (PUT /api/webflow/pages/:pageId/seo, POST /api/webflow/seo-rewrite, keywords.analyze/persistAnalysis)",
+        "useSeoEditorBulkWorkflow (POST /api/webflow/seo-bulk-fix/:siteId, /api/webflow/seo-pattern-apply/:siteId, /api/seo/:workspaceId/bulk-analyze, /api/seo/:workspaceId/bulk-rewrite)",
+        "SeoSuggestionsPanel (GET/POST-apply/DELETE /api/webflow/seo-suggestions/:workspaceId)",
+        "useSeoEditorApprovalWorkflow + useCmsEditorApprovalWorkflow (POST /api/approvals/:workspaceId)",
+        "useCmsEditorSaveWorkflow (PATCH /api/webflow/collections/:collectionId/items/:itemId)",
+        "useCmsEditorPublishBulkWorkflow (POST /api/webflow/collections/:collectionId/publish)",
+        "POST /api/webflow/publish/:siteId"
+      ],
+      "statesPlan": "Skeleton per source while loading; EmptyState per filter/manual/collections; per-field inline mutation errors (B5) + section ErrorState with retry; no tier lock (admin surface).",
+      "mountNote": "In-place-behind-flags (D2): rebuild the SeoEditorWrapper subtree under @ds-rebuilt gated on ui-rebuild-shell, writing through the SAME endpoints so E5 change tracking and approval wiring survive; keep fixContext receiver + session persistence carried over (T1)."
+    },
+    "crossSurfaceDeps": [
+      "D3 (locked): Page Intelligence folds into Research mode — coordinate with the page-intelligence surface audit; route-removal checklist + D8 redirect map when retiring the standalone Page",
+      "Keyword Hub owns keyword-set mutations (Q9 single-writer decision) — N8 writes blocked on it",
+      "Approvals/Inbox surface: Q7 decides where the Retract batch panel lives; client approval flow drives E2 states",
+      "Site Audit / crawl data: source for sn-seo-editor-1 noindex field; fixContext senders (Site Audit, Cannibalization, dead links) depend on B14 receiver",
+      "Workspace Home SeoChangeImpact depends on E5 write-through (do not bypass PUT pages/:pageId/seo)",
+      "Links/RedirectManager surface: N9/sn-seo-editor-4 redirect-create hand-off",
+      "Insights Engine: N11 graduation contract"
+    ],
+    "unknowns": [
+      "Whether the redirects.list/save API wrappers (src/api/misc.ts:250-256) have any consumer at all — RedirectManager.tsx doesn't call them and no server route exists; flagged as newly-found open question rather than classified",
+      "E1 Retract endpoint internals not re-verified in server code (doc cites FEATURE_AUDIT.md:1826 + PendingApprovals.tsx only)",
+      "D7 approval-history map verified from doc evidence (CmsEditorCollections.tsx:436-444), not re-read"
+    ],
+    "effortEstimate": "XL",
+    "surface": "seo-editor"
+  },
+  "verify": {
+    "surface": "seo-editor",
+    "verdicts": [
+      {
+        "needId": "sn-seo-editor-1",
+        "verdict": "CONFIRMED",
+        "evidence": "src/hooks/admin/useSeoEditor.ts:13-23 PageMeta has only id/title/slug/publishedPath/seo/source/collectionId — no index field. server/routes/webflow.ts:152-178 builds the all-pages row literally from those fields plus CMS discovery; no index/noindex/robots read anywhere in the route (grep 'noindex|indexable|robots' over server/routes/webflow.ts + server/webflow-pages.ts returns nothing). No existing implementation missed."
+      },
+      {
+        "needId": "sn-seo-editor-2",
+        "verdict": "CONFIRMED",
+        "evidence": "server/webflow-pages.ts:73-97 updatePageSeo accepts a slug field in its signature but the ONLY route wiring it (server/routes/webflow.ts:209) passes just { seo, openGraph, title } — slug/H1 are never threaded through. No H1/slug write route exists: grep of router.(post|put) with h1 in server/routes/webflow*.ts finds only audit/coverage math. webflow-seo-page-tools.ts:100 'currentH1' is an INPUT to the AI /seo-copy generator (returns suggestions, no webflowMutation/PUT), not a write. No redirect-write route (see sn-seo-editor-4). Claim stands: read-only today."
+      },
+      {
+        "needId": "sn-seo-editor-3",
+        "verdict": "ADJUSTED",
+        "evidence": "existsToday=partial is correct — no per-page projection onto the all-pages payload (server/routes/webflow.ts:152-185 joins no rank/traffic). BUT the whereItLives detail is imprecise: per-page rank does NOT live in 'keyword strategy' JSON — it lives in the dedicated page_keywords table as current_position/previous_position columns (server/page-keywords.ts:36-37,161-162,221-222), read side-effect-free via listPageKeywordsPaged (page-keywords.ts:520-538) which also already carries per-page impressions/clicks/volume. So the projection source is page_keywords (a clean paged read), not keywordStrategy. GA4 monthly organic traffic remains workspace-level only (server/routes/google.ts:356 /api/google/analytics-top-pages). Effort M holds."
+      },
+      {
+        "needId": "sn-seo-editor-4",
+        "verdict": "ADJUSTED",
+        "evidence": "Core claim CONFIRMED: no server route for POST/GET /api/webflow/redirects/:siteId (grep 'webflow/redirects' over server/ returns nothing; no redirect create/write route by any name — grep router.(post|put).*redirect empty). Only redirect-scan (server/routes/webflow-analysis.ts:198, scan-only, writes a snapshot) and redirect-snapshot (:239, read) exist. The evidence's assertion that 'RedirectManager.tsx never calls them' is WRONG: RedirectManager.tsx:91,118 DOES call redirects.snapshot and redirects.scan; it is redirects.list/save (the orphaned /api/webflow/redirects wrappers) that have no server route — and save is actually called by src/components/audit/DeadLinkPanel.tsx:47 (a live orphaned call that would 404). So the wrappers are not fully unused; the DeadLinkPanel 'Add redirect' path is already broken against a missing endpoint."
+      },
+      {
+        "needId": "sn-seo-editor-5",
+        "verdict": "ADJUSTED",
+        "evidence": "existsToday=partial is correct — drafts are localStorage-only (src/components/editor/seoEditorPersistence.ts:26 returns window.localStorage; the cited useSeoEditorPageWorkflow.ts path is wrong — the hook lives at src/components/editor/useSeoEditorPageWorkflow.ts, not src/hooks/admin/). Server persistence exists only for bulk SEO suggestions (server/routes/webflow-seo-suggestions.ts list/apply/dismiss), NOT per-page drafts. No seo_drafts/seo_draft table exists (grep over server/db/migrations/ + server/ returns nothing). Correction is only the file-path citation; effort M and 'new table + endpoints' scope stand."
+      },
+      {
+        "needId": "sn-seo-editor-6",
+        "verdict": "ADJUSTED",
+        "evidence": "existsToday=partial correct — optimizationScore is NOT on the all-pages row payload (PageMeta lacks it, useSeoEditor.ts:13-23; route builds no score, webflow.ts:152-185). BUT the persisted source is not just 'keywordStrategy.pageMap JSON' as whereItLives states — it is a dedicated page_keywords.optimization_score column with a row mapper (server/page-keywords.ts:175 rowToModel, :234 upsert) and a clean paged read (listPageKeywordsPaged:520-538). The read is side-effect-free: the maybeRecordScoreSnapshot writer (page-keywords.ts:473) is only invoked from the WRITE/upsert helpers (lines 579,600,623,653), never from list/get reads — so it is safe for a hot editor-rows read (unlike the computeROI hazard). This makes effort S credible provided the projection reads page_keywords, not a re-parse of keywordStrategy JSON."
+      }
+    ]
+  }
+}

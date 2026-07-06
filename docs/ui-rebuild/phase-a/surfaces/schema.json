@@ -1,0 +1,494 @@
+{
+  "gather": {
+    "surface": "schema",
+    "capabilityClassification": [
+      {
+        "capability": "Row 1 — Nav entry (Optimization, needsSite)",
+        "resolution": "ui-only",
+        "note": "NavItem/NavGroup in F4 shell; navRegistry re-wire only."
+      },
+      {
+        "capability": "Row 2 — Generator/Workflow Guide sub-tabs + ?tab deep-link",
+        "resolution": "ui-only",
+        "note": "Segmented + useSearchParams two-halves contract; contract test exists."
+      },
+      {
+        "capability": "Row 3 — 5-step WorkflowStepper",
+        "resolution": "ui-only",
+        "note": "Existing WorkflowStepper primitive carries."
+      },
+      {
+        "capability": "Row 4 — Workflow Guide content",
+        "resolution": "ui-only",
+        "note": "Static content re-skin."
+      },
+      {
+        "capability": "Row 5 — CommandPalette action",
+        "resolution": "ui-only",
+        "note": "Behavior contract; re-wire only."
+      },
+      {
+        "capability": "Row 6 — fixContext handoff receiver (slug resolve, consume-once)",
+        "resolution": "ui-only",
+        "note": "Receiver logic ports; sender moves to SEO Editor per D3 (cross-surface dep)."
+      },
+      {
+        "capability": "Row 7 — Site Audit quick-fix link",
+        "resolution": "ui-only",
+        "note": "Sender exists (SeoAudit.tsx:551); the deepened stat is sn-schema-2/Q6."
+      },
+      {
+        "capability": "Row 8 — Rec deep-link + per-page banners (at_risk)",
+        "resolution": "ui-only",
+        "note": "Data exists (recTypeTab.ts:17); no mockup home — must be designed into rebuilt card."
+      },
+      {
+        "capability": "Row 9 — Full-site scan background job (cancel/progress/stream)",
+        "resolution": "ui-only",
+        "note": "SCHEMA_GENERATOR job platform unchanged; state-matrix kit owes semantics."
+      },
+      {
+        "capability": "Row 10 — Snapshot persistence + saved-date",
+        "resolution": "ui-only",
+        "note": "GET schema-snapshot (webflow-schema.ts:110-115) exists."
+      },
+      {
+        "capability": "Row 11 — Pre-scan setup screen + Page Type Guide (at_risk)",
+        "resolution": "ui-only",
+        "note": "Endpoints exist; prototype omits it — carry as the empty/setup state."
+      },
+      {
+        "capability": "Row 12 — Add Page picker + single-page generate",
+        "resolution": "ui-only",
+        "note": "POST .../page (webflow-schema.ts:272-295) exists; full picker UX to build."
+      },
+      {
+        "capability": "Row 13 — Per-page Regenerate (edit-clearing contract)",
+        "resolution": "ui-only",
+        "note": "Manual-edit-clearing is a correctness contract to preserve in port."
+      },
+      {
+        "capability": "Row 14 — Type hint persist + revert-on-failure",
+        "resolution": "ui-only",
+        "note": "PUT schema-page-types (webflow-schema.ts:128-132) exists."
+      },
+      {
+        "capability": "Rows 15-17 — error/empty/retry states",
+        "resolution": "ui-only",
+        "note": "State-matrix obligations; existing patterns."
+      },
+      {
+        "capability": "Row 18 — Generation context (profiles, entities, plan roles)",
+        "resolution": "ui-only",
+        "note": "Server-side, unaffected by rebuild."
+      },
+      {
+        "capability": "Row 19 — Page card badges (improved w/ pub tag; existing/rich/stale/rec badges dropped in kit)",
+        "resolution": "ui-only",
+        "note": "All badge data already on snapshot rows; restore dropped badges in rebuilt card."
+      },
+      {
+        "capability": "Row 20 — Already-on-page existing schemas (at_risk)",
+        "resolution": "ui-only",
+        "note": "existingSchemas already in snapshot; carry into Drawer detail."
+      },
+      {
+        "capability": "Row 21 — Per-field validation findings drill-down",
+        "resolution": "ui-only",
+        "note": "Persisted validation records exist (schemaValidation.getAll, src/api/schema.ts:39-52)."
+      },
+      {
+        "capability": "Row 22 — Generation diagnostics (at_risk)",
+        "resolution": "ui-only",
+        "note": "Data on snapshot; port section into Drawer."
+      },
+      {
+        "capability": "Row 23 — @graph type chips + reason",
+        "resolution": "ui-only",
+        "note": "Chips in kit; reason text needs a slot."
+      },
+      {
+        "capability": "Row 24 — Rich-results eligibility (at_risk)",
+        "resolution": "ui-only",
+        "note": "Data on snapshot; carry."
+      },
+      {
+        "capability": "Row 25 — Side-by-side diff (at_risk)",
+        "resolution": "ui-only",
+        "note": "existingSchemaJson already captured in snapshot."
+      },
+      {
+        "capability": "Row 26 — Inline JSON editor + getEffectiveSchema override (at_risk)",
+        "resolution": "ui-only",
+        "note": "Pure client behavior; without it the stepper's Edit step is a lie — must carry."
+      },
+      {
+        "capability": "Row 27 — Two-target copy (script wrapper vs raw JSON-LD)",
+        "resolution": "ui-only",
+        "note": "Restore script variant the kit drops; user-facing guidance at HEAD."
+      },
+      {
+        "capability": "Row 28 — JSON-LD preview",
+        "resolution": "ui-only",
+        "note": "Kit has it."
+      },
+      {
+        "capability": "Row 29 — Per-page publish: confirm + 422 validation gate + errors",
+        "resolution": "ui-only",
+        "note": "Server gate exists (webflow-schema.ts:298-334, publish-schema-to-live.ts); rebuild keeps confirm step, not kit's one-click."
+      },
+      {
+        "capability": "Row 30 — Per-page validation status badge + blocks publish",
+        "resolution": "ui-only",
+        "note": "useSchemaValidation + persisted records exist."
+      },
+      {
+        "capability": "Row 31 — Whole-site @graph validation chip + bulk-publish gate (at_risk)",
+        "resolution": "ui-only",
+        "note": "getGraph endpoint exists (webflow-schema.ts:691-705); carry per Q3 default (hard floor)."
+      },
+      {
+        "capability": "Row 32 — Bulk Publish All with progress + skips",
+        "resolution": "ui-only",
+        "note": "Existing workflow hook logic ports."
+      },
+      {
+        "capability": "Row 33 — Stale >90d detection (at_risk)",
+        "resolution": "ui-only",
+        "note": "Derived client-side from publishDates already in snapshot view (webflow-schema.ts:113)."
+      },
+      {
+        "capability": "Row 34 — Published-state persistence merge semantics",
+        "resolution": "ui-only",
+        "note": "Correctness contract in useSchemaSuggesterPublishingWorkflow.ts:52-73; port verbatim."
+      },
+      {
+        "capability": "Rows 35-36 — CMS-field publishing + retract restriction (at_risk)",
+        "resolution": "open-question",
+        "note": "Q2: server pipeline fully exists (publish-schema-to-cms-field.ts); owner decides IA home (advanced panel vs settings vs sequenced)."
+      },
+      {
+        "capability": "Row 37 — Manual-delivery fallback (char-limit paste instructions) (at_risk)",
+        "resolution": "ui-only",
+        "note": "SchemaDeliveryDecision result already returned; dropping it bricks large schemas — carry."
+      },
+      {
+        "capability": "Row 38 — Retract published schema (at_risk)",
+        "resolution": "ui-only",
+        "note": "Endpoint exists (webflow-schema.ts:528-560); undo safety net, carry per hard floor."
+      },
+      {
+        "capability": "Row 39 — Version history + rollback (at_risk)",
+        "resolution": "ui-only",
+        "note": "Endpoints exist (webflow-schema.ts:564-607); carry in Drawer."
+      },
+      {
+        "capability": "Row 40 — Save as Site Template (at_risk)",
+        "resolution": "ui-only",
+        "note": "GET/PUT/PATCH template endpoints exist (webflow-schema.ts:379-461); also seeds generation."
+      },
+      {
+        "capability": "Row 41 — Publish side-effects (seo_change, outcome, llms.txt, broadcast)",
+        "resolution": "ui-only",
+        "note": "Server-side, shared with MCP publish_schema; UI must keep calling publishSchemaToLive path."
+      },
+      {
+        "capability": "Rows 42-44 — Send to client (bulk + single) w/ note + effective-schema values",
+        "resolution": "ui-only",
+        "note": "POST /api/approvals exists; note textarea must be restored (admin-send convention) — kit omits it."
+      },
+      {
+        "capability": "Row 45 — PendingApprovals panel (filter Schema, batch retract) (at_risk)",
+        "resolution": "ui-only",
+        "note": "Existing PendingApprovals component + endpoints; only admin visibility of open batches — carry."
+      },
+      {
+        "capability": "Row 46 — Client receives schema_item via inbox",
+        "resolution": "ui-only",
+        "note": "Cross-surface (D4 C-track); do not touch server adapters."
+      },
+      {
+        "capability": "Rows 47-54 — Schema Site Plan subsystem (generation, roles, lifecycle, activate, retract, lock, entities)",
+        "resolution": "open-question",
+        "note": "Q1: zero mockup home; proposed default = re-mount SchemaPlanPanel as bridge per ratified T1 carry-over-then-reskin."
+      },
+      {
+        "capability": "Row 55 — Client plan review (schema_plan deliverable)",
+        "resolution": "ui-only",
+        "note": "Newest post-Reconcile stack; keep as-is, owned by client-dashboard C-track."
+      },
+      {
+        "capability": "Row 56 — Legacy public endpoints + orphaned SchemaReviewTab/Modal",
+        "resolution": "defer-candidate",
+        "note": "Q8 default: retire orphans in rebuild with DEF-* row; keep shared respondToSchemaPlanFeedback service."
+      },
+      {
+        "capability": "Row 57 — Business-profile completeness callout + LocalBusiness inference (at_risk)",
+        "resolution": "ui-only",
+        "note": "Client-side heuristics + deep link to brand?tab=business-footprint; carry."
+      },
+      {
+        "capability": "Row 58 — CMS field-mapping panel (at_risk)",
+        "resolution": "open-question",
+        "note": "Q2 (same decision as rows 35-36); endpoints exist (webflow-schema.ts:155-270)."
+      },
+      {
+        "capability": "Row 59 — Schema completeness widget + Fix→ deep-links (at_risk)",
+        "resolution": "ui-only",
+        "note": "Computed from snapshot findings client-side (SchemaCompletenessWidget + fieldTargets.ts); presentational %, not a money number."
+      },
+      {
+        "capability": "Row 60 — Schema Impact panel (GSC before/after) (at_risk)",
+        "resolution": "open-question",
+        "note": "Q4: complement vs replace by Insights graduation; endpoint exists (seo-change-tracker.ts:59)."
+      },
+      {
+        "capability": "Row 61 — Results + edit-status summary (improved by kit strip)",
+        "resolution": "needs-server-work",
+        "note": "Kit strip's coverage % needs the single-definition metric — sn-schema-1; edit-status breakdown stays client-side."
+      },
+      {
+        "capability": "Row 62 — How-to-use footer + never-touch guarantee",
+        "resolution": "ui-only",
+        "note": "Kit keeps same guarantee text."
+      },
+      {
+        "capability": "Row 63 — WS event handlers (4 schema:* events)",
+        "resolution": "ui-only",
+        "note": "Re-wire useWorkspaceEvents per data-flow rule #2; events exist (ws-events.ts:68-71)."
+      },
+      {
+        "capability": "Row 64 — Background job types on jobs platform",
+        "resolution": "ui-only",
+        "note": "Platform unchanged."
+      },
+      {
+        "capability": "Row 65 — MCP tools share domain services",
+        "resolution": "ui-only",
+        "note": "Constraint: UI must not fork publish logic from publishSchemaToLive."
+      },
+      {
+        "capability": "Row 66 — Competitor schema endpoint (dark, no UI consumer)",
+        "resolution": "open-question",
+        "note": "Q7: verified zero src consumers (grep empty); default = leave internal-only feeding plan gen."
+      },
+      {
+        "capability": "Row 67 — Planned-page pre-generation queue",
+        "resolution": "ui-only",
+        "note": "Server-only by design (W6.3); no UI obligation."
+      },
+      {
+        "capability": "Row 68 — Activity log types",
+        "resolution": "ui-only",
+        "note": "Server-side, unchanged."
+      },
+      {
+        "capability": "Row 69 — Orphaned SchemaHealthDashboard",
+        "resolution": "defer-candidate",
+        "note": "Q8 default: delete (mounted nowhere; its data surfaces via row-30 badges); DEF-* row."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-schema-1",
+        "kind": "derivation",
+        "description": "Single-definition schema coverage metric (covered pages / total, with definition of covered = published vs generated per Q5), serialized onto the snapshot view so the coverage ring + summary strip and any Site Audit/Links reuse read one number.",
+        "existsToday": "no",
+        "evidence": "grep 'coverage' across server/domains/schema + server/schema*.ts hits only workflow-guide copy in src/components/schema/SchemaWorkflowGuide.tsx; toAdminSchemaSnapshotView (server/routes/webflow-schema.ts:110-115) returns pages+publishDates but no aggregate.",
+        "effort": "S",
+        "whereItLives": "server/domains/schema/ new coverage helper, surfaced via toAdminSchemaSnapshotView (server/audit-snapshot-views.ts if shared with audit)",
+        "likelySharedWith": [
+          "site-audit",
+          "links"
+        ]
+      },
+      {
+        "id": "sn-schema-2",
+        "kind": "projection",
+        "description": "'Missing schema — from Site Audit' count: expose a per-workspace count of audit schema findings consumable by the Schema surface. NOTE: the check ids the frontend expects (missing_schema/schema_errors) have NO server producer — server emits only aeo-faq-no-schema; the finding itself must be defined or the frontend mapping fixed first.",
+        "existsToday": "no",
+        "evidence": "grep -rc 'missing_schema' server shared = 0 occurrences (only src/components/SeoAudit.tsx:547 + src/components/audit/types.ts:98 reference it); server producer emits 'aeo-faq-no-schema' (server/audit-page.ts:384).",
+        "effort": "M",
+        "whereItLives": "server audit domain (server/audit-page.ts check producer + a snapshot/coverage projection), possibly folded into sn-schema-1",
+        "likelySharedWith": [
+          "site-audit"
+        ]
+      },
+      {
+        "id": "sn-schema-3",
+        "kind": "job",
+        "description": "Insights Engine graduation pipeline: schema deploys that win a rich result / AI citation graduate into a client win. Producer half exists (idempotent outcome recordAction on publish); the detection + graduation consumer does not.",
+        "existsToday": "partial",
+        "evidence": "server/domains/schema/publish-schema-to-live.ts:108-136 records outcome action + GSC baseline; grep for any graduation/insight producer from schema outcomes came up empty (no bridge in server/intelligence or insight stores references schema wins).",
+        "effort": "L",
+        "whereItLives": "server insight-bridge module (bridge-authoring contract) consuming outcome-measurement results",
+        "likelySharedWith": [
+          "insights",
+          "results/wins"
+        ]
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "Q1 — Schema Site Plan subsystem (rows 47-55) has no home in the prototype: bridge-mount, redesign, or retire?",
+        "proposedDefault": "Bridge-mount existing SchemaPlanPanel inside the rebuilt surface (ratified T1 carry-over-then-reskin default); redesign as a follow-up.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q2 — CMS-field publishing pipeline home (rows 35-36, 58): same-surface advanced panel, settings-level config, or sequenced later?",
+        "proposedDefault": "Same-surface advanced panel (Drawer/GroupBlock), sequenced within one release train so CMS-heavy sites never lose publish capability.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q3 — Confirm all five publish-safety affordances carry (graph gate, manual-delivery fallback, retract, history/rollback, site template).",
+        "proposedDefault": "All carry — forced by the no-capability-deletion hard floor; only the UI form is discretionary.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q4 — Does Insights Engine graduation REPLACE or COMPLEMENT the GSC before/after impact panel?",
+        "proposedDefault": "Complement: carry the aggregate impact panel; graduation (sn-schema-3) is a C3-style addition.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q5 — Coverage % definition: existing vs generated vs published (mockup is internally inconsistent).",
+        "proposedDefault": "Published-live over total pages (matches 'live in Webflow' copy); server-computed per sn-schema-1.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q6 — 'Missing schema — from Site Audit' stat scope + owner (data ticket).",
+        "proposedDefault": "Fold into sn-schema-1/2 shared coverage service; ship the strip without this stat until the ticket lands.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q7 — Surface the dark competitor-schema endpoint in the rebuild or leave internal-only?",
+        "proposedDefault": "Leave internal-only (feeds plan generation); revisit with the Competitors surface.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q8 — Retire orphaned SchemaHealthDashboard + SchemaReviewTab/Modal in the rebuild?",
+        "proposedDefault": "Retire with DEF-* ledger rows; keep the shared respondToSchemaPlanFeedback service intact.",
+        "needsOwner": false,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q9 — Prototype styles Schema purple; HEAD is teal.",
+        "proposedDefault": "Keep teal — Phase D standing policy says HEAD no-purple is the default and Badge purple/tone is a Tier-2 F2/F3 decision.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "NEW — Frontend audit check ids missing_schema/schema_errors have no server producer (server emits aeo-faq-no-schema): is SeoAudit.tsx:547's hasSchemaIssues tip dead at HEAD, and which check taxonomy should sn-schema-2 build on?",
+        "proposedDefault": "Treat as a pre-existing wiring bug; define the schema checks server-side as part of sn-schema-2 and fix the frontend mapping.",
+        "needsOwner": true,
+        "source": "newly-found"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "Coverage ring hero with narrative headline",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Strong proof-of-need framing; gated on Q5 definition + sn-schema-1 so the number is server-computed and shared."
+      },
+      {
+        "proposal": "4-stat summary strip incl. 'Missing schema — from Site Audit'",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Adopt the strip now; the audit-sourced stat waits for sn-schema-2 (no server producer exists today)."
+      },
+      {
+        "proposal": "Pub-status tag (Live/Sent/Draft) on collapsed card header",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Genuine improvement, purely ui-only — publishDates already on the snapshot view."
+      },
+      {
+        "proposal": "Insights Engine graduation (schema win → client win)",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "New cross-system pipeline (sn-schema-3, effort L) touching insight bridges + attribution honesty; not a rebuild-parity item."
+      },
+      {
+        "proposal": "Purple surface accent",
+        "recommendation": "reject",
+        "rationale": "Phase D standing policy keeps HEAD no-purple default; keep teal unless the design-system owner re-rules at F2/F3 (Q9)."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Generator (setup state → results card list, filterable by validation/pub status)",
+        "Workflow Guide",
+        "Advanced panels within Generator: Site Plan (bridge-mounted SchemaPlanPanel), CMS Mapping, Impact, Completeness, Pending Approvals"
+      ],
+      "primitives": [
+        "PageContainer",
+        "Toolbar",
+        "Segmented (sub-tabs)",
+        "MetricTile (summary strip)",
+        "Meter (coverage ring analog)",
+        "GroupBlock (page card sections)",
+        "Drawer (page detail: diff, JSON editor, findings, history)",
+        "FilterChip + SearchField (page filter)",
+        "DataTable (optional for plan roles)",
+        "StatusBadge/Badge (validation + pub tags)",
+        "WorkflowStepper (existing)"
+      ],
+      "dataHooks": [
+        "GET /api/webflow/schema-snapshot/:siteId (webflow-schema.ts:110)",
+        "GET /api/webflow/schema-suggestions/:siteId + POST .../page",
+        "schemaValidation.validate/getAll/get/getGraph (src/api/schema.ts:39-52)",
+        "schemaPlan.* (src/api/schema.ts:54)",
+        "schemaImpact (src/api/schema.ts:101 → /api/schema-impact/:workspaceId)",
+        "schema.retract (src/api/schema.ts:17)",
+        "useSchemaSuggesterGeneration",
+        "useSchemaSuggesterPublishingWorkflow",
+        "useSchemaSuggesterCmsWorkflow",
+        "useSchemaValidation",
+        "POST /api/approvals/:workspaceId",
+        "useWorkspaceEvents (schema:* events, ws-events.ts:68-71)"
+      ],
+      "statesPlan": "needsSite lock → pre-scan setup empty state (hero CTA + inventory) → snapshot-loading interstitial → results; scan-error retry, dismissible single-page error banner, per-page publish/send errors; plan panel locked-while-regenerating banner.",
+      "mountNote": "Admin Page 'seo-schema' inside F4 RebuiltAppChrome, flag-gated on ui-rebuild-shell; keyed by webflowSiteId with fixContext/businessProfile/intelligenceProfile props preserved (App.tsx:407)."
+    },
+    "crossSurfaceDeps": [
+      "D3: Page Intelligence merges into SEO Editor Research mode — the fixContext 'Add Schema' sender moves there; receiver contract must survive",
+      "Site Audit surface: quick-fix link sender (SeoAudit.tsx:551) + the Q6/sn-schema-2 missing-schema stat + shared coverage definition (Q5)",
+      "Client dashboard C-track (D4): schema_item + schema_plan inbox deliverables are the client half — do not touch",
+      "Recommendations surface: recTypeTab.schema deep-link + per-page rec banners (row 8)",
+      "Brand/Workspace Settings: completeness Fix→ deep-links target brand?tab=business-footprint / intelligence-profile / eeat-assets (?tab= receiver contract on those surfaces)",
+      "Links surface: 'Schema coverage per page' ledger row overlaps the Q5 coverage definition"
+    ],
+    "unknowns": [
+      "Whether the 'Sent' pub-status persists across reload: sent-state lockout is client-session state in useSchemaSuggesterPublishingWorkflow; a reload-durable Sent tag likely needs deriving from the approvals list (existing endpoint) — feasible ui-only but unverified in code",
+      "Whether SeoAudit's hasSchemaIssues tip (missing_schema/schema_errors) ever fires at HEAD — no server producer emits those check ids (carried as newly-found open question)",
+      "Prototype schema.js was not directly re-read (design-kit mockup outside repo audit scope); classifications trust the surface doc's line-cited coverage notes"
+    ],
+    "effortEstimate": "XL"
+  },
+  "verify": {
+    "surface": "schema",
+    "verdicts": [
+      {
+        "needId": "sn-schema-1",
+        "verdict": "ADJUSTED",
+        "evidence": "server/serializers/client-safe.ts:213-227 (toAdminSchemaSnapshotView returns id/siteId/workspaceId/createdAt/pageCount/results only — no aggregate); rg 'coverage' across server/domains/schema + server/routes/webflow-schema.ts + server/schema*.ts = 0 real hits; server/schema-store.ts / schema-plan.ts have no covered/total metric.",
+        "correction": "Core claim STANDS: no single-definition schema coverage metric (covered/total) exists on any read path — confirmed. But the gatherer's evidence file:line is WRONG. toAdminSchemaSnapshotView is NOT at server/routes/webflow-schema.ts:110-115 (that line just CALLS it) — it is DEFINED at server/serializers/client-safe.ts:213. The 'whereItLives' should point there (not server/audit-snapshot-views.ts, which exists but is the audit-side twin and does not serialize schema). Effort S holds: covered/total is derivable from the existing snapshot.results[] + publishDates already passed to the serializer, so it is a computed helper + one field on AdminSchemaSnapshotView — no migration, no DB-column lockstep."
+      },
+      {
+        "needId": "sn-schema-2",
+        "verdict": "CONFIRMED",
+        "evidence": "server/audit-page.ts emits only 'structured-data' (info, line 180: 'No structured data (JSON-LD) found') and 'aeo-faq-no-schema' (warning, line 384) — grep of all `check: '...'` producers confirms NO 'missing_schema' or 'schema_errors' producer anywhere in server/ or shared/. Frontend consumers reference the phantom ids: src/components/SeoAudit.tsx:547 (hasSchemaIssues checks ['missing_schema','schema_errors']) and src/components/audit/types.ts:98 ('missing_schema':'seo-schema','schema_errors':'seo-schema'). The frontend→server mapping is broken as described.",
+        "correction": "existsToday=no is correct; effort M is defensible — the finding must be defined server-side (new check producer in audit-page.ts) OR the frontend mapping repointed to the real 'structured-data'/'aeo-faq-no-schema' ids, then a per-workspace count projection built. Note the frontend already has a working 'structured-data'/AEO signal it is not using; the cheapest fix is repoint-frontend, but a proper 'missing schema' count still needs a producer + projection."
+      },
+      {
+        "needId": "sn-schema-3",
+        "verdict": "ADJUSTED",
+        "evidence": "Producer confirmed: server/domains/schema/publish-schema-to-live.ts:113-135 records a 'schema_deployed' action with baseline {rich_result_eligible:true, rich_result_appearing:false}. Measurement consumer EXISTS (gatherer missed it): server/outcome-measurement.ts:329,552 scores schema_deployed (primary_metric='ctr', clicks×CPC dollar attribution); server/workspace-learnings.ts:410-417 aggregates schemaWins filtered on outcome.metricsSnapshot.rich_result_appearing===true into schemaTypesWithRichResults. DETECTION is the true gap: fetchCurrentMetrics (outcome-measurement.ts:128-145) only reads GSC rows via averageGscRows — no path ever sets rich_result_appearing=true, so the workspace-learnings:414 filter is dead. GRADUATION bridge absent: rg over server/insight*/server/intelligence/server/domains/recommendations for schema_deployed/schema-win bridges = 0 hits (bridge inventory: bridge-local-visibility-shift, webflow-seo-audit-bridges — neither touches schema outcomes).",
+        "correction": "existsToday=partial is right, but the partition is wrong. The claim frames 'detection + graduation consumer' as one missing block; in fact an OUTCOME-MEASUREMENT/SCORING consumer already exists and dollar-attributes schema deploys — that is NOT net-new work. What is genuinely absent: (1) rich-result / AI-citation DETECTION that flips rich_result_appearing:false→true (GSC alone cannot supply this — a net-new data source, the real cost driver), and (2) the insight-bridge that graduates a detected schema win into a client-facing win/insight. Effort L holds precisely because of the missing detection data source, not because scoring must be built. Plan the L against 'detection source + bridge', and reuse the existing outcome-measurement + workspace-learnings machinery rather than rebuilding it."
+      }
+    ]
+  }
+}

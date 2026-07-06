@@ -1,0 +1,45 @@
+{
+  "holes": [
+    {
+      "surface": "cross-surface (cockpit ∥ global-ops ∥ content-pipeline)",
+      "hole": "Meeting Brief has NO unambiguous build owner. It lives at Page `brief` (MeetingBriefPage, App.tsx:394), the Parity Ledger MISATTRIBUTES that route to content-brief authoring, and three surface docs each claim it: cockpit (rows 36-37), global-ops (its own §8), content-pipeline (tangentially). All three converge on the same DEFAULT ('T1 carry-over as a cockpit/WorkspaceHome tab') but none is the designated ticket, and the ledger misattribution means a naive fan-out could leave it orphaned in every lane — exactly the 'falls between tickets' failure the program fears. Assign one owning ticket (cockpit is the natural home) and correct the ledger row before dispatch.",
+      "severity": "blocking"
+    },
+    {
+      "surface": "insights (client half)",
+      "hole": "Lane assignment is unresolved and undispatchable as-is. The gatherer's own newly-found open question asks whether the insights client render rides the C-lane (C1→C2→C3 client-portal sequence, client-ia-v2 / strategy-the-issue flags) or the A-lane (ui-rebuild-shell fan-out). The insights doc contains ZERO grep evidence for C-lane/A-lane/ui-rebuild-shell — the distinction is asserted, not grounded. Dispatching this surface into the wrong lane either double-builds it or blocks it behind the wrong flag. Resolve the lane before the client-facing surfaces (insights, recommendations) fan out; they are gated on D4's C1 cutover, not the A-lane shell flag.",
+      "severity": "blocking"
+    },
+    {
+      "surface": "site-audit",
+      "hole": "The '3→1 merge' scope is genuinely undefined even in the doc — Reading A (audit + Performance-triage + Links-triage as categories) vs Reading B (SeoAudit's own 3 sub-tools redistributed), both 'half-true' per the doc's own Q1. The merge-ticket scope (and therefore effort, file ownership, and whether Performance/Links remain standalone) hinges on an owner answer that does not yet exist. Fanning out site-audit before Q1 is answered risks a mis-scoped ticket that collides with the performance and links tickets.",
+      "severity": "blocking"
+    },
+    {
+      "surface": "insights (B1) ↔ recommendations",
+      "hole": "The insights→recommendations handoff for B1 ('Prioritized Action Plan' / InsightsEngine recommendations set) is classified `unknown` by the insights gatherer ('pickup NOT verified from this seat') and there is no shared cross-surface contract row pinning it. The recommendations doc DOES confirm InsightsEngine.tsx is the legacy action-plan carrier (line 14, sole live mount = Health tab actionPlanSlot), so the capability is real — but the two surfaces were audited independently and neither commits to owning the render in the new IA. Add an explicit cross-surface contract (who mounts InsightsEngine's rec set, where) before wave 1.",
+      "severity": "important"
+    },
+    {
+      "surface": "ai-visibility / site-audit / content-pipeline (AeoReview + Content Health 3-way move)",
+      "hole": "The AeoReview and ContentDecay relocations are claimed on BOTH the sending side (site-audit rows 48-49 'preserved (moved)') and the receiving side (ai-visibility C3-C7, content-pipeline N6/Q6) but the receiving homes are themselves OPEN QUESTIONS (ai-visibility Q4 AeoReview drill-in home undecided; content-pipeline Q6 decay dedupe undecided). A move whose destination is still an open question is not yet a wireable contract — if both sending and receiving tickets fan out simultaneously with unresolved homes, the moved capability can land nowhere. Resolve Q4 (ai-visibility) and Q6 (content-pipeline) before dispatching the site-audit move.",
+      "severity": "important"
+    },
+    {
+      "surface": "multiple (owner-gated open questions)",
+      "hole": "The discovery is heavily owner-gated: nearly every XL/L surface carries 8-14 open questions marked needsOwner:true (brand-ai 14, engine 12, cockpit 11+, content-pipeline 13, schema 9, global-ops 11, recommendations 8). Many are load-bearing on scope/effort (e.g. Q1 stage-model in content-pipeline is explicitly BLOCKING; Q2 curation-machinery absorption in engine; Q1 Site Plan home in schema). These are correctly surfaced, but the Phase A plan cannot be written to a fixed scope until an owner-decision batch clears the blocking/needsOwner:true questions. Run a consolidated owner sign-off pass on the ~15 blocking-or-scope-load-bearing questions before writing per-surface fan-out tickets.",
+      "severity": "important"
+    },
+    {
+      "surface": "asset-manager (sn-asset-manager-1) / competitors (sn-competitors-1)",
+      "hole": "Two serverNeeds depend on external provider payload shapes that are NOT repo-verifiable and were flagged as unknowns: whether the Webflow v2 list-assets API returns width/height (gates sn-asset-manager-1 effort S-vs-larger) and whether DataForSEO can supply domain-rank/top-3 (gates sn-competitors-1) and Perplexity/Gemini mentions (ai-visibility N2). These are correctly deferred/owner-gated, but the effort estimates riding on them (S if payload already carries the field, M+ if N+1 fetch/probe needed) are provisional. Verify one live API response for each before committing the effort number in the plan.",
+      "severity": "minor"
+    },
+    {
+      "surface": "verification-adjusted serverNeeds (whereItLives corrections)",
+      "hole": "The verifier ADJUSTED several serverNeeds where the gatherer's cited file:line or 'whereItLives' was wrong even though the exists-today verdict held — e.g. sn-brand-ai-1 (natural home is ai-context-check.ts, not a new brand slice), sn-cockpit-3 (OutcomeProvenance at outcome-tracking.ts:139 not :293; must not use OutcomeCoverageProvenance), sn-content-pipeline-2/4 (wrong module + existing decay→brief writer already exists), sn-global-ops-5 (RecSource.diagnostic mapping already exists — effort overstated), sn-schema-3 (scoring consumer already exists; only detection+bridge net-new), sn-performance-2 (OutcomeReadback verdict already computed server-side). These corrections materially change effort/home for those tickets. The Phase A plan must consume the VERIFIER verdicts, not the gatherer's original whereItLives, or wave-1 agents will build in the wrong module or re-build existing machinery.",
+      "severity": "important"
+    }
+  ],
+  "overallReadiness": "This discovery is sound enough to write the Phase A plan on, with reservations that are themselves the plan's first tasks. Coverage is genuinely strong: every spot-checked surface doc's capability rows map 1:1 to the JSON classification (ai-visibility 53/53, asset-manager 43/43, competitors 43/43, links 46/46, page-rewriter 43/43, schema 69/69, content-pipeline 93/93, engine 61/61, brand-ai 56/56) — the additive-parity gathering discipline held and I found no silently-skipped rows, which is the failure mode this program exists to prevent. serverNeeds are well-grounded (mostly rg-backed 'exists=no/partial' evidence) and the verifier caught real over/under-scoping (existing machinery the gatherer missed on ~6 needs), so nobody has a suspiciously-zero serverNeeds count that hides work. The holes are NOT coverage gaps — they are (a) a small number of true cross-surface ownership ambiguities that will burn a fan-out if dispatched naively: Meeting Brief has no owning ticket and a misattributed ledger row (blocking), the insights client half has an ungrounded C-lane/A-lane assignment (blocking), and the site-audit 3→1 merge scope is undefined in its own doc (blocking); and (b) a heavy owner-gate load — the XL surfaces each carry 8-14 needsOwner questions, several explicitly blocking, so the plan cannot be scoped to fixed tickets until a consolidated owner-decision pass clears them. Net: write the Phase A plan, but front-load it with (1) an owner sign-off batch on the ~15 blocking/scope-load-bearing questions, (2) resolution of the three cross-surface ownership/lane ambiguities, and (3) an instruction that per-surface tickets consume the VERIFIER-adjusted serverNeed homes rather than the gatherer's originals. Do those three and the fan-out is safe."
+}

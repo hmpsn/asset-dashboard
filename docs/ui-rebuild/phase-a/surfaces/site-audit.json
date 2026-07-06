@@ -1,0 +1,567 @@
+{
+  "gather": {
+    "surface": "site-audit",
+    "capabilityClassification": [
+      {
+        "capability": "#1 Run audit as background job w/ live progress",
+        "resolution": "ui-only",
+        "note": "useSeoAuditWorkflow.ts:82-94 + jobs platform exist; rebuild restyles progress UI."
+      },
+      {
+        "capability": "#2 skipLinkCheck opt-out checkbox",
+        "resolution": "ui-only",
+        "note": "Not in mockup; carry additively onto rebuilt re-run flow (hook param exists, useSeoAuditWorkflow.ts:39)."
+      },
+      {
+        "capability": "#3 Auto-restore latest snapshot on mount",
+        "resolution": "ui-only",
+        "note": "GET /api/reports/:siteId/latest verified at reports.ts:252."
+      },
+      {
+        "capability": "#4 Attach to running/recent audit job on remount",
+        "resolution": "ui-only",
+        "note": "Behavior contract in useSeoAuditWorkflow.ts:117-128; carry as-is."
+      },
+      {
+        "capability": "#5 Empty state (never run) w/ CTA",
+        "resolution": "ui-only",
+        "note": "State-kit EmptyState."
+      },
+      {
+        "capability": "#6 Error state with retry",
+        "resolution": "ui-only",
+        "note": "State-kit ErrorState."
+      },
+      {
+        "capability": "#7 Post-run NextSteps → narrative headline",
+        "resolution": "ui-only",
+        "note": "Headline is copy templating over server-computed counts; no client-side verdict math."
+      },
+      {
+        "capability": "#8 Site Score + delta + score bar → score ring hero",
+        "resolution": "ui-only",
+        "note": "Score/previousScore are server-side (effective-snapshot views); render with MetricRing/Meter."
+      },
+      {
+        "capability": "#9 Severity stat pills + click-to-filter",
+        "resolution": "open-question",
+        "note": "Doc Q5 — mockup has sort but no severity filter; default: add filter additively (ui-only)."
+      },
+      {
+        "capability": "#10 Broken Links card → Links deep-link",
+        "resolution": "ui-only",
+        "note": "Deep-link retarget to rebuilt Links; two-halves contract."
+      },
+      {
+        "capability": "#11 Contextual Quick-fix chips by finding type",
+        "resolution": "ui-only",
+        "note": "fixContext plumbing exists (types.ts:94-112); cross-links per destination."
+      },
+      {
+        "capability": "#12 CWV summary (mobile+desktop CrUX+Lighthouse)",
+        "resolution": "ui-only",
+        "note": "Split: single field-data strip here, dual-strategy detail in Performance; data already in CwvSummaryCard types."
+      },
+      {
+        "capability": "#13 Site-wide issues section w/ AI suggestions",
+        "resolution": "ui-only",
+        "note": "server/seo-audit.ts:184-250 unchanged; taxonomy display depends on Q2."
+      },
+      {
+        "capability": "#14 20+ per-page checks, weighted scoring, noindex exclusion",
+        "resolution": "ui-only",
+        "note": "Data layer untouched; UI re-presents."
+      },
+      {
+        "capability": "#15 noindex badge + inline explanation",
+        "resolution": "ui-only",
+        "note": "Not in mockup; carry additively (SeoAudit.tsx:747,767-772)."
+      },
+      {
+        "capability": "#16 Search box over pages + issues",
+        "resolution": "open-question",
+        "note": "Doc Q5 — default: add SearchField additively; no server change."
+      },
+      {
+        "capability": "#17 Category filter pills → category cards w/ click-isolate",
+        "resolution": "open-question",
+        "note": "Blocked on Q2 taxonomy (5-cat HEAD vs 6-cat mockup); mapping half is sn-site-audit-2."
+      },
+      {
+        "capability": "#18 Per-category scores",
+        "resolution": "needs-server-work",
+        "note": "sn-site-audit-1 — no category scoring exists anywhere server-side."
+      },
+      {
+        "capability": "#19 Severity vs traffic-impact sort",
+        "resolution": "ui-only",
+        "note": "GET /api/audit-traffic/:siteId verified misc.ts:72; useAuditTrafficMap useAdminSeo.ts:9."
+      },
+      {
+        "capability": "#20 Showing X of Y + clear-filters",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "#21 Per-issue rows → issue-first pivot w/ affected pages",
+        "resolution": "ui-only",
+        "note": "Client regroup of existing PageSeoResult.issues[].check rows; must re-map suppressions/filters/batch actions onto issue-type grouping."
+      },
+      {
+        "capability": "#22 Per-page traffic badges (clicks/views 28d)",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "#23 Editable AI suggested fix w/ char count",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "#24 Apply AI fix → Webflow SEO/OG write",
+        "resolution": "ui-only",
+        "note": "PUT /api/webflow/pages/:pageId/seo exists (SeoAudit.tsx:131-156)."
+      },
+      {
+        "capability": "#25 Bulk Accept All (job, WS progress, cancel, recovery)",
+        "resolution": "ui-only",
+        "note": "Behavior contract — job/WS/sessionStorage semantics carry unchanged."
+      },
+      {
+        "capability": "#26 Fix → route to owning tool with fixContext",
+        "resolution": "ui-only",
+        "note": "Receivers must be re-wired per rebuilt destination — cross-surface dep."
+      },
+      {
+        "capability": "#27 Page → Page Intelligence deep-dive",
+        "resolution": "ui-only",
+        "note": "Retarget to SEO Editor Research per D3; keep auto-focus (two-halves)."
+      },
+      {
+        "capability": "#28 Send to Client w/ optional note",
+        "resolution": "ui-only",
+        "note": "POST /api/approvals/:ws exists; carry the note field the mockup omits."
+      },
+      {
+        "capability": "#29 Add to Tasks (single issue)",
+        "resolution": "ui-only",
+        "note": "POST /api/requests exists."
+      },
+      {
+        "capability": "#30 Batch add to tasks (All/Errors/Filtered)",
+        "resolution": "open-question",
+        "note": "Doc Q4 — default: keep in Site Audit toolbar; endpoint exists (POST /api/requests/batch)."
+      },
+      {
+        "capability": "#31 Suppress issue / suppress pattern (server-persisted)",
+        "resolution": "ui-only",
+        "note": "server/routes/workspaces.ts:548-614 verified."
+      },
+      {
+        "capability": "#32 Suppressed-count strip + clear-all",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "#33 Suppression-aware effective scores",
+        "resolution": "ui-only",
+        "note": "audit-snapshot-views already applied on server exit points (reports.ts:17,55,207)."
+      },
+      {
+        "capability": "#34 Dead-link panel (status/type/found-on/anchor)",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "#35 Dead link → Fix in SEO Editor",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "#36 Inline redirect per dead link → moves to Links",
+        "resolution": "ui-only",
+        "note": "Cross-surface: Links Redirects tab; deep-link must carry the specific URL."
+      },
+      {
+        "capability": "#37 Export dead links CSV → moves to Links",
+        "resolution": "ui-only",
+        "note": "Owned by Links surface; no server change."
+      },
+      {
+        "capability": "#38 Scheduled audits config UI",
+        "resolution": "open-question",
+        "note": "Doc Q3 — endpoints exist (audit-schedules.ts:17-33); default: Drawer off the Schedule toolbar button."
+      },
+      {
+        "capability": "#39 Scheduled-audit email alerts",
+        "resolution": "ui-only",
+        "note": "Server behavior, unaffected."
+      },
+      {
+        "capability": "#40 Post-audit side effects (snapshot, AUDIT_COMPLETE, auto-regen, emails)",
+        "resolution": "ui-only",
+        "note": "Keep useWorkspaceEvents/registry invalidation for AUDIT_COMPLETE (wsInvalidation.ts:184)."
+      },
+      {
+        "capability": "#41 Save & Share → public /report/:id",
+        "resolution": "ui-only",
+        "note": "reports.ts:313-320; intentional no-auth share."
+      },
+      {
+        "capability": "#42 Export HTML report + CSV",
+        "resolution": "ui-only",
+        "note": "CSV/HTML CWV rows must keep working after the CWV split."
+      },
+      {
+        "capability": "#43 History sub-tab (trend chart, snapshots, refresh)",
+        "resolution": "ui-only",
+        "note": "reports.ts:264 history; carry per-snapshot copy-link the mockup omits."
+      },
+      {
+        "capability": "#44 Latest-report permalink /report/audit/:siteId",
+        "resolution": "ui-only",
+        "note": "reports.ts:337."
+      },
+      {
+        "capability": "#45 Snapshot Action Items CRUD",
+        "resolution": "open-question",
+        "note": "Doc Q4 — endpoints exist (reports.ts:278-306); default: keep inside History."
+      },
+      {
+        "capability": "#46 Guide sub-tab (SeoAuditGuide)",
+        "resolution": "open-question",
+        "note": "Doc Q9 — default: keep per-surface guide (Schema precedent)."
+      },
+      {
+        "capability": "#47 ?sub= deep link receiver",
+        "resolution": "ui-only",
+        "note": "Retarget content-decay senders (ContentPipeline.tsx:220, WorkspaceHome.tsx:241,547) in the same PR that moves Content Health — Q12."
+      },
+      {
+        "capability": "#48 Content Health sub-tool (ContentDecay)",
+        "resolution": "ui-only",
+        "note": "Moved — owned by Content Pipeline surface ticket."
+      },
+      {
+        "capability": "#49 AI Search Ready sub-tool (AeoReview)",
+        "resolution": "ui-only",
+        "note": "Moved — owned by AI Visibility surface ticket."
+      },
+      {
+        "capability": "#50 Unified page edit-state badges (6 states)",
+        "resolution": "ui-only",
+        "note": "usePageEditStates verified (usePageEditStates.ts:41); keep full 6-state machine, not mockup's 4."
+      },
+      {
+        "capability": "#51 Audit graduation to Insights Engine",
+        "resolution": "defer-candidate",
+        "note": "Prototype-only flow rule interacting with existing auto-regen; defer to C3-style follow-up with owner sign-off."
+      },
+      {
+        "capability": "#52 Book-level cross-client Site Health roll-up",
+        "resolution": "needs-server-work",
+        "note": "sn-site-audit-3; also owner Q10 on scope/sequencing (read-only matrix first)."
+      },
+      {
+        "capability": "P1 PI tabs Pages/Architecture/Guide split",
+        "resolution": "ui-only",
+        "note": "Pages→Editor Research (D3), Architecture→Links; Guide half is Q9."
+      },
+      {
+        "capability": "P2 Unified page list w/ search + sort",
+        "resolution": "ui-only",
+        "note": "usePageJoin verified (usePageJoin.ts:31)."
+      },
+      {
+        "capability": "P3 Stats header counts",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "P4 Per-page AI analysis",
+        "resolution": "ui-only",
+        "note": "/api/webflow/page-html + /api/webflow/content-score exist (usePageIntelligenceAnalysis.ts:54-90)."
+      },
+      {
+        "capability": "P5 Bulk Analyze All/Remaining background job",
+        "resolution": "open-question",
+        "note": "Doc Q7 — default: keep as Editor-toolbar background job."
+      },
+      {
+        "capability": "P6 Persisted analyses hydrate from pageMap",
+        "resolution": "ui-only",
+        "note": "Verify persistence read path at build time (buildEffectiveAnalyses)."
+      },
+      {
+        "capability": "P7 Full analysis field set (intent-confidence, difficulty, placement)",
+        "resolution": "ui-only",
+        "note": "Carry full field set; mockup draws a subset."
+      },
+      {
+        "capability": "P8 Content gaps / recommendations / trust signals",
+        "resolution": "ui-only",
+        "note": "missingTrustSignals→E-E-A-T autofill data contract must survive."
+      },
+      {
+        "capability": "P9 Fix Queue score×traffic ranking",
+        "resolution": "ui-only",
+        "note": "Collapses into per-page priority chip; confirm at build that a triage list isn't needed."
+      },
+      {
+        "capability": "P10 Edit primary + secondary keyword mapping",
+        "resolution": "open-question",
+        "note": "Doc Q6 — secondaryKeywords editing has no visible home; default: Editor Research keyword panel."
+      },
+      {
+        "capability": "P11 Track keyword + WS live refresh",
+        "resolution": "ui-only",
+        "note": "usePageIntelligenceKeywordTracking exists; RANK_TRACKING_UPDATED/STRATEGY_UPDATED handlers carry."
+      },
+      {
+        "capability": "P12 Generate SEO copy (AI title/meta/H1)",
+        "resolution": "ui-only",
+        "note": "Editor version writing into live fields is an improvement; endpoint exists."
+      },
+      {
+        "capability": "P13 Page-scoped local SEO visibility panel",
+        "resolution": "open-question",
+        "note": "Doc Q8 — default: confirm Keywords lenses + Local Presence cover it, else add to Editor Research."
+      },
+      {
+        "capability": "P14 Hand-offs (Editor / Create Brief w/ payload / Schema)",
+        "resolution": "ui-only",
+        "note": "Brief hand-off must keep the rich analysis payload, not just the keyword."
+      },
+      {
+        "capability": "P15 fixContext receiver auto-expand",
+        "resolution": "ui-only",
+        "note": "Editor Research must accept the equivalent deep-link — two-halves, lands with the merge."
+      },
+      {
+        "capability": "P16 Loading/error states w/ retry",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "P17 Architecture tab (SiteArchitecture)",
+        "resolution": "ui-only",
+        "note": "Moved — owned by Links surface ticket."
+      },
+      {
+        "capability": "P18 Page Intelligence Guide",
+        "resolution": "open-question",
+        "note": "Same as Q9 guide-pattern decision."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-site-audit-1",
+        "kind": "derivation",
+        "description": "Per-category audit scores: compute category-level scores server-side, serialize onto the audit result/snapshot, and make them suppression-aware on all effective-score exit points.",
+        "existsToday": "no",
+        "evidence": "rg 'categoryScore|category_score|perCategory|scoreByCategory' across server/ src/ shared/ returned zero hits; server/seo-audit.ts computes only siteScore + per-page score.",
+        "whereItLives": "server/seo-audit.ts (scoring) + server/audit-snapshot-views.ts (suppression-aware views); shared/types via src/components/audit/types.ts shapes.",
+        "effort": "M",
+        "likelySharedWith": [
+          "client-portal (HealthTab audit shape)",
+          "global-ops sitehealth roll-up"
+        ]
+      },
+      {
+        "id": "sn-site-audit-2",
+        "kind": "field",
+        "description": "Category taxonomy remap: map the 5-value CheckCategory (content/technical/social/performance/accessibility) to the mockup's 6-cat model (index/onpage/perf/schema/links/mobile) via a server-side mapping, keeping check/category keys stable for suppressions, CSV export, and the client read path. Blocked on Q2.",
+        "existsToday": "partial",
+        "evidence": "Per-check category map exists at server/audit-page.ts:36 (CHECK_CATEGORY) with the 5-value union at server/audit-page.ts:11 and src/components/audit/types.ts:8; no 6-cat model anywhere.",
+        "whereItLives": "server/audit-page.ts (mapping) + src/components/audit/types.ts; additive displayCategory field preferred over renaming persisted keys.",
+        "effort": "S",
+        "likelySharedWith": [
+          "client-portal",
+          "links",
+          "performance",
+          "schema"
+        ]
+      },
+      {
+        "id": "sn-site-audit-3",
+        "kind": "endpoint",
+        "description": "Cross-workspace site-health aggregation (issue-type totals × client matrix from each workspace's latest effective snapshot) and, later, a cross-client batch-fix background job for sitehealth.js. Read-only aggregation endpoint first per Q10 default.",
+        "existsToday": "no",
+        "evidence": "All report reads are per-siteId (server/routes/reports.ts:252,264); rg -l 'cross.?workspace' server/ matches only unrelated modules (jobs, learnings, keyword cache) — no audit aggregation.",
+        "whereItLives": "New module, e.g. server/audit-rollup.ts (or server/domains/site-health/) reading listEffectiveSnapshotSummaries across workspaces; batch-fix via server/jobs.ts.",
+        "effort": "L",
+        "likelySharedWith": [
+          "global-ops",
+          "cockpit"
+        ]
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "Q1: Which three screens does 'Site Audit 3→1' merge — Reading A (audit + Performance-triage + Links-triage as categories) or Reading B (SeoAudit's own 3 sub-tools redistributed)?",
+        "proposedDefault": "Reading A per audit.js:1-7's own comment; Reading B's redistribution happens anyway via the Parity Ledger moves.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q2: Category taxonomy — server-side 5→6 mapping or UI-only regrouping? Client HealthTab, CSV export, and suppression keys all key on check/category.",
+        "proposedDefault": "Server-side additive displayCategory mapping (sn-site-audit-2), persisted keys unchanged.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q3: Where does the real scheduled-audit config form live (mockup stubs Schedule as a toast)?",
+        "proposedDefault": "F3 Drawer opened from the Site Audit toolbar Schedule button; reuses /api/audit-schedules as-is.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q4: Snapshot Action Items + batch add-to-tasks — keep in Site Audit, fold into Inbox/Requests, or retire?",
+        "proposedDefault": "Keep both in Site Audit (action items inside History, batch-add in toolbar); endpoints already exist.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q5: Confirm severity filter + search box are added additively to the rebuilt toolbar (mockup omits both).",
+        "proposedDefault": "Add both (FilterChip + SearchField); pure client-side, zero server change.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q6: Where does secondaryKeywords editing live (mockup Research shows one target keyword)?",
+        "proposedDefault": "Editor Research keyword panel keeps primary + secondary editing against the existing PATCH strategy pageMap.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q7: Does bulk page analysis (cancellable background job) get a home or is it cut?",
+        "proposedDefault": "Keep as an Editor-toolbar background job; existing job semantics carry.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q8: Does Keywords' local rank lenses + Local Presence fully replace the page-scoped local visibility read?",
+        "proposedDefault": "Accept keyword-scoped replacement; add a page-scoped panel to Editor Research only if the persona pass flags it.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q9: Guide pattern — per-surface guides, one help center, or cut? (SeoAuditGuide + PageIntelligenceGuide homeless.)",
+        "proposedDefault": "Keep per-surface Guide sub-tab (Schema precedent in the Parity Ledger).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q10: sitehealth.js book roll-up + cross-client batch fix — scope and sequencing sign-off.",
+        "proposedDefault": "Read-only matrix first (sn-site-audit-3 aggregation endpoint); batch-fix job is a separate later phase with write-safety review.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q11: Confirm the SEO Editor surface ticket adopts rows P1–P18 as acceptance criteria so PI doesn't fall between tickets.",
+        "proposedDefault": "Yes — SEO Editor ticket owns P1–P18; this ticket owns only the audit-side deep-link sender.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q12: ?sub=content-decay senders must be retargeted in the same change that moves Content Health to Pipeline.",
+        "proposedDefault": "Treat as a hard acceptance criterion on the Pipeline move PR (two-halves contract), not a separate task.",
+        "needsOwner": false,
+        "source": "surface-doc"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "Per-category scores on 6 category cards (audit.js:265,576-586)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Core triage upgrade of the prototype; server-side derivation scoped as sn-site-audit-1, suppression-aware."
+      },
+      {
+        "proposal": "Issue-first primary pivot (issue-type rows → affected pages) replacing page-first list",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Client-side regroup of existing data; the prototype's main UX improvement, no server change."
+      },
+      {
+        "proposal": "Narrative verdict headline ('X critical issues are bleeding rankings')",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Copy templating over server counts; no fabricated numbers."
+      },
+      {
+        "proposal": "Audit graduation rule → Insights Engine ('plumbing stays plumbing until it earns a story')",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Flow/product decision interacting with existing auto-regen recommendations (#40); needs its own signed-off design."
+      },
+      {
+        "proposal": "sitehealth.js book-level roll-up + cross-client batch fix",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Entirely new backend (sn-site-audit-3) + cross-client write-safety review; owner Q10 gates scope, read-only matrix could land first."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Audit (score hero + category cards + issue-first table + dead-link panel)",
+        "History (trend + snapshots + action items pending Q4)",
+        "Guide (pending Q9)",
+        "Schedule drawer (pending Q3)"
+      ],
+      "primitives": [
+        "PageContainer",
+        "Toolbar (+ToolbarSpacer)",
+        "Segmented (severity/traffic sort)",
+        "SearchField",
+        "FilterChip (severity/category isolate)",
+        "MetricTile (crawl stats)",
+        "Meter + existing MetricRing (score hero)",
+        "DataTable (issue rows + affected pages)",
+        "GroupBlock (category cards, dead-link panel)",
+        "Drawer (schedule config, issue detail)",
+        "Sparkline (history trend)",
+        "Badge/StatusBadge (page edit states)"
+      ],
+      "dataHooks": [
+        "useSeoAuditWorkflow (src/hooks/admin/useSeoAuditWorkflow.ts:32)",
+        "useAuditTrafficMap / useAuditSuppressions / useAuditSchedule (src/hooks/admin/useAdminSeo.ts:9,24,45)",
+        "usePageEditStates (src/hooks/usePageEditStates.ts:41)",
+        "GET /api/reports/:siteId/latest|history, /api/reports/snapshot/:id(/actions)",
+        "GET /api/audit-traffic/:siteId",
+        "PUT /api/webflow/pages/:pageId/seo",
+        "POST /api/approvals/:ws, POST /api/requests(/batch)",
+        "PUT/DELETE /api/audit-schedules/:workspaceId"
+      ],
+      "statesPlan": "Empty = never-run CTA w/ check list; loading = job progress % + contextual message; error = retry; no tier lock (admin surface); AUDIT_COMPLETE invalidation via useWorkspaceEvents stays wired.",
+      "mountNote": "Flag-gated on ui-rebuild-shell inside RebuiltAppChrome at Page 'seo-audit'; 'page-intelligence' route retires with a D8 redirect map entry → SEO Editor Research."
+    },
+    "crossSurfaceDeps": [
+      "D3: Page Intelligence → SEO Editor Research mode — SEO Editor ticket must adopt P1–P18 (Q11)",
+      "Links: dead-link redirects + CSV move there; Architecture tab lands there; audit→links deep-link must carry the specific broken URL",
+      "Performance: dual-strategy CWV detail home; audit keeps only a field-data strip + cross-link",
+      "Content Pipeline: Content Health (ContentDecay) moves there; ?sub=content-decay senders retargeted same PR (Q12)",
+      "AI Visibility: AeoReview moves there",
+      "Client portal (C1/C2): HealthTab + GET /api/public/audit-traffic/:workspaceId consume the same audit shape — Q2 taxonomy changes hit the client read path",
+      "Insights Engine: graduation proposal (#51) + stale Diagnostics ledger-row cleanup",
+      "Global Ops/Cockpit: sitehealth.js roll-up 'Open cockpit' hand-off (sn-site-audit-3)",
+      "fixContext receivers: seo-editor / schema / links / briefs / performance must re-accept fixContext after their own rebuilds"
+    ],
+    "unknowns": [
+      "History 'full version' snapshot-diff view: GET /api/reports/snapshot/:id exists (reports.ts:271) so classified reusable, but whether its payload shape supports an in-app diff render (vs the public report page) was not verified.",
+      "Whether the score-ring hero uses HEAD MetricRing/MetricRingSvg or needs a kit-ported ring — F3 has no ring primitive; resolved at build, no data impact.",
+      "sitehealth.js internals were taken from the surface doc's description only (mockup file not re-read); the read-only-matrix quick-win perf claim (N-per-workspace fetch slow at book scale) is unverified."
+    ],
+    "effortEstimate": "L"
+  },
+  "verify": {
+    "surface": "site-audit",
+    "verdicts": [
+      {
+        "needId": "sn-site-audit-1",
+        "verdict": "CONFIRMED",
+        "evidence": "server/seo-audit.ts:23-34 (SeoAuditResult has only siteScore, no category-level score); server/seo-audit.ts:224,263 (site-level siteScore computed); page-level score at server/audit-page.ts:467 (computePageScore); rg for categoryScore|category_score|perCategory|scoreByCategory across server/ src/ shared/ returned zero hits. Suppression-aware exit points operate only on siteScore: server/audit-snapshot-views.ts:21,57-60 and server/audit-suppression-projection.ts:17 (getEffectiveAudit) — none carry per-category scores.",
+        "correction": "Claim stands. Per-category audit scores do not exist. Note the effective-score exit points to make suppression-aware are concrete: getEffectiveAudit (audit-suppression-projection.ts:17), getEffectivePreviousScore/toEffectiveAuditSnapshot (audit-snapshot-views.ts:14,33,57), applySuppressionsToAudit (seo-audit-suppressions.ts:16), AND the new cross-workspace read path GET /api/workspace-overview (workspaces.ts:118-129) which also serializes siteScore — any category-score field would need serializing there too (see sn-site-audit-3)."
+      },
+      {
+        "needId": "sn-site-audit-2",
+        "verdict": "CONFIRMED",
+        "evidence": "server/audit-page.ts:11 (5-value CheckCategory union: content|technical|social|performance|accessibility); server/audit-page.ts:36 (CHECK_CATEGORY per-check map) and :463 auto-assign at audit-run time; src/components/audit/types.ts:8 mirrors the 5-value union and :86 CATEGORY_CONFIG. rg for the 6-cat mockup labels (index|onpage|schema|links|mobile as categories) found no 6-category model anywhere. Category is COMPUTED at audit-run and stored in snapshot JSON per-issue (audit-page.ts:463), so an additive displayCategory remap can be applied on read with no migration.",
+        "correction": "Claim stands as written including effort S. The 'partial' assessment (per-check map exists, no 6-cat model) is accurate, and the additive-displayCategory-over-renaming-persisted-keys approach is correct because the existing category is persisted in snapshot blobs — renaming would break historical reads. Effort S holds ONLY if implemented as a pure read-side/audit-time mapping with no snapshot-schema change; the plan's stated preference keeps it there."
+      },
+      {
+        "needId": "sn-site-audit-3",
+        "verdict": "ADJUSTED",
+        "evidence": "A cross-workspace audit-score aggregation endpoint ALREADY EXISTS: GET /api/workspace-overview (server/routes/workspaces.ts:107-138) iterates listVisibleWorkspaces() and, per workspace, reads getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions) and serializes { score:siteScore, totalPages, errors, warnings, previousScore, lastAuditDate } — read-only, suppression-aware, multi-workspace. All PER-SITE report reads confirmed at server/routes/reports.ts:252,264. site-health-slice (server/intelligence/site-health-slice.ts:100) is strictly single-workspace (every fn takes one workspaceId), so it does NOT provide this. No issue-type-total or client-matrix aggregation exists (rg clientMatrix|issueTypeTotals|cross-workspace audit = zero relevant hits).",
+        "correction": "Direction (aggregation needs building) is right but the framing 'existsToday: no / New module' is wrong on two counts. (1) A cross-workspace, suppression-aware, read-only audit-score roll-up ALREADY ships at GET /api/workspace-overview (workspaces.ts:107) — the natural home is to EXTEND this existing endpoint's per-workspace audit block, not a brand-new server/audit-rollup.ts. (2) What genuinely does NOT exist is the specific SHAPE claimed: issue-type totals (per-check-type breakdown) and a client×issue-type matrix — workspace-overview only emits scalar siteScore + errors/warnings counts per workspace, no per-check-type dimension. So: aggregation SCAFFOLD exists (reuse it); the issue-type×client MATRIX and the batch-fix background job do not. Effort L is still plausible for the matrix + batch-fix job, but the read-only aggregation half is closer to M given the existing endpoint to extend. Threading a category-score serialization here also ties this to sn-site-audit-1's exit-point list."
+      }
+    ]
+  }
+}

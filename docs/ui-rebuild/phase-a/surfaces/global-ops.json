@@ -1,0 +1,454 @@
+{
+  "gather": {
+    "capabilityClassification": [
+      {
+        "capability": "Settings rows 1-6,8,9,12 (Google OAuth, GSC props, Webflow overview, API keys, platform health, storage monitor, booking link, global flags, MCP keys)",
+        "resolution": "ui-only",
+        "note": "All endpoints exist and are called from SettingsPanel.tsx/McpApiKeysSettings.tsx today; rebuild wraps raw get() calls in React Query hooks."
+      },
+      {
+        "capability": "Settings row 7 (4th prune action: activity logs)",
+        "resolution": "ui-only",
+        "note": "Prune endpoint exists (SettingsPanel.tsx:79-93); prototype omitted the button — trivially additive."
+      },
+      {
+        "capability": "Settings row 10 (flag override reset)",
+        "resolution": "ui-only",
+        "note": "Exists at HEAD (FeatureFlagSettings.tsx:165-168); carry the override-vs-default concept into the rebuilt toggle list."
+      },
+      {
+        "capability": "Settings row 11 (Stripe product/price config)",
+        "resolution": "ui-only",
+        "note": "StripeSettings.tsx:151-390 + endpoints exist; port as-is (T1 carry-over). Deferring it (quick-win #2) means payments unconfigurable from UI — not recommended."
+      },
+      {
+        "capability": "Settings row 13 (⌘, and ⌘1-5 shortcuts)",
+        "resolution": "ui-only",
+        "note": "Shell-level; F4 RebuiltAppChrome must carry App.tsx:254-261 bindings."
+      },
+      {
+        "capability": "WS-Settings rows 14-18 (rename, ?tab= receiver, Webflow token flow, domain override, GSC/GA4 pickers)",
+        "resolution": "ui-only",
+        "note": "Existing PATCH/connection endpoints; ?tab= two-halves contract re-implemented on the rebuilt tab structure (CLAUDE.md rule 12)."
+      },
+      {
+        "capability": "WS-Settings row 19 (Integration Health Center)",
+        "resolution": "ui-only",
+        "note": "useIntegrationHealth hook + shared/types/integration-health.ts exist; compose into rebuilt connections lens."
+      },
+      {
+        "capability": "WS-Settings rows 20-32 (tier mgmt, portal toggles, questionnaire reset, reports generate-now, white-label, site capabilities, per-ws flag overrides, CMS publish target, client access, client users CRUD, GA4 events, conversion tracking, outcome value)",
+        "resolution": "ui-only",
+        "note": "All 13 unhomed capabilities have working HEAD components + endpoints (FeaturesTab/ClientDashboardTab/PublishSettings/WorkspaceFeatureFlagOverrides); rebuild is pure re-composition — full 7-tab parity, no fallback-route hybrid needed."
+      },
+      {
+        "capability": "WS-Settings row 33 (data export CSV/JSON)",
+        "resolution": "ui-only",
+        "note": "server/routes/data-export.ts serves /api/export/:ws/:key; whole tab is a port."
+      },
+      {
+        "capability": "WS-Settings row 34 (llms.txt generator)",
+        "resolution": "ui-only",
+        "note": "Moved to AI Visibility surface per ledger — cross-surface dep, not built here."
+      },
+      {
+        "capability": "WS-Settings row 35 (strategy inputs relocation Strategy→wsettings)",
+        "resolution": "open-question",
+        "note": "Relocation needs single-source-of-truth agreement with Strategy surface owner; endpoints exist (StrategySettings.tsx reads them today)."
+      },
+      {
+        "capability": "WS-Settings rows 36-37 (scheduled audits, delete workspace)",
+        "resolution": "ui-only",
+        "note": "audit-schedules.ts route + DELETE workspace exist; prototype relocations only."
+      },
+      {
+        "capability": "WS-Settings row 38 (NEW archive workspace)",
+        "resolution": "needs-server-work",
+        "note": "No archive concept server-side — sn-global-ops-1 if adopted."
+      },
+      {
+        "capability": "WS-Settings row 39 (NEW GBP connection card)",
+        "resolution": "ui-only",
+        "note": "GBP OAuth/status/sync fully exist: server/routes/google-business-profile.ts + useGbpConnectionStatus/useGbpAuthUrl (src/hooks/admin/useGoogleBusinessProfile.ts:11-28); card is composition only."
+      },
+      {
+        "capability": "WS-Settings row 40 (NEW re-run initial audit/strategy buttons)",
+        "resolution": "ui-only",
+        "note": "Audit start (server/routes/webflow-seo-audit.ts) and strategy generation (server/routes/keyword-strategy.ts) endpoints exist; buttons wire to them."
+      },
+      {
+        "capability": "WS-Settings row 41 (NEW reporting cadence + timezone/locale prefs)",
+        "resolution": "needs-server-work",
+        "note": "Cadence exists (FeaturesTab automated reports); tz/locale fields do not — sn-global-ops-2 if adopted."
+      },
+      {
+        "capability": "Roadmap rows 42-48 (views, status cycle, stats, velocity, filters, sorting, expand)",
+        "resolution": "ui-only",
+        "note": "roadmapApi via React Query already; shippedAt already in the Zod schema (server/routes/roadmap.ts:20). Carry P3/P4 filters + aria-sort; monthly-vs-per-sprint velocity is a note-level default (keep monthly, add sprint toggle)."
+      },
+      {
+        "capability": "Business rows 49-52,55-65 (revenue stats/chart/lists/transactions, AI usage stats/charts, DataForSEO credits, feature library, prospect job + history + printable report)",
+        "resolution": "ui-only",
+        "note": "All read existing endpoints (RevenueDashboard/AIUsageSection get(), SalesReport useBackgroundTasks + /api/sales-report/:id/html); 4→1 Business consolidation needs a D8 redirect map. Carry the omitted SEO daily chart (row 59)."
+      },
+      {
+        "capability": "Business rows 53-54 (delete payment / purge all)",
+        "resolution": "ui-only",
+        "note": "del() endpoints exist (RevenueDashboard.tsx:61-76); include in rebuild — destructive-op parity, ConfirmDialog."
+      },
+      {
+        "capability": "Business row 66 (full prospect report detail view)",
+        "resolution": "ui-only",
+        "note": "Report data is stored and rendered at HEAD (SalesReport.tsx:236-433); no prototype spec so port HEAD UI under T1 carry-over."
+      },
+      {
+        "capability": "Business row 67 (Onboard-as-Client handoff)",
+        "resolution": "open-question",
+        "note": "Dead code at HEAD (no #new-workspace consumer); owner decides wire-to-create-prefill vs cut. Wiring itself would be ui-only."
+      },
+      {
+        "capability": "Outcomes row 68 (cross-ws table value reframing)",
+        "resolution": "needs-server-work",
+        "note": "Prototype's value-$/mo + clicks columns are not in WorkspaceOutcomeOverview — sn-global-ops-3; keep winRate/scored30d fields additively (open question q10)."
+      },
+      {
+        "capability": "Outcomes rows 69-72 (aggregate stats, attention flags, coverage column, row deep-link)",
+        "resolution": "ui-only",
+        "note": "All fields exist on WorkspaceOutcomeOverview (shared/types/outcome-tracking.ts:498-514); compose into rebuilt DataTable."
+      },
+      {
+        "capability": "Outcomes rows 73-79 (per-ws Top Wins/Scorecard/Action Feed/Learnings/Playbooks/Coverage funnel/RecordPublishedWork)",
+        "resolution": "open-question",
+        "note": "All hooks exist (useOutcomes.ts:14-127) so rehome is ui-only once the owner picks the home; default = keep OutcomeDashboard mounted behind Cockpit link."
+      },
+      {
+        "capability": "Diagnostics rows 80-84 (report detail, run theater, failed state, list view, ?report= deep link)",
+        "resolution": "ui-only",
+        "note": "useDiagnosticsList/useDiagnosticReport/useRunDiagnostic exist (useDiagnostics.ts:5-36); add prototype's progress theater, keep failed + list states."
+      },
+      {
+        "capability": "Diagnostics row 85 (registry nav entry)",
+        "resolution": "open-question",
+        "note": "Owner call: keep navRegistry admin entry + list lens vs prototype drill-in-only."
+      },
+      {
+        "capability": "Diagnostics row 86 (NEW stage-as-backing-move + export)",
+        "resolution": "needs-server-work",
+        "note": "No diagnostics→recommendation bridge or export projection exists — sn-global-ops-5 if adopted."
+      },
+      {
+        "capability": "Requests row 87 (4 sub-tools → 1 feed reframe)",
+        "resolution": "open-question",
+        "note": "Mapping undefined; default = hybrid (feed + retained RequestManager view). Losing the lifecycle machinery is a hard stop per doc."
+      },
+      {
+        "capability": "Requests rows 88-95 (deliverables pane, signals inbox, 6-state workflow, filters, bulk ops, stats, team reply, client actions)",
+        "resolution": "ui-only",
+        "note": "All backed by existing hooks/routes (useWorkspaceDeliverables/useRemindDeliverable, server/state-machines.ts, RequestManager endpoints); pure re-composition once q4's shape is decided."
+      },
+      {
+        "capability": "Requests row 96 (NEW promote request → strategy signal)",
+        "resolution": "needs-server-work",
+        "note": "Mockup-only — lexicon entries are wordClass proposed; no implementation in server/routes/requests.ts — sn-global-ops-4."
+      },
+      {
+        "capability": "Meeting Brief rows 97-102 (generate/regenerate, summary strip, wins/attention, recommendations, blueprint link, OV divergence panel)",
+        "resolution": "open-question",
+        "note": "Zero server work (useAdminMeetingBrief + OvDivergencePanel exist); blocked only on a home — default = port unchanged as a cockpit/WorkspaceHome tab (q2)."
+      },
+      {
+        "capability": "Onboarding row 103 (admin checklist → gated cold-start flow)",
+        "resolution": "ui-only",
+        "note": "Composes existing connection/audit/strategy status (OnboardingChecklist + integration health); onboard.js is an upgrade — adopt."
+      },
+      {
+        "capability": "Onboarding rows 104-105 (client questionnaire, welcome wizard)",
+        "resolution": "ui-only",
+        "note": "Owned by the D4 client-portal C-phase (C2 re-skin), not this zone; cannot drop — feeds Brand Engine."
+      },
+      {
+        "capability": "Onboarding row 106 (workspace creation entry point)",
+        "resolution": "ui-only",
+        "note": "POST /api/workspaces exists (WorkspaceSelector.tsx:293); rebuilt shell must expose a New-workspace entry before onboard.js's flow."
+      },
+      {
+        "capability": "Onboarding row 107 (NEW locked-workbench preview)",
+        "resolution": "ui-only",
+        "note": "Pure presentation over existing setup state; adopt with the cold-start flow."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-global-ops-1",
+        "kind": "migration",
+        "description": "Archive workspace: archived_at column on workspaces + PATCH archive/unarchive endpoint + exclusion from the default workspace list.",
+        "existsToday": "no",
+        "evidence": "rg -in 'archiv' server/routes/workspaces.ts server/workspaces.ts shared/types/workspace.ts → 0 hits",
+        "whereItLives": "server/routes/workspaces.ts + server/workspaces.ts + new migration",
+        "effort": "S",
+        "likelySharedWith": [
+          "cockpit (workspace book/selector)"
+        ]
+      },
+      {
+        "id": "sn-global-ops-2",
+        "kind": "field",
+        "description": "Per-workspace timezone/locale preference fields (reporting cadence already exists via automated-reports settings).",
+        "existsToday": "no",
+        "evidence": "rg -in 'timezone|locale' shared/types/workspace.ts server/routes/workspaces.ts → 0 hits",
+        "whereItLives": "shared/types/workspace.ts + workspaces migration + settings PATCH",
+        "effort": "S",
+        "likelySharedWith": [
+          "client portal (report timestamps)"
+        ]
+      },
+      {
+        "id": "sn-global-ops-3",
+        "kind": "projection",
+        "description": "Extend GET /api/outcomes/overview with per-workspace value-$/mo and clicks fields for the prototype's value framing; must apply attribution-honesty exclusions (not_acted_on) at this read path.",
+        "existsToday": "partial",
+        "evidence": "getWinsWithValueByWorkspace exists per-workspace (server/outcome-tracking.ts:83,909) but WorkspaceOutcomeOverview has only winRate/trend/activeActions/scoredLast30d/coverage (shared/types/outcome-tracking.ts:498-514); overview route at server/routes/outcomes.ts:171-182",
+        "whereItLives": "server/routes/outcomes.ts + server/outcome-tracking.ts + shared/types/outcome-tracking.ts",
+        "effort": "M",
+        "likelySharedWith": [
+          "cockpit",
+          "client portal Results"
+        ]
+      },
+      {
+        "id": "sn-global-ops-4",
+        "kind": "endpoint",
+        "description": "Promote client request → strategy signal/insight: endpoint creating an insight from a request, request status transition, activity log + broadcast, typed contract in shared/types.",
+        "existsToday": "no",
+        "evidence": "rg -in 'signal|insight' server/routes/requests.ts → 0 hits; shared/types/lexicon.ts entries for promotable/promote are wordClass proposed, defined as 'Mockup requests.js'",
+        "whereItLives": "server/routes/requests.ts + insights store (server/intelligence/ write path)",
+        "effort": "M",
+        "likelySharedWith": [
+          "insights-engine surface"
+        ]
+      },
+      {
+        "id": "sn-global-ops-5",
+        "kind": "derivation",
+        "description": "Diagnostics 'stage as backing move' (convert remediation plan into a recommendation/backing-move row) + report export projection.",
+        "existsToday": "no",
+        "evidence": "rg -in 'backing' server/ → only strategy-archetype label types (shared/types/strategy-archetype.ts); no diagnostics→recommendation bridge; no export route for diagnostic reports",
+        "whereItLives": "server/routes/diagnostics or server/domains/strategy recommendation writer",
+        "effort": "M",
+        "likelySharedWith": [
+          "recommendations surface"
+        ]
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "Zone is absent from the 18-surface map — need explicit build tickets (or explicit cuts) for all 12+ pages.",
+        "proposedDefault": "Cut tickets from this spec's 9-lens composition; nothing is silently dropped.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Meeting Brief has no home anywhere in the kit.",
+        "proposedDefault": "T1 carry-over: port MeetingBriefPage unchanged as a cockpit/WorkspaceHome tab; design pass later.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Onboard-as-Client handoff is dead code at HEAD (no #new-workspace consumer) — wire or cut?",
+        "proposedDefault": "Wire: prospect report → New-workspace form with URL prefill (small, ui-only).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Requests: how do 4 sub-tools map onto the prototype's single feed?",
+        "proposedDefault": "Hybrid: prototype feed for signals + promote flow; retain RequestManager (status machine, priorities, bulk) as an 'All requests' view behind it.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Where do per-workspace outcome tabs (scorecard/actions/learnings/playbooks/coverage/RecordPublishedWork) live? 'Cockpit/Insights Engine' is undemonstrated.",
+        "proposedDefault": "Keep OutcomeDashboard mounted behind the book table's 'Cockpit →' link until an Insights-Engine rehome is specced.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Diagnostics: keep the registry nav entry + reports list, or prototype drill-in-only?",
+        "proposedDefault": "Keep nav entry and add a list lens — without it old reports become unreachable after insight resolution.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Workspace-settings depth: full 7-tab parity vs quick-win + legacy-route fallback?",
+        "proposedDefault": "Full parity — all 14 unhomed capabilities are ui-only ports, so the fallback hybrid buys little.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Client onboarding questionnaire/wizard rehome.",
+        "proposedDefault": "Owned by D4 C-phase (C2 re-skin); this zone only preserves the admin enable/reset controls.",
+        "needsOwner": false,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Sign-off on the 7 prototype-only features (see kitNewFeatures).",
+        "proposedDefault": "Adopt the 4 ui-only/S ones; defer tz-locale + stage-backing-move; adopt promote-to-signal flagged.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Outcomes value framing: replace or augment win-rate/scored-30d/coverage/attention columns?",
+        "proposedDefault": "Additive: add value fields (sn-global-ops-3), keep the HEAD columns — no silent field loss.",
+        "needsOwner": true,
+        "source": "newly-found"
+      },
+      {
+        "question": "Strategy-inputs relocation (Strategy → workspace settings) single-source-of-truth.",
+        "proposedDefault": "Relocate with a redirect note; confirm with the Strategy surface owner before removing StrategySettings.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "Promote request → strategy signal (requests.js:133-141)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Flagship operator flow with real value; needs sn-global-ops-4 and its own flag + data contract."
+      },
+      {
+        "proposal": "Archive workspace (wsettings.js:250)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Small (sn-global-ops-1) and solves a real book-hygiene gap delete cannot."
+      },
+      {
+        "proposal": "GBP connection card in workspace settings (wsettings.js:159)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Zero server work — GBP OAuth/status/sync already exist; card is composition."
+      },
+      {
+        "proposal": "Re-run initial audit / initial strategy buttons (wsettings.js:162-163)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Endpoints exist; pure wiring."
+      },
+      {
+        "proposal": "Reporting cadence + timezone/locale prefs (wsettings.js:227-236)",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Cadence half already exists; tz/locale (sn-global-ops-2) is low-urgency and touches report rendering broadly."
+      },
+      {
+        "proposal": "Diagnostics 'stage as backing move' + export (diagnostics.js:182-183)",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Cross-system write into recommendations (sn-global-ops-5); needs its own contract, not a rebuild rider."
+      },
+      {
+        "proposal": "Locked-workbench preview during setup (onboard.js:159-171)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Pure presentation over existing setup state; clear onboarding upgrade."
+      },
+      {
+        "proposal": "Gated cold-start onboarding flow (onboard.js:85-172)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Upgrade of the existing OnboardingChecklist; composes existing connection/audit status."
+      },
+      {
+        "proposal": "Roadmap free-text search + sort dropdown (roadmap.js:150-168)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Client-side; keep clickable-header aria-sort alongside."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Settings (global)",
+        "Workspace Settings (7 tabs: connections/features/flags/publishing/dashboard/export/llms-txt→moved)",
+        "Roadmap (Sprint | Backlog)",
+        "Business (Revenue | AI Usage | Features | Prospects)",
+        "Outcomes (book roll-up + per-ws dashboard via Cockpit link)",
+        "Diagnostics (list + report drill-in)",
+        "Requests/Inbox (feed + All-requests manage view)",
+        "Meeting Brief (cockpit tab)",
+        "Onboarding (admin cold-start flow)"
+      ],
+      "primitives": [
+        "AppShell/PageContainer",
+        "Segmented",
+        "LensSwitcher",
+        "DataTable",
+        "MetricTile",
+        "Sparkline",
+        "Meter",
+        "FilterChip",
+        "SearchField",
+        "Drawer",
+        "KeyValueRow/DefinitionList",
+        "GroupBlock",
+        "Toolbar",
+        "Avatar",
+        "NavGroup/NavItem"
+      ],
+      "dataHooks": [
+        "useOutcomeOverview/useOutcomeScorecard/useOutcomeActions/useOutcomeTopWins/useOutcomeLearnings/useOutcomePlaybooks/useOutcomeCoverage (src/hooks/admin/useOutcomes.ts)",
+        "useDiagnosticsList/useDiagnosticReport/useRunDiagnostic (src/hooks/admin/useDiagnostics.ts)",
+        "useAdminMeetingBrief",
+        "useWorkspaceDeliverables/useRemindDeliverable",
+        "useMcpApiKeys",
+        "useWorkspaceFeatureFlags",
+        "useIntegrationHealth",
+        "useGbpConnectionStatus/useGbpAuthUrl (src/hooks/admin/useGoogleBusinessProfile.ts)",
+        "useBackgroundTasks (SalesReport)",
+        "roadmapApi/featuresApi (src/api/platform.ts) via React Query",
+        "raw get() endpoints in SettingsPanel/RevenueDashboard/AIUsageSection (/api/outcomes/overview, /api/export/:ws/:key via server/routes/data-export.ts, /api/sales-report/:id/html) — wrap in admin-* React Query hooks during rebuild"
+      ],
+      "statesPlan": "Every lens ships Skeleton/EmptyState/ErrorState; AI-usage keeps return-null-when-zero; diagnostics keeps failed + running states; no TierGate (admin-only zone).",
+      "mountNote": "All pages mount in F4 RebuiltAppChrome behind ui-rebuild-shell, GLOBAL_TABS paths preserved; the 4→1 Business consolidation ships a D8 redirect map; shell carries ⌘, and ⌘1-5 shortcuts."
+    },
+    "crossSurfaceDeps": [
+      "Strategy surface — strategy-inputs relocation (row 35) needs single-source-of-truth agreement before StrategySettings is removed",
+      "AI Visibility surface — llms.txt generator moves there (row 34); this zone drops it only once that home ships",
+      "Client portal (D4 C-phase) — client questionnaire + welcome wizard (rows 104-105) rehome with C2 re-skin",
+      "Insights Engine — target of promote-to-signal (sn-global-ops-4) and the claimed per-ws outcomes rehome (rows 73-79)",
+      "Cockpit/WorkspaceHome — Meeting Brief default home + onboarding cold-start flow mount",
+      "D8 — redirect maps required for revenue/ai-usage/features/prospect → business consolidation"
+    ],
+    "unknowns": [
+      "Row 21: whether the prototype's 4 portal-section toggles map 1:1 onto HEAD's 3 client-portal toggles — mapping not verifiable from code alone",
+      "Row 103: whether every onboard.js gate state (GA4→GSC→Webflow→audit→strategy) is derivable from existing integration-health + audit-status reads, or needs a small derived setup-state endpoint — not verified end-to-end",
+      "Whether the Parity Ledger's contradictory Diagnostics rows (Gap vs Improved) have been reconciled upstream since the audit — ledger file not re-read here"
+    ],
+    "effortEstimate": "XL",
+    "surface": "global-ops"
+  },
+  "verify": {
+    "surface": "global-ops",
+    "verdicts": [
+      {
+        "needId": "sn-global-ops-1",
+        "verdict": "CONFIRMED",
+        "evidence": "server/routes/workspaces.ts + server/workspaces.ts: `grep -in archiv` → 0 hits in both. listWorkspaces() is `SELECT * FROM workspaces` with no status/deleted/archived filter (server/workspaces.ts:327 listAll stmt, :483-486 listWorkspaces body). No archived_at migration exists (server/db/migrations/ ends at 175; none reference workspace archive). No PATCH archive/unarchive route among workspaces.ts endpoints. NOTE the `action_outcomes_archive` twin (server/db/archive-twin.ts) is OUTCOME archival, unrelated to workspace archival — a naming-drift trap the gatherer correctly did not fall into. Effort S is plausible but note the DB-column+mapper lockstep: adding archived_at needs migration + WorkspaceRow interface + rowToWorkspace mapper + list-filter change + PATCH route + Zod — leans S/M, not trivially S.",
+        "correction": "existsToday=no stands. Flag effort as S-bordering-M (touches mapper + serialization lockstep, not just an endpoint)."
+      },
+      {
+        "needId": "sn-global-ops-2",
+        "verdict": "CONFIRMED",
+        "evidence": "shared/types/workspace.ts + server/routes/workspaces.ts + server/workspaces.ts: `grep -in 'timezone|locale|time_zone'` → 0 hits. The parenthetical premise ('reporting cadence already exists') is TRUE: Workspace has autoReportFrequency?: 'weekly' | 'monthly' (shared/types/workspace.ts:363, WorkspaceRow :502) and server/monthly-report.ts + cron drive it — but no timezone/locale field backs report timestamps. existsToday=no is correct.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-global-ops-3",
+        "verdict": "CONFIRMED",
+        "evidence": "server/routes/outcomes.ts:223-236 — the overview route pushes EXACTLY {workspaceId, workspaceName, winRate, trend, activeActions, scoredLast30d, topWin, attentionNeeded, attentionReason, coverage}; no value-$/mo, no clicks aggregate. WorkspaceOutcomeOverview (shared/types/outcome-tracking.ts:498-514) matches. getWinsWithValueByWorkspace (server/outcome-tracking.ts:83) is verified reusable for the value side: pure SELECT (no snapshot write on read — passes the computeROI hot-read hazard) and ALREADY applies `ta.attribution != 'not_acted_on'` (line ~93), so the attribution-honesty exclusion the claim demands is present. BUT it returns per-action win rows, not a per-workspace value-$/mo aggregate — a new aggregate query/projection is genuinely net-new. 'partial' + effort M is accurate.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-global-ops-4",
+        "verdict": "CONFIRMED",
+        "evidence": "server/routes/requests.ts routes are CRUD-only: POST /api/requests, /batch, PATCH /bulk, GET (list/detail), PATCH /:id, POST /:id/notes, DELETE /:id, POST /:id/notes-with-files (lines 93-282). `grep -in 'promote|signal|insight'` on requests.ts → 0 hits. No request→insight bridge under any synonym across server/ (checked requestToInsight/promoteRequest/createInsightFrom/insightFromRequest — 0). The lexicon entries for promote/promotable are wordClass=proposed (shared/types/lexicon.ts, def refs 'Mockup requests.js/store.js') — mockup-only, not implemented. existsToday=no + effort M stand.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-global-ops-5",
+        "verdict": "ADJUSTED",
+        "evidence": "The diagnostics→recommendation MAPPING already exists and the gatherer missed it. appendDiagnosticRecommendations (server/domains/recommendations/maintenance-producers.ts:167-217) reads completed diagnostic reports' remediationActions and pushes them as recommendations via RecSource.diagnostic(reportId, actionIdx, actionTitle) (encoder at server/domains/recommendations/rules.ts:181-182; wired into the batch rec-gen cycle at generation-service.ts:271 'Diagnostic remediation recommendations'). So 'convert a remediation plan into a recommendation/backing-move row' is NOT net-new machinery — the source type, opportunity scoring, and rec shape are built. What is genuinely absent: (a) an ON-DEMAND 'stage a SPECIFIC remediation action as a backing move' trigger (today it's automated, batch-only, capped top-3-reports × top-5-actions — no HTTP endpoint to promote one chosen action), and (b) the report-export projection (server/routes/diagnostics.ts is 4 read-only GETs; no export/PDF route anywhere).",
+        "correction": "Downgrade from a full net-new build. Reuse RecSource.diagnostic + appendDiagnosticRecommendations logic; the real net-new work is (a) a single-action on-demand stage endpoint reusing that mapping, and (b) the diagnostic-report export projection. Effort M is defensible only because of (b); the 'backing move' half is closer to S (adapt existing producer). Correct existsToday from 'no' to 'partial'."
+      }
+    ]
+  }
+}
