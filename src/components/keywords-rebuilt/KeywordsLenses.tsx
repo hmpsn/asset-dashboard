@@ -1,4 +1,5 @@
 // @ds-rebuilt
+import { normalizePageUrl } from '../../../shared/page-address-utils';
 import { keywordTrackingKey } from '../../lib/keywordTracking';
 import { useKeywordCommandCenterRows } from '../../hooks/admin/useKeywordCommandCenter';
 import type {
@@ -6,7 +7,7 @@ import type {
   KeywordCommandCenterSummaryResponse,
 } from '../../../shared/types/keyword-command-center';
 import { KEYWORD_LIFECYCLE_STAGES } from '../../../shared/types/keyword-command-center';
-import { Badge, BoardCard, BoardColumn, GroupBlock, InlineBanner } from '../ui';
+import { Badge, BoardCard, BoardColumn, Button, GroupBlock, InlineBanner, Skeleton } from '../ui';
 import { KeywordsTable } from './KeywordsTable';
 import type { KeywordsSurfaceLens, UseKeywordsSurfaceStateReturn } from './useKeywordsSurfaceState';
 
@@ -45,24 +46,42 @@ function averageRank(rows: KeywordCommandCenterRow[]): string {
   return `#${avg.toFixed(avg >= 10 ? 0 : 1)}`;
 }
 
+function opportunityTraffic(rows: KeywordCommandCenterRow[]): string {
+  const impressions = rows
+    .map((row) => row.metrics.impressions)
+    .filter((value): value is number => typeof value === 'number');
+  if (impressions.length === 0) return 'No data';
+  const total = impressions.reduce((sum, value) => sum + value, 0);
+  return new Intl.NumberFormat('en-US', { notation: total >= 10_000 ? 'compact' : 'standard' }).format(total);
+}
+
+function normalizedPath(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  return normalizePageUrl(value).toLowerCase();
+}
+
 function groupRowsByPage(rows: KeywordCommandCenterRow[], summary?: KeywordCommandCenterSummaryResponse): KeywordGroup[] {
   const cannibalizedPaths = new Set<string>();
   for (const issue of summary?.cannibalization ?? []) {
-    for (const page of issue.pages) cannibalizedPaths.add(page.path);
+    for (const page of issue.pages) {
+      const path = normalizedPath(page.path);
+      if (path) cannibalizedPaths.add(path);
+    }
   }
 
   const groups = new Map<string, KeywordGroup>();
   for (const row of rows) {
     const pagePath = row.assignment?.pagePath ?? 'unassigned';
+    const pageKey = normalizedPath(row.assignment?.pagePath) ?? pagePath;
     const title = row.assignment?.pageTitle ?? row.assignment?.pagePath ?? 'Unassigned keywords';
-    const existing = groups.get(pagePath) ?? {
-      id: pagePath,
+    const existing = groups.get(pageKey) ?? {
+      id: pageKey,
       title,
       rows: [],
-      flag: cannibalizedPaths.has(pagePath) ? 'Cannibalization risk' : undefined,
+      flag: cannibalizedPaths.has(pageKey) ? 'Cannibalization risk' : undefined,
     };
     existing.rows.push(row);
-    groups.set(pagePath, existing);
+    groups.set(pageKey, existing);
   }
   return [...groups.values()].sort((a, b) => a.title.localeCompare(b.title));
 }
@@ -159,6 +178,7 @@ function GroupedLens({
           stats={[
             { label: 'Rows', value: group.rows.length },
             { label: 'Avg rank', value: averageRank(group.rows) },
+            { label: 'Opp traffic', value: opportunityTraffic(group.rows) },
           ]}
           flag={group.flag ? { label: group.flag } : undefined}
           collapsible
@@ -212,6 +232,29 @@ export function KeywordsLenses({ workspaceId, state, summary }: KeywordsLensesPr
   const rowsQuery = rowsQueryForLens(state, state.lens);
   const rowsResult = useKeywordCommandCenterRows(workspaceId, rowsQuery);
   const rows = rowsResult.data?.rows ?? [];
+
+  if (rowsResult.isLoading && !rowsResult.data) {
+    return (
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" data-testid="keywords-lens-loading">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <Skeleton key={index} className="h-[116px] w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (rowsResult.isError && !rowsResult.data) {
+    return (
+      <InlineBanner tone="error" title="Could not load keyword rows">
+        <div className="flex flex-wrap items-center gap-2">
+          <span>Try again to reload this lens.</span>
+          <Button size="sm" variant="secondary" onClick={() => rowsResult.refetch()}>
+            Retry
+          </Button>
+        </div>
+      </InlineBanner>
+    );
+  }
 
   if (state.lens === 'pages') {
     return <GroupedLens groups={groupRowsByPage(rows, summary)} onOpen={(row) => state.openKeyword(row.keyword)} />;

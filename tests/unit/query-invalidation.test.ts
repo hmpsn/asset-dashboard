@@ -12,6 +12,7 @@ describe('queryInvalidation', () => {
       queryKeys.admin.rankTrackingKeywords(WS),
       queryKeys.admin.rankTrackingLatest(WS),
       queryKeys.admin.rankTrackingHistory(WS),
+      queryKeys.admin.keywordFeedback(WS),
       queryKeys.admin.intelligenceAll(WS),
     ]);
   });

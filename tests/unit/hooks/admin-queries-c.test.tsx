@@ -656,7 +656,8 @@ describe('useKeywordCommandCenterAction', () => {
     expect(invalidateSpy).toHaveBeenNthCalledWith(3, { queryKey: queryKeys.admin.rankTrackingKeywords('ws-1') });
     expect(invalidateSpy).toHaveBeenNthCalledWith(4, { queryKey: queryKeys.admin.rankTrackingLatest('ws-1') });
     expect(invalidateSpy).toHaveBeenNthCalledWith(5, { queryKey: queryKeys.admin.rankTrackingHistory('ws-1') });
-    expect(invalidateSpy).toHaveBeenNthCalledWith(6, { queryKey: queryKeys.admin.intelligenceAll('ws-1') });
+    expect(invalidateSpy).toHaveBeenNthCalledWith(6, { queryKey: queryKeys.admin.keywordFeedback('ws-1') });
+    expect(invalidateSpy).toHaveBeenNthCalledWith(7, { queryKey: queryKeys.admin.intelligenceAll('ws-1') });
   });
 });
 

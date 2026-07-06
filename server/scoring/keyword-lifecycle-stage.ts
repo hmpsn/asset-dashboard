@@ -4,7 +4,7 @@ import {
   type KeywordCommandCenterRow,
   type KeywordLifecycleStage,
 } from '../../shared/types/keyword-command-center.js';
-import { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS } from '../../shared/types/rank-tracking.js';
+import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import { normalizePageUrl } from '../utils/page-address.js';
 
 function normalizedPagePath(path: string | undefined): string | undefined {
@@ -38,8 +38,7 @@ export function deriveLifecycleStage(
     return KEYWORD_LIFECYCLE_STAGES.PUBLISHED;
   }
 
-  const isActive = row.tracking.status === TRACKED_KEYWORD_STATUS.ACTIVE;
-  if (isActive && pagePath && isInStrategySource(row)) {
+  if (pagePath && isInStrategySource(row)) {
     return KEYWORD_LIFECYCLE_STAGES.TARGETED;
   }
 

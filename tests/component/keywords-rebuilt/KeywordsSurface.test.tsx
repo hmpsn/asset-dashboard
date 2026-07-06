@@ -1,9 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '../../../src/api/client';
 import { Dashboard } from '../../../src/App';
+import { ToastProvider } from '../../../src/components/Toast';
 import { KeywordsSurface } from '../../../src/components/keywords-rebuilt/KeywordsSurface';
+import { queryKeys } from '../../../src/lib/queryKeys';
+import { WS_EVENTS } from '../../../src/lib/wsEvents';
 import { KEYWORD_COMMAND_CENTER_ACTIONS } from '../../../shared/types/keyword-command-center';
 import type {
   KeywordCommandCenterFilterMeta,
@@ -28,7 +32,9 @@ const hardDeleteMutateMock = vi.fn();
 const pinMutateMock = vi.fn();
 const nationalRefreshMutateMock = vi.fn();
 const localRefreshMutateMock = vi.fn();
+const addKeywordMutateMock = vi.fn();
 const apiGetMock = vi.fn();
+let capturedWorkspaceHandlers: Record<string, (data?: unknown) => void> = {};
 
 const workspace = {
   id: 'ws-1',
@@ -75,12 +81,42 @@ vi.mock('../../../src/hooks/admin/useKeywordCommandCenter', () => ({
   useKeywordCommandCenterDetail: (...args: unknown[]) => detailHookMock(...args),
   useKeywordCommandCenterAction: () => ({ mutate: rowActionMutateMock, isPending: false, error: null, variables: undefined }),
   useKeywordHardDelete: () => ({ mutate: hardDeleteMutateMock, isPending: false, error: null }),
+  useRankTrackingAddKeyword: () => ({ mutate: addKeywordMutateMock, isPending: false, error: null }),
   useRankTrackingTogglePin: () => ({ mutate: pinMutateMock, isPending: false, error: null }),
   useNationalSerpRefresh: () => ({ mutate: nationalRefreshMutateMock, isPending: false, error: null }),
 }));
 
 vi.mock('../../../src/hooks/admin/useLocalSeo', () => ({
   useLocalSeoRefresh: () => ({ mutate: localRefreshMutateMock, isPending: false, error: null }),
+}));
+
+vi.mock('../../../src/components/strategy/hooks/useKeywordFeedback', () => ({
+  useKeywordFeedback: () => ({
+    rows: [
+      {
+        keyword: 'dental implants',
+        status: 'requested',
+        reason: 'Client wants this service prioritized.',
+        source: 'content_gap',
+        created_at: '2026-07-01T00:00:00.000Z',
+        updated_at: '2026-07-01T00:00:00.000Z',
+        declined_by: null,
+      },
+      {
+        keyword: 'cheap veneers',
+        status: 'declined',
+        reason: 'Off-brand query.',
+        source: 'opportunity',
+        created_at: '2026-07-01T00:00:00.000Z',
+        updated_at: '2026-07-01T00:00:00.000Z',
+        declined_by: 'client',
+      },
+    ],
+    addError: null,
+    setAddError: vi.fn(),
+    addRequestedKeyword: vi.fn(),
+    addPending: false,
+  }),
 }));
 
 vi.mock('../../../src/api/client', async () => {
@@ -93,6 +129,13 @@ vi.mock('../../../src/api/client', async () => {
 
 vi.mock('../../../src/hooks/useGlobalAdminEvents', () => ({
   useGlobalAdminEvents: vi.fn(),
+}));
+
+vi.mock('../../../src/hooks/useWorkspaceEvents', () => ({
+  useWorkspaceEvents: (_workspaceId: string | undefined, handlers: Record<string, (data?: unknown) => void>) => {
+    capturedWorkspaceHandlers = handlers;
+    return { send: vi.fn() };
+  },
 }));
 
 vi.mock('../../../src/hooks/useWsInvalidation', () => ({
@@ -146,8 +189,11 @@ const summaryPayload: KeywordCommandCenterSummaryResponse = {
     declined: 0,
   },
   filters: [
+    { id: 'all', label: 'All', count: 2 },
     { id: 'tracked', label: 'Tracked', count: 2 },
     { id: 'page_assigned', label: 'Page assigned', count: 2 },
+    { id: 'requested', label: 'Requested', count: 1 },
+    { id: 'lost_visibility', label: 'Lost visibility', count: 1 },
   ] as KeywordCommandCenterFilterMeta[],
   rawEvidenceTotal: 120,
   rawEvidenceReturned: 75,
@@ -187,6 +233,8 @@ const rows: KeywordCommandCenterRow[] = [
       nationalPosition: 4,
       matchedUrl: 'https://acme.com/cosmetic-dentistry',
       serpFeatures: ['featured_snippet'],
+      aiOverviewPresent: true,
+      aiOverviewCited: true,
       clicks: 42,
       impressions: 900,
       volume: 700,
@@ -209,6 +257,42 @@ const rows: KeywordCommandCenterRow[] = [
         tone: 'teal',
         keyword: 'cosmetic dentistry',
       },
+      {
+        type: KEYWORD_COMMAND_CENTER_ACTIONS.PAUSE_TRACKING,
+        label: 'Pause tracking',
+        detail: 'Pause rank tracking while retaining history.',
+        tone: 'amber',
+        keyword: 'cosmetic dentistry',
+      },
+      {
+        type: KEYWORD_COMMAND_CENTER_ACTIONS.DECLINE,
+        label: 'Decline keyword',
+        detail: 'Mark this keyword as declined.',
+        tone: 'red',
+        keyword: 'cosmetic dentistry',
+      },
+      {
+        type: KEYWORD_COMMAND_CENTER_ACTIONS.RESTORE,
+        label: 'Restore keyword',
+        detail: 'Restore this keyword to active consideration.',
+        tone: 'teal',
+        keyword: 'cosmetic dentistry',
+      },
+      {
+        type: 'review_page',
+        label: 'Review page',
+        detail: 'Open the assigned page for review.',
+        tone: 'blue',
+        keyword: 'cosmetic dentistry',
+        pagePath: '/cosmetic-dentistry',
+      },
+      {
+        type: 'generate_brief',
+        label: 'Generate brief',
+        detail: 'Create a content brief for this keyword.',
+        tone: 'blue',
+        keyword: 'cosmetic dentistry',
+      },
     ],
     isProtected: false,
     localSeoState: {
@@ -220,6 +304,51 @@ const rows: KeywordCommandCenterRow[] = [
       checked: true,
       marketLabel: 'Austin',
       sourceLabels: ['GBP'],
+      localPackPresent: true,
+      businessMatchConfidence: 'verified',
+    },
+    localSeo: {
+      keyword: 'cosmetic dentistry',
+      normalizedKeyword: 'cosmetic dentistry',
+      marketId: 'market-austin',
+      marketLabel: 'Austin',
+      capturedAt: '2026-07-01T00:00:00.000Z',
+      posture: 'visible',
+      label: 'Visible #2',
+      detail: 'Business appears in local results.',
+      localPackPresent: true,
+      businessFound: true,
+      businessMatchConfidence: 'verified',
+      localRank: 2,
+      sourceEndpoint: 'google_maps',
+      provider: 'dataforseo',
+      topCompetitors: [
+        { title: 'Austin Smile Studio', rank: 1, domain: 'smile.example' },
+      ],
+      marketCount: 1,
+      markets: [
+        {
+          keyword: 'cosmetic dentistry',
+          normalizedKeyword: 'cosmetic dentistry',
+          marketId: 'market-austin',
+          marketLabel: 'Austin',
+          capturedAt: '2026-07-01T00:00:00.000Z',
+          posture: 'visible',
+          label: 'Visible #2',
+          detail: 'Business appears in local results.',
+          localPackPresent: true,
+          businessFound: true,
+          businessMatchConfidence: 'verified',
+          localRank: 2,
+          sourceEndpoint: 'google_maps',
+          provider: 'dataforseo',
+        },
+      ],
+      visibleMarketCount: 1,
+      possibleMatchMarketCount: 0,
+      localPackOnlyMarketCount: 0,
+      notVisibleMarketCount: 0,
+      degradedMarketCount: 0,
     },
     opportunityScore: 84,
     currentMonthly: 1234,
@@ -253,6 +382,7 @@ const rows: KeywordCommandCenterRow[] = [
 ];
 
 function setupKeywordHooks() {
+  capturedWorkspaceHandlers = {};
   summaryHookMock.mockReturnValue({
     data: summaryPayload,
     isLoading: false,
@@ -312,7 +442,22 @@ function setupKeywordHooks() {
   bulkMutateMock.mockImplementation((_body: unknown, options?: { onSuccess?: (result: { message: string }) => void }) => {
     options?.onSuccess?.({ message: 'Bulk action complete' });
   });
+  rowActionMutateMock.mockImplementation((_body: unknown, options?: { onSuccess?: () => void }) => {
+    options?.onSuccess?.();
+  });
   hardDeleteMutateMock.mockImplementation((_vars: unknown, options?: { onSuccess?: () => void }) => {
+    options?.onSuccess?.();
+  });
+  pinMutateMock.mockImplementation((_keyword: string, options?: { onSuccess?: () => void }) => {
+    options?.onSuccess?.();
+  });
+  nationalRefreshMutateMock.mockImplementation((_vars?: void, options?: { onSuccess?: () => void }) => {
+    options?.onSuccess?.();
+  });
+  localRefreshMutateMock.mockImplementation((_body: unknown, options?: { onSuccess?: () => void }) => {
+    options?.onSuccess?.();
+  });
+  addKeywordMutateMock.mockImplementation((_keyword: string, options?: { onSuccess?: () => void }) => {
     options?.onSuccess?.();
   });
   apiGetMock.mockResolvedValue([
@@ -323,13 +468,16 @@ function setupKeywordHooks() {
 
 function renderSurface(path: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const result = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[path]}>
-        <KeywordsSurface workspaceId="ws-1" />
+        <ToastProvider>
+          <KeywordsSurface workspaceId="ws-1" />
+        </ToastProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  return { ...result, queryClient };
 }
 
 function renderDashboard(path = '/ws/ws-1/seo-keywords?tab=lifecycle') {
@@ -376,6 +524,9 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByText('Commercial')).toBeInTheDocument();
     expect(screen.getByText('#6')).toBeInTheDocument();
     expect(screen.getAllByText('$1,234').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('700')).toBeInTheDocument();
+    expect(screen.getByText('29')).toBeInTheDocument();
+    expect(screen.getByText('Tracked locally')).toBeInTheDocument();
     expect(screen.getByText('From gap')).toBeInTheDocument();
     expect(screen.getByText('Auto-managed')).toBeInTheDocument();
     expect(screen.getByText('No CPC')).toBeInTheDocument();
@@ -399,25 +550,57 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     });
   });
 
-  it('switches lenses, updates the URL-backed query, and renders grouped shapes', async () => {
+  it('supports manual add, advanced filters, select-visible, and client feedback actions', async () => {
     renderSurface('/ws/ws-1/seo-keywords');
+
+    fireEvent.change(screen.getByLabelText('Add keyword'), { target: { value: 'dental crowns' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(addKeywordMutateMock).toHaveBeenCalledWith('dental crowns', expect.anything());
+    expect(screen.getByText('Keyword added to rank tracking')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Advanced keyword filter'), { target: { value: 'requested' } });
+    await waitFor(() => {
+      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: 'requested' });
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select visible 2' }));
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+
+    expect(screen.getByText('Client keyword feedback')).toBeInTheDocument();
+    expect(screen.getByText('dental implants')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add to strategy' }).at(-1)!);
+    expect(rowActionMutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY,
+        keyword: 'dental implants',
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('switches lenses, updates the URL-backed query, and renders grouped shapes', async () => {
+    const { container } = renderSurface('/ws/ws-1/seo-keywords');
+    await expectNoA11yViolations(container);
 
     fireEvent.click(screen.getByRole('radio', { name: /Opportunities/ }));
     await waitFor(() => {
       expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'opportunity', direction: 'desc' });
     });
+    await expectNoA11yViolations(container);
 
     fireEvent.click(screen.getByRole('radio', { name: /Pages/ }));
     await waitFor(() => {
       expect(screen.getAllByText('Cosmetic Dentistry').length).toBeGreaterThan(0);
     });
     expect(screen.getByText('Cannibalization risk')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
 
     fireEvent.click(screen.getByRole('radio', { name: /Clusters/ }));
     await waitFor(() => {
       expect(screen.getByText('Dental services')).toBeInTheDocument();
     });
     expect(screen.getByText('2/3 covered')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
 
     fireEvent.click(screen.getByRole('radio', { name: /Lifecycle/ }));
     await waitFor(() => {
@@ -426,10 +609,11 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     });
     expect(screen.getByText('cosmetic dentistry')).toBeInTheDocument();
     expect(screen.getByText('emergency dentist')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 
   it('opens the detail drawer from a row click and renders value, provenance, and outcome context', async () => {
-    renderSurface('/ws/ws-1/seo-keywords');
+    const { container } = renderSurface('/ws/ws-1/seo-keywords');
 
     fireEvent.click(screen.getAllByText('cosmetic dentistry')[0]);
 
@@ -440,9 +624,14 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(within(dialog).getByText('Page-one rankings with meaningful click volume.')).toBeInTheDocument();
     expect(within(dialog).getByText('$2,400/mo')).toBeInTheDocument();
     expect(within(dialog).getByText('strategy primary')).toBeInTheDocument();
-    expect(within(dialog).getByText('Austin')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('Austin').length).toBeGreaterThan(0);
     expect(within(dialog).getByText('Live SERP #4')).toBeInTheDocument();
-    expect(within(dialog).getByText('featured snippet')).toBeInTheDocument();
+    expect(within(dialog).getByText('Cited in AI Overview')).toBeInTheDocument();
+    expect(within(dialog).getByText('Snippet')).toBeInTheDocument();
+    expect(within(dialog).getByText('Visible #2')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Austin Smile Studio/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Generate brief' })).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 
   it('opens the detail drawer from a ?q deep link', async () => {
@@ -451,6 +640,126 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('heading', { name: 'emergency dentist' })).toBeInTheDocument();
     expect(within(dialog).getByText('Tracked client keyword')).toBeInTheDocument();
+  });
+
+  it('invalidates the keyword command-center prefix for live workspace events', () => {
+    const { queryClient } = renderSurface('/ws/ws-1/seo-keywords');
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    act(() => {
+      capturedWorkspaceHandlers[WS_EVENTS.RANK_TRACKING_UPDATED]?.();
+      capturedWorkspaceHandlers[WS_EVENTS.SERP_SNAPSHOTS_REFRESHED]?.();
+      capturedWorkspaceHandlers[WS_EVENTS.STRATEGY_UPDATED]?.();
+    });
+
+    const invalidatedKeys = invalidateSpy.mock.calls
+      .map(([arg]) => (arg as { queryKey?: readonly unknown[] }).queryKey)
+      .filter((key): key is readonly unknown[] => Array.isArray(key));
+
+    expect(invalidatedKeys).toEqual([
+      queryKeys.admin.keywordCommandCenter('ws-1'),
+      queryKeys.admin.keywordCommandCenter('ws-1'),
+      queryKeys.admin.keywordCommandCenter('ws-1'),
+    ]);
+  });
+
+  it('renders loading shimmers without fabricating zero-value metrics', () => {
+    summaryHookMock.mockReturnValue({ data: undefined, isLoading: true, isError: false, error: null });
+    rowsHookMock.mockReturnValue({ data: undefined, isLoading: true, isError: false, error: null, refetch: vi.fn() });
+
+    const { container } = renderSurface('/ws/ws-1/seo-keywords');
+
+    expect(container.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Total')).not.toBeInTheDocument();
+    expect(screen.queryByText('Monthly Value')).not.toBeInTheDocument();
+  });
+
+  it('renders an action-oriented empty state for a workspace with no keyword data', () => {
+    summaryHookMock.mockReturnValue({
+      data: { ...summaryPayload, counts: { ...summaryPayload.counts, total: 0 }, rawEvidenceTotal: 0, rawEvidenceReturned: 0 },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    rowsHookMock.mockReturnValue({
+      data: {
+        rows: [],
+        pageInfo: { page: 1, pageSize: 50, totalRows: 0, totalPages: 1, hasNextPage: false, hasPreviousPage: false },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    expect(screen.getByText('No keywords yet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open strategy' })).toBeInTheDocument();
+  });
+
+  it('renders a filtered empty state with a clear action', () => {
+    rowsHookMock.mockReturnValue({
+      data: {
+        rows: [],
+        pageInfo: { page: 1, pageSize: 50, totalRows: 0, totalPages: 1, hasNextPage: false, hasPreviousPage: false },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderSurface('/ws/ws-1/seo-keywords?filter=tracked&search=missing');
+
+    expect(screen.getByText('No keywords match this view')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    return waitFor(() => {
+      expect(screen.getByRole('searchbox')).toHaveValue('');
+    });
+  });
+
+  it('renders row errors inline while preserving stale row data and retry', () => {
+    const refetch = vi.fn();
+    rowsHookMock.mockImplementation((_workspaceId: string, query: KeywordCommandCenterRowsQuery) => ({
+      data: {
+        rows,
+        pageInfo: {
+          page: query.page ?? 1,
+          pageSize: query.pageSize ?? 50,
+          totalRows: rows.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+      },
+      isLoading: false,
+      isError: true,
+      error: new Error('network down'),
+      refetch,
+    }));
+
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    expect(screen.getByText('Could not load keywords')).toBeInTheDocument();
+    expect(screen.getByText('cosmetic dentistry')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('renders locked keyword access as a permission state', () => {
+    summaryHookMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new ApiError(403, 'Upgrade required'),
+      refetch: vi.fn(),
+    });
+
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    expect(screen.getByText('Keyword intelligence is locked')).toBeInTheDocument();
+    expect(screen.queryByText('cosmetic dentistry')).not.toBeInTheDocument();
   });
 
   it('dispatches drawer lifecycle and local-refresh actions', async () => {
@@ -464,10 +773,13 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
         action: KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE,
         keyword: 'cosmetic dentistry',
       }),
+      expect.anything(),
     );
+    expect(screen.getByText('Retire keyword complete')).toBeInTheDocument();
 
     fireEvent.click(within(dialog).getAllByRole('button', { name: 'Refresh local visibility' })[0]);
-    expect(localRefreshMutateMock).toHaveBeenCalledWith({ keywords: ['cosmetic dentistry'] });
+    expect(localRefreshMutateMock).toHaveBeenCalledWith({ keywords: ['cosmetic dentistry'] }, expect.anything());
+    expect(screen.getAllByText('Local visibility refresh started').length).toBeGreaterThan(0);
   });
 
   it('shows hard delete only for eligible manual rows and closes after confirmed delete', async () => {
@@ -483,6 +795,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
       { keyword: 'emergency dentist' },
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
+    expect(screen.getByText('Keyword permanently deleted')).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
@@ -502,6 +815,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
       }),
       expect.anything(),
     );
+    expect(screen.getAllByText('Bulk action complete').length).toBeGreaterThan(0);
   });
 
   it('gates protected bulk actions behind confirmation before sending force', () => {

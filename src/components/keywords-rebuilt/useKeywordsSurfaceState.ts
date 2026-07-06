@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   KEYWORD_COMMAND_CENTER_FILTERS,
@@ -8,7 +8,6 @@ import {
 } from '../../../shared/types/keyword-command-center';
 import {
   HUB_DEEP_LINK_PARAMS,
-  isKeywordHubSegment,
   readHubDeepLink,
 } from '../../lib/keywordHubDeepLink';
 import { keywordTrackingKey } from '../../lib/keywordTracking';
@@ -40,6 +39,7 @@ export const KEYWORDS_SURFACE_FILTERS = [
 ] as const satisfies ReadonlyArray<{ id: KeywordCommandCenterFilter; label: string }>;
 
 const LENS_VALUES = new Set<string>(KEYWORDS_SURFACE_LENSES.map((lens) => lens.id));
+const FILTER_VALUES = new Set<string>(Object.values(KEYWORD_COMMAND_CENTER_FILTERS));
 const SORT_VALUES = new Set<string>([
   'opportunity',
   'keyword',
@@ -66,6 +66,10 @@ function isKeywordHubSortKey(value: string | null | undefined): value is Keyword
   return typeof value === 'string' && SORT_VALUES.has(value);
 }
 
+function isKeywordCommandCenterFilter(value: string | null | undefined): value is KeywordCommandCenterFilter {
+  return typeof value === 'string' && FILTER_VALUES.has(value);
+}
+
 function isSortDirection(value: string | null | undefined): value is KeywordHubSortState['direction'] {
   return value === 'asc' || value === 'desc';
 }
@@ -78,7 +82,7 @@ function positiveInt(value: string | null, fallback: number): number {
 
 function filterFromParams(params: URLSearchParams): KeywordCommandCenterFilter {
   const explicitFilter = params.get('filter');
-  if (isKeywordHubSegment(explicitFilter)) return explicitFilter;
+  if (isKeywordCommandCenterFilter(explicitFilter)) return explicitFilter;
   return readHubDeepLink(params).segment ?? DEFAULT_FILTER;
 }
 
@@ -111,6 +115,7 @@ export interface UseKeywordsSurfaceStateReturn {
   setFilter: (filter: KeywordCommandCenterFilter) => void;
   searchInput: string;
   setSearchInput: (value: string) => void;
+  clearFilters: () => void;
   search: string;
   sort: KeywordHubSortState;
   setSort: (key: KeywordHubSortKey) => void;
@@ -126,6 +131,7 @@ export interface UseKeywordsSurfaceStateReturn {
 export function useKeywordsSurfaceState(): UseKeywordsSurfaceStateReturn {
   const [searchParams, setSearchParams] = useSearchParams();
   const committedSearch = searchParams.get('search') ?? '';
+  const lastSyncedSearchRef = useRef(committedSearch);
   const [searchInput, setSearchInput] = useState(committedSearch);
   const debouncedSearchInput = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS);
 
@@ -152,15 +158,17 @@ export function useKeywordsSurfaceState(): UseKeywordsSurfaceStateReturn {
   }, [setSearchParams]);
 
   useEffect(() => {
-    if (committedSearch === searchInput) return;
+    if (committedSearch === lastSyncedSearchRef.current) return;
+    lastSyncedSearchRef.current = committedSearch;
     setSearchInput(committedSearch);
-  }, [committedSearch, searchInput]);
+  }, [committedSearch]);
 
   useEffect(() => {
     const nextSearch = debouncedSearchInput.trim();
+    if (nextSearch !== searchInput.trim()) return;
     if (nextSearch === committedSearch) return;
     updateParams({ search: nextSearch, page: DEFAULT_PAGE });
-  }, [committedSearch, debouncedSearchInput, updateParams]);
+  }, [committedSearch, debouncedSearchInput, searchInput, updateParams]);
 
   const setLens = useCallback((nextLens: KeywordsSurfaceLens) => {
     const nextSort = defaultSortForLens(nextLens);
@@ -174,6 +182,11 @@ export function useKeywordsSurfaceState(): UseKeywordsSurfaceStateReturn {
 
   const setFilter = useCallback((nextFilter: KeywordCommandCenterFilter) => {
     updateParams({ filter: nextFilter, page: DEFAULT_PAGE });
+  }, [updateParams]);
+
+  const clearFilters = useCallback(() => {
+    setSearchInput('');
+    updateParams({ filter: null, search: null, page: DEFAULT_PAGE });
   }, [updateParams]);
 
   const setSort = useCallback((key: KeywordHubSortKey) => {
@@ -211,6 +224,7 @@ export function useKeywordsSurfaceState(): UseKeywordsSurfaceStateReturn {
     setFilter,
     searchInput,
     setSearchInput,
+    clearFilters,
     search,
     sort,
     setSort,

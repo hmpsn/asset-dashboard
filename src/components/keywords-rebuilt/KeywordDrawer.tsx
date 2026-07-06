@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { get } from '../../api/client';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
+import { buildHubDeepLinkQuery } from '../../lib/keywordHubDeepLink';
 import { rankTrackingHistoryPath } from '../../lib/keywordTracking';
 import { queryKeys } from '../../lib/queryKeys';
 import { adminPath } from '../../routes';
@@ -21,7 +23,12 @@ import {
   useRankTrackingTogglePin,
 } from '../../hooks/admin/useKeywordCommandCenter';
 import { useLocalSeoRefresh } from '../../hooks/admin/useLocalSeo';
+import { useToast } from '../Toast';
 import { canHardDelete } from '../keyword-command-center/KeywordActionMenu';
+import { actionVariant, localPriorityTone } from '../keyword-command-center/kccDisplayHelpers';
+import { LocalSeoVisibilityBadge } from '../local-seo/LocalSeoVisibilityPanel';
+import { serpBadges } from '../shared/serpFeatureBadges';
+import { mutationErrorMessage } from './keywordMutationFeedback';
 import {
   Badge,
   Button,
@@ -45,6 +52,7 @@ interface KeywordDrawerProps {
 }
 
 type HistoryPoint = { date: string; positions: Record<string, number> };
+const MAX_INLINE_MARKETS = 6;
 
 const SERVER_ACTIONS = new Set<KeywordCommandCenterNextActionType>([
   KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY,
@@ -103,6 +111,8 @@ function detailItems(row: KeywordCommandCenterRow) {
 
 export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerProps) {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const nationalSerpEnabled = useFeatureFlag('national-serp-tracking');
   const open = keyword != null;
   const detail = useKeywordCommandCenterDetail(workspaceId, keyword);
   const row = detail.data?.row ?? null;
@@ -113,6 +123,7 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
   const localRefresh = useLocalSeoRefresh(workspaceId);
   const [pendingForceAction, setPendingForceAction] = useState<KeywordCommandCenterNextAction | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showAllMarkets, setShowAllMarkets] = useState(false);
 
   const historyKeyword = row?.keyword ?? keyword ?? '';
   const rankHistory = useQuery({
@@ -129,6 +140,18 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
       .filter((position): position is number => typeof position === 'number')
       .map((position) => -position);
   }, [rankHistory.data, row]);
+
+  const allMarkets = row?.localSeo?.markets
+    ? [...row.localSeo.markets].sort((a, b) => a.marketLabel.localeCompare(b.marketLabel))
+    : [];
+  const visibleMarkets = showAllMarkets ? allMarkets : allMarkets.slice(0, MAX_INLINE_MARKETS);
+  const hiddenMarketCount = allMarkets.length - visibleMarkets.length;
+  const hasLiveSerp = !!row && (
+    row.metrics.nationalPosition != null
+    || !!row.metrics.matchedUrl
+    || (row.metrics.serpFeatures?.length ?? 0) > 0
+    || row.metrics.aiOverviewPresent != null
+  );
 
   const runAction = (action: KeywordCommandCenterNextAction, force = false) => {
     if (!row) return;
@@ -159,7 +182,13 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
       return;
     }
     if (action.type === 'check_local_visibility') {
-      localRefresh.mutate({ keywords: [row.keyword] });
+      localRefresh.mutate(
+        { keywords: [row.keyword] },
+        {
+          onSuccess: () => toast('Local visibility refresh started', 'success'),
+          onError: (error) => toast(mutationErrorMessage(error, 'Local visibility refresh failed'), 'error'),
+        },
+      );
       return;
     }
     if (!isServerAction(action.type)) return;
@@ -172,6 +201,9 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
       keyword: row.keyword,
       pagePath: action.pagePath,
       force: force || undefined,
+    }, {
+      onSuccess: () => toast(`${action.label} complete`, 'success'),
+      onError: (error) => toast(mutationErrorMessage(error, `${action.label} failed`), 'error'),
     });
   };
 
@@ -186,11 +218,11 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
         width={520}
         footer={row && (
           <Toolbar label="Keyword detail actions" className="w-full">
-            {row.nextActions.slice(0, 4).map((action) => (
+            {row.nextActions.map((action) => (
               <Button
-                key={action.type}
+                key={`${action.type}-${action.label}`}
                 size="sm"
-                variant={action.type === KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE || action.type === KEYWORD_COMMAND_CENTER_ACTIONS.DECLINE ? 'ghost' : 'secondary'}
+                variant={actionVariant(action)}
                 disabled={actionMutation.isPending || action.disabled}
                 onClick={() => runAction(action)}
               >
@@ -246,6 +278,21 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
 
             <DefinitionList items={detailItems(row)} />
 
+            {row.tracking.replacedBy && (
+              <InlineBanner tone="warning" size="sm" title="Replacement keyword">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>This keyword was replaced by {row.tracking.replacedBy}.</span>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => navigate(`${adminPath(workspaceId, 'seo-keywords')}${buildHubDeepLinkQuery({ keyword: row.tracking.replacedBy ?? '' })}`)}
+                  >
+                    View replacement
+                  </Button>
+                </div>
+              </InlineBanner>
+            )}
+
             {row.valueReasons && row.valueReasons.length > 0 && (
               <div>
                 <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Why this score</h3>
@@ -290,14 +337,116 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
                   )}
                 </div>
               </div>
-              {row.metrics.serpFeatures && row.metrics.serpFeatures.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {row.metrics.serpFeatures.map((feature) => (
-                    <Badge key={feature} label={labelize(feature)} tone="blue" variant="outline" />
-                  ))}
+              {hasLiveSerp && (
+                <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="t-caption-sm text-[var(--brand-text-muted)]">Live SERP rank</p>
+                      <p className="t-caption font-semibold text-[var(--blue)] tabular-nums">
+                        {typeof row.metrics.nationalPosition === 'number' ? `#${row.metrics.nationalPosition}` : 'Not ranking'}
+                      </p>
+                    </div>
+                    {row.metrics.aiOverviewPresent != null && (
+                      <Badge
+                        label={row.metrics.aiOverviewPresent
+                          ? row.metrics.aiOverviewCited ? 'Cited in AI Overview' : 'AI Overview present'
+                          : 'No AI Overview'}
+                        tone={row.metrics.aiOverviewCited ? 'emerald' : row.metrics.aiOverviewPresent ? 'blue' : 'zinc'}
+                        variant="outline"
+                        shape="pill"
+                      />
+                    )}
+                  </div>
+                  {row.metrics.matchedUrl && (
+                    <p className="mt-2 truncate t-caption-sm text-[var(--brand-text-muted)]">
+                      Ranking URL: <span className="text-[var(--brand-text)]">{row.metrics.matchedUrl}</span>
+                    </p>
+                  )}
+                  <div className="mt-2">{serpBadges(row.metrics.serpFeatures, 'plain')}</div>
                 </div>
               )}
             </div>
+
+            {(visibleMarkets.length > 0 || row.localSeoState) && (
+              <div>
+                <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Local visibility</h3>
+                {visibleMarkets.length > 0 ? (
+                  <div className="mt-2 flex flex-col gap-2">
+                    {visibleMarkets.map((market) => (
+                      <div key={market.marketId} className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="t-caption font-semibold text-[var(--brand-text-bright)]">{market.marketLabel}</p>
+                            <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                              {typeof market.localRank === 'number' ? `Pack rank #${market.localRank}` : market.label}
+                            </p>
+                            <p className="t-caption-sm text-[var(--brand-text-muted)]">{market.detail}</p>
+                          </div>
+                          <LocalSeoVisibilityBadge visibility={market} />
+                        </div>
+                      </div>
+                    ))}
+                    {hiddenMarketCount > 0 && (
+                      <Button size="sm" variant="ghost" onClick={() => setShowAllMarkets(true)}>
+                        +{hiddenMarketCount} more markets
+                      </Button>
+                    )}
+                  </div>
+                ) : row.localSeoState ? (
+                  <div className="mt-2 rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="t-caption font-semibold text-[var(--brand-text-bright)]">
+                          {row.localSeoState.marketLabel ?? row.localSeoState.lifecycleLabel}
+                        </p>
+                        <p className="t-caption-sm text-[var(--brand-text-muted)]">{row.localSeoState.detail}</p>
+                      </div>
+                      <div className="flex flex-wrap justify-end gap-1.5">
+                        <Badge label={row.localSeoState.priorityLabel} tone={localPriorityTone(row.localSeoState.priority)} variant="outline" shape="pill" />
+                        {row.localSeo ? (
+                          <LocalSeoVisibilityBadge visibility={row.localSeo} />
+                        ) : (
+                          <StatusBadge domain="keyword-command-center" status={row.localSeoState.lifecycle} variant="soft" shape="pill" fallback="neutral" />
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {row.localSeoState.sourceLabels.map((source) => (
+                        <Badge key={source} label={source} tone="blue" variant="soft" />
+                      ))}
+                      {row.localSeoState.localPackPresent != null && (
+                        <Badge
+                          label={row.localSeoState.localPackPresent ? 'Local pack present' : 'No local pack'}
+                          tone={row.localSeoState.localPackPresent ? 'blue' : 'zinc'}
+                          variant="outline"
+                        />
+                      )}
+                      {row.localSeoState.businessMatchConfidence && (
+                        <Badge label={labelize(row.localSeoState.businessMatchConfidence)} tone="amber" variant="outline" />
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+                {row.localSeo?.topCompetitors && row.localSeo.topCompetitors.length > 0 && (
+                  <div className="mt-2 rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
+                    <p className="t-caption-sm font-semibold text-[var(--brand-text-bright)]">Top local result evidence</p>
+                    <div className="mt-2 flex flex-col gap-1.5">
+                      {row.localSeo.topCompetitors.slice(0, 3).map((result) => (
+                        <div key={`${result.rank ?? 'rank'}-${result.title}`} className="flex items-center justify-between gap-3">
+                          <p className="truncate t-caption-sm text-[var(--brand-text)]">
+                            {result.rank ? `#${result.rank} ` : ''}{result.title}
+                          </p>
+                          {result.domain && <span className="truncate t-caption-sm text-[var(--blue)]">{result.domain}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <p className="mt-2 t-caption-sm text-[var(--brand-text-muted)]">
+                  Local SEO is market-specific local-pack visibility. Rank Tracker remains Search Console measurement.
+                </p>
+              </div>
+            )}
 
             <div>
               <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Controls</h3>
@@ -308,17 +457,43 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
                     variant={row.tracking.pinned ? 'secondary' : 'ghost'}
                     disabled={togglePin.isPending}
                     aria-pressed={row.tracking.pinned === true}
-                    onClick={() => togglePin.mutate(row.keyword)}
+                    onClick={() => togglePin.mutate(row.keyword, {
+                      onSuccess: () => toast(row.tracking.pinned ? 'Keyword unpinned' : 'Keyword pinned', 'success'),
+                      onError: (error) => toast(mutationErrorMessage(error, 'Pin update failed'), 'error'),
+                    })}
                   >
                     {row.tracking.pinned ? 'Pinned' : 'Pin'}
                   </Button>
                 )}
-                <Button size="sm" variant="ghost" disabled={nationalRefresh.isPending} onClick={() => nationalRefresh.mutate()}>
-                  Refresh national ranks
-                </Button>
-                <Button size="sm" variant="ghost" disabled={localRefresh.isPending} onClick={() => localRefresh.mutate({ keywords: [row.keyword] })}>
-                  Refresh local visibility
-                </Button>
+                {nationalSerpEnabled && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={nationalRefresh.isPending}
+                    onClick={() => nationalRefresh.mutate(undefined, {
+                      onSuccess: () => toast('National rank refresh started', 'success'),
+                      onError: (error) => toast(mutationErrorMessage(error, 'National rank refresh failed'), 'error'),
+                    })}
+                  >
+                    Refresh national ranks
+                  </Button>
+                )}
+                {row.localSeoState && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={localRefresh.isPending}
+                    onClick={() => localRefresh.mutate(
+                      { keywords: [row.keyword] },
+                      {
+                        onSuccess: () => toast('Local visibility refresh started', 'success'),
+                        onError: (error) => toast(mutationErrorMessage(error, 'Local visibility refresh failed'), 'error'),
+                      },
+                    )}
+                  >
+                    Refresh local visibility
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -348,7 +523,16 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
         onCancel={() => setConfirmDelete(false)}
         onConfirm={() => {
           if (row) {
-            hardDelete.mutate({ keyword: row.keyword }, { onSuccess: onClose });
+            hardDelete.mutate(
+              { keyword: row.keyword },
+              {
+                onSuccess: () => {
+                  toast('Keyword permanently deleted', 'success');
+                  onClose();
+                },
+                onError: (error) => toast(mutationErrorMessage(error, 'Keyword delete failed'), 'error'),
+              },
+            );
           }
           setConfirmDelete(false);
         }}

@@ -1,7 +1,9 @@
 // @ds-rebuilt
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
+  KEYWORD_COMMAND_CENTER_FILTERS,
   type KeywordCommandCenterBulkActionType,
   type KeywordCommandCenterRow,
   type KeywordCommandCenterSummaryResponse,
@@ -9,18 +11,23 @@ import {
 import { GSC_METRIC_WINDOW_DAYS } from '../../../shared/keyword-window';
 import { useKeywordCommandCenterBulkAction, useKeywordCommandCenterRows } from '../../hooks/admin/useKeywordCommandCenter';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
+import { adminPath } from '../../routes';
+import { useToast } from '../Toast';
 import { KeywordBulkConfirmDialog } from '../keyword-command-center/KeywordBulkConfirmDialog';
 import {
   summarizeBulkAction,
   type KeywordBulkActionSummary,
 } from '../keyword-command-center/kccActionHelpers';
+import { mutationErrorMessage } from './keywordMutationFeedback';
 import type { KeywordIntent } from '../ui';
 import {
   Badge,
   Button,
   Checkbox,
   DataTable,
+  EmptyState,
   FilterChip,
+  Icon,
   InlineBanner,
   IntentTag,
   Meter,
@@ -67,6 +74,14 @@ const SORT_CONTROLS = [
   { key: 'difficulty', label: 'Difficulty' },
 ] as const;
 
+function TargetEmptyIcon({ className }: { className?: string }) {
+  return <Icon name="target" className={className} />;
+}
+
+function SearchEmptyIcon({ className }: { className?: string }) {
+  return <Icon name="search" className={className} />;
+}
+
 function asIntent(value: string | undefined): KeywordIntent | null {
   if (!value) return null;
   const normalized = value.trim().toLowerCase() as KeywordIntent;
@@ -75,6 +90,10 @@ function asIntent(value: string | undefined): KeywordIntent | null {
 
 function formatMoney(value: number | undefined): string {
   return typeof value === 'number' ? MONEY_FORMAT.format(value) : 'No CPC';
+}
+
+function formatNumber(value: number | undefined): string {
+  return typeof value === 'number' ? NUMBER_FORMAT.format(value) : 'No data';
 }
 
 function toRecord(row: KeywordCommandCenterRow): KeywordsTableRecord {
@@ -94,6 +113,8 @@ function selectedRowsFrom(rows: KeywordCommandCenterRow[], selectedKeys: Set<str
 }
 
 export function KeywordsTable({ workspaceId, state, summary, rowsResult: externalRowsResult }: KeywordsTableProps) {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const ownedRowsResult = useKeywordCommandCenterRows(workspaceId, state.rowsQuery, {
     enabled: externalRowsResult == null,
   });
@@ -106,8 +127,17 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
   const [bulkResult, setBulkResult] = useState<string | null>(null);
   const selectedRows = selectedRowsFrom(rows, selectedKeys);
   const hiddenByCap = Math.max(0, (summary?.rawEvidenceTotal ?? 0) - (summary?.rawEvidenceReturned ?? 0));
+  const visibleKeys = useMemo(() => rows.map((row) => row.normalizedKeyword), [rows]);
+  const allVisibleSelected = visibleKeys.length > 0 && visibleKeys.every((key) => selectedKeys.has(key));
 
   const clearSelection = () => setSelectedKeys(new Set());
+  const toggleVisibleSelection = () => {
+    if (allVisibleSelected) {
+      setSelectedKeys(new Set([...selectedKeys].filter((key) => !visibleKeys.includes(key))));
+      return;
+    }
+    setSelectedKeys(new Set([...selectedKeys, ...visibleKeys]));
+  };
 
   const runBulkAction = (bulkSummary: KeywordBulkActionSummary, force: boolean) => {
     bulkAction.mutate(
@@ -119,8 +149,12 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
       {
         onSuccess: (result) => {
           setBulkResult(result.message);
+          toast(result.message, 'success');
           setPendingBulk(null);
           clearSelection();
+        },
+        onError: (error) => {
+          toast(mutationErrorMessage(error, 'Keyword bulk action failed'), 'error');
         },
       },
     );
@@ -136,6 +170,34 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
   };
 
   const tableRows = useMemo(() => rows.map(toRecord), [rows]);
+  const isDefaultView = state.filter === KEYWORD_COMMAND_CENTER_FILTERS.ALL && state.search.length === 0;
+  const emptyState = isDefaultView ? (
+    <EmptyState
+      icon={TargetEmptyIcon}
+      title="No keywords yet"
+      description="Connect Search Console data or run an initial strategy to seed keyword opportunities."
+      action={(
+        <Button size="sm" variant="secondary" onClick={() => navigate(adminPath(workspaceId, 'seo-strategy'))}>
+          Open strategy
+        </Button>
+      )}
+    />
+  ) : (
+    <EmptyState
+      icon={SearchEmptyIcon}
+      title="No keywords match this view"
+      description="Clear filters or adjust the search to bring keyword opportunities back into view."
+      action={(
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={state.clearFilters}
+        >
+          Clear filters
+        </Button>
+      )}
+    />
+  );
 
   const columns = useMemo<DataColumn[]>(() => [
     {
@@ -196,6 +258,16 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
       },
     },
     {
+      key: 'volume',
+      label: 'Volume',
+      width: '104px',
+      align: 'right',
+      render: (_value, record) => {
+        const row = (record as KeywordsTableRecord).source;
+        return <span>{formatNumber(row.metrics.volume)}</span>;
+      },
+    },
+    {
       key: 'opportunity',
       label: 'Opp',
       width: '148px',
@@ -205,6 +277,16 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
         return typeof score === 'number'
           ? <Meter value={score} showValue ariaLabel={`${row.keyword} opportunity score`} gradient />
           : <span className="t-caption-sm text-[var(--brand-text-muted)]">No score</span>;
+      },
+    },
+    {
+      key: 'difficulty',
+      label: 'KD',
+      width: '76px',
+      align: 'right',
+      render: (_value, record) => {
+        const row = (record as KeywordsTableRecord).source;
+        return <span>{formatNumber(row.metrics.difficulty)}</span>;
       },
     },
     {
@@ -233,6 +315,23 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
         );
       },
     },
+    {
+      key: 'local',
+      label: 'Local',
+      width: 'minmax(150px, 0.9fr)',
+      render: (_value, record) => {
+        const row = (record as KeywordsTableRecord).source;
+        if (!row.localSeoState) {
+          return <span className="t-caption-sm text-[var(--brand-text-muted)]">No local data</span>;
+        }
+        return (
+          <div className="flex min-w-0 flex-col gap-1">
+            <Badge label={row.localSeoState.lifecycleLabel} tone="blue" variant="soft" size="sm" />
+            <span className="truncate t-caption-sm text-[var(--brand-text-muted)]">{row.localSeoState.priorityLabel}</span>
+          </div>
+        );
+      },
+    },
   ], [selectedKeys, toggleKey]);
 
   return (
@@ -247,6 +346,11 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
           />
         ))}
         <ToolbarSpacer />
+        {rows.length > 0 && (
+          <Button size="sm" variant="ghost" onClick={toggleVisibleSelection}>
+            {allVisibleSelected ? 'Deselect visible' : `Select visible ${rows.length}`}
+          </Button>
+        )}
         <span className="t-caption text-[var(--brand-text-muted)]">
           {pageInfo ? `${NUMBER_FORMAT.format(pageInfo.totalRows)} keywords` : 'Keyword rows'}
         </span>
@@ -316,7 +420,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
         loading={rowsResult.isLoading && tableRows.length === 0}
         getRowKey={(record) => (record as KeywordsTableRecord).source.normalizedKeyword}
         onRowClick={(record) => state.openKeyword((record as KeywordsTableRecord).source.keyword)}
-        empty="No keywords match this view"
+        empty={emptyState}
       />
 
       {pageInfo && pageInfo.totalPages > 1 && (

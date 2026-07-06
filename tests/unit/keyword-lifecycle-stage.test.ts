@@ -83,4 +83,17 @@ describe('deriveLifecycleStage', () => {
 
     expect(deriveLifecycleStage(row, new Set(['/services/emergency-dentist']))).toBe(KEYWORD_LIFECYCLE_STAGES.PUBLISHED);
   });
+
+  it('classifies assigned in-strategy keywords as targeted even before active tracking resumes', () => {
+    const row = makeRow({
+      lifecycleStatus: KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY,
+      tracking: {
+        status: TRACKED_KEYWORD_STATUS.PAUSED,
+        source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
+        pagePath: '/unpublished-page',
+      },
+    });
+
+    expect(deriveLifecycleStage(row, new Set())).toBe(KEYWORD_LIFECYCLE_STAGES.TARGETED);
+  });
 });
