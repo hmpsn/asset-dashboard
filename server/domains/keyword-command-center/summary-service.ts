@@ -10,7 +10,9 @@ import { isSuspiciousPlannerGroupedVolume } from '../../keyword-strategy-helpers
 import { countLocalSeoKeywordCandidates } from '../local-seo/candidate-service.js';
 import { getPrimaryMarketLocationCode } from '../local-seo/configuration-service.js';
 import { createLogger } from '../../logger.js';
+import { listCannibalizationIssues } from '../../cannibalization-issues.js';
 import { computeOrganicTrafficValue } from '../../roi.js';
+import { listTopicClusters } from '../../topic-clusters.js';
 import {
   UNIVERSE_SAFETY_CEILING,
   selectRankEvidence,
@@ -237,6 +239,20 @@ export async function buildKeywordCommandCenterSummary(
     log.debug({ err, workspaceId }, 'KCC summary traffic value lookup failed; omitting');
   }
 
+  let topicClusters: KeywordCommandCenterSummaryResponse['topicClusters'] | undefined;
+  try {
+    topicClusters = listTopicClusters(workspace.id);
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'KCC summary topic cluster lookup failed; omitting');
+  }
+
+  let cannibalization: KeywordCommandCenterSummaryResponse['cannibalization'] | undefined;
+  try {
+    cannibalization = listCannibalizationIssues(workspace.id);
+  } catch (err) {
+    log.debug({ err, workspaceId }, 'KCC summary cannibalization lookup failed; omitting');
+  }
+
   const droppedRankEvidenceTail = Math.max(0, rankEvidenceTotal - rankEvidence.selected.length);
   const rawEvidenceReturnedCap = UNIVERSE_SAFETY_CEILING;
 
@@ -249,5 +265,7 @@ export async function buildKeywordCommandCenterSummary(
     summarizedAt: new Date().toISOString(),
     geoLabel,
     trafficValueMonthly,
+    topicClusters,
+    cannibalization,
   };
 }

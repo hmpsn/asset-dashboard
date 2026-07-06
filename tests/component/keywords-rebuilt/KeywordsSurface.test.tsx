@@ -6,11 +6,13 @@ import { Dashboard } from '../../../src/App';
 import { KeywordsSurface } from '../../../src/components/keywords-rebuilt/KeywordsSurface';
 import { KEYWORD_COMMAND_CENTER_ACTIONS } from '../../../shared/types/keyword-command-center';
 import type {
+  KeywordCommandCenterFilterMeta,
   KeywordCommandCenterRow,
   KeywordCommandCenterRowsQuery,
   KeywordCommandCenterRowsResponse,
   KeywordCommandCenterSummaryResponse,
 } from '../../../shared/types/keyword-command-center';
+import { KEYWORD_LIFECYCLE_STAGES } from '../../../shared/types/keyword-command-center';
 import { expectNoA11yViolations } from '../a11y';
 
 const mockCreate = vi.fn();
@@ -119,11 +121,33 @@ const summaryPayload: KeywordCommandCenterSummaryResponse = {
     retired: 0,
     declined: 0,
   },
-  filters: [],
+  filters: [
+    { id: 'tracked', label: 'Tracked', count: 2 },
+    { id: 'page_assigned', label: 'Page assigned', count: 2 },
+  ] as KeywordCommandCenterFilterMeta[],
   rawEvidenceTotal: 120,
   rawEvidenceReturned: 75,
   summarizedAt: '2026-07-05T12:00:00.000Z',
   trafficValueMonthly: 1234,
+  topicClusters: [
+    {
+      topic: 'Dental services',
+      keywords: ['cosmetic dentistry', 'emergency dentist'],
+      ownedCount: 2,
+      totalCount: 3,
+      coveragePercent: 67,
+      avgPosition: 10,
+      gap: ['dental implants'],
+    },
+  ],
+  cannibalization: [
+    {
+      keyword: 'cosmetic dentistry',
+      pages: [{ path: '/cosmetic-dentistry', source: 'keyword_map' }],
+      severity: 'high',
+      recommendation: 'Pick a canonical service page.',
+    },
+  ],
 };
 
 const rows: KeywordCommandCenterRow[] = [
@@ -134,12 +158,13 @@ const rows: KeywordCommandCenterRow[] = [
     statusLabel: 'In Strategy',
     sourceLabels: [],
     metrics: { intent: 'commercial', currentPosition: 6, clicks: 42, impressions: 900, volume: 700, difficulty: 29 },
-    assignment: { pagePath: '/cosmetic-dentistry', pageTitle: 'Cosmetic Dentistry' },
+    assignment: { pagePath: '/cosmetic-dentistry', pageTitle: 'Cosmetic Dentistry', topicCluster: 'Dental services' },
     tracking: { status: 'active', source: 'strategy_primary', sourceGapKey: 'gap-1', strategyOwned: true },
     nextActions: [],
     isProtected: false,
     opportunityScore: 84,
     currentMonthly: 1234,
+    lifecycleStage: KEYWORD_LIFECYCLE_STAGES.RANKING,
   },
   {
     keyword: 'emergency dentist',
@@ -148,12 +173,13 @@ const rows: KeywordCommandCenterRow[] = [
     statusLabel: 'Tracked',
     sourceLabels: [],
     metrics: { intent: 'local', currentPosition: 14, clicks: 5, impressions: 240, volume: 300, difficulty: 18 },
-    assignment: { pagePath: '/emergency-dentist' },
+    assignment: { pagePath: '/emergency-dentist', pageTitle: 'Emergency Dentist', topicCluster: 'Dental services' },
     tracking: { status: 'active', source: 'manual', strategyOwned: false },
     nextActions: [],
     isProtected: true,
     protectionReason: 'Tracked client keyword',
     opportunityScore: 66,
+    lifecycleStage: KEYWORD_LIFECYCLE_STAGES.WINNING,
   },
 ];
 
@@ -218,10 +244,10 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
   it('receives rebuilt lens, filter, search, page, and keyword deep-link params', async () => {
     const { container } = renderSurface('/ws/ws-1/seo-keywords?tab=lifecycle&filter=tracked&search=cosmetic&page=3&q=emergency+dentist');
 
-    expect(screen.getByRole('radio', { name: 'Lifecycle' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /Lifecycle/ })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: 'Tracked' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('searchbox')).toHaveValue('cosmetic');
-    expect(screen.getByText(/page 3 of 3/i)).toBeInTheDocument();
+    expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: 'tracked', search: 'cosmetic', page: 3 });
     expect(screen.getByRole('button', { name: 'emergency dentist' })).toBeInTheDocument();
 
     await expectNoA11yViolations(container);
@@ -230,7 +256,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
   it('preserves legacy ?tab segment links by treating them as filters', () => {
     renderSurface('/ws/ws-1/seo-keywords?tab=tracked&q=cosmetic+dentistry');
 
-    expect(screen.getByRole('radio', { name: 'Rankings' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /Rankings/ })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: 'Tracked' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'cosmetic dentistry' })).toBeInTheDocument();
   });
@@ -252,15 +278,46 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
   it('threads sort and pagination controls into the rows query', async () => {
     renderSurface('/ws/ws-1/seo-keywords');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Rank' }));
+    expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'rank', direction: 'asc' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clicks' }));
     await waitFor(() => {
-      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'rank', direction: 'asc' });
+      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'clicks', direction: 'asc' });
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => {
       expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ page: 2 });
     });
+  });
+
+  it('switches lenses, updates the URL-backed query, and renders grouped shapes', async () => {
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    fireEvent.click(screen.getByRole('radio', { name: /Opportunities/ }));
+    await waitFor(() => {
+      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'opportunity', direction: 'desc' });
+    });
+
+    fireEvent.click(screen.getByRole('radio', { name: /Pages/ }));
+    await waitFor(() => {
+      expect(screen.getAllByText('Cosmetic Dentistry').length).toBeGreaterThan(0);
+    });
+    expect(screen.getByText('Cannibalization risk')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('radio', { name: /Clusters/ }));
+    await waitFor(() => {
+      expect(screen.getByText('Dental services')).toBeInTheDocument();
+    });
+    expect(screen.getByText('2/3 covered')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('radio', { name: /Lifecycle/ }));
+    await waitFor(() => {
+      expect(screen.getByText('Ranking')).toBeInTheDocument();
+      expect(screen.getByText('Winning')).toBeInTheDocument();
+    });
+    expect(screen.getByText('cosmetic dentistry')).toBeInTheDocument();
+    expect(screen.getByText('emergency dentist')).toBeInTheDocument();
   });
 
   it('shows the bulk bar on selection and fires non-protected bulk actions immediately', () => {

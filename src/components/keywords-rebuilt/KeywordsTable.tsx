@@ -30,11 +30,14 @@ import {
 } from '../ui';
 import type { DataColumn } from '../ui';
 import type { UseKeywordsSurfaceStateReturn } from './useKeywordsSurfaceState';
+import type { UseQueryResult } from '@tanstack/react-query';
+import type { KeywordCommandCenterRowsResponse } from '../../../shared/types/keyword-command-center';
 
 interface KeywordsTableProps {
   workspaceId: string;
   state: UseKeywordsSurfaceStateReturn;
   summary?: KeywordCommandCenterSummaryResponse;
+  rowsResult?: UseQueryResult<KeywordCommandCenterRowsResponse, Error>;
 }
 
 type KeywordsTableRecord = Record<string, unknown> & {
@@ -90,8 +93,11 @@ function selectedRowsFrom(rows: KeywordCommandCenterRow[], selectedKeys: Set<str
   return rows.filter((row) => selectedKeys.has(row.normalizedKeyword));
 }
 
-export function KeywordsTable({ workspaceId, state, summary }: KeywordsTableProps) {
-  const rowsResult = useKeywordCommandCenterRows(workspaceId, state.rowsQuery);
+export function KeywordsTable({ workspaceId, state, summary, rowsResult: externalRowsResult }: KeywordsTableProps) {
+  const ownedRowsResult = useKeywordCommandCenterRows(workspaceId, state.rowsQuery, {
+    enabled: externalRowsResult == null,
+  });
+  const rowsResult = externalRowsResult ?? ownedRowsResult;
   const rows = rowsResult.data?.rows ?? [];
   const pageInfo = rowsResult.data?.pageInfo;
   const bulkAction = useKeywordCommandCenterBulkAction(workspaceId);

@@ -6,6 +6,7 @@ import type {
 import type { KeywordStrategyExplanation } from './keyword-strategy-ux.ts';
 import type { LocalSeoKeywordVisibilitySummary } from './local-seo.ts';
 import type { OutcomeReadback } from './outcome-tracking.ts';
+import type { CannibalizationItem, TopicCluster } from './workspace.ts';
 
 export const KEYWORD_COMMAND_CENTER_STATUS = {
   IN_STRATEGY: 'in_strategy',
@@ -159,6 +160,7 @@ export interface KeywordCommandCenterMetrics {
 export interface KeywordCommandCenterAssignment {
   pagePath?: string;
   pageTitle?: string;
+  topicCluster?: string;
   role?: 'site_keyword' | 'page_keyword' | 'content_gap' | 'raw_evidence';
 }
 
@@ -346,6 +348,10 @@ export interface KeywordCommandCenterSummaryResponse {
    * Display-only; null when no page-keyword or legacy page-map source exists.
    */
   trafficValueMonthly?: number | null;
+  /** Topic cluster rows from the normalized topic_clusters table for rebuilt grouping lenses. */
+  topicClusters?: TopicCluster[];
+  /** Cannibalization rows from the normalized cannibalization_issues table for rebuilt grouping flags. */
+  cannibalization?: CannibalizationItem[];
 }
 
 export interface KeywordCommandCenterRowsQuery {

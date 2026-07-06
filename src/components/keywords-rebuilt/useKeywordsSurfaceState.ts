@@ -53,7 +53,7 @@ const SORT_VALUES = new Set<string>([
 
 const DEFAULT_LENS: KeywordsSurfaceLens = 'rankings';
 const DEFAULT_FILTER = KEYWORD_COMMAND_CENTER_FILTERS.ALL;
-const DEFAULT_SORT: KeywordHubSortState = { key: 'opportunity', direction: 'desc' };
+const DEFAULT_SORT: KeywordHubSortState = { key: 'position', direction: 'asc' };
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -90,10 +90,16 @@ function lensFromParams(params: URLSearchParams): KeywordsSurfaceLens {
 function sortFromParams(params: URLSearchParams): KeywordHubSortState {
   const key = params.get('sort');
   const direction = params.get('direction');
+  const lensDefault = defaultSortForLens(lensFromParams(params));
   return {
-    key: isKeywordHubSortKey(key) ? key : DEFAULT_SORT.key,
-    direction: isSortDirection(direction) ? direction : DEFAULT_SORT.direction,
+    key: isKeywordHubSortKey(key) ? key : lensDefault.key,
+    direction: isSortDirection(direction) ? direction : lensDefault.direction,
   };
+}
+
+function defaultSortForLens(lens: KeywordsSurfaceLens): KeywordHubSortState {
+  if (lens === 'opportunities') return { key: 'opportunity', direction: 'desc' };
+  return DEFAULT_SORT;
 }
 
 type ParamValue = string | number | null | undefined;
@@ -157,7 +163,13 @@ export function useKeywordsSurfaceState(): UseKeywordsSurfaceStateReturn {
   }, [committedSearch, debouncedSearchInput, updateParams]);
 
   const setLens = useCallback((nextLens: KeywordsSurfaceLens) => {
-    updateParams({ [HUB_DEEP_LINK_PARAMS.segment]: nextLens, page: DEFAULT_PAGE });
+    const nextSort = defaultSortForLens(nextLens);
+    updateParams({
+      [HUB_DEEP_LINK_PARAMS.segment]: nextLens,
+      sort: nextSort.key,
+      direction: nextSort.direction,
+      page: DEFAULT_PAGE,
+    });
   }, [updateParams]);
 
   const setFilter = useCallback((nextFilter: KeywordCommandCenterFilter) => {
@@ -211,4 +223,3 @@ export function useKeywordsSurfaceState(): UseKeywordsSurfaceStateReturn {
     rowsQuery,
   };
 }
-

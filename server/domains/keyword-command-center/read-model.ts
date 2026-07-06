@@ -137,6 +137,7 @@ export async function populateDraftRows(rows: Map<string, DraftRow>, bundle: Com
       setAssignment(row, {
         pagePath: page.pagePath,
         pageTitle: page.pageTitle,
+        topicCluster: page.topicCluster,
         role: 'page_keyword',
       });
       addSource(row, { kind: 'page_assignment', label: 'Page assignment', detail: page.pageTitle ?? page.pagePath });
@@ -363,6 +364,7 @@ export function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): Ke
     assignment: row.explanation ? {
       pagePath: row.explanation.pagePath,
       pageTitle: row.explanation.pageTitle,
+      topicCluster: row.assignment?.topicCluster,
       role: explanationRole === 'competitor_gap' ? 'raw_evidence' : explanationRole,
     } : row.assignment ?? (row.localCandidate?.pagePath || row.localCandidate?.pageTitle ? {
       pagePath: row.localCandidate.pagePath,

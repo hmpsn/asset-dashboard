@@ -1,10 +1,11 @@
 // @ds-rebuilt
 import { useKeywordCommandCenterSummary } from '../../hooks/admin/useKeywordCommandCenter';
 import { Button, PageHeader, LensSwitcher, SearchField, Toolbar, ToolbarSpacer, FilterChip, MetricTile, Skeleton } from '../ui';
-import { KeywordsTable } from './KeywordsTable';
+import { KeywordsLenses } from './KeywordsLenses';
 import {
   KEYWORDS_SURFACE_FILTERS,
   KEYWORDS_SURFACE_LENSES,
+  type KeywordsSurfaceLens,
   useKeywordsSurfaceState,
 } from './useKeywordsSurfaceState';
 
@@ -17,6 +18,21 @@ const MONEY_FORMAT = new Intl.NumberFormat('en-US', {
   currency: 'USD',
   maximumFractionDigits: 0,
 });
+
+const LENS_FILTER_HINTS: Partial<Record<KeywordsSurfaceLens, string>> = {
+  rankings: 'tracked',
+  pages: 'page_assigned',
+};
+
+function lensCount(summary: ReturnType<typeof useKeywordCommandCenterSummary>['data'], lens: KeywordsSurfaceLens): number | undefined {
+  if (!summary) return undefined;
+  if (lens === 'clusters') return summary.topicClusters?.length;
+  if (lens === 'lifecycle') return summary.counts.total;
+  if (lens === 'opportunities') return summary.counts.total;
+  const filterId = LENS_FILTER_HINTS[lens];
+  if (!filterId) return undefined;
+  return summary.filters.find((filter) => filter.id === filterId)?.count;
+}
 
 export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
   const state = useKeywordsSurfaceState();
@@ -35,7 +51,11 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
       <Toolbar label="Keyword view controls" className="w-full">
         <LensSwitcher
           id="keywords-rebuilt-lens"
-          options={KEYWORDS_SURFACE_LENSES.map((lens) => ({ value: lens.id, label: lens.label }))}
+          options={KEYWORDS_SURFACE_LENSES.map((lens) => ({
+            value: lens.id,
+            label: lens.label,
+            count: lensCount(summary.data, lens.id),
+          }))}
           value={state.lens}
           onChange={(value) => state.setLens(value as typeof state.lens)}
           size="sm"
@@ -92,7 +112,7 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
         </div>
       )}
 
-      <KeywordsTable workspaceId={workspaceId} state={state} summary={summary.data} />
+      <KeywordsLenses workspaceId={workspaceId} state={state} summary={summary.data} />
     </div>
   );
 }
