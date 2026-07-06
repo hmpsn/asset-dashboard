@@ -25,7 +25,7 @@ function makeRow(overrides: Partial<KeywordCommandCenterRow> = {}): KeywordComma
 
 describe('deriveLifecycleStage', () => {
   it('buckets rows into all five lifecycle stages', () => {
-    const publishedPaths = new Set(['/published-page']);
+    const publishedPaths = new Set(['published-page']);
 
     expect(deriveLifecycleStage(makeRow({
       metrics: { currentPosition: 2 },
@@ -57,7 +57,7 @@ describe('deriveLifecycleStage', () => {
   });
 
   it('prioritizes actual ranking position over content state', () => {
-    const publishedPaths = new Set(['/published-page']);
+    const publishedPaths = new Set(['published-page']);
     const row = makeRow({
       lifecycleStatus: KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY,
       metrics: { currentPosition: 11 },
@@ -71,17 +71,21 @@ describe('deriveLifecycleStage', () => {
     expect(deriveLifecycleStage(row, publishedPaths)).toBe(KEYWORD_LIFECYCLE_STAGES.RANKING);
   });
 
-  it('normalizes assigned page paths before checking published content', () => {
+  it('matches a bare published slug against a prefixed keyword page path (different address spaces)', () => {
+    // The published set is bare title-slugs (what listPublishedPostPagePaths emits from
+    // published_slug), while the keyword's assigned path is a full, collection-prefixed
+    // site URL. Both must reduce to the shared slug 'emergency-dentist' → PUBLISHED.
+    // (A whole-path compare — the pre-fix behavior — would miss this, the common CMS case.)
     const row = makeRow({
       lifecycleStatus: KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY,
       tracking: {
         status: TRACKED_KEYWORD_STATUS.ACTIVE,
         source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
-        pagePath: 'https://example.com/services/emergency-dentist?utm=ignore',
+        pagePath: 'https://example.com/blog/emergency-dentist?utm=ignore',
       },
     });
 
-    expect(deriveLifecycleStage(row, new Set(['/services/emergency-dentist']))).toBe(KEYWORD_LIFECYCLE_STAGES.PUBLISHED);
+    expect(deriveLifecycleStage(row, new Set(['emergency-dentist']))).toBe(KEYWORD_LIFECYCLE_STAGES.PUBLISHED);
   });
 
   it('classifies assigned in-strategy keywords as targeted even before active tracking resumes', () => {

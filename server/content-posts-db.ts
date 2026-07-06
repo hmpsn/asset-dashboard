@@ -11,7 +11,7 @@ import { postSectionSchema, reviewChecklistSchema, storedAiReviewSchema } from '
 import { validateTransition, POST_STATUS_TRANSITIONS } from './state-machines.js';
 import { resolveContentGenerationStyle } from './page-type-copy-contract.js';
 import { getScoredOutcomeReadbacks } from './outcome-tracking.js';
-import { normalizePageUrl } from './utils/page-address.js';
+import { pageAddressSlug } from './utils/page-address.js';
 
 const log = createLogger('content-posts-db');
 
@@ -305,7 +305,7 @@ export function listPublishedPostPagePaths(workspaceId: string): Set<string> {
   const rows = stmts().selectPublishedPaths.all(workspaceId) as PublishedPathRow[];
   return new Set(
     rows
-      .map(row => row.published_slug ? normalizePageUrl(row.published_slug).toLowerCase() : '')
+      .map(row => row.published_slug ? pageAddressSlug(row.published_slug) : '')
       .filter(Boolean),
   );
 }

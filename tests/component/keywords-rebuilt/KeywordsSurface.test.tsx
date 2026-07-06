@@ -495,7 +495,7 @@ function renderSurface(path: string) {
   return { ...result, queryClient };
 }
 
-function renderDashboard(path = '/ws/ws-1/seo-keywords?tab=lifecycle') {
+function renderDashboard(path = '/ws/ws-1/seo-keywords?lens=lifecycle') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -513,7 +513,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
   });
 
   it('receives rebuilt lens, filter, search, page, and keyword deep-link params', async () => {
-    const { container } = renderSurface('/ws/ws-1/seo-keywords?tab=lifecycle&filter=tracked&search=cosmetic&page=3&q=emergency+dentist');
+    const { container } = renderSurface('/ws/ws-1/seo-keywords?lens=lifecycle&filter=tracked&search=cosmetic&page=3&q=emergency+dentist');
 
     expect(screen.getByRole('radio', { name: /Lifecycle/ })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: 'Tracked' })).toHaveAttribute('aria-pressed', 'true');
@@ -530,6 +530,19 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByRole('radio', { name: /Rankings/ })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: 'Tracked' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'cosmetic dentistry' })).toBeInTheDocument();
+  });
+
+  it('keeps an inbound ?tab filter when the user switches lens (review PR #1480)', () => {
+    renderSurface('/ws/ws-1/seo-keywords?tab=tracked');
+    expect(screen.getByRole('button', { name: 'Tracked' })).toHaveAttribute('aria-pressed', 'true');
+
+    // Switching lens must NOT clobber the inbound filter: the lens now owns its own
+    // `?lens=` param, not the shared `?tab=` segment that carries the filter. Previously
+    // setLens overwrote `tab`, silently dropping the filter back to 'all'.
+    fireEvent.click(screen.getByRole('radio', { name: /Opportunities/ }));
+
+    expect(screen.getByRole('radio', { name: /Opportunities/ })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('button', { name: 'Tracked' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('uses the combined initial view except for the local-candidates full-model exception', () => {
@@ -911,5 +924,13 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.queryByTestId('legacy-sidebar')).not.toBeInTheDocument();
     expect(screen.queryByTestId('legacy-keyword-hub')).not.toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Admin' })).toBeInTheDocument();
+
+    // Global overlay chrome must SURVIVE the rebuilt mount (review PR #1480 regression:
+    // the rebuilt branch dropped these). CommandPalette renders unconditionally — it
+    // hosts the global ⌘K listener, so losing it kills the shortcut on every rebuilt
+    // surface. (AdminChat is gated on hasOpenAIKey — false in this fixture. StatusBar is
+    // intentionally deferred to an AppShell footer slot, DEF-shell-005.)
+    expect(screen.getByTestId('command-palette')).toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-status')).not.toBeInTheDocument();
   });
 });

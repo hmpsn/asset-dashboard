@@ -52,6 +52,11 @@ const SORT_VALUES = new Set<string>([
 ]);
 
 const DEFAULT_LENS: KeywordsSurfaceLens = 'rankings';
+// The rebuilt surface's own lens lives in its OWN param — NOT the shared 'tab' segment,
+// which is the cross-surface FILTER deep-link contract (readHubDeepLink). Overloading
+// 'tab' for both silently dropped an inbound filter the moment the user switched lens
+// (review PR #1480).
+const LENS_PARAM = 'lens';
 const DEFAULT_FILTER = KEYWORD_COMMAND_CENTER_FILTERS.ALL;
 const DEFAULT_SORT: KeywordHubSortState = { key: 'position', direction: 'asc' };
 const DEFAULT_PAGE = 1;
@@ -87,8 +92,8 @@ function filterFromParams(params: URLSearchParams): KeywordCommandCenterFilter {
 }
 
 function lensFromParams(params: URLSearchParams): KeywordsSurfaceLens {
-  const tab = params.get(HUB_DEEP_LINK_PARAMS.segment);
-  return isKeywordsSurfaceLens(tab) ? tab : DEFAULT_LENS;
+  const lensParam = params.get(LENS_PARAM);
+  return isKeywordsSurfaceLens(lensParam) ? lensParam : DEFAULT_LENS;
 }
 
 function sortFromParams(params: URLSearchParams): KeywordHubSortState {
@@ -173,7 +178,7 @@ export function useKeywordsSurfaceState(): UseKeywordsSurfaceStateReturn {
   const setLens = useCallback((nextLens: KeywordsSurfaceLens) => {
     const nextSort = defaultSortForLens(nextLens);
     updateParams({
-      [HUB_DEEP_LINK_PARAMS.segment]: nextLens,
+      [LENS_PARAM]: nextLens,
       sort: nextSort.key,
       direction: nextSort.direction,
       page: DEFAULT_PAGE,

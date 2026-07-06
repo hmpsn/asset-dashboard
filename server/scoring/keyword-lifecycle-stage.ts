@@ -5,11 +5,15 @@ import {
   type KeywordLifecycleStage,
 } from '../../shared/types/keyword-command-center.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
-import { normalizePageUrl } from '../utils/page-address.js';
+import { pageAddressSlug } from '../utils/page-address.js';
 
-function normalizedPagePath(path: string | undefined): string | undefined {
+// The keyword's assigned path is a full site path (`/blog/x`) while the published set
+// is bare title-slugs (`published_slug`); match on the shared slug segment so prefixed
+// CMS content isn't silently excluded from PUBLISHED. See pageAddressSlug.
+function assignedPageSlug(path: string | undefined): string | undefined {
   if (!path) return undefined;
-  return normalizePageUrl(path).toLowerCase();
+  const slug = pageAddressSlug(path);
+  return slug || undefined;
 }
 
 function assignedPagePath(row: KeywordCommandCenterRow): string | undefined {
@@ -33,12 +37,12 @@ export function deriveLifecycleStage(
   if (position != null && position <= 3) return KEYWORD_LIFECYCLE_STAGES.WINNING;
   if (position != null && position <= 20) return KEYWORD_LIFECYCLE_STAGES.RANKING;
 
-  const pagePath = normalizedPagePath(assignedPagePath(row));
-  if (pagePath && publishedPagePaths.has(pagePath)) {
+  const pageSlug = assignedPageSlug(assignedPagePath(row));
+  if (pageSlug && publishedPagePaths.has(pageSlug)) {
     return KEYWORD_LIFECYCLE_STAGES.PUBLISHED;
   }
 
-  if (pagePath && isInStrategySource(row)) {
+  if (pageSlug && isInStrategySource(row)) {
     return KEYWORD_LIFECYCLE_STAGES.TARGETED;
   }
 

@@ -38,15 +38,6 @@ const LIFECYCLE_META: Array<{
   { stage: KEYWORD_LIFECYCLE_STAGES.WINNING, title: 'Winning', accent: 'var(--emerald)' },
 ];
 
-function averageRank(rows: KeywordCommandCenterRow[]): string {
-  const ranks = rows
-    .map((row) => row.metrics.currentPosition)
-    .filter((rank): rank is number => typeof rank === 'number');
-  if (ranks.length === 0) return 'No rank';
-  const avg = ranks.reduce((sum, rank) => sum + rank, 0) / ranks.length;
-  return `#${avg.toFixed(avg >= 10 ? 0 : 1)}`;
-}
-
 function opportunityTraffic(rows: KeywordCommandCenterRow[]): string {
   const impressions = rows
     .map((row) => row.metrics.impressions)
@@ -178,7 +169,6 @@ function GroupedLens({
           meta={group.meta}
           stats={[
             { label: 'Rows', value: group.rows.length },
-            { label: 'Avg rank', value: averageRank(group.rows) },
             { label: 'Opp traffic', value: opportunityTraffic(group.rows) },
           ]}
           flag={group.flag ? { label: group.flag } : undefined}
@@ -237,6 +227,19 @@ export function KeywordsLenses({ workspaceId, state, summary, initialRowsResult 
   const rowsResult = initialRowsResult ?? ownedRowsResult;
   const rows = rowsResult.data?.rows ?? [];
 
+  // Pages/Clusters/Lifecycle group the CURRENT PAGE of rows, not the whole workspace.
+  // Be honest when that is a subset — never present a page-1 board as the full universe
+  // (review PR #1480). Full server-side grouping over all keywords is DEF-kw-003.
+  const totalCount = summary?.counts?.total ?? rows.length;
+  const hiddenFromGroups = Math.max(0, totalCount - rows.length);
+  const truncationBanner = hiddenFromGroups > 0 ? (
+    <InlineBanner tone="warning" title={`Grouped from the first ${rows.length} keywords`}>
+      {hiddenFromGroups} more keywords are not shown here — these lenses group the current
+      page, not the full set (server-side grouping is tracked as DEF-kw-003). Use the
+      Rankings lens to page through every keyword.
+    </InlineBanner>
+  ) : null;
+
   if (rowsResult.isLoading && !rowsResult.data) {
     return (
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" data-testid="keywords-lens-loading">
@@ -261,15 +264,30 @@ export function KeywordsLenses({ workspaceId, state, summary, initialRowsResult 
   }
 
   if (state.lens === 'pages') {
-    return <GroupedLens groups={groupRowsByPage(rows, summary)} onOpen={(row) => state.openKeyword(row.keyword)} />;
+    return (
+      <div className="flex flex-col gap-3">
+        {truncationBanner}
+        <GroupedLens groups={groupRowsByPage(rows, summary)} onOpen={(row) => state.openKeyword(row.keyword)} />
+      </div>
+    );
   }
 
   if (state.lens === 'clusters') {
-    return <GroupedLens groups={groupRowsByCluster(rows, summary)} onOpen={(row) => state.openKeyword(row.keyword)} />;
+    return (
+      <div className="flex flex-col gap-3">
+        {truncationBanner}
+        <GroupedLens groups={groupRowsByCluster(rows, summary)} onOpen={(row) => state.openKeyword(row.keyword)} />
+      </div>
+    );
   }
 
   if (state.lens === 'lifecycle') {
-    return <LifecycleLens rows={rows} onOpen={(row) => state.openKeyword(row.keyword)} />;
+    return (
+      <div className="flex flex-col gap-3">
+        {truncationBanner}
+        <LifecycleLens rows={rows} onOpen={(row) => state.openKeyword(row.keyword)} />
+      </div>
+    );
   }
 
   return (

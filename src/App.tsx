@@ -20,6 +20,7 @@ import { CommandPalette } from './components/CommandPalette';
 import { Sidebar } from './components/layout/Sidebar';
 import { Breadcrumbs } from './components/layout/Breadcrumbs';
 import { RebuiltAppChrome, useRebuildShellEnabled } from './components/layout/RebuiltAppChrome';
+import { REBUILT_SURFACES } from './components/layout/rebuiltSurfaces';
 import { ScannerReveal } from './components/ui/ScannerReveal';
 import { TabBar } from './components/ui/TabBar';
 import { Clipboard, Globe } from 'lucide-react';
@@ -51,7 +52,6 @@ const WorkspaceHome = lazyWithRetry(() => import('./components/WorkspaceHome').t
 const SeoEditorWrapper = lazyWithRetry(() => import('./components/SeoEditorWrapper').then(m => ({ default: m.SeoEditorWrapper })));
 const KeywordStrategyPanel = lazyWithRetry(() => import('./components/KeywordStrategy').then(m => ({ default: m.KeywordStrategyPanel })));
 const KeywordHub = lazyWithRetry(() => import('./components/KeywordHub').then(m => ({ default: m.KeywordHub })));
-const KeywordsSurface = lazyWithRetry(() => import('./components/keywords-rebuilt/KeywordsSurface').then(m => ({ default: m.KeywordsSurface })));
 const LocalPresencePage = lazyWithRetry(() => import('./components/local-seo/LocalPresencePage').then(m => ({ default: m.LocalPresencePage })));
 const CompetitorsPage = lazyWithRetry(() => import('./components/competitors/CompetitorsPage').then(m => ({ default: m.CompetitorsPage })));
 const PageIntelligence = lazyWithRetry(() => import('./components/PageIntelligence').then(m => ({ default: m.PageIntelligence })));
@@ -460,27 +460,46 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     return <Navigate to={adminPath(selected.id, 'home')} replace />;
   };
 
-  if (rebuildShellEnabled && selected && tab === 'seo-keywords') {
+  const RebuiltSurface = rebuildShellEnabled && selected ? REBUILT_SURFACES[tab] : undefined;
+  if (RebuiltSurface && selected) {
     return (
-      <RebuiltAppChrome
-        workspaces={workspaces}
-        selected={selected}
-        tab={tab}
-        theme={theme}
-        pendingContentRequests={pendingContentRequests}
-        onCreate={handleCreate}
-        onDelete={handleDelete}
-        onLinkSite={handleLinkSite}
-        onUnlinkSite={handleUnlinkSite}
-        toggleTheme={toggleTheme}
-        onLogout={onLogout}
-      >
-        <ErrorBoundary label="seo-keywords">
-          <Suspense fallback={<ChunkFallback />}>
-            <KeywordsSurface workspaceId={selected.id} />
-          </Suspense>
-        </ErrorBoundary>
-      </RebuiltAppChrome>
+      <>
+        <RebuiltAppChrome
+          workspaces={workspaces}
+          selected={selected}
+          tab={tab}
+          theme={theme}
+          pendingContentRequests={pendingContentRequests}
+          onCreate={handleCreate}
+          onDelete={handleDelete}
+          onLinkSite={handleLinkSite}
+          onUnlinkSite={handleUnlinkSite}
+          toggleTheme={toggleTheme}
+          onLogout={onLogout}
+        >
+          <ErrorBoundary label={tab}>
+            <Suspense fallback={<ChunkFallback />}>
+              <RebuiltSurface workspaceId={selected.id} />
+            </Suspense>
+          </ErrorBoundary>
+        </RebuiltAppChrome>
+        {/* Global chrome the legacy shell renders as siblings — restored for EVERY
+            rebuilt surface (review PR #1480: the rebuilt branch dropped these, killing
+            ⌘K + admin chat). StatusBar needs an AppShell footer slot → DEF-shell-005. */}
+        <CommandPalette
+          workspaces={workspaces}
+          selectedWorkspace={selected}
+          onSelectWorkspace={(ws) => navigate(adminPath(ws.id))}
+        />
+        {health.hasOpenAIKey && (
+          <ErrorBoundary label="Admin Chat">
+            <AdminChat
+              workspaceId={selected.id}
+              workspaceName={selected.webflowSiteName || selected.name}
+            />
+          </ErrorBoundary>
+        )}
+      </>
     );
   }
 

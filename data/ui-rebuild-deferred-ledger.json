@@ -179,6 +179,34 @@
       "createdAt": "2026-07-05",
       "reviewBy": "2026-10-31",
       "links": { "pr": "#1479" }
+    },
+    {
+      "id": "DEF-shell-005",
+      "surface": "foundation",
+      "item": "RebuiltAppChrome/AppShell has no slot for the connection/health StatusBar (hasOpenAIKey/hasWebflowToken/connected/workspaceCount) the legacy shell renders — AppShell exposes sidebar/topbar/children but no footer. Review PR #1480 restored CommandPalette (⌘K) + AdminChat to the rebuilt mount (real capability losses), but StatusBar needs a shell footer slot.",
+      "decision": "Ship the rebuilt Keywords surface without the StatusBar footer for now — the RebuiltSidebar footer's NotificationBell already surfaces connection state, and adding an AppShell footer slot is a shell-primitive enhancement, not a Keywords-pilot bug. The two capability-loss items (⌘K, admin chat) were fixed in-PR; this display-affordance is ledgered.",
+      "class": "behavior",
+      "upgradeTrigger": "Phase A shell-expansion (the rebuilt shell covers non-Keywords surfaces) — add a `footer` slot to AppShell + thread StatusBar through RebuiltAppChrome so every rebuilt surface shows connection/health state.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-06",
+      "reviewBy": "2026-10-31",
+      "links": { "pr": "#1480" }
+    },
+    {
+      "id": "DEF-kw-003",
+      "surface": "keywords",
+      "item": "The Pages/Clusters/Lifecycle grouped lenses group only the CURRENT PAGE of rows (pageSize <= 100), not the full workspace keyword set — so BoardColumn counts and group stats reflect page 1 while the lens tab shows the true total. Review PR #1480 made this HONEST (a truncation banner + removed the fabricated client-side averageRank) but full coverage needs server-side grouping.",
+      "decision": "Ship the grouped lenses over the current page WITH an explicit truncation banner (never present a page-1 board as the full universe) rather than fetch-all-client-side (unbounded) or block the pilot on a server grouping contract. averageRank removed per DEF-kw-002 (no client rollups).",
+      "class": "data",
+      "upgradeTrigger": "A server-side grouped-view read model (group by page/cluster/lifecycleStage across ALL keywords with server-computed counts + rollups) — then the grouped lenses render complete groups without the page cap.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-06",
+      "reviewBy": "2026-10-31",
+      "links": { "pr": "#1480" }
     }
   ]
 }
