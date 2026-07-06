@@ -59,6 +59,32 @@
       "links": { "kitDoc": "components/feedback/Toast.jsx" }
     },
     {
+      "id": "DEF-shell-001",
+      "surface": "foundation",
+      "item": "RebuiltSidebar footer utilities (NotificationBell, WorkspaceSelector, Revenue/Settings/theme/logout IconButtons) carry over from the legacy Sidebar; a fully DS-native restyle is deferred.",
+      "decision": "T1 carry-over — machinery-dense, zero capability loss; the visual seam is accepted for F4 so the pilot can validate the registry-driven shell first.",
+      "class": "primitive",
+      "upgradeTrigger": "Phase A admin fan-out reaches the shell chrome.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-05",
+      "reviewBy": "2026-09-30"
+    },
+    {
+      "id": "DEF-shell-002",
+      "surface": "foundation",
+      "item": "NAV_REGISTRY icons render as lucide via <Icon as>; FA-name mapping of registry entries is deferred.",
+      "decision": "D5 keeps <Icon as={LucideIcon}> during the incremental lucide-to-FA migration; remapping the registry icons now is out of F4 scope.",
+      "class": "token",
+      "upgradeTrigger": "The lucide-to-FA call-site migration reaches navRegistry.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-05",
+      "reviewBy": "2026-09-30"
+    },
+    {
       "id": "DEF-icon-001",
       "surface": "foundation",
       "item": "~381 files still import lucide-react directly (or use <Icon as={LucideIcon}>). The icon system of record is now Font Awesome Sharp Regular (<Icon name=...>); lucide is kept as a supported migration path but every surface should migrate to FA glyphs.",
@@ -85,6 +111,32 @@
       "createdAt": "2026-07-03",
       "reviewBy": "2026-10-31",
       "links": { "kitDoc": "css/fontawesome.min.css" }
+    },
+    {
+      "id": "DEF-shell-003",
+      "surface": "foundation",
+      "item": "The rebuilt shell has no way to express focus mode — legacy Sidebar takes hidden/onExitHidden and collapses to a slim exit strip (App.tsx effectiveFocusMode, fires on the rewrite surface). RebuiltSidebar/AppShell omit it.",
+      "decision": "Not a pilot regression — focus mode only fires on Page Rewriter and the pilot is Keywords-only. Ledgered so it is closed before the rebuilt shell expands to cover the Page Rewriter surface (review PR #1478).",
+      "class": "behavior",
+      "upgradeTrigger": "The rebuild reaches the Page Rewriter surface (Phase A) — add a hidden/collapsed shell state to AppShell + RebuiltSidebar before the shell replaces the legacy one there.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-05",
+      "reviewBy": "2026-10-31"
+    },
+    {
+      "id": "DEF-shell-004",
+      "surface": "foundation",
+      "item": "The rebuilt breadcrumb/topbar drops the visible ⌘K search IconButton and the breadcrumb workspace-switcher dropdown that legacy Breadcrumbs render. The ⌘K keyboard shortcut still works (global listener) and workspace switching is covered by the sidebar selector — this is a secondary/discoverability affordance loss, not a capability loss.",
+      "decision": "Accepted for F4 (shortcut + sidebar switcher preserve the underlying capability). Re-add the visible top-bar search affordance before the rebuilt shell replaces the legacy one platform-wide (review PR #1478).",
+      "class": "behavior",
+      "upgradeTrigger": "Phase A shell-expansion, or the first mouse-user report of the missing search button — add a ⌘K IconButton to the rebuilt Toolbar/breadcrumb.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-05",
+      "reviewBy": "2026-10-31"
     }
   ]
 }

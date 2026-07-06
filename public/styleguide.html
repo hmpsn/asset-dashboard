@@ -2022,6 +2022,66 @@ SectionCard: var(--radius-signature-lg)</div>
       <div class="spec-note">Use as the outer two-zone rail + topbar + content region that every authenticated screen mounts into — this specimen is scaled down purely to fit the styleguide; the real shell fills the viewport.</div>
     </div>
 
+    <!-- F4: Rebuilt admin shell -->
+    <div class="sub-section">
+      <div class="col-label">Rebuilt admin shell · NavItem + NavGroup + Breadcrumb + AppShell composition</div>
+      <div class="card" style="max-width:760px; margin:0 auto; padding:0; overflow:hidden;">
+        <div style="display:grid; grid-template-columns:210px 1fr; height:300px; background:var(--surface-1); color:var(--brand-text);">
+          <div style="display:flex; flex-direction:column; min-width:0; border-right:1px solid var(--brand-border);">
+            <div style="padding:var(--space-4) var(--space-4) var(--space-3); border-bottom:1px solid var(--brand-border);">
+              <div style="font-size:13px; font-weight:700; color:var(--brand-text-bright);">hmpsn.studio</div>
+              <div style="margin-top:var(--space-3); padding:var(--space-2) var(--space-3); border:1px solid var(--brand-border); border-radius:var(--radius-md); color:var(--brand-text-bright); font-size:12px;">Acme Dental</div>
+            </div>
+            <div style="flex:1; padding:var(--space-3) var(--space-2); overflow:hidden;">
+              <div style="display:flex; align-items:center; gap:var(--space-2); padding:var(--space-3) var(--space-2) var(--space-1); font-family:var(--font-mono); font-size:10px; font-weight:600; letter-spacing:.11em; text-transform:uppercase; color:var(--blue);">
+                MONITORING <span style="flex:1; height:1px; background:var(--blue); opacity:.35;"></span>
+              </div>
+              <div style="position:relative; display:flex; align-items:center; gap:var(--space-3); min-height:40px; padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); background:color-mix(in srgb, var(--blue) 12%, transparent); color:var(--blue); font-size:13px; font-weight:500;">
+                <span style="position:absolute; left:-8px; top:50%; transform:translateY(-50%); width:3px; height:18px; background:var(--blue); border-radius:0 var(--radius-sm) var(--radius-sm) 0;"></span>
+                <span style="width:12px; height:12px; border-radius:var(--radius-sm); background:var(--blue); opacity:.85;"></span>
+                <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Search &amp; Traffic</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:var(--space-3); min-height:40px; padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); color:var(--brand-text); font-size:13px; font-weight:500;">
+                <span style="width:12px; height:12px; border-radius:var(--radius-sm); background:var(--brand-text-dim);"></span>
+                <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Action Results</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:var(--space-2); padding:var(--space-3) var(--space-2) var(--space-1); font-family:var(--font-mono); font-size:10px; font-weight:600; letter-spacing:.11em; text-transform:uppercase; color:var(--teal);">
+                STRATEGY <span style="flex:1; height:1px; background:var(--teal); opacity:.35;"></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:var(--space-3); min-height:40px; padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); color:var(--brand-text); font-size:13px; font-weight:500;">
+                <span style="width:12px; height:12px; border-radius:var(--radius-sm); background:var(--brand-text-dim);"></span>
+                <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Keyword Hub</span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; min-width:0;">
+            <div style="height:48px; border-bottom:1px solid var(--brand-border); display:flex; align-items:center; padding:0 18px;">
+              <div style="display:flex; align-items:center; gap:8px; min-width:0; font-size:12.5px; color:var(--brand-text-dim);">
+                <span>Command Center</span>
+                <span style="color:var(--brand-text-dim);">→</span>
+                <span>Acme Dental</span>
+                <span style="color:var(--brand-text-dim);">→</span>
+                <span style="color:var(--brand-text-bright); font-weight:600;">Keyword Hub</span>
+              </div>
+            </div>
+            <div style="flex:1; padding:22px; display:flex; flex-direction:column; gap:14px;">
+              <div>
+                <div style="height:18px; width:220px; border-radius:var(--radius-sm); background:var(--surface-3);"></div>
+                <div style="height:10px; width:320px; border-radius:var(--radius-sm); background:var(--surface-3); margin-top:8px;"></div>
+              </div>
+              <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
+                <div style="height:58px; border:1px solid var(--brand-border); border-radius:var(--radius-md); background:var(--surface-2);"></div>
+                <div style="height:58px; border:1px solid var(--brand-border); border-radius:var(--radius-md); background:var(--surface-2);"></div>
+                <div style="height:58px; border:1px solid var(--brand-border); border-radius:var(--radius-md); background:var(--surface-2);"></div>
+              </div>
+              <div style="height:86px; border:1px solid var(--brand-border); border-radius:var(--radius-md); background:var(--surface-2);"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spec-note">F4 adds the nav-chrome layer. Item identity stays single-sourced in <span class="t-mono">NAV_REGISTRY</span>; the new shell is gated by <span class="t-mono">ui-rebuild-shell</span> and is mounted by rebuilt pilot surfaces, not by the live admin app.</div>
+    </div>
+
     <!-- F3: PageContainer -->
     <div class="sub-section">
       <div class="col-label">PageContainer · miniature max-width + padding concept</div>

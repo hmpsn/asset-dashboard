@@ -22,6 +22,7 @@ import type { RoadmapData } from '../../shared/types/roadmap.js';
 
 const ROADMAP_PATH = path.resolve(process.cwd(), 'data/roadmap.json');
 const ROADMAP_ARCHIVE_PATH = path.resolve(process.cwd(), 'data/roadmap.archive.json');
+const CURRENT_AUDIT_AS_OF = '2026-07-05';
 
 // Shipped roadmap items move to roadmap.archive.json; a flag's linkedRoadmapItemId still
 // references its archived item until the flag is retired, so resolve links against BOTH
@@ -37,7 +38,7 @@ function loadRoadmap(): RoadmapData {
 describe('feature-flag lifecycle audit', () => {
   it('covers every feature flag and keeps lifecycle contract complete', () => {
     const roadmap = loadRoadmap();
-    const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-29');
+    const report = buildFeatureFlagLifecycleReport(roadmap, CURRENT_AUDIT_AS_OF);
 
     expect(report.generatedBy).toBe('scripts/feature-flag-lifecycle.ts');
     expect(report.totalFlags).toBe(FEATURE_FLAG_KEYS.length);
@@ -48,7 +49,7 @@ describe('feature-flag lifecycle audit', () => {
 
   it('keeps cadence accounting aligned with the available cadence set', () => {
     const roadmap = loadRoadmap();
-    const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-29');
+    const report = buildFeatureFlagLifecycleReport(roadmap, CURRENT_AUDIT_AS_OF);
 
     const cadenceTotal = FEATURE_FLAG_AUDIT_CADENCES.reduce((sum, cadence) => sum + report.cadenceCounts[cadence], 0);
     expect(cadenceTotal).toBe(FEATURE_FLAG_KEYS.length);
@@ -56,7 +57,7 @@ describe('feature-flag lifecycle audit', () => {
 
   it('builds stable markdown output with contract sections', () => {
     const roadmap = loadRoadmap();
-    const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-29');
+    const report = buildFeatureFlagLifecycleReport(roadmap, CURRENT_AUDIT_AS_OF);
     const markdown = formatFeatureFlagLifecycleReportMarkdown(report);
 
     expect(markdown).toContain('# Feature Flag Lifecycle Report');
@@ -117,7 +118,7 @@ describe('feature-flag lifecycle audit', () => {
   describe('R12b — dated burn-down done-targets', () => {
     it('computes a doneTarget of lastReviewedAt + 3x cadence for a normal active flag', () => {
       const roadmap = loadRoadmap();
-      const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-29');
+      const report = buildFeatureFlagLifecycleReport(roadmap, CURRENT_AUDIT_AS_OF);
 
       const row = report.rows.find(r => r.key === 'national-serp-tracking');
       expect(row).toBeDefined();
@@ -142,7 +143,7 @@ describe('feature-flag lifecycle audit', () => {
 
     it('assigns no doneTarget to any reserved flag (forward guard — category currently empty)', () => {
       const roadmap = loadRoadmap();
-      const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-29');
+      const report = buildFeatureFlagLifecycleReport(roadmap, CURRENT_AUDIT_AS_OF);
 
       const reservedRows = report.rows.filter(
         r => FEATURE_FLAG_CATALOG[r.key].lifecycle.status === 'reserved',
@@ -161,7 +162,7 @@ describe('feature-flag lifecycle audit', () => {
 
     it('includes a Burn-Down Done Targets section in the markdown report', () => {
       const roadmap = loadRoadmap();
-      const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-29');
+      const report = buildFeatureFlagLifecycleReport(roadmap, CURRENT_AUDIT_AS_OF);
       const markdown = formatFeatureFlagLifecycleReportMarkdown(report);
 
       expect(markdown).toContain('## Burn-Down Done Targets');
@@ -218,7 +219,7 @@ describe('feature-flag lifecycle audit', () => {
 
     it('is counted in permanentlyExemptCount', () => {
       const roadmap = loadRoadmap();
-      const report = buildFeatureFlagLifecycleReport(roadmap, '2026-06-29');
+      const report = buildFeatureFlagLifecycleReport(roadmap, CURRENT_AUDIT_AS_OF);
       expect(report.permanentlyExemptCount).toBe(PERMANENTLY_EXEMPT_FLAGS.size);
     });
   });

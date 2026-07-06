@@ -18,3 +18,7 @@ export { Toolbar, ToolbarSpacer } from './Toolbar';
 export type { ToolbarProps } from './Toolbar';
 export { GroupBlock } from './GroupBlock';
 export type { GroupBlockProps, GroupStat, GroupFlag } from './GroupBlock';
+export { NavItem } from './NavItem';
+export type { NavItemProps } from './NavItem';
+export { NavGroup } from './NavGroup';
+export type { NavGroupProps } from './NavGroup';
