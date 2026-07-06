@@ -6,6 +6,7 @@ import { listLocalSeoMarkets } from '../local-seo/configuration-service.js';
 import { buildLocalSeoKeywordVisibilityForKeyword } from '../local-seo/snapshot-store.js';
 import { createLogger } from '../../logger.js';
 import { getScoredOutcomeReadbacks, STRATEGY_PAGE_KEYWORD_SOURCE_TYPE, strategyPageKeywordSourceId } from '../../outcome-tracking.js';
+import { listPublishedPostPagePaths } from '../../content-posts-db.js';
 import {
   filterMapByKeys,
   filterStrategyForSingleKeyword,
@@ -93,12 +94,14 @@ export async function buildKeywordCommandCenterDetail(
     includeWorkspaceIntelligence: false,
   });
   ensureLocalVisibilityRows(rows, localVisibilityByKeyword);
+  const publishedPagePaths = listPublishedPostPagePaths(workspace.id);
   const row = rows.get(normalized)
     ? finalizeDraftRow(rows.get(normalized)!, {
       workspaceId: workspace.id,
       localVisibilityByKeyword,
       activeLocalMarketCount,
       lostVisibilityKeys: safeLostVisibilityKeys(workspace.id),
+      publishedPagePaths,
       // P1 dark-loop fix: the rows/model path passes valueScoring so
       // finalizeDraftRow computes valueReasons, but the detail path omitted it —
       // KeywordDetailDrawer renders row.valueReasons, so the value-first reason chips

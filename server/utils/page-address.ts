@@ -73,6 +73,21 @@ export function normalizePageUrl(url: string): string {
   return normalizePageUrlShared(url);
 }
 
+/**
+ * Reduce any page address — a full site path (`/blog/post-x`) OR a bare slug (`post-x`)
+ * — to its final slug segment, lowercased. Use to compare a keyword's assigned page
+ * path (a full path from the strategy pageMap) against a published post's
+ * `published_slug` (a bare title-slug): they live in different address spaces, so a
+ * whole-path `.has()` systematically misses prefixed CMS/collection content. The slug
+ * IS the Webflow item identity and is the only page reference stored on the post, so
+ * the last segment is the right denominator; this trades a rare cross-prefix collision
+ * (`/blog/x` vs `/services/x`) for fixing the common false-negative.
+ */
+export function pageAddressSlug(path: string): string {
+  const segments = normalizePageUrlShared(path).toLowerCase().split('/').filter(Boolean);
+  return segments.length > 0 ? segments[segments.length - 1] : '';
+}
+
 /** Exact match for page identity values that may be full URLs, paths, or bare slugs. */
 export function matchPageIdentity(a: string, b: string): boolean {
   return matchPageIdentityShared(a, b);

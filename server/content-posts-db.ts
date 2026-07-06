@@ -11,6 +11,7 @@ import { postSectionSchema, reviewChecklistSchema, storedAiReviewSchema } from '
 import { validateTransition, POST_STATUS_TRANSITIONS } from './state-machines.js';
 import { resolveContentGenerationStyle } from './page-type-copy-contract.js';
 import { getScoredOutcomeReadbacks } from './outcome-tracking.js';
+import { pageAddressSlug } from './utils/page-address.js';
 
 const log = createLogger('content-posts-db');
 
@@ -50,6 +51,10 @@ interface PostRow {
 interface PublishedMonthCountRow {
   month: string;
   cnt: number;
+}
+
+interface PublishedPathRow {
+  published_slug: string | null;
 }
 
 export interface PublishedMonthCount {
@@ -208,6 +213,14 @@ const stmts = createStmtCache(() => ({
       GROUP BY substr(published_at, 1, 7)
       ORDER BY month ASC`,
   ),
+  selectPublishedPaths: db.prepare(
+    `SELECT published_slug
+       FROM content_posts
+      WHERE workspace_id = ?
+        AND (published_at IS NOT NULL OR webflow_item_id IS NOT NULL)
+        AND published_slug IS NOT NULL
+        AND trim(published_slug) <> ''`,
+  ),
 }));
 
 function rowToPost(row: PostRow): GeneratedPost {
@@ -286,6 +299,15 @@ function postToParams(post: GeneratedPost): Record<string, unknown> {
 export function listPosts(workspaceId: string): GeneratedPost[] {
   const rows = stmts().selectByWorkspace.all(workspaceId) as PostRow[];
   return rows.map(rowToPost);
+}
+
+export function listPublishedPostPagePaths(workspaceId: string): Set<string> {
+  const rows = stmts().selectPublishedPaths.all(workspaceId) as PublishedPathRow[];
+  return new Set(
+    rows
+      .map(row => row.published_slug ? pageAddressSlug(row.published_slug) : '')
+      .filter(Boolean),
+  );
 }
 
 /**

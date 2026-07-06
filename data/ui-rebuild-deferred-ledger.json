@@ -139,6 +139,34 @@
       "reviewBy": "2026-10-31"
     },
     {
+      "id": "DEF-kw-001",
+      "surface": "keywords",
+      "item": "Inline list-row rank sparkline and 7-day delta pill from the mockup are deferred; the drawer sparkline remains because it uses the existing per-keyword history endpoint.",
+      "decision": "Avoid an N+1 history fetch in the pilot table. Ship the DS-native row without inline trend graphics until a batched history-by-keyword read model exists.",
+      "class": "data",
+      "upgradeTrigger": "Add a batched rank-history read model for visible keyword rows, then render the row sparkline/delta through the DataTable cell without client-side data fabrication.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-06",
+      "reviewBy": "2026-10-31",
+      "links": { "source": "docs/ui-rebuild/pilot/keywords-data-source-ledger.md#3-platform-build-backlog--build-vs-defer-recommendation" }
+    },
+    {
+      "id": "DEF-kw-002",
+      "surface": "keywords",
+      "item": "Avg-position and period-over-period delta KPI variants are deferred; the pilot renders existing count and traffic-value tiles only.",
+      "decision": "Do not compute new summary rollups or deltas in the client. The KPI variants need a server-owned rollup/snapshot-diff contract before they can be trusted.",
+      "class": "data",
+      "upgradeTrigger": "Server summary exposes average-position and comparison-period deltas with tests that define the date window and empty-state semantics.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-06",
+      "reviewBy": "2026-10-31",
+      "links": { "source": "docs/ui-rebuild/pilot/keywords-data-source-ledger.md#3-platform-build-backlog--build-vs-defer-recommendation" }
+    },
+    {
       "id": "DEF-lint-001",
       "surface": "foundation",
       "item": "Retiring lint:ds-adherence (D-F2b-1) drops the only check that flagged raw-px literals in inline-style DS components. The F2a ds-* gates cover hex/palette/motion/icon purity but NOT raw pixel values, so raw-px in inline-style primitives is now unenforced.",
@@ -151,6 +179,62 @@
       "createdAt": "2026-07-05",
       "reviewBy": "2026-10-31",
       "links": { "pr": "#1479" }
+    },
+    {
+      "id": "DEF-shell-005",
+      "surface": "foundation",
+      "item": "RebuiltAppChrome/AppShell has no slot for the connection/health StatusBar (hasOpenAIKey/hasWebflowToken/connected/workspaceCount) the legacy shell renders — AppShell exposes sidebar/topbar/children but no footer. Review PR #1480 restored CommandPalette (⌘K) + AdminChat to the rebuilt mount (real capability losses), but StatusBar needs a shell footer slot.",
+      "decision": "Ship the rebuilt Keywords surface without the StatusBar footer for now — the RebuiltSidebar footer's NotificationBell already surfaces connection state, and adding an AppShell footer slot is a shell-primitive enhancement, not a Keywords-pilot bug. The two capability-loss items (⌘K, admin chat) were fixed in-PR; this display-affordance is ledgered.",
+      "class": "behavior",
+      "upgradeTrigger": "Phase A shell-expansion (the rebuilt shell covers non-Keywords surfaces) — add a `footer` slot to AppShell + thread StatusBar through RebuiltAppChrome so every rebuilt surface shows connection/health state.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-06",
+      "reviewBy": "2026-10-31",
+      "links": { "pr": "#1480" }
+    },
+    {
+      "id": "DEF-kw-003",
+      "surface": "keywords",
+      "item": "The Pages/Clusters/Lifecycle grouped lenses group only the CURRENT PAGE of rows (pageSize <= 100), not the full workspace keyword set — so BoardColumn counts and group stats reflect page 1 while the lens tab shows the true total. Review PR #1480 made this HONEST (a truncation banner + removed the fabricated client-side averageRank) but full coverage needs server-side grouping.",
+      "decision": "Ship the grouped lenses over the current page WITH an explicit truncation banner (never present a page-1 board as the full universe) rather than fetch-all-client-side (unbounded) or block the pilot on a server grouping contract. averageRank removed per DEF-kw-002 (no client rollups).",
+      "class": "data",
+      "upgradeTrigger": "A server-side grouped-view read model (group by page/cluster/lifecycleStage across ALL keywords with server-computed counts + rollups) — then the grouped lenses render complete groups without the page cap.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-06",
+      "reviewBy": "2026-10-31",
+      "links": { "pr": "#1480" }
+    },
+    {
+      "id": "DEF-kw-004",
+      "surface": "keywords",
+      "item": "hubSortToKccSort was extracted to the shared src/lib/keywordHubSort.ts (the rebuilt surface consumes it), but the legacy KeywordHub.tsx still keeps its own byte-identical copy + HubSortKey type. Two mappings can drift.",
+      "decision": "Do NOT touch the legacy KeywordHub during the pilot (a deliberate Task 8.4 constraint — it is the surface being replaced). The drift window is transient: KeywordHub is retired when ui-rebuild-shell covers Keywords, and the duplicate dies with it. Unifying now risks destabilizing legacy for no lasting benefit.",
+      "class": "primitive",
+      "upgradeTrigger": "KeywordHub retirement (the rebuilt Keywords surface goes global / legacy branch removed) — delete the legacy hubSortToKccSort + HubSortKey and import from src/lib/keywordHubSort.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-06",
+      "reviewBy": "2026-10-31",
+      "links": { "pr": "#1480" }
+    },
+    {
+      "id": "DEF-kw-005",
+      "surface": "keywords",
+      "item": "The rebuilt surface fetches summary+rows as ONE initial-view query keyed on the full rowsQuery, so the summary (counts + topicClusters + cannibalization + computeOrganicTrafficValue) rebuilds on every sort/page/lens/filter change though it is invariant to sort/page; computeOrganicTrafficValue also re-SELECT*s page_keywords despite the lite sourceSnapshot already being in memory. A standalone summary hook keyed WITHOUT query already exists.",
+      "decision": "Efficiency, not correctness — the surface is right, just does redundant work per interaction. Deferred rather than rushed: decoupling the summary from rowsQuery + threading the snapshot into computeOrganicTrafficValueFromPages needs careful type alignment (lite vs full PageKeywordMap) and is a template pattern worth getting right, not fast.",
+      "class": "perf",
+      "upgradeTrigger": "Before Phase A fan-out leans on the initial-view pattern — split the summary into its own query keyed without sort/page (reuse the existing summary hook), and feed computeOrganicTrafficValueFromPages the in-memory sourceSnapshot.pageMap instead of re-reading page_keywords.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-06",
+      "reviewBy": "2026-10-31",
+      "links": { "pr": "#1480" }
     }
   ]
 }

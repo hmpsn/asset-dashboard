@@ -35,6 +35,8 @@ dist-ssr
 # Coverage reports
 coverage/
 .claire/
+test-results/
+playwright/.cache/
 
 # Local experiment artifacts
 artifacts/

@@ -19,6 +19,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { CommandPalette } from './components/CommandPalette';
 import { Sidebar } from './components/layout/Sidebar';
 import { Breadcrumbs } from './components/layout/Breadcrumbs';
+import { RebuiltAppChrome, useRebuildShellEnabled } from './components/layout/RebuiltAppChrome';
+import { REBUILT_SURFACES } from './components/layout/rebuiltSurfaces';
 import { ScannerReveal } from './components/ui/ScannerReveal';
 import { TabBar } from './components/ui/TabBar';
 import { Clipboard, Globe } from 'lucide-react';
@@ -179,6 +181,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const rebuildShellEnabled = useRebuildShellEnabled();
 
   // ── Server state via React Query ──
   const { data: workspaces = [] } = useWorkspaces();
@@ -456,6 +459,49 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
 
     return <Navigate to={adminPath(selected.id, 'home')} replace />;
   };
+
+  const RebuiltSurface = rebuildShellEnabled && selected ? REBUILT_SURFACES[tab] : undefined;
+  if (RebuiltSurface && selected) {
+    return (
+      <>
+        <RebuiltAppChrome
+          workspaces={workspaces}
+          selected={selected}
+          tab={tab}
+          theme={theme}
+          pendingContentRequests={pendingContentRequests}
+          onCreate={handleCreate}
+          onDelete={handleDelete}
+          onLinkSite={handleLinkSite}
+          onUnlinkSite={handleUnlinkSite}
+          toggleTheme={toggleTheme}
+          onLogout={onLogout}
+        >
+          <ErrorBoundary label={tab}>
+            <Suspense fallback={<ChunkFallback />}>
+              <RebuiltSurface workspaceId={selected.id} />
+            </Suspense>
+          </ErrorBoundary>
+        </RebuiltAppChrome>
+        {/* Global chrome the legacy shell renders as siblings — restored for EVERY
+            rebuilt surface (review PR #1480: the rebuilt branch dropped these, killing
+            ⌘K + admin chat). StatusBar needs an AppShell footer slot → DEF-shell-005. */}
+        <CommandPalette
+          workspaces={workspaces}
+          selectedWorkspace={selected}
+          onSelectWorkspace={(ws) => navigate(adminPath(ws.id))}
+        />
+        {health.hasOpenAIKey && (
+          <ErrorBoundary label="Admin Chat">
+            <AdminChat
+              workspaceId={selected.id}
+              workspaceName={selected.webflowSiteName || selected.name}
+            />
+          </ErrorBoundary>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-[var(--surface-1)] text-[var(--brand-text)]">

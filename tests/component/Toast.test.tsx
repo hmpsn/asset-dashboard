@@ -116,9 +116,9 @@ describe('Toast', () => {
       vi.advanceTimersByTime(50);
     });
 
-    // Success toast should have emerald border class
+    // Success toast should use the canonical success accent token.
     const toastEl = screen.getByText('Success toast').closest('div');
-    expect(toastEl!.className).toContain('border-emerald-500/20');
+    expect(toastEl!.className).toContain('border-accent-success-soft');
   });
 
   it('renders error type with red border', () => {
@@ -137,7 +137,7 @@ describe('Toast', () => {
     });
 
     const toastEl = screen.getByText('Error toast').closest('div');
-    expect(toastEl!.className).toContain('border-red-500/20');
+    expect(toastEl!.className).toContain('border-accent-danger-soft');
   });
 
   it('renders info type with blue border', () => {
@@ -156,7 +156,7 @@ describe('Toast', () => {
     });
 
     const toastEl = screen.getByText('Info toast').closest('div');
-    expect(toastEl!.className).toContain('border-blue-500/20');
+    expect(toastEl!.className).toContain('border-accent-info-soft');
   });
 
   it('has a close button on each toast', () => {

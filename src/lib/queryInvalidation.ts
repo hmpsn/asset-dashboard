@@ -19,6 +19,7 @@ export function keywordMutationInvalidationKeys(workspaceId: string): readonly Q
     queryKeys.admin.rankTrackingKeywords(workspaceId),
     queryKeys.admin.rankTrackingLatest(workspaceId),
     queryKeys.admin.rankTrackingHistory(workspaceId),
+    queryKeys.admin.keywordFeedback(workspaceId),
     queryKeys.admin.intelligenceAll(workspaceId),
   ] as const;
 }

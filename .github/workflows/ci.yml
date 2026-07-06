@@ -256,6 +256,8 @@ jobs:
             command: npm run test:integration -- --reporter=dot --shard=2/3
           - name: integration (3/3)
             command: npm run test:integration -- --reporter=dot --shard=3/3
+          - name: playwright-ct
+            command: npx playwright install --with-deps chromium && npm run test:ct
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

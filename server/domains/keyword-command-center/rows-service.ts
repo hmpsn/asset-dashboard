@@ -10,6 +10,7 @@ import type { PageKeywordMap } from '../../../shared/types/workspace.js';
 import { buildLocalSeoKeywordCandidates } from '../local-seo/candidate-service.js';
 import { buildLocalSeoKeywordVisibilitySummaryByKey } from '../local-seo/snapshot-store.js';
 import { createLogger } from '../../logger.js';
+import { listPublishedPostPagePaths } from '../../content-posts-db.js';
 import {
   filterMapByKeys,
   filterStrategyForKeys,
@@ -185,6 +186,7 @@ async function buildKeywordCommandCenterLocalCandidateRows(
   const cappedBundle = filterBundleToKeys({ ...baseBundle, localCandidates }, candidateKeys);
   const valueScoring = buildValueScoringConfig(workspace);
   const lostVisibilityKeys = safeLostVisibilityKeys(workspace.id);
+  const publishedPagePaths = listPublishedPostPagePaths(workspace.id);
   const rows = new Map<string, DraftRow>();
   await populateDraftRows(rows, cappedBundle);
   ensureLocalVisibilityRows(rows, candidateVisibility);
@@ -194,6 +196,7 @@ async function buildKeywordCommandCenterLocalCandidateRows(
     activeLocalMarketCount: options.includeLocalSeo ? snapshot.activeLocalMarketCount ?? 0 : 0,
     lostVisibilityKeys,
     valueScoring,
+    publishedPagePaths,
   });
   const filtered = finalized.rows
     .filter(row => matchesFilter(row, KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES))
@@ -267,6 +270,7 @@ async function buildKeywordCommandCenterRowsSkinny(
   const pagedBundle = filterBundleToKeys(bundle, pageSelection.keys);
   const pagedLocalVisibility = filterMapByKeys(localVisibilityByKeyword, pageSelection.keys);
   const lostVisibilityKeys = safeLostVisibilityKeys(workspace.id);
+  const publishedPagePaths = listPublishedPostPagePaths(workspace.id);
   const rows = new Map<string, DraftRow>();
   await populateDraftRows(rows, pagedBundle);
   ensureLocalVisibilityRows(rows, pagedLocalVisibility);
@@ -276,6 +280,7 @@ async function buildKeywordCommandCenterRowsSkinny(
     activeLocalMarketCount,
     lostVisibilityKeys,
     valueScoring,
+    publishedPagePaths,
   });
   const filtered = finalized.rows
     .filter(row => matchesFilter(row, filter))

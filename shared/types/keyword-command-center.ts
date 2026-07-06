@@ -6,6 +6,7 @@ import type {
 import type { KeywordStrategyExplanation } from './keyword-strategy-ux.ts';
 import type { LocalSeoKeywordVisibilitySummary } from './local-seo.ts';
 import type { OutcomeReadback } from './outcome-tracking.ts';
+import type { CannibalizationItem, TopicCluster } from './workspace.ts';
 
 export const KEYWORD_COMMAND_CENTER_STATUS = {
   IN_STRATEGY: 'in_strategy',
@@ -18,6 +19,17 @@ export const KEYWORD_COMMAND_CENTER_STATUS = {
 
 export type KeywordCommandCenterStatus =
   typeof KEYWORD_COMMAND_CENTER_STATUS[keyof typeof KEYWORD_COMMAND_CENTER_STATUS];
+
+export const KEYWORD_LIFECYCLE_STAGES = {
+  DISCOVERED: 'discovered',
+  TARGETED: 'targeted',
+  PUBLISHED: 'published',
+  RANKING: 'ranking',
+  WINNING: 'winning',
+} as const;
+
+export type KeywordLifecycleStage =
+  typeof KEYWORD_LIFECYCLE_STAGES[keyof typeof KEYWORD_LIFECYCLE_STAGES];
 
 export const KEYWORD_COMMAND_CENTER_FILTERS = {
   ALL: 'all',
@@ -148,6 +160,7 @@ export interface KeywordCommandCenterMetrics {
 export interface KeywordCommandCenterAssignment {
   pagePath?: string;
   pageTitle?: string;
+  topicCluster?: string;
   role?: 'site_keyword' | 'page_keyword' | 'content_gap' | 'raw_evidence';
 }
 
@@ -242,6 +255,7 @@ export interface KeywordCommandCenterRow {
   isProtected: boolean;
   protectionReason?: string;
   rawEvidenceOnly?: boolean;
+  lifecycleStage?: KeywordLifecycleStage;
   /** Number of GSC query variants aggregated onto this row. */
   variantCount?: number;
   /** Aggregated GSC query variants (populated when variantCount > 0). */
@@ -260,6 +274,8 @@ export interface KeywordCommandCenterRow {
    * Absent when the keyword has no value signal (signal gate fails).
    */
   valueReasons?: string[];
+  /** 0-100, server-computed; display-only. */
+  opportunityScore?: number;
   /**
    * Realized monthly dollar value of the keyword: clicks × cpc (Task 3.3).
    * Built in finalizeDraftRow via the single keywordDollarValue helper (one $
@@ -327,6 +343,15 @@ export interface KeywordCommandCenterSummaryResponse {
   generatedAt?: string | null;
   summarizedAt: string;
   geoLabel?: string;
+  /**
+   * Monthly organic traffic value from the ROI page-keyword read path.
+   * Display-only; null when no page-keyword or legacy page-map source exists.
+   */
+  trafficValueMonthly?: number | null;
+  /** Topic cluster rows from the normalized topic_clusters table for rebuilt grouping lenses. */
+  topicClusters?: TopicCluster[];
+  /** Cannibalization rows from the normalized cannibalization_issues table for rebuilt grouping flags. */
+  cannibalization?: CannibalizationItem[];
 }
 
 export interface KeywordCommandCenterRowsQuery {

@@ -83,27 +83,27 @@ function ToastMessage({
   }, [durationMs, item.id, onDismiss]);
 
   const icons = {
-    success: <Icon as={CheckCircle} size="md" className="text-emerald-400 shrink-0" />,
-    error: <Icon as={AlertTriangle} size="md" className="text-red-400/80 shrink-0" />,
-    info: <Icon as={Info} size="md" className="text-blue-400 shrink-0" />,
+    success: <Icon as={CheckCircle} size="md" className="text-accent-success shrink-0" />,
+    error: <Icon as={AlertTriangle} size="md" className="text-accent-danger shrink-0" />,
+    info: <Icon as={Info} size="md" className="text-accent-info shrink-0" />,
   };
 
   const borders = {
-    success: 'border-emerald-500/20',
-    error: 'border-red-500/20',
-    info: 'border-blue-500/20',
+    success: 'border-accent-success-soft',
+    error: 'border-accent-danger-soft',
+    info: 'border-accent-info-soft',
   };
 
   if (variant === 'client') {
     const clientClasses = {
-      success: 'bg-emerald-500/15 border-emerald-500/30 text-accent-success',
-      error: 'bg-red-500/15 border-red-500/30 text-accent-danger',
-      info: 'bg-blue-500/15 border-blue-500/30 text-blue-400',
+      success: 'bg-accent-success-soft border-accent-success-soft text-accent-success',
+      error: 'bg-accent-danger-soft border-accent-danger-soft text-accent-danger',
+      info: 'bg-accent-info-soft border-accent-info-soft text-accent-info',
     };
 
     return (
       <div
-        className={`pointer-events-auto px-5 py-3 rounded-[var(--radius-xl)] border shadow-lg backdrop-blur-sm flex items-center gap-2.5 t-caption font-medium transition-all duration-200 ${clientClasses[item.type]} ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}
+        className={`pointer-events-auto px-5 py-3 rounded-[var(--radius-lg)] border shadow-[var(--shadow-md)] backdrop-blur-sm flex items-center gap-2.5 t-caption font-medium transition-all duration-[var(--dur-base)] ${clientClasses[item.type]} ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}
       >
         {icons[item.type]}
         <span className="t-caption font-medium">{item.message}</span>
@@ -121,7 +121,7 @@ function ToastMessage({
 
   return (
     <div
-      className={`pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-[var(--radius-xl)] bg-[var(--surface-2)] border ${borders[item.type]} shadow-2xl shadow-black/40 t-caption text-[var(--brand-text-bright)] transition-all duration-200 ${visible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'}`}
+      className={`pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-[var(--radius-lg)] bg-[var(--surface-2)] border ${borders[item.type]} shadow-[var(--shadow-md)] t-caption text-[var(--brand-text-bright)] transition-all duration-[var(--dur-base)] ${visible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'}`}
     >
         {icons[item.type]}
         <span className="t-caption">{item.message}</span>
