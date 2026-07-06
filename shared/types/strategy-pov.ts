@@ -21,6 +21,12 @@ export interface StrategyPov {
   wins: string[];
   /** "What I'd flag" — short, client-safe. */
   flags: string[];
+  /**
+   * SB-038 (UI-rebuild W1.2) — short admin verdict headline drafted DURING POV generation
+   * (server-derived, never client-composed — AD-002). Additive on the pov_json blob (no migration).
+   * Optional: absent in pre-SB-038 blobs and until the generator emits one; render nothing when absent.
+   */
+  verdictHeadline?: string;
   /** Bumps on every operator edit; participates in the cache hash. */
   version: number;
   generatedAt: string;
@@ -34,6 +40,8 @@ export interface StrategyPovAIOutput {
   leadSentence: string;
   wins: string[];
   flags: string[];
+  /** SB-038 — the drafted admin verdict headline (optional; honest absence when the model omits it). */
+  verdictHeadline?: string;
 }
 
 export type StrategyPovVariant = 'admin' | 'client';

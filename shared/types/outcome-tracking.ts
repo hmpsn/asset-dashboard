@@ -168,6 +168,27 @@ export type OutcomeCoverageProvenance =
   | 'actual_reconciled'; // The outcome's value has been reconciled to closed/actual records.
                         // Counts as 'reconciled' in the funnel — the top of the stack.
 
+/**
+ * SB-003 (UI-rebuild W1.1) — read-safe admin money-frame for the Engine/cockpit header.
+ * CRON-PRECOMPUTED (mirrors return-hook-cron), NEVER computed on a hot GET: computeROI WRITES a
+ * snapshot (server/roi.ts → saveSnapshot), so it must not run at render time (AD-003).
+ *  - `valueAtStake` REUSES ROIData.revenueAtStake (Σ keyword upsideMonthly) — not re-derived.
+ *  - `recoveredSoFar` is net-new: realized/measured outcome value to date.
+ *  - `provenance` is the READ-TIME, client-facing tier that drives the estimate/measured/actual
+ *    basis pill. It is `OutcomeProvenance`, NEVER `OutcomeCoverageProvenance` (that one is the
+ *    admin-only per-row coverage signal above — do not conflate).
+ */
+export interface AdminMoneyFrame {
+  /** Monthly $ unlocked if tracked keywords move toward stronger positions (= ROIData.revenueAtStake). */
+  valueAtStake: number;
+  /** $ already realized/measured to date (net-new derived). */
+  recoveredSoFar: number;
+  /** Read-time confidence tier → estimate/measured/actual pill. */
+  provenance: OutcomeProvenance;
+  /** ISO timestamp of the cron precompute — drives the freshness meta (AD-001). */
+  precomputedAt: string;
+}
+
 /** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */
 export interface BaselineSnapshot {
   captured_at: string;

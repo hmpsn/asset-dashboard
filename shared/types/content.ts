@@ -395,6 +395,15 @@ export interface ContentPerformanceItem {
   source?: ContentPerformanceSource;
   coverage: ContentTermCoverageGrade;
   joinback?: ContentPerformanceJoinback;
+  /**
+   * SB-006 (UI-rebuild W1.2) — server-computed win/early/flat verdict for this item's tracked
+   * action, REUSING the existing OutcomeReadback (score + direction). Wired at the read boundary
+   * by joining source-id (`post::<id>`) then targetKeyword to the scored read-back — the exact
+   * pattern already proven for GeneratedPost.outcome (server/content-posts-db.ts enrichPostsWithOutcomes).
+   * NOT a new enum and NOT persisted; absent when no scored action exists yet (honest absence).
+   * The client maps OutcomeScore → its win/early/flat label; the server never composes prose (AD-002).
+   */
+  outcome?: OutcomeReadback;
 }
 
 export interface ContentPerformanceResponse {
