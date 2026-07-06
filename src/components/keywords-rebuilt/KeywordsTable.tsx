@@ -145,12 +145,17 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
         return (
-          <Checkbox
-            checked={selectedKeys.has(row.normalizedKeyword)}
-            onChange={() => toggleKey(row.normalizedKeyword)}
-            label={`Select ${row.keyword}`}
-            srOnlyLabel
-          />
+          <div
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.stopPropagation()}
+          >
+            <Checkbox
+              checked={selectedKeys.has(row.normalizedKeyword)}
+              onChange={() => toggleKey(row.normalizedKeyword)}
+              label={`Select ${row.keyword}`}
+              srOnlyLabel
+            />
+          </div>
         );
       },
     },

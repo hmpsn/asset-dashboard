@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Dashboard } from '../../../src/App';
@@ -21,7 +21,14 @@ const mockLink = vi.fn();
 const mockUnlink = vi.fn();
 const summaryHookMock = vi.fn();
 const rowsHookMock = vi.fn();
+const detailHookMock = vi.fn();
 const bulkMutateMock = vi.fn();
+const rowActionMutateMock = vi.fn();
+const hardDeleteMutateMock = vi.fn();
+const pinMutateMock = vi.fn();
+const nationalRefreshMutateMock = vi.fn();
+const localRefreshMutateMock = vi.fn();
+const apiGetMock = vi.fn();
 
 const workspace = {
   id: 'ws-1',
@@ -65,7 +72,24 @@ vi.mock('../../../src/hooks/admin/useKeywordCommandCenter', () => ({
   useKeywordCommandCenterSummary: (...args: unknown[]) => summaryHookMock(...args),
   useKeywordCommandCenterRows: (...args: unknown[]) => rowsHookMock(...args),
   useKeywordCommandCenterBulkAction: () => ({ mutate: bulkMutateMock, isPending: false }),
+  useKeywordCommandCenterDetail: (...args: unknown[]) => detailHookMock(...args),
+  useKeywordCommandCenterAction: () => ({ mutate: rowActionMutateMock, isPending: false, error: null, variables: undefined }),
+  useKeywordHardDelete: () => ({ mutate: hardDeleteMutateMock, isPending: false, error: null }),
+  useRankTrackingTogglePin: () => ({ mutate: pinMutateMock, isPending: false, error: null }),
+  useNationalSerpRefresh: () => ({ mutate: nationalRefreshMutateMock, isPending: false, error: null }),
 }));
+
+vi.mock('../../../src/hooks/admin/useLocalSeo', () => ({
+  useLocalSeoRefresh: () => ({ mutate: localRefreshMutateMock, isPending: false, error: null }),
+}));
+
+vi.mock('../../../src/api/client', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/api/client')>('../../../src/api/client');
+  return {
+    ...actual,
+    get: (...args: unknown[]) => apiGetMock(...args),
+  };
+});
 
 vi.mock('../../../src/hooks/useGlobalAdminEvents', () => ({
   useGlobalAdminEvents: vi.fn(),
@@ -157,13 +181,50 @@ const rows: KeywordCommandCenterRow[] = [
     lifecycleStatus: 'in_strategy',
     statusLabel: 'In Strategy',
     sourceLabels: [],
-    metrics: { intent: 'commercial', currentPosition: 6, clicks: 42, impressions: 900, volume: 700, difficulty: 29 },
+    metrics: {
+      intent: 'commercial',
+      currentPosition: 6,
+      nationalPosition: 4,
+      matchedUrl: 'https://acme.com/cosmetic-dentistry',
+      serpFeatures: ['featured_snippet'],
+      clicks: 42,
+      impressions: 900,
+      volume: 700,
+      difficulty: 29,
+    },
     assignment: { pagePath: '/cosmetic-dentistry', pageTitle: 'Cosmetic Dentistry', topicCluster: 'Dental services' },
     tracking: { status: 'active', source: 'strategy_primary', sourceGapKey: 'gap-1', strategyOwned: true },
-    nextActions: [],
+    nextActions: [
+      {
+        type: KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE,
+        label: 'Retire keyword',
+        detail: 'Pause active tracking once the page is no longer strategic.',
+        tone: 'amber',
+        keyword: 'cosmetic dentistry',
+      },
+      {
+        type: 'check_local_visibility',
+        label: 'Refresh local visibility',
+        detail: 'Refresh local pack visibility for this keyword.',
+        tone: 'teal',
+        keyword: 'cosmetic dentistry',
+      },
+    ],
     isProtected: false,
+    localSeoState: {
+      lifecycle: 'checked',
+      lifecycleLabel: 'Tracked locally',
+      priority: 'high_opportunity',
+      priorityLabel: 'High opportunity',
+      detail: 'Primary service market',
+      checked: true,
+      marketLabel: 'Austin',
+      sourceLabels: ['GBP'],
+    },
     opportunityScore: 84,
     currentMonthly: 1234,
+    upsideMonthly: 2400,
+    valueReasons: ['Page-one rankings with meaningful click volume.', 'Commercial intent supports revenue tracking.'],
     lifecycleStage: KEYWORD_LIFECYCLE_STAGES.RANKING,
   },
   {
@@ -174,8 +235,16 @@ const rows: KeywordCommandCenterRow[] = [
     sourceLabels: [],
     metrics: { intent: 'local', currentPosition: 14, clicks: 5, impressions: 240, volume: 300, difficulty: 18 },
     assignment: { pagePath: '/emergency-dentist', pageTitle: 'Emergency Dentist', topicCluster: 'Dental services' },
-    tracking: { status: 'active', source: 'manual', strategyOwned: false },
-    nextActions: [],
+    tracking: { status: 'active', source: 'manual', strategyOwned: false, pinned: false },
+    nextActions: [
+      {
+        type: KEYWORD_COMMAND_CENTER_ACTIONS.TRACK,
+        label: 'Track keyword',
+        detail: 'Keep this keyword in active rank tracking.',
+        tone: 'teal',
+        keyword: 'emergency dentist',
+      },
+    ],
     isProtected: true,
     protectionReason: 'Tracked client keyword',
     opportunityScore: 66,
@@ -211,16 +280,55 @@ function setupKeywordHooks() {
       refetch: vi.fn(),
     };
   });
+  detailHookMock.mockImplementation((_workspaceId: string, keyword: string | null) => {
+    const row = keyword ? rows.find((candidate) => candidate.normalizedKeyword === keyword || candidate.keyword === keyword) : undefined;
+    return {
+      data: row ? {
+        row,
+        outcome: row.keyword === 'cosmetic dentistry'
+          ? {
+              actionId: 'act-1',
+              actionType: 'strategy_keyword_added',
+              score: 'win',
+              checkpointDays: 30,
+              primaryMetric: 'position',
+              direction: 'improved',
+              baselineValue: 14,
+              currentValue: 6,
+              baselinePosition: 14,
+              currentPosition: 6,
+              baselineClicks: null,
+              currentClicks: null,
+              measuredAt: '2026-07-01T00:00:00.000Z',
+            }
+          : undefined,
+      } : undefined,
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+    };
+  });
   bulkMutateMock.mockImplementation((_body: unknown, options?: { onSuccess?: (result: { message: string }) => void }) => {
     options?.onSuccess?.({ message: 'Bulk action complete' });
   });
+  hardDeleteMutateMock.mockImplementation((_vars: unknown, options?: { onSuccess?: () => void }) => {
+    options?.onSuccess?.();
+  });
+  apiGetMock.mockResolvedValue([
+    { date: '2026-07-01', positions: { 'cosmetic dentistry': 8, 'emergency dentist': 16 } },
+    { date: '2026-07-02', positions: { 'cosmetic dentistry': 6, 'emergency dentist': 14 } },
+  ]);
 }
 
 function renderSurface(path: string) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <KeywordsSurface workspaceId="ws-1" />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[path]}>
+        <KeywordsSurface workspaceId="ws-1" />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -318,6 +426,66 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     });
     expect(screen.getByText('cosmetic dentistry')).toBeInTheDocument();
     expect(screen.getByText('emergency dentist')).toBeInTheDocument();
+  });
+
+  it('opens the detail drawer from a row click and renders value, provenance, and outcome context', async () => {
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    fireEvent.click(screen.getAllByText('cosmetic dentistry')[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: 'cosmetic dentistry' })).toBeInTheDocument();
+    expect(within(dialog).getByText('#14 → #6 · Win · 30d')).toBeInTheDocument();
+    expect(within(dialog).getByText('Why this score')).toBeInTheDocument();
+    expect(within(dialog).getByText('Page-one rankings with meaningful click volume.')).toBeInTheDocument();
+    expect(within(dialog).getByText('$2,400/mo')).toBeInTheDocument();
+    expect(within(dialog).getByText('strategy primary')).toBeInTheDocument();
+    expect(within(dialog).getByText('Austin')).toBeInTheDocument();
+    expect(within(dialog).getByText('Live SERP #4')).toBeInTheDocument();
+    expect(within(dialog).getByText('featured snippet')).toBeInTheDocument();
+  });
+
+  it('opens the detail drawer from a ?q deep link', async () => {
+    renderSurface('/ws/ws-1/seo-keywords?q=emergency+dentist');
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: 'emergency dentist' })).toBeInTheDocument();
+    expect(within(dialog).getByText('Tracked client keyword')).toBeInTheDocument();
+  });
+
+  it('dispatches drawer lifecycle and local-refresh actions', async () => {
+    renderSurface('/ws/ws-1/seo-keywords');
+    fireEvent.click(screen.getAllByText('cosmetic dentistry')[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Retire keyword' }));
+    expect(rowActionMutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE,
+        keyword: 'cosmetic dentistry',
+      }),
+    );
+
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Refresh local visibility' })[0]);
+    expect(localRefreshMutateMock).toHaveBeenCalledWith({ keywords: ['cosmetic dentistry'] });
+  });
+
+  it('shows hard delete only for eligible manual rows and closes after confirmed delete', async () => {
+    renderSurface('/ws/ws-1/seo-keywords?q=emergency+dentist');
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete permanently' }));
+
+    expect(hardDeleteMutateMock).toHaveBeenCalledWith(
+      { keyword: 'emergency dentist' },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
   });
 
   it('shows the bulk bar on selection and fires non-protected bulk actions immediately', () => {

@@ -1,6 +1,7 @@
 // @ds-rebuilt
 import { useKeywordCommandCenterSummary } from '../../hooks/admin/useKeywordCommandCenter';
 import { Button, PageHeader, LensSwitcher, SearchField, Toolbar, ToolbarSpacer, FilterChip, MetricTile, Skeleton } from '../ui';
+import { KeywordDrawer } from './KeywordDrawer';
 import { KeywordsLenses } from './KeywordsLenses';
 import {
   KEYWORDS_SURFACE_FILTERS,
@@ -113,6 +114,11 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
       )}
 
       <KeywordsLenses workspaceId={workspaceId} state={state} summary={summary.data} />
+      <KeywordDrawer
+        workspaceId={workspaceId}
+        keyword={state.selectedKeyword}
+        onClose={state.closeKeyword}
+      />
     </div>
   );
 }
