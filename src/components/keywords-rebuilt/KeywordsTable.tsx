@@ -95,12 +95,15 @@ function asIntent(value: string | undefined): KeywordIntent | null {
   return INTENTS.has(normalized) ? normalized : null;
 }
 
+// Empty numeric cells use a quiet em-dash rather than a word-placeholder ("No data",
+// "No CPC", …). In the right-aligned columns DataTable styles cell text bright semibold
+// tabular-nums, so word placeholders read as loud values; "—" reads correctly as empty.
 function formatMoney(value: number | undefined): string {
-  return typeof value === 'number' ? MONEY_FORMAT.format(value) : 'No CPC';
+  return typeof value === 'number' ? MONEY_FORMAT.format(value) : '—';
 }
 
 function formatNumber(value: number | undefined): string {
-  return typeof value === 'number' ? NUMBER_FORMAT.format(value) : 'No data';
+  return typeof value === 'number' ? NUMBER_FORMAT.format(value) : '—';
 }
 
 function toRecord(row: KeywordCommandCenterRow): KeywordsTableRecord {
@@ -261,7 +264,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
       align: 'right',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
-        return <span>{row.metrics.currentPosition != null ? `#${row.metrics.currentPosition}` : 'No rank'}</span>;
+        return <span>{row.metrics.currentPosition != null ? `#${row.metrics.currentPosition}` : '—'}</span>;
       },
     },
     {
@@ -293,7 +296,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
         const score = row.opportunityScore;
         return typeof score === 'number'
           ? <Meter value={score} showValue ariaLabel={`${row.keyword} opportunity score`} gradient />
-          : <span className="t-caption-sm text-[var(--brand-text-muted)]">No score</span>;
+          : <span className="t-caption-sm text-[var(--brand-text-muted)]">—</span>;
       },
     },
     {
@@ -327,7 +330,9 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
             <StatusBadge status={row.lifecycleStatus} domain="keyword-command-center" variant="soft" />
             {row.tracking.sourceGapKey && <Badge label="From gap" tone="blue" variant="soft" size="sm" />}
             {row.tracking.strategyOwned === true && <Badge label="Auto-managed" tone="teal" variant="soft" size="sm" />}
-            {row.rawEvidenceOnly && <Badge label="Raw evidence" tone="zinc" variant="outline" size="sm" />}
+            {/* No separate "Raw evidence" badge — the StatusBadge above already renders the
+                raw-evidence lifecycle status; a second badge duplicated the term (with
+                inconsistent casing) in the same cell. */}
           </div>
         );
       },
@@ -354,14 +359,22 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
   return (
     <div className="flex flex-col gap-3">
       <Toolbar label="Keyword table controls" className="w-full">
-        {SORT_CONTROLS.map((control) => (
-          <FilterChip
-            key={control.key}
-            label={`${control.label}${state.sort.key === control.key ? ` ${state.sort.direction}` : ''}`}
-            active={state.sort.key === control.key}
-            onClick={() => state.setSort(control.key)}
-          />
-        ))}
+        {/* Leading "Sort" label so this chip row is not mistaken for the status FilterChip
+            row above it — same primitive, different axis (sort vs filter). The active chip
+            shows its direction as an arrow rather than raw "asc"/"desc" enum text. */}
+        <span className="t-caption font-medium text-[var(--brand-text-muted)]">Sort</span>
+        {SORT_CONTROLS.map((control) => {
+          const isActive = state.sort.key === control.key;
+          const arrow = isActive ? (state.sort.direction === 'asc' ? ' ↑' : ' ↓') : '';
+          return (
+            <FilterChip
+              key={control.key}
+              label={`${control.label}${arrow}`}
+              active={isActive}
+              onClick={() => state.setSort(control.key)}
+            />
+          );
+        })}
         <ToolbarSpacer />
         {rows.length > 0 && (
           <Button size="sm" variant="ghost" onClick={toggleVisibleSelection}>
@@ -394,7 +407,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
         </InlineBanner>
       )}
 
-      {selectedKeys.size > 0 && (
+      {selectedRows.length > 0 && (
         <div className="sticky top-0 z-[var(--z-dropdown)] bg-[var(--surface-1)] pb-1">
           {/* Sticky so the bulk-action bar stays reachable while scrolling a long
               selection. The AppShell scroll container is #app-shell-main-content, so
@@ -403,7 +416,11 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
               (above the DataTable's own z-sticky header) keeps the pinned bar — and its
               buttons — clickable over the sticky column header they share the top edge
               with. pb-1 gives the overlay a clean lower edge over the header. */}
-        <InlineBanner tone="info" size="sm" title={`${selectedKeys.size} selected`}>
+          {/* Count + visibility track selectedROWS (the current page's intersection with
+              the selection), NOT selectedKeys.size — a bulk action only ever executes on
+              the loaded rows it can summarize, so counting off-page keys would let the
+              banner claim "60 selected" while the action touches ~50. */}
+        <InlineBanner tone="info" size="sm" title={`${selectedRows.length} selected`}>
           <Toolbar label="Selected keyword bulk actions" className="mt-2">
             <Button size="sm" variant="primary" disabled={bulkAction.isPending} onClick={() => handleBulkAction(KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY)}>
               Add to strategy

@@ -244,9 +244,20 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
             <Skeleton className="h-[160px] w-full" />
             <Skeleton className="h-[120px] w-full" />
           </div>
+        ) : detail.isError && !row ? (
+          // The drawer is already open and titled with the keyword — a failed detail
+          // fetch must show a real error + retry, not the "pick a row" placeholder.
+          <InlineBanner tone="error" title="Couldn't load this keyword">
+            <div className="flex flex-wrap items-center gap-2">
+              <span>The keyword detail didn&apos;t load. Retry, or close and pick another row.</span>
+              <Button size="sm" variant="secondary" onClick={() => detail.refetch()}>
+                Retry
+              </Button>
+            </div>
+          </InlineBanner>
         ) : !row ? (
-          <InlineBanner tone="info" title="Select a keyword">
-            Pick a row to inspect source evidence, rank movement, revenue potential, and safe next actions.
+          <InlineBanner tone="info" title="Keyword details unavailable">
+            This keyword may have been removed. Close the panel and pick another row.
           </InlineBanner>
         ) : (
           <div className="flex flex-col gap-5">
@@ -272,8 +283,8 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
             {detail.data?.outcome && <OutcomeReadbackChip outcome={detail.data.outcome} />}
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <MetricTile label="Value Today" value={money(row.currentMonthly)} sub="Server-computed" accent="var(--emerald)" />
-              <MetricTile label="Upside" value={money(row.upsideMonthly)} sub="Server-computed" accent="var(--emerald)" />
+              <MetricTile label="Value Today" value={money(row.currentMonthly)} sub="Est. monthly value" accent="var(--emerald)" />
+              <MetricTile label="Upside" value={money(row.upsideMonthly)} sub="Est. potential gain" accent="var(--emerald)" />
             </div>
 
             <DefinitionList items={detailItems(row)} />

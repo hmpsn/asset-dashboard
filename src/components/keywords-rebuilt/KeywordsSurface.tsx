@@ -38,11 +38,6 @@ const MONEY_FORMAT = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 });
 
-const LENS_FILTER_HINTS: Partial<Record<KeywordsSurfaceLens, string>> = {
-  rankings: 'tracked',
-  pages: 'page_assigned',
-};
-
 const PRIMARY_FILTER_IDS = new Set<string>(KEYWORDS_SURFACE_FILTERS.map((filter) => filter.id));
 
 function isLockedError(error: unknown): boolean {
@@ -51,12 +46,14 @@ function isLockedError(error: unknown): boolean {
 
 function lensCount(summary: KeywordCommandCenterSummaryResponse | undefined, lens: KeywordsSurfaceLens): number | undefined {
   if (!summary) return undefined;
+  // Clusters is the one lens with a truthful server-provided group count. The
+  // rankings / opportunities / pages / lifecycle lenses each organize the SAME
+  // full keyword set (just sorted or grouped differently), so every one previews
+  // counts.total — a single consistent unit instead of the old mix of filter
+  // counts (which contradicted the table) and per-lens subsets. Distinct-page and
+  // high-opportunity-subset counts await server support (DEF-kw follow-up).
   if (lens === 'clusters') return summary.topicClusters?.length;
-  if (lens === 'lifecycle') return summary.counts.total;
-  if (lens === 'opportunities') return summary.counts.total;
-  const filterId = LENS_FILTER_HINTS[lens];
-  if (!filterId) return undefined;
-  return summary.filters.find((filter) => filter.id === filterId)?.count;
+  return summary.counts.total;
 }
 
 function feedbackGroups(rows: AdminKeywordFeedbackListRow[]) {
@@ -177,7 +174,7 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
       <div className="flex min-h-full flex-col gap-5">
         <PageHeader
           title="Keywords"
-          subtitle="Rankings, opportunities, pages, clusters, and lifecycle state in one rebuild pilot."
+          subtitle="Rankings, opportunities, pages, clusters, and lifecycle for every tracked keyword."
         />
         <ErrorState
           type="permission"
@@ -193,7 +190,7 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
     <div className="flex min-h-full flex-col gap-5">
       <PageHeader
         title="Keywords"
-        subtitle="Rankings, opportunities, pages, clusters, and lifecycle state in one rebuild pilot."
+        subtitle="Rankings, opportunities, pages, clusters, and lifecycle for every tracked keyword."
         actions={(
           <div className="flex min-w-[280px] items-center gap-2">
             <FormInput
@@ -275,8 +272,7 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
               <MetricTile label="Needs Review" value={counts?.needsReview ?? 0} accent="var(--amber)" />
               <MetricTile
                 label="Monthly Value"
-                value={typeof trafficValue === 'number' ? MONEY_FORMAT.format(trafficValue) : 'No source'}
-                sub="Display-only"
+                value={typeof trafficValue === 'number' ? MONEY_FORMAT.format(trafficValue) : '—'}
                 accent="var(--emerald)"
               />
             </>
@@ -293,14 +289,6 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
             </Button>
           </div>
         </InlineBanner>
-      )}
-
-      {state.selectedKeyword && (
-        <div className="flex justify-end">
-          <Button onClick={state.closeKeyword} variant="secondary" size="sm">
-            {state.selectedKeyword}
-          </Button>
-        </div>
       )}
 
       <KeywordsLenses workspaceId={workspaceId} state={state} summary={summary} initialRowsResult={initialRowsResult} />
