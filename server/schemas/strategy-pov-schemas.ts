@@ -7,8 +7,9 @@ import type { StrategyPov, StrategyPovAIOutput } from '../../shared/types/strate
  * a mismatch silently fails safeParse and destroys the stored POV (CLAUDE.md "Zod schema field
  * names" + "Schema vs stored shape"). `leadMoveRecId` and `editedAt` are nullable per the type.
  *
- * NOTE: this reflects what is actually written to the column (rowToPov reads it back). The store
- * always persists every field, so none are optional here.
+ * NOTE: this reflects what is actually written to the column (rowToPov reads it back). Every field
+ * the store persists is required here EXCEPT `verdictHeadline` (SB-038, W1.2), which is additive and
+ * absent from pre-SB-038 blobs — it must stay `.optional()` so a legacy blob still safeParses.
  */
 export const strategyPovSchema: z.ZodType<StrategyPov> = z.object({
   situation: z.string(),
@@ -16,6 +17,7 @@ export const strategyPovSchema: z.ZodType<StrategyPov> = z.object({
   leadSentence: z.string(),
   wins: z.array(z.string()),
   flags: z.array(z.string()),
+  verdictHeadline: z.string().optional(),
   version: z.number(),
   generatedAt: z.string(),
   editedAt: z.string().nullable(),
@@ -30,4 +32,5 @@ export const strategyPovAIOutputSchema: z.ZodType<StrategyPovAIOutput> = z.objec
   leadSentence: z.string().trim().min(1),
   wins: z.array(z.string().trim().min(1)),
   flags: z.array(z.string().trim().min(1)),
+  verdictHeadline: z.string().trim().min(1).optional(),
 });

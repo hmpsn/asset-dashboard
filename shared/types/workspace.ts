@@ -120,6 +120,29 @@ export interface PageKeywordMap {
   serpFeatures?: string[];
 }
 
+/**
+ * SB-005 (UI-rebuild W1.3) — additive per-page projection spread onto page-row payloads
+ * (all-pages / seo-editor / rewrite load-page). Sourced from the `page_keywords` table via the
+ * side-effect-free `listPageKeywords*` reads — NO N-per-row API fan-out. Every field is optional:
+ * a page with no keyword row, or one outside the batched GA4 set, renders honest absence, never a
+ * fabricated value (BUILD_CONVENTIONS §6). primaryKeyword/rank/optimizationScore are cheap column
+ * reads; monthlyTraffic is the one join (batched, see below).
+ */
+export interface PageKeywordProjection {
+  /** page_keywords.primary_keyword — the page's primary keyword assignment. */
+  primaryKeyword?: string;
+  /** page_keywords.current_position — current GSC rank; lower is better; null when unranked. */
+  rank?: number | null;
+  /** page_keywords.optimization_score — persisted 0–100 on-page score. */
+  optimizationScore?: number;
+  /**
+   * Monthly organic sessions for this page from a SINGLE batched GA4 landing-pages read
+   * (getGA4LandingPages, organicOnly), joined by pagePath. undefined when the page falls outside
+   * the batched top-N set — honest absence, never fabricated, never an N-per-row fetch.
+   */
+  monthlyTraffic?: number;
+}
+
 export interface KeywordGapItem {
   keyword: string;
   volume: number;
