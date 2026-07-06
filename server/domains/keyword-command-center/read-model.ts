@@ -22,6 +22,7 @@ import {
 } from '../../scoring/keyword-value-score.js';
 import { buildKeywordValueScoringContext } from '../../scoring/keyword-value-context.js';
 import { keywordDollarValue } from '../../scoring/keyword-value-money.js';
+import { deriveLifecycleStage } from '../../scoring/keyword-lifecycle-stage.js';
 import {
   UNIVERSE_SAFETY_CEILING,
   addCandidateKeysFromBundle,
@@ -59,6 +60,7 @@ import type {
 } from './types.js';
 
 const log = createLogger('keyword-command-center');
+const EMPTY_PUBLISHED_PAGE_PATHS = new Set<string>();
 
 /**
  * Build the per-request value-scoring config. Fetches posture + markets ONCE and
@@ -390,6 +392,7 @@ export function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): Ke
     isProtected,
     protectionReason: protection,
     rawEvidenceOnly: row.rawEvidenceOnly,
+    lifecycleStage: undefined,
     variantCount: row.variants?.length ?? 0,
     variants: row.variants?.map(variant => ({
       query: variant.query,
@@ -400,6 +403,7 @@ export function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): Ke
     })),
     isLostVisibility: context.lostVisibilityKeys?.has(row.normalizedKeyword) ?? false,
   };
+  finalized.lifecycleStage = deriveLifecycleStage(finalized, context.publishedPagePaths ?? EMPTY_PUBLISHED_PAGE_PATHS);
 
   if (context.valueScoring?.on && context.valueScoring.ctx) {
     const input = {

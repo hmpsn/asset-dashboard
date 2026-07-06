@@ -19,6 +19,17 @@ export const KEYWORD_COMMAND_CENTER_STATUS = {
 export type KeywordCommandCenterStatus =
   typeof KEYWORD_COMMAND_CENTER_STATUS[keyof typeof KEYWORD_COMMAND_CENTER_STATUS];
 
+export const KEYWORD_LIFECYCLE_STAGES = {
+  DISCOVERED: 'discovered',
+  TARGETED: 'targeted',
+  PUBLISHED: 'published',
+  RANKING: 'ranking',
+  WINNING: 'winning',
+} as const;
+
+export type KeywordLifecycleStage =
+  typeof KEYWORD_LIFECYCLE_STAGES[keyof typeof KEYWORD_LIFECYCLE_STAGES];
+
 export const KEYWORD_COMMAND_CENTER_FILTERS = {
   ALL: 'all',
   IN_STRATEGY: 'in_strategy',
@@ -242,6 +253,7 @@ export interface KeywordCommandCenterRow {
   isProtected: boolean;
   protectionReason?: string;
   rawEvidenceOnly?: boolean;
+  lifecycleStage?: KeywordLifecycleStage;
   /** Number of GSC query variants aggregated onto this row. */
   variantCount?: number;
   /** Aggregated GSC query variants (populated when variantCount > 0). */

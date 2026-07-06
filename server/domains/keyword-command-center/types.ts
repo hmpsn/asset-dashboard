@@ -69,6 +69,7 @@ export interface RowFinalizeContext {
   lostVisibilityKeys?: Set<string>;
   /** Phase 1: when present + on, finalize computes the row valueScore once per key. */
   valueScoring?: ValueScoringConfig;
+  publishedPagePaths?: Set<string>;
 }
 
 export interface FinalizedRows {
