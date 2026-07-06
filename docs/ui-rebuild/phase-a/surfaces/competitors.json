@@ -1,0 +1,404 @@
+{
+  "gather": {
+    "surface": "competitors",
+    "capabilityClassification": [
+      {
+        "capability": "#1 competitors Page union + admin route",
+        "resolution": "ui-only",
+        "note": "Route preserved (src/routes.ts:7, src/App.tsx:404); rebuild only re-skins."
+      },
+      {
+        "capability": "#2 NON_REGISTRY deep-link-only entry → first-class nav",
+        "resolution": "ui-only",
+        "note": "F4 shell adds a NavItem; keep cockpit deep-link (KeywordStrategy.tsx:798) landing here."
+      },
+      {
+        "capability": "#3 PageHeader title/subtitle",
+        "resolution": "ui-only",
+        "note": "Verbatim copy exists at CompetitorsPage.tsx:45-49."
+      },
+      {
+        "capability": "#4 page-level loading state",
+        "resolution": "ui-only",
+        "note": "Four-state convention; useKeywordStrategy isLoading already drives it."
+      },
+      {
+        "capability": "#5 competitor list derived from strategy settings",
+        "resolution": "ui-only",
+        "note": "Same reads: useKeywordStrategy + useStrategySettings (CompetitorsPage.tsx:25-35)."
+      },
+      {
+        "capability": "#6 GET /api/workspaces/:id/competitor-alerts",
+        "resolution": "ui-only",
+        "note": "Endpoint verified server/routes/competitor-alerts.ts:34-50; rebuild consumes as-is."
+      },
+      {
+        "capability": "#7 alert row fields",
+        "resolution": "ui-only",
+        "note": "All fields on the wire (shared/types/competitor-alerts.ts:20-38); render with DataTable."
+      },
+      {
+        "capability": "#8 severity badges (red/amber/emerald)",
+        "resolution": "ui-only",
+        "note": "Badge/IntentTag tones; no purple."
+      },
+      {
+        "capability": "#9 alerts loading/error/empty states incl. configured-but-quiet",
+        "resolution": "ui-only",
+        "note": "Behavior exists (CompetitorAlertsPanel.tsx:95-104); rebuild must keep the quiet-empty distinct from unconfigured."
+      },
+      {
+        "capability": "#10 WS invalidate on STRATEGY_UPDATED + 1h staleTime",
+        "resolution": "ui-only",
+        "note": "Reuse useCompetitorAlerts verbatim (src/hooks/admin/useCompetitorAlerts.ts:30-46)."
+      },
+      {
+        "capability": "#11 'N this week' count + 'Weekly check · updated Mon' sync line",
+        "resolution": "needs-server-work",
+        "note": "Count derivable client-side from alerts, but the sync line needs sn-competitors-2 (lastSnapshotDate not on wire; empty-alerts case has no timestamp)."
+      },
+      {
+        "capability": "#12 share-of-voice bars",
+        "resolution": "ui-only",
+        "note": "Same intel payload (organicTraffic per domain); Meter primitive."
+      },
+      {
+        "capability": "#13 ShareBar own-domain trust guard",
+        "resolution": "ui-only",
+        "note": "Client-side guard (ShareBar.tsx:47-51) must be carried; specced via Q6 (default: carry)."
+      },
+      {
+        "capability": "#14 ShareBar/CompetitiveIntel shared query key",
+        "resolution": "ui-only",
+        "note": "queryKeys.admin.competitorIntelAll verified (src/lib/queryKeys.ts:135); keep one fetch."
+      },
+      {
+        "capability": "#15 GET /api/seo/competitive-intel/:ws live fetch",
+        "resolution": "ui-only",
+        "note": "Endpoint verified in full (server/routes/seo-provider.ts:59-171: geo, ≤5 cap, degraded flag, providerFailures, sanitized 502); unchanged."
+      },
+      {
+        "capability": "#16 per-competitor summary → head-to-head table w/ YOU row",
+        "resolution": "ui-only",
+        "note": "All columns (traffic/keywords/refDomains) already in the response; DataTable upgrade."
+      },
+      {
+        "capability": "#17 expandable detail incl. traffic value ($)",
+        "resolution": "open-question",
+        "note": "Q2 — data is already in payload (organicCost, server/seo-data-provider.ts:58); proposed default: carry via Drawer, zero server work."
+      },
+      {
+        "capability": "#18 per-competitor Their Top Keywords (top 10)",
+        "resolution": "open-question",
+        "note": "Q2 — topKeywords[20] already fetched per domain (seo-provider.ts:126-128); same Drawer default."
+      },
+      {
+        "capability": "#19 Refresh button → invalidate competitorIntelAll",
+        "resolution": "ui-only",
+        "note": "Cache invalidation only; carry into rebuilt Toolbar."
+      },
+      {
+        "capability": "#20 degraded-partial + cached-fallback messaging + Retry",
+        "resolution": "ui-only",
+        "note": "degraded/providerFailures on the wire (seo-provider.ts:158-164); spec into state matrix per Q6."
+      },
+      {
+        "capability": "#21 cached keyword-gap fallback + 'from strategy' provenance badge",
+        "resolution": "ui-only",
+        "note": "Strategy blob already loaded on this page; carry badge per Q6 default."
+      },
+      {
+        "capability": "#22 freshness label from fetchedAt",
+        "resolution": "ui-only",
+        "note": "fetchedAt on the wire (seo-provider.ts:160)."
+      },
+      {
+        "capability": "#23 two distinct empty states (provider-not-configured vs add-domains)",
+        "resolution": "ui-only",
+        "note": "Both causes distinguishable today (503 no-provider vs empty competitor list); rebuild must render both, prototype has only one."
+      },
+      {
+        "capability": "#24 Authority (DR) + Top 3 columns",
+        "resolution": "open-question",
+        "note": "Q3 — not derivable today (sn-competitors-1); default: drop from v1, never fabricate."
+      },
+      {
+        "capability": "#25 gap rows w/ KD banding + Evidence-only framing",
+        "resolution": "ui-only",
+        "note": "keywordGaps in intel response + stored strategy; carry the evidence-not-curation meaning."
+      },
+      {
+        "capability": "#26 per-gap Create brief → seo-briefs fixContext",
+        "resolution": "ui-only",
+        "note": "Existing navigate + fixContext state (KeywordGaps.tsx:103-113); wire, don't toast-stub."
+      },
+      {
+        "capability": "#27 per-gap View in Hub deep-link",
+        "resolution": "open-question",
+        "note": "Q5 — proposed default: carry (buildHubDeepLinkQuery exists, Keywords surface is in the new IA); ui-only once decided."
+      },
+      {
+        "capability": "#28 per-gap Track keyword (onTrack prop)",
+        "resolution": "ui-only",
+        "note": "Not mounted on this page at HEAD; owned by Keywords surface — listed to prevent double-count."
+      },
+      {
+        "capability": "#29 backlink stat cards",
+        "resolution": "ui-only",
+        "note": "BacklinksOverview fields verified (server/seo-data-provider.ts:82-91); MetricTile x4."
+      },
+      {
+        "capability": "#30 top referring domains table w/ external link-out",
+        "resolution": "ui-only",
+        "note": "ReferringDomain shape verified (:93-97); keep real anchors, not the prototype's dead links."
+      },
+      {
+        "capability": "#31 backlink states incl. DATAFORSEO env-var hint",
+        "resolution": "ui-only",
+        "note": "Carry admin-appropriate env guidance (BacklinkProfile.tsx:18-51)."
+      },
+      {
+        "capability": "#32 useBacklinkProfile refetch on strategy:updated",
+        "resolution": "ui-only",
+        "note": "Hook verified src/hooks/admin/useBacklinkProfile.ts:18-20."
+      },
+      {
+        "capability": "#33 competitor send flow (mint + rec lifecycle)",
+        "resolution": "open-question",
+        "note": "Q1 — backend fully live (POST /api/recommendations/:ws/competitor-rec, recommendations.ts:691-724; flags feature-flags.ts:72,83) but UI unreachable at HEAD; carrying it is ui-only, retiring needs owner call."
+      },
+      {
+        "capability": "#34 save competitor domains endpoint + settings home",
+        "resolution": "open-question",
+        "note": "Q4 — POST /api/seo/competitors/:ws exists (seo-provider.ts:196-217); only the edit-UI HOME (Strategy vs Workspace settings) is undecided."
+      },
+      {
+        "capability": "#35 auto-discover competitors",
+        "resolution": "ui-only",
+        "note": "GET /api/seo/discover-competitors/:ws exists (seo-provider.ts:174); placement follows Q4."
+      },
+      {
+        "capability": "#36 header competitor chips + Edit set",
+        "resolution": "ui-only",
+        "note": "new_proposed, adopt: read-only FilterChips from settings.competitors; Edit routes per Q4."
+      },
+      {
+        "capability": "#37 SEO cache clear + diagnose utilities",
+        "resolution": "ui-only",
+        "note": "Endpoints kept working by carrying Refresh (#19); record so they are not orphaned."
+      },
+      {
+        "capability": "#38 competitor-monitoring cron (Monday-gated)",
+        "resolution": "ui-only",
+        "note": "Backend unchanged; use 'Weekly check' copy (execution is Monday-gated, intelligence-crons.ts:93-94)."
+      },
+      {
+        "capability": "#39 alert detection thresholds + severity",
+        "resolution": "ui-only",
+        "note": "Backend unchanged (competitor-snapshot-store.ts:157-230)."
+      },
+      {
+        "capability": "#40 alert→competitor_alert insight upsert + renderers",
+        "resolution": "ui-only",
+        "note": "Backend unchanged; renderers owned by Insights/client audits (crossSurfaceDeps, Q7)."
+      },
+      {
+        "capability": "#41 competitor overtake → DECAYING rec boost",
+        "resolution": "ui-only",
+        "note": "Invisible scoring behavior; must survive untouched — no UI work."
+      },
+      {
+        "capability": "#42 client competitor surfaces (public gaps, client strategy)",
+        "resolution": "ui-only",
+        "note": "Out of this surface's scope; owned by Client Dashboard audit — cross-ref only."
+      },
+      {
+        "capability": "#43 competitor schema comparison endpoint",
+        "resolution": "ui-only",
+        "note": "Owned by Schema surface audit; shares ws.competitorDomains set."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-competitors-1",
+        "kind": "field",
+        "description": "Domain rank (DR/authority) + true top-3 rankings count per domain on the competitive-intel response, sourced from the provider (DataForSEO domain rank + a top-3 aggregate, not the top-20 sample). Only if owner approves Q3; otherwise drop the columns.",
+        "existsToday": "no",
+        "evidence": "DomainOverview has only organicKeywords/organicTraffic/organicCost (server/seo-data-provider.ts:55-59); BacklinksOverview has no rank field (:82-91); getDomainKeywords capped at 20 (server/routes/seo-provider.ts:126-128) so an absolute top-3 count is not derivable.",
+        "effort": "M",
+        "whereItLives": "server/seo-data-provider.ts (provider interface + DataForSEO impl) + server/routes/seo-provider.ts competitive-intel handler",
+        "likelySharedWith": [
+          "keywords",
+          "strategy-issue"
+        ]
+      },
+      {
+        "id": "sn-competitors-2",
+        "kind": "field",
+        "description": "Expose lastSnapshotDate (MAX(competitor_snapshots.snapshot_date) for the workspace) on the GET competitor-alerts response so the 'Weekly check · updated Mon' sync line renders even when zero alerts fired.",
+        "existsToday": "partial",
+        "evidence": "snapshot_date is stored and read newest-first in server/competitor-snapshot-store.ts:72, but the wire shape CompetitorAlertsResponse is only {workspaceId, alerts} (shared/types/competitor-alerts.ts:35-38; server/routes/competitor-alerts.ts:41-44).",
+        "effort": "S",
+        "whereItLives": "server/competitor-snapshot-store.ts (one query) + server/routes/competitor-alerts.ts + shared/types/competitor-alerts.ts",
+        "likelySharedWith": []
+      },
+      {
+        "id": "sn-competitors-3",
+        "kind": "field",
+        "description": "Expose insightId on CompetitorAlertView to link each alert to its Insights Engine entry / resolve action — the trade-off table's 'full' alerts version only.",
+        "existsToday": "partial",
+        "evidence": "Alert rows are linked to insight ids in the store (surface doc #40, server/intelligence-crons.ts:160-186) but insightId is deliberately omitted from the wire (shared/types/competitor-alerts.ts header comment; toView in server/routes/competitor-alerts.ts:14-27 does not map it).",
+        "effort": "S",
+        "whereItLives": "server/routes/competitor-alerts.ts toView + shared/types/competitor-alerts.ts",
+        "likelySharedWith": [
+          "insights-engine"
+        ]
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "Q1 (#33): carry the competitor send-to-client flow into the rebuilt gaps card, keep backend-only, or formally retire? Ledger lists it as a carried func; UI is unreachable at HEAD while the backend is live.",
+        "proposedDefault": "Carry: add Send-to-client on gap rows via the existing mint endpoint, behind the existing strategy-competitor-send flag — ui-only, no ledger over-claim.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q2 (#17,#18): flat table drops comparison bars, traffic value ($), and Their Top Keywords. Simplify or add expand/drawer?",
+        "proposedDefault": "Row → Drawer with comparison bars + traffic value + top-10 keywords; data is already in the intel payload so it is cheap and ui-only.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q3 (#24): approve data ticket sn-competitors-1 for Authority (DR) + Top-3 columns, or drop from v1?",
+        "proposedDefault": "Drop from v1 (never fabricate); ticket sn-competitors-1 as a follow-up.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q4 (#34-36): confirm competitor-set editing moves to Workspace settings as the single home, with Auto-discover shipped there and strategy-generation retaining access.",
+        "proposedDefault": "Adopt the prototype move; Competitors page shows read-only chips + Edit set routing to Workspace settings; endpoints unchanged.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q5 (#27): carry the per-gap View-in-Hub deep-link into the new gaps card?",
+        "proposedDefault": "Yes — one affordance reusing buildHubDeepLinkQuery; Keywords surface exists in the new IA.",
+        "needsOwner": false,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q6 (#13,#20,#21): confirm the trust behaviors (ShareBar own-domain guard, degraded-partial banner, cached-fallback 'from strategy' badge) are specced into the state matrix.",
+        "proposedDefault": "Spec all three as required behaviors in the surface's state matrix — they are ui-only carries.",
+        "needsOwner": false,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q7 (#40,#42): confirm client competitor surfaces and competitor_alert insight renderers are covered by the Client Dashboard and Insights Engine audits.",
+        "proposedDefault": "Cross-reference in both ledgers; no work on this surface.",
+        "needsOwner": false,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Newly found: cron-registry description says 'Daily competitor visibility check' but execution is Monday-gated — prototype 'Weekly check' copy is the accurate one; the registry description is stale.",
+        "proposedDefault": "Use 'Weekly' copy in UI; fix the CRON_METADATA description string in a trivial follow-up, not this surface's PR.",
+        "needsOwner": false,
+        "source": "newly-found"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "Head-to-head as a single sortable table including your row with YOU pill (competitors.js:277-286)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Genuine upgrade of the collapsed-row scan; all columns already in the intel response — omit DR/Top-3 pending Q3."
+      },
+      {
+        "proposal": "Header competitor-set chips + Edit set button (competitors.js:258-261)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Additive visibility win; read-only FilterChips from existing settings data, Edit routes per Q4."
+      },
+      {
+        "proposal": "'N this week' alert count + 'Weekly check · updated Mon' sync line (competitors.js:253,267)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Honest freshness metadata; needs the small sn-competitors-2 field for the zero-alerts case."
+      },
+      {
+        "proposal": "Authority (DR) + Top 3 columns (competitors.js:282)",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Not derivable at HEAD (sn-competitors-1); showing sampled/fabricated numbers violates a hard floor."
+      },
+      {
+        "proposal": "Move competitor-set editing to Workspace settings (wsettings.js:184-190)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Endpoints unchanged; contingent on Q4 confirmation of single home + strategy-flow access."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Single page, section stack (no LensSwitcher): Header w/ set chips",
+        "Competitor alerts",
+        "Share of voice",
+        "Head-to-head table",
+        "Keyword gaps",
+        "Backlink profile"
+      ],
+      "primitives": [
+        "PageContainer",
+        "Toolbar (Refresh + Edit set)",
+        "FilterChip (competitor set chips)",
+        "DataTable (alerts, head-to-head, gaps, referring domains)",
+        "Meter (share-of-voice bars)",
+        "MetricTile (4 backlink stat cards)",
+        "IntentTag/Badge (severity + provenance)",
+        "Drawer (per-competitor detail, pending Q2)",
+        "GroupBlock",
+        "KeyValueRow (drawer comparison rows)"
+      ],
+      "dataHooks": [
+        "useKeywordStrategy",
+        "useStrategySettings",
+        "useCompetitorAlerts → GET /api/workspaces/:id/competitor-alerts",
+        "queryKeys.admin.competitorIntelAll → GET /api/seo/competitive-intel/:ws (shared ShareBar+intel fetch)",
+        "useBacklinkProfile → queryKeys.admin.backlinkProfile",
+        "POST /api/seo/competitors/:ws + GET /api/seo/discover-competitors/:ws (settings home)",
+        "POST /api/recommendations/:ws/competitor-rec (send flow, pending Q1)",
+        "DELETE /api/seo/cache/:ws (Refresh pairing)"
+      ],
+      "statesPlan": "Four states per section; TWO distinct page empties (provider-not-configured vs add-domains) + configured-but-quiet alerts empty; degraded-partial banner, cached-fallback 'from strategy' badge, honest fetchedAt freshness label, error+Retry.",
+      "mountNote": "@ds-rebuilt page inside F4 RebuiltAppChrome behind ui-rebuild-shell; promoted from NON_REGISTRY deep-link-only to a first-class Strategy & Content nav item; The Issue cockpit deep-link keeps landing on the same /ws/:id/competitors route (no redirect map needed — route unchanged)."
+    },
+    "crossSurfaceDeps": [
+      "Keywords surface — View-in-Hub deep-link target (#27) and Track-keyword ownership (#28)",
+      "SEO Briefs / Content Pipeline — Create-brief fixContext navigation (#26)",
+      "Workspace settings surface — competitor-set editing home + Auto-discover (Q4, #34-36)",
+      "Insights Engine audit — competitor_alert insight renderers (#40) + sn-competitors-3 linkage",
+      "Client Dashboard audit — public competitor-gaps + client strategy gap list (#42)",
+      "Schema surface — competitor-schema comparison reads the same competitorDomains set (#43)",
+      "Strategy/The Issue cockpit — deep-link source + shared strategy-competitor-send / strategy-command-center flags (#33)"
+    ],
+    "unknowns": [],
+    "effortEstimate": "M"
+  },
+  "verify": {
+    "surface": "competitors",
+    "verdicts": [
+      {
+        "needId": "sn-competitors-1",
+        "verdict": "CONFIRMED",
+        "evidence": "DomainOverview has only organicKeywords/organicTraffic/organicCost/paid* — no DR/authority field (server/seo-data-provider.ts:55-63). BacklinksOverview has no rank field (server/seo-data-provider.ts:82-91). getDomainKeywords(domain, workspaceId, limit?, ...) is caller-limited (server/seo-data-provider.ts:257) and the competitive-intel handler passes limit=20 (server/routes/seo-provider.ts:127-128), so an absolute top-3 count is not derivable from the top-20 sample. The rank fields at seo-data-provider.ts:125-127 belong to a different (National SERP client-rank) interface, not domain authority.",
+        "correction": "Claim stands as written. Minor scoping note only: the provider does expose a domain-rank source (DataForSEO Labs google_domain_rank_overview) and a true top-3 count would require a separate aggregate call (not the top-20 sample), so 'source from provider' is achievable and the effort M (provider interface + DataForSEO impl + handler, live pass-through, no migration) is right. Owner Q3 gate still applies."
+      },
+      {
+        "needId": "sn-competitors-2",
+        "verdict": "CONFIRMED",
+        "evidence": "snapshot_date is a stored column read newest-first (server/competitor-snapshot-store.ts:71-73 getLatestSnapshot; listAlerts orders by created_at DESC). The wire shape is exactly {workspaceId, alerts} (shared/types/competitor-alerts.ts:34-38) built at server/routes/competitor-alerts.ts:41-43. lastSnapshotDate is genuinely absent from the response.",
+        "correction": "Partial is correct and effort S holds: needs one new MAX(snapshot_date) store query over an EXISTING column, one field on CompetitorAlertsResponse, one line in the route. No DB migration and no column+mapper lockstep is triggered because it reads an already-present column."
+      },
+      {
+        "needId": "sn-competitors-3",
+        "verdict": "CONFIRMED",
+        "evidence": "insight_id IS carried on the store row (server/competitor-snapshot-store.ts:30 AlertRow.insight_id → :63 CompetitorAlert.insightId), populated by the cron via linkAlertToInsight (server/intelligence-crons.ts:181-184). But CompetitorAlertView omits insightId (shared/types/competitor-alerts.ts:20-31) and toView() does not map it (server/routes/competitor-alerts.ts:14-26).",
+        "correction": "Partial is correct and effort S holds: the field already exists on the source CompetitorAlert domain object, so exposing it is one type field on CompetitorAlertView plus one mapping line in toView — no migration, no store change."
+      }
+    ]
+  }
+}

@@ -1,0 +1,478 @@
+{
+  "gather": {
+    "capabilityClassification": [
+      {
+        "capability": "Row 1: dedicated Local Presence page under Strategy nav",
+        "resolution": "ui-only",
+        "note": "Route/nav registry entries exist (src/routes.ts:7, navRegistry.tsx:141)."
+      },
+      {
+        "capability": "Row 2: ?tab= deep links for 4 legacy tab values",
+        "resolution": "ui-only",
+        "note": "Receiver-side useSearchParams wiring + alias map for overview|visibility|reviews|setup; contract test exists. Final tab set pending OQ8."
+      },
+      {
+        "capability": "Row 3: Overview stat cards (Markets/Checked/Visible/4th flag-dependent)",
+        "resolution": "ui-only",
+        "note": "All counts in LocalSeoReadResponse.report; recompose as MetricTiles."
+      },
+      {
+        "capability": "Row 4: Local operating status card (posture badge, setupLabel/Detail, market chips)",
+        "resolution": "ui-only",
+        "note": "setupState/setupLabel/setupDetail exist (shared/types/local-seo.ts:532-535); prototype has no home — give it one in Overview."
+      },
+      {
+        "capability": "Row 5: reviews-vs-competitors / local-pack coverage blurb",
+        "resolution": "ui-only",
+        "note": "Existing report fields; prototype upgrades to share-of-voice table (see sn-local-presence-3 for the % column)."
+      },
+      {
+        "capability": "Rows 6, 22: Setup entry points + business-locations shortcut to Brand & AI",
+        "resolution": "ui-only",
+        "note": "Cross-surface link only; locations editor stays in Brand & AI."
+      },
+      {
+        "capability": "Rows 7, 13, 31, 35, 48: empty/error/locked/flag-OFF states",
+        "resolution": "ui-only",
+        "note": "All exist at HEAD, none in prototype; rebuild owes EmptyState/ErrorState/TierGate treatments per Build Conventions."
+      },
+      {
+        "capability": "Row 8: visibility posture stat grid (5-posture model incl provider_degraded)",
+        "resolution": "ui-only",
+        "note": "Data exists in report; home pending OQ3 — default is a Visibility lens restyled with MetricTiles."
+      },
+      {
+        "capability": "Row 9: setup-state callout with refresh-error safety copy",
+        "resolution": "ui-only",
+        "note": "setupState union + copy exist; carry verbatim."
+      },
+      {
+        "capability": "Row 10: manual visibility Refresh (job-aware, gated)",
+        "resolution": "ui-only",
+        "note": "POST /refresh exists (server/routes/local-seo.ts:225) + useLocalSeoRefresh + useBackgroundTasks; keep-vs-cron is OQ6."
+      },
+      {
+        "capability": "Row 11: per-market visibility trend sparklines",
+        "resolution": "ui-only",
+        "note": "LocalSeoVisibilityTrendSeries in read response (shared/types/local-seo.ts:566-570); maps to Sparkline primitive."
+      },
+      {
+        "capability": "Row 12: repeat competitors + one-click Track keyword",
+        "resolution": "ui-only",
+        "note": "LocalSeoRepeatCompetitor (shared/types/local-seo.ts:537) + useRankTrackingAddKeyword; recompose as DataTable with row action."
+      },
+      {
+        "capability": "Row 14: cross-surface mounts of LocalSeoVisibilityPanel/Badge",
+        "resolution": "ui-only",
+        "note": "Owned by Strategy/Keyword Hub/Page Intelligence ledgers; do not delete the shared component during rebuild."
+      },
+      {
+        "capability": "Rows 15-26: market setup drawer (posture, gaps, suggested markets, CRUD, provider match, set-primary, budget, validation, save-and-refresh, a11y, refresh API extras)",
+        "resolution": "ui-only",
+        "note": "Near-1:1 prototype parity; T1 carry-over-then-reskin onto DS Drawer primitive; server contract (local-seo.ts:71-118,195-250) unchanged incl API-only refresh extras (row 26)."
+      },
+      {
+        "capability": "Rows 27-28: GBP aggregate readout + completeness score /100",
+        "resolution": "ui-only",
+        "note": "GET /gbp-reviews exists (local-seo.ts:257-277); completeness maps to Meter; never invent 0-star."
+      },
+      {
+        "capability": "Row 29: manual Refresh GBP & reviews incl bootstrap path",
+        "resolution": "ui-only",
+        "note": "POST /refresh-gbp exists (local-seo.ts:287); first-refresh bootstrap CTA must survive (shipped-bug regression risk); OQ6."
+      },
+      {
+        "capability": "Row 30: claim-status suppression vs prototype Verified badge",
+        "resolution": "open-question",
+        "note": "OQ4 — HEAD deliberately suppresses (GbpReviewsPanel.tsx:44-47); default keep suppressed."
+      },
+      {
+        "capability": "Rows 32-33: GBP OAuth connect/disconnect + mapping status chip",
+        "resolution": "ui-only",
+        "note": "Routes exist (google-business-profile.ts:140-205,449-499); chip is additive; Settings GbpConnectionCard survives in the Settings surface."
+      },
+      {
+        "capability": "Row 34: authenticated review sync (trigger, per-location sync health, aggregates, copy policy)",
+        "resolution": "open-question",
+        "note": "OQ5 — server complete (google-business-profile.ts:207-274); placement in the new Reviews pipeline is an owner call; default = pipeline header block."
+      },
+      {
+        "capability": "Rows 36, 38-41: review-response draft/edit/send/approve-publish/retry/policy copy",
+        "resolution": "ui-only",
+        "note": "All hooks + routes verified (useGoogleBusinessProfile.ts:114-173; google-business-profile.ts:289-448)."
+      },
+      {
+        "capability": "Row 37: full response lifecycle incl declined/cancelled renderings",
+        "resolution": "ui-only",
+        "note": "All 9 statuses in GBP_REVIEW_RESPONSE_TRANSITIONS (state-machines.ts:172-183); prototype omits 2 — rebuild must render them (OQ7)."
+      },
+      {
+        "capability": "Rows 42-44, 46-47: locations CRUD API, background jobs, WS events, insights/intelligence integration, MCP tool + route id",
+        "resolution": "ui-only",
+        "note": "Server plumbing untouched; rebuild keeps both broadcast halves and the /local-seo route id (D8)."
+      },
+      {
+        "capability": "Row 45: four local/GBP feature flags",
+        "resolution": "open-question",
+        "note": "UI-shell flag retirement during rebuild needs owner sign-off per P2 direction; backend flags stay on lifecycle."
+      },
+      {
+        "capability": "N1: 7x7 geo-grid rank map",
+        "resolution": "open-question",
+        "note": "OQ1 — no data source exists (no geo-grid code/table anywhere; verified grep empty); default = defer, ship quick-win markets-x-keywords posture grid; full build = sn-local-presence-1."
+      },
+      {
+        "capability": "N2: profile views + calls/directions hero metrics",
+        "resolution": "open-question",
+        "note": "OQ2 — no GBP Performance API integration (grep 'performance' in google-business-profile-client.ts empty); default = cut from hero; sn-local-presence-2 if adopted."
+      },
+      {
+        "capability": "N3: Verified badge",
+        "resolution": "open-question",
+        "note": "Same decision as row 30 (OQ4); default reject."
+      },
+      {
+        "capability": "N4: extended profile-health checklist with Fix flows",
+        "resolution": "defer-candidate",
+        "note": "Quick win renders the 3 real completeness signals as the checklist; full ingestion = sn-local-presence-8, DEF-* row."
+      },
+      {
+        "capability": "N5: map-pack share-of-voice % per competitor",
+        "resolution": "needs-server-work",
+        "note": "sn-local-presence-3 — derivable from existing snapshot appearances + checkedCount; cheapest new item."
+      },
+      {
+        "capability": "N6: reviews pipeline funnel + desk filters",
+        "resolution": "ui-only",
+        "note": "Pure re-presentation of existing statuses; must still render declined/cancelled."
+      },
+      {
+        "capability": "N7: nudge-client reminder on awaiting_client",
+        "resolution": "needs-server-work",
+        "note": "sn-local-presence-4 — no endpoint exists (grep nudge/reminder empty in google-business-profile.ts)."
+      },
+      {
+        "capability": "N8: View-on-Google link for published replies",
+        "resolution": "needs-server-work",
+        "note": "sn-local-presence-5 — no review/maps URL persisted (grep reviewUrl/maps_url empty across store, migrations, shared types)."
+      },
+      {
+        "capability": "N9: Rewrite-with-AI + Write-manually + Draft-and-send",
+        "resolution": "needs-server-work",
+        "note": "sn-local-presence-6 — AI regen partially exists via upsertGbpReviewResponseDraft (google-business-profile.ts:303); manual-create and one-step send are new."
+      },
+      {
+        "capability": "N10: Reopen-for-edits from approved/publish_failed",
+        "resolution": "needs-server-work",
+        "note": "sn-local-presence-7 — approved→draft is ILLEGAL today (state-machines.ts:176 approved:['publishing','cancelled']); requires state-machine change + owner sign-off (OQ7)."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-local-presence-1",
+        "kind": "job",
+        "description": "49-point geo-grid scan: new background job (per-node DataForSEO spend, budget-gated like local-gbp), new snapshot table + migration, read projection onto LocalSeoReadResponse. Only if N1 adopted.",
+        "existsToday": "no",
+        "evidence": "grep -rln 'geogrid|geo_grid|geoGrid' server/ shared/ returned nothing; only local_visibility_snapshots (one point per market) exists (migrations/099-client-locations.sql:30)",
+        "effort": "L",
+        "whereItLives": "server/local-seo.ts + new migration + shared/types/background-jobs.ts",
+        "likelySharedWith": []
+      },
+      {
+        "id": "sn-local-presence-2",
+        "kind": "endpoint",
+        "description": "GBP Performance API ingestion (profile views, calls, directions): new Google OAuth scope, client method, snapshot storage, hero-card serialization. Only if N2 adopted.",
+        "existsToday": "no",
+        "evidence": "grep -rn 'performance' server/google-business-profile-client.ts returned no matches",
+        "effort": "L",
+        "whereItLives": "server/google-business-profile-client.ts + server/local-gbp.ts",
+        "likelySharedWith": []
+      },
+      {
+        "id": "sn-local-presence-3",
+        "kind": "derivation",
+        "description": "Map-pack share-of-voice % per competitor: compute appearances/checked-slots server-side in the report assembly and add a field to LocalSeoRepeatCompetitor.",
+        "existsToday": "partial",
+        "evidence": "totalAppearances + winsAgainstClient exist on LocalSeoRepeatCompetitor (shared/types/local-seo.ts:537-544) and checkedCount on trend points (local-seo.ts:560-564); no share % field or computation",
+        "effort": "S",
+        "whereItLives": "server/local-seo.ts (report/competitorBrands assembly) + shared/types/local-seo.ts",
+        "likelySharedWith": []
+      },
+      {
+        "id": "sn-local-presence-4",
+        "kind": "endpoint",
+        "description": "Nudge-client reminder for awaiting_client review responses: notification/email path + activity log + rate limit.",
+        "existsToday": "no",
+        "evidence": "grep -rn 'nudge|reminder' server/routes/google-business-profile.ts returned no matches",
+        "effort": "M",
+        "whereItLives": "server/routes/google-business-profile.ts + existing client-notification machinery",
+        "likelySharedWith": [
+          "client-inbox (any awaiting_client deliverable could reuse a generic nudge)"
+        ]
+      },
+      {
+        "id": "sn-local-presence-5",
+        "kind": "field",
+        "description": "Persist a Google review/maps URL on synced reviews (capture at sync time or construct from location URI) + column/mapper/serialization lockstep, so published replies get a View-on-Google link.",
+        "existsToday": "no",
+        "evidence": "grep -rn 'reviewUrl|review_url|maps_url|mapsUrl' server/google-business-profile-reviews-store.ts server/db/migrations/ shared/types/*.ts returned no matches",
+        "effort": "S",
+        "whereItLives": "server/google-business-profile-reviews-store.ts + migration",
+        "likelySharedWith": []
+      },
+      {
+        "id": "sn-local-presence-6",
+        "kind": "endpoint",
+        "description": "Review-response authoring extras: manual (no-AI) draft creation and one-step draft-and-send; explicit AI-rewrite semantics on an existing draft.",
+        "existsToday": "partial",
+        "evidence": "POST /review-responses/draft calls upsertGbpReviewResponseDraft (server/routes/google-business-profile.ts:289-323) so AI re-draft of a draft-status response works; no manual-create or draft-and-send path exists",
+        "effort": "S",
+        "whereItLives": "server/routes/google-business-profile.ts + google-business-profile-review-responses-store.ts",
+        "likelySharedWith": []
+      },
+      {
+        "id": "sn-local-presence-7",
+        "kind": "derivation",
+        "description": "Reopen-for-edits: add approved→draft and publish_failed→draft to GBP_REVIEW_RESPONSE_TRANSITIONS (must clear approval metadata) if N10 is adopted.",
+        "existsToday": "no",
+        "evidence": "server/state-machines.ts:176-180 — approved: ['publishing','cancelled'], publish_failed: ['publishing','cancelled']; draft is not a legal target from either",
+        "effort": "S",
+        "whereItLives": "server/state-machines.ts + google-business-profile-review-responses-store.ts",
+        "likelySharedWith": []
+      },
+      {
+        "id": "sn-local-presence-8",
+        "kind": "endpoint",
+        "description": "Extended GBP profile ingestion for the full N4 checklist (hours/holiday hours, products, photo cadence, Q&A, service area) + defined fix flows.",
+        "existsToday": "partial",
+        "evidence": "Only photos/attributes/category signals captured today (GbpReviewsPanel.tsx:48-51 per surface doc; completeness at server/routes/local-seo.ts:270-277); no hours/products/Q&A fields anywhere",
+        "effort": "L",
+        "whereItLives": "server/local-gbp.ts + server/google-business-profile-client.ts",
+        "likelySharedWith": []
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "OQ1: build the paid 49-point geo-grid scanner or ship v1 on existing single-point market data?",
+        "proposedDefault": "Defer geo-grid (DEF-* row); ship markets-x-keywords posture grid on real data. Fabricating grid data violates a hard floor.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ2: GBP Performance metrics (views/calls/directions) in rebuild scope?",
+        "proposedDefault": "Cut from hero card until sn-local-presence-2 ships; show rating + review count + completeness (all real).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ3: where do HEAD Visibility-tab capabilities (posture grid, degraded warnings, trends, Track action, manual refresh) live in the new IA?",
+        "proposedDefault": "Keep a Visibility lens restyled with F3 primitives — the additive-parity floor per the doc's own trade-off table.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ4: reinstate the Verified badge the prototype shows?",
+        "proposedDefault": "Keep suppressed — provider cannot reliably report unclaimed listings (shipped correctness decision, GbpReviewsPanel.tsx:44-47).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ5: where do the authenticated review-sync trigger, per-location sync health, and copy-policy guidance live in the new Reviews pipeline?",
+        "proposedDefault": "Pipeline header block: Sync button + per-location status chips + policy footer; failures stay visible.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ6: keep manual Refresh buttons (incl GBP bootstrap path) or move to scheduled refresh?",
+        "proposedDefault": "Keep both manual triggers; scheduled refresh is a separate cron-registry decision. Bootstrap chicken-and-egg was a real shipped bug.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ7: declined/cancelled renderings + Reopen-for-edits. NEWLY RESOLVED HALF: approved→draft is confirmed ILLEGAL today (state-machines.ts:176) — so N10 requires a deliberate state-machine change, not just UI.",
+        "proposedDefault": "Render declined/cancelled in the funnel (mandatory); defer Reopen (sn-local-presence-7) to a follow-up with its own sign-off.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ8: prototype 2 sub-tabs vs HEAD 4 deep-linked tabs — redirect/alias plan for existing ?tab= bookmarks.",
+        "proposedDefault": "Keep 4 receiver-recognized values; if lenses collapse to 3, alias overview→presence per D8 redirect-map requirement.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Are the four flags (local-gbp, gbp-auth-connection, gbp-auth-reviews, gbp-review-responses) retired during this surface rebuild or kept?",
+        "proposedDefault": "Keep all four — local-gbp is a paid/tier gate and the gbp-* flags gate backend phases, not UI shell; retire nothing without the flag-lifecycle process.",
+        "needsOwner": true,
+        "source": "newly-found"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "N1 7x7 geo-grid rank map",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "No data source exists; full build is a new paid scan job + table (sn-local-presence-1). Quick-win posture grid ships instead."
+      },
+      {
+        "proposal": "N2 profile views + calls/directions hero metrics",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Requires new Google scope + ingestion (sn-local-presence-2); rendering them now would fabricate numbers."
+      },
+      {
+        "proposal": "N3 Verified badge",
+        "recommendation": "reject",
+        "rationale": "Directly contradicts a shipped correctness decision — provider defaults is_claimed=true, so the badge would lie."
+      },
+      {
+        "proposal": "N4 extended profile-health checklist with Fix flows",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Adopt the checklist PRESENTATION over the 3 real completeness signals; full data ingestion (sn-local-presence-8) deferred with a DEF-* row."
+      },
+      {
+        "proposal": "N5 map-pack share-of-voice %",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Derivable server-side from existing snapshots (sn-local-presence-3, S); doc calls it the cheapest new item."
+      },
+      {
+        "proposal": "N6 reviews funnel + desk filters",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Pure re-presentation of existing statuses; must add declined/cancelled renderings the prototype omitted."
+      },
+      {
+        "proposal": "N7 nudge-client reminder",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Needs a new notification endpoint (sn-local-presence-4); product/workflow change per the D4-Q4 send-boundary posture."
+      },
+      {
+        "proposal": "N8 View-on-Google deep link",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "No URL persisted today (sn-local-presence-5); needs sync-time capture verification against the Google API payload first."
+      },
+      {
+        "proposal": "N9 rewrite-with-AI / write-manually / draft-and-send",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "AI re-draft already works via the existing upsert (google-business-profile.ts:303); manual-create + draft-and-send are small additive routes (sn-local-presence-6)."
+      },
+      {
+        "proposal": "N10 reopen-for-edits",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "approved→draft is illegal in the state machine today (state-machines.ts:176); a transition-table change needs its own sign-off (sn-local-presence-7)."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Overview (hero GBP card + operating-status + share-of-voice + reviews mini-strip)",
+        "Visibility (posture grid, trends, repeat competitors + Track, manual Refresh)",
+        "Reviews (funnel + desk filters + response pipeline + auth sync block)",
+        "Setup (drawer launcher; ?tab=setup opens LocalSeoMarketSetupDrawer reskinned)"
+      ],
+      "primitives": [
+        "PageContainer",
+        "Toolbar",
+        "LensSwitcher",
+        "MetricTile",
+        "Meter",
+        "DataTable",
+        "Sparkline",
+        "Drawer",
+        "FilterChip",
+        "Segmented",
+        "GroupBlock",
+        "KeyValueRow",
+        "EmptyState/ErrorState/TierGate (existing)"
+      ],
+      "dataHooks": [
+        "useLocalSeo",
+        "useGbpReviews",
+        "useLocalSeoRefresh",
+        "useLocalGbpRefresh",
+        "useLocalSeoUpdate",
+        "useSetPrimaryMarket",
+        "useLocalSeoLocationLookup",
+        "useGbpConnectionStatus",
+        "useWorkspaceGbpMappings",
+        "useGbpAuthenticatedReviews",
+        "useSyncGbpAuthenticatedReviews",
+        "useGbpReviewResponses",
+        "useDraftGbpReviewResponse",
+        "useUpdateGbpReviewResponse",
+        "useSendGbpReviewResponseToClient",
+        "useApproveAndPublishGbpReviewResponse",
+        "useRetryGbpReviewResponsePublish",
+        "useBackgroundTasks",
+        "useRankTrackingAddKeyword",
+        "useWsInvalidation registry (LOCAL_SEO_UPDATED, LOCAL_GBP_SNAPSHOTS_REFRESHED, GBP_CONNECTION_UPDATED, GBP_REVIEWS_UPDATED, GBP_REVIEW_RESPONSES_UPDATED)"
+      ],
+      "statesPlan": "Every lens: Skeleton loading, not-configured EmptyState with Open-setup CTA (row 7), first-load ErrorState with retry rendered BEFORE the flag check (row 13), flag-OFF renders nothing via empty server payload (row 31), 403 tier / 404 flag / 409 conflict surfaced as error bands not swallowed (row 48), connection-gated empties for auth reviews (row 35).",
+      "mountNote": "Rebuilt page mounts flag-gated inside RebuiltAppChrome (ui-rebuild-shell) at route id local-seo (unchanged — MCP job link + navRegistry depend on it); @ds-rebuilt marker on all new files; drawer is T1 carry-over-then-reskin."
+    },
+    "crossSurfaceDeps": [
+      "Keywords pilot / Strategy / Page Intelligence: shared LocalSeoVisibilityPanel + LocalSeoVisibilityBadge mounts (row 14) — do not delete or reshape props without checking those ledgers",
+      "D3: Page Intelligence moves into SEO Editor Research mode — the mode=\"page\" annotation mount follows it",
+      "Workspace Settings surface: GbpConnectionCard in ConnectionsTab must survive alongside the new connection chip (row 32)",
+      "Brand & AI (business-footprint): locations editor + GBP mapping editor live there; this surface only links/status (rows 6, 22, 33, 42)",
+      "Client Inbox surface: gbp_review_response deliverable renderer is the client half of send-to-client (row 39)",
+      "D8: any tab consolidation ships a redirect/alias map for ?tab= bookmarks"
+    ],
+    "unknowns": [
+      "Whether the Google reviews API payload captured at sync time includes (or allows constructing) a per-review maps URL — determines sn-local-presence-5 feasibility; not verifiable from repo code alone",
+      "Per-node DataForSEO cost for a 49-point geo-grid scan (pricing, budget-gate design) — external provider question",
+      "Whether KeywordHub's LocalPresenceHandoff card survives the Keywords pilot rebuild unchanged — owned by that surface's ledger, not checked here"
+    ],
+    "effortEstimate": "L",
+    "surface": "local-presence"
+  },
+  "verify": {
+    "surface": "sn-local-presence",
+    "verdicts": [
+      {
+        "needId": "sn-local-presence-1",
+        "verdict": "CONFIRMED",
+        "evidence": "server/db/migrations/096-local-seo-visibility.sql:31-56 defines local_visibility_snapshots as one row per (keyword, market_id) — market_id FKs local_seo_markets, no lat/lng grid-node concept; 099-client-locations.sql only adds match/location columns. rg for geogrid|geo_grid|geoGrid|grid.?scan|ScanNode across server/ shared/ src/ returned zero hits. No geo-grid job, table, or read projection exists.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-local-presence-2",
+        "verdict": "CONFIRMED",
+        "evidence": "server/google-business-profile-client.ts exports only exchangeGbpOAuthCode, getValidGbpAccessToken, listGbpAccountsFromGoogle (:276), listGbpLocationsFromGoogle (:296), listGbpReviewsFromGoogle (:349), updateGbpReviewReply (:386), sync/disconnect. GBP_SCOPE is a single business-manage scope; no performance/insights/impressions/profileViews/callClicks/directions method or scope anywhere in server/. Ingestion + snapshot + hero-card serialization all absent.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-local-presence-3",
+        "verdict": "CONFIRMED",
+        "evidence": "shared/types/local-seo.ts:537-544 LocalSeoRepeatCompetitor has totalAppearances + winsAgainstClient + markets + suggestedTrackingKeywords but NO share/percentage field. getLocalSeoCompetitorBrands (server/domains/local-seo/visibility-read-model.ts:28-100) is a pure in-memory reduction over snapshots — no writes, workspace-scoped, safe for a hot read path — and already accumulates totalAppearances per competitor and iterates every checked snapshot row, so a share-of-voice %% is a small added compute in this exact function plus one field on the computed (not DB-stored) type. No migration/mapper/serialization lockstep needed; effort S stands.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-local-presence-4",
+        "verdict": "ADJUSTED",
+        "evidence": "A GENERIC client-nudge path already exists and already covers GBP awaiting_client review responses. server/routes/deliverables.ts:275-299 POST /api/deliverables/:workspaceId/:id/remind → remindDeliverable() (server/domains/inbox/send-to-client.ts:299-313) sends the client email reminder (notifyClientOfReminder), broadcasts DELIVERABLE_UPDATED, and the route logs deliverable_reminded activity. GBP review-response sends go through sendToClient() creating a client_deliverable in awaiting_client (server/routes/google-business-profile.ts:365-386), so that deliverable is ALREADY remindable via this endpoint. The claim's 'grep in google-business-profile.ts found no nudge' is a naming-drift miss — the reuse lives under the deliverables domain the claim itself flagged in likelySharedWith. So the notification/email + activity-log halves EXIST and are reusable; the only genuinely-new work is a rate-limit/throttle on remind (none exists today). Kind should be 'reuse existing generic remind path (+ optional rate-limit)', not a net-new endpoint; effort drops from M toward S.",
+        "correction": "existsToday should be 'yes-reusable' for the nudge machinery: POST /api/deliverables/:id/remind + remindDeliverable() already emails, broadcasts, and logs activity for any awaiting_client client_deliverable, and GBP review responses already create such a deliverable. Only a per-target rate-limit is net-new."
+      },
+      {
+        "needId": "sn-local-presence-5",
+        "verdict": "CONFIRMED",
+        "evidence": "server/db/migrations/160-google-business-profile-reviews.sql google_business_reviews has review_resource_name, review_id, star_rating, comment, reviewer_display_name, reply_comment, reply_state, sync/timestamps — no url/uri/link column (grep for url|uri|link returned nothing). server/google-business-profile-reviews-store.ts maps only review_resource_name / review_id (no reviewUrl/mapsUrl). No persisted Google review/maps URL exists; capturing/constructing one is a genuine column + mapper + serialization lockstep. Because it is a DB-column addition (not a computed projection like claim 3), effort S is arguably light per the DB-column-lockstep rule, but the field is small and single-table so S is defensible.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-local-presence-6",
+        "verdict": "CONFIRMED",
+        "evidence": "server/routes/google-business-profile.ts:289-323 POST /review-responses/draft calls generateGbpReviewResponseDraft (AI) then upsertGbpReviewResponseDraft — AI (re)draft of a draft-status response works; PATCH /review-responses/:responseId (:325-350) edits existing draft text (manual EDIT of an existing draft, not manual CREATE); send-to-client (:353-390) is a SEPARATE two-step. No manual (no-AI) initial-draft path and no one-step draft-and-send exist. Partial is accurate; effort S stands (route + store additions, no migration).",
+        "correction": ""
+      },
+      {
+        "needId": "sn-local-presence-7",
+        "verdict": "CONFIRMED",
+        "evidence": "server/state-machines.ts:172-186 GBP_REVIEW_RESPONSE_TRANSITIONS defines approved: ['publishing','cancelled'] and publish_failed: ['publishing','cancelled'] — neither lists 'draft' as a legal target, so approved→draft and publish_failed→draft reopen edges do not exist. (Cited lines were 176-180; actual span is 172-186 but the substance — no →draft reopen — is exactly correct.) Adding them plus approval-metadata clearing is net-new; effort S stands.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-local-presence-8",
+        "verdict": "CONFIRMED",
+        "evidence": "server/routes/local-seo.ts:270-277 deriveGbpCompletenessScore takes only { claimed, totalPhotos, attributeCount, category }; server/local-gbp.ts:115-116 the owned-listing projection captures only attributes + totalPhotos (plus claimed/category upstream). grep for regularHours|holidayHours|business_hours|serviceArea|products|questionsAndAnswers|photo cadence across local-gbp.ts, google-business-profile-client.ts, shared/types/local-seo.ts returned zero hits. Hours/holiday-hours/products/Q&A/service-area ingestion + fix flows are all absent; partial is accurate and effort L is justified (new client methods + storage + fix flows).",
+        "correction": ""
+      }
+    ]
+  }
+}

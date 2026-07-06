@@ -1,0 +1,381 @@
+{
+  "decisions": [
+    {
+      "id": "AD-001",
+      "theme": "UX",
+      "question": "Adopt a single system-wide shell/toolbar freshness-and-refresh convention (last-updated meta + manual Refresh button, honest freshness copy) applied uniformly to every rebuilt surface, deferring all scheduled-cron scanning to a separate per-surface cron decision?",
+      "proposedDefault": "Yes — promote freshness meta + manual refresh to a Build-Conventions shell pattern decided once and applied everywhere; scheduled/automatic crawls (weekly scans, background-job migration) are individually-flagged follow-ups per surface.",
+      "surfaces": [
+        "cockpit",
+        "ai-visibility",
+        "competitors",
+        "links",
+        "local-presence",
+        "performance",
+        "site-audit",
+        "asset-manager"
+      ],
+      "urgency": "before-fan-out"
+    },
+    {
+      "id": "AD-002",
+      "theme": "data",
+      "question": "Ratify the hard-floor rule that every narrative verdict/status headline on any rebuilt surface is server-derived (template first, AI later) and never client-composed, and green-light the server-side verdict field tickets so surfaces can adopt the headline?",
+      "proposedDefault": "Yes — verdict headlines ship only via a server-drafted field (never a client heuristic); approve the per-surface server-verdict tickets (sn-cockpit-1, sn-engine-2, sn-performance-2, site-audit template) as the shared pattern.",
+      "surfaces": [
+        "cockpit",
+        "engine",
+        "performance",
+        "site-audit",
+        "ai-visibility",
+        "content-pipeline"
+      ],
+      "urgency": "before-fan-out"
+    },
+    {
+      "id": "AD-003",
+      "theme": "monetization",
+      "question": "Lock the admin money-frame + provenance-pill data contract (which server fields render dollars, cron-precomputed to avoid per-render snapshot writes, with an estimate/measured/actual basis pill) before any admin dollar figure or provenance chip is rendered?",
+      "proposedDefault": "Approve sn-engine-1/sn-cockpit-3 fields with a provenance pill mirroring the client Measured/Estimate pill; money value is cron-precomputed (return-hook-cron pattern), read-only at render — never snapshot on header render.",
+      "surfaces": [
+        "engine",
+        "cockpit",
+        "performance"
+      ],
+      "urgency": "before-fan-out"
+    },
+    {
+      "id": "AD-004",
+      "theme": "scope",
+      "question": "Confirm the standing 'graduation to Insights Engine' cross-surface write contract is deferred wholesale to a C3-era owner-signed design (attribution-honesty + insight-bridge + broadcast), so no rebuild surface builds an ad-hoc graduation path?",
+      "proposedDefault": "Defer all graduation bridges to one C3 cross-surface contract; every surface ships parity without graduation and adds a DEF-* ledger row. No surface invents its own graduation write.",
+      "surfaces": [
+        "ai-visibility",
+        "asset-manager",
+        "brand-ai",
+        "cockpit",
+        "content-pipeline",
+        "engine",
+        "links",
+        "performance",
+        "schema",
+        "search-traffic",
+        "site-audit"
+      ],
+      "urgency": "before-fan-out"
+    },
+    {
+      "id": "AD-005",
+      "theme": "scope",
+      "question": "Confirm the client-facing surfaces (Insights, Recommendations) rebuild inside the C1→C2→C3 client lane (riding the C-lane client flags), while only their operator/admin halves ride the A-lane shell flag — before fan-out assigns lanes?",
+      "proposedDefault": "Yes — client render work lands in the C2 re-skin on C-lane flags (strategy-the-issue/client-ia-v2); the operator Insights Engine half rides the A-lane shell flag. Confirm lane assignment per surface before dispatch.",
+      "surfaces": [
+        "insights",
+        "recommendations"
+      ],
+      "urgency": "before-fan-out"
+    },
+    {
+      "id": "AD-006",
+      "theme": "migration",
+      "question": "Enumerate the per-flag disposition mapping (which UI-shell flags join the rebuild retirement track vs which backend/tier/phase flags stay lifecycle-governed) in the build plan before any surface starts retiring flags?",
+      "proposedDefault": "UI-shell flags map to the rebuild retirement track; backend-phase and paid/tier gates (local-gbp, gbp-auth-*, strategy-the-issue, strategy-competitor-send, the-issue-client-*) stay backend-lifecycle-governed. Enumerate the full mapping in the plan; retire nothing outside the flag-lifecycle process.",
+      "surfaces": [
+        "local-presence",
+        "recommendations",
+        "engine",
+        "insights"
+      ],
+      "urgency": "before-fan-out"
+    },
+    {
+      "id": "AD-007",
+      "theme": "scope",
+      "question": "Add the missing Parity Ledger rows (Workspace Home → Cockpit, and the entire absent Global-Ops zone's 12+ pages) with explicit build-or-cut tickets before any build PR, so nothing is silently dropped?",
+      "proposedDefault": "Add the 'Workspace Home → Cockpit (+Today)' row and cut explicit tickets for all Global-Ops pages from the 9-lens composition before fan-out; nothing silently dropped.",
+      "surfaces": [
+        "cockpit",
+        "global-ops"
+      ],
+      "urgency": "before-fan-out"
+    },
+    {
+      "id": "AD-008",
+      "theme": "UX",
+      "question": "Where does the orphaned Meeting Brief live in the new IA — carry it over unchanged as a secondary Cockpit/Workspace-Home tab (T1), or retire it?",
+      "proposedDefault": "T1 carry-over: port MeetingBriefPage unchanged as a secondary Cockpit tab (additive-parity insurance); redesign later.",
+      "surfaces": [
+        "cockpit",
+        "global-ops"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-009",
+      "theme": "scope",
+      "question": "Confirm the AI Answer Monitor / raw prompt-transcript capture (reversing the aggregates-only data stance) is descoped to a C3 follow-up, and v1 AI Visibility ships honest single-engine (ChatGPT) aggregates only?",
+      "proposedDefault": "Descope raw-answer capture and multi-engine chips to C3 (they reverse the data stance and only chat_gpt is procurable); ship SoV×100 aggregates with an explicit 'not measured' state and no fabricated engine chips.",
+      "surfaces": [
+        "ai-visibility"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-010",
+      "theme": "UX",
+      "question": "Confirm the ratified T1 default — machinery-dense HEAD subsystems mount as token-restyled drill-in Drawers/panels behind the new surface (never dropped) — applies to each surface's flagged carry-over subsystems, or does any specific one warrant a redesign now?",
+      "proposedDefault": "Apply T1 carry-over-then-reskin uniformly: Voice calibration, Page Strategy/Copy Pipeline, discovery loop (brand-ai); Audit/Upload/Organize lenses (asset-manager); MatrixGrid/CellDetailPanel/PostEditor (content-pipeline); curation machinery (engine); SchemaPlanPanel (schema); WorkOrderPanel (cockpit); OutcomeDashboard/RequestManager (global-ops) all mount as drill-ins. No redesigns in the rebuild.",
+      "surfaces": [
+        "brand-ai",
+        "asset-manager",
+        "content-pipeline",
+        "engine",
+        "schema",
+        "cockpit",
+        "global-ops",
+        "recommendations",
+        "seo-editor",
+        "local-presence"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-011",
+      "theme": "data",
+      "question": "For each surface, confirm the additive-parity floor: dropped-in-prototype capabilities (breakdowns, filters, export menus, sort, CSS-source rows, secondary metrics, extra date presets) are carried into Drawers/overflow menus, not deleted?",
+      "proposedDefault": "Carry all of them — competitor comparison bars/traffic-value/top-keywords Drawer; GSC devices/countries + GA4 pages Breakdowns Drawer; full date-preset sets; CSV/JSON/PDF export in Toolbar overflow; severity filter + search; bulk PageSpeed; field/lab badge + diagnostics; delivered-but-unpublished FilterChip. Export/capability drops violate a hard floor.",
+      "surfaces": [
+        "competitors",
+        "search-traffic",
+        "performance",
+        "content-pipeline",
+        "links",
+        "site-audit",
+        "asset-manager",
+        "local-presence"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-012",
+      "theme": "scope",
+      "question": "BLOCKING for content-pipeline: is the 6-stage lifecycle board a derived view over existing status unions (no schema change, single advance() through validateTransition), or a new server-derived stage model?",
+      "proposedDefault": "Derived view over existing statuses (quick-win) — no schema change, single advance() routed through validateTransition; sn-content-pipeline-3 only if server-derived is later required.",
+      "surfaces": [
+        "content-pipeline"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-013",
+      "theme": "UX",
+      "question": "Resolve the Content Health / Content Decay dedupe: does the pipeline Content Health tab become the acting home (queue-refresh) with seo-audit keeping the diagnostic view and the ?sub=content-decay deep-link retargeted in the same PR?",
+      "proposedDefault": "Yes — pipeline is the acting home; seo-audit keeps the diagnostic view; the decay-alert deep-link retargets to pipeline as a hard two-halves acceptance criterion on the move PR.",
+      "surfaces": [
+        "content-pipeline",
+        "site-audit",
+        "performance"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-014",
+      "theme": "scope",
+      "question": "Confirm competitor-set editing consolidates to Workspace Settings as the single home (Auto-discover there, strategy-generation retains access), with the Competitors page showing read-only chips + Edit-set routing?",
+      "proposedDefault": "Adopt the move; Competitors page shows read-only FilterChips + Edit routing to Workspace settings; endpoints unchanged; strategy flow keeps access.",
+      "surfaces": [
+        "competitors",
+        "global-ops"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-015",
+      "theme": "UX",
+      "question": "Confirm the composite 0–100 health/signals score is KEPT (with the qualitative On-track/At-risk chip derived FROM the score), rather than replaced by the chip alone?",
+      "proposedDefault": "Keep the number; the chip label is derived from the score and the score shows on hover/detail. Chip-only is a status-meaning change.",
+      "surfaces": [
+        "cockpit"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-016",
+      "theme": "data",
+      "question": "Confirm every displayed score/coverage/share metric is server-computed and shared (never a second client heuristic that can disagree with an authoritative source): AI SoV %, schema coverage %, on-page optimization score, per-category audit scores, map-pack SoV?",
+      "proposedDefault": "Server-compute and share each metric via its data ticket (sn-schema-1, sn-site-audit-1, sn-seo-editor-6, sn-local-presence-3); a second disagreeing client heuristic is a trust landmine. Define denominators explicitly (e.g. SoV = brand ÷ all co-mentioned).",
+      "surfaces": [
+        "ai-visibility",
+        "schema",
+        "site-audit",
+        "seo-editor",
+        "local-presence"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-017",
+      "theme": "scope",
+      "question": "For CMS-write / publish-target surfaces, confirm export-only parity ships first with any new Webflow write path (save-draft, publish-to-CMS, H1/slug edit with auto-redirect, insert-internal-link) gated behind a flag as an owner-signed follow-up?",
+      "proposedDefault": "Export-only parity v1; hide new write paths behind a flag and correct any Parity-Ledger 'apply back to CMS' over-claim. New write scope (sn-page-rewriter-1, sn-seo-editor-2/-4, sn-links N1) is a follow-up needing seo-editor-write-targets contract work.",
+      "surfaces": [
+        "page-rewriter",
+        "seo-editor",
+        "links",
+        "schema",
+        "asset-manager"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-018",
+      "theme": "UX",
+      "question": "Confirm the SEO Editor keeps HEAD's 7-state client-approval state machine (rejecting the prototype's admin bulk-Approve) so approved/rejected remain client actions?",
+      "proposedDefault": "Keep HEAD 7-state; reject admin bulk-Approve (corrupts the client-approval machine); the review queue ships Send/Publish/Skip only.",
+      "surfaces": [
+        "seo-editor"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-019",
+      "theme": "UX",
+      "question": "Confirm the CMS field selector ships at launch as a safety gate (not polish), and if cut, CMS-aware compression is deferred with it to avoid clobbering intentionally-sized OG images?",
+      "proposedDefault": "Ship the full CMS field selector at launch; if cut, defer CMS-aware compression in the same move.",
+      "surfaces": [
+        "asset-manager"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-020",
+      "theme": "data",
+      "question": "Confirm the AI-quota 429 / capacity-exhausted state renders as disabled AI actions with a quota tooltip + dismissible banner (four-states rule), across AI-action surfaces?",
+      "proposedDefault": "Disabled AI actions with a quota tooltip + first-429 dismissible banner; bulk streams show a partial-run tally. Adopt as the shared 429 pattern.",
+      "surfaces": [
+        "asset-manager",
+        "brand-ai",
+        "content-pipeline",
+        "page-rewriter"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-021",
+      "theme": "UX",
+      "question": "Confirm the Brandscript stays multi-script (API unchanged) with a single-script flow UI auto-selecting the newest and list/import/delete in an overflow, and completeness renders as qualitative Ready/Partial/Needs-setup (numeric % only if sn-brand-ai-1 ships)?",
+      "proposedDefault": "Keep multi-script API behind a single-script UI; completeness is qualitative from field presence; per-section Redo (sn-brand-ai-2) and E-E-A-T 4-pillar read-only lens adopted; founder-interview + KB-regen + brandscript-approve pill deferred/rejected.",
+      "surfaces": [
+        "brand-ai"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-022",
+      "theme": "scope",
+      "question": "Confirm Diagnostics keeps a nav entry + reports-list lens (so resolved-insight reports stay reachable) rather than becoming prototype drill-in-only?",
+      "proposedDefault": "Keep the Diagnostics nav entry and add a list lens; the Run-Deep-Diagnostic CTA + ?report= deep-link point at the existing page unchanged. Per-move deep-diagnostic (E8) and stage-as-backing-move are deferred.",
+      "surfaces": [
+        "global-ops",
+        "engine",
+        "search-traffic"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-023",
+      "theme": "scope",
+      "question": "Confirm the promote-request→strategy-signal operator flow is adopted as a flagged, contract-backed follow-up (sn-global-ops-4 / sn-cockpit-4 / sn-engine-3), not built ad-hoc in any single surface rebuild?",
+      "proposedDefault": "Adopt as one flagged flow with its own data contract; coordinate the client-greenlight/promote overlap (insights D3, recommendations, engine E2) into a single design rather than three ad-hoc endpoints.",
+      "surfaces": [
+        "global-ops",
+        "cockpit",
+        "engine",
+        "insights",
+        "recommendations"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-024",
+      "theme": "UX",
+      "question": "Confirm the reviews/approval funnel renders declined/cancelled states (mandatory), while Reopen-for-edits is deferred because approved→draft is illegal in the state machine today and needs a transition-table change?",
+      "proposedDefault": "Render declined/cancelled in the funnel now; defer Reopen-for-edits (sn-local-presence-7) to a follow-up with its own state-machine sign-off. N9 rewrite/manual/draft-and-send review actions adopted (small additive routes).",
+      "surfaces": [
+        "local-presence"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-025",
+      "theme": "scope",
+      "question": "Confirm the geo-grid rank scanner and GBP Performance metrics (views/calls/directions) are deferred (no data source / new Google scope), shipping the markets×keywords posture grid + rating/reviews/completeness on real data instead?",
+      "proposedDefault": "Defer geo-grid (DEF-* row) and GBP Performance (sn-local-presence-2); ship posture grid + real completeness signals + map-pack SoV (sn-local-presence-3). Suppress the Verified badge (provider can't report unclaimed listings). Fabricating grid data violates a hard floor.",
+      "surfaces": [
+        "local-presence"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-026",
+      "theme": "data",
+      "question": "Confirm sparkline/trend series render only when a real source exists (linked request or persisted trend), showing an absent state otherwise, never a fabricated series?",
+      "proposedDefault": "Ship verdict + tiles first; sparklines behind their data ticket (sn-content-pipeline-2, sn-search-traffic-1) with an honest absent state until then. Per-KPI sparklines where trend data already exists are adopted.",
+      "surfaces": [
+        "content-pipeline",
+        "search-traffic",
+        "performance"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-027",
+      "theme": "UX",
+      "question": "Confirm the Links Redirects/Dead subsystems keep their full HEAD capability (redirect-chains panel, all-pages status table, domain selector, 3xx sub-list, CSV export, redirect-proposal send) and expose only the real heuristic 'match' score — never a fabricated AI confidence %?",
+      "proposedDefault": "Restore chains panel + status table as collapsed GroupBlocks (else SeoAudit's deep-link breaks and the only chains UI is deleted); carry domain selector + 3xx + export; expose bestScore as 'match' (sn-links-2); keep batch send semantics; Architecture becomes the 4th Links tab (relocation, coordinated per D3).",
+      "surfaces": [
+        "links"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-028",
+      "theme": "data",
+      "question": "Confirm client-facing dollar/value display is banded (impactBand) only and never raw $/mo, treating it as a non-negotiable trust invariant?",
+      "proposedDefault": "Banded only — A2 is a client trust invariant; raw $/mo on client cards is prohibited. Seek explicit ratification since the prototype showed raw figures.",
+      "surfaces": [
+        "recommendations",
+        "insights"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-029",
+      "theme": "scope",
+      "question": "Confirm Workspace Settings rebuilds to full multi-tab parity (all ~14 unhomed capabilities are UI-only ports) and adopt the zero-server-work additions (GBP connection card, Archive workspace, re-run audit/strategy buttons)?",
+      "proposedDefault": "Full parity; adopt GBP card, Archive workspace (sn-global-ops-1), re-run buttons, gated cold-start onboarding + locked-workbench preview; defer tz/locale prefs. Relocate Strategy inputs here with a redirect note after confirming with the Strategy owner.",
+      "surfaces": [
+        "global-ops",
+        "competitors",
+        "local-presence"
+      ],
+      "urgency": "per-surface-dispatch"
+    },
+    {
+      "id": "AD-030",
+      "theme": "scope",
+      "question": "Confirm the various dead-code / doc-drift cleanups are folded into their surface's first rebuild PR (delete, or adopt as a named contract) rather than left dangling?",
+      "proposedDefault": "Fold each into the surface PR: delete SteeringChat, PerformancePulse export, pageWeight dead methods, GSC search-chat api wrapper, orphaned SchemaHealthDashboard/SchemaReviewTab; adopt-or-delete src/api/misc.ts redirect wrappers; fix stale FEATURE_AUDIT #607 and the cron 'Daily→Weekly' competitor-check description; fix the missing_schema/schema_errors frontend-check wiring bug as part of sn-schema-2.",
+      "surfaces": [
+        "brand-ai",
+        "insights",
+        "performance",
+        "search-traffic",
+        "schema",
+        "seo-editor",
+        "competitors"
+      ],
+      "urgency": "C3-later"
+    }
+  ]
+}

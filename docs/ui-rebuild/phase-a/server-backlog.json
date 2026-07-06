@@ -1,0 +1,820 @@
+{
+  "droppedRefuted": [
+    "sn-content-pipeline-4"
+  ],
+  "items": [
+    {
+      "id": "SB-001",
+      "title": "Insight-graduation write seam (published win / content win / search win / schema win → insight)",
+      "kind": "endpoint",
+      "description": "Single shared 'graduate to Insights Engine' write path: new POST route + a registered content/win InsightType via the 4-part registration rule, reusing existing upsertInsight with broadcast + addActivity + ephemeral-source snapshot-ref. Consuming surfaces pass their own source (published post, search win, schema deploy). Contract is TBD and MUST be defined once, not re-invented per surface.",
+      "consumers": [
+        "content-pipeline",
+        "performance",
+        "search-traffic",
+        "schema",
+        "ai-visibility",
+        "engine",
+        "insights"
+      ],
+      "effort": "L",
+      "priority": "blocker",
+      "notes": "Home: server/routes/insights.ts (POST) + shared/types/analytics.ts (new InsightType) + server/analytics-insights-store.ts upsertInsight. Verify: schema's rich-result DETECTION data source is a separate net-new dependency (SB-021) that gates the schema variant only. Dedup of content-pipeline-7 / performance-3 / schema-3 / search-traffic-3 / ai-visibility (N6 graduation) — all named 'graduation' but converge on one insight-write contract."
+    },
+    {
+      "id": "SB-002",
+      "title": "Promote client request → strategy signal / backing move (mint rec/insight from inbox request)",
+      "kind": "endpoint",
+      "description": "Generic write turning an inbox/client request into an Insights-Engine insight or a minted recommendation, with request status transition, activity log + broadcast, typed provenance. Reuse mintManualRecommendation as the rec base (Recommendation.source is a free-form string — no union to widen; pass e.g. 'client_request:<id>'); honest attribution needs the ephemeral-source snapshot-ref pattern to record which request minted the rec.",
+      "consumers": [
+        "cockpit",
+        "global-ops",
+        "engine",
+        "insights",
+        "client-inbox"
+      ],
+      "effort": "M",
+      "priority": "blocker",
+      "notes": "Home: server/routes/requests.ts (or insights.ts) + server/domains/recommendations/route-mutations.ts (mintManualRecommendation reuse) + insight store. Dedup of cockpit-4 (promote-to-signal), global-ops-4 (request→signal), engine-3 (client-request→backing-move). VERIFY correction: no source union exists — pass distinct source string, no migration for the union."
+    },
+    {
+      "id": "SB-003",
+      "title": "Read-safe money-frame projection (value-at-stake / recovered-so-far / basis pill)",
+      "kind": "projection",
+      "description": "Precomputed (cron/snapshot, NOT compute-on-GET) admin money read for the Engine/cockpit header. computeROI WRITES a snapshot (server/roi.ts:411), so it must NOT run on a hot GET — use the return-hook cron precompute pattern. revenueAtStake ALREADY exists (ROIData.revenueAtStake); only 'recovered-so-far' + 'basis pill' are net-new derived fields. Serialize OutcomeProvenance (estimate/measured/actual, read-time value, NOT the persisted admin-only OutcomeCoverageProvenance) onto money rows.",
+      "consumers": [
+        "engine",
+        "cockpit",
+        "outcomes",
+        "client-portal",
+        "global-ops",
+        "recommendations"
+      ],
+      "effort": "M",
+      "priority": "blocker",
+      "notes": "Home: server/routes/the-issue-admin.ts (or new strategy-engine read) + return-hook-cron precompute. VERIFY: value-at-stake half is REUSE of ROIData.revenueAtStake, not a build. Provenance serialization (cockpit-3) is pure read-time (effort S) — use OutcomeProvenance at outcome-tracking.ts:139 / roi.ts:71, never OutcomeCoverageProvenance at :293. Dedup of engine-1 + cockpit-1 + cockpit-3."
+    },
+    {
+      "id": "SB-004",
+      "title": "Unified server-side work-queue / stream classification (opt/send/money + unclassified)",
+      "kind": "endpoint",
+      "description": "Server-side work-queue model classifying attention items into opt/send/money streams (+ explicit unclassified bucket) with counts guaranteed to match destination screens. Replaces the client-side attention assembly in WorkspaceHome.tsx (~10 inline pushes). Shared by cockpit and the global-ops all-clients Today.",
+      "consumers": [
+        "cockpit",
+        "global-ops"
+      ],
+      "effort": "L",
+      "priority": "blocker",
+      "notes": "Home: server/routes/workspace-home.ts or a server/domains/ work-queue module. Dedup of cockpit-2 (both surfaces reuse the same streams). Blocker because both consuming surfaces depend on identical counts."
+    },
+    {
+      "id": "SB-005",
+      "title": "Per-page keyword / rank / traffic / optimization-score projection onto page-row payloads",
+      "kind": "projection",
+      "description": "Join per-page primaryKeyword, current rank position, monthly organic traffic, and persisted optimizationScore onto the all-pages / editor / load-page row payloads, avoiding N-per-row API fan-out. Source is the dedicated page_keywords table (current_position/previous_position/optimization_score columns via listPageKeywordsPaged / listPageKeywordsLite — side-effect-free reads), NOT keywordStrategy JSON. maybeRecordScoreSnapshot fires only on writes, so list reads are hot-path safe.",
+      "consumers": [
+        "seo-editor",
+        "page-rewriter",
+        "competitors",
+        "page-intelligence",
+        "keywords"
+      ],
+      "effort": "M",
+      "priority": "early",
+      "notes": "Home: server/routes/webflow.ts all-pages assembly + rewrite-chat load-page handler + server/page-keywords.ts (listPageKeywordsPaged/Lite). VERIFY: score source is page_keywords column, not keywordStrategy re-parse (effort S for score alone; M with rank+traffic join). Dedup of seo-editor-3 + seo-editor-6 + page-rewriter-3 + competitors-1(top-3 half separate). GA4 monthly organic traffic remains workspace-level (google.ts:356) — per-page needs pagePath-filtered read."
+    },
+    {
+      "id": "SB-006",
+      "title": "Server-computed win/early/flat verdict on content & performance items",
+      "kind": "derivation",
+      "description": "Wire the EXISTING server-computed OutcomeReadback (OutcomeScore + DeltaDirection, via getScoredOutcomeReadbacks, already enriched onto GeneratedPost.outcome) onto ContentPerformanceItem by join on source-id/targetKeyword. The verdict vocabulary AND scoring engine already exist and the 'verdicts never UI-computed' floor is already satisfied server-side — this is a wiring join, not net-new derivation.",
+      "consumers": [
+        "performance",
+        "content-pipeline",
+        "client-portal"
+      ],
+      "effort": "S",
+      "priority": "early",
+      "notes": "Home: server/domains/content/content-performance.ts (+ shared/types/content.ts field). VERIFY correction: performance-2 is REUSE of existing readback (S/M, not M) — reuse content-posts-db.ts:314-341 join pattern. Dedup with content-pipeline engagement/verdict needs."
+    },
+    {
+      "id": "SB-007",
+      "title": "Per-published-post engagement metrics + per-post clicks timeseries (sparkline)",
+      "kind": "projection",
+      "description": "Attach GA4 per-page engagement (time-on-page/engagement duration via pagePath-filtered report) AND a per-post clicks trend series to the Published-tab. The trend series REUSES the existing page-URL-keyed getPageTrend (search-console.ts:766, backing /content-performance/:requestId/trend) resolved via the post's target page URL — extending to posts is slug/URL resolution over an existing fetcher, not net-new plumbing.",
+      "consumers": [
+        "content-pipeline",
+        "performance"
+      ],
+      "effort": "M",
+      "priority": "with-surface",
+      "notes": "Home: server/routes/content-requests.ts trend handler (getPageTrend) + enrichPostsWithOutcomes decoration in content-posts-db.ts. VERIFY: content-pipeline-2 whereItLives corrected — trend lives in content-requests.ts calling search-console.ts:getPageTrend, NOT domains/content/content-performance.ts; effort S–M. Dedup of content-pipeline-1 + content-pipeline-2."
+    },
+    {
+      "id": "SB-008",
+      "title": "Pre/post-publish baseline lift computation (engagement-lift % + impressions-lift %)",
+      "kind": "derivation",
+      "description": "Add a before/after publish GA4+GSC window read producing engagement-lift % and impressions-lift % per piece, serialized on the item. getContentPerformance today reads only a single trailing 90-day window.",
+      "consumers": [
+        "performance",
+        "content-pipeline"
+      ],
+      "effort": "M",
+      "priority": "with-surface",
+      "notes": "Home: server/domains/content/content-performance.ts. Distinct from SB-007 (SB-007 is raw series/engagement; this is the derived lift delta requiring a second baseline window). performance-4."
+    },
+    {
+      "id": "SB-009",
+      "title": "AI Search Ready readiness projection + single-definition schema coverage metric",
+      "kind": "derivation",
+      "description": "Two audit-derived coverage projections sharing the same read-side pattern: (a) AEO readiness rows + server-computed readiness score mapping the 8 aeo-* checks (never client-side), on a new /readiness GET reading the latest audit snapshot; (b) single-definition schema coverage metric (covered/total, covered=published-vs-generated per owner Q) on the schema snapshot view. Both are computed helpers over existing snapshot data — no migration.",
+      "consumers": [
+        "ai-visibility",
+        "site-audit",
+        "schema",
+        "links"
+      ],
+      "effort": "M",
+      "priority": "with-surface",
+      "notes": "Home: (a) server/routes/aeo-review.ts + derivation beside audit-page.ts consumers; (b) coverage helper surfaced via toAdminSchemaSnapshotView DEFINED at server/serializers/client-safe.ts:213 (NOT webflow-schema.ts:110 which only calls it). Do NOT cross-wire the-issue-readiness.ts assembleSetupReadiness — unrelated. Dedup of ai-visibility-1 + schema-1 (schema-1 effort S). AEO readiness is a 3-to-1 merge coordination with site-audit which produces the checks."
+    },
+    {
+      "id": "SB-010",
+      "title": "Per-category audit scores + 6-cat display taxonomy remap (suppression-aware)",
+      "kind": "derivation",
+      "description": "Compute category-level audit scores server-side, serialize onto the audit result/snapshot, and make them suppression-aware on ALL effective-score exit points (getEffectiveAudit, toEffectiveAuditSnapshot, applySuppressionsToAudit, AND the cross-workspace /api/workspace-overview serialization). Plus an additive displayCategory remap of the 5-value CheckCategory to the 6-cat model (index/onpage/perf/schema/links/mobile) — additive, keeping persisted check/category keys stable for suppressions/CSV/client read.",
+      "consumers": [
+        "site-audit",
+        "client-portal",
+        "links",
+        "performance",
+        "schema",
+        "global-ops"
+      ],
+      "effort": "M",
+      "priority": "with-surface",
+      "notes": "Home: server/seo-audit.ts (scoring) + server/audit-snapshot-views.ts (suppression-aware views) + audit-page.ts CHECK_CATEGORY (remap). Category is persisted in snapshot JSON per-issue, so remap is read-side only (no migration) — effort S for taxonomy, M with per-category scoring. Dedup of site-audit-1 + site-audit-2. Ties to SB-009 coverage exit-points and SB-018 rollup serialization."
+    },
+    {
+      "id": "SB-011",
+      "title": "Missing-schema audit finding producer + count projection",
+      "kind": "projection",
+      "description": "The frontend expects check ids missing_schema/schema_errors that have NO server producer (server emits only 'structured-data' info + 'aeo-faq-no-schema'). Either define the missing-schema check producer in audit-page.ts OR repoint the frontend mapping to the real ids, then build a per-workspace missing-schema count projection for the Schema surface.",
+      "consumers": [
+        "schema",
+        "site-audit"
+      ],
+      "effort": "M",
+      "priority": "with-surface",
+      "notes": "Home: server/audit-page.ts check producer + snapshot/coverage projection (possibly folded into SB-009). schema-2. Cheapest path is repoint-frontend to structured-data/aeo-faq-no-schema, but a proper count still needs producer + projection."
+    },
+    {
+      "id": "SB-012",
+      "title": "GA4 AI-referral session segmentation + GSC prior-period dated trend series",
+      "kind": "derivation",
+      "description": "Two shared GA4/GSC read extensions: (a) GA4 AI-referral session segmentation (chatgpt.com/perplexity.ai/gemini referrers) + MoM delta (owner-gated, ai-visibility N4); (b) prior-period dated trend series for the dashed-comparison overlay — the fetchPerformanceTrend helper ALREADY accepts dateRange and getPreviousGscWindow already exists; the only gap is threading startDate/endDate/offset query params through server/routes/google.ts:258-270.",
+      "consumers": [
+        "search-traffic",
+        "ai-visibility",
+        "performance",
+        "client-portal"
+      ],
+      "effort": "S",
+      "priority": "with-surface",
+      "notes": "Home: server/routes/google.ts + analytics-data.ts fetchPerformanceTrend (already dateRange-capable) + GA4 fetch layer for referrer segmentation. VERIFY correction: search-traffic-1 is a ~1-line route param thread, NOT a fetcher extension (S). AI-referral half (ai-visibility-2) is genuinely 'no' + M. Kept together as the shared GA4/GSC read seam."
+    },
+    {
+      "id": "SB-013",
+      "title": "Cross-workspace rollup endpoint(s): outcome value, GSC book, site-health issue-matrix",
+      "kind": "projection",
+      "description": "Extend/build cross-workspace aggregations, reusing the EXISTING GET /api/workspace-overview scaffold (already iterates workspaces, suppression-aware, serializes audit score + churn + requests). Add: per-workspace value-$/mo + clicks (getWinsWithValueByWorkspace already applies the not_acted_on attribution-honesty exclusion — reuse it); a cross-client GSC clicks/traffic/position roll-up (genuinely net-new, no existing loop); and an issue-type×client site-health matrix (net-new SHAPE — overview only emits scalar score/errors today).",
+      "consumers": [
+        "global-ops",
+        "cockpit",
+        "client-portal"
+      ],
+      "effort": "L",
+      "priority": "with-surface",
+      "notes": "Home: EXTEND server/routes/workspaces.ts /api/workspace-overview + new book-rollup module (GSC) + audit issue-matrix. VERIFY: global-ops-3 value read is partial-reuse (M); search-traffic-2 GSC book is net-new (M); site-audit-3 aggregation SCAFFOLD exists (read-only half ~M) but issue-type matrix + batch-fix job are net-new (L). Apply attribution-honesty (exclude not_acted_on) at each read path. Dedup of global-ops-3 + search-traffic-2 + site-audit-3."
+    },
+    {
+      "id": "SB-014",
+      "title": "Generic client-nudge rate-limit (reuse existing deliverables remind for awaiting-client)",
+      "kind": "endpoint",
+      "description": "The generic client-reminder path ALREADY exists and covers any awaiting_client client_deliverable: POST /api/deliverables/:ws/:id/remind → remindDeliverable() emails, broadcasts DELIVERABLE_UPDATED, and logs deliverable_reminded. GBP review-response sends already create such a deliverable, so they are already remindable. The ONLY net-new work is a per-target rate-limit/throttle; brief/content-request nudges also route through this pattern.",
+      "consumers": [
+        "local-presence",
+        "content-pipeline",
+        "client-inbox"
+      ],
+      "effort": "S",
+      "priority": "with-surface",
+      "notes": "Home: server/routes/deliverables.ts remind (reuse) + rate-limit; content-briefs/content-requests nudge follows the same template. VERIFY correction: local-presence-4 and content-pipeline-5 are REUSE (S), not net-new endpoints — the email/broadcast/activity halves exist. Dedup of local-presence-4 + content-pipeline-5."
+    },
+    {
+      "id": "SB-015",
+      "title": "Public client 'Discuss' write + client-authored discussion thread",
+      "kind": "endpoint",
+      "description": "Single-writer discussRecommendation lifecycle fn (sent→discussing edge exists in CLIENT_REC_TRANSITIONS but is read-only today, never written) + public POST /discuss, plus optionally a client-authored discussion-thread write (thread is admin-write-only via requireWorkspaceAccess today). Only if owner adopts prototype Discuss semantics.",
+      "consumers": [
+        "recommendations",
+        "client-portal",
+        "cockpit",
+        "engine"
+      ],
+      "effort": "M",
+      "priority": "with-surface",
+      "notes": "Home: server/recommendation-lifecycle.ts (new discussRecommendation) + routes/recommendations.ts public section + server/rec-discussion.ts. recommendations-1. Distinct from SB-016 progress-join."
+    },
+    {
+      "id": "SB-016",
+      "title": "Approved-rec progress join onto public projection (linked content-request status)",
+      "kind": "projection",
+      "description": "Serialize the linked content-request status onto the public rec projection so the 'you approved this — we'll update you here' card has a real data home. Today only boolean delivered (status==='completed') is exposed. Rec→request lineage exists (stamped at act-on) and an admin-side join+stage helper (strategy-issue-lenses.ts) exists to model on, but the public projection allow-list addition is net-new.",
+      "consumers": [
+        "recommendations",
+        "client-portal",
+        "content-pipeline"
+      ],
+      "effort": "M",
+      "priority": "with-surface",
+      "notes": "Home: server/client-insight-recommendation-view-model.ts + server/recommendation-public-projection.ts (allow-list addition). recommendations-2. No migration (allow-list + join + serialization)."
+    },
+    {
+      "id": "SB-017",
+      "title": "Brandscript approved status + per-section regenerate ('Redo')",
+      "kind": "migration",
+      "description": "Two brandscript endpoint gaps: (a) 'approved' status — new column + row mapper + write path + state-machine registration (MIRROR the existing brand_identity_deliverables draft↔approved machine, don't invent) + transitions test; (b) per-section brandscript regenerate reusing the complete-section prompt path (completeBrandscript today only fills empty sections).",
+      "consumers": [
+        "brand-ai"
+      ],
+      "effort": "M",
+      "priority": "with-surface",
+      "notes": "Home: server/brandscript.ts + migration + server/state-machines.ts + routes/brandscript.ts. VERIFY correction: brand-ai-6 effort S→M (DB-column+mapper+state-machine lockstep). Regenerate half (brand-ai-2) is S. Merged as one brandscript work item."
+    },
+    {
+      "id": "SB-018",
+      "title": "GBP review-response authoring/lifecycle extensions",
+      "kind": "endpoint",
+      "description": "Bundle of GBP review-response gaps: manual (no-AI) draft-create + one-step draft-and-send (brand-ai/local-presence-6); reopen-for-edits (approved→draft, publish_failed→draft transitions clearing approval metadata, local-presence-7); persist a Google review/maps URL on synced reviews (column+mapper+serialization lockstep, local-presence-5).",
+      "consumers": [
+        "local-presence"
+      ],
+      "effort": "M",
+      "priority": "with-surface",
+      "notes": "Home: server/routes/google-business-profile.ts + google-business-profile-review-responses-store.ts + state-machines.ts (GBP_REVIEW_RESPONSE_TRANSITIONS at :172-186) + reviews-store migration. Grouped GBP-review sub-items; the maps-URL persistence is the only DB-column piece."
+    },
+    {
+      "id": "SB-019",
+      "title": "Map-pack share-of-voice % + competitor top-3/domain-rank fields",
+      "kind": "derivation",
+      "description": "Two competitor/local read derivations: (a) map-pack share-of-voice % per competitor (appearances/checked-slots) added to LocalSeoRepeatCompetitor — pure in-memory reduction in getLocalSeoCompetitorBrands, no migration; (b) domain rank (DR/authority) + true top-3 rankings count on competitive-intel, sourced from DataForSEO domain-rank + a separate top-3 aggregate (NOT the top-20 sample). Both owner-gated.",
+      "consumers": [
+        "local-presence",
+        "competitors",
+        "keywords",
+        "strategy-issue"
+      ],
+      "effort": "M",
+      "priority": "with-surface",
+      "notes": "Home: (a) server/domains/local-seo/visibility-read-model.ts + shared/types/local-seo.ts (effort S, computed type); (b) server/seo-data-provider.ts provider interface + DataForSEO impl + routes/seo-provider.ts (effort M, live pass-through, no migration). local-presence-3 + competitors-1."
+    },
+    {
+      "id": "SB-020",
+      "title": "Competitor-alert wire fields: lastSnapshotDate + insightId",
+      "kind": "field",
+      "description": "Two small competitor-alert serializations over EXISTING columns: expose lastSnapshotDate (MAX(competitor_snapshots.snapshot_date)) on the alerts response so the 'updated Mon' sync line renders with zero alerts; expose insightId on CompetitorAlertView (insight_id already on the store row via linkAlertToInsight) to link each alert to its Insights entry.",
+      "consumers": [
+        "competitors",
+        "insights-engine"
+      ],
+      "effort": "S",
+      "priority": "with-surface",
+      "notes": "Home: server/competitor-snapshot-store.ts (one MAX query) + routes/competitor-alerts.ts toView + shared/types/competitor-alerts.ts. Both read existing columns — no migration. competitors-2 + competitors-3."
+    },
+    {
+      "id": "SB-021",
+      "title": "Rich-result / AI-citation detection data source (schema graduation prerequisite)",
+      "kind": "other",
+      "description": "The schema-win graduation (SB-001 schema variant) is blocked on DETECTION that flips rich_result_appearing:false→true. The outcome-measurement + workspace-learnings SCORING machinery already exists and dollar-attributes schema deploys, but fetchCurrentMetrics reads only GSC rows — no path sets rich_result_appearing=true, so the schemaWins filter is dead. This is a net-new external data source, the real cost driver.",
+      "consumers": [
+        "schema",
+        "insights",
+        "results"
+      ],
+      "effort": "L",
+      "priority": "later",
+      "notes": "Home: server/outcome-measurement.ts fetchCurrentMetrics + a new detection provider. VERIFY correction: schema-3 SCORING is REUSE (not net-new); the L cost is this detection source + the SB-001 bridge, not rebuilding measurement. Gates only the schema variant of SB-001."
+    },
+    {
+      "id": "SB-022",
+      "title": "Asset dimensions (w×h) on Webflow asset rows",
+      "kind": "field",
+      "description": "Map image width/height onto GET /api/webflow/assets/:siteId rows (in-memory Webflow-API passthrough shape, NOT a DB column). If Webflow's /assets response carries dimensions it's mapping-only (S); if not, needs image introspection (larger, still endpoint-shape).",
+      "consumers": [
+        "asset-manager",
+        "site-audit",
+        "performance"
+      ],
+      "effort": "S",
+      "priority": "with-surface",
+      "notes": "Home: server/webflow-assets.ts (listAssets mapping + WebflowAsset) + src/hooks/admin/useAdminAssets.ts. asset-manager-1. No migration."
+    },
+    {
+      "id": "SB-023",
+      "title": "Compression graduation insight (CWV-move on compress pass)",
+      "kind": "derivation",
+      "description": "New InsightType + typed data + Zod schema + renderer (4-part rule) written when a compression pass measurably moves CWV, triggered from the bulk-compress job or a Performance/CWV bridge. Blocked on which system owns measurement (OQ5).",
+      "consumers": [
+        "asset-manager",
+        "performance",
+        "insights-engine"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: shared/types/analytics.ts + server/schemas/ + insight bridge (server/intelligence/ or outcome-tracking). asset-manager-2. Distinct from SB-001 (this is a specific CWV-move insight type); could register through SB-001's seam once it lands."
+    },
+    {
+      "id": "SB-024",
+      "title": "Lighthouse extra category scores (a11y / best-practices / SEO)",
+      "kind": "field",
+      "description": "Fetch + persist Lighthouse accessibility/best-practices/SEO category scores alongside performance in PSI calls; extend the snapshot shape. Snapshot persists via a free JSON result column so no migration/row-mapper lockstep.",
+      "consumers": [
+        "performance",
+        "site-audit"
+      ],
+      "effort": "S",
+      "priority": "with-surface",
+      "notes": "Home: server/pagespeed.ts (category:['performance',...]) + server/performance-store.ts. performance-1."
+    },
+    {
+      "id": "SB-025",
+      "title": "GSC hits (clicks/impressions) + match-score on redirect PageStatus rows",
+      "kind": "field",
+      "description": "Thread GSC clicks/impressions onto matching 404/ghost PageStatus rows (dropped inside scanRedirects today) for a real 404s/mo column, and serialize the existing keyword-overlap match score as PageStatus.matchScore (findBestMatch computes bestScore internally but returns only the page). Both are optional fields on a JSON-blob-persisted result — no migration.",
+      "consumers": [
+        "links",
+        "site-audit"
+      ],
+      "effort": "S",
+      "priority": "with-surface",
+      "notes": "Home: server/redirect-scanner.ts (PageStatus + scanRedirects + findBestMatch) + redirect-store snapshot type. Display match as 'match %', never 'AI'. links-1 + links-2. RedirectScanResult persists as JSON (redirect-store.ts) — DB-column-lockstep does not apply."
+    },
+    {
+      "id": "SB-026",
+      "title": "Webflow redirect-create endpoint (fix orphaned redirects.save wrappers)",
+      "kind": "endpoint",
+      "description": "No server route backs /api/webflow/redirects — the redirects.list/save client wrappers are orphaned and DeadLinkPanel.tsx:47 already calls save against a missing endpoint (live 404). Build the redirect-create route backing the 'Add redirect' CTA; also prerequisite for any slug-change auto-redirect.",
+      "consumers": [
+        "seo-editor",
+        "links"
+      ],
+      "effort": "M",
+      "priority": "early",
+      "notes": "Home: server/routes/webflow-analysis.ts (alongside redirect-scan) or new redirects route. VERIFY correction: seo-editor-4 evidence wrong — RedirectManager.tsx DOES call scan/snapshot; it's redirects.list/save that 404, and DeadLinkPanel already calls save (broken today). Early because an existing UI path is already broken. seo-editor-4 = links N9 hand-off."
+    },
+    {
+      "id": "SB-027",
+      "title": "Persisted reviewed/suppressed state for dead links",
+      "kind": "endpoint",
+      "description": "New store + POST toggle endpoint + serialization into link-check snapshot reads for reviewed/suppressed dead links. No suppression store exists for Links (Site Audit's is separate). Synonyms dismiss/ignore/hide also confirmed absent.",
+      "consumers": [
+        "links",
+        "site-audit"
+      ],
+      "effort": "M",
+      "priority": "with-surface",
+      "notes": "Home: server/performance-store.ts (or new module) + routes/webflow-analysis.ts. links-3."
+    },
+    {
+      "id": "SB-028",
+      "title": "Per-page index/noindex status on SEO-editor rows",
+      "kind": "field",
+      "description": "Add per-page index/noindex status to the all-pages row payload for the Noindex quick-filter chip. PageMeta lacks it; likely sourced from audit/crawl data (no robots/noindex read exists in the webflow route today).",
+      "consumers": [
+        "seo-editor",
+        "site-audit",
+        "page-intelligence"
+      ],
+      "effort": "M",
+      "priority": "with-surface",
+      "notes": "Home: server/routes/webflow.ts all-pages assembly (or join from seo-audit crawl store). seo-editor-1."
+    },
+    {
+      "id": "SB-029",
+      "title": "H1 + URL-slug write endpoints (with auto-redirect on slug change)",
+      "kind": "endpoint",
+      "description": "H1 and URL-slug write endpoints plus automatic redirect on slug change (updatePageSeo writes seo/openGraph/title only; slug is in the signature but never threaded). Owner-gated; recommend read-only v1. Depends on SB-026 for the redirect half.",
+      "consumers": [
+        "seo-editor"
+      ],
+      "effort": "L",
+      "priority": "later",
+      "notes": "Home: server/webflow-pages.ts + new route in routes/webflow.ts. seo-editor-2. Gated on owner Q1."
+    },
+    {
+      "id": "SB-030",
+      "title": "Server-persisted per-page SEO drafts (replace localStorage)",
+      "kind": "migration",
+      "description": "New seo_drafts table + endpoints replacing localStorage-only per-page drafts (server persistence today exists only for bulk suggestions). Contingent on owner choosing the server-side draft tier (Q6).",
+      "consumers": [
+        "seo-editor"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: new seo_drafts table + endpoints near server/routes/webflow-seo-suggestions.ts. VERIFY: draft persistence lives at src/components/editor/seoEditorPersistence.ts (not src/hooks/admin/). seo-editor-5."
+    },
+    {
+      "id": "SB-031",
+      "title": "Rewrite-playbook patterns read (confirm existing workspace-view field first)",
+      "kind": "endpoint",
+      "description": "Playbook chips for the page-rewriter. The RAW rewritePlaybook string is ALREADY serialized to the admin UI via admin-workspace-view.ts, and patterns = string.split('\\n'). Confirm the rewriter UI can consume the existing workspace-view field client-side before building a dedicated GET — that could reduce this to zero net-new backend work.",
+      "consumers": [
+        "page-rewriter"
+      ],
+      "effort": "S",
+      "priority": "later",
+      "notes": "Home: server/routes/rewrite-chat.ts (GET /playbook) ONLY if the existing workspace-view rewritePlaybook field can't be reused. VERIFY correction: page-rewriter-2 may be unnecessary — raw string already delivered. Quick-win (static chips) needs nothing."
+    },
+    {
+      "id": "SB-032",
+      "title": "Page-rewriter save-draft / publish spine (full-page Webflow write-back)",
+      "kind": "endpoint",
+      "description": "rewrite-drafts table + migration, draft/publish lifecycle endpoints, Webflow full-page copy write-back with static-DOM vs CMS-field write-target resolution (docs/rules/seo-editor-write-targets.md), activity log + broadcast. Owner-gated (Q1) — not in scope unless approved.",
+      "consumers": [
+        "page-rewriter",
+        "seo-editor",
+        "content-pipeline"
+      ],
+      "effort": "L",
+      "priority": "later",
+      "notes": "Home: server/routes/rewrite-chat.ts (or new domain module) + migration. page-rewriter-1. Shares the write-target contract with seo-editor."
+    },
+    {
+      "id": "SB-033",
+      "title": "Brand-context completeness score (extend ai-context-check, not new scorer)",
+      "kind": "derivation",
+      "description": "Brand-context completeness % (overall + per-group) IF the cockpit ships a numeric score. EXTEND the existing checkAIContext engine (server/ai-context-check.ts — a 0-100 workspace AI-context completeness scorer that already scores brand-voice as one source, exposed via routes/ai.ts:112), do NOT build a fresh scorer or a projection on GET /api/workspaces/:id. Quick-win is client-side qualitative booleans (nothing needed).",
+      "consumers": [
+        "brand-ai",
+        "client-portal"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: server/ai-context-check.ts (add brand-scoped sources), NOT a brand slice. VERIFY correction: brand-ai-1 whereItLives wrong — reuse ai-context-check.ts, which has a dedicated GET route."
+    },
+    {
+      "id": "SB-034",
+      "title": "Founder-interview Q&A store + AI-draft-from-docs (Discovery)",
+      "kind": "migration",
+      "description": "New interview questions/answers store + AI-draft-from-docs endpoint + wiring into the Discovery flow. Only a prompt-string reference exists today.",
+      "consumers": [
+        "brand-ai"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: server/discovery-ingestion.ts domain + new migration + ai-operation-registry entry. brand-ai-4."
+    },
+    {
+      "id": "SB-035",
+      "title": "Source-fed knowledge-base regeneration job",
+      "kind": "job",
+      "description": "Regenerate the knowledge base FROM discovery sources/extractions. The existing KNOWLEDGE_BASE_GENERATION job crawls the website (scrapeWorkspaceSite) instead and never reads discovery sources.",
+      "consumers": [
+        "brand-ai"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: server/discovery-ingestion.ts + a job variant in the background-job platform. brand-ai-5."
+    },
+    {
+      "id": "SB-036",
+      "title": "PDF/DOCX/XLSX discovery-source parsing",
+      "kind": "other",
+      "description": "Richer-format upload parsing for discovery sources (server enforces .txt/.md by both extension and mimetype, reads via utf-8 readFileSync — no binary parser).",
+      "consumers": [
+        "brand-ai"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: server/routes/discovery-ingestion.ts upload path + a parsing dependency. brand-ai-7. Shared with brand-docs upload (Q9)."
+    },
+    {
+      "id": "SB-037",
+      "title": "Single-deliverable brand-identity export",
+      "kind": "endpoint",
+      "description": "Per-item Export (export-all with ?tier filter already exists and lists all approved deliverables joined to one blob). Add a per-item/type param or /export/:type route.",
+      "consumers": [
+        "brand-ai"
+      ],
+      "effort": "S",
+      "priority": "later",
+      "notes": "Home: server/routes/brand-identity.ts (param on existing route or /export/:type). brand-ai-3."
+    },
+    {
+      "id": "SB-038",
+      "title": "Admin verdict headline field on the strategy-POV payload",
+      "kind": "derivation",
+      "description": "Short admin verdict headline drafted during POV generation (never hardcoded), additive field on the POV payload. POV persists as a pov_json blob so no migration — but must be added to StrategyPov, StrategyPovAIOutput, the Zod schema + fallback, and the generator prompt (one file-cluster, still S).",
+      "consumers": [
+        "engine",
+        "client-portal"
+      ],
+      "effort": "S",
+      "priority": "with-surface",
+      "notes": "Home: server/strategy-pov-generator.ts + shared/types/strategy-pov.ts + strategy-pov-store.ts schema/fallback. engine-2."
+    },
+    {
+      "id": "SB-039",
+      "title": "Admin 'what the client sees' spine preview (read-safe data source)",
+      "kind": "endpoint",
+      "description": "Admin-auth serialization of the client-safe issue spine for admin render (frontend groundwork exists: TheIssueClientPage previewMode + the removed IssueHeader toggle). Owner-gated (E9). HAZARD: the reusable assembleOnePagerExport calls computeROI which WRITES a snapshot — do not reuse it on a hot admin GET; needs a write-free read source (same landmine as SB-003). Existing export routes are client-portal auth, not admin.",
+      "consumers": [
+        "engine",
+        "client-portal"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: routes/the-issue-export.ts or the-issue-admin.ts. VERIFY correction: engine-4 cited 'admin export routes' are actually requireAuthenticatedClientPortalAuth; assembler writes via computeROI — effort S→M once made read-safe."
+    },
+    {
+      "id": "SB-040",
+      "title": "Recall/unsend recommendation semantics",
+      "kind": "derivation",
+      "description": "Either document recall=strike (no server change — struck recs already leave the curated set via isCuratedForClient) OR add a sent→recalled/unsent transition + lifecycle fn. Admin-owned; client only observes disappearance.",
+      "consumers": [
+        "recommendations",
+        "cockpit"
+      ],
+      "effort": "S",
+      "priority": "later",
+      "notes": "Home: server/recommendation-lifecycle.ts + state-machines.ts (if new edge). recommendations-3. CLIENT_REC_TRANSITIONS has no back-edge from sent today."
+    },
+    {
+      "id": "SB-041",
+      "title": "Monetization 'to pitch' admin queue (upsell/scope-expansion plays)",
+      "kind": "projection",
+      "description": "Admin-facing queue of upsell/scope-expansion plays per client for the cockpit money stream. Upsell exists ONLY as client purchase flows (productType/'Recommended for You') — no admin pitch queue.",
+      "consumers": [
+        "cockpit",
+        "recommendations",
+        "global-ops"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: new module under server/domains/recommendations/ or briefing-candidates adjacency. cockpit-5."
+    },
+    {
+      "id": "SB-042",
+      "title": "Diagnostics: on-demand stage-single-action-as-backing-move + report export",
+      "kind": "endpoint",
+      "description": "The diagnostics→recommendation MAPPING already exists (appendDiagnosticRecommendations + RecSource.diagnostic, automated batch top-3×top-5). Net-new: (a) an on-demand endpoint to stage ONE chosen remediation action as a backing move reusing that mapping (closer to S), and (b) a diagnostic-report export projection (diagnostics routes are read-only, no export route anywhere) — the (b) half drives the M.",
+      "consumers": [
+        "global-ops",
+        "recommendations"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: server/routes/diagnostics + server/domains/recommendations (reuse maintenance-producers.ts appendDiagnosticRecommendations + rules.ts RecSource.diagnostic). VERIFY correction: global-ops-5 existsToday no→partial; backing-move half is REUSE (~S), export is the net-new cost. Reuse, don't rebuild."
+    },
+    {
+      "id": "SB-043",
+      "title": "Archive workspace (archived_at + PATCH + list exclusion)",
+      "kind": "migration",
+      "description": "archived_at column on workspaces + PATCH archive/unarchive endpoint + exclusion from the default workspace list (listWorkspaces is unfiltered SELECT *). Do NOT conflate with the unrelated action_outcomes_archive twin.",
+      "consumers": [
+        "global-ops",
+        "cockpit"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: routes/workspaces.ts + workspaces.ts + new migration + WorkspaceRow interface + rowToWorkspace mapper. VERIFY correction: global-ops-1 effort S→S/M (mapper + serialization lockstep, not just an endpoint)."
+    },
+    {
+      "id": "SB-044",
+      "title": "Per-workspace timezone/locale preference fields",
+      "kind": "field",
+      "description": "Timezone/locale preference on workspaces to back report timestamps (autoReportFrequency cadence exists, but no timezone/locale field).",
+      "consumers": [
+        "global-ops",
+        "client-portal"
+      ],
+      "effort": "S",
+      "priority": "later",
+      "notes": "Home: shared/types/workspace.ts + workspaces migration + settings PATCH. global-ops-2."
+    },
+    {
+      "id": "SB-045",
+      "title": "Move synchronous long-GET link/redirect/internal-link scans to background jobs",
+      "kind": "job",
+      "description": "The three scans (redirect-scan, link-check, internal-links) run inline in GET handlers; move them to the background-job platform with an optional recurring crawl cron. Defer-candidate, not a Phase-1 blocker.",
+      "consumers": [
+        "links",
+        "site-audit"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: server/jobs.ts workers + cron-registry.ts if scheduled. links-4."
+    },
+    {
+      "id": "SB-046",
+      "title": "Board lifecycleStage derivation over posts+requests+briefs",
+      "kind": "derivation",
+      "description": "Content-board lifecycleStage (queued/brief/draft/review/scheduled/published) — Keywords-pilot deriveLifecycleStage pattern. No persisted queued/scheduled stage exists; statuses live in separate state-machine unions. Only needed if Q1 resolves to server-derived over client view-mapping.",
+      "consumers": [
+        "content-pipeline"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: new server/domains/content/pipeline-stage.ts (or client-side mapper if Q1 picks derived-view). content-pipeline-3. Mirror KCC read-model.ts deriveLifecycleStage."
+    },
+    {
+      "id": "SB-047",
+      "title": "Content-Health decay intake endpoint (thin wrapper over existing decay→brief seam)",
+      "kind": "endpoint",
+      "description": "'Queue refresh' one-card intake. The decay-sourced suggested-brief WRITE PATH ALREADY EXISTS and ships in prod (POST /content-decay/:ws/analyze → fireBridge decay-suggested-brief → createSuggestedBrief source:'content_decay' + broadcast); createSuggestedBrief's default source is already content_decay. Only the dedicated queueRefresh HTTP entry point is missing — a thin wrapper, not source support.",
+      "consumers": [
+        "content-pipeline",
+        "seo-audit"
+      ],
+      "effort": "S",
+      "priority": "later",
+      "notes": "Home: routes/suggested-briefs.ts + suggested-briefs-store.ts, reusing the routes/content-decay.ts:38-50 writer. VERIFY: content-pipeline-4 REFUTED as 'no source support'; reframed as thin intake wrapper only."
+    },
+    {
+      "id": "SB-048",
+      "title": "'Generate briefs for planned' matrix bulk action (background job)",
+      "kind": "job",
+      "description": "Implement HEAD's declared-but-no-op generate_briefs matrix bulk action as a background job fanning out per-cell brief generation (ContentPlanner handles only export_csv + send_review today; MatrixGrid wires the menu item to a nonexistent endpoint).",
+      "consumers": [
+        "content-pipeline"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: routes/content-matrices.ts + server/jobs.ts worker. content-pipeline-6."
+    },
+    {
+      "id": "SB-049",
+      "title": "Per-field brief AI assists (angle/keywords/links/eeat)",
+      "kind": "endpoint",
+      "description": "New named AI operations for per-field brief assists; the outline assist alone maps to the existing regenerate-outline job. The other four fields are net-new named operations.",
+      "consumers": [
+        "content-pipeline"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: routes/content-briefs.ts + server/ai-operation-registry.ts. content-pipeline-9."
+    },
+    {
+      "id": "SB-050",
+      "title": "Client questionnaire flow for content briefs (5-Q, answers folded into brief)",
+      "kind": "other",
+      "description": "New client-facing 5-Q form + new AI operations to fold answers into a brief. No content-brief questionnaire path exists, but ClientOnboardingQuestionnaire + the public-portal onboarding submit+transform pattern are reusable scaffolding — removes the 'net-new client surface from scratch' framing (still L: new AI ops + brief-answer folding + client surface).",
+      "consumers": [
+        "content-pipeline",
+        "client-dashboard"
+      ],
+      "effort": "L",
+      "priority": "later",
+      "notes": "Home: new server/routes + client portal flow + ai-operation-registry entries, modeled on ClientOnboardingQuestionnaire + public-portal onboarding. VERIFY correction: content-pipeline-8 existsToday no→'no for the 5-Q flow, but questionnaire scaffolding exists'."
+    },
+    {
+      "id": "SB-051",
+      "title": "Composite AI visibility score /100 + MoM delta",
+      "kind": "derivation",
+      "description": "Server-computed composite AI visibility score /100 + MoM delta serialized onto the existing ai-visibility GET, IF owner chooses a composite over SoV×100. shareOfVoice 0..1 + dated trend exist; no composite anywhere.",
+      "consumers": [
+        "ai-visibility"
+      ],
+      "effort": "S",
+      "priority": "later",
+      "notes": "Home: server/llm-mentions.ts + rank-tracking.ts GET route. ai-visibility-5. Pure server derivation on existing GET."
+    },
+    {
+      "id": "SB-052",
+      "title": "Authority-signals assembled read for AI-visibility 'why' rows",
+      "kind": "projection",
+      "description": "Assembled authority-signals read (owned-content-cited, NAP/reviews, roundup presence) joining existing sourceDomains + GBP review data. Inputs exist but no assembled join.",
+      "consumers": [
+        "ai-visibility"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: server/intelligence/ or a small assembler beside llm-mentions. ai-visibility-7. Net-new projection over existing inputs."
+    },
+    {
+      "id": "SB-053",
+      "title": "Weekly LLM mentions refresh cron",
+      "kind": "job",
+      "description": "Weekly LLM_MENTIONS_REFRESH cron with credit-budget enforcement (refresh is route-triggered only today). Adding to CRON_METADATA also requires the cron-registry-census contract-test update. Conditional on owner Q8.",
+      "consumers": [
+        "ai-visibility"
+      ],
+      "effort": "S",
+      "priority": "later",
+      "notes": "Home: server/cron-registry.ts (CRON_METADATA) + server/llm-mentions.ts + tests/contract/cron-registry-census.test.ts. ai-visibility-3."
+    },
+    {
+      "id": "SB-054",
+      "title": "AI Answer Monitor backing (tracked-prompt table + transcripts + DataForSEO ChatGPT scraper)",
+      "kind": "migration",
+      "description": "Tracked-prompt table + per-prompt answer-transcript snapshots + DataForSEO ChatGPT-scraper provider capability + read/CRUD endpoints. REVERSES the current aggregates-only stance (rank-tracking.ts:190-193 comment; snapshots hold counts/domains only). Owner-gated (Q1-Q3).",
+      "consumers": [
+        "ai-visibility",
+        "insights-engine"
+      ],
+      "effort": "L",
+      "priority": "later",
+      "notes": "Home: new migration + server/llm-mentions*.ts extension + server/seo-data-provider.ts capability. ai-visibility-4. New migration + row-mapper lockstep + provider capability = genuinely L."
+    },
+    {
+      "id": "SB-055",
+      "title": "Branded vs non-branded demand split + branded search volume",
+      "kind": "derivation",
+      "description": "Branded vs non-branded demand split + branded search volume/mo. No such KPI (only competitor-brand-FILTER logic exists). Contested ownership with search-traffic (Q10) — home is the GSC/keyword domain, not ai-visibility routes.",
+      "consumers": [
+        "ai-visibility",
+        "search-traffic"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: search/keyword domain alongside GSC read paths (NOT ai-visibility routes). ai-visibility-6. Owner Q10 ownership decision required."
+    },
+    {
+      "id": "SB-056",
+      "title": "Extended GBP profile ingestion (hours/products/Q&A/service-area) + fix flows",
+      "kind": "endpoint",
+      "description": "Full N4 checklist GBP ingestion: hours/holiday hours, products, photo cadence, Q&A, service area + defined fix flows (only photos/attributes/category captured today). New client methods + storage + fix flows.",
+      "consumers": [
+        "local-presence"
+      ],
+      "effort": "L",
+      "priority": "later",
+      "notes": "Home: server/local-gbp.ts + server/google-business-profile-client.ts. local-presence-8."
+    },
+    {
+      "id": "SB-057",
+      "title": "49-point geo-grid scan (job + snapshot table + read projection)",
+      "kind": "job",
+      "description": "New background job (per-node DataForSEO spend, budget-gated like local-gbp) + new snapshot table + migration + read projection onto LocalSeoReadResponse. Only local_visibility_snapshots (one point per market) exists. Owner-gated (N1).",
+      "consumers": [
+        "local-presence"
+      ],
+      "effort": "L",
+      "priority": "later",
+      "notes": "Home: server/local-seo.ts + new migration + shared/types/background-jobs.ts. local-presence-1."
+    },
+    {
+      "id": "SB-058",
+      "title": "GBP Performance API ingestion (profile views / calls / directions)",
+      "kind": "endpoint",
+      "description": "New Google OAuth scope + client method + snapshot storage + hero-card serialization for GBP Performance metrics. The GBP client exposes no performance/insights method or scope today. Owner-gated (N2).",
+      "consumers": [
+        "local-presence"
+      ],
+      "effort": "L",
+      "priority": "later",
+      "notes": "Home: server/google-business-profile-client.ts + server/local-gbp.ts. local-presence-2."
+    },
+    {
+      "id": "SB-059",
+      "title": "Optional server-side compression savings estimate (sharp dry-run)",
+      "kind": "derivation",
+      "description": "Server-computed potential-savings estimate (sharp dry-run) replacing the client 55% heuristic. Ships ONLY if the client heuristic is rejected (quick-win is client-side from the already-fetched asset list). No savings-estimate endpoint exists.",
+      "consumers": [
+        "asset-manager",
+        "performance"
+      ],
+      "effort": "M",
+      "priority": "later",
+      "notes": "Home: server/routes/webflow-audit.ts or webflow-alt-text SERVICE module. VERIFY correction: asset-manager-3 evidence cited wrong file — savings computed in compressImageBuffer (webflow-alt-text SERVICE module), not route lines 274-325."
+    },
+    {
+      "id": "SB-060",
+      "title": "Cross-workspace site-health batch-fix background job",
+      "kind": "job",
+      "description": "Cross-client batch-fix background job for sitehealth.js (the later half of site-audit-3, after the read-only aggregation SB-013 lands). Net-new job over server/jobs.ts.",
+      "consumers": [
+        "site-audit",
+        "global-ops"
+      ],
+      "effort": "L",
+      "priority": "later",
+      "notes": "Home: server/jobs.ts worker reading the SB-013 aggregation. Split from site-audit-3 read-only aggregation (folded into SB-013) — this is the deferred batch-fix half."
+    },
+    {
+      "id": "SB-061",
+      "title": "Wins→proof-point graduation contract (search win → Insights Engine proof point)",
+      "kind": "other",
+      "description": "Write contract for staging a search win into the Insights Engine as a proof point. Unimplemented (mockup-only, 'proposed'-class lexicon entries). A persisted proof-point ledger row would pull in migration + row mapper + serialization lockstep, pushing it toward L. Only if N3 adopted.",
+      "consumers": [
+        "search-traffic",
+        "insights",
+        "cockpit"
+      ],
+      "effort": "L",
+      "priority": "later",
+      "notes": "Home: server/domains insights/outcomes seam + shared/types contract. VERIFY correction: search-traffic-3 effort M→M/L (persisted ledger row triggers DB-column+mapper lockstep). Converges with SB-001 graduation seam but adds a proof-point ledger."
+    }
+  ]
+}

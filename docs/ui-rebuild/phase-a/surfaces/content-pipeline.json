@@ -1,0 +1,770 @@
+{
+  "gather": {
+    "capabilityClassification": [
+      {
+        "capability": "A1 tabs→view modes",
+        "resolution": "ui-only",
+        "note": "LensSwitcher over existing data; board-column semantics gated by Q1."
+      },
+      {
+        "capability": "A2 ?tab= deep links + legacy aliases (content/calendar/seo-briefs/subscriptions)",
+        "resolution": "ui-only",
+        "note": "Re-wire two-halves contract + D8 redirect map; contract test exists."
+      },
+      {
+        "capability": "A3 ?post= deep link opens editor",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "A4 workflow stepper → board columns",
+        "resolution": "open-question",
+        "note": "Blocked on Q1 stage-model mapping."
+      },
+      {
+        "capability": "A5 health summary counts",
+        "resolution": "ui-only",
+        "note": "useContentPipeline.ts:25-59 already computes counts."
+      },
+      {
+        "capability": "A6 decay alert band → Content Health mode",
+        "resolution": "open-question",
+        "note": "Render is ui-only (useContentDecay), but Q6 dedupe vs seo-audit ContentDecay must be decided; queue-refresh write is sn-content-pipeline-4."
+      },
+      {
+        "capability": "A7 cannibalization warnings + growth-tier gate",
+        "resolution": "open-question",
+        "note": "Q5 — no prototype home; data exists in intel slice."
+      },
+      {
+        "capability": "A8 alerts disclosure collapse",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "A9 AI Suggested → intake lane (accept/dismiss, PATCH lifecycle)",
+        "resolution": "ui-only",
+        "note": "Existing suggested-briefs endpoints; snooze sub-item is Q10."
+      },
+      {
+        "capability": "A9-snooze (1w/1m)",
+        "resolution": "open-question",
+        "note": "Q10 — add to intake card overflow menu or drop deliberately."
+      },
+      {
+        "capability": "A10 export menu 5 types × CSV/JSON",
+        "resolution": "open-question",
+        "note": "Q2 home; endpoints exist (data-export.ts:73-135) — proposed default: overflow menu = ui-only."
+      },
+      {
+        "capability": "A11 Content Pipeline Guide",
+        "resolution": "defer-candidate",
+        "note": "No prototype element; DEF-* row + re-add slide-over later."
+      },
+      {
+        "capability": "A12 fixContext prefill (full payload incl. pageAnalysisContext)",
+        "resolution": "ui-only",
+        "note": "Must carry full FixContext, not just the keyword like pipeline.js:1177."
+      },
+      {
+        "capability": "A13 pending-requests shell badge",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "A14 workspace-tier awareness",
+        "resolution": "open-question",
+        "note": "Pairs with Q5 tier-gate question."
+      },
+      {
+        "capability": "B15 generate brief form (bg job, 409 single-flight)",
+        "resolution": "ui-only",
+        "note": "Add reference-URLs + page-type fields to workspace form; endpoints unchanged."
+      },
+      {
+        "capability": "B16 template crossref hint",
+        "resolution": "defer-candidate",
+        "note": "Small UX nicety; DEF-* if dropped from v1."
+      },
+      {
+        "capability": "B17 generation style selector",
+        "resolution": "open-question",
+        "note": "Q11 — keep as advanced control or drop."
+      },
+      {
+        "capability": "B18 briefs search/sort",
+        "resolution": "ui-only",
+        "note": "SearchField + DataTable sort over existing list."
+      },
+      {
+        "capability": "B19 brief detail inline editing (all HEAD fields)",
+        "resolution": "ui-only",
+        "note": "Existing PATCH content-briefs.ts:139; verify every field survives in workspace."
+      },
+      {
+        "capability": "B20 brief rich content display",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "B21 regenerate brief w/ feedback",
+        "resolution": "ui-only",
+        "note": "Endpoint exists content-briefs.ts:196; needs affordance in workspace."
+      },
+      {
+        "capability": "B22 regenerate outline w/ feedback",
+        "resolution": "ui-only",
+        "note": "Endpoint content-briefs.ts:213; distinguish from prototype 'suggest' assist."
+      },
+      {
+        "capability": "B23 copy Markdown/JSON",
+        "resolution": "ui-only",
+        "note": "Client-side; markdown mirror exists in useAdminBriefWorkflow.ts:62-97."
+      },
+      {
+        "capability": "B24 export brief HTML/PDF",
+        "resolution": "ui-only",
+        "note": "GET /export exists (content-briefs.ts:229); overflow-menu affordance per Q2."
+      },
+      {
+        "capability": "B25 send brief to client",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "B26 delete brief + 6s undo",
+        "resolution": "ui-only",
+        "note": "Existing mutation + optimistic pattern; add board-card affordance."
+      },
+      {
+        "capability": "B27 generate post from brief",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "B28 brief-not-found recovery",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "B29 loading/error states",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "B30 validate-keyword(s) endpoints",
+        "resolution": "open-question",
+        "note": "Q12 — no src UI caller found; confirm MCP/server consumer before treating as UI-droppable."
+      },
+      {
+        "capability": "C31 request status lifecycle actions (approve/in-progress/delivered)",
+        "resolution": "open-question",
+        "note": "Q3 — Inbox vs pipeline drawer home for embedded production actions."
+      },
+      {
+        "capability": "C32 serviceType/Upgraded badge + upgrade path",
+        "resolution": "open-question",
+        "note": "Q3; monetization-relevant."
+      },
+      {
+        "capability": "C33 generate brief for request + decline",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "C34 deliver w/ deliveryUrl+notes",
+        "resolution": "open-question",
+        "note": "Q3 — delivery capture absent from prototype."
+      },
+      {
+        "capability": "C35 resubmit-to-client / send post (post_review)",
+        "resolution": "open-question",
+        "note": "Q3; status semantics must not change."
+      },
+      {
+        "capability": "C36 view/edit linked brief inline",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "C37 delete request + undo",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "D38 posts status filters → board columns + counts",
+        "resolution": "ui-only",
+        "note": "generating/error must render as card states."
+      },
+      {
+        "capability": "D39 posts search/sort",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "D40 status progression via advance()",
+        "resolution": "open-question",
+        "note": "Q1 — mapping to validateTransition-backed unions is the blocking decision."
+      },
+      {
+        "capability": "D41 send post to client (optional note)",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "D42 publish to Webflow + hasPublishTarget gate",
+        "resolution": "ui-only",
+        "note": "Locked/empty state for missing publish target needs a designed home."
+      },
+      {
+        "capability": "D43 publish w/ AI image + confirm",
+        "resolution": "ui-only",
+        "note": "Option exists (PostEditor.tsx:293-311); add control per Q8."
+      },
+      {
+        "capability": "D44 voice score ring + feedback + re-score",
+        "resolution": "open-question",
+        "note": "Q9 — becomes Brand-voice gate detail view; data/endpoints exist."
+      },
+      {
+        "capability": "D45 outcome readback → Published tab (verdict/sparkline/tiles/engagement)",
+        "resolution": "needs-server-work",
+        "note": "Verdict+tiles ui-only (enrichPostsWithOutcomes); sparkline=sn-content-pipeline-2, engagement=sn-content-pipeline-1."
+      },
+      {
+        "capability": "D46 export post (html/md/pdf)",
+        "resolution": "ui-only",
+        "note": "Endpoints exist content-posts.ts:424-455; affordance per Q2."
+      },
+      {
+        "capability": "D47 delete post",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "D48 generating-state per-section progress + poll",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "E49 rich-text autosave + retry contract",
+        "resolution": "ui-only",
+        "note": "T1 carry-over of PostEditor; rich-text-content.md contract must survive."
+      },
+      {
+        "capability": "E50 regenerate single section",
+        "resolution": "ui-only",
+        "note": "Endpoint content-posts.ts:222; home per Q8."
+      },
+      {
+        "capability": "E51 AI review 6-item checklist (provenance-safe)",
+        "resolution": "ui-only",
+        "note": "Prototype gates mirror HEAD 1:1."
+      },
+      {
+        "capability": "E52 AI fix + FixDiffModal apply",
+        "resolution": "ui-only",
+        "note": "Endpoint content-posts.ts:471; wire gate 'Resolve' to it instead of nav-only stub."
+      },
+      {
+        "capability": "E53 version history + revert",
+        "resolution": "ui-only",
+        "note": "Endpoints content-posts.ts:496-538; home per Q8."
+      },
+      {
+        "capability": "E54 preview/copy/unification badge",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "E55 SEO title/meta + char counts",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "E56 planned-publish-date set/clear",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "F57 4-type calendar plotting (brief/post/request/matrix)",
+        "resolution": "open-question",
+        "note": "Q7 — prototype plots posts only; default keep all 4 types (client-side derivation exists in useContentCalendar)."
+      },
+      {
+        "capability": "F58 type filter pills + month stats",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "F59 day detail panel + deep links",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "F60 schedule/unschedule draft picker",
+        "resolution": "ui-only",
+        "note": "PATCH /planned-date exists; Q7 confirms carry — must not ship display-only calendar."
+      },
+      {
+        "capability": "F61 AI suggest-dates + apply panel",
+        "resolution": "ui-only",
+        "note": "Endpoint /suggest-dates exists (content-posts.ts:147 region); Q7 confirms carry."
+      },
+      {
+        "capability": "F62 month nav + today",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "G63 templates CRUD + editor depth",
+        "resolution": "ui-only",
+        "note": "Endpoints content-templates.ts:96-211; T1 carry-over TemplateEditor behind Matrix mode; Q4 confirms."
+      },
+      {
+        "capability": "G64 matrix builder wizard",
+        "resolution": "ui-only",
+        "note": "Endpoint content-matrices.ts:73; T1 carry-over MatrixBuilder."
+      },
+      {
+        "capability": "G65 8-status grid vs prototype 4",
+        "resolution": "open-question",
+        "note": "Q1/Q4 — status collapse changes meaning; forbidden without sign-off."
+      },
+      {
+        "capability": "G66 cell detail panel (candidates/validation/apply)",
+        "resolution": "open-question",
+        "note": "Q4; proposed default = T1 carry-over of CellDetailPanel."
+      },
+      {
+        "capability": "G67 bulk actions (send_review live; generate_briefs no-op stub)",
+        "resolution": "needs-server-work",
+        "note": "'Generate briefs for planned' implements a confirmed HEAD no-op — sn-content-pipeline-6."
+      },
+      {
+        "capability": "G68 cell update PATCH",
+        "resolution": "ui-only",
+        "note": "content-matrices.ts:148; depends on G66 home."
+      },
+      {
+        "capability": "G69 AI keyword recommendation endpoints",
+        "resolution": "open-question",
+        "note": "Q12 — API wrappers exist, no src UI caller found; confirm consumer."
+      },
+      {
+        "capability": "G70 matrix cannibalization endpoints",
+        "resolution": "open-question",
+        "note": "Q12/Q5 pair."
+      },
+      {
+        "capability": "G71 matrix delete/update",
+        "resolution": "ui-only",
+        "note": "Endpoints content-matrices.ts:113,269; add affordance."
+      },
+      {
+        "capability": "G72 client plan-review flow (send-template-review/batch-approve/public read)",
+        "resolution": "open-question",
+        "note": "Only send-sample survives visibly; needs a named home (Q4-adjacent)."
+      },
+      {
+        "capability": "H73 create subscription (plans/topic-source/notes)",
+        "resolution": "ui-only",
+        "note": "Drawer notes-field editability unverified — see unknowns."
+      },
+      {
+        "capability": "H74 active summary + capacity meter",
+        "resolution": "ui-only",
+        "note": "postsPerMonth + delivered exist (content-subscriptions.ts:72,150) — N3 is composable."
+      },
+      {
+        "capability": "H75 pause/resume/cancel/mark-delivered",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "H76 pending/past_due statuses",
+        "resolution": "ui-only",
+        "note": "Statuses exist at HEAD; add badges to drawer."
+      },
+      {
+        "capability": "H77 subscription history",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "H78 no-plan empty state",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "I79 WS events + RQ invalidation",
+        "resolution": "ui-only",
+        "note": "Re-wire useWorkspaceEvents handlers for all listed events; server unchanged."
+      },
+      {
+        "capability": "I80 background jobs + NotificationBell",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "I81 activity logging + slice invalidation",
+        "resolution": "ui-only",
+        "note": "Server-side; rebuild must keep hitting the same mutation endpoints."
+      },
+      {
+        "capability": "I82 rec↔pipeline reconciliation + issue-lens deep links",
+        "resolution": "ui-only",
+        "note": "?tab=briefs|posts targets must resolve post-IA-change (D8)."
+      },
+      {
+        "capability": "I83 MCP content tools share stores",
+        "resolution": "ui-only",
+        "note": "Rebuild must not fork data paths."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-content-pipeline-1",
+        "kind": "field",
+        "description": "Per-published-post engagement metrics (time-on-page + lift) for the Published tab N4 engagement tile.",
+        "existsToday": "partial",
+        "evidence": "GA4 per-page fetchers exist (server/google-analytics.ts:193-194,257,646-675: pagePath dims, averageSessionDuration, engagementRate) but OutcomeReadback (shared/types/outcome-tracking.ts:471-496) has no engagement field and enrichPostsWithOutcomes (server/routes/content-posts.ts:133-137) doesn't attach it.",
+        "whereItLives": "server/domains/content + enrichPostsWithOutcomes decoration in server/routes/content-posts.ts",
+        "effort": "M",
+        "likelySharedWith": [
+          "content-perf"
+        ]
+      },
+      {
+        "id": "sn-content-pipeline-2",
+        "kind": "projection",
+        "description": "Per-POST clicks timeseries for the Published-tab sparkline; readback today carries only baseline/current scalars.",
+        "existsToday": "partial",
+        "evidence": "A per-REQUEST trend endpoint exists (server/routes/content-requests.ts:305 /api/content-performance/:workspaceId/:requestId/trend via server/domains/content/content-performance.ts) but nothing keyed by post; OutcomeReadback has no series fields (grep 'sparkline|timeseries|series' shared/types/outcome-tracking.ts = empty).",
+        "whereItLives": "server/domains/content/content-performance.ts (extend to post-URL keyed trend)",
+        "effort": "M",
+        "likelySharedWith": [
+          "content-perf"
+        ]
+      },
+      {
+        "id": "sn-content-pipeline-3",
+        "kind": "derivation",
+        "description": "Board lifecycleStage derivation (queued/brief/draft/review/scheduled/published) over posts+requests+briefs — Keywords-pilot lifecycleStage pattern; only needed if Q1 resolves to server-derived rather than client view-mapping.",
+        "existsToday": "no",
+        "evidence": "No queued/scheduled persisted stage: shared/types/content.ts:272-274 shows plannedPublishAt is only 'intent'; post/request/matrix statuses live in separate state-machine unions (server/state-machines.ts).",
+        "whereItLives": "new server/domains/content/pipeline-stage.ts (or client-side mapper if Q1 picks derived-view)",
+        "effort": "M",
+        "likelySharedWith": []
+      },
+      {
+        "id": "sn-content-pipeline-4",
+        "kind": "endpoint",
+        "description": "Content Health 'Queue refresh' write — create a decay-sourced intake card by inserting a suggested brief with source='content_decay' (N6).",
+        "existsToday": "partial",
+        "evidence": "suggested_briefs store + free-string source field exist (shared/types/intelligence.ts:1060-1073, server/suggested-briefs-store.ts) but only 'ranking_opportunity' is generated today (server/routes/suggested-briefs.ts:46); grep 'queueRefresh|queue.?refresh' server/ src/ = empty.",
+        "whereItLives": "server/routes/suggested-briefs.ts + server/suggested-briefs-store.ts",
+        "effort": "S",
+        "likelySharedWith": [
+          "seo-audit"
+        ]
+      },
+      {
+        "id": "sn-content-pipeline-5",
+        "kind": "endpoint",
+        "description": "Nudge-client reminder on awaiting-client briefs (N10) — new notification write following the deliverables remind pattern.",
+        "existsToday": "partial",
+        "evidence": "Pattern exists: POST /api/deliverables/:workspaceId/:id/remind (server/routes/deliverables.ts:275) + manual approval reminder (server/routes/approvals.ts); no brief/content-request nudge endpoint (grep 'nudge|remind' server/routes/content-*.ts = empty).",
+        "whereItLives": "server/routes/content-requests.ts (or content-briefs.ts) + email send",
+        "effort": "S",
+        "likelySharedWith": [
+          "inbox"
+        ]
+      },
+      {
+        "id": "sn-content-pipeline-6",
+        "kind": "job",
+        "description": "'Generate briefs for planned' matrix bulk action — implements HEAD's declared-but-no-op generate_briefs bulk (background job fanning out per-cell brief generation).",
+        "existsToday": "no",
+        "evidence": "src/components/ContentPlanner.tsx:88-107 handles only export_csv + send_review; comment 'Other bulk actions will be wired to specific endpoints as they're implemented' — no server endpoint exists.",
+        "whereItLives": "server/routes/content-matrices.ts + server/jobs.ts worker",
+        "effort": "M",
+        "likelySharedWith": []
+      },
+      {
+        "id": "sn-content-pipeline-7",
+        "kind": "endpoint",
+        "description": "'Graduate to Insights Engine' write from a published win (N5) — contract undefined; needs an insight-creation seam.",
+        "existsToday": "no",
+        "evidence": "grep -l 'graduate' server/ src/ hits only server/roi.ts, src/utils/formatNumbers.ts, outcomeProvenance.ts — all unrelated to an insights write.",
+        "whereItLives": "server/routes/content-posts.ts → server insight store (contract TBD)",
+        "effort": "M",
+        "likelySharedWith": [
+          "insights"
+        ]
+      },
+      {
+        "id": "sn-content-pipeline-8",
+        "kind": "other",
+        "description": "N7 client questionnaire flow (5-Q form sent to client, answers folded into brief) — new client-facing surface + new AI operations.",
+        "existsToday": "no",
+        "evidence": "grep -l 'questionnaire' server/ src/ hits only server/brandscript.ts, business-priorities-source.ts, ClientDashboard.tsx — no content-brief questionnaire path.",
+        "whereItLives": "new server/routes + client portal flow + ai-operation-registry entries",
+        "effort": "L",
+        "likelySharedWith": [
+          "client-dashboard"
+        ]
+      },
+      {
+        "id": "sn-content-pipeline-9",
+        "kind": "endpoint",
+        "description": "N7 per-field brief AI assists (angle/keywords/links/eeat) — new named AI operations; outline assist alone maps to the existing regenerate-outline job.",
+        "existsToday": "partial",
+        "evidence": "regenerate-outline w/ feedback exists (server/routes/content-briefs.ts:213); grep 'assist' server/routes/content-briefs.ts = empty for the other fields.",
+        "whereItLives": "server/routes/content-briefs.ts + server/ai-operation-registry.ts",
+        "effort": "M",
+        "likelySharedWith": []
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "Q1 (BLOCKING) Stage-model mapping: prototype 6-stage board vs HEAD's separate status unions; are queued/scheduled persisted statuses or derived views?",
+        "proposedDefault": "Derived view over existing statuses (quick-win), no schema change, single advance() routed through existing validateTransition; sn-content-pipeline-3 only if server-derived.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q2 Where do exports live (pipeline 5×CSV/JSON menu, brief PDF/MD/JSON, post md/html/pdf)?",
+        "proposedDefault": "Keep existing endpoints behind an overflow menu on the new Toolbar — zero server work, zero capability loss.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q3 Client-request production lifecycle (deliver-URL/notes, upgrade path, resubmit, post_review handoff): Inbox, pipeline drawer, or both?",
+        "proposedDefault": "Pipeline drawer keeps production actions; Inbox keeps triage — split by actor.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q4 Matrix depth: keep CellDetailPanel + 8 cell statuses + template/matrix edit/delete/duplicate, or simplify to prototype grid?",
+        "proposedDefault": "T1 carry-over: existing MatrixGrid/CellDetailPanel/TemplateEditor/MatrixBuilder behind the Matrix mode entry.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q5 Cannibalization warnings + growth-tier gate: where in new IA, and does tier gating survive on this surface?",
+        "proposedDefault": "Content Health tab section + board-card attn treatment; keep tierAtLeast gate.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q6 Content Health dedupe: pipeline Content Health tab vs seo-audit ContentDecay (?sub=content-decay) — one home or two?",
+        "proposedDefault": "Pipeline becomes the acting home (queue-refresh); seo-audit keeps the diagnostic view; decay-alert deep-link retargets to pipeline.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q7 Calendar interactivity: confirm schedule-a-draft, unschedule, AI suggest-dates carry into Calendar mode, and whether briefs/requests/matrix items stay plottable.",
+        "proposedDefault": "Carry all three interactions (endpoints exist); keep all 4 item types; drop only 'created'-date plotting as an explicit trade-off row.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q8 Post-editor power features (versions/revert, section regenerate, AI-fix diff apply, unification badge, publish-with-image): confirm homes in draft workspace.",
+        "proposedDefault": "All live in the draft-workspace side rail; gate 'Resolve' wires to the ai-fix diff apply.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q9 Voice score: does numeric score + feedback + re-score become the Brand-voice gate detail view?",
+        "proposedDefault": "Yes — gate expands to show MetricRing score, prose feedback, Re-score button.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q10 Suggested-brief snooze (1w/1m): intake card menu or deliberate drop?",
+        "proposedDefault": "Keep — overflow menu on intake cards (status union already has 'snoozed').",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q11 Generation style (standard/concise/hybrid): keep as advanced control in brief/draft workspaces?",
+        "proposedDefault": "Keep behind an 'Advanced' disclosure in both workspaces.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q12 API-only endpoints with no UI caller (validate-keyword(s) #30, recommend-keywords #69, matrix cannibalization #70): confirm actual consumers before treating as UI-droppable.",
+        "proposedDefault": "Grep MCP tools + server-internal callers during build ticket; do not delete endpoints in this rebuild either way.",
+        "needsOwner": false,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q13 New proposals N1-N10 each need explicit sign-off (esp. N4 engagement data, N5 graduate contract, N7 questionnaire).",
+        "proposedDefault": "Adopt N1/N2/N3/N4-core/N6/N8 in rebuild; defer N4-engagement/N5/N7-questionnaire/N9/N10 to C3-style follow-ups.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "NEW: sparkline identity — Published-tab trend is per-request today (content-requests.ts:305) but the tab renders posts; posts without a linked request have no trend source. Accept sparkline-only-when-linked, or build post-URL-keyed trend (sn-content-pipeline-2)?",
+        "proposedDefault": "Ship verdict+tiles first; sparkline behind sn-content-pipeline-2, absent state until then (no fabricated series).",
+        "needsOwner": true,
+        "source": "newly-found"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "N1 lifecycle board (6 stages, advance() single CTA)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Core of the new IA; ship as derived view over existing statuses pending Q1 — no status-meaning change."
+      },
+      {
+        "proposal": "N2 unified intake lane (client requests + AI suggestions + strategy work orders + decay)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "First three sources compose existing hooks (useAiSuggestedBriefs, requests, useIssueLenses); decay source needs only sn-content-pipeline-4 (S)."
+      },
+      {
+        "proposal": "N3 capacity meter gating from subscription quota",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "postsPerMonth + delivered already served (content-subscriptions.ts:72,150); pure Meter composition."
+      },
+      {
+        "proposal": "N4 Published results tab — verdict/position/impressions tiles",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "OutcomeReadback is server-computed and already attached to the posts list (content-posts.ts:133-137)."
+      },
+      {
+        "proposal": "N4b Published engagement tile + clicks sparkline",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Needs sn-content-pipeline-1/-2; hard floor forbids fabricating the series meanwhile."
+      },
+      {
+        "proposal": "N5 Graduate to Insights Engine on wins",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Cross-surface write with undefined contract (sn-content-pipeline-7); not parity-relevant."
+      },
+      {
+        "proposal": "N6 Content Health tab w/ Queue refresh",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Small write (sn-content-pipeline-4) reusing suggested-briefs store; pending Q6 dedupe answer."
+      },
+      {
+        "proposal": "N7 Brief workspace: full-page shell",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Quick-win mounts existing BriefDetail+BriefGenerator; loses nothing (doc trade-off table)."
+      },
+      {
+        "proposal": "N7b per-field AI assists + readiness checklist + client questionnaire",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Needs new AI ops (sn-content-pipeline-9) and a new client flow (sn-content-pipeline-8, L)."
+      },
+      {
+        "proposal": "N8 Draft workspace (block doc + side rail)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Via T1: reuse PostEditor machinery inside new chrome — rebuilding from scratch risks #49-54."
+      },
+      {
+        "proposal": "N9 inline keyword picker fed from Keywords surface",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Keyword-hub hooks exist but wiring is net-new scope; fixContext already carries the keyword into briefs."
+      },
+      {
+        "proposal": "N10 Nudge client on awaiting-client briefs",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "New notification write (sn-content-pipeline-5); pattern exists but is a product change, not parity."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Board (lifecycle) + Intake lane",
+        "Calendar mode",
+        "Matrix mode (+ Templates strip)",
+        "Published mode",
+        "Content Health mode",
+        "Subscription drawer (capacity meter entry)",
+        "Full-page Brief workspace (route)",
+        "Full-page Draft workspace (route)"
+      ],
+      "primitives": [
+        "LensSwitcher (modes)",
+        "BoardColumn/BoardCard (lifecycle + intake)",
+        "Toolbar/ToolbarSpacer (header + export overflow)",
+        "SearchField + FilterChip + Segmented (search/sort/filters)",
+        "DataTable (briefs list, matrix list view)",
+        "Drawer (subscription, cell detail, request detail)",
+        "Meter (capacity ring)",
+        "MetricTile + Sparkline (Published tab)",
+        "MetricRing (voice score gate)",
+        "IntentTag (keyword intent on cards)",
+        "KeyValueRow/DefinitionList (brief spec fields)",
+        "GroupBlock + PageContainer (workspaces)"
+      ],
+      "dataHooks": [
+        "useContentPipeline",
+        "useAdminBriefWorkflow",
+        "useAdminPostWorkflow",
+        "useAdminPosts (+usePublishTarget)",
+        "useContentCalendar",
+        "useAiSuggestedBriefs",
+        "useContentDecay",
+        "useIssueLenses",
+        "contentSubscriptions (src/api/misc)",
+        "contentTemplates + contentMatrices (src/api/content)",
+        "useWsInvalidation (CONTENT_*/BRIEF_*/POST_*/SUGGESTED_BRIEF_*/CONTENT_SUBSCRIPTION_* events)"
+      ],
+      "statesPlan": "Per-mode 4-state: Skeleton loading, action-CTA EmptyState, ErrorState+retry (incl. brief-not-found recovery), plus locked states for missing publish target and growth-tier gate; generating/error render as board-card states.",
+      "mountNote": "Mounts as Page 'content-pipeline' inside RebuiltAppChrome behind ui-rebuild-shell; legacy aliases content/calendar/seo-briefs/subscriptions and ?tab= modes must keep resolving (D8 redirect map + tab-deep-link contract test)."
+    },
+    "crossSurfaceDeps": [
+      "content-perf surface owns the Published-tab fold (ContentPerformance → Published); sn-content-pipeline-1/-2 shared with it",
+      "seo-audit surface: ContentDecay dedupe (Q6) — decay alert deep-link currently targets seo-audit ?sub=content-decay",
+      "inbox/requests surface: RequestManager moved to Inbox but per-request production actions live here (Q3 split)",
+      "keywords surface + D3 (SEO Editor Research mode): fixContext prefill senders + N9 keyword picker data",
+      "workspace settings owns Webflow publish-target config that usePublishTarget reads",
+      "strategy/issue-lenses: intake strategy source + ?tab=briefs|posts deep-links + rec↔pipeline reconciliation",
+      "Insights Engine: N5 graduate write (deferred)"
+    ],
+    "unknowns": [
+      "Guide element (#11): doc says Parity Ledger claims at:'guide' but none found in pipeline.js — verify at build; classified defer-candidate on doc evidence only",
+      "Subscription drawer notes-field editability (#73) — doc flags 'verify', not re-verified against prototype js here",
+      "Actual consumers of validate-keyword(s)/recommend-keywords/matrix-cannibalization endpoints (#30/#69/#70) — MCP/server-internal usage not exhaustively traced (Q12)",
+      "Whether the per-request trend endpoint covers enough published posts (post↔request linkage rate) to make sn-content-pipeline-2 optional — not measurable statically"
+    ],
+    "effortEstimate": "XL",
+    "surface": "content-pipeline"
+  },
+  "verify": {
+    "surface": "content-pipeline",
+    "verdicts": [
+      {
+        "needId": "sn-content-pipeline-1",
+        "verdict": "CONFIRMED",
+        "evidence": "shared/types/outcome-tracking.ts:471-496 (OutcomeReadback) has fields limited to score/position/clicks — no time-on-page or engagement field (grep engagement|averageSessionDuration|engagementRate over the file = empty). enrichPostsWithOutcomes (server/content-posts-db.ts:325-343, wired at server/routes/content-posts.ts:136) only attaches the scalar `outcome` readback. GA4 per-page engagement fetchers do exist (server/google-analytics.ts:194 averageSessionDuration, 257 pagePath dim, 648/675 engagementRate) but are not joined to posts. Partial is correct; effort M is reasonable (readback interface extension + new GA4-per-post join, no migration required since it's a read-side decoration).",
+        "correction": "Minor: the claim cites GA4 lines 646-675 as 'pagePath + engagementRate' — line 675's engagementRate lives in the ORGANIC-summary fetcher (not per-page); the per-pagePath fetcher getGA4TopPages (line ~257) returns userEngagementDuration, not engagementRate. The engagement data needed per-post would come from a pagePath-filtered report, which the codebase supports (server/google-analytics.ts:509-540 pagePath CONTAINS filter) but does not currently expose keyed by post."
+      },
+      {
+        "needId": "sn-content-pipeline-2",
+        "verdict": "ADJUSTED",
+        "evidence": "OutcomeReadback carries only baseline/current scalars — no series field (confirmed shared/types/outcome-tracking.ts:471-496; grep sparkline|timeseries|series = empty). A per-page GSC daily-clicks trend endpoint EXISTS and is reusable: GET /api/content-performance/:workspaceId/:requestId/trend (server/routes/content-requests.ts:305-334) resolves request.targetPageSlug → full page URL → getPageTrend(...,90) (server/search-console.ts:766). getPageTrend is keyed by PAGE URL, not by request-id per se — a published post also has a target page URL, so the sparkline series is a page-URL lookup that already exists, not net-new plumbing.",
+        "correction": "Two detail corrections. (1) whereItLives is wrong: the trend endpoint lives in server/routes/content-requests.ts:305 calling server/search-console.ts:getPageTrend — NOT in server/domains/content/content-performance.ts (that module backs the non-trend /content-performance summary). (2) 'nothing keyed by post' overstates the gap: the trend is keyed by page URL derived from a content-request's targetPageSlug; extending to posts is a slug/URL-resolution wire-up over an existing series fetcher, so effort is closer to S–M than M."
+      },
+      {
+        "needId": "sn-content-pipeline-3",
+        "verdict": "CONFIRMED",
+        "evidence": "No persisted queued/scheduled content pipeline stage: shared/types/content.ts:272-277 documents plannedPublishAt as 'intent' only. The only lifecycleStage derivation in the codebase is for the Keywords Command Center (deriveLifecycleStage in server/domains/keyword-command-center/read-model.ts, typed KeywordLifecycleStage) — there is NO analogous derivation over posts+requests+briefs (grep lifecycleStage|pipelineStage across server/src/shared returns only KCC + keywords-rebuilt UI). Post/request/matrix statuses live in separate state-machine unions (server/state-machines.ts). existsToday=no is correct; kind=derivation and effort=M are sound.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-content-pipeline-4",
+        "verdict": "REFUTED",
+        "evidence": "The evidence 'only ranking_opportunity is generated today' is false. A decay-sourced suggested-brief WRITE PATH already exists and ships in prod: POST /api/content-decay/:workspaceId/analyze (server/routes/content-decay.ts:22) runs fireBridge('bridge-decay-suggested-brief') which loops analysis.decayingPages.slice(0,5) and calls createSuggestedBrief({... source: 'content_decay' ...}) (server/routes/content-decay.ts:38-50), broadcasting WS_EVENTS.SUGGESTED_BRIEF_UPDATED. Additionally the store's createSuggestedBrief default source is already 'content_decay' (server/suggested-briefs-store.ts:113,133,150). So both the store default AND a live decay→brief seam exist.",
+        "correction": "The N6 'Queue refresh' one-card intake is a THIN wrapper over an existing seam, not net-new source support. What is genuinely absent is only the specific queueRefresh HTTP entry point (grep queueRefresh|queue.?refresh = empty) — the createSuggestedBrief({source:'content_decay'}) call and its broadcast already exist and are reusable. This makes effort=S accurate but for a different reason (reuse the existing bridge/store path, don't build source generation). existsToday should read 'partial (write path already exists; only a dedicated intake endpoint/trigger is missing)', and evidence must be corrected to cite server/routes/content-decay.ts:38-50 as the existing decay-sourced brief writer."
+      },
+      {
+        "needId": "sn-content-pipeline-5",
+        "verdict": "CONFIRMED",
+        "evidence": "The remind pattern exists: POST /api/deliverables/:workspaceId/:id/remind (server/routes/deliverables.ts:274-289) calls remindDeliverable + addActivity('deliverable_reminded'). No brief/content-request nudge endpoint exists (grep nudge|remind over server/routes/content-requests.ts, content-briefs.ts, content-posts.ts = empty). Partial and effort=S are correct; the deliverables remind handler is a clean template.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-content-pipeline-6",
+        "verdict": "CONFIRMED",
+        "evidence": "src/components/ContentPlanner.tsx:88-107 handleBulkAction only branches on export_csv and send_review; the trailing comment 'Other bulk actions will be wired to specific endpoints as they're implemented' confirms generate_briefs is declared-but-no-op. MatrixGrid.tsx wires the 'Generate Briefs' menu item to onBulkAction('generate_briefs', ...) but no server endpoint receives it (grep generate_briefs across server/ = empty; only client references). existsToday=no, kind=job, effort=M all sound.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-content-pipeline-7",
+        "verdict": "CONFIRMED",
+        "evidence": "grep 'graduate' across server/ + src/ hits only server/roi.ts, src/utils/formatNumbers.ts, and src/components/client/the-issue/outcomeProvenance.ts — all provenance/ROI language, none an insight-creation write. No 'graduate to Insights Engine' seam from a published win exists. existsToday=no is correct; contract is genuinely undefined.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-content-pipeline-8",
+        "verdict": "ADJUSTED",
+        "evidence": "No content-brief questionnaire path exists (grep 'questionnaire' in server/routes/content-briefs.ts + content-requests.ts = NONE). existsToday=no for the content-brief-specific flow is correct. HOWEVER a full client-facing questionnaire flow DOES exist and is directly reusable as a template: src/components/client/ClientOnboardingQuestionnaire.tsx (full-screen multi-step client portal flow) + POST public onboarding submission in server/routes/public-portal.ts that transforms responses into KB/brand-voice/personas, plus the brandscript questionnaire-seeded path (server/brandscript.ts).",
+        "correction": "existsToday should be nuanced from a flat 'no' to 'no for the content-brief 5-Q flow, but a client-portal questionnaire submit+transform pattern already exists (ClientOnboardingQuestionnaire + public-portal onboarding submission) to model on'. This does not lower effort materially (still L: new AI operations + brief-answer folding + a new client surface) but it removes the 'net-new client-facing surface from scratch' framing — the client questionnaire scaffolding is reusable."
+      },
+      {
+        "needId": "sn-content-pipeline-9",
+        "verdict": "CONFIRMED",
+        "evidence": "regenerate-outline WITH feedback exists as an async job endpoint: POST /api/content-briefs/:workspaceId/:briefId/regenerate-outline (server/routes/content-briefs.ts:213-225) → startContentBriefRegenerateJob({mode:'outline'}). No per-field assist endpoints for angle/keywords/links/eeat exist (grep 'assist' in content-briefs.ts = empty; eeatGuidance appears only as a brief schema field at line 12/69, not an assist operation). Partial + effort=M are correct: outline maps to the existing job, the other four fields are net-new named AI operations.",
+        "correction": ""
+      }
+    ]
+  }
+}

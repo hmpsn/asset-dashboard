@@ -1,0 +1,392 @@
+{
+  "gather": {
+    "surface": "page-rewriter",
+    "capabilityClassification": [
+      {
+        "capability": "#1 Admin route 'rewrite' + per-workspace remount key",
+        "resolution": "ui-only",
+        "note": "Route + key remount survive unchanged (src/routes.ts:12, App.tsx:438)."
+      },
+      {
+        "capability": "#2 Two-pane layout (chat left / document right, independent scroll)",
+        "resolution": "ui-only",
+        "note": "PageContainer + GroupBlock grid; mirrors prototype .rw-panes."
+      },
+      {
+        "capability": "#3 Focus mode (header toggle, sidebar 14px exit strip, Esc guard, nav auto-reset)",
+        "resolution": "ui-only",
+        "note": "Needs F4 AppShell cooperation for rail collapse — see crossSurfaceDeps; no server change."
+      },
+      {
+        "capability": "#4 Back button -> seo-audit, clears pending page URL",
+        "resolution": "ui-only",
+        "note": "Behavior carries; exact back-target may shift with new IA (minor design call, not owner-blocking)."
+      },
+      {
+        "capability": "#5 needsSite nav lock",
+        "resolution": "ui-only",
+        "note": "Locked state via four-states rule; navRegistry flag unchanged."
+      },
+      {
+        "capability": "#6 initialPageUrl deep-link prop (dead at HEAD)",
+        "resolution": "open-question",
+        "note": "Q3 — carry a 'Rewrite this page' deep-link or formally retire; retiring by omission forbidden."
+      },
+      {
+        "capability": "#7 Sitemap page combobox (GET /pages, admin-rewrite-pages key, 5-min staleTime)",
+        "resolution": "ui-only",
+        "note": "Verified: usePageRewriteChatShell.ts:62-64 + queryKeys.ts:98; rebuild as SearchField-based combobox."
+      },
+      {
+        "capability": "#8 Filter by slug/title + hierarchical indent",
+        "resolution": "ui-only",
+        "note": "Client-side filter logic ports as-is."
+      },
+      {
+        "capability": "#9 Paste arbitrary URL load",
+        "resolution": "ui-only",
+        "note": "http/https detection ports into new picker."
+      },
+      {
+        "capability": "#10 Combobox keyboard nav + ARIA semantics",
+        "resolution": "ui-only",
+        "note": "Prototype has no keyboard model — re-spec on the DS combobox; a11y hard floor."
+      },
+      {
+        "capability": "#11 Empty-sitemap fallback + no-match state",
+        "resolution": "ui-only",
+        "note": "EmptyState copy carries."
+      },
+      {
+        "capability": "#12 Server page load (fetchPublicWebText, 15s timeout, 50k html cap)",
+        "resolution": "ui-only",
+        "note": "Backend contract untouched (rewrite-chat.ts:175-214)."
+      },
+      {
+        "capability": "#13 Section extraction (balanced-div tokenizer, li/blockquote, preamble)",
+        "resolution": "ui-only",
+        "note": "Backend untouched; tests exist."
+      },
+      {
+        "capability": "#14 Per-page audit issues resolved from snapshot by slug",
+        "resolution": "ui-only",
+        "note": "Backend untouched (rewrite-chat.ts:193-201); display half is #28."
+      },
+      {
+        "capability": "#15 Load states (empty/loading/error 502 detail)",
+        "resolution": "ui-only",
+        "note": "Four-states rule; prototype omits them, rebuild mandates them."
+      },
+      {
+        "capability": "#16 Chat empty state + 6 quick prompts -> always-visible playbook chips",
+        "resolution": "ui-only",
+        "note": "Quick win: render static QUICK_PROMPTS as FilterChips. Full playbook-sourced chips = sn-page-rewriter-2 (follow-up)."
+      },
+      {
+        "capability": "#17 Send message (Enter/Shift+Enter, disabled states, sending indicator)",
+        "resolution": "ui-only",
+        "note": "Ports unchanged."
+      },
+      {
+        "capability": "#18 Markdown-rendered answers + Copy",
+        "resolution": "ui-only",
+        "note": "Ports unchanged."
+      },
+      {
+        "capability": "#19 Rewrite-answer parsing (BEGIN/END_REWRITE delimiters -> editor-safe prose)",
+        "resolution": "ui-only",
+        "note": "src/lib/rewriteResponse.ts contract co-designed with prompt (rewrite-chat.ts:275-278); must not regress."
+      },
+      {
+        "capability": "#20 Inline edit of AI rewrite before applying (contentEditable bubble)",
+        "resolution": "ui-only",
+        "note": "at_risk in prototype but pure client machinery; carry per additive-parity floor. Home confirmation folded into Q5."
+      },
+      {
+        "capability": "#21 Apply to named section (data-section match, highlight, fallback+toast)",
+        "resolution": "ui-only",
+        "note": "Trade-off table: porting HEAD mechanism unchanged IS full parity ('none material' risk)."
+      },
+      {
+        "capability": "#22 Copy message/rewrite with 2s Copied state + failure toast",
+        "resolution": "ui-only",
+        "note": "Ports unchanged; uses existing useToast."
+      },
+      {
+        "capability": "#23 Per-mount session id feeding server chat memory",
+        "resolution": "ui-only",
+        "note": "Backend contract unchanged; transcript stays ephemeral (same as prototype)."
+      },
+      {
+        "capability": "#24 Chat endpoint (callAI gpt-5.4, feature rewrite-chat, key-missing 400)",
+        "resolution": "ui-only",
+        "note": "Backend untouched."
+      },
+      {
+        "capability": "#25 System prompt (SEO copywriter + AEO + output contract)",
+        "resolution": "ui-only",
+        "note": "Backend untouched."
+      },
+      {
+        "capability": "#26 Page-assist intelligence context (keyword/voice/personas/knowledge/playbook blocks)",
+        "resolution": "ui-only",
+        "note": "Backend untouched (page-assist-context-builder.ts:98-155 verified)."
+      },
+      {
+        "capability": "#27 Voice DNA layering, history, persistence, auto-summary, activity log",
+        "resolution": "ui-only",
+        "note": "Backend untouched; no WS broadcasts on this surface."
+      },
+      {
+        "capability": "#28 Audit issue chips strip (first 20, severity-coded)",
+        "resolution": "ui-only",
+        "note": "at_risk (no prototype slot) but issues already arrive on load-page response — pure UI slot design. Home confirmation in Q5."
+      },
+      {
+        "capability": "#29 Document from extracted sections + pageKey re-init guard",
+        "resolution": "ui-only",
+        "note": "Guard prevents clobbering user edits; carry regardless of block model chosen."
+      },
+      {
+        "capability": "#30 contentEditable document (role=textbox, aria-label)",
+        "resolution": "ui-only",
+        "note": "Bespoke editor carried via T1 carry-over-then-reskin."
+      },
+      {
+        "capability": "#31 Formatting B/I/H2/H3 with data-section re-slugging",
+        "resolution": "ui-only",
+        "note": "Promote to fixed Toolbar per prototype; re-slugging must carry (feeds #21)."
+      },
+      {
+        "capability": "#32 Clear formatting action",
+        "resolution": "ui-only",
+        "note": "at_risk; add to the fixed toolbar — trivial carry."
+      },
+      {
+        "capability": "#33 Floating selection toolbar",
+        "resolution": "ui-only",
+        "note": "Mechanism superseded by fixed toolbar; function kept via #31/#32."
+      },
+      {
+        "capability": "#34 Open live page in new tab",
+        "resolution": "ui-only",
+        "note": "at_risk; make header URL a link — trivial carry."
+      },
+      {
+        "capability": "#35 Export: Copy as Markdown + .md download",
+        "resolution": "ui-only",
+        "note": "Keep verbatim; add Copy-as-HTML per trade-off table."
+      },
+      {
+        "capability": "#36 Export: .docx download",
+        "resolution": "ui-only",
+        "note": "at_risk in prototype; hard floor 'no export drops' — carry (FEATURE_AUDIT #449)."
+      },
+      {
+        "capability": "#37 Export: PDF (print root, scoped CSS)",
+        "resolution": "ui-only",
+        "note": "Same hard floor; carry."
+      },
+      {
+        "capability": "#38 Export popover outside-click/Escape close",
+        "resolution": "ui-only",
+        "note": "Rebuild on DS overlayUtils instead of hand-rolled listeners."
+      },
+      {
+        "capability": "#39 Save draft (prototype-only)",
+        "resolution": "open-question",
+        "note": "Q1/Q4 — no draft persistence exists; if approved -> sn-page-rewriter-1."
+      },
+      {
+        "capability": "#40 Publish rewrite to Webflow (prototype-only)",
+        "resolution": "open-question",
+        "note": "Q1 — no CMS write path exists at HEAD (verified: zero Webflow writes in rewrite-chat.ts); sn-page-rewriter-1 if approved."
+      },
+      {
+        "capability": "#41 Draft-status line (prototype-only)",
+        "resolution": "open-question",
+        "note": "Wholly dependent on #39/#40 (Q1)."
+      },
+      {
+        "capability": "#42 Export target 'push to a new draft' (prototype-only)",
+        "resolution": "open-question",
+        "note": "Q2 — destination undefined (content-pipeline post vs Q1 draft)."
+      },
+      {
+        "capability": "#43 Seeded AI greeting naming the page's target keyword (prototype-only)",
+        "resolution": "needs-server-work",
+        "note": "sn-page-rewriter-3 — pageMap data exists server-side but load-page response carries no keyword field."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-page-rewriter-1",
+        "kind": "endpoint",
+        "description": "Save-draft/publish spine: rewrite-drafts table + migration, draft/publish lifecycle endpoints, Webflow full-page copy write-back (static-DOM vs CMS-field write-target resolution per docs/rules/seo-editor-write-targets.md), activity log + broadcast. Blocked on Q1 — NOT in scope unless owner approves.",
+        "existsToday": "no",
+        "evidence": "grep 'webflow|publish|draft' server/routes/rewrite-chat.ts — only a comment (L87) and snapshot READS (L162-196); zero write calls. SEO Editor writes meta fields only (webflow-seo-apply.ts, different surface).",
+        "whereItLives": "server/routes/rewrite-chat.ts (or new server/domains module) + server/db/migrations/",
+        "effort": "L",
+        "likelySharedWith": [
+          "seo-editor (write-target contract)",
+          "content pipeline (if Q2 push-to-draft targets posts)"
+        ]
+      },
+      {
+        "id": "sn-page-rewriter-2",
+        "kind": "endpoint",
+        "description": "Small GET endpoint exposing the workspace rewritePlaybook patterns to the admin UI so playbook chips reflect what the AI actually follows (full version of #16). Quick win (static chips) needs nothing.",
+        "existsToday": "partial",
+        "evidence": "page-assist-context-builder.ts:128,152-155 — playbookPatterns computed and injected into the prompt block only; grep buildPageAssistContext across server/routes shows prompt consumers only, no UI read endpoint.",
+        "whereItLives": "server/routes/rewrite-chat.ts (GET /api/rewrite-chat/:workspaceId/playbook)",
+        "effort": "S",
+        "likelySharedWith": []
+      },
+      {
+        "id": "sn-page-rewriter-3",
+        "kind": "field",
+        "description": "Add targetKeyword (per-page primary keyword) to the load-page response by joining the page_keywords/pageMap lookup on slug, enabling the seeded greeting (#43) without a heavy full-strategy client fetch.",
+        "existsToday": "partial",
+        "evidence": "pageMap reassembled from page_keywords in server/routes/keyword-strategy.ts:231-277 (full-model read); rewrite-chat.ts:204 load-page response json has no keyword field.",
+        "whereItLives": "server/routes/rewrite-chat.ts load-page handler (reuse listPageKeywords)",
+        "effort": "S",
+        "likelySharedWith": [
+          "seo-editor (per-page keyword display)"
+        ]
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "Q1 — Approve the Save-draft/Publish-to-Webflow spine (new server capability, sn-page-rewriter-1) or ship export-only parity first? Parity Ledger's 'Apply back to CMS' func claim is wrong and needs correcting either way.",
+        "proposedDefault": "Export-only parity v1; hide Save draft/Publish behind a flag; correct the ledger row.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q2 — Confirm .docx/.pdf stay in the export menu and define what 'push to a new draft' targets.",
+        "proposedDefault": "Keep all four HEAD export modes + add Copy-as-HTML; defer push-to-draft until Q1 resolves its destination.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q3 — Carry a 'Rewrite this page' deep-link (initialPageUrl) into the new IA (e.g. from SEO Editor Research mode / audit rows) or formally retire the contract?",
+        "proposedDefault": "Carry: wire the deep-link from SEO Editor Research mode (D3 home of Page Intelligence) — cheap and makes the dead contract live.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q4 — Is losing document edits on navigation acceptable for v1 (status quo), or is the localStorage draft quick-win required?",
+        "proposedDefault": "Status quo for v1 (avoids over-promising 'Draft saved'); revisit with Q1.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q5 — Confirm homes for the 8 at_risk rows (#6,20,21,28,32,34,36,37), especially audit issue chips (#28) and edit-before-apply (#20) which have no prototype slot.",
+        "proposedDefault": "Carry all 8 (additive-parity floor): chips strip above the document, editable rewrite bubble kept, clear-format in fixed toolbar, live-page link on header URL, docx/pdf in export menu; #6 per Q3.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Prototype uses per-block contenteditable; HEAD uses one contenteditable body. Which block model does the rebuild adopt?",
+        "proposedDefault": "Keep HEAD single-body model (T1 carry-over-then-reskin — full parity incl. #21 apply targeting); per-block is C3-style UX polish.",
+        "needsOwner": false,
+        "source": "newly-found"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "#39 Save draft (persisted rewrite drafts)",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "No persistence exists; needs a storage decision (Q1/Q4) and a table+lifecycle — not a parity rebuild item."
+      },
+      {
+        "proposal": "#40 Publish rewrite to Webflow",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Hard write-target problem (static DOM vs CMS fields); zero write path at HEAD — new product capability, owner-gated (Q1)."
+      },
+      {
+        "proposal": "#41 Draft-status line",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Entirely dependent on #39/#40."
+      },
+      {
+        "proposal": "#42 Export 'push to a new draft'",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Destination undefined (Q2); scoping before building."
+      },
+      {
+        "proposal": "Always-visible playbook chips (upgrade of #16 quick prompts)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Pure UI change rendering existing QUICK_PROMPTS as chips; playbook-sourced chips (sn-page-rewriter-2) as small follow-up."
+      },
+      {
+        "proposal": "Fixed formatting toolbar replacing floating selection toolbar (#31/#33)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Discoverability upgrade; function-preserving if clear-format and data-section re-slugging carry."
+      },
+      {
+        "proposal": "#43 Seeded greeting naming the target keyword",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Data already exists (page_keywords); one small server field (sn-page-rewriter-3) — high trust-signal value for low cost."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Single view, no lenses: two-pane workspace (chat pane | document pane)",
+        "Page picker combobox in header",
+        "Export menu",
+        "Focus mode toggle"
+      ],
+      "primitives": [
+        "PageContainer",
+        "Toolbar (+ToolbarSpacer) — header bar and fixed formatting toolbar",
+        "SearchField — page combobox base (keyboard/ARIA re-spec needed)",
+        "FilterChip — playbook chips",
+        "GroupBlock — pane framing",
+        "Badge/IntentTag — severity-coded audit issue chips",
+        "Note: chat bubbles + contentEditable document are bespoke carried machinery (T1), not F3 primitives"
+      ],
+      "dataHooks": [
+        "usePageRewriteChatShell (src/components/page-rewrite-chat/usePageRewriteChatShell.ts)",
+        "queryKeys.admin.rewritePages -> GET /api/rewrite-chat/:workspaceId/pages",
+        "POST /api/rewrite-chat/:workspaceId/load-page",
+        "POST /api/rewrite-chat/:workspaceId (chat)",
+        "useToast (Toast.tsx)"
+      ],
+      "statesPlan": "Empty: no-page CTA + empty-sitemap paste-URL fallback; Loading: contextual spinner ('Loading page...'); Error: fetch-failure with HTTP status detail + retry; Locked: needsSite nav lock per four-states rule.",
+      "mountNote": "Flag-gated on ui-rebuild-shell inside F4 RebuiltAppChrome; Page 'rewrite' under Optimization NavGroup; preserve per-workspace remount key and focus-mode shell contract."
+    },
+    "crossSurfaceDeps": [
+      "F4 AppShell: focus mode requires the rebuilt shell to support rail collapse + Esc exit + nav auto-reset (AppShell frozen post-F3 — needs a shell hook, not a fork)",
+      "SEO Audit / SEO Editor (D3): back-button target and the Q3 'Rewrite this page' deep-link origin live on those surfaces",
+      "seo-editor write-target contract (docs/rules/seo-editor-write-targets.md) if Q1 approves publish — shared write-target resolution",
+      "D5 icons: WandSparkles (lucide) nav icon migrates to an ICON_NAMES key",
+      "Parity Ledger correction: 'Apply back to CMS' func row overstates HEAD (program-level doc fix)"
+    ],
+    "unknowns": [],
+    "effortEstimate": "M"
+  },
+  "verify": {
+    "surface": "page-rewriter",
+    "verdicts": [
+      {
+        "needId": "sn-page-rewriter-1",
+        "verdict": "CONFIRMED",
+        "evidence": "server/routes/rewrite-chat.ts has only 3 routes (GET /pages:158, POST /load-page:175, POST chat:217) — all reads/AI-generation, zero write-back, no draft/publish. server/routes/webflow-seo-rewrite.ts:3-6 header declares '@writes none' (returns rewrite variations only). SEO Editor apply (server/routes/webflow-seo-apply.ts:85-88) writes ONLY seo.title/seo.description via updatePageSeo — meta fields, not full-page body. No rewrite-drafts table: `rg 'CREATE TABLE' migrations` finds nothing for rewritten page content (briefing_drafts @077 is a different surface — briefs). No rewrite publish/draft/save endpoint anywhere.",
+        "correction": "Claim stands as written. existsToday=no confirmed; effort L defensible (new migration + draft/publish lifecycle + Webflow static-DOM/CMS write-target resolution + activity/broadcast). Correctly gated on Q1."
+      },
+      {
+        "needId": "sn-page-rewriter-2",
+        "verdict": "ADJUSTED",
+        "evidence": "The rewrite-playbook patterns array (intelligence.contentPipeline.rewritePlaybook.patterns, page-assist-context-builder.ts:128,152-155) is prompt-injection-only — no dedicated UI read endpoint. The GET /api/outcomes/:workspaceId/playbooks (server/routes/outcomes.ts:582) is a DIFFERENT playbook (outcome/action patterns from outcome-playbooks.ts), NOT the rewrite playbook. HOWEVER: the RAW rewrite-playbook string IS ALREADY serialized to the admin UI (server/serializers/admin-workspace-view.ts:41 `rewritePlaybook: ws.rewritePlaybook`, served via server/routes/workspaces.ts:67 toAdminWorkspaceView). The slice 'patterns' array is a trivial rawPlaybook.split('\\n') (content-pipeline-slice.ts:258-264), so the UI can already derive chips from the raw string on the workspace view without any new endpoint.",
+        "correction": "Direction right (no dedicated patterns endpoint exists; buildPageAssistContext is prompt-only), but the 'full version' may be UNNECESZARY: the raw playbook string is already delivered to the admin UI via the workspace view serializer, and patterns = string.split('\\n'). Before building a new GET endpoint, confirm the rewriter UI can't just consume the existing workspace-view rewritePlaybook field and split client-side — that could reduce this from S to zero net-new backend work. Effort S is otherwise correct if a dedicated endpoint is still wanted."
+      },
+      {
+        "needId": "sn-page-rewriter-3",
+        "verdict": "CONFIRMED",
+        "evidence": "rewrite-chat.ts load-page response (line 203) has no keyword field. listPageKeywords(workspaceId) exists (server/page-keywords.ts:505) returning PageKeywordMap[]; PageKeywordMap (shared/types/workspace.ts:76) carries primaryKeyword keyed by pagePath (rowToLiteModel:544 sets primaryKeyword: row.primary_keyword). It is a pure read (SELECT + rowToModel, no writes/snapshot side-effects). The load-page handler already derives `slug` at line 193, so targetKeyword resolves via a slug-match against listPageKeywords. No migration, no mapper, no serialization lockstep — the column already exists.",
+        "correction": "Claim stands; effort S correct. Minor efficiency note (not a refutation): listPageKeywords assembles per-page score histories for ALL pages (groupScoreHistory) which is heavier than needed for a single-slug lookup on a hot load-page call — prefer listPageKeywordsLite (page-keywords.ts:561, skips history) or a slug-scoped read to keep the read cheap. Does not change effort/existsToday."
+      }
+    ]
+  }
+}

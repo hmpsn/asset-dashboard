@@ -1,0 +1,477 @@
+{
+  "gather": {
+    "surface": "brand-ai",
+    "capabilityClassification": [
+      {
+        "capability": "Row 1: nav entry Page 'brand' (Optimization, needsSite)",
+        "resolution": "ui-only",
+        "note": "Remount in RebuiltAppChrome NavGroup; src/routes.ts:8, navRegistry.tsx:149 unchanged."
+      },
+      {
+        "capability": "Row 2: 9 tabs → Overview cockpit + 4 groups regroup",
+        "resolution": "ui-only",
+        "note": "Pure IA recomposition of existing data; every tab's contents accounted for in rows below."
+      },
+      {
+        "capability": "Rows 3-5: ?tab= deep links, legacy aliases, &focus= targets (4 external senders)",
+        "resolution": "open-question",
+        "note": "Q13 — new URL scheme undefined; D8 mandates a redirect map in the consolidation PR."
+      },
+      {
+        "capability": "Row 6: Overview snapshot cards → completeness cockpit",
+        "resolution": "open-question",
+        "note": "Q7 metric semantics; default = client-side qualitative Ready/Partial/Needs-setup; true % needs sn-brand-ai-1."
+      },
+      {
+        "capability": "Row 7: brand voice rich-text editor (TipTap)",
+        "resolution": "ui-only",
+        "note": "Keep RichTextEditor; prototype's plain-textarea modal variant rejected as a downgrade."
+      },
+      {
+        "capability": "Rows 8/10: voice + KB Generate-from-Website background jobs",
+        "resolution": "ui-only",
+        "note": "Existing brand-voice-generation / knowledge-base-generation job types (shared/types/background-jobs.ts:16-17)."
+      },
+      {
+        "capability": "Row 9: sessionStorage job-recovery on remount/workspace switch",
+        "resolution": "ui-only",
+        "note": "Behavior contract carried verbatim from BrandHub.tsx:74-88,341-443; invisible in mocks, must be in the build ticket."
+      },
+      {
+        "capability": "Row 11: personas manager incl. 4 structured edit fields",
+        "resolution": "ui-only",
+        "note": "Existing PUT via workspace API; prototype omits painPoints/goals/objections/format editor — carry it (newly-found OQ)."
+      },
+      {
+        "capability": "Row 12: provenance footer → 'how this context is used' rail",
+        "resolution": "ui-only",
+        "note": "Prototype improves it; static content."
+      },
+      {
+        "capability": "Row 13: brand-docs API (headless at HEAD)",
+        "resolution": "open-question",
+        "note": "Q9 — give it a Discovery-dropzone home (API already exists: server/routes/brand-docs.ts:26,54,92) or record as API-only."
+      },
+      {
+        "capability": "Rows 14-16: multi-brandscript list/create/import/delete/templates",
+        "resolution": "open-question",
+        "note": "Q6 — default: single-script flow over existing multi-script API with list/import/delete in overflow (ui-only under default)."
+      },
+      {
+        "capability": "Rows 17-18: per-section edit/save + expectedUpdatedAt 409 concurrency",
+        "resolution": "ui-only",
+        "note": "Existing PUT /api/brandscripts/:ws/:id/sections (server/routes/brandscript.ts:120); 409 toast behavior carried."
+      },
+      {
+        "capability": "Row 19: AI complete-N-empty-sections batch",
+        "resolution": "ui-only",
+        "note": "Existing POST :id/complete (brandscript.ts:161); prototype per-section Redo is sn-brand-ai-2."
+      },
+      {
+        "capability": "Row 20: questionnaire → brandscript auto-population",
+        "resolution": "ui-only",
+        "note": "Server behavior, UI-agnostic; don't break idempotency under single-script default."
+      },
+      {
+        "capability": "Rows 21-23: discovery sources list/upload/paste/delete + source-type selector",
+        "resolution": "ui-only",
+        "note": "Existing discovery API; carry the 4-value source-type selector the prototype hides. PDF/DOCX is sn-brand-ai-7."
+      },
+      {
+        "capability": "Rows 24-26: process → extraction review loop (accept/dismiss/confidence/routing)",
+        "resolution": "open-question",
+        "note": "Q3 — default (a) drill-in step inside new Discovery flow; dropping it violates the additive mandate."
+      },
+      {
+        "capability": "Rows 27-31: voice calibration workspace (create/samples/DNA/guardrails/loop)",
+        "resolution": "open-question",
+        "note": "Q1 — default T1 carry-over: HEAD VoiceTab as token-restyled drill-in behind the Voice row (ui-only under default)."
+      },
+      {
+        "capability": "Row 32: approved copy → voice samples auto-feed",
+        "resolution": "ui-only",
+        "note": "Server behavior (server/copy-review.ts); depends on copy approval surviving (rows 42-43)."
+      },
+      {
+        "capability": "Rows 33-34/36: 17 deliverables + generator-modal lifecycle + empty/loading/error",
+        "resolution": "ui-only",
+        "note": "Maps 1:1 to existing identity API + brand-modal.js lifecycle; regroup by feed-target is additive."
+      },
+      {
+        "capability": "Row 35: Export All approved deliverables (+ unexposed ?tier=)",
+        "resolution": "ui-only",
+        "note": "Endpoint exists (server/routes/brand-identity.ts:68); must stay visible. Per-item export = Q8 / sn-brand-ai-3."
+      },
+      {
+        "capability": "Row 37: deliverable version history exposure",
+        "resolution": "open-question",
+        "note": "Q12 — brand_identity_versions exists server-side; expose in modal or leave server-only."
+      },
+      {
+        "capability": "Row 38: MCP get_brand_identity/update_brand_deliverable + expectedVersion",
+        "resolution": "ui-only",
+        "note": "Server/MCP contract untouched; rebuild must keep deliverable IDs/versioning."
+      },
+      {
+        "capability": "Rows 39-41: Page Strategy blueprints (list/detail/entries/versions/AI gen)",
+        "resolution": "open-question",
+        "note": "Q2 — 'lives with Content Pipeline' pointer has no designed destination; default: relocate wholesale, components as-is."
+      },
+      {
+        "capability": "Rows 42-45: copy pipeline (per-entry gen, review/steering, batch, export)",
+        "resolution": "open-question",
+        "note": "Same Q2 destination decision; all endpoints exist (server/routes/copy-pipeline.ts, 14 routes verified)."
+      },
+      {
+        "capability": "Row 46: copy intelligence incl. locked Promote-to-Guardrail",
+        "resolution": "open-question",
+        "note": "Q10 — preserve the deliberately-disabled affordance (CopyIntelligenceManager.tsx:288-298) or implement; default preserve."
+      },
+      {
+        "capability": "Row 47: SteeringChat dead code",
+        "resolution": "defer-candidate",
+        "note": "Q11 — not a parity obligation; default: delete in a cleanup PR (DEF row if punted from the rebuild PR)."
+      },
+      {
+        "capability": "Row 48: content-decay copy-refresh recommendations",
+        "resolution": "ui-only",
+        "note": "Server behavior (server/copy-refresh.ts); consumer is the pipeline surface — cross-surface wiring note only."
+      },
+      {
+        "capability": "Rows 49-50: Business Footprint composite mount + dual-authority copy + gbp flag gate + Locations flow",
+        "resolution": "ui-only",
+        "note": "Mount + contract owned here; sub-component internals owned by Business/Local surface audits."
+      },
+      {
+        "capability": "Row 51: E-E-A-T 8-type asset CRUD + metadata + autofill vs pillar view",
+        "resolution": "open-question",
+        "note": "Q5 — default: keep CRUD+autofill (useEeatAssets/server/routes/eeat-assets.ts), pillar as read-only client-derived lens (non-money, so UI-derivable)."
+      },
+      {
+        "capability": "Row 52: intelligence profile edit + autofill",
+        "resolution": "ui-only",
+        "note": "Existing PUT /intelligence-profile + /autofill; folds into Knowledge group."
+      },
+      {
+        "capability": "Row 53: 7 WS events → useWsInvalidation registry",
+        "resolution": "ui-only",
+        "note": "Both-halves contract re-verified per rebuilt group; events exist at server/ws-events.ts:120-133."
+      },
+      {
+        "capability": "Row 54: 5 owned background job types via Task Panel",
+        "resolution": "ui-only",
+        "note": "Existing platform (useBackgroundTasks/NotificationBell)."
+      },
+      {
+        "capability": "Rows 55-56: downstream consumers (prompt assembly, intelligence slices, MCP brand slice)",
+        "resolution": "ui-only",
+        "note": "Rebuild changes editors, not the store; field/status semantics frozen."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-brand-ai-1",
+        "kind": "derivation",
+        "description": "Brand-context completeness score (overall + per-group) if the cockpit ships numeric %; default quick-win is client-side qualitative booleans and needs nothing.",
+        "existsToday": "no",
+        "evidence": "rg -in 'completeness' server shared → hits only local-seo/schema/listing modules, nothing brand-scoped",
+        "whereItLives": "server/intelligence/brand slice or a small projection on GET /api/workspaces/:id",
+        "effort": "M",
+        "likelySharedWith": [
+          "client dashboard settings/brand card"
+        ]
+      },
+      {
+        "id": "sn-brand-ai-2",
+        "kind": "endpoint",
+        "description": "Per-section brandscript regenerate ('Redo'); HEAD has only batch complete-all-empty.",
+        "existsToday": "no",
+        "evidence": "server/routes/brandscript.ts route census: only POST :id/complete (line 161), no per-section AI route",
+        "whereItLives": "server/routes/brandscript.ts + server/brandscript.ts (reuse the complete-section prompt path)",
+        "effort": "S"
+      },
+      {
+        "id": "sn-brand-ai-3",
+        "kind": "endpoint",
+        "description": "Single-deliverable export (prototype per-item Export). Export-all with ?tier filter already exists and is reusable.",
+        "existsToday": "partial",
+        "evidence": "server/routes/brand-identity.ts:68 GET /api/brand-identity/:ws/export (?tier=); no per-item route",
+        "whereItLives": "server/routes/brand-identity.ts (param on existing route or /export/:type)",
+        "effort": "S"
+      },
+      {
+        "id": "sn-brand-ai-4",
+        "kind": "migration",
+        "description": "Founder interview Q&A: new store (questions/answers), AI-draft-from-docs endpoint, wiring into Discovery flow.",
+        "existsToday": "no",
+        "evidence": "rg -in 'interview' server shared/types → only a prompt string at server/discovery-ingestion.ts:199",
+        "whereItLives": "server/discovery-ingestion.ts domain + new migration + ai-operation-registry entry",
+        "effort": "M"
+      },
+      {
+        "id": "sn-brand-ai-5",
+        "kind": "job",
+        "description": "Regenerate knowledge base FROM discovery sources; HEAD's knowledge-base-generation job crawls the website instead.",
+        "existsToday": "no",
+        "evidence": "shared/types/background-jobs.ts:16 (website-crawl KB job); no source-fed KB path in server/discovery-ingestion.ts route census",
+        "whereItLives": "server/discovery-ingestion.ts + a job variant in the background-job platform",
+        "effort": "M"
+      },
+      {
+        "id": "sn-brand-ai-6",
+        "kind": "field",
+        "description": "Brandscript 'approved' status (prototype Approve script pill) — new column + state-machine registration.",
+        "existsToday": "no",
+        "evidence": "grep of server/routes/brandscript.ts shows no status/approve route; no brandscript entry implies approval in server/state-machines.ts per doc row audit",
+        "whereItLives": "server/brandscript.ts + migration + server/state-machines.ts",
+        "effort": "S"
+      },
+      {
+        "id": "sn-brand-ai-7",
+        "kind": "other",
+        "description": "PDF/DOCX/XLSX discovery-source parsing (HEAD accepts .txt/.md only).",
+        "existsToday": "no",
+        "evidence": "client validation DiscoveryTab.tsx:434-446 (.txt/.md); surface doc row 21 confirms no richer-format backend",
+        "whereItLives": "server/routes/discovery-ingestion.ts upload path + a parsing dependency",
+        "effort": "M",
+        "likelySharedWith": [
+          "brand-docs upload (Q9)"
+        ]
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "Q1 Voice calibration workspace home (samples/DNA/guardrails/loop reduced to one row in prototype)",
+        "proposedDefault": "T1 carry-over: mount HEAD VoiceTab as a token-restyled drill-in behind the Voice & Messaging row; full redesign deferred",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q2 Page Strategy + Copy Pipeline destination (pointer says Content Pipeline; pipeline.js has none of it)",
+        "proposedDefault": "Relocate wholesale as its own tab/route under Content Pipeline, components unchanged; pipeline-integrated redesign is a separate ticket",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q3 Keep discovery process→extraction-review loop?",
+        "proposedDefault": "Yes — drill-in step inside the new Discovery flow (docs → process → review); dropping violates additive mandate",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q4 Founder interview Q&A build now or defer? (sn-brand-ai-4)",
+        "proposedDefault": "Defer; ship the Discovery flow without the interview section",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q5 E-E-A-T 8 typed assets → 4-pillar mapping semantics",
+        "proposedDefault": "Keep asset CRUD + autofill; pillar view as read-only lens computed from asset types client-side",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q6 Brandscript multiplicity: collapse to one-per-workspace or keep multi?",
+        "proposedDefault": "Keep multi-script API; single-script flow UI auto-selecting newest, with list/import/delete in an overflow menu",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q7 Completeness % semantics + the invented '92% on-brand similarity' stat",
+        "proposedDefault": "Qualitative Ready/Partial/Needs-setup from field presence; cut the similarity stat (nothing computes it — hard floor on fabricated numbers)",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q8 Per-deliverable export vs Export-All only (sn-brand-ai-3)",
+        "proposedDefault": "Keep Export All only in rebuild scope; per-item export deferred",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q9 Brand-docs upload UI (API is headless at HEAD)",
+        "proposedDefault": "Give it a home in the new Discovery dropzone (API already complete)",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q10 Promote-to-Guardrail: preserve locked affordance or implement?",
+        "proposedDefault": "Preserve the deliberately-disabled button unchanged",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q11 SteeringChat dead code: delete or revive in generator-modal refine loop?",
+        "proposedDefault": "Delete in a cleanup PR",
+        "needsOwner": false,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q12 Expose brand_identity_versions history in the generator modal?",
+        "proposedDefault": "Leave server-only for the rebuild; expose later if asked",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q13 New URL scheme for 9 ?tab= values + 2 legacy aliases + &focus= targets with 4 external senders",
+        "proposedDefault": "?group= + anchor scheme with a full redirect map in the consolidation PR (D8 requirement)",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Persona structured-field editor (painPoints/goals/objections/preferredContentFormat) has no prototype design",
+        "proposedDefault": "Carry the 4 fields into the persona card's expanded edit state; do not ship name/stage/description-only",
+        "needsOwner": false,
+        "source": "newly-found"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "Overview completeness scoring (overall % + per-group)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Adopt as qualitative states derived client-side from field presence; numeric % only if sn-brand-ai-1 ships."
+      },
+      {
+        "proposal": "Founder interview Q&A with AI-draft answers",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Needs a new store + AI endpoint (sn-brand-ai-4); not a parity item."
+      },
+      {
+        "proposal": "One-click Regenerate KB from discovery sources",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "New derivation path (sn-brand-ai-5); HEAD website-crawl KB job stays."
+      },
+      {
+        "proposal": "Brandscript 'Approve script' status",
+        "recommendation": "reject",
+        "rationale": "No lifecycle consumer at HEAD; adds state-machine + migration cost (sn-brand-ai-6) for a cosmetic pill."
+      },
+      {
+        "proposal": "Per-section brandscript Redo regeneration",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Small additive endpoint (sn-brand-ai-2) reusing the existing complete prompt path."
+      },
+      {
+        "proposal": "Per-deliverable export in generator modal",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Export-All covers parity; sn-brand-ai-3 is cheap but non-blocking (Q8)."
+      },
+      {
+        "proposal": "'Paste existing' manual entry path for empty items",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Pure UI over existing updateDeliverableContent; no server change."
+      },
+      {
+        "proposal": "'92% on-brand similarity' voice metric",
+        "recommendation": "reject",
+        "rationale": "Fabricated number — nothing at HEAD computes it; violates the no-fabricated-numbers hard floor."
+      },
+      {
+        "proposal": "PDF/DOCX/XLSX discovery uploads",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Backend parsing work (sn-brand-ai-7); .txt/.md parity ships first."
+      },
+      {
+        "proposal": "E-E-A-T 4-pillar signal view with per-signal AI Add",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Adopt as a read-only lens computed from existing typed assets; pillar-native model rejected pending Q5."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Overview cockpit",
+        "Voice & Messaging (drill-in: voice calibration workspace)",
+        "Knowledge (KB, industry/goals, discovery flow drill-in)",
+        "Audience (personas)",
+        "Business Facts & Trust (footprint, E-E-A-T, locations flow)",
+        "Generator modal (17 deliverables)",
+        "Page Strategy + Copy Pipeline (destination pending Q2)"
+      ],
+      "primitives": [
+        "GroupBlock",
+        "Drawer (drill-ins + generator modal)",
+        "Meter (completeness)",
+        "KeyValueRow/DefinitionList",
+        "Avatar (persona cards)",
+        "DataTable (sources, extractions, blueprint versions)",
+        "FilterChip (extraction status filters)",
+        "Segmented (import mode, export format/scope)",
+        "Toolbar",
+        "PageContainer/AppShell"
+      ],
+      "dataHooks": [
+        "src/api/brand-engine.ts namespaces: brandscripts/discovery/voice/identity/blueprints/blueprintEntries/blueprintVersions/copyGeneration/copyReview/copyBatch/copyExport/copyIntelligence",
+        "src/hooks/admin/useBlueprints.ts",
+        "src/hooks/admin/useCopyPipeline.ts",
+        "src/hooks/admin/useEeatAssets.ts",
+        "BrandHub inline useQuery on queryKeys.admin.workspaceDetail (voice/KB/personas)",
+        "src/components/brand/voice-tab/useVoiceTabShell.ts + useVoiceCalibrationWorkflow.ts",
+        "useBackgroundTasks",
+        "useWsInvalidation (7 brand events, server/ws-events.ts:120-133)"
+      ],
+      "statesPlan": "Skeleton per group on load; EmptyState with Generate CTA per item; ErrorState+retry on jobs incl. sessionStorage job re-attach; only lock is the gbp-auth-connection flag gate on the GBP mapping panel.",
+      "mountNote": "Replaces BrandHub at Page 'brand' behind ui-rebuild-shell, @ds-rebuilt; D8 redirect map for 9 ?tab= values, 2 legacy aliases, and &focus= targets is a required PR deliverable."
+    },
+    "crossSurfaceDeps": [
+      "content-pipeline surface: Q2 Page Strategy + Copy Pipeline relocation target (pipeline.js currently has zero blueprint/copy content)",
+      "ai-visibility surface: AeoReview/LlmsTxtGenerator moved OUT of Brand & AI to Search & Site Health per brand.js:414",
+      "business/local-SEO surfaces own BusinessFootprintTab sub-component internals; this surface owns only the mount + dual-authority contract + gbp-auth-connection gate",
+      "Inbound &focus= deep-link senders: SchemaGeneratorSetup, GbpMappingStatusBlock, LocalSeoMarketSetupDrawer, LocalPresencePage — receiver half must survive (Q13/D8)",
+      "Client copy-review portal (ClientCopyReview public routes) + unified-inbox projected reviews consume copy send-to-review — both halves must stay wired",
+      "D8 redirect-map deliverable; D3/Keywords pilot unaffected"
+    ],
+    "unknowns": [
+      "Whether the content-pipeline surface's own discovery doc reserves room for Page Strategy — reading other surface docs was out of scope; Q2 must be reconciled at fan-out",
+      "Server-side accept-list for discovery uploads relied on the doc's client-side citation (DiscoveryTab.tsx:434-446); server route MIME validation not independently read",
+      "Brandscript template section-count parity (prototype 7 vs HEAD 8 canonical types, doc row 17) — template data not inspected"
+    ],
+    "effortEstimate": "XL"
+  },
+  "verify": {
+    "surface": "brand-ai",
+    "verdicts": [
+      {
+        "needId": "sn-brand-ai-1",
+        "verdict": "ADJUSTED",
+        "evidence": "server/ai-context-check.ts:29-46 (ContextCompleteness { score 0-100, connected, total, sources[] }), :80-123 includes a 'brand-voice' source scoring voice guidelines + brand-docs count",
+        "correction": "The narrow claim is correct — no BRAND-scoped completeness % exists (rg brandCompleteness / completenessScore-brand → 0 hits; server/intelligence/brand-slice.ts emits no completeness/score/percent). BUT the gatherer missed reusable prior art: server/ai-context-check.ts already implements a general workspace 'AI Context Completeness' engine (checkAIContext → 0-100 score with per-source status/detail/impacts, exposed via server/routes/ai.ts:112). It even scores brand-voice as one source. A brand cockpit % should EXTEND this pattern (or add brand-scoped sources to it), not build a fresh scorer from scratch. effort 'M' is fair, but the whereItLives ('brand slice or a projection on GET /api/workspaces/:id') is wrong — the natural home is ai-context-check.ts, and there is already a dedicated GET route for it."
+      },
+      {
+        "needId": "sn-brand-ai-2",
+        "verdict": "CONFIRMED",
+        "evidence": "server/routes/brandscript.ts:161 POST :id/complete is the only AI section route; completeBrandscript (server/brandscript.ts:211-) takes only (workspaceId, brandscriptId), filters emptySections and returns early if none empty — no per-section/'redo a filled section' parameter. The prompt path is reusable for a per-section variant, matching the whereItLives note. effort 'S' holds (no schema/migration).",
+        "correction": ""
+      },
+      {
+        "needId": "sn-brand-ai-3",
+        "verdict": "CONFIRMED",
+        "evidence": "server/routes/brand-identity.ts:68 GET /:workspaceId/export reads ?tier and calls exportDeliverables (server/brand-identity.ts:382), which lists ALL approved deliverables (status==='approved') and joins to one markdown blob — no per-item route or type/id param. Route census (56/68/81/88/111/138) has no single-item export. effort 'S' holds.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-brand-ai-4",
+        "verdict": "CONFIRMED",
+        "evidence": "rg -in 'interview' server shared → single hit at server/discovery-ingestion.ts:199 (a prompt string: 'focus on what the CLIENT said (not the interviewer)'). No interview/Q&A store, migration, or route. discovery-ingestion route census (server/routes/discovery-ingestion.ts:70-209) covers sources/text/process/extractions only — no interview endpoint. effort 'M' (new store + migration + ai-operation entry) holds.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-brand-ai-5",
+        "verdict": "CONFIRMED",
+        "evidence": "The KNOWLEDGE_BASE_GENERATION job (shared/types/background-jobs.ts:16) is implemented in server/workspace-context-generation-job.ts:89 as `const { scraped } = await scrapeWorkspaceSite(ws)` then AI-summarizes SCRAPED WEBSITE content (:96-143) — it never reads discovery sources/extractions. Discovery extraction (server/discovery-ingestion.ts:176+) produces voice_pattern/story_element extractions, NOT a knowledge base. No source-fed KB path exists. effort 'M' holds.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-brand-ai-6",
+        "verdict": "CONFIRMED",
+        "evidence": "brandscripts table (server/db/migrations/053-brandscript-engine.sql:14-21) has columns id/workspace_id/name/framework_type/created_at/updated_at — NO status column; rg 'ALTER TABLE brandscripts' → 0 migrations. server/brandscript.ts has no status/approved code. server/routes/brandscript.ts has no approve route. state-machines register brand_deliverable (BRAND_DELIVERABLE_TRANSITIONS, state-machines.ts:532/597 — a DIFFERENT entity: brand_identity_deliverables draft↔approved) but NO brandscript entity. effort 'S' UNDERSTATED: adding a status column triggers the DB-column+mapper lockstep rule (migration + rowToBrandscript mapper + write path + state-machine registration + transitions test) — realistically M.",
+        "correction": "Direction and 'does not exist today' are correct, but effort 'S' should be M: per CLAUDE.md's 'DB column + mapper lockstep' + 'status transitions must use state machines' rules, this needs migration SQL + row mapper update + write path + registerTransitionTable + a transitions guard test, not a trivial change. Also note brand_identity_deliverables ALREADY has a draft↔approved state machine (state-machines.ts:532) — the brandscript work should mirror that pattern rather than invent a new one."
+      },
+      {
+        "needId": "sn-brand-ai-7",
+        "verdict": "CONFIRMED",
+        "evidence": "Server enforces .txt/.md by BOTH extension and mimetype: server/routes/discovery-ingestion.ts:93-97 (extOk = ext==='txt'||'md'; mimeOk = ACCEPTED_MIMETYPES.has(file.mimetype); rejects if either fails), and reads via fs.readFileSync(..., 'utf-8') (:112) — no PDF/DOCX/XLSX binary parser. Client mirrors this (src/components/brand/DiscoveryTab.tsx handleFiles: ext==='txt'||'md'). effort 'M' (upload path + parsing dependency) holds.",
+        "correction": ""
+      }
+    ]
+  }
+}
