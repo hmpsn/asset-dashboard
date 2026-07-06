@@ -15,7 +15,6 @@ export type * from './insights.ts';
 export type * from './intelligence.ts';
 export type * from './client-signals.ts';
 export type * from './business-priorities.ts';
-export type * from './meeting-brief.ts';
 export * from './keywords.ts';
 export type * from './keyword-command-center.ts';
 export * from './local-seo.ts';

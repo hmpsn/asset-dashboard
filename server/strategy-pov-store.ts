@@ -6,8 +6,8 @@ import type { StrategyPov } from '../shared/types/strategy-pov.js';
 
 /**
  * The Issue (Lane B) — strategy POV store. One row per workspace, upserted on regenerate.
- * Mirrors server/meeting-brief-store.ts: lazy prepared statements via createStmtCache, JSON
- * column parsed at the read boundary via parseJsonSafe, ON CONFLICT upsert.
+ * Lazy prepared statements via createStmtCache, JSON column parsed at the read boundary via
+ * parseJsonSafe, ON CONFLICT upsert (pattern inherited from the retired meeting-brief store).
  *
  * The stored `pov_json` is the resolved StrategyPov (operator override ∪ AI draft). `prompt_hash`
  * busts the cache when any signal changes; `version` bumps on every operator edit.

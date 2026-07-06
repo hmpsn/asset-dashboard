@@ -35,7 +35,6 @@ const INVENTORY: Array<{
   { file: 'server/internal-links.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/keyword-recommendations.ts', classification: 'native', targetPath: 'recommendation-builder' },
   { file: 'server/keyword-strategy-synthesis/context.ts', classification: 'native', targetPath: 'low-level' },
-  { file: 'server/meeting-brief-generator.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/strategy-pov-generator.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/monthly-digest.ts', classification: 'native', targetPath: 'future-briefing-builder' },
   { file: 'server/page-analysis-job.ts', classification: 'native', targetPath: 'low-level' },

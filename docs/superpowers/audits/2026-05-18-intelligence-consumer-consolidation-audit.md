@@ -19,10 +19,12 @@ plans.
 
 ## Findings Summary
 
-- `native`: 34
+- `native`: 33
 - `hybrid`: 0
 - `legacy`: 0
 - `documented-exception`: 0
+
+_(Count updated 2026-07-06: `server/meeting-brief-generator.ts` removed with the Meeting Brief retirement.)_
 
 Root pattern confirmed:
 
@@ -48,7 +50,6 @@ Root pattern confirmed:
 | `server/internal-links.ts` | `seo-health` | `native` | slice-backed SEO context for AI internal-link suggestions | recommendation builder later if it broadens beyond seoContext | wave 4 |
 | `server/keyword-recommendations.ts` | `seo-health` | `native` | shared `buildRecommendationGenerationContext()` for ranking context plus deterministic strategic-fit scoring hooks (declines, cannibalization, client signals) | keep on recommendation builder path | completed in wave 2 |
 | `server/keyword-strategy-ai-synthesis.ts` | `analytics-intelligence` | `native` | rich slice-backed context with consistent `slices` usage | content/recommendation builder optional later | keep as reference implementation |
-| `server/meeting-brief-generator.ts` | `analytics-intelligence` | `native` | intelligence facade only | keep low-level | only revisit if a dedicated briefing builder is introduced |
 | `server/monthly-digest.ts` | `analytics-intelligence` | `native` | shared `buildRecommendationGenerationContext()` for insights/learnings-backed digest prompt enrichment | future digest/briefing builder | completed in PR5 |
 | `server/page-analysis-job.ts` | `seo-health` | `native` | consistent slice-backed prompt assembly | recommendation builder later if it simplifies page job boilerplate | wave 4 |
 | `server/routes/content-posts.ts` | `content-pipeline` | `native` | `buildIntelPrompt(['seoContext', 'learnings'])` for review flows | keep low-level | later only if raw slice access becomes necessary |

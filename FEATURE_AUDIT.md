@@ -6,6 +6,18 @@ A comprehensive value assessment of every feature in the platform — **541 feat
 
 ---
 
+### 617. Meeting Brief RETIRED — server-unit deletion + table archive 2026-07-06
+
+**What it does:** Completes the owner-ratified (2026-07-05) Meeting Brief retirement started in PR #1487 (UI + routes + broadcast chain). This PR deletes the deliberately-retained server unit: `server/meeting-brief-generator.ts` (`generateMeetingBrief` had zero callers), `server/meeting-brief-store.ts`, `server/schemas/meeting-brief-schemas.ts`, `shared/types/meeting-brief.ts`, and the `'meeting-brief'` AI-operation registry entry. The planned extraction of `assembleMeetingBriefMetrics` turned out to be unnecessary: its sole remaining import (`server/strategy-pov-generator.ts`) invoked it as `void assembleMeetingBriefMetrics(intel)` — a pure function with the result discarded, i.e. a no-op — so the dead call was removed instead of relocating the function. The `meeting_briefs` table is renamed to `meeting_briefs_archive` (migration 176) per the destructive-migrations rename-to-archive contract; the actual DROP ships in a later PR after staging verify + one backup retention window. The `meeting_brief_generated` activity type stays (persisted historical value, lexicon rule).
+
+**Why it matters to the agency:** Removes ~1,300 lines of dead generator/store/schema/test code and a stale AI-operation contract that would otherwise mislead future agents (the registry, consumer inventories, and rules docs all claimed a live meeting-brief AI path). The strategy POV engine — which cloned and superseded the brief — is now the single narrative surface, with its own cache-hash contract (`buildStrategyPovHash`).
+
+**Why it matters to clients:** None directly (surface already removed); indirectly, one retired concept fewer means admin narrative energy concentrates on The Issue/POV surface clients actually see.
+
+**Tests:** Deleted the 9 meeting-brief test files (unit + server + coverage-entry stubs; nothing needed porting — the metrics function died with the retirement). Updated the contract inventories (`intelligence-consumer-inventory`, `voice-authority-consumer-inventory`, `ai-dispatch-migration`), the AI-operation registry census, `narrative-ai.test.ts` (operations re-pointed at `strategy-pov`, source-contract check trimmed), and retired the G8 brief-cache block in `seo-genquality-p4-ov-coherence.test.ts`.
+
+**Files:** deletions above; `server/strategy-pov-generator.ts`; `server/strategy-pov-store.ts`; `server/ai-operation-registry.ts`; `shared/types/index.ts`; `server/db/migrations/176-archive-meeting-briefs.sql`; `scripts/pr-check.ts`; `scripts/report-platform-organization.ts`; `docs/rules/platform-organization.md`; `docs/rules/seo-generation-quality.md`; the test files above; `FEATURE_AUDIT.md`.
+
 ### 616. UI Rebuild Pilot — DS-native Keywords surface 2026-07-06
 
 **What it does:** Adds the first production-pilot `@ds-rebuilt` surface: Keywords (`seo-keywords`) mounted inside `RebuiltAppChrome` only when `ui-rebuild-shell` is ON and the active tab is Keywords. The legacy `KeywordHub` remains the OFF/non-Keywords branch. The pilot composes the F3/F4 primitives into five lenses (Rankings, Opportunities, Pages, Clusters, Lifecycle), a keyboard-accessible DataTable with sort/pagination/multi-select/bulk lifecycle actions, a full detail Drawer, client keyword feedback, mutation toast feedback, workspace-event invalidation, `?tab=`/`?q=` deep-link receiving, and loading/empty/error/locked states. It also adds the three additive KCC fields the rebuilt UI consumes: serialized `opportunityScore`, display-only `trafficValueMonthly`, and derived/tested `lifecycleStage`.

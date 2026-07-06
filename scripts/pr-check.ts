@@ -1712,7 +1712,6 @@ export const CHECKS: Check[] = [
       'server/performance-store.ts', 'server/rank-tracking.ts',
       'server/processor.ts', // file-based metadata JSON, not DB columns
       'server/websocket.ts', // WebSocket message parsing, not DB columns
-      'server/meeting-brief-generator.ts', // AI response text parser, not DB columns
       'server/openai-helpers.ts', // disk-based usage log files + AI response text parser, not DB columns
       'server/__tests__/openai-helpers-format.test.ts', // parsing mock fetch request body in tests, not DB columns
       'server/semrush.ts', // legacy disk files: SEMRush API usage log + credit log files (not DB columns)
@@ -8773,7 +8772,6 @@ export const CHECKS: Check[] = [
     exclude: [
       'server/db/', 'server/schemas/', 'tests/', 'server/ai.ts',
       'server/openai-helpers.ts', 'server/anthropic-helpers.ts',
-      'server/meeting-brief-generator.ts', // comment-only exclusion, validated elsewhere
       'server/routes/content-publish.ts', // field-mapping suggestion, not critical schema
       'server/schema/extractors/', 'server/content-posts-ai.ts',
     ],

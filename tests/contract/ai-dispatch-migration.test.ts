@@ -40,7 +40,6 @@ const migratedOperationBackedStructuredFiles: Array<{
   callPattern?: string;
 }> = [
   { path: 'server/content-posts-ai.ts', aiImport: "from './ai.js'", operations: ['content-post-seo-meta', 'content-post-unify', 'voice-scoring'] },
-  { path: 'server/meeting-brief-generator.ts', aiImport: "from './narrative-ai.js'", operations: ['meeting-brief'], callPattern: 'callNarrativeAI({' },
   { path: 'server/strategy-pov-generator.ts', aiImport: "from './narrative-ai.js'", operations: ['strategy-pov'], callPattern: 'callNarrativeAI({' },
   { path: 'server/routes/workspaces.ts', aiImport: "from '../ai.js'", operations: ['intelligence-profile-autofill'] },
 ];

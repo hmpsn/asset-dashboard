@@ -9,10 +9,12 @@ Secondary integrations: `analytics-intelligence`, `seo-health`, `content-pipelin
 
 This audit is the control artifact for the voice authority sprint. It classifies server-side AI consumers by how they receive workspace voice instructions.
 
-- `correct`: 22
+- `correct`: 21
 - `builder-backed`: 5
 - `drift`: 0
 - `documented-exception`: 18
+
+_(Count updated 2026-07-06: `server/meeting-brief-generator.ts` removed with the Meeting Brief retirement.)_
 
 Authority rules:
 
@@ -64,7 +66,6 @@ These consumers intentionally do not use client brand voice as writing authority
 | `server/keyword-recommendations.ts` | builder-backed | Uses recommendation context; raw voice appears only as business-fit text. |
 | `server/keyword-strategy-ai-synthesis.ts` | correct | Wraps strategy messages with `buildSystemPrompt()`. |
 | `server/llms-txt-generator.ts` | documented-exception | Factual web-content summarizer for AI-crawl metadata. |
-| `server/meeting-brief-generator.ts` | correct | Uses `buildSystemPrompt()` with custom-note cache inputs. |
 | `server/monthly-digest.ts` | correct | Uses `buildSystemPrompt()` and recommendation context. |
 | `server/page-analysis-job.ts` | documented-exception | Keyword analysis JSON classifier, not voice-bearing prose. |
 | `server/schema-plan.ts` | documented-exception | Structured schema planning output. |
