@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { KeyValueRow, DefinitionList } from '../../../src/components/ui/KeyValueRow';
+import { expectNoA11yViolations } from '../a11y';
 
 describe('KeyValueRow', () => {
   it('renders label and value', () => {
@@ -14,6 +15,11 @@ describe('KeyValueRow', () => {
     const value = screen.getByText('a1b2c3');
     expect(value.style.fontFamily).toBe('var(--font-mono)');
   });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<KeyValueRow label="Domain Authority" value="42" />);
+    await expectNoA11yViolations(container);
+  }, 15_000);
 });
 
 describe('DefinitionList', () => {

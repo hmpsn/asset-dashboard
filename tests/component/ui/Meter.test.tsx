@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Meter } from '../../../src/components/ui/Meter';
+import { expectNoA11yViolations } from '../a11y';
 
 describe('Meter', () => {
   it('exposes correct aria-valuenow/min/max', () => {
@@ -26,4 +27,9 @@ describe('Meter', () => {
     const fill = meter.firstElementChild as HTMLElement;
     expect(fill.style.width).toBe('0%');
   });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<Meter value={40} max={100} label="Storage used" showValue />);
+    await expectNoA11yViolations(container);
+  }, 15_000);
 });

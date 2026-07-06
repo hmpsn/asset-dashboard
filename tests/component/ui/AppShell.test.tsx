@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { AppShell } from '../../../src/components/ui/layout/AppShell';
+import { expectNoA11yViolations } from '../a11y';
 
 afterEach(() => {
   cleanup();
@@ -54,4 +55,13 @@ describe('AppShell', () => {
     expect(target).not.toBeNull();
     expect(target).toHaveAttribute('tabIndex', '-1');
   });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(
+      <AppShell sidebar={<nav>Sidebar content</nav>} topbar={<div>Topbar content</div>}>
+        <div>Page content</div>
+      </AppShell>,
+    );
+    await expectNoA11yViolations(container);
+  }, 15_000);
 });

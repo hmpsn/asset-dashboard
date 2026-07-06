@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { IntentTag } from '../../../src/components/ui/IntentTag';
+import { expectNoA11yViolations } from '../a11y';
 
 describe('IntentTag', () => {
   it('renders commercial with the correct label and amber tone class', () => {
@@ -32,6 +33,11 @@ describe('IntentTag', () => {
     render(<IntentTag intent="commercial" abbreviate />);
     expect(screen.getByText('Comm')).toBeInTheDocument();
   });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<IntentTag intent="commercial" />);
+    await expectNoA11yViolations(container);
+  }, 15_000);
 
   it('type-rejects an unknown intent value', () => {
     // @ts-expect-error -- 'bogus' is not a valid KeywordIntent

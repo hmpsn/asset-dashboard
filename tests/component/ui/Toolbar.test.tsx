@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { Toolbar, ToolbarSpacer } from '../../../src/components/ui/layout/Toolbar';
+import { expectNoA11yViolations } from '../a11y';
 
 afterEach(() => {
   cleanup();
@@ -94,6 +95,16 @@ describe('Toolbar', () => {
     expect(first.tabIndex).toBe(0);
     expect(second.tabIndex).toBe(-1);
   });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(
+      <Toolbar label="Table controls">
+        <button>Search</button>
+        <button>Filter</button>
+      </Toolbar>,
+    );
+    await expectNoA11yViolations(container);
+  }, 15_000);
 });
 
 describe('ToolbarSpacer', () => {

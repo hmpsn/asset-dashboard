@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { GroupBlock } from '../../../src/components/ui/layout/GroupBlock';
+import { expectNoA11yViolations } from '../a11y';
 
 afterEach(() => {
   cleanup();
@@ -74,4 +75,9 @@ describe('GroupBlock', () => {
     );
     expect(screen.getByText('Needs review')).toBeInTheDocument();
   });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<GroupBlock title="Keyword Cluster">Body</GroupBlock>);
+    await expectNoA11yViolations(container);
+  }, 15_000);
 });

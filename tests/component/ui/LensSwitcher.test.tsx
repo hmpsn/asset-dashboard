@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Search, BarChart3 } from 'lucide-react';
 import { LensSwitcher, type LensOption } from '../../../src/components/ui/forms/LensSwitcher';
+import { expectNoA11yViolations } from '../a11y';
 
 const options: LensOption[] = [
   { value: 'overview', label: 'Overview', icon: Search, count: 4 },
@@ -50,4 +51,9 @@ describe('LensSwitcher', () => {
     expect(screen.getByRole('radio', { name: /Gaps/ })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: /Overview/ })).toHaveAttribute('aria-checked', 'false');
   });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<LensSwitcher options={options} value="overview" onChange={vi.fn()} />);
+    await expectNoA11yViolations(container);
+  }, 15_000);
 });
