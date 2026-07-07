@@ -47,6 +47,9 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'brand': lazyWithRetry(() =>
     import('../brand-ai-rebuilt/BrandAiSurface').then(m => ({ default: m.BrandAiSurface })),
   ),
+  'content-pipeline': lazyWithRetry(() =>
+    import('../content-pipeline-rebuilt/ContentPipelineSurface').then(m => ({ default: m.ContentPipelineSurface })),
+  ),
   'seo-editor': lazyWithRetry(() =>
     import('../seo-editor-rebuilt/SeoEditorSurface').then(m => ({ default: m.SeoEditorSurface })),
   ),

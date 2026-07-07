@@ -16,9 +16,10 @@ type View =
 
 interface ContentPlannerProps {
   workspaceId: string;
+  embedded?: boolean;
 }
 
-export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
+export function ContentPlanner({ workspaceId, embedded = false }: ContentPlannerProps) {
   const queryClient = useQueryClient();
   const [view, setView] = useState<View>({ mode: 'list' });
   const [error, setError] = useState<string | null>(null);
@@ -221,11 +222,13 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
   if (!hasData) {
     return (
       <div className="space-y-4">
-        <PageHeader
-          title="Content Planner"
-          subtitle="Create templates and build content matrices at scale"
-          icon={<Icon as={Layers} size="lg" className="text-accent-brand" />}
-        />
+        {!embedded && (
+          <PageHeader
+            title="Content Planner"
+            subtitle="Create templates and build content matrices at scale"
+            icon={<Icon as={Layers} size="lg" className="text-accent-brand" />}
+          />
+        )}
         <EmptyState
           icon={Layers}
           title="No templates or matrices yet"
@@ -248,38 +251,45 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
 
   const totalCells = matrices.reduce((sum, m) => sum + m.cells.length, 0);
   const publishedCells = matrices.reduce((sum, m) => sum + m.cells.filter(c => c.status === 'published').length, 0);
+  const plannerActions = (
+    <div className="flex items-center gap-2">
+      <Button
+        onClick={() => setView({ mode: 'template-editor' })}
+        icon={FileText}
+        size="sm"
+        variant="secondary"
+        className="rounded-[var(--radius-lg)] bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)]"
+      >
+        New Template
+      </Button>
+      {templates.length > 0 && (
+        <Button
+          onClick={() => setView({ mode: 'matrix-builder' })}
+          icon={Grid3X3}
+          size="sm"
+          variant="secondary"
+          className="rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 border-0"
+        >
+          Build Matrix
+        </Button>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Content Planner"
-        subtitle={`${templates.length} template${templates.length !== 1 ? 's' : ''} · ${matrices.length} matri${matrices.length !== 1 ? 'ces' : 'x'} · ${totalCells} pages planned`}
-        icon={<Icon as={Layers} size="lg" className="text-accent-brand" />}
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setView({ mode: 'template-editor' })}
-              icon={FileText}
-              size="sm"
-              variant="secondary"
-              className="rounded-[var(--radius-lg)] bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)]"
-            >
-              New Template
-            </Button>
-            {templates.length > 0 && (
-              <Button
-                onClick={() => setView({ mode: 'matrix-builder' })}
-                icon={Grid3X3}
-                size="sm"
-                variant="secondary"
-                className="rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 border-0"
-              >
-                Build Matrix
-              </Button>
-            )}
-          </div>
-        }
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Content Planner"
+          subtitle={`${templates.length} template${templates.length !== 1 ? 's' : ''} · ${matrices.length} matri${matrices.length !== 1 ? 'ces' : 'x'} · ${totalCells} pages planned`}
+          icon={<Icon as={Layers} size="lg" className="text-accent-brand" />}
+          actions={plannerActions}
+        />
+      ) : (
+        <div className="flex flex-wrap items-center justify-end gap-2" aria-label="Content planner controls">
+          {plannerActions}
+        </div>
+      )}
 
       {error && (
         <InlineBanner>{error}</InlineBanner>

@@ -17,7 +17,12 @@ const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; label: 
   approved: { icon: CheckCircle2, color: 'text-accent-success', label: 'Approved', bg: 'bg-emerald-500/10 border-emerald-500/20', tone: 'emerald' },
 };
 
-export function ContentManager({ workspaceId }: { workspaceId: string }) {
+interface ContentManagerProps {
+  workspaceId: string;
+  embedded?: boolean;
+}
+
+export function ContentManager({ workspaceId, embedded = false }: ContentManagerProps) {
   const {
     postsQ,
     posts,
@@ -107,11 +112,13 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Content Posts"
-        subtitle={`${posts.length} post${posts.length !== 1 ? 's' : ''}`}
-        icon={<Icon as={FileText} size="lg" className="text-accent-info" />}
-      />
+      {!embedded && (
+        <PageHeader
+          title="Content Posts"
+          subtitle={`${posts.length} post${posts.length !== 1 ? 's' : ''}`}
+          icon={<Icon as={FileText} size="lg" className="text-accent-info" />}
+        />
+      )}
 
       {/* Header stats */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
