@@ -86,6 +86,7 @@ import { startWebflowFormPoller, stopWebflowFormPoller } from './webflow-form-po
 import { startBriefingCron, stopBriefingCron } from './briefing-cron.js';
 import { startStrategyIssueCron, stopStrategyIssueCron } from './strategy-issue-cron.js';
 import { startReturnHookCron, stopReturnHookCron } from './return-hook-cron.js';
+import { startAdminMoneyFrameCron, stopAdminMoneyFrameCron } from './money-frame-cron.js';
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -114,6 +115,7 @@ export type CronId =
   | 'briefing-cron'
   | 'strategy-issue-cron'
   | 'return-hook-cron'
+  | 'admin-money-frame-cron'
   | 'mcp-handle-ttl-sweeper'
   | 'middleware-rate-limit-cleanup'
   | 'middleware-login-lockout-cleanup'
@@ -327,6 +329,15 @@ export const CRON_METADATA: Record<CronId, CronMetadataEntry> = {
     stopHook: true,
     start: startReturnHookCron,
     stop: stopReturnHookCron,
+  },
+  'admin-money-frame-cron': {
+    label: 'Admin Money Frame Cron',
+    module: 'server/money-frame-cron.js',
+    intervalMs: HOUR_MS,
+    description: 'Hourly tick that precomputes the UI rebuild admin money-frame projection.',
+    stopHook: true,
+    start: startAdminMoneyFrameCron,
+    stop: stopAdminMoneyFrameCron,
   },
 
   // ── Module-level timers outside startSchedulers() ────────────────────────
