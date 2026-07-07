@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { RefreshCw, Settings } from 'lucide-react';
+import { Clock, RefreshCw, Settings } from 'lucide-react';
 import type { WorkQueueItem } from '../../../shared/types/work-queue';
 import { adminPath } from '../../routes';
 import { useCockpitRebuilt, countWorkQueueSourceTypes, workQueueWithVisibleItems } from '../../hooks/admin/useCockpitRebuilt';
@@ -10,25 +10,21 @@ import { queryKeys } from '../../lib/queryKeys';
 import { useToast } from '../Toast';
 import {
   Avatar,
-  Badge,
   Button,
   ErrorState,
-  Icon,
   InlineBanner,
   OnboardingChecklist,
   PageContainer,
   PageHeader,
   Skeleton,
-  Toolbar,
-  ToolbarSpacer,
+  WorkStreamSelector,
 } from '../ui';
 import { WeeklyAccomplishments } from '../workspace-home';
 import { CockpitActivityDrawer } from './CockpitActivityDrawer';
 import { CockpitEvidenceRail } from './CockpitEvidenceRail';
-import { CockpitKpiStrip } from './CockpitKpiStrip';
 import { CockpitWorkOrderDrawer } from './CockpitWorkOrderDrawer';
-import { CockpitWorkQueue } from './CockpitWorkQueue';
-import { formatDate, formatMoney, provenanceBasis } from './cockpitFormatters';
+import { CockpitWorkQueue, STREAM_META, toSelectableWorkStream } from './CockpitWorkQueue';
+import { formatDate } from './cockpitFormatters';
 import { mutationErrorMessage } from './cockpitMutationFeedback';
 import { useCockpitSurfaceState } from './useCockpitSurfaceState';
 
@@ -39,18 +35,6 @@ interface CockpitSurfaceProps {
 function initialsFor(name: string): string {
   const parts = name.split(/\s+/).filter(Boolean).slice(0, 2);
   return (parts.map((part) => part[0]).join('') || 'WS').toUpperCase();
-}
-
-function verdictTone(status: string | undefined): 'emerald' | 'amber' | 'red' | 'zinc' {
-  if (status === 'on_track') return 'emerald';
-  if (status === 'watch') return 'amber';
-  if (status === 'at_risk') return 'red';
-  return 'zinc';
-}
-
-function healthTone(score: number | null): 'ok' | 'risk' | 'new' {
-  if (score == null) return 'new';
-  return score >= 80 ? 'ok' : 'risk';
 }
 
 export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
@@ -132,8 +116,6 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
   const sourceTypeCounts = countWorkQueueSourceTypes(workQueue.items);
   const lastFetched = cockpit.lastFetched;
   const isStale = lastFetched ? now.getTime() - lastFetched.getTime() > 60 * 60 * 1000 : false;
-  const statusTone = verdictTone(cockpit.verdict?.status);
-  const basis = provenanceBasis(cockpit.moneyFrame?.provenance);
 
   const openRoute = (route: string) => navigate(route);
 
@@ -230,41 +212,50 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 t-caption-sm">
           <Avatar initials={workspaceInitials} label={workspaceName} size="sm" tone="teal" />
-          <span className="font-semibold text-[var(--brand-text-bright)]">Client cockpit</span>
-          <span className="text-[var(--brand-text-muted)]">· {workspaceName}</span>
+          <span className="font-[family-name:var(--font-mono)] font-semibold tracking-[0.14em] text-[var(--teal)]">Client cockpit · {workspaceName}</span>
           <span className="text-[var(--brand-text-dim)]">· Today, scoped to one</span>
         </div>
-        <Button variant="secondary" size="sm" icon={Settings} onClick={() => navigate(routes.settings)}>
-          Settings
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* muted-tier-ok: freshness/date is tertiary metadata (matches prototype's dim eyebrow date) */}
+          <span
+            className={`t-caption-sm ${isStale ? 'text-[var(--amber)]' : 'text-[var(--brand-text-dim)]'}`}
+            title={lastFetched ? `Data loaded at ${formatDate(lastFetched)}` : undefined}
+          >
+            {lastFetched ? `${isStale ? 'Stale · ' : ''}Data as of ${formatDate(lastFetched)}` : 'Data freshness unavailable'}
+          </span>
+          <Button variant="ghost" size="sm" icon={Clock} onClick={() => setActivityOpen(true)} aria-label="Open activity log" />
+          <Button variant="ghost" size="sm" icon={RefreshCw} onClick={handleRefresh} loading={cockpit.homeQuery.isFetching} aria-label="Refresh Cockpit data" />
+          <Button variant="secondary" size="sm" icon={Settings} onClick={() => navigate(routes.settings)}>
+            Settings
+          </Button>
+        </div>
       </div>
 
-      {/* co-head — verdict hero headline */}
-      <div className="flex items-start justify-between gap-6">
-        <div className="min-w-0">
-          <h1 className="t-h2 max-w-[44ch] font-bold text-[var(--brand-text-bright)]">
-            {cockpit.verdict?.headline ?? 'Cockpit verdict unavailable'}
-          </h1>
-          <p className="t-body mt-2 max-w-[72ch] text-[var(--brand-text)]">
-            {cockpit.verdict?.narrative ?? 'The server has not returned a Cockpit verdict for this workspace yet.'}
-          </p>
-        </div>
-        <div className="flex flex-none flex-wrap items-center justify-end gap-2 pt-1">
-          <Badge
-            label={cockpit.verdict?.status?.replace(/_/g, ' ') ?? 'not available'}
-            tone={statusTone}
-            variant="soft"
-            shape="pill"
-          />
-          <Badge
-            label={cockpit.kpis.overallHealth.label}
-            tone={cockpit.kpis.overallHealth.label === 'On track' ? 'emerald' : cockpit.kpis.overallHealth.label === 'At risk' ? 'amber' : 'zinc'}
-            variant="outline"
-            shape="pill"
-            ariaLabel={cockpit.kpis.overallHealth.score == null ? 'Client signals health score unavailable' : `Client signals health score ${cockpit.kpis.overallHealth.score} of 100`}
-          />
-        </div>
+      {/* co-head — verdict hero card */}
+      <div
+        // pr-check-disable-next-line -- brand signature radius on the verdict hero container (owner-ratified global asymmetric-on-containers, ui-parity)
+        className="rounded-[var(--radius-signature-lg)] border border-[var(--brand-border)] px-6 py-[22px]"
+        style={{ background: 'linear-gradient(135deg, var(--surface-2), color-mix(in srgb, var(--teal) 5%, var(--surface-2)))' }}
+      >
+        <h1 className="t-h2 max-w-[44ch] font-bold text-[var(--brand-text-bright)]">
+          {cockpit.verdict?.headline ?? 'Cockpit verdict unavailable'}
+        </h1>
+        <p className="t-body mt-2 max-w-[72ch] text-[var(--brand-text)]">
+          {cockpit.verdict?.narrative ?? 'The server has not returned a Cockpit verdict for this workspace yet.'}
+        </p>
       </div>
+
+      {/* co-streams — full-width work-stream selector, sibling of the grid below */}
+      <WorkStreamSelector
+        ariaLabel="Cockpit work streams"
+        value={toSelectableWorkStream(state.stream)}
+        onChange={state.setStream}
+        options={[
+          { id: 'opt', label: STREAM_META.opt.label, unit: STREAM_META.opt.unit, description: STREAM_META.opt.description, count: workQueue.streams.opt, iconName: 'gauge' },
+          { id: 'send', label: STREAM_META.send.label, unit: STREAM_META.send.unit, description: STREAM_META.send.description, count: workQueue.streams.send, iconName: 'zap' },
+          { id: 'money', label: STREAM_META.money.label, unit: STREAM_META.money.unit, description: STREAM_META.money.description, count: workQueue.streams.money, iconName: 'trophy' },
+        ]}
+      />
 
       {state.retiredTab === 'meeting-brief' && (
         <InlineBanner
@@ -283,29 +274,6 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
           data-testid="cockpit-invalid-tab-fallback"
         />
       )}
-
-      <Toolbar label="Cockpit toolbar" className="w-full">
-        <Button variant="ghost" size="sm" onClick={() => setActivityOpen(true)}>
-          <Icon name="clock" size="sm" />
-          Activity
-        </Button>
-        <ToolbarSpacer />
-        <span
-          className={`t-caption-sm ${isStale ? 'text-[var(--amber)]' : 'text-[var(--brand-text-muted)]'}`}
-          title={lastFetched ? `Data loaded at ${formatDate(lastFetched)}` : undefined}
-        >
-          {lastFetched ? `${isStale ? 'Stale · ' : ''}Data as of ${formatDate(lastFetched)}` : 'Data freshness unavailable'}
-        </span>
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={RefreshCw}
-          onClick={handleRefresh}
-          loading={cockpit.homeQuery.isFetching}
-        >
-          Refresh
-        </Button>
-      </Toolbar>
 
       {cockpit.homeQuery.isError && cockpit.homeData && (
         <InlineBanner
@@ -345,47 +313,18 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
         </div>
 
         <div className="flex flex-col gap-4">
-          {/* money-frame folded into a compact rail strip (dropped the top KPI row per decision A) */}
-          <div className="rounded-[var(--radius-signature)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-4 py-3">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="t-caption-sm text-[var(--brand-text-muted)]">Value at stake</div>
-                <div className="t-stat-sm text-[var(--brand-text-bright)]">{formatMoney(cockpit.moneyFrame?.valueAtStake)}</div>
-              </div>
-              <div className="text-right">
-                <div className="t-caption-sm text-[var(--brand-text-muted)]">Recovered</div>
-                <div className="t-stat-sm text-[var(--blue)]">{formatMoney(cockpit.moneyFrame?.recoveredSoFar)}</div>
-              </div>
-            </div>
-            <div className="t-caption-sm mt-2 text-[var(--brand-text-dim)]">
-              {basis ? `${basis} provenance · stored frame only` : 'Stored money frame only'}
-            </div>
-          </div>
-
           <CockpitEvidenceRail
-            workspaceId={workspaceId}
             workspaceName={workspaceName}
             workspaceInitials={workspaceInitials}
-            hasGsc={!!cockpit.workspace?.gscPropertyUrl}
-            healthTone={healthTone(cockpit.kpis.overallHealth.score)}
             workQueue={workQueue}
             requests={cockpit.requests}
             ranks={cockpit.ranks}
             kpis={cockpit.kpis}
-            view={state.view}
-            onViewChange={state.setView}
             onOpenRoute={openRoute}
             route={routes}
           />
         </div>
       </div>
-
-      <CockpitKpiStrip
-        kpis={cockpit.kpis}
-        moneyFramePrecomputedAt={cockpit.moneyFrame?.precomputedAt ?? null}
-        onOpenRoute={openRoute}
-        route={routes}
-      />
 
       <CockpitActivityDrawer
         open={activityOpen}

@@ -155,7 +155,9 @@ export function NavItem({
           size="sm"
           style={{
             flexShrink: 0,
-            color: active || interactive ? 'var(--nav-accent)' : 'var(--brand-text-dim)',
+            // Prototype: nav icons ALWAYS wear their group accent hue, active or not.
+            // Active/hover state is carried by the pill background + label color, not the icon.
+            color: 'var(--nav-accent)',
           }}
         />
       )}

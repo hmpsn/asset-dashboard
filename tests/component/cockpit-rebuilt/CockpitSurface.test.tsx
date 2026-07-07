@@ -269,7 +269,7 @@ describe('CockpitSurface rebuilt', () => {
     });
 
     expect(await screen.findByTestId('cockpit-rebuilt-surface')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Cockpit' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Client-facing work is ready to review and send.' })).toBeInTheDocument();
   });
 
   it('meets the rebuilt a11y floor after animate-pulse settles', async () => {

@@ -29,7 +29,7 @@ export interface WorkStreamSelectorProps {
 
 const STREAM_STYLE: Record<SelectableWorkStream, { color: string; bg: string; icon: IconName }> = {
   opt: { color: 'var(--blue)', bg: 'color-mix(in srgb, var(--blue) 12%, transparent)', icon: 'gauge' },
-  send: { color: 'var(--teal)', bg: 'var(--brand-mint-dim)', icon: 'send' },
+  send: { color: 'var(--teal)', bg: 'var(--brand-mint-dim)', icon: 'zap' },
   money: { color: 'var(--amber)', bg: 'color-mix(in srgb, var(--amber) 12%, transparent)', icon: 'trophy' },
 };
 
@@ -81,12 +81,10 @@ export function WorkStreamSelector({
             onKeyDown={itemProps.onKeyDown}
             onClick={itemProps.onClick}
             className={cn(
-              'min-h-[126px] rounded-[var(--radius-signature)] border px-4 py-3 text-left',
-              'transition-[border-color,background-color,transform] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
-              active ? 'border-[color-mix(in_srgb,var(--teal)_45%,var(--brand-border))] bg-[var(--surface-2)]' : 'border-[var(--brand-border)] bg-[var(--surface-2)]',
-              'hover:border-[var(--brand-border-hover)]',
+              'min-h-[126px] rounded-[var(--radius-signature)] border bg-[var(--surface-2)] px-4 py-3 text-left',
+              'transition-[border-color,transform] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
+              active ? 'border-[var(--teal)]' : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]',
             )}
-            style={active ? { background: 'linear-gradient(135deg, var(--surface-2), color-mix(in srgb, var(--teal) 7%, var(--surface-2)))' } : undefined}
           >
             <span
               className="mb-3 inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)]"
@@ -95,9 +93,9 @@ export function WorkStreamSelector({
               <Icon name={option.iconName ?? tone.icon} size="md" aria-hidden="true" />
             </span>
             <span className="block">
-              <span className="t-stat inline-flex items-baseline gap-1.5 font-bold text-[var(--brand-text-bright)]">
+              <span className="flex items-baseline gap-1.5 font-[family-name:var(--font-display)] text-[28px] font-extrabold leading-none tracking-[-0.03em] text-[var(--brand-text-bright)]">{/* // arbitrary-text-ok: prototype .snum hero stat number, 28px DIN Pro */}
                 {option.count}
-                {option.unit && <span className="t-caption-sm text-[var(--brand-text-muted)]">{option.unit}</span>}
+                {option.unit && <span className="t-caption-sm font-semibold text-[var(--brand-text-dim)]">{option.unit}</span>}
               </span>
               <span className="t-ui mt-2 block font-semibold text-[var(--brand-text-bright)]">{option.label}</span>
               <span className="t-caption-sm mt-1 block text-[var(--brand-text)]">{option.description}</span>

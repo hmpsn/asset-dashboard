@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { Bell, Gauge, Send, Trophy, type LucideIcon } from 'lucide-react';
+import { Bell, Gauge, Trophy, Zap, type LucideIcon } from 'lucide-react';
 import type { WorkQueueClassification, WorkQueueItem, WorkQueueSourceType, WorkQueueStream } from '../../../shared/types/work-queue';
 import {
   Button,
@@ -8,7 +8,6 @@ import {
   Icon,
   SectionCard,
   WorkQueueRow,
-  WorkStreamSelector,
   type SelectableWorkStream,
 } from '../ui';
 import { sourceTypeLabel } from './cockpitFormatters';
@@ -27,33 +26,38 @@ interface CockpitWorkQueueProps {
   onOpenItem: (item: WorkQueueItem) => void;
 }
 
-const STREAM_META: Record<WorkQueueStream, {
+export const STREAM_META: Record<WorkQueueStream, {
   label: string;
+  /** Short count suffix shown inline after the tile number (prototype `.su`), e.g. "to fix". */
+  unit: string;
   description: string;
   groupTitle: string;
   icon: LucideIcon;
-  iconName: 'gauge' | 'send' | 'trophy' | 'bell';
+  iconName: 'gauge' | 'zap' | 'trophy' | 'bell';
   color: string;
 }> = {
   opt: {
-    label: 'Optimize',
-    description: 'Technical and content improvements to open.',
+    label: 'Optimizations',
+    unit: 'to fix',
+    description: 'Site health & rankings',
     groupTitle: 'Optimization queue',
     icon: Gauge,
     iconName: 'gauge',
     color: 'var(--blue)',
   },
   send: {
-    label: 'Send',
-    description: 'Client-facing work ready for review.',
+    label: 'To send',
+    unit: 'to send',
+    description: 'Ready for the client',
     groupTitle: 'Send-ready queue',
-    icon: Send,
-    iconName: 'send',
+    icon: Zap,
+    iconName: 'zap',
     color: 'var(--teal)',
   },
   money: {
-    label: 'Money',
-    description: 'Value and pricing work with real provenance.',
+    label: 'Monetization',
+    unit: 'to pitch',
+    description: 'Grow the account',
     groupTitle: 'Money queue',
     icon: Trophy,
     iconName: 'trophy',
@@ -61,6 +65,7 @@ const STREAM_META: Record<WorkQueueStream, {
   },
   unclassified: {
     label: 'Risk',
+    unit: 'to triage',
     description: 'Client signals and unclassified attention.',
     groupTitle: 'Risk and unclassified',
     icon: Bell,
@@ -83,6 +88,10 @@ const SOURCE_ORDER: WorkQueueSourceType[] = [
 
 function EmptyQueueIcon({ className }: { className?: string }) {
   return <Icon name="check" className={className} />;
+}
+
+export function toSelectableWorkStream(stream: CockpitStreamFilter): SelectableWorkStream {
+  return stream === 'send' || stream === 'money' || stream === 'opt' ? stream : 'opt';
 }
 
 function visibleItems(
@@ -118,42 +127,12 @@ export function CockpitWorkQueue({
   clientInitials,
   onOpenItem,
 }: CockpitWorkQueueProps) {
-  const primaryStream: SelectableWorkStream = stream === 'send' || stream === 'money' || stream === 'opt' ? stream : 'opt';
   const filteredItems = visibleItems(workQueue.items, stream, activeSourceTypes);
   const grouped = groupItems(filteredItems, stream);
   const sourceTypes = SOURCE_ORDER.filter((sourceType) => (sourceTypeCounts[sourceType] ?? 0) > 0);
 
   return (
     <div className="flex flex-col gap-3" data-testid="cockpit-work-queue">
-      <WorkStreamSelector
-        ariaLabel="Cockpit work streams"
-        value={primaryStream}
-        onChange={onStreamChange}
-        options={[
-          {
-            id: 'opt',
-            label: STREAM_META.opt.label,
-            description: STREAM_META.opt.description,
-            count: workQueue.streams.opt,
-            iconName: 'gauge',
-          },
-          {
-            id: 'send',
-            label: STREAM_META.send.label,
-            description: STREAM_META.send.description,
-            count: workQueue.streams.send,
-            iconName: 'send',
-          },
-          {
-            id: 'money',
-            label: STREAM_META.money.label,
-            description: STREAM_META.money.description,
-            count: workQueue.streams.money,
-            iconName: 'trophy',
-          },
-        ]}
-      />
-
       <div className="flex flex-wrap items-center gap-2" aria-label="Queue filters">
         <FilterChip label="All" active={stream === 'all'} count={workQueue.items.length} onClick={() => onStreamChange('all')} />
         <FilterChip label="Risk" active={stream === 'unclassified'} count={workQueue.streams.unclassified} onClick={() => onStreamChange('unclassified')} />
@@ -177,7 +156,8 @@ export function CockpitWorkQueue({
         <SectionCard
           title={`${clientName}'s work queue`}
           titleIcon={<Icon name="bell" size="sm" className="text-[var(--teal)]" />}
-          titleExtra={<span className="t-caption-sm text-[var(--brand-text-muted)]">Everything this client needs, grouped by kind</span>}
+          iconChip
+          subtitle="Everything this client needs, grouped by kind"
           noPadding
         >
           <div className="flex flex-col">
@@ -191,7 +171,7 @@ export function CockpitWorkQueue({
                     <Icon name={meta.iconName} size="sm" />
                     <span>{meta.label}</span>
                     <span
-                      className="rounded-full px-1.5 t-caption-sm font-semibold tabular-nums"
+                      className="rounded-[var(--radius-pill)] px-1.5 t-caption-sm font-semibold tabular-nums"
                       style={{ color: meta.color, backgroundColor: `color-mix(in srgb, ${meta.color} 14%, transparent)` }}
                     >
                       {rows.length}
@@ -218,6 +198,7 @@ export function CockpitWorkQueue({
           title="No queue rows match this view"
           description="Clear filters or switch streams to review the shared work queue."
           action={activeSourceTypes.size > 0 ? <Button variant="secondary" size="sm" onClick={onClearSourceTypes}>Clear filters</Button> : undefined}
+          // pr-check-disable-next-line -- brand signature radius on the empty-state container (owner-ratified global asymmetric-on-containers, ui-parity)
           className="rounded-[var(--radius-signature-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]"
         />
       )}

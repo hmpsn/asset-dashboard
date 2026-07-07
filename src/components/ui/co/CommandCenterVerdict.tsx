@@ -33,6 +33,7 @@ export function CommandCenterVerdict({
     <section
       id={id}
       className={cn(
+        // pr-check-disable-next-line -- brand signature radius on the verdict container (owner-ratified global asymmetric-on-containers, ui-parity)
         'relative overflow-hidden rounded-[var(--radius-signature-lg)] border border-[var(--brand-border)]',
         'bg-[var(--surface-2)] px-5 py-4',
         className,
