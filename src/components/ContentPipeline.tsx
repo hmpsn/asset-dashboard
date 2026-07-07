@@ -217,7 +217,7 @@ export function ContentPipeline({ workspaceId, fixContext, clearFixContext }: Pr
             {/* Content decay alert — clickable through to Content Decay in SEO Audit */}
             {decay && !decayDismissed && (decay.critical > 0 || decay.warning > 0) && (
               <ClickableRow
-                onClick={() => navigate(`${adminPath(workspaceId, 'content-pipeline')}?tab=content-health`)}
+                onClick={() => navigate(`${adminPath(workspaceId, 'seo-audit')}?sub=content-decay`)}
                 className={cn('flex items-center gap-3 px-4 py-2.5 border text-xs', decay.critical > 0 ? 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10' : 'bg-amber-500/5 border-amber-500/20 hover:bg-amber-500/10')}
                 style={{ borderRadius: 'var(--radius-signature)' }}
               >
