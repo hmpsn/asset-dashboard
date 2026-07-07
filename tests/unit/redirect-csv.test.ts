@@ -9,7 +9,7 @@ describe('serializeRedirectRulesCsv', () => {
     ]);
 
     expect(csv).toBe([
-      'Old Path,New Path',
+      'Old Path,Redirect To',
       '/old-page,/new-page',
       '"/old, comma","/new ""quoted"" page"',
     ].join('\n'));

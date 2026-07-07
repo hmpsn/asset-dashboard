@@ -3,7 +3,10 @@ export interface RedirectCsvRule {
   to: string;
 }
 
-export const REDIRECT_CSV_HEADERS = ['Old Path', 'New Path'] as const;
+// Webflow's bulk 301-redirect import expects exactly these column headers:
+// "Old Path" (relative source path) and "Redirect To" (relative or absolute target).
+// See https://help.webflow.com/hc/en-us/articles/33961211526291-Import-export-301-redirects
+export const REDIRECT_CSV_HEADERS = ['Old Path', 'Redirect To'] as const;
 
 function csvCell(value: string): string {
   return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
