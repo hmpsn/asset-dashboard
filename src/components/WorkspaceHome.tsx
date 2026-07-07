@@ -214,7 +214,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
         : `${contentDecayData.warning} pages declining in clicks`,
       severity: contentDecayData.critical > 0 ? 'critical' : 'warning',
       icon: TrendingDown,
-      href: `${adminPath(workspaceId, 'seo-audit')}?sub=content-decay`,
+      href: `${adminPath(workspaceId, 'content-pipeline')}?tab=content-health`,
     });
   }
 
@@ -505,7 +505,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
               icon={TrendingDown}
               iconColor={contentDecayData.critical > 0 ? CHART_SERIES_COLORS.red : CHART_SERIES_COLORS.amber}
               sub={contentDecayData.critical > 0 ? `${contentDecayData.critical} crit · ${contentDecayData.warning} risk` : `${contentDecayData.warning} declining`}
-              onClick={() => navigate(`${adminPath(workspaceId, 'seo-audit')}?sub=content-decay`)}
+              onClick={() => navigate(`${adminPath(workspaceId, 'content-pipeline')}?tab=content-health`)}
               size="default"
               staggerIndex={5}
             />

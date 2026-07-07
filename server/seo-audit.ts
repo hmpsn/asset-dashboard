@@ -15,6 +15,8 @@ import { getWebflowSiteDomainInfo } from './webflow-domains.js';
 import { runSiteWideChecks } from './seo-audit-site-checks.js';
 import { generateAiRecommendations } from './seo-audit-ai-recs.js';
 import type { SchemaSourcePageMeta } from '../shared/types/schema-generation.js';
+import type { AuditCategoryScore } from '../shared/types/seo-audit.js';
+import { enrichAuditCategoryScoring } from './audit-category-scores.js';
 import type { CwvSummary } from './seo-audit-cwv-types.js';
 export type { CwvMetricSummary, CwvStrategyResult, CwvSummary } from './seo-audit-cwv-types.js';
 
@@ -28,6 +30,8 @@ export interface SeoAuditResult {
   infos: number;
   pages: PageSeoResult[];
   siteWideIssues: SeoIssue[];
+  categoryScoreVersion?: 1;
+  categoryScores?: AuditCategoryScore[];
   cwvSummary?: CwvSummary;
   deadLinkSummary?: { total: number; internal: number; external: number; redirects: number };
   deadLinkDetails?: DeadLink[];
@@ -259,7 +263,7 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     }
   }
 
-  return {
+  return enrichAuditCategoryScoring({
     siteScore,
     totalPages: results.length,
     errors: totalErrors,
@@ -270,5 +274,5 @@ export async function runSeoAudit(siteId: string, tokenOverride?: string, worksp
     cwvSummary: (cwvSummary.mobile || cwvSummary.desktop) ? cwvSummary : undefined,
     deadLinkSummary,
     deadLinkDetails,
-  };
+  });
 }

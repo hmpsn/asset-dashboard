@@ -266,6 +266,8 @@ router.get('/api/public/audit-summary/:workspaceId', requireClientPortalAuth('wo
     errors: filtered.errors,
     warnings: filtered.warnings,
     infos: filtered.infos,
+    categoryScoreVersion: filtered.categoryScoreVersion,
+    categoryScores: filtered.categoryScores,
     previousScore: latest.previousScore,
   });
 });

@@ -14,6 +14,7 @@ import * as activityModule from '../../server/activity-log.js';
 import * as bridgesModule from '../../server/webflow-seo-audit-bridges.js';
 import * as broadcastModule from '../../server/broadcast.js';
 import * as recommendationsModule from '../../server/recommendations.js';
+import { getEffectiveAudit } from '../../server/audit-snapshot-views.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 
 const SITE_ID = 'wf-site-seo-audit-contract';
@@ -133,7 +134,11 @@ describe('SEO audit background job contract', () => {
       expect.stringContaining('pages scanned'),
       expect.objectContaining({ score: seoAuditResult.siteScore }),
     );
-    expect(bridgeSpy).toHaveBeenCalledWith(expect.objectContaining({ id: workspaceId }), seoAuditResult);
+    // W5 (SB-010): the bridge receives the EFFECTIVE audit — getEffectiveAudit now enriches
+    // even with no suppressions (adds suppression-aware categoryScores + per-issue displayCategory),
+    // so category scores persist and reach the insight bridge. Raw result still hits saveSnapshot above.
+    const effectiveResult = getEffectiveAudit(seoAuditResult as never, []);
+    expect(bridgeSpy).toHaveBeenCalledWith(expect.objectContaining({ id: workspaceId }), effectiveResult);
     expect(broadcastSpy).toHaveBeenCalledWith(
       workspaceId,
       WS_EVENTS.AUDIT_COMPLETE,

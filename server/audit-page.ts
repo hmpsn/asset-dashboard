@@ -6,6 +6,8 @@ import {
 import { computePageScore } from '../shared/scoring.js';
 import { decodeEntities } from './utils/text.js';
 import type { SchemaSourcePageMeta } from '../shared/types/schema-generation.js';
+import type { AuditDisplayCategory } from '../shared/types/seo-audit.js';
+import { auditDisplayCategoryFor } from './audit-category-scores.js';
 export type Severity = 'error' | 'warning' | 'info';
 
 export type CheckCategory = 'content' | 'technical' | 'social' | 'performance' | 'accessibility';
@@ -14,6 +16,7 @@ export interface SeoIssue {
   check: string;
   severity: Severity;
   category?: CheckCategory;
+  displayCategory?: AuditDisplayCategory;
   message: string;
   recommendation: string;
   value?: string;
@@ -461,6 +464,7 @@ export function auditPage(
   // Auto-assign categories
   for (const issue of issues) {
     issue.category = CHECK_CATEGORY[issue.check] || 'technical';
+    issue.displayCategory = auditDisplayCategoryFor(issue.check, issue.category);
   }
 
   // Score: computed from issues via shared/scoring.ts (single source of truth)

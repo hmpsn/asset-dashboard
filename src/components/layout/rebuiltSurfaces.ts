@@ -53,4 +53,7 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'seo-editor': lazyWithRetry(() =>
     import('../seo-editor-rebuilt/SeoEditorSurface').then(m => ({ default: m.SeoEditorSurface })),
   ),
+  'seo-audit': lazyWithRetry(() =>
+    import('../site-audit-rebuilt/SiteAuditSurface').then(m => ({ default: m.SiteAuditSurface })),
+  ),
 };
