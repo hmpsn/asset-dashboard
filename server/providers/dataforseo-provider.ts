@@ -34,6 +34,7 @@ import type {
   DomainOverview,
   OrganicCompetitor,
   KeywordGapEntry,
+  DomainAuthorityMetric,
   BacklinksOverview,
   ReferringDomain,
   NationalSerpProviderRequest,
@@ -1940,6 +1941,95 @@ export class DataForSeoProvider implements SeoDataProvider {
     return allGaps
       .filter(g => { if (seen.has(g.keyword.toLowerCase())) return false; seen.add(g.keyword.toLowerCase()); return true; })
       .sort((a, b) => b.volume - a.volume);
+  }
+
+  async getDomainAuthorityMetrics(
+    domains: string[],
+    workspaceId: string,
+    database = 'us',
+    locationCode?: number,
+    languageCode?: string,
+  ): Promise<DomainAuthorityMetric[]> {
+    const lang = normalizeLanguageCode(languageCode);
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
+    const targets = [...new Set(domains.map(cleanDomain).filter(Boolean))].slice(0, MAX_COMPETITORS + 1);
+    if (targets.length === 0) return [];
+
+    const targetKey = targets.map(cacheKeyPart).sort().join('_');
+    const rankRows = await runDataForSeoOperation<Array<{ domain: string; authorityRank: number | null }>>({
+      workspaceId,
+      cacheKey: `domain_authority_bulk_rank_${targetKey}`,
+      cacheTtlHours: CACHE_TTL_BACKLINKS,
+      endpointLabel: 'backlinks_bulk_ranks',
+      query: targets.join(',').slice(0, 100),
+      emptyValue: [],
+      endpoint: 'backlinks/bulk_ranks/live',
+      body: [{
+        targets,
+        rank_scale: 'one_hundred',
+      }],
+      mapResult: (json) => {
+        const taskResults = getTaskResult(json);
+        const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+        const results = items
+          .map((item) => {
+            const domain = cleanDomain(String(item.target ?? ''));
+            const rank = item.rank;
+            if (!domain) return null;
+            return {
+              domain,
+              authorityRank: typeof rank === 'number' ? rank : null,
+            };
+          })
+          .filter((item): item is { domain: string; authorityRank: number | null } => item !== null);
+        return { value: results, rowsReturned: results.length };
+      },
+      handleError: (err) => {
+        log.error({ err, domains: targets }, 'DataForSEO backlinks bulk rank error');
+        return [];
+      },
+    });
+
+    const top3Rows = await Promise.all(targets.map((target) =>
+      runDataForSeoOperation<{ domain: string; top3Keywords: number | null }>({
+        workspaceId,
+        cacheKey: `domain_rank_overview_${domainGeoToken(database, locationCode, lang)}_${cacheKeyPart(target)}`,
+        cacheTtlHours: CACHE_TTL_DOMAIN_OVERVIEW,
+        endpointLabel: 'domain_rank_overview',
+        query: target,
+        emptyValue: { domain: target, top3Keywords: null },
+        endpoint: 'dataforseo_labs/google/domain_rank_overview/live',
+        body: [{
+          target,
+          location_code: resolvedLocationCode,
+          language_code: lang,
+        }],
+        mapResult: (json) => {
+          const taskResults = getTaskResult(json);
+          const resultObj = taskResults[0] ?? {};
+          const metrics = resultObj.metrics as Record<string, Record<string, number>> | undefined;
+          const organic = metrics?.organic;
+          const pos1 = typeof organic?.pos_1 === 'number' ? organic.pos_1 : 0;
+          const pos2To3 = typeof organic?.pos_2_3 === 'number' ? organic.pos_2_3 : 0;
+          return {
+            value: { domain: target, top3Keywords: pos1 + pos2To3 },
+            rowsReturned: 1,
+          };
+        },
+        handleError: (err) => {
+          log.error({ err, domain: target }, 'DataForSEO domain rank overview error');
+          return { domain: target, top3Keywords: null };
+        },
+      })
+    ));
+
+    const rankByDomain = new Map(rankRows.map((row) => [row.domain, row.authorityRank]));
+    const top3ByDomain = new Map(top3Rows.map((row) => [row.domain, row.top3Keywords]));
+    return targets.map((domain) => ({
+      domain,
+      authorityRank: rankByDomain.get(domain) ?? null,
+      top3Keywords: top3ByDomain.get(domain) ?? null,
+    }));
   }
 
   // ── getBacklinksOverview → backlinks/summary ──

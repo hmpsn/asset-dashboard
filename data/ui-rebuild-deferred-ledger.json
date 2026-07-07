@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-06",
+  "updatedAt": "2026-07-07",
   "entries": [
     {
       "id": "DEF-foundation-001",
@@ -14,7 +14,10 @@
       "roadmapItemId": null,
       "createdAt": "2026-07-03",
       "reviewBy": "2026-08-14",
-      "links": { "pr": "#1472", "kitDoc": "tokens/typography.css" }
+      "links": {
+        "pr": "#1472",
+        "kitDoc": "tokens/typography.css"
+      }
     },
     {
       "id": "DEF-foundation-002",
@@ -28,41 +31,48 @@
       "roadmapItemId": null,
       "createdAt": "2026-07-03",
       "reviewBy": "2026-09-30",
-      "links": { "pr": "#1472", "kitDoc": "tokens/effects.css" }
+      "links": {
+        "pr": "#1472",
+        "kitDoc": "tokens/effects.css"
+      }
     },
     {
       "id": "DEF-foundation-003",
       "surface": "foundation",
-      "item": "pr-check 'Non-standard transition duration' rule still allows the legacy 120/180/400ms literal set alongside var(--dur-*) — zero legacy call sites exist repo-wide (verified by adversarial review 2026-07-03), so the allowance + rule message should be retired to make motion tokens the sole standard",
+      "item": "pr-check 'Non-standard transition duration' rule still allows the legacy 120/180/400ms literal set alongside var(--dur-*) \u2014 zero legacy call sites exist repo-wide (verified by adversarial review 2026-07-03), so the allowance + rule message should be retired to make motion tokens the sole standard",
       "decision": "Motion tokens ratified as canonical (F2a). The legacy literal allowance is kept only so pre-rebuild code additions stay possible during the transition; this is a policy retirement, NOT a call-site migration (none exist)",
       "class": "token",
-      "upgradeTrigger": "Phase Z consolidation closeout — remove the legacy ALLOWED set from the rule and update its message so var(--dur-*) is the only standard",
+      "upgradeTrigger": "Phase Z consolidation closeout \u2014 remove the legacy ALLOWED set from the rule and update its message so var(--dur-*) is the only standard",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,
       "createdAt": "2026-07-03",
       "reviewBy": "2026-09-30",
-      "links": { "pr": "#1472" }
+      "links": {
+        "pr": "#1472"
+      }
     },
     {
       "id": "DEF-foundation-004",
       "surface": "foundation",
-      "item": "The kit Toast visuals are not yet ported onto the existing src/components/Toast.tsx — F3 deliberately did NOT build a second Toast (HEAD's ToastProvider/useToast is the canonical mutation-feedback primitive, mounted in App.tsx with 15+ consumers). The kit Toast's look becomes a tokens-only restyle of the existing component (T1 carry-over-then-reskin).",
+      "item": "The kit Toast visuals are not yet ported onto the existing src/components/Toast.tsx \u2014 F3 deliberately did NOT build a second Toast (HEAD's ToastProvider/useToast is the canonical mutation-feedback primitive, mounted in App.tsx with 15+ consumers). The kit Toast's look becomes a tokens-only restyle of the existing component (T1 carry-over-then-reskin).",
       "decision": "Keep the existing Toast as the single mutation-feedback primitive; restyle its visuals to the kit spec later rather than forking a duplicate during F3 (adversarial review CP1).",
       "class": "primitive",
-      "upgradeTrigger": "Keywords pilot ships mutations (the first rebuilt surface that fires toasts) — restyle then so the new look lands with real usage.",
+      "upgradeTrigger": "Keywords pilot ships mutations (the first rebuilt surface that fires toasts) \u2014 restyle then so the new look lands with real usage.",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,
       "createdAt": "2026-07-03",
       "reviewBy": "2026-09-30",
-      "links": { "kitDoc": "components/feedback/Toast.jsx" }
+      "links": {
+        "kitDoc": "components/feedback/Toast.jsx"
+      }
     },
     {
       "id": "DEF-shell-001",
       "surface": "foundation",
       "item": "RebuiltSidebar footer utilities (NotificationBell, WorkspaceSelector, Revenue/Settings/theme/logout IconButtons) carry over from the legacy Sidebar; a fully DS-native restyle is deferred.",
-      "decision": "T1 carry-over — machinery-dense, zero capability loss; the visual seam is accepted for F4 so the pilot can validate the registry-driven shell first.",
+      "decision": "T1 carry-over \u2014 machinery-dense, zero capability loss; the visual seam is accepted for F4 so the pilot can validate the registry-driven shell first.",
       "class": "primitive",
       "upgradeTrigger": "Phase A admin fan-out reaches the shell chrome.",
       "owner": "josh",
@@ -96,7 +106,9 @@
       "roadmapItemId": null,
       "createdAt": "2026-07-03",
       "reviewBy": "2026-10-31",
-      "links": { "kitDoc": "components/icon/Icon.jsx" }
+      "links": {
+        "kitDoc": "components/icon/Icon.jsx"
+      }
     },
     {
       "id": "DEF-icon-002",
@@ -104,21 +116,23 @@
       "item": "The self-hosted Font Awesome ships the FULL Pro CSS (fontawesome.min.css ~158KB) + the full Sharp Regular woff2 (~288KB, all glyphs) while the app uses only ~52 ICON_NAMES glyphs.",
       "decision": "Ship the complete CSS + font now for correctness/simplicity (any glyph renders); gzip brings the CSS to ~30KB. Subsetting is a perf optimization, not correctness.",
       "class": "perf",
-      "upgradeTrigger": "The bundle-budget ratchet flags Font Awesome as the active regression source, or the icon migration (DEF-icon-001) settles the final glyph set — then subset the woff2 (pyftsubset) + trim the CSS to the used glyphs.",
+      "upgradeTrigger": "The bundle-budget ratchet flags Font Awesome as the active regression source, or the icon migration (DEF-icon-001) settles the final glyph set \u2014 then subset the woff2 (pyftsubset) + trim the CSS to the used glyphs.",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,
       "createdAt": "2026-07-03",
       "reviewBy": "2026-10-31",
-      "links": { "kitDoc": "css/fontawesome.min.css" }
+      "links": {
+        "kitDoc": "css/fontawesome.min.css"
+      }
     },
     {
       "id": "DEF-shell-003",
       "surface": "foundation",
-      "item": "The rebuilt shell has no way to express focus mode — legacy Sidebar takes hidden/onExitHidden and collapses to a slim exit strip (App.tsx effectiveFocusMode, fires on the rewrite surface). RebuiltSidebar/AppShell omit it.",
-      "decision": "Not a pilot regression — focus mode only fires on Page Rewriter and the pilot is Keywords-only. Ledgered so it is closed before the rebuilt shell expands to cover the Page Rewriter surface (review PR #1478).",
+      "item": "The rebuilt shell has no way to express focus mode \u2014 legacy Sidebar takes hidden/onExitHidden and collapses to a slim exit strip (App.tsx effectiveFocusMode, fires on the rewrite surface). RebuiltSidebar/AppShell omit it.",
+      "decision": "Not a pilot regression \u2014 focus mode only fires on Page Rewriter and the pilot is Keywords-only. Ledgered so it is closed before the rebuilt shell expands to cover the Page Rewriter surface (review PR #1478).",
       "class": "behavior",
-      "upgradeTrigger": "The rebuild reaches the Page Rewriter surface (Phase A) — add a hidden/collapsed shell state to AppShell + RebuiltSidebar before the shell replaces the legacy one there.",
+      "upgradeTrigger": "The rebuild reaches the Page Rewriter surface (Phase A) \u2014 add a hidden/collapsed shell state to AppShell + RebuiltSidebar before the shell replaces the legacy one there.",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,
@@ -128,10 +142,10 @@
     {
       "id": "DEF-shell-004",
       "surface": "foundation",
-      "item": "The rebuilt breadcrumb/topbar drops the visible ⌘K search IconButton and the breadcrumb workspace-switcher dropdown that legacy Breadcrumbs render. The ⌘K keyboard shortcut still works (global listener) and workspace switching is covered by the sidebar selector — this is a secondary/discoverability affordance loss, not a capability loss.",
+      "item": "The rebuilt breadcrumb/topbar drops the visible \u2318K search IconButton and the breadcrumb workspace-switcher dropdown that legacy Breadcrumbs render. The \u2318K keyboard shortcut still works (global listener) and workspace switching is covered by the sidebar selector \u2014 this is a secondary/discoverability affordance loss, not a capability loss.",
       "decision": "Accepted for F4 (shortcut + sidebar switcher preserve the underlying capability). Re-add the visible top-bar search affordance before the rebuilt shell replaces the legacy one platform-wide (review PR #1478).",
       "class": "behavior",
-      "upgradeTrigger": "Phase A shell-expansion, or the first mouse-user report of the missing search button — add a ⌘K IconButton to the rebuilt Toolbar/breadcrumb.",
+      "upgradeTrigger": "Phase A shell-expansion, or the first mouse-user report of the missing search button \u2014 add a \u2318K IconButton to the rebuilt Toolbar/breadcrumb.",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,
@@ -150,7 +164,9 @@
       "roadmapItemId": null,
       "createdAt": "2026-07-06",
       "reviewBy": "2026-10-31",
-      "links": { "source": "docs/ui-rebuild/pilot/keywords-data-source-ledger.md#3-platform-build-backlog--build-vs-defer-recommendation" }
+      "links": {
+        "source": "docs/ui-rebuild/pilot/keywords-data-source-ledger.md#3-platform-build-backlog--build-vs-defer-recommendation"
+      }
     },
     {
       "id": "DEF-kw-002",
@@ -164,7 +180,9 @@
       "roadmapItemId": null,
       "createdAt": "2026-07-06",
       "reviewBy": "2026-10-31",
-      "links": { "source": "docs/ui-rebuild/pilot/keywords-data-source-ledger.md#3-platform-build-backlog--build-vs-defer-recommendation" }
+      "links": {
+        "source": "docs/ui-rebuild/pilot/keywords-data-source-ledger.md#3-platform-build-backlog--build-vs-defer-recommendation"
+      }
     },
     {
       "id": "DEF-lint-001",
@@ -172,69 +190,96 @@
       "item": "Retiring lint:ds-adherence (D-F2b-1) drops the only check that flagged raw-px literals in inline-style DS components. The F2a ds-* gates cover hex/palette/motion/icon purity but NOT raw pixel values, so raw-px in inline-style primitives is now unenforced.",
       "decision": "The kit adherence config was redundant with the F2a ds-* gates plus TypeScript prop-checking for everything except raw-px. Rather than keep a whole lint pass alive for one signal, the raw-px gap is accepted now and re-addressed as a focused rule when inline-style primitives settle.",
       "class": "token",
-      "upgradeTrigger": "Phase Z consolidation closeout (or when inline-style DS primitives stabilize) — add a focused raw-px pr-check rule, or migrate inline px to the --space-* scale.",
+      "upgradeTrigger": "Phase Z consolidation closeout (or when inline-style DS primitives stabilize) \u2014 add a focused raw-px pr-check rule, or migrate inline px to the --space-* scale.",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,
       "createdAt": "2026-07-05",
       "reviewBy": "2026-10-31",
-      "links": { "pr": "#1479" }
+      "links": {
+        "pr": "#1479"
+      }
     },
     {
       "id": "DEF-shell-005",
       "surface": "foundation",
-      "item": "RebuiltAppChrome/AppShell has no slot for the connection/health StatusBar (hasOpenAIKey/hasWebflowToken/connected/workspaceCount) the legacy shell renders — AppShell exposes sidebar/topbar/children but no footer. Review PR #1480 restored CommandPalette (⌘K) + AdminChat to the rebuilt mount (real capability losses), but StatusBar needs a shell footer slot.",
-      "decision": "Ship the rebuilt Keywords surface without the StatusBar footer for now — the RebuiltSidebar footer's NotificationBell already surfaces connection state, and adding an AppShell footer slot is a shell-primitive enhancement, not a Keywords-pilot bug. The two capability-loss items (⌘K, admin chat) were fixed in-PR; this display-affordance is ledgered.",
+      "item": "RebuiltAppChrome/AppShell has no slot for the connection/health StatusBar (hasOpenAIKey/hasWebflowToken/connected/workspaceCount) the legacy shell renders \u2014 AppShell exposes sidebar/topbar/children but no footer. Review PR #1480 restored CommandPalette (\u2318K) + AdminChat to the rebuilt mount (real capability losses), but StatusBar needs a shell footer slot.",
+      "decision": "Ship the rebuilt Keywords surface without the StatusBar footer for now \u2014 the RebuiltSidebar footer's NotificationBell already surfaces connection state, and adding an AppShell footer slot is a shell-primitive enhancement, not a Keywords-pilot bug. The two capability-loss items (\u2318K, admin chat) were fixed in-PR; this display-affordance is ledgered.",
       "class": "behavior",
-      "upgradeTrigger": "Phase A shell-expansion (the rebuilt shell covers non-Keywords surfaces) — add a `footer` slot to AppShell + thread StatusBar through RebuiltAppChrome so every rebuilt surface shows connection/health state.",
+      "upgradeTrigger": "Phase A shell-expansion (the rebuilt shell covers non-Keywords surfaces) \u2014 add a `footer` slot to AppShell + thread StatusBar through RebuiltAppChrome so every rebuilt surface shows connection/health state.",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,
       "createdAt": "2026-07-06",
       "reviewBy": "2026-10-31",
-      "links": { "pr": "#1480" }
+      "links": {
+        "pr": "#1480"
+      }
     },
     {
       "id": "DEF-kw-003",
       "surface": "keywords",
-      "item": "The Pages/Clusters/Lifecycle grouped lenses group only the CURRENT PAGE of rows (pageSize <= 100), not the full workspace keyword set — so BoardColumn counts and group stats reflect page 1 while the lens tab shows the true total. Review PR #1480 made this HONEST (a truncation banner + removed the fabricated client-side averageRank) but full coverage needs server-side grouping.",
+      "item": "The Pages/Clusters/Lifecycle grouped lenses group only the CURRENT PAGE of rows (pageSize <= 100), not the full workspace keyword set \u2014 so BoardColumn counts and group stats reflect page 1 while the lens tab shows the true total. Review PR #1480 made this HONEST (a truncation banner + removed the fabricated client-side averageRank) but full coverage needs server-side grouping.",
       "decision": "Ship the grouped lenses over the current page WITH an explicit truncation banner (never present a page-1 board as the full universe) rather than fetch-all-client-side (unbounded) or block the pilot on a server grouping contract. averageRank removed per DEF-kw-002 (no client rollups).",
       "class": "data",
-      "upgradeTrigger": "A server-side grouped-view read model (group by page/cluster/lifecycleStage across ALL keywords with server-computed counts + rollups) — then the grouped lenses render complete groups without the page cap.",
+      "upgradeTrigger": "A server-side grouped-view read model (group by page/cluster/lifecycleStage across ALL keywords with server-computed counts + rollups) \u2014 then the grouped lenses render complete groups without the page cap.",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,
       "createdAt": "2026-07-06",
       "reviewBy": "2026-10-31",
-      "links": { "pr": "#1480" }
+      "links": {
+        "pr": "#1480"
+      }
     },
     {
       "id": "DEF-kw-004",
       "surface": "keywords",
       "item": "hubSortToKccSort was extracted to the shared src/lib/keywordHubSort.ts (the rebuilt surface consumes it), but the legacy KeywordHub.tsx still keeps its own byte-identical copy + HubSortKey type. Two mappings can drift.",
-      "decision": "Do NOT touch the legacy KeywordHub during the pilot (a deliberate Task 8.4 constraint — it is the surface being replaced). The drift window is transient: KeywordHub is retired when ui-rebuild-shell covers Keywords, and the duplicate dies with it. Unifying now risks destabilizing legacy for no lasting benefit.",
+      "decision": "Do NOT touch the legacy KeywordHub during the pilot (a deliberate Task 8.4 constraint \u2014 it is the surface being replaced). The drift window is transient: KeywordHub is retired when ui-rebuild-shell covers Keywords, and the duplicate dies with it. Unifying now risks destabilizing legacy for no lasting benefit.",
       "class": "primitive",
-      "upgradeTrigger": "KeywordHub retirement (the rebuilt Keywords surface goes global / legacy branch removed) — delete the legacy hubSortToKccSort + HubSortKey and import from src/lib/keywordHubSort.",
+      "upgradeTrigger": "KeywordHub retirement (the rebuilt Keywords surface goes global / legacy branch removed) \u2014 delete the legacy hubSortToKccSort + HubSortKey and import from src/lib/keywordHubSort.",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,
       "createdAt": "2026-07-06",
       "reviewBy": "2026-10-31",
-      "links": { "pr": "#1480" }
+      "links": {
+        "pr": "#1480"
+      }
     },
     {
       "id": "DEF-kw-005",
       "surface": "keywords",
       "item": "The rebuilt surface fetches summary+rows as ONE initial-view query keyed on the full rowsQuery, so the summary (counts + topicClusters + cannibalization + computeOrganicTrafficValue) rebuilds on every sort/page/lens/filter change though it is invariant to sort/page; computeOrganicTrafficValue also re-SELECT*s page_keywords despite the lite sourceSnapshot already being in memory. A standalone summary hook keyed WITHOUT query already exists.",
-      "decision": "Efficiency, not correctness — the surface is right, just does redundant work per interaction. Deferred rather than rushed: decoupling the summary from rowsQuery + threading the snapshot into computeOrganicTrafficValueFromPages needs careful type alignment (lite vs full PageKeywordMap) and is a template pattern worth getting right, not fast.",
+      "decision": "Efficiency, not correctness \u2014 the surface is right, just does redundant work per interaction. Deferred rather than rushed: decoupling the summary from rowsQuery + threading the snapshot into computeOrganicTrafficValueFromPages needs careful type alignment (lite vs full PageKeywordMap) and is a template pattern worth getting right, not fast.",
       "class": "perf",
-      "upgradeTrigger": "Before Phase A fan-out leans on the initial-view pattern — split the summary into its own query keyed without sort/page (reuse the existing summary hook), and feed computeOrganicTrafficValueFromPages the in-memory sourceSnapshot.pageMap instead of re-reading page_keywords.",
+      "upgradeTrigger": "Before Phase A fan-out leans on the initial-view pattern \u2014 split the summary into its own query keyed without sort/page (reuse the existing summary hook), and feed computeOrganicTrafficValueFromPages the in-memory sourceSnapshot.pageMap instead of re-reading page_keywords.",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,
       "createdAt": "2026-07-06",
       "reviewBy": "2026-10-31",
-      "links": { "pr": "#1480" }
+      "links": {
+        "pr": "#1480"
+      }
+    },
+    {
+      "id": "DEF-competitors-001",
+      "surface": "competitors",
+      "item": "Competitor\u2192insight graduation write is not built; the rebuilt surface renders existing insightId linkage only, it does not create/graduate insights.",
+      "decision": "AD-004 defers all 'graduate to Insights Engine' writes wholesale to the one C3-era owner-signed cross-surface contract; no surface builds an ad-hoc graduation write.",
+      "class": "behavior",
+      "upgradeTrigger": "The C3 cross-surface insight-graduation contract lands.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/competitors.md",
+        "ad": "AD-004"
+      }
     }
   ]
 }

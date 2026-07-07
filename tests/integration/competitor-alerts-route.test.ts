@@ -21,15 +21,21 @@
  * with explicit created_at values so the ordering assertion is deterministic.
  */
 import { afterAll, beforeAll, afterEach, describe, expect, it } from 'vitest';
-import http from 'http';
-import type { AddressInfo } from 'net';
+import { IncomingMessage, ServerResponse } from 'http';
+import { Socket } from 'net';
+import type { Express } from 'express';
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
+import { parseJsonFallback } from '../../server/db/json-validation.js';
 import type { CompetitorAlertsResponse } from '../../shared/types/competitor-alerts.js';
 
-let baseUrl = '';
-let server: http.Server | undefined;
+type CompetitorAlertsResponseWithRideAlong = CompetitorAlertsResponse & {
+  lastSnapshotDate: string | null;
+  alerts: Array<CompetitorAlertsResponse['alerts'][number] & { insightId: string | null }>;
+};
+
+let app: Express;
 let wsId = '';
 let otherWsId = '';
 
@@ -40,6 +46,13 @@ const insertAlert = db.prepare(`
   VALUES
     (@id, @workspace_id, @competitor_domain, @alert_type, @keyword, @previous_position,
      @current_position, @position_change, @volume, @severity, @snapshot_date, @insight_id, @created_at)
+`);
+
+const insertSnapshot = db.prepare(`
+  INSERT INTO competitor_snapshots
+    (id, workspace_id, competitor_domain, snapshot_date, keyword_count, organic_traffic, top_keywords, created_at)
+  VALUES
+    (@id, @workspace_id, @competitor_domain, @snapshot_date, @keyword_count, @organic_traffic, @top_keywords, @created_at)
 `);
 
 function seedAlert(opts: {
@@ -53,6 +66,7 @@ function seedAlert(opts: {
   positionChange?: number | null;
   volume?: number | null;
   severity?: string;
+  insightId?: string | null;
   snapshotDate?: string;
   createdAt: string;
 }): void {
@@ -68,24 +82,93 @@ function seedAlert(opts: {
     volume: opts.volume ?? 900,
     severity: opts.severity ?? 'warning',
     snapshot_date: opts.snapshotDate ?? '2026-06-15',
-    insight_id: null,
+    insight_id: opts.insightId ?? null,
     created_at: opts.createdAt,
   });
 }
 
-async function fetchAlerts(id: string): Promise<{ status: number; body: CompetitorAlertsResponse }> {
-  const res = await fetch(`${baseUrl}/api/workspaces/${id}/competitor-alerts`);
-  const body = await res.json() as CompetitorAlertsResponse;
-  return { status: res.status, body };
+function seedSnapshot(opts: {
+  id: string;
+  workspaceId: string;
+  competitorDomain?: string;
+  snapshotDate: string;
+  createdAt?: string;
+}): void {
+  insertSnapshot.run({
+    id: opts.id,
+    workspace_id: opts.workspaceId,
+    competitor_domain: opts.competitorDomain ?? 'competitor.example.com',
+    snapshot_date: opts.snapshotDate,
+    keyword_count: 12,
+    organic_traffic: 1200,
+    top_keywords: '[]',
+    created_at: opts.createdAt ?? `${opts.snapshotDate}T00:00:00.000Z`,
+  });
+}
+
+async function requestJson(path: string): Promise<{ status: number; body: unknown }> {
+  return await new Promise<{ status: number; body: unknown }>((resolve, reject) => {
+    const req = new IncomingMessage(new Socket());
+    req.method = 'GET';
+    req.url = path;
+    req.headers = { host: 'localhost' };
+
+    const res = new ServerResponse(req);
+    const chunks: Buffer[] = [];
+    let settled = false;
+
+    function settle(bodyText: string): void {
+      if (settled) return;
+      settled = true;
+      resolve({
+        status: res.statusCode,
+        body: bodyText ? parseJsonFallback<unknown>(bodyText, bodyText) : undefined,
+      });
+    }
+
+    res.write = ((chunk: unknown, encodingOrCallback?: BufferEncoding | ((error?: Error) => void), callback?: (error?: Error) => void): boolean => {
+      if (chunk != null) {
+        const encoding = typeof encodingOrCallback === 'string' ? encodingOrCallback : undefined;
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), encoding));
+      }
+      if (typeof encodingOrCallback === 'function') encodingOrCallback();
+      if (callback) callback();
+      return true;
+    }) as typeof res.write;
+
+    res.end = ((chunk?: unknown, encodingOrCallback?: BufferEncoding | (() => void), callback?: () => void): ServerResponse => {
+      if (chunk != null) {
+        const encoding = typeof encodingOrCallback === 'string' ? encodingOrCallback : undefined;
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), encoding));
+      }
+      if (typeof encodingOrCallback === 'function') encodingOrCallback();
+      if (callback) callback();
+      settle(Buffer.concat(chunks).toString('utf8'));
+      return res;
+    }) as typeof res.end;
+
+    app.handle(req, res, (err) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      res.statusCode = 404;
+      res.end('{"error":"Not found"}');
+    });
+
+    req.push(null);
+  });
+}
+
+async function fetchAlerts(id: string): Promise<{ status: number; body: CompetitorAlertsResponseWithRideAlong }> {
+  const { status, body } = await requestJson(`/api/workspaces/${id}/competitor-alerts`);
+  return { status, body: body as CompetitorAlertsResponseWithRideAlong };
 }
 
 beforeAll(async () => {
   delete process.env.APP_PASSWORD;
   const { createApp } = await import('../../server/app.js'); // dynamic-import-ok
-  server = http.createServer(createApp());
-  await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', resolve));
-  const { port } = server.address() as AddressInfo;
-  baseUrl = `http://127.0.0.1:${port}`;
+  app = createApp();
 
   wsId = createWorkspace('Competitor Alerts Route WS').id;
   otherWsId = createWorkspace('Competitor Alerts Route Empty WS').id;
@@ -94,12 +177,13 @@ beforeAll(async () => {
 afterEach(() => {
   db.prepare('DELETE FROM competitor_alerts WHERE workspace_id = ?').run(wsId);
   db.prepare('DELETE FROM competitor_alerts WHERE workspace_id = ?').run(otherWsId);
+  db.prepare('DELETE FROM competitor_snapshots WHERE workspace_id = ?').run(wsId);
+  db.prepare('DELETE FROM competitor_snapshots WHERE workspace_id = ?').run(otherWsId);
 });
 
 afterAll(async () => {
   deleteWorkspace(wsId);
   deleteWorkspace(otherWsId);
-  if (server) await new Promise<void>((resolve, reject) => server!.close(err => (err ? reject(err) : resolve())));
 });
 
 describe('GET /api/workspaces/:workspaceId/competitor-alerts', () => {
@@ -152,9 +236,33 @@ describe('GET /api/workspaces/:workspaceId/competitor-alerts', () => {
     expect(view!.severity).toBe('critical');
     expect(view!.positionChange).toBe(6);
     expect(view!.keyword).toBe('metal roofing');
-    // toMatchObject is a SUBSET matcher, so assert the admin-internal `insightId` is NOT leaked onto
-    // the wire shape (toView omits it; a future `...alert` spread would silently re-expose it).
-    expect(view).not.toHaveProperty('insightId');
+    expect(view!.insightId).toBeNull();
+  });
+
+  it('adds insightId to alert rows when an alert has been linked to an insight', async () => {
+    seedAlert({
+      id: 'ca-insight',
+      workspaceId: wsId,
+      insightId: 'insight-123',
+      createdAt: '2026-06-15T08:00:00.000Z',
+    });
+
+    const { status, body } = await fetchAlerts(wsId);
+    expect(status).toBe(200);
+    expect(body.alerts[0]).toMatchObject({
+      id: 'ca-insight',
+      insightId: 'insight-123',
+    });
+  });
+
+  it('returns the latest competitor snapshot date even when no alerts fired', async () => {
+    seedSnapshot({ id: 'snap-old', workspaceId: otherWsId, snapshotDate: '2026-06-08' });
+    seedSnapshot({ id: 'snap-new', workspaceId: otherWsId, snapshotDate: '2026-06-15' });
+
+    const { status, body } = await fetchAlerts(otherWsId);
+    expect(status).toBe(200);
+    expect(body.alerts).toEqual([]);
+    expect(body.lastSnapshotDate).toBe('2026-06-15');
   });
 
   it('scopes alerts to the workspace through the HTTP path (no cross-workspace leak)', async () => {

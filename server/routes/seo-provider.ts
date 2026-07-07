@@ -39,7 +39,7 @@ function parseCsvQuery(rawValue: unknown): string[] {
     .filter(Boolean);
 }
 
-type CompetitiveIntelFailureArea = 'overview' | 'backlinks' | 'keyword_gap' | 'top_keywords';
+type CompetitiveIntelFailureArea = 'overview' | 'backlinks' | 'keyword_gap' | 'top_keywords' | 'authority';
 
 interface CompetitiveIntelProviderFailure {
   area: CompetitiveIntelFailureArea;
@@ -114,12 +114,15 @@ router.get('/api/seo/competitive-intel/:workspaceId', requireWorkspaceAccess('wo
       }
     };
 
-    const [overviews, backlinks, keywordGaps] = await Promise.all([
+    const [overviews, backlinks, keywordGaps, authorityMetrics] = await Promise.all([
       Promise.all(allDomains.map(d => readProvider('overview', provider.name, () => provider.getDomainOverview(d, workspaceId, undefined, geo.locationCode, geo.languageCode), null, d))),
       blProvider
         ? Promise.all(allDomains.map(d => readProvider('backlinks', blProvider.name, () => blProvider.getBacklinksOverview(d, workspaceId), null, d)))
         : Promise.resolve(allDomains.map(() => null)),
       readProvider('keyword_gap', provider.name, () => provider.getKeywordGap(myDomain, cappedCompetitors, workspaceId, 30, undefined, geo.locationCode, geo.languageCode), []),
+      provider.getDomainAuthorityMetrics
+        ? readProvider('authority', provider.name, () => provider.getDomainAuthorityMetrics!(allDomains, workspaceId, undefined, geo.locationCode, geo.languageCode), [])
+        : Promise.resolve([]),
     ]);
 
     // Get top keywords for each domain (parallel, limit 20 for speed)
@@ -146,13 +149,22 @@ router.get('/api/seo/competitive-intel/:workspaceId', requireWorkspaceAccess('wo
       return;
     }
 
-    const domains = allDomains.map((domain, i) => ({
-      domain,
-      isOwn: i === 0,
-      overview: overviews[i],
-      backlinks: backlinks[i],
-      topKeywords: topKeywords[i],
-    }));
+    const authorityByDomain = new Map(authorityMetrics.map(metric => [normalizeSeoDomain(metric.domain), metric]));
+
+    const domains = allDomains.map((domain, i) => {
+      const authority = authorityByDomain.get(domain);
+      return {
+        domain,
+        isOwn: i === 0,
+        overview: overviews[i],
+        backlinks: backlinks[i],
+        topKeywords: topKeywords[i],
+        ...(authority ? {
+          authorityRank: authority.authorityRank,
+          top3Keywords: authority.top3Keywords,
+        } : {}),
+      };
+    });
 
     res.json({
       domains,

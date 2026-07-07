@@ -79,6 +79,14 @@ export interface KeywordGapEntry {
   competitorDomain: string;
 }
 
+export interface DomainAuthorityMetric {
+  domain: string;
+  /** DataForSEO backlinks bulk rank, rank_scale one_hundred (0-100). */
+  authorityRank: number | null;
+  /** True top-3 organic keyword count: pos_1 + pos_2_3 from domain_rank_overview. */
+  top3Keywords: number | null;
+}
+
 export interface BacklinksOverview {
   totalBacklinks: number;
   referringDomains: number;
@@ -261,6 +269,7 @@ export interface SeoDataProvider {
 
   // Competitive Analysis
   getKeywordGap(clientDomain: string, competitorDomains: string[], workspaceId: string, limit?: number, database?: string, locationCode?: number, languageCode?: string): Promise<KeywordGapEntry[]>;
+  getDomainAuthorityMetrics?(domains: string[], workspaceId: string, database?: string, locationCode?: number, languageCode?: string): Promise<DomainAuthorityMetric[]>;
 
   // Backlinks
   getBacklinksOverview(domain: string, workspaceId: string, database?: string): Promise<BacklinksOverview | null>;
