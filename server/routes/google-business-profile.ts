@@ -1,3 +1,4 @@
+// @ds-rebuilt
 /**
  * Google Business Profile integration routes.
  *
@@ -76,6 +77,15 @@ const mappingBodySchema = z.object({
 
 const reviewResponseDraftSchema = z.object({
   reviewResourceName: z.string().min(1).max(500),
+}).strict();
+
+const reviewResponseManualDraftSchema = z.object({
+  reviewResourceName: z.string().min(1).max(500),
+  draftText: z.string().trim().min(20).max(1500),
+}).strict();
+
+const reviewResponseDraftAndSendSchema = reviewResponseManualDraftSchema.extend({
+  note: z.string().max(1000).optional(),
 }).strict();
 
 const reviewResponseUpdateSchema = z.object({
@@ -315,6 +325,87 @@ router.post(
       );
       broadcastGbpReviewResponseChange(workspaceId, 'drafted', response.id);
       res.json(response);
+    } catch (error) {
+      if (handleReviewResponseError(error, res)) return;
+      next(error);
+    }
+  },
+);
+
+router.post(
+  '/api/google-business-profile/workspaces/:workspaceId/review-responses/manual-draft',
+  requireAdminAuth,
+  requireWorkspaceAccess('workspaceId'),
+  validate(reviewResponseManualDraftSchema),
+  (req, res, next) => {
+    const { workspaceId } = req.params;
+    if (!responseFeatureEnabled(workspaceId)) {
+      return res.status(404).json({ error: 'Google Business Profile review responses are not enabled' });
+    }
+    const body = req.body as { reviewResourceName: string; draftText: string };
+    try {
+      const response = upsertGbpReviewResponseDraft({
+        workspaceId,
+        reviewResourceName: body.reviewResourceName,
+        draftText: body.draftText,
+        actor: { type: 'admin' },
+      });
+      addActivity(
+        workspaceId,
+        'local_seo_updated',
+        'Google Business Profile review reply drafted manually',
+        'An admin wrote a draft response for an unanswered Google Business Profile review.',
+        { source: 'google_business_profile', responseId: response.id },
+      );
+      broadcastGbpReviewResponseChange(workspaceId, 'manual_draft_created', response.id);
+      res.json(response);
+    } catch (error) {
+      if (handleReviewResponseError(error, res)) return;
+      next(error);
+    }
+  },
+);
+
+router.post(
+  '/api/google-business-profile/workspaces/:workspaceId/review-responses/draft-and-send',
+  requireAdminAuth,
+  requireWorkspaceAccess('workspaceId'),
+  validate(reviewResponseDraftAndSendSchema),
+  async (req, res, next) => {
+    const { workspaceId } = req.params;
+    if (!responseFeatureEnabled(workspaceId)) {
+      return res.status(404).json({ error: 'Google Business Profile review responses are not enabled' });
+    }
+    const body = req.body as { reviewResourceName: string; draftText: string; note?: string };
+    try {
+      const draft = upsertGbpReviewResponseDraft({
+        workspaceId,
+        reviewResourceName: body.reviewResourceName,
+        draftText: body.draftText,
+        actor: { type: 'admin' },
+      });
+      const deliverable = await sendToClient(
+        workspaceId,
+        'gbp_review_response',
+        { response: draft },
+        { note: body.note ?? null, source: 'google_business_profile' },
+      );
+      const response = markGbpReviewResponseSent({
+        workspaceId,
+        responseId: draft.id,
+        deliverableId: deliverable.id,
+        actor: { type: 'admin' },
+        note: body.note,
+      });
+      addActivity(
+        workspaceId,
+        'local_seo_updated',
+        'Google Business Profile review reply drafted and sent',
+        'An admin wrote a Google Business Profile review response and sent it to the client for approval.',
+        { source: 'google_business_profile', responseId: response.id, deliverableId: deliverable.id },
+      );
+      broadcastGbpReviewResponseChange(workspaceId, 'manual_draft_sent_to_client', response.id);
+      res.json({ response, deliverable });
     } catch (error) {
       if (handleReviewResponseError(error, res)) return;
       next(error);

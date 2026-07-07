@@ -541,6 +541,15 @@ export interface LocalSeoRepeatCompetitor {
   winsAgainstClient: number;
   markets: string[];
   suggestedTrackingKeywords: string[];
+  /**
+   * SB-019a — percent of checked local-pack snapshots in which this competitor appeared
+   * (server-computed; already a percentage, e.g. 42.5 for 42.5%). Optional: only the
+   * map-pack visibility read model (getLocalSeoCompetitorBrands) populates it; empty
+   * defaults and other producers omit it.
+   */
+  mapPackShareOfVoicePct?: number;
+  /** Denominator (number of checked snapshots) behind mapPackShareOfVoicePct. */
+  mapPackShareOfVoiceBasis?: number;
 }
 
 export interface LocalSeoServiceGap {

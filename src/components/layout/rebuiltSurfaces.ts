@@ -32,4 +32,7 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'media': lazyWithRetry(() =>
     import('../asset-manager-rebuilt/AssetManagerSurface').then(m => ({ default: m.AssetManagerSurface })),
   ),
+  'local-seo': lazyWithRetry(() =>
+    import('../local-presence-rebuilt/LocalPresenceSurface').then(m => ({ default: m.LocalPresenceSurface })),
+  ),
 };

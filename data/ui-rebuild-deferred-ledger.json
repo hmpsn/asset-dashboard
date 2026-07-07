@@ -417,6 +417,111 @@
         "ticket": "docs/ui-rebuild/phase-a/tickets/asset-manager.md",
         "sb": "SB-022"
       }
+    },
+    {
+      "id": "DEF-local-presence-001",
+      "surface": "local-presence",
+      "item": "49-point geo-grid rank map is not built; the surface ships a posture grid on real per-market single-point data instead of a geo-grid scan.",
+      "decision": "AD-025: no data source exists and the geo-grid needs a new paid scan job + snapshot table + migration; ship the posture grid now and defer the scan.",
+      "class": "data",
+      "upgradeTrigger": "Owner greenlights the paid geo-grid scan job (SB-057 / sn-local-presence-1).",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-30",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/local-presence.md",
+        "sb": "SB-057",
+        "ad": "AD-025"
+      }
+    },
+    {
+      "id": "DEF-local-presence-002",
+      "surface": "local-presence",
+      "item": "View-on-Google link is deferred; no review/maps URL is persisted so the surface cannot deep-link a reviewer to the live Google review.",
+      "decision": "SB-018-5 needs a DB-column + mapper + serialization lockstep to persist the maps URL; defer that column and ship review-response authoring without the outbound link.",
+      "class": "data",
+      "upgradeTrigger": "SB-018-5 lands the maps-URL column + mapper + serialization (sn-local-presence-5).",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-30",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/local-presence.md",
+        "sb": "SB-018-5"
+      }
+    },
+    {
+      "id": "DEF-local-presence-003",
+      "surface": "local-presence",
+      "item": "Reopen-for-edits on an approved review response is deferred; the approved→draft transition is illegal in the state machine today.",
+      "decision": "SB-018-7 needs state-machine sign-off (AD-024) to add the reopen transitions that clear approval metadata; ship the forward lifecycle now and defer reopen.",
+      "class": "data",
+      "upgradeTrigger": "State-machine sign-off adds the approved→draft reopen transitions (SB-018-7 / sn-local-presence-7).",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-30",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/local-presence.md",
+        "sb": "SB-018-7",
+        "ad": "AD-024"
+      }
+    },
+    {
+      "id": "DEF-local-presence-004",
+      "surface": "local-presence",
+      "item": "Per-target nudge-client rate-limit is deferred; the existing remindDeliverable path has no per-target throttle so repeat nudges are not rate-limited on this surface.",
+      "decision": "SB-014's email/broadcast/activity halves already exist; only the net-new per-target throttle is missing and it did not ride W2, so ledger it rather than ship an ad-hoc throttle.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-014 per-target rate-limit ships (sn-local-presence-4 / N7).",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-30",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/local-presence.md",
+        "sb": "SB-014"
+      }
+    },
+    {
+      "id": "DEF-local-presence-005",
+      "surface": "local-presence",
+      "item": "GBP Performance hero metrics (views/calls/directions) are cut; the surface shows rating + reviews + completeness instead of live performance metrics.",
+      "decision": "AD-025: SB-058 needs a new Google Performance OAuth scope + client method + storage that the GBP client does not have today; ship the available signals and defer the performance ingestion.",
+      "class": "data",
+      "upgradeTrigger": "Owner greenlights the new Google Performance scope + ingestion (SB-058 / sn-local-presence-2).",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-30",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/local-presence.md",
+        "sb": "SB-058",
+        "ad": "AD-025"
+      }
+    },
+    {
+      "id": "DEF-local-presence-006",
+      "surface": "local-presence",
+      "item": "Profile-health checklist ships 3 real signals (photos/attributes/category); hours/products/Q&A/service-area signals are deferred.",
+      "decision": "Only photos/attributes/category are captured by GBP ingestion today; ship the 3-signal checklist and defer the extended-profile signals until ingestion covers them.",
+      "class": "data",
+      "upgradeTrigger": "SB-056 extended GBP profile ingestion lands (hours/products/Q&A/service-area) (sn-local-presence-8).",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-30",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/local-presence.md",
+        "sb": "SB-056"
+      }
     }
   ]
 }
