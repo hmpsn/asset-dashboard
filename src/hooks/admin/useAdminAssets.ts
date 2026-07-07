@@ -14,6 +14,9 @@ interface Asset {
   hostedUrl?: string;
   altText?: string;
   createdOn?: string;
+  width?: number;
+  height?: number;
+  dimensionsDerivedAt?: string;
 }
 
 /**

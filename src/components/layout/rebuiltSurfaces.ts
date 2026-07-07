@@ -29,4 +29,7 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'analytics-hub': lazyWithRetry(() =>
     import('../search-traffic-rebuilt/SearchTrafficSurface').then(m => ({ default: m.SearchTrafficSurface })),
   ),
+  'media': lazyWithRetry(() =>
+    import('../asset-manager-rebuilt/AssetManagerSurface').then(m => ({ default: m.AssetManagerSurface })),
+  ),
 };
