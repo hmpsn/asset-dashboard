@@ -20,9 +20,11 @@ import { createLogger } from '../logger.js';
 import { parsePositiveIntQuery } from '../query-param-parsers.js';
 import { getLatestEffectiveSnapshot } from '../audit-snapshot-views.js';
 import { classifyWorkQueue } from '../domains/work-queue.js';
+import { buildCockpitVerdict } from '../domains/cockpit-verdict.js';
+import { loadAdminMoneyFrame } from '../money-frame-store.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('workspace-home');
-import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 /**
@@ -110,6 +112,7 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
     requestsResolved: recentActivity.filter(a => a.type === 'request_resolved').length,
   };
   const weeklyTotal = Object.values(weeklySummary).reduce((s, n) => s + n, 0);
+  const weeklySummaryPayload = weeklyTotal > 0 ? weeklySummary : null;
 
   // Derive content pipeline summary
   const allCells = (matrices as Array<{ cells?: Array<{ status: string }> }>).flatMap(m => m.cells || []);
@@ -141,6 +144,21 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
     },
   });
 
+  let moneyFrame = null;
+  try {
+    moneyFrame = loadAdminMoneyFrame(ws.id);
+  } catch (err) {
+    log.warn({ err }, 'workspace-home partial fetch failed');
+  }
+
+  const cockpitVerdict = buildCockpitVerdict({
+    workQueue,
+    audit,
+    weeklySummary: weeklySummaryPayload,
+    moneyFrame,
+    contentVelocity,
+  });
+
   res.json({
     ranks,
     requests,
@@ -156,7 +174,9 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
     contentVelocity,
     contentDecay,
     workQueue,
-    weeklySummary: weeklyTotal > 0 ? weeklySummary : null,
+    cockpitVerdict,
+    moneyFrame,
+    weeklySummary: weeklySummaryPayload,
   });
 });
 

@@ -1340,6 +1340,79 @@
         "surface": "docs/ui-rebuild/phase-a/surfaces/site-audit.json:212-215",
         "backlog": "SB-001"
       }
+    },
+    {
+      "id": "DEF-cockpit-001",
+      "surface": "cockpit",
+      "item": "Monetization to-pitch admin stream",
+      "decision": "Do not invent an admin upsell or scope-expansion queue in the Cockpit rebuild; ship opt/send/unclassified streams on the shared work-queue source and show honest absence for money-stream pitch work until SB-041 lands.",
+      "class": "data",
+      "upgradeTrigger": "SB-041 ships a server-authored admin pitch queue with source provenance, counts shared with Global Ops Today, activity/audit coverage, and tests proving client purchase upsells are not reused as admin pitch items.",
+      "owner": "Joshua",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "C-Q9 P2",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/cockpit.json:406-411,514-526",
+        "backlog": "docs/ui-rebuild/phase-a/server-backlog.json:558-568"
+      }
+    },
+    {
+      "id": "DEF-cockpit-002",
+      "surface": "cockpit",
+      "item": "Promote client request to strategy signal",
+      "decision": "Do not build a Cockpit-only promote-to-signal POST; keep client requests as queue rows and route operators to the owning surface until the shared flagged flow is signed.",
+      "class": "behavior",
+      "upgradeTrigger": "AD-023 follow-up lands SB-002 with one shared endpoint, request status transition, provenance snapshot, activity log, broadcast, and coordinated receivers across Cockpit, Global Ops, Engine, Insights, and Recommendations.",
+      "owner": "Joshua",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-023 / C-Q9 P4",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/cockpit.json:421-426,516-520",
+        "backlog": "docs/ui-rebuild/phase-a/server-backlog.json:24-38"
+      }
+    },
+    {
+      "id": "DEF-cockpit-003",
+      "surface": "cockpit",
+      "item": "Technicals graduate to proof point or Insights Engine",
+      "decision": "Do not build a Cockpit-specific graduation/proof-point write from technical rows; keep technicals as hand-off evidence and wait for the C3 owner-signed graduation contract.",
+      "class": "behavior",
+      "upgradeTrigger": "AD-004/SB-001 or SB-061 lands a shared graduation/proof-point contract with typed source provenance, attribution honesty, activity logging, broadcasts, and receiver UI.",
+      "owner": "Joshua",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-004 / C-Q9 P5",
+        "phaseA": "docs/ui-rebuild/phase-a/PHASE_A_DECISIONS.md:13,28-30",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/cockpit.json:427-432",
+        "backlog": "docs/ui-rebuild/phase-a/server-backlog.json:7-23,786-796"
+      }
+    },
+    {
+      "id": "DEF-cockpit-004",
+      "surface": "cockpit",
+      "item": "Client-switcher book roll-up",
+      "decision": "Do not extend the global workspace switcher from the single-client Cockpit lane; leave at-risk/open-request/in-setup roll-ups to Global Ops or shell ownership.",
+      "class": "data",
+      "upgradeTrigger": "The shell/global-ops owner extends the existing /api/workspace-overview aggregation with typed roll-up fields and proves the switcher, Global Ops Today, and Cockpit read any shared counts from one source.",
+      "owner": "Joshua",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "C-Q9 P6",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/cockpit.json:433-438,528-536",
+        "backlog": "docs/ui-rebuild/phase-a/surfaces/cockpit.json:319-332"
+      }
     }
   ]
 }

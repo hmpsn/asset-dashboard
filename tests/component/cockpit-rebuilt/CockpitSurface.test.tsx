@@ -1,0 +1,315 @@
+// @ds-rebuilt
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { CockpitSurface } from '../../../src/components/cockpit-rebuilt/CockpitSurface';
+import { ToastProvider } from '../../../src/components/Toast';
+import { useFeatureFlag } from '../../../src/hooks/useFeatureFlag';
+import { expectNoA11yViolations } from '../a11y';
+import type { UseCockpitRebuiltResult } from '../../../src/hooks/admin/useCockpitRebuilt';
+import type { WorkQueueClassification, WorkQueueItem, WorkQueueSourceType } from '../../../shared/types/work-queue';
+
+const mocks = vi.hoisted(() => ({
+  featureFlagsList: vi.fn(),
+  cockpitState: null as UseCockpitRebuiltResult | null,
+}));
+
+vi.mock('../../../src/api/misc', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/api/misc')>('../../../src/api/misc');
+  return {
+    ...actual,
+    featureFlags: {
+      ...actual.featureFlags,
+      list: (...args: unknown[]) => mocks.featureFlagsList(...args),
+    },
+  };
+});
+
+vi.mock('../../../src/hooks/admin/useCockpitRebuilt', () => {
+  const emptyQueue: WorkQueueClassification = {
+    streams: { opt: 0, send: 0, money: 0, unclassified: 0 },
+    items: [],
+  };
+  return {
+    useCockpitRebuilt: () => {
+      if (!mocks.cockpitState) throw new Error('Cockpit test state was not initialized');
+      return mocks.cockpitState;
+    },
+    workQueueWithVisibleItems: (queue: WorkQueueClassification | null, suppressSetup: boolean): WorkQueueClassification => {
+      const source = queue ?? emptyQueue;
+      const items = suppressSetup ? source.items.filter((item) => item.sourceType !== 'setup_gap') : source.items;
+      return {
+        streams: {
+          opt: items.filter((item) => item.stream === 'opt').length,
+          send: items.filter((item) => item.stream === 'send').length,
+          money: items.filter((item) => item.stream === 'money').length,
+          unclassified: items.filter((item) => item.stream === 'unclassified').length,
+        },
+        items,
+      };
+    },
+    countWorkQueueSourceTypes: (items: WorkQueueItem[]): Partial<Record<WorkQueueSourceType, number>> => (
+      items.reduce<Partial<Record<WorkQueueSourceType, number>>>((acc, item) => {
+        acc[item.sourceType] = (acc[item.sourceType] ?? 0) + 1;
+        return acc;
+      }, {})
+    ),
+  };
+});
+
+vi.mock('../../../src/components/workspace-home', () => ({
+  ActivityFeed: ({ activity }: { activity: Array<{ title: string }> }) => (
+    <div data-testid="activity-feed">{activity.map((item) => item.title).join(', ')}</div>
+  ),
+  SeoChangeImpact: () => <div data-testid="seo-change-impact">Before and after impact</div>,
+  WeeklyAccomplishments: () => <div data-testid="weekly-accomplishments">This week landed work</div>,
+}));
+
+vi.mock('../../../src/components/admin/WorkOrderPanel', () => ({
+  WorkOrderPanel: ({ workspaceId, onDismiss }: { workspaceId: string; onDismiss: () => void }) => (
+    <div role="dialog" aria-label="Work orders" data-testid="work-order-panel">
+      Work orders for {workspaceId}
+      <button type="button" onClick={onDismiss}>Close work orders</button>
+    </div>
+  ),
+}));
+
+const workspaceId = 'ws-cockpit';
+
+const workQueue: WorkQueueClassification = {
+  streams: { opt: 2, send: 1, money: 1, unclassified: 1 },
+  items: [
+    {
+      stream: 'send',
+      id: 'request-1',
+      title: 'Approve July content plan',
+      meta: 'Client request · Jul 4',
+      impact: 'Send',
+      direction: 'neutral',
+      sourceType: 'request',
+    },
+    {
+      stream: 'opt',
+      id: 'order-1',
+      title: 'Close Core Web Vitals cleanup',
+      meta: 'Work order · in progress',
+      impact: '2 tasks',
+      direction: 'negative',
+      sourceType: 'work_order',
+    },
+    {
+      stream: 'opt',
+      id: 'decay-1',
+      title: 'Refresh decaying service page',
+      meta: 'Content health · -24% clicks',
+      impact: '-24%',
+      direction: 'negative',
+      sourceType: 'content_decay',
+    },
+    {
+      stream: 'money',
+      id: 'money-1',
+      title: 'Review measured value frame',
+      meta: 'Outcome evidence',
+      impact: '$18k',
+      direction: 'positive',
+      sourceType: 'content_pipeline',
+    },
+    {
+      stream: 'unclassified',
+      id: 'churn-1',
+      title: 'Client has not viewed the portal',
+      meta: 'Churn signal · critical',
+      direction: 'negative',
+      sourceType: 'churn_signal',
+    },
+    {
+      stream: 'opt',
+      id: 'setup-1',
+      title: 'Connect GA4',
+      meta: 'Setup gap',
+      direction: 'neutral',
+      sourceType: 'setup_gap',
+    },
+  ],
+};
+
+function makeCockpitState(overrides: Partial<UseCockpitRebuiltResult> = {}): UseCockpitRebuiltResult {
+  const homeData = {
+    weeklySummary: {
+      seoUpdates: 1,
+      auditsRun: 1,
+      contentGenerated: 1,
+      contentPublished: 1,
+      requestsResolved: 1,
+    },
+    workQueue,
+    cockpitVerdict: {
+      status: 'watch',
+      headline: 'Client-facing work is ready to review and send.',
+      narrative: 'One send item and optimization work are waiting in the shared work queue.',
+      generatedAt: '2026-07-07T12:00:00.000Z',
+      evidence: [{ label: 'Work queue', value: 5, tone: 'warning' }],
+    },
+    moneyFrame: {
+      valueAtStake: 18450,
+      recoveredSoFar: 2760,
+      provenance: 'measured_action',
+      precomputedAt: '2026-07-07T12:00:00.000Z',
+    },
+  };
+
+  return {
+    workspace: {
+      id: workspaceId,
+      name: 'Acme Dental',
+      webflowSiteId: 'site-1',
+      webflowSiteName: 'Acme Dental',
+      gscPropertyUrl: 'https://acme.example',
+      ga4PropertyId: 'properties/123',
+    } as UseCockpitRebuiltResult['workspace'],
+    workspaceQuery: { data: [], isLoading: false, isError: false } as UseCockpitRebuiltResult['workspaceQuery'],
+    homeQuery: {
+      data: homeData,
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      dataUpdatedAt: new Date('2026-07-07T12:05:00.000Z').getTime(),
+      refetch: vi.fn().mockResolvedValue({ error: null }),
+    } as unknown as UseCockpitRebuiltResult['homeQuery'],
+    auditQuery: { audit: { siteScore: 82, errors: 1, warnings: 3, previousScore: 79 } } as UseCockpitRebuiltResult['auditQuery'],
+    roiQuery: { data: { organicTrafficValue: 42000, adSpendEquivalent: 8700 } } as UseCockpitRebuiltResult['roiQuery'],
+    intelligenceQuery: { data: { clientSignals: { compositeHealthScore: 84 } } } as UseCockpitRebuiltResult['intelligenceQuery'],
+    homeData: homeData as UseCockpitRebuiltResult['homeData'],
+    verdict: homeData.cockpitVerdict,
+    moneyFrame: homeData.moneyFrame,
+    workQueue,
+    ranks: [
+      { id: 'rank-1', query: 'cosmetic dentist', position: 3, previousPosition: 6, change: 3 },
+      { id: 'rank-2', query: 'emergency dentist', position: 9, previousPosition: 7, change: -2 },
+    ],
+    requests: [
+      { id: 'req-1', title: 'Can we review July posts?', status: 'open', category: 'content', createdAt: '2026-07-04T12:00:00.000Z' },
+    ],
+    activity: [
+      { id: 'activity-1', type: 'content_published', title: 'Published July article', createdAt: '2026-07-06T12:00:00.000Z' },
+    ],
+    kpis: {
+      siteHealth: { score: 82, errors: 1, warnings: 3, delta: 3 },
+      search: { clicks: 1234, impressions: 18800, ctr: 0.066, avgPosition: 8.4 },
+      trafficValue: { organic: 42000, adSpendEquivalent: 8700, valueAtStake: 18450, recoveredSoFar: 2760, provenance: 'measured_action' },
+      ga4: { users: 5400, sessions: 7200, newUserPercentage: 62, usersDelta: 12 },
+      ranks: { tracked: 2, up: 1, down: 1, flat: 0 },
+      contentDecay: { critical: 1, warning: 2, total: 3, avgDeclinePct: -24 },
+      contentPipeline: { total: 10, published: 4, review: 2, approved: 2, inProgress: 2, percent: 40 },
+      contentVelocity: { monthly: [1, 2, 3, 4], currentMonthPublished: 4, trailingThreeMonthAvg: 3, previousThreeMonthAvg: 2, trendPct: 50 },
+      coverageGaps: 3,
+      overallHealth: { score: 84, label: 'On track' },
+    },
+    lastFetched: new Date('2026-07-07T12:05:00.000Z'),
+    ...overrides,
+  };
+}
+
+function createClient() {
+  return new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+}
+
+function renderSurface(initialEntry = `/ws/${workspaceId}`, client = createClient()) {
+  const result = render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <ToastProvider>
+          <CockpitSurface workspaceId={workspaceId} />
+        </ToastProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  return { ...result, client };
+}
+
+function FlaggedCockpitHarness() {
+  const enabled = useFeatureFlag('ui-rebuild-shell');
+  return enabled ? <CockpitSurface workspaceId={workspaceId} /> : <div data-testid="legacy-home">Legacy home</div>;
+}
+
+function renderFlagHarness(client = createClient()) {
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[`/ws/${workspaceId}`]}>
+        <ToastProvider>
+          <FlaggedCockpitHarness />
+        </ToastProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+describe('CockpitSurface rebuilt', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.setItem(`onboarding_checklist_dismissed_${workspaceId}`, '1');
+    mocks.featureFlagsList.mockResolvedValue({ 'ui-rebuild-shell': true });
+    mocks.cockpitState = makeCockpitState();
+  });
+
+  it('mounts after the real feature-flag hook transitions from loading fallback to ON', async () => {
+    let resolveFlags: (value: { 'ui-rebuild-shell': boolean }) => void = () => {};
+    mocks.featureFlagsList.mockReturnValue(new Promise((resolve) => {
+      resolveFlags = resolve;
+    }));
+
+    renderFlagHarness();
+
+    expect(screen.getByTestId('legacy-home')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveFlags({ 'ui-rebuild-shell': true });
+    });
+
+    expect(await screen.findByTestId('cockpit-rebuilt-surface')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Cockpit' })).toBeInTheDocument();
+  });
+
+  it('meets the rebuilt a11y floor after animate-pulse settles', async () => {
+    const { container } = renderSurface();
+
+    expect(await screen.findByTestId('cockpit-rebuilt-surface')).toBeInTheDocument();
+    await waitFor(() => expect(container.querySelectorAll('.animate-pulse').length).toBe(0));
+    await expectNoA11yViolations(container);
+  });
+
+  it('falls back retired and invalid tab receivers without crashing', async () => {
+    renderSurface(`/ws/${workspaceId}?tab=meeting-brief`);
+    expect(await screen.findByTestId('cockpit-retired-tab-fallback')).toBeInTheDocument();
+    expect(screen.getByTestId('cockpit-rebuilt-surface')).toBeInTheDocument();
+
+    renderSurface(`/ws/${workspaceId}?tab=unknown`);
+    expect(await screen.findByTestId('cockpit-invalid-tab-fallback')).toBeInTheDocument();
+  });
+
+  it('reads stream query state and filters to the selected shared work stream', async () => {
+    renderSurface(`/ws/${workspaceId}?stream=send`);
+
+    expect(await screen.findByText('Approve July content plan')).toBeInTheDocument();
+    expect(screen.queryByText('Close Core Web Vitals cleanup')).not.toBeInTheDocument();
+  });
+
+  it('opens the carried-over work-order panel from a work-order queue row', async () => {
+    renderSurface();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Open panel/i }));
+
+    expect(await screen.findByTestId('work-order-panel')).toHaveTextContent(`Work orders for ${workspaceId}`);
+  });
+
+  it('opens the activity drawer from the toolbar', async () => {
+    renderSurface();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Activity/i }));
+
+    expect(await screen.findByRole('dialog', { name: /Recent activity/i })).toBeInTheDocument();
+    expect(screen.getByTestId('activity-feed')).toHaveTextContent('Published July article');
+  });
+});
