@@ -156,13 +156,15 @@ Return a JSON object with exactly these keys:
   "situation": "2-3 sentence narrative of where the site stands and where the momentum is",
   "leadSentence": "the single 'the one move I'd bring' sentence — value-first, names the #1 move (the first in the list)",
   "wins": ["2-4 short wins worth saying out loud — client-safe"],
-  "flags": ["1-3 short things to flag — client-safe, constructive"]
+  "flags": ["1-3 short things to flag — client-safe, constructive"],
+  "verdictHeadline": "short, value-first admin verdict headline over the same evidence"
 }
 
 Rules:
 - ${datelineNote}
 - Never use admin jargon (no 'insight', 'severity', 'impact score', 'rec', 'lifecycle')
 - The leadSentence MUST be about the first move in the list (the #1).
+- The verdictHeadline is operator-facing, value-first, and drafted from the evidence — do not hard-code or template generic client copy.
 - Be specific: name pages, queries, outcomes — not internal scores.
 - Lead with momentum; keep it constructive.
 `.trim();
@@ -231,7 +233,7 @@ export async function generateStrategyPov(
       const systemPrompt = buildSystemPrompt(workspaceId, `
 You are a strategic SEO advisor drafting a curated point of view for ${variant === 'client' ? 'the client' : 'the operator review'}. Your output must be valid JSON matching the StrategyPovAIOutput interface exactly.
 
-Write a confident, value-first narrative over the operator's CURATED moves. No admin jargon, no internal scoring language. Lead with momentum, name the single best move, and keep wins and flags short and client-safe.
+Write a confident, value-first narrative over the operator's variant-appropriate moves. No admin jargon, no internal scoring language. Lead with momentum, name the single best move, draft a short admin verdict headline from the evidence, and keep wins and flags short and client-safe.
 `.trim(), customPromptNotes);
 
       const prompt = buildStrategyPovPrompt(intel, povRecs, variant);
@@ -245,6 +247,7 @@ Write a confident, value-first narrative over the operator's CURATED moves. No a
         leadSentence: parsed.leadSentence,
         wins: parsed.wins,
         flags: parsed.flags,
+        ...(parsed.verdictHeadline ? { verdictHeadline: parsed.verdictHeadline } : {}),
         version,
         generatedAt: new Date().toISOString(),
         editedAt: null,

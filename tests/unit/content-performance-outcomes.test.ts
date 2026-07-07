@@ -1,0 +1,189 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ContentTopicRequest, GeneratedPost } from '../../shared/types/content.js';
+import type { OutcomeReadback } from '../../shared/types/outcome-tracking.js';
+import type { Workspace } from '../../shared/types/workspace.js';
+import type { OutcomeReadbacks } from '../../server/outcome-tracking.js';
+
+const mocks = vi.hoisted(() => ({
+  getBrief: vi.fn(),
+  getGA4LandingPages: vi.fn(),
+  getAllGscPages: vi.fn(),
+  getScoredOutcomeReadbacks: vi.fn(),
+  getWorkspace: vi.fn(),
+  listContentRequests: vi.fn(),
+  listMatrices: vi.fn(),
+  listPosts: vi.fn(),
+}));
+
+vi.mock('../../server/content-brief.js', () => ({
+  getBrief: mocks.getBrief,
+}));
+
+vi.mock('../../server/content-matrices.js', () => ({
+  listMatrices: mocks.listMatrices,
+}));
+
+vi.mock('../../server/content-requests.js', () => ({
+  listContentRequests: mocks.listContentRequests,
+}));
+
+vi.mock('../../server/content-posts.js', () => ({
+  listPosts: mocks.listPosts,
+}));
+
+vi.mock('../../server/google-analytics.js', () => ({
+  getGA4LandingPages: mocks.getGA4LandingPages,
+}));
+
+vi.mock('../../server/outcome-tracking.js', () => ({
+  getScoredOutcomeReadbacks: mocks.getScoredOutcomeReadbacks,
+}));
+
+vi.mock('../../server/search-console.js', () => ({
+  getAllGscPages: mocks.getAllGscPages,
+}));
+
+vi.mock('../../server/workspaces.js', () => ({
+  getWorkspace: mocks.getWorkspace,
+}));
+
+import { getContentPerformance } from '../../server/domains/content/content-performance.js';
+
+function makeWorkspace(): Workspace {
+  return {
+    id: 'ws-content-performance',
+    name: 'Content Performance Workspace',
+  };
+}
+
+function makeRequest(overrides: Partial<ContentTopicRequest> = {}): ContentTopicRequest {
+  return {
+    id: 'req-content',
+    workspaceId: 'ws-content-performance',
+    topic: 'Emergency dentist cost guide',
+    targetKeyword: 'Emergency Dentist Cost',
+    intent: 'informational',
+    priority: 'high',
+    rationale: 'Create a useful cost guide.',
+    status: 'published',
+    requestedAt: '2026-06-01T00:00:00.000Z',
+    updatedAt: '2026-06-15T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makePost(overrides: Partial<GeneratedPost> = {}): GeneratedPost {
+  return {
+    id: 'post-content',
+    workspaceId: 'ws-content-performance',
+    briefId: 'brief-content',
+    targetKeyword: 'Emergency Dentist Cost',
+    title: 'Emergency Dentist Cost Guide',
+    metaDescription: 'Emergency dentist cost ranges and next steps.',
+    introduction: '<p>Emergency dentist cost depends on treatment.</p>',
+    sections: [],
+    conclusion: '<p>Ask for a treatment estimate.</p>',
+    totalWordCount: 600,
+    targetWordCount: 1200,
+    status: 'approved',
+    publishedAt: '2026-06-15T00:00:00.000Z',
+    createdAt: '2026-06-01T00:00:00.000Z',
+    updatedAt: '2026-06-15T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makeOutcome(overrides: Partial<OutcomeReadback> = {}): OutcomeReadback {
+  return {
+    actionId: 'action-content',
+    actionType: 'content_published',
+    score: 'win',
+    checkpointDays: 90,
+    primaryMetric: 'position',
+    direction: 'improved',
+    baselineValue: 14,
+    currentValue: 6,
+    baselinePosition: 14,
+    currentPosition: 6,
+    baselineClicks: null,
+    currentClicks: null,
+    measuredAt: '2026-07-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makeReadbacks(overrides: Partial<OutcomeReadbacks> = {}): OutcomeReadbacks {
+  return {
+    bySource: new Map(),
+    byKeyword: new Map(),
+    byPage: new Map(),
+    ...overrides,
+  };
+}
+
+describe('getContentPerformance outcome readbacks', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getWorkspace.mockReturnValue(makeWorkspace());
+    mocks.getBrief.mockReturnValue(undefined);
+    mocks.listContentRequests.mockReturnValue([]);
+    mocks.listMatrices.mockReturnValue([]);
+    mocks.listPosts.mockReturnValue([]);
+    mocks.getScoredOutcomeReadbacks.mockReturnValue(makeReadbacks());
+  });
+
+  it('attaches outcome from the resolved post source-id before keyword fallback', async () => {
+    const sourceOutcome = makeOutcome({ actionId: 'source-action', score: 'strong_win' });
+    const keywordOutcome = makeOutcome({ actionId: 'keyword-action', score: 'loss', direction: 'declined' });
+
+    mocks.listContentRequests.mockReturnValue([
+      makeRequest({ id: 'req-source', postId: 'post-source', targetKeyword: 'Emergency Dentist Cost' }),
+    ]);
+    mocks.listPosts.mockReturnValue([
+      makePost({ id: 'post-source', targetKeyword: 'Emergency Dentist Cost' }),
+    ]);
+    mocks.getScoredOutcomeReadbacks.mockReturnValue(makeReadbacks({
+      bySource: new Map([['post::post-source', sourceOutcome]]),
+      byKeyword: new Map([['emergency dentist cost', keywordOutcome]]),
+    }));
+
+    const response = await getContentPerformance('ws-content-performance');
+
+    expect(response.items).toHaveLength(1);
+    expect(response.items[0].joinback?.postId).toBe('post-source');
+    expect(response.items[0].outcome).toBe(sourceOutcome);
+    expect(response.items[0].outcome?.actionId).toBe('source-action');
+    expect(mocks.getScoredOutcomeReadbacks).toHaveBeenCalledTimes(1);
+  });
+
+  it('attaches outcome via normalized targetKeyword fallback when no post source exists', async () => {
+    const keywordOutcome = makeOutcome({ actionId: 'keyword-action', score: 'neutral', direction: 'stable' });
+
+    mocks.listContentRequests.mockReturnValue([
+      makeRequest({ id: 'req-keyword', targetKeyword: '  Emergency Dentist Cost  ' }),
+    ]);
+    mocks.getScoredOutcomeReadbacks.mockReturnValue(makeReadbacks({
+      byKeyword: new Map([['emergency dentist cost', keywordOutcome]]),
+    }));
+
+    const response = await getContentPerformance('ws-content-performance');
+
+    expect(response.items).toHaveLength(1);
+    expect(response.items[0].joinback).toBeUndefined();
+    expect(response.items[0].outcome).toBe(keywordOutcome);
+  });
+
+  it('leaves outcome absent when no scored action readback matches', async () => {
+    mocks.listContentRequests.mockReturnValue([
+      makeRequest({ id: 'req-none', postId: 'post-none', targetKeyword: 'No Scored Action' }),
+    ]);
+    mocks.listPosts.mockReturnValue([
+      makePost({ id: 'post-none', targetKeyword: 'No Scored Action' }),
+    ]);
+
+    const response = await getContentPerformance('ws-content-performance');
+
+    expect(response.items.length).toBeGreaterThan(0);
+    expect(response.items.every(item => item.outcome === undefined)).toBe(true); // every-ok — length asserted on the line above
+  });
+});
