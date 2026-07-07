@@ -612,14 +612,9 @@ describe('src/api/misc — recommendations', () => {
 });
 
 describe('src/api/misc — redirects', () => {
-  it('redirects.list uses getSafe', async () => {
-    await redirects.list('site-1');
-    expect(mockedGetSafe).toHaveBeenCalledWith('/api/webflow/redirects/site-1', []);
-  });
-
-  it('redirects.save calls post with body', async () => {
-    await redirects.save('site-1', { from: '/old', to: '/new' });
-    expect(mockedPost).toHaveBeenCalledWith('/api/webflow/redirects/site-1', { from: '/old', to: '/new' });
+  it('does not expose list/save wrappers for nonexistent webflow redirect routes', () => {
+    expect('list' in redirects).toBe(false);
+    expect('save' in redirects).toBe(false);
   });
 
   it('redirects.scan appends workspaceId when provided', async () => {
