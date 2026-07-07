@@ -407,6 +407,10 @@ const createWorkspaceSchema = z.object({
   webflowSiteName: z.string().optional(),
 });
 
+const archiveWorkspaceSchema = z.object({
+  archived: z.boolean(),
+});
+
 router.post('/api/workspaces', validate(createWorkspaceSchema), (req, res) => {
   const { name, webflowSiteId, webflowSiteName } = req.body;
   const ws = createWorkspace(name, webflowSiteId, webflowSiteName);
@@ -475,6 +479,33 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
     invalidatePageCache(req.params.id);
     invalidateSubCachePrefix(req.params.id, 'slice:'); // Invalidate ALL slice caches on settings change
   });
+  const safe = toAdminWorkspaceView(ws);
+  broadcast(WS_EVENTS.WORKSPACE_UPDATED, safe);
+  broadcastToWorkspace(req.params.id, WS_EVENTS.WORKSPACE_UPDATED, safe);
+  res.json(safe);
+});
+
+router.patch('/api/workspaces/:id/archive', requireWorkspaceAccess(), validate(archiveWorkspaceSchema), (req, res) => {
+  const before = getWorkspace(req.params.id);
+  if (!before) return res.status(404).json({ error: 'Not found' });
+
+  const archivedAt = req.body.archived ? (before.archivedAt ?? new Date().toISOString()) : null;
+  const ws = updateWorkspace(req.params.id, { archivedAt });
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+
+  const type = archivedAt ? 'workspace_archived' : 'workspace_unarchived';
+  addActivity(
+    req.params.id,
+    type,
+    archivedAt ? `Archived workspace: ${before.name}` : `Restored workspace: ${before.name}`,
+    archivedAt
+      ? 'Hidden from default admin workspace lists; data and client history were preserved.'
+      : 'Returned to default admin workspace lists.',
+    { previousArchivedAt: before.archivedAt ?? null, archivedAt },
+  );
+
+  invalidateIntelligenceCache(req.params.id);
+  invalidatePageCache(req.params.id);
   const safe = toAdminWorkspaceView(ws);
   broadcast(WS_EVENTS.WORKSPACE_UPDATED, safe);
   broadcastToWorkspace(req.params.id, WS_EVENTS.WORKSPACE_UPDATED, safe);

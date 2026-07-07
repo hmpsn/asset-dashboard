@@ -79,6 +79,8 @@ export function toAdminWorkspaceView(ws: Workspace, nowMs = Date.now()): AdminWo
     autoPublishBriefings: ws.autoPublishBriefings,
     autoPublishAfterHours: ws.autoPublishAfterHours,
     lastBriefingRunWeekOf: ws.lastBriefingRunWeekOf,
+    lastIssuePushedWeekOf: ws.lastIssuePushedWeekOf,
+    archivedAt: ws.archivedAt ?? null,
     folder: ws.folder,
     createdAt: ws.createdAt,
     hasPassword: !!ws.clientPassword,

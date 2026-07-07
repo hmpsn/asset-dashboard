@@ -1532,6 +1532,7 @@ export const ACTIVITY_TYPE_LEXICON_BASELINE = new Set<string>([
   'suggested_brief_snoozed', 'post_voice_scored', 'strategy_keyword_kept', 'strategy_keyword_removed',
   'strategy_keyword_added', 'cannibalization_keeper_set', 'form_submission_captured', 'form_capture_configured',
   'client_return_hook_sent', 'autosend_policy_changed',
+  'workspace_archived', 'workspace_unarchived',
 ]);
 
 /** Same anchored member-line pattern the ActivityType parsers in this file

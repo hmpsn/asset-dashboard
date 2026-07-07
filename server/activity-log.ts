@@ -168,6 +168,8 @@ export type ActivityType =
   | 'suggested_brief_dismissed'  // admin dismissed a suggested brief
   | 'suggested_brief_snoozed'    // admin snoozed a suggested brief
   | 'post_voice_scored'          // admin-only: voice score persisted for a post
+  | 'workspace_archived'         // admin-only: workspace hidden from default operator lists
+  | 'workspace_unarchived'       // admin-only: workspace restored to default operator lists
   // Strategy redesign P2 pre-commit (consumed in P3 Lane A) — managed keyword working-set
   // mutations (strategy_keyword_set table). Admin-only curation hygiene; deliberately NOT
   // in CLIENT_VISIBLE_TYPES — keyword-set add/remove/keep is an internal operator audit

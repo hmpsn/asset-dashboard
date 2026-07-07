@@ -62,4 +62,37 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'seo-strategy': lazyWithRetry(() =>
     import('../engine-rebuilt/EngineSurface').then(m => ({ default: m.EngineSurface })),
   ),
+  'settings': lazyWithRetry(() =>
+    import('../global-ops-rebuilt').then(m => ({ default: m.GlobalSettingsSurface })),
+  ),
+  'workspace-settings': lazyWithRetry(() =>
+    import('../global-ops-rebuilt').then(m => ({ default: m.WorkspaceSettingsSurface })),
+  ),
+  'roadmap': lazyWithRetry(() =>
+    import('../global-ops-rebuilt').then(m => ({ default: m.RoadmapSurface })),
+  ),
+  'revenue': lazyWithRetry(() =>
+    import('../global-ops-rebuilt').then(m => ({ default: m.RevenueBusinessSurface })),
+  ),
+  'ai-usage': lazyWithRetry(() =>
+    import('../global-ops-rebuilt').then(m => ({ default: m.AiUsageBusinessSurface })),
+  ),
+  'features': lazyWithRetry(() =>
+    import('../global-ops-rebuilt').then(m => ({ default: m.FeatureLibraryBusinessSurface })),
+  ),
+  'prospect': lazyWithRetry(() =>
+    import('../global-ops-rebuilt').then(m => ({ default: m.ProspectBusinessSurface })),
+  ),
+  'outcomes-overview': lazyWithRetry(() =>
+    import('../global-ops-rebuilt').then(m => ({ default: m.OutcomesOverviewSurface })),
+  ),
+  'outcomes': lazyWithRetry(() =>
+    import('../global-ops-rebuilt').then(m => ({ default: m.OutcomeWorkspaceSurface })),
+  ),
+  'diagnostics': lazyWithRetry(() =>
+    import('../global-ops-rebuilt').then(m => ({ default: m.DiagnosticsSurface })),
+  ),
+  'requests': lazyWithRetry(() =>
+    import('../global-ops-rebuilt').then(m => ({ default: m.RequestsSurface })),
+  ),
 };
