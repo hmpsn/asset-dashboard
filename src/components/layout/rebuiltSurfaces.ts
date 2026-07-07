@@ -41,4 +41,7 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'links': lazyWithRetry(() =>
     import('../links-rebuilt/LinksSurface').then(m => ({ default: m.LinksSurface })),
   ),
+  'seo-schema': lazyWithRetry(() =>
+    import('../schema-rebuilt/SchemaSurface').then(m => ({ default: m.SchemaSurface })),
+  ),
 };
