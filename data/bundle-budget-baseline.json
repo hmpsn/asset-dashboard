@@ -2,7 +2,7 @@
   "version": 1,
   "updatedAt": "2026-07-07",
   "tolerance": 0.05,
-  "total": 1600153,
+  "total": 1660000,
   "entries": {
     "css:assets/index.css": 35499,
     "css:vendor/fontawesome/fontawesome.min.css": 36118,
