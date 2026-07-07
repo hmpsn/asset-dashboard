@@ -333,6 +333,40 @@
       }
     },
     {
+      "id": "DEF-search-traffic-001",
+      "surface": "search-traffic",
+      "item": "Insight/proof-point graduation bridge (search win \u2192 Insights Engine, SB-061/SB-001) not built; the surface renders wins but does not graduate them.",
+      "decision": "AD-004 defers all graduation writes wholesale to the one C3-era owner-signed cross-surface contract.",
+      "class": "behavior",
+      "upgradeTrigger": "The C3 cross-surface insight-graduation contract lands.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/search-traffic.md",
+        "ad": "AD-004"
+      }
+    },
+    {
+      "id": "DEF-search-traffic-002",
+      "surface": "search-traffic",
+      "item": "Cross-workspace GSC book roll-up (SB-013 / N1) not built; the surface is single-workspace.",
+      "decision": "Roll-up is a global-ops/cockpit concern scheduled with that wave, not a leaf-surface build.",
+      "class": "data",
+      "upgradeTrigger": "Global-ops roll-up wave (W6).",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/search-traffic.md",
+        "sb": "SB-013"
+      }
+    },
+    {
       "id": "DEF-asset-manager-001",
       "surface": "asset-manager",
       "item": "Compression graduation insight (CWV-move on a compress pass) is not built; the rebuilt surface ships compression parity without writing a graduation insight.",
