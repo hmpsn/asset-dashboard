@@ -12,6 +12,9 @@ export const workspaces = {
   update: (id: string, body: Record<string, unknown>) =>
     patch<unknown>(`/api/workspaces/${id}`, body),
 
+  archive: (id: string, archived: boolean) =>
+    patch<unknown>(`/api/workspaces/${id}/archive`, { archived }),
+
   remove: (id: string) => del(`/api/workspaces/${id}`),
 
   // ── Audit suppressions ────────────────────────────────────────

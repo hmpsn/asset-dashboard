@@ -15,3 +15,6 @@ Living redirect map required by the Phase A plan. Every future route/tab move ad
 | `seo-strategy?tab=content` | `content-pipeline?tab=content-health` | W6 engine | 2026-07-07 |
 | `seo-strategy?tab=rankings` | `seo-keywords?lens=rankings` | W6 engine | 2026-07-07 |
 | `seo-strategy?tab=competitive` | `competitors` | W6 engine | 2026-07-07 |
+| `ai-usage` | `revenue?tab=ai-usage` (Business lens alias; old Page id retained) | W6 global-ops | 2026-07-07 |
+| `features` | `revenue?tab=features` (Business lens alias; old Page id retained) | W6 global-ops | 2026-07-07 |
+| `prospect` | `revenue?tab=prospects` (Business lens alias; old Page id retained) | W6 global-ops | 2026-07-07 |

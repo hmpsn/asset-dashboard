@@ -496,6 +496,8 @@ export interface Workspace {
   lastIssuePushedWeekOf?: string | null;
   /** ISO-week marker (YYYY-MM-DD) of last weekly email return-hook send (The Issue, P1c) — prevents duplicate weekly sends */
   lastReturnHookSentWeekOf?: string | null;
+  /** Soft-archive timestamp. Archived workspaces are excluded from default admin lists. */
+  archivedAt?: string | null;
   folder: string;
   createdAt: string;
 }
@@ -557,6 +559,7 @@ export interface AdminWorkspaceView {
   autoPublishAfterHours?: number;
   lastBriefingRunWeekOf?: string | null;
   lastIssuePushedWeekOf?: string | null;
+  archivedAt?: string | null;
   folder: string;
   createdAt: string;
   // Computed fields (not on Workspace row)
