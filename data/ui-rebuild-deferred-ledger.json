@@ -522,6 +522,133 @@
         "ticket": "docs/ui-rebuild/phase-a/tickets/local-presence.md",
         "sb": "SB-056"
       }
+    },
+    {
+      "id": "DEF-schema-001",
+      "surface": "schema",
+      "item": "Missing-schema Site Audit count omitted from the Schema summary strip until the audit check taxonomy and projection are fixed.",
+      "decision": "Ship the summary strip with an honest absent state for this one stat; do not derive from mismatched client-only check ids.",
+      "class": "data",
+      "upgradeTrigger": "SB-011 defines or remaps the schema audit finding producer and serializes a per-workspace missing-schema count.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "backlog": "SB-011",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/schema.json:363-367,400-402,481-485",
+        "server": "server/audit-page.ts:177-181,377-388",
+        "frontend": "src/components/SeoAudit.tsx:547-551"
+      }
+    },
+    {
+      "id": "DEF-schema-002",
+      "surface": "schema",
+      "item": "Automatic schema-win graduation to Insights Engine after schema deploys prove a rich result or AI citation.",
+      "decision": "Defer the insight write to the owner-signed C3 graduation seam; this rebuild carries impact display only.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-001 lands the shared graduation write contract with InsightType registration, broadcast, activity log, and snapshot provenance.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-004",
+        "backlog": "SB-001",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/schema.json:351-355,410-412",
+        "source": "docs/ui-rebuild/phase0/surfaces/schema.md:135,163"
+      }
+    },
+    {
+      "id": "DEF-schema-003",
+      "surface": "schema",
+      "item": "Rich-result and AI-citation detection source for schema outcome scoring and graduation.",
+      "decision": "Do not add client-side detection or scrape logic in the rebuilt surface; wait for the server outcome-measurement provider.",
+      "class": "data",
+      "upgradeTrigger": "SB-021 adds the detection provider that can set rich_result_appearing true for schema_deployed outcomes.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "backlog": "SB-021",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/schema.json:487-490",
+        "serverBacklog": "docs/ui-rebuild/phase-a/server-backlog.json:296-308"
+      }
+    },
+    {
+      "id": "DEF-schema-004",
+      "surface": "schema",
+      "item": "Shared Site Audit category score omitted from Schema until SB-010 provides the Site Audit-owned projection.",
+      "decision": "Do not invent a Schema-local audit scorer; consume the shared category score only after the Site Audit backlog item lands.",
+      "class": "data",
+      "upgradeTrigger": "SB-010 ships per-category audit scoring with the six-category taxonomy and exposes the schema category score for consumers.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "backlog": "SB-010",
+        "serverBacklog": "docs/ui-rebuild/phase-a/server-backlog.json:142-157",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/schema.json:464-491"
+      }
+    },
+    {
+      "id": "DEF-schema-005",
+      "surface": "schema",
+      "item": "Schema Site Plan first-class redesign deferred while SchemaPlanPanel is bridge-mounted as T1 carry-over.",
+      "decision": "Mount the existing plan machinery inside the rebuilt surface now; defer a full DS-native plan redesign until after parity is proven.",
+      "class": "primitive",
+      "upgradeTrigger": "A follow-up design spec replaces the bridge with a DS-native plan sub-view without changing plan lifecycle semantics.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-010",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/schema.json:331-337",
+        "head": "src/components/schema/SchemaPlanPanel.tsx:100-580"
+      }
+    },
+    {
+      "id": "DEF-schema-006",
+      "surface": "schema",
+      "item": "Orphaned SchemaHealthDashboard and legacy SchemaReviewTab/Modal cleanup deferred outside the admin rebuild surface.",
+      "decision": "Do not port or resurrect the orphaned client/schema-review surfaces in W3; leave cleanup to the AD-030 dead-code pass.",
+      "class": "behavior",
+      "upgradeTrigger": "AD-030 cleanup pass is scheduled and can safely delete or retire orphaned schema client/review files with route tests.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-030",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/schema.json:221-224,286-289,375-379",
+        "source": "docs/ui-rebuild/phase0/surfaces/schema.md:101,124,167"
+      }
+    },
+    {
+      "id": "DEF-schema-007",
+      "surface": "schema",
+      "item": "Reload-durable Sent publication tag derived from approvals rather than session-only sent state.",
+      "decision": "Render session-backed sent feedback now; defer a durable Sent tag until the approvals-derived read is verified and tested.",
+      "class": "data",
+      "upgradeTrigger": "A schema approvals read joins open/recent schema batches to page rows and survives reload without changing deliverable shapes.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "surfaceUnknown": "docs/ui-rebuild/phase-a/surfaces/schema.json:464-466",
+        "workflow": "src/components/schema/useSchemaSuggesterPublishingWorkflow.ts:31-35,82-105,191-217"
+      }
     }
   ]
 }
