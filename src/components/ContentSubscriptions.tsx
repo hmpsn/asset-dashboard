@@ -11,6 +11,7 @@ import { CONTENT_SUB_PLANS } from '../../shared/types/content';
 
 interface Props {
   workspaceId: string;
+  embedded?: boolean;
 }
 
 type BadgeColor = 'teal' | 'blue' | 'emerald' | 'amber' | 'red' | 'orange' | 'zinc';
@@ -23,7 +24,7 @@ const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; color: string; 
   cancelled: { icon: XCircle,       color: 'text-[var(--brand-text-muted)]',    label: 'Cancelled', badgeColor: 'zinc' },
 };
 
-export function ContentSubscriptions({ workspaceId }: Props) {
+export function ContentSubscriptions({ workspaceId, embedded = false }: Props) {
   const [subs, setSubs] = useState<ContentSubscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -77,23 +78,30 @@ export function ContentSubscriptions({ workspaceId }: Props) {
   };
 
   const activeSub = subs.find(s => s.status === 'active' || s.status === 'pending' || s.status === 'past_due');
+  const newSubscriptionButton = (
+    <Button
+      onClick={() => setShowCreate(true)}
+      icon={Plus}
+      size="sm"
+    >
+      New Subscription
+    </Button>
+  );
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Content Subscriptions"
-        subtitle="Recurring monthly content packages"
-        icon={<Icon as={RefreshCw} size="md" className="text-[var(--brand-text-muted)]" />}
-        actions={
-          <Button
-            onClick={() => setShowCreate(true)}
-            icon={Plus}
-            size="sm"
-          >
-            New Subscription
-          </Button>
-        }
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Content Subscriptions"
+          subtitle="Recurring monthly content packages"
+          icon={<Icon as={RefreshCw} size="md" className="text-[var(--brand-text-muted)]" />}
+          actions={newSubscriptionButton}
+        />
+      ) : (
+        <div className="flex flex-wrap items-center justify-end gap-2" aria-label="Content subscriptions controls">
+          {newSubscriptionButton}
+        </div>
+      )}
 
       {loading && (
         <div className="flex items-center justify-center py-12 gap-3 text-[var(--brand-text-muted)]">
