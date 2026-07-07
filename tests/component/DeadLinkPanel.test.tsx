@@ -65,7 +65,7 @@ describe('DeadLinkPanel redirect export', () => {
     const createObjectURL = vi.mocked(URL.createObjectURL);
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     await expect((createObjectURL.mock.calls[0][0] as Blob).text()).resolves.toBe([
-      'Old Path,New Path',
+      'Old Path,Redirect To',
       '/old-page,"/new, page"',
     ].join('\n'));
     expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledTimes(1);
