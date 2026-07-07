@@ -524,6 +524,90 @@
       }
     },
     {
+      "id": "DEF-performance-001",
+      "surface": "performance",
+      "item": "Per-asset in-place Compress action from Page Weight asset rows is not built; the surface ships the Asset Manager deep-link sender only.",
+      "decision": "Ship the Asset Manager deep-link sender only; defer in-place compression until the receiver and a per-asset action contract are proven.",
+      "class": "behavior",
+      "upgradeTrigger": "Asset Manager exposes a verified asset-id/filter receiver plus a per-asset compression action contract.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/performance.md"
+      }
+    },
+    {
+      "id": "DEF-performance-002",
+      "surface": "performance",
+      "item": "Per-opportunity Fix routing from the PageSpeed opportunities list is not built; the list renders with savings but no Fix buttons.",
+      "decision": "Render the opportunities list with savings now; defer Fix buttons because destination ownership is undefined.",
+      "class": "behavior",
+      "upgradeTrigger": "A signed fix-target routing contract names the owning surface for each PageSpeed opportunity class.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/performance.md"
+      }
+    },
+    {
+      "id": "DEF-performance-003",
+      "surface": "performance",
+      "item": "Lighthouse accessibility / best-practices / SEO category bars are not shown; only the performance score + full Core Web Vitals ship.",
+      "decision": "Defer the extra Lighthouse categories; ship the existing performance score and full Core Web Vitals parity first.",
+      "class": "data",
+      "upgradeTrigger": "SB-024 fetches and persists extra Lighthouse categories on the PageSpeed snapshot shape.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/performance.md",
+        "sb": "SB-024"
+      }
+    },
+    {
+      "id": "DEF-performance-004",
+      "surface": "performance",
+      "item": "Automatic content-win graduation to the Insights Engine is not built; the surface renders verdicts but does not graduate them.",
+      "decision": "Defer the automatic insight write to the owner-signed C3 graduation seam; do not build an ad-hoc Performance-only endpoint.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-001 lands the shared graduation write contract (InsightType registration, broadcast, activity log, snapshot provenance).",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/performance.md",
+        "ad": "AD-004",
+        "sb": "SB-001"
+      }
+    },
+    {
+      "id": "DEF-performance-005",
+      "surface": "performance",
+      "item": "Engagement / impressions lift percent versus a pre-publish baseline is not shown; the server reads only one trailing 90-day window.",
+      "decision": "Do not fabricate lift percentages from the trailing 90-day read; defer until a real pre/post baseline derivation exists.",
+      "class": "data",
+      "upgradeTrigger": "SB-008 adds pre/post-publish GA4 and GSC window reads and serializes the lift fields.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/performance.md",
+        "sb": "SB-008"
+      }
+    },
+    {
       "id": "DEF-links-001",
       "surface": "links",
       "item": "Insert internal link directly into a Webflow source page",
