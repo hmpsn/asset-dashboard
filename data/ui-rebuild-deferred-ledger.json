@@ -968,6 +968,195 @@
         "api": "server/routes/brand-docs.ts:25-109",
         "contract": "docs/rules/brand-engine.md:11-19"
       }
+    },
+    {
+      "id": "DEF-content-pipeline-001",
+      "surface": "content-pipeline",
+      "item": "GeneratedPost engagement readbacks and per-post time-series cards",
+      "decision": "Defer deeper GeneratedPost metrics beyond the shared Content Performance read path.",
+      "class": "data",
+      "upgradeTrigger": "SB-007 lands engagement and time-series readback fields for GeneratedPost rows.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "ref1": "docs/ui-rebuild/phase-a/server-backlog.json:101-112",
+        "ref2": "docs/ui-rebuild/phase-a/surfaces/content-pipeline.json:721-724"
+      }
+    },
+    {
+      "id": "DEF-content-pipeline-002",
+      "surface": "content-pipeline",
+      "item": "Pre-post baseline lift for published content performance",
+      "decision": "Use current trailing-window metrics for W4 and defer baseline lift modeling.",
+      "class": "data",
+      "upgradeTrigger": "SB-008 provides baseline lift calculations and fixture-backed read tests.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "ref1": "docs/ui-rebuild/phase-a/server-backlog.json:114-125",
+        "ref2": "server/domains/content/content-performance.ts:216-249"
+      }
+    },
+    {
+      "id": "DEF-content-pipeline-003",
+      "surface": "content-pipeline",
+      "item": "Graduate qualifying published wins into the Insights Engine",
+      "decision": "Keep graduation out of the W4 critical path per AD-004.",
+      "class": "behavior",
+      "upgradeTrigger": "Owner confirms win criteria and SB-001 ships a tested graduation endpoint.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "ref1": "docs/ui-rebuild/phase-a/PHASE_A_DECISIONS.md:13",
+        "ref2": "docs/ui-rebuild/phase-a/server-backlog.json:7-23",
+        "ref3": "server/routes/insights.ts:13-51"
+      }
+    },
+    {
+      "id": "DEF-content-pipeline-004",
+      "surface": "content-pipeline",
+      "item": "Client nudge and reminder actions for awaiting client review",
+      "decision": "Preserve current request actions and defer rate-limited nudges.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-014 defines reminder cooldowns, activity logging, and broadcast behavior.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "ref1": "docs/ui-rebuild/phase-a/server-backlog.json:201-213",
+        "ref2": "src/components/briefs/RequestList.tsx:185-241"
+      }
+    },
+    {
+      "id": "DEF-content-pipeline-005",
+      "surface": "content-pipeline",
+      "item": "Approved recommendation progress join for public/client surfaces",
+      "decision": "Do not block the admin rebuild on the cross-surface recommendation join.",
+      "class": "data",
+      "upgradeTrigger": "SB-016 ships the recommendation progress join with public read-path coverage.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "ref1": "docs/ui-rebuild/phase-a/server-backlog.json:230-241"
+      }
+    },
+    {
+      "id": "DEF-content-pipeline-006",
+      "surface": "content-pipeline",
+      "item": "CMS draft and publish writeback from the rebuilt draft workspace",
+      "decision": "Preserve current export and publish controls until write-target rules are owner-approved.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-032 lands Webflow writeback with route tests and write-target documentation.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "ref1": "docs/ui-rebuild/phase-a/server-backlog.json:440-451",
+        "ref2": "src/components/PostEditor.tsx:340-363",
+        "ref3": "src/components/PostEditor.tsx:963-1004"
+      }
+    },
+    {
+      "id": "DEF-content-pipeline-007",
+      "surface": "content-pipeline",
+      "item": "Persisted lifecycleStage model for content pipeline items",
+      "decision": "Use AD-012 derived stage labels in W4 and defer a schema-backed model.",
+      "class": "data",
+      "upgradeTrigger": "SB-046 proves derived stages are insufficient and ships a migration plus mappers.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "ref1": "docs/ui-rebuild/phase-a/owner-decisions.json:176-184",
+        "ref2": "docs/ui-rebuild/phase-a/server-backlog.json:620-630"
+      }
+    },
+    {
+      "id": "DEF-content-pipeline-008",
+      "surface": "content-pipeline",
+      "item": "Generate briefs for selected matrix cells as a bulk job",
+      "decision": "Keep existing planner actions and defer the currently non-live bulk job.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-048 implements the matrix bulk brief job with background-task tracking.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "ref1": "docs/ui-rebuild/phase-a/server-backlog.json:645-655",
+        "ref2": "src/components/ContentPlanner.tsx:88-107",
+        "ref3": "src/components/matrix/MatrixGrid.tsx:244-280"
+      }
+    },
+    {
+      "id": "DEF-content-pipeline-009",
+      "surface": "content-pipeline",
+      "item": "Per-field AI assists inside the brief editing workflow",
+      "decision": "Preserve current brief field editing and defer granular assist controls.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-049 ships per-field operations, 429 copy, and schema-validated outputs.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "ref1": "docs/ui-rebuild/phase-a/server-backlog.json:657-667",
+        "ref2": "src/hooks/admin/useAdminBriefWorkflow.ts:277-283"
+      }
+    },
+    {
+      "id": "DEF-content-pipeline-010",
+      "surface": "content-pipeline",
+      "item": "Client questionnaire intake flow for content requests",
+      "decision": "Keep the current request lifecycle and defer questionnaire intake.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-050 ships questionnaire persistence, client/admin read paths, and tests.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "ref1": "docs/ui-rebuild/phase-a/server-backlog.json:669-680",
+        "ref2": "src/components/briefs/RequestList.tsx:120-317"
+      }
+    },
+    {
+      "id": "DEF-content-pipeline-011",
+      "surface": "content-pipeline",
+      "item": "Page content-perf is not yet retired to content-pipeline?tab=published; the legacy content-perf route still mounts alongside the rebuilt Published tab.",
+      "decision": "Ship the rebuilt content-pipeline surface (with the Published tab) additively behind ui-rebuild-shell first; defer the content-perf route-removal (routes.ts / App.tsx / navRegistry / D8 / contract tests) to a focused follow-up so the multi-site retirement is verified on its own. Flag-OFF, content-perf remains the sole live home, so there is no user-facing double-home.",
+      "class": "behavior",
+      "upgradeTrigger": "A follow-up PR executes the route-removal checklist for Page content-perf → content-pipeline?tab=published with the D8 redirect + nav/deep-link contract tests, before the ui-rebuild-shell flag flips on for content.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/content-pipeline.md",
+        "performanceTicket": "docs/ui-rebuild/phase-a/tickets/performance.md"
+      }
     }
   ]
 }

@@ -75,7 +75,12 @@ function dayKey(d: Date): string {
 
 // ── Component ──
 
-export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
+interface ContentCalendarProps {
+  workspaceId: string;
+  embedded?: boolean;
+}
+
+export function ContentCalendar({ workspaceId, embedded = false }: ContentCalendarProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -291,45 +296,57 @@ export function ContentCalendar({ workspaceId }: { workspaceId: string }) {
     );
   }
 
+  const calendarControls = (
+    <>
+      {/* Suggest dates — proposes publish dates for unscheduled drafts (teal=action) */}
+      <Button
+        onClick={() => { void loadSuggestions(); }}
+        disabled={busy || unscheduledDrafts.length === 0}
+        variant="ghost"
+        size="sm"
+        className="t-caption-sm gap-1.5 px-2.5 py-1 rounded-[var(--radius-pill)] border border-teal-500/30 bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 font-medium transition-colors disabled:opacity-40"
+        title="Suggest publish dates for unscheduled drafts"
+      >
+        <Icon as={Wand2} size="sm" />
+        Suggest dates
+      </Button>
+      {/* Type filter pills */}
+      {(['all', 'brief', 'post', 'request', 'matrix'] as const).map(t => (
+        <Button
+          key={t}
+          onClick={() => setTypeFilter(t)}
+          variant="ghost"
+          size="sm"
+          className={`t-caption-sm px-2.5 py-1 rounded-[var(--radius-pill)] border font-medium transition-colors ${
+            typeFilter === t
+              ? 'bg-[var(--surface-3)] border-[var(--brand-border-hover)] text-[var(--brand-text-bright)]'
+              : 'bg-[var(--surface-2)] border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
+          }`}
+        >
+          {t === 'all' ? 'All' : TYPE_CONFIG[t].label + 's'}
+        </Button>
+      ))}
+    </>
+  );
+
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Icon as={CalendarIcon} size="lg" className="text-accent-warning" />
-          <h2 className="t-h2 text-[var(--brand-text-bright)]">Content Calendar</h2>
+      {!embedded ? (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Icon as={CalendarIcon} size="lg" className="text-accent-warning" />
+            <h2 className="t-h2 text-[var(--brand-text-bright)]">Content Calendar</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            {calendarControls}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Suggest dates — proposes publish dates for unscheduled drafts (teal=action) */}
-          <Button
-            onClick={() => { void loadSuggestions(); }}
-            disabled={busy || unscheduledDrafts.length === 0}
-            variant="ghost"
-            size="sm"
-            className="t-caption-sm gap-1.5 px-2.5 py-1 rounded-[var(--radius-pill)] border border-teal-500/30 bg-teal-500/10 text-accent-brand hover:bg-teal-500/20 font-medium transition-colors disabled:opacity-40"
-            title="Suggest publish dates for unscheduled drafts"
-          >
-            <Icon as={Wand2} size="sm" />
-            Suggest dates
-          </Button>
-          {/* Type filter pills */}
-          {(['all', 'brief', 'post', 'request', 'matrix'] as const).map(t => (
-            <Button
-              key={t}
-              onClick={() => setTypeFilter(t)}
-              variant="ghost"
-              size="sm"
-              className={`t-caption-sm px-2.5 py-1 rounded-[var(--radius-pill)] border font-medium transition-colors ${
-                typeFilter === t
-                  ? 'bg-[var(--surface-3)] border-[var(--brand-border-hover)] text-[var(--brand-text-bright)]'
-                  : 'bg-[var(--surface-2)] border-[var(--brand-border)] text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)]'
-              }`}
-            >
-              {t === 'all' ? 'All' : TYPE_CONFIG[t].label + 's'}
-            </Button>
-          ))}
+      ) : (
+        <div className="flex flex-wrap items-center justify-end gap-2" aria-label="Content calendar controls">
+          {calendarControls}
         </div>
-      </div>
+      )}
 
       {/* Month stats */}
       <div className="grid grid-cols-5 gap-3">

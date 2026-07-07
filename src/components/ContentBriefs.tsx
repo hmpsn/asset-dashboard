@@ -10,7 +10,14 @@ import { RequestList } from './briefs/RequestList';
 import { BriefList } from './briefs/BriefList';
 import { useAdminBriefWorkflow, type BriefSortField } from '../hooks/admin/useAdminBriefWorkflow';
 
-export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { workspaceId: string; fixContext?: FixContext | null; clearFixContext?: () => void }) {
+interface ContentBriefsProps {
+  workspaceId: string;
+  fixContext?: FixContext | null;
+  clearFixContext?: () => void;
+  embedded?: boolean;
+}
+
+export function ContentBriefs({ workspaceId, fixContext, clearFixContext, embedded = false }: ContentBriefsProps) {
   const {
     activePostId,
     briefError,
@@ -114,6 +121,39 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
     );
   }
 
+  const briefControls = (
+    <div className="flex items-center gap-2">
+      <div className="relative">
+        <Icon as={Search} size="md" className="text-[var(--brand-text-muted)] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <FormInput
+          type="text"
+          value={briefSearch}
+          onChange={setBriefSearch}
+          placeholder="Search briefs..."
+          className="w-48 pl-8 pr-7 t-caption-sm"
+        />
+        {briefSearch && (
+          <IconButton
+            onClick={() => setBriefSearch('')}
+            icon={X}
+            label="Clear search"
+            variant="ghost"
+            size="sm"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
+          />
+        )}
+      </div>
+      <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
+        <Icon as={ArrowUpDown} size="sm" />
+        <FormSelect value={briefSort} onChange={value => setBriefSort(value as BriefSortField)} options={[
+          { value: 'date', label: 'Newest' },
+          { value: 'keyword', label: 'Keyword A-Z' },
+          { value: 'difficulty', label: 'Difficulty' },
+        ]} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded px-1.5 py-1 t-caption-sm text-[var(--brand-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 cursor-pointer" />
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-8">
       {/* Delete Confirmation Modal */}
@@ -173,43 +213,18 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
         </div>
       )}
 
-      <PageHeader
-        title="Content Briefs"
-        subtitle={`${briefs.length} total brief${briefs.length === 1 ? '' : 's'}`}
-        icon={<Icon as={Clipboard} size="lg" className="text-accent-brand" />}
-        actions={
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Icon as={Search} size="md" className="text-[var(--brand-text-muted)] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <FormInput
-                type="text"
-                value={briefSearch}
-                onChange={setBriefSearch}
-                placeholder="Search briefs..."
-                className="w-48 pl-8 pr-7 t-caption-sm"
-              />
-              {briefSearch && (
-                <IconButton
-                  onClick={() => setBriefSearch('')}
-                  icon={X}
-                  label="Clear search"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
-                />
-              )}
-            </div>
-            <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
-              <Icon as={ArrowUpDown} size="sm" />
-              <FormSelect value={briefSort} onChange={value => setBriefSort(value as BriefSortField)} options={[
-                { value: 'date', label: 'Newest' },
-                { value: 'keyword', label: 'Keyword A-Z' },
-                { value: 'difficulty', label: 'Difficulty' },
-              ]} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded px-1.5 py-1 t-caption-sm text-[var(--brand-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 cursor-pointer" />
-            </div>
-          </div>
-        }
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Content Briefs"
+          subtitle={`${briefs.length} total brief${briefs.length === 1 ? '' : 's'}`}
+          icon={<Icon as={Clipboard} size="lg" className="text-accent-brand" />}
+          actions={briefControls}
+        />
+      ) : (
+        <div className="flex flex-wrap items-center justify-end gap-2" aria-label="Content briefs controls">
+          {briefControls}
+        </div>
+      )}
 
       {/* Generator */}
       <BriefGenerator
