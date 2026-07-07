@@ -18,6 +18,8 @@ import { loadDecayAnalysis } from '../content-decay.js';
 import { getContentVelocityTrend } from '../content-posts.js';
 import { createLogger } from '../logger.js';
 import { parsePositiveIntQuery } from '../query-param-parsers.js';
+import { getLatestEffectiveSnapshot } from '../audit-snapshot-views.js';
+import { classifyWorkQueue } from '../domains/work-queue.js';
 
 const log = createLogger('workspace-home');
 import { requireWorkspaceAccess } from '../auth.js';
@@ -80,6 +82,22 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
   let contentDecay = null;
   try { contentDecay = loadDecayAnalysis(req.params.id)?.summary ?? null; } catch (err) { log.warn({ err }, 'workspace-home partial fetch failed'); }
 
+  let audit = null;
+  try {
+    const snapshot = ws.webflowSiteId
+      ? getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions || [])
+      : null;
+    audit = snapshot
+      ? {
+        errors: snapshot.audit.errors,
+        warnings: snapshot.audit.warnings,
+        siteScore: snapshot.audit.siteScore,
+      }
+      : null;
+  } catch (err) {
+    log.warn({ err }, 'workspace-home partial fetch failed');
+  }
+
   // Weekly accomplishments — aggregate activity from last 7 days
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const recentActivity = (activity as Array<{ type: string; createdAt: string }>)
@@ -105,6 +123,24 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
     inProgressCells: allCells.filter(c => c.status === 'brief_generated' || c.status === 'in_progress').length,
   };
 
+  const workQueue = classifyWorkQueue({
+    clientId: ws.id,
+    requests,
+    workOrders,
+    contentRequests,
+    ranks,
+    contentPipeline,
+    contentDecay,
+    audit,
+    churnSignals,
+    setup: {
+      webflowSiteId: ws.webflowSiteId,
+      gscPropertyUrl: ws.gscPropertyUrl,
+      ga4PropertyId: ws.ga4PropertyId,
+      includeGaps: true,
+    },
+  });
+
   res.json({
     ranks,
     requests,
@@ -119,6 +155,7 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
     contentPipeline,
     contentVelocity,
     contentDecay,
+    workQueue,
     weeklySummary: weeklyTotal > 0 ? weeklySummary : null,
   });
 });

@@ -148,6 +148,27 @@ export type { NeedsAttentionProps, AttentionItem, AttentionSeverity } from './Ne
 export { Disclosure } from './Disclosure';
 export type { DisclosureProps } from './Disclosure';
 export { SectionLabel } from './SectionLabel';
+export {
+  CommandCenterVerdict,
+  WorkStreamSelector,
+  ProvenanceChip,
+  WorkQueueRow,
+  ClientSwitcherRow,
+  ClientThreadRow,
+} from './co';
+export type {
+  CommandCenterVerdictProps,
+  WorkStreamOption,
+  WorkStreamSelectorProps,
+  SelectableWorkStream,
+  ProvenanceBasis,
+  ProvenanceChipProps,
+  WorkQueueRowProps,
+  ClientHealthTone,
+  ClientSwitcherRowProps,
+  ClientThreadKind,
+  ClientThreadRowProps,
+} from './co';
 
 // className merge helper — re-exported so Phase 2 consumers can write
 // `import { cn } from '../ui'` alongside the primitives they're using

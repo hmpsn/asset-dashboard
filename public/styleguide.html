@@ -1953,6 +1953,120 @@ SectionCard: var(--radius-signature-lg)</div>
       <div class="spec-note">Use to switch a shared data set between a small number of curated perspectives, each carrying its own count badge — the active lens gets the elevated surface, not a color change, so it reads as "selected view" rather than "status."</div>
     </div>
 
+    <!-- W6: CommandCenterVerdict -->
+    <div class="sub-section">
+      <div class="col-label">CommandCenterVerdict · server-authored daily headline</div>
+      <div class="card" style="position:relative; overflow:hidden; border:1px solid var(--brand-border); background:var(--surface-2);">
+        <div style="position:absolute; inset:0 0 0 auto; width:120px; background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--teal) 10%, transparent));"></div>
+        <div class="row" style="position:relative; align-items:flex-start; gap:var(--space-3);">
+          <span style="width:32px; height:32px; border-radius:var(--radius-md); display:inline-flex; align-items:center; justify-content:center; background:var(--brand-mint-dim); color:var(--teal);"><svg class="i"><use href="#i-alert"/></svg></span>
+          <div>
+            <div class="t-label" style="color:var(--teal); margin-bottom:4px;">TODAY</div>
+            <div style="font-size:18px; font-weight:700; color:var(--brand-text-bright);">Acme has three things ready for review.</div>
+            <div class="t-caption" style="margin-top:7px; max-width:58ch; color:var(--brand-text);">Two optimization fixes and one client-ready recommendation are waiting. The headline is supplied by the server, never composed in the component.</div>
+          </div>
+        </div>
+      </div>
+      <div class="spec-note">Ports the mockup <span class="t-mono">co-head</span> structure for cockpit/global ops verdict blocks. Use only with server-derived verdict copy.</div>
+    </div>
+
+    <!-- W6: WorkStreamSelector -->
+    <div class="sub-section">
+      <div class="col-label">WorkStreamSelector · opt / send / money selector</div>
+      <div class="grid3">
+        <button style="text-align:left; min-height:112px; border:1px solid var(--teal); border-radius:var(--radius-lg); background:linear-gradient(135deg, var(--surface-2), color-mix(in srgb, var(--teal) 7%, var(--surface-2))); padding:var(--space-4);">
+          <span style="width:32px; height:32px; border-radius:var(--radius-md); display:inline-flex; align-items:center; justify-content:center; background:color-mix(in srgb, var(--blue) 12%, transparent); color:var(--blue);"><svg class="i"><use href="#i-gauge"/></svg></span>
+          <div class="t-stat" style="margin-top:10px; color:var(--brand-text-bright);">6</div>
+          <div class="t-ui" style="font-weight:700; color:var(--brand-text-bright);">Optimizations</div>
+          <div class="t-caption-sm" style="color:var(--brand-text);">What needs fixing?</div>
+        </button>
+        <button style="text-align:left; min-height:112px; border:1px solid var(--brand-border); border-radius:var(--radius-lg); background:var(--surface-2); padding:var(--space-4);">
+          <span style="width:32px; height:32px; border-radius:var(--radius-md); display:inline-flex; align-items:center; justify-content:center; background:var(--brand-mint-dim); color:var(--teal);"><svg class="i"><use href="#i-send"/></svg></span>
+          <div class="t-stat" style="margin-top:10px; color:var(--brand-text-bright);">2</div>
+          <div class="t-ui" style="font-weight:700; color:var(--brand-text-bright);">To send</div>
+          <div class="t-caption-sm" style="color:var(--brand-text);">Ready for clients</div>
+        </button>
+        <button style="text-align:left; min-height:112px; border:1px solid var(--brand-border); border-radius:var(--radius-lg); background:var(--surface-2); padding:var(--space-4);">
+          <span style="width:32px; height:32px; border-radius:var(--radius-md); display:inline-flex; align-items:center; justify-content:center; background:color-mix(in srgb, var(--amber) 12%, transparent); color:var(--amber);"><svg class="i"><use href="#i-target"/></svg></span>
+          <div class="t-stat" style="margin-top:10px; color:var(--brand-text-bright);">1</div>
+          <div class="t-ui" style="font-weight:700; color:var(--brand-text-bright);">Monetization</div>
+          <div class="t-caption-sm" style="color:var(--brand-text);">Revenue plays</div>
+        </button>
+      </div>
+      <div class="spec-note">Ports <span class="t-mono">co-streams/co-stream</span> as a roving-tabindex single-select control. Use existing <span class="t-mono">MetricTile</span> when the tiles are read-only metrics.</div>
+    </div>
+
+    <!-- W6: ProvenanceChip -->
+    <div class="sub-section">
+      <div class="col-label">ProvenanceChip · estimate / measured / actual basis</div>
+      <div class="card">
+        <div class="row" style="gap:var(--space-2);">
+          <span class="t-micro" style="display:inline-flex; align-items:center; gap:4px; padding:var(--space-1) var(--space-2); border-radius:var(--radius-pill); color:var(--amber); background:color-mix(in srgb, var(--amber) 12%, transparent);"><span style="width:6px; height:6px; border-radius:var(--radius-pill); background:var(--amber);"></span>estimate</span>
+          <span class="t-micro" style="display:inline-flex; align-items:center; gap:4px; padding:var(--space-1) var(--space-2); border-radius:var(--radius-pill); color:var(--emerald); background:color-mix(in srgb, var(--emerald) 12%, transparent);"><span style="width:6px; height:6px; border-radius:var(--radius-pill); background:var(--emerald);"></span>measured</span>
+          <span class="t-micro" style="display:inline-flex; align-items:center; gap:4px; padding:var(--space-1) var(--space-2); border-radius:var(--radius-pill); color:var(--blue); background:color-mix(in srgb, var(--blue) 12%, transparent);"><span style="width:6px; height:6px; border-radius:var(--radius-pill); background:var(--blue);"></span>actual</span>
+        </div>
+      </div>
+      <div class="spec-note">Ports <span class="t-mono">prov</span>. Use beside admin-only value figures so the basis is never separated from the money number.</div>
+    </div>
+
+    <!-- W6: WorkQueueRow -->
+    <div class="sub-section">
+      <div class="col-label">WorkQueueRow · command-center queue item</div>
+      <div class="sectioncard" style="padding:0; overflow:hidden;">
+        <div style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); border-top:1px solid var(--brand-border);">
+          <span style="width:24px; height:24px; border-radius:var(--radius-md); display:inline-flex; align-items:center; justify-content:center; background:linear-gradient(135deg, var(--teal), var(--emerald)); color:var(--surface-1); font-weight:800;">B</span>
+          <div style="flex:1; min-width:0;">
+            <div class="t-ui" style="font-weight:700; color:var(--brand-text-bright); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Pitch implant landing page</div>
+            <div class="t-caption-sm" style="color:var(--brand-text-muted);">Bay Street Dental · high-intent demand</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="t-ui" style="font-weight:700; color:var(--emerald);">$2.4k/mo</div>
+            <span class="t-micro" style="display:inline-flex; align-items:center; gap:4px; padding:var(--space-1) var(--space-2); border-radius:var(--radius-pill); color:var(--amber); background:color-mix(in srgb, var(--amber) 12%, transparent);"><span style="width:6px; height:6px; border-radius:var(--radius-pill); background:var(--amber);"></span>estimate</span>
+          </div>
+          <button style="display:inline-flex; align-items:center; gap:6px; border:1px solid var(--brand-border); border-radius:var(--radius-md); background:var(--surface-3); color:var(--amber); padding:var(--space-2) var(--space-3); font-size:12px; font-weight:700;"><svg class="i i-sm"><use href="#i-target"/></svg>Propose</button>
+        </div>
+      </div>
+      <div class="spec-note">Ports <span class="t-mono">co-sig</span>. Compose inside <span class="t-mono">GroupBlock</span> for stream groups instead of wrapping it in another card.</div>
+    </div>
+
+    <!-- W6: ClientSwitcherRow -->
+    <div class="sub-section">
+      <div class="col-label">ClientSwitcherRow · cross-client rail item</div>
+      <div class="sectioncard" style="padding:0; overflow:hidden; max-width:360px;">
+        <div style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); border-top:1px solid var(--brand-border);">
+          <span style="width:28px; height:28px; border-radius:var(--radius-md); display:inline-flex; align-items:center; justify-content:center; background:linear-gradient(135deg, var(--teal), var(--emerald)); color:var(--surface-1); font-weight:800;">A</span>
+          <div style="flex:1; min-width:0;">
+            <div class="t-ui" style="font-weight:700; color:var(--brand-text-bright); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Acme Interiors</div>
+            <div class="t-caption-sm" style="color:var(--brand-text-muted);">acme.example</div>
+          </div>
+          <span aria-hidden="true" style="width:8px; height:8px; border-radius:var(--radius-pill); background:var(--emerald);"></span>
+          <span class="badge b-amber">3</span>
+          <svg class="i i-sm" style="color:var(--brand-text-dim);"><use href="#i-chev"/></svg>
+        </div>
+      </div>
+      <div class="spec-note">Ports <span class="t-mono">co-crow</span>. Use for a compact selectable client rail; keep full workspace navigation in <span class="t-mono">NavItem</span>.</div>
+    </div>
+
+    <!-- W6: ClientThreadRow -->
+    <div class="sub-section">
+      <div class="col-label">ClientThreadRow · from-client rail message</div>
+      <div class="sectioncard" style="padding:0; overflow:hidden; max-width:460px;">
+        <div style="display:flex; align-items:flex-start; gap:var(--space-3); padding:var(--space-3) var(--space-4); border-top:1px solid var(--brand-border);">
+          <span style="width:24px; height:24px; border-radius:var(--radius-md); display:inline-flex; align-items:center; justify-content:center; background:var(--blue); color:var(--surface-1); font-weight:800;">J</span>
+          <div style="flex:1; min-width:0;">
+            <div class="row" style="gap:var(--space-2);">
+              <span class="t-ui" style="font-weight:700; color:var(--brand-text-bright);">Jordan</span>
+              <span class="badge b-amber">Request</span>
+              <span class="t-caption-sm" style="margin-left:auto; color:var(--brand-text-muted);">1h ago</span>
+            </div>
+            <div class="t-caption" style="margin-top:5px; color:var(--brand-text);">Can we prioritize the services page?</div>
+            <button style="margin-top:8px; display:inline-flex; align-items:center; gap:6px; border:0; border-radius:var(--radius-md); background:var(--teal); color:var(--button-primary-text); padding:var(--space-2) var(--space-3); font-size:12px; font-weight:700;"><svg class="i i-sm"><use href="#i-trend"/></svg>Promote to signal</button>
+          </div>
+        </div>
+      </div>
+      <div class="spec-note">Ports <span class="t-mono">co-trow/ck-frow</span>. Use for the from-client rail; approval decisions still use the inbox decision primitives.</div>
+    </div>
+
     <!-- F3: FilterChip -->
     <div class="sub-section">
       <div class="col-label">FilterChip · active / inactive / removable</div>
