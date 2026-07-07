@@ -112,7 +112,8 @@ export const NON_REGISTRY_PAGES: Page[] = [
  */
 export const NAV_REGISTRY: NavEntry[] = [
   { id: 'home', label: 'Home', icon: LayoutDashboard, group: 'home',
-    description: 'Workspace overview and quick actions' },
+    description: 'Workspace overview and quick actions',
+    flagBehavior: { flag: 'ui-rebuild-shell', labelWhenOn: 'Cockpit', descriptionWhenOn: 'Operator cockpit — verdict, work streams, and evidence' } },
 
   // ── Monitoring ──
   { id: 'analytics-hub', label: 'Search & Traffic', icon: BarChart3, group: 'monitoring', needsSite: true,

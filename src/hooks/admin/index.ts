@@ -7,6 +7,14 @@ export type { BriefSortField, BriefDeleteTarget, RequestStatusUpdateExtra } from
 export { useAdminPostWorkflow } from './useAdminPostWorkflow';
 export type { ContentPostSortField, ContentPostStatusFilter, ContentPostStatusCounts } from './useAdminPostWorkflow';
 export { useWorkspaceHomeData } from './useWorkspaceHome';
+export { useCockpitRebuilt, countWorkQueueSourceTypes, workQueueWithVisibleItems } from './useCockpitRebuilt';
+export type {
+  CockpitActivityEntry,
+  CockpitKpiModel,
+  CockpitRankRow,
+  CockpitRequestRow,
+  UseCockpitRebuiltResult,
+} from './useCockpitRebuilt';
 export { useWorkspaceOverviewData } from './useWorkspaceOverview';
 export { useWorkspaceBadges } from './useWorkspaceBadges';
 export { useAuditTrafficMap, useAuditSuppressions, useAuditSchedule, useSchemaSnapshot, useWebflowPages } from './useAdminSeo';
