@@ -47,16 +47,21 @@ site-audit, asset-manager.** (Ratified: `docs/ui-rebuild/phase-a/PHASE_A_DECISIO
 
 ## 2. Verdict headlines (AD-002)
 
-- Verdicts are **server-drafted fields only, never client-composed** (AD-002: *"extends the
-  no-client-verdicts hard floor to narrative headlines"*). The fields arrive from wave-1 server tickets
-  SB-006/SB-038 (plan W1.2): `verdict: 'win' | 'early' | 'flat'` (outcome vocabulary) and
-  `verdictHeadline: string` (server-templated).
+- Verdict data is **server-derived only, never client-composed** (AD-002: *"extends the
+  no-client-verdicts hard floor to narrative headlines"*). SB-006 does **not** introduce a server enum:
+  content-performance items receive the existing `OutcomeReadback` (`score: OutcomeScore` +
+  `direction: DeltaDirection`) by joining to scored actions. The server never emits
+  `win | early | flat`; those are client rendering labels mapped from `OutcomeScore`.
+- Narrative verdict headlines are the separate SB-038 contract: `verdictHeadline?: string` is drafted
+  during strategy-POV generation and rendered as-is when present. It is server/model-derived, never a
+  hardcoded or templated client string; absent means render the honest-absence state (§6).
 - **Client code renders; it does not write.** No string interpolation that *composes* a judgment
-  ("Traffic is up 40% because…"), no client-side thresholding that maps a metric to win/early/flat. If
-  the payload has no verdict fields, render the honest-absence state (§6) — do not synthesize one.
-- Rendering guidance: `verdict` maps to tone via existing primitives (`Badge`/`StatusBadge` from
-  `src/components/ui/`); `verdictHeadline` renders as-is. Tone mapping stays a lookup table like the
-  pilot's `FEEDBACK_TONE` const (`KeywordsSurface.tsx:84–88`) — data → tone, never data → prose.
+  ("Traffic is up 40% because…"), no client-side metric thresholding to invent a verdict, and no fallback
+  prose when the payload has no `OutcomeReadback` or `verdictHeadline`.
+- Rendering guidance: `OutcomeReadback.score` maps to the surface's win/early/flat label and tone via
+  existing primitives (`Badge`/`StatusBadge` from `src/components/ui/`); `direction` can support the
+  movement detail. Tone mapping stays a lookup table like the pilot's `FEEDBACK_TONE` const
+  (`KeywordsSurface.tsx:84–88`) — data → label/tone, never data → prose.
 
 ## 3. Money-frame + basis pill (AD-003, AD-028)
 

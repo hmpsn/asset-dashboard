@@ -7,6 +7,7 @@ import { getGA4LandingPages } from '../../google-analytics.js';
 import { normalizePageUrl } from '../../utils/page-address.js';
 import { stripHtmlToText } from '../../utils/text.js';
 import { createLogger } from '../../logger.js';
+import { getScoredOutcomeReadbacks, type OutcomeReadbacks } from '../../outcome-tracking.js';
 import { getAllGscPages } from '../../search-console.js';
 import { getWorkspace } from '../../workspaces.js';
 import type {
@@ -158,6 +159,28 @@ function buildJoinback(brief: ContentBrief | undefined, post: GeneratedPost | un
   };
 }
 
+function loadOutcomeReadbacks(workspaceId: string): OutcomeReadbacks | undefined {
+  try {
+    const readbacks = getScoredOutcomeReadbacks(workspaceId);
+    if (readbacks.bySource.size === 0 && readbacks.byKeyword.size === 0) return undefined;
+    return readbacks;
+  } catch (err) {
+    // catch-ok: outcome verdicts are read-side decoration; content performance still renders without them.
+    log.debug({ err, workspaceId }, 'Outcome read-back unavailable for content performance');
+    return undefined;
+  }
+}
+
+function lookupOutcome(
+  readbacks: OutcomeReadbacks | undefined,
+  postId: string | undefined,
+  targetKeyword: string | undefined,
+): ContentPerformanceItem['outcome'] {
+  if (!readbacks) return undefined;
+  return (postId ? readbacks.bySource.get(`post::${postId}`) : undefined)
+    ?? (targetKeyword ? readbacks.byKeyword.get(targetKeyword.trim().toLowerCase()) : undefined);
+}
+
 function scrubForPublic(item: ContentPerformanceItem): ContentPerformanceItem {
   const { joinback: _joinback, coverage, ...rest } = item;
   return {
@@ -227,6 +250,7 @@ export async function getContentPerformance(
 
   const now = Date.now();
   const seenKeywords = new Set<string>();
+  const outcomeReadbacks = loadOutcomeReadbacks(workspaceId);
   const items: ContentPerformanceItem[] = published.map(request => {
     const slug = request.targetPageSlug;
     const path = slug ? normalizePageUrl(slug) : undefined;
@@ -235,6 +259,7 @@ export async function getContentPerformance(
     const post = request.postId ? postsById.get(request.postId) : (request.briefId ? postsByBriefId.get(request.briefId) : undefined);
     const publishDate = request.updatedAt || request.requestedAt;
     const coverage = gradeContentTermCoverage(brief, post);
+    const outcome = lookupOutcome(outcomeReadbacks, post?.id, request.targetKeyword);
 
     return {
       requestId: request.id,
@@ -249,6 +274,7 @@ export async function getContentPerformance(
       ga4: path ? (ga4Pages.get(path) || null) : null,
       source: 'request',
       coverage,
+      ...(outcome ? { outcome } : {}),
       joinback: buildJoinback(brief, post),
     };
   });
@@ -263,6 +289,7 @@ export async function getContentPerformance(
 
         const slug = cell.plannedUrl;
         const path = slug ? normalizePageUrl(slug) : undefined;
+        const outcome = lookupOutcome(outcomeReadbacks, undefined, cell.targetKeyword);
 
         items.push({
           requestId: cell.id,
@@ -277,6 +304,7 @@ export async function getContentPerformance(
           ga4: path ? (ga4Pages.get(path) || null) : null,
           source: 'matrix',
           coverage: unavailableCoverage('Matrix item has no linked brief or post'),
+          ...(outcome ? { outcome } : {}),
         });
       }
     }
