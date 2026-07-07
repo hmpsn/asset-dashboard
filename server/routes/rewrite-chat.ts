@@ -19,10 +19,47 @@ import type { SeoIssue, PageSeoResult } from '../seo-audit.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { fetchPublicWebText, isExternalFetchError } from '../external-fetch.js';
 import { buildPageAssistContext } from '../intelligence/page-assist-context-builder.js';
+import { getPageKeyword } from '../page-keywords.js';
+import { getGA4PageOrganicTrafficMap } from '../google-analytics.js';
+import { normalizePageUrl } from '../utils/page-address.js';
+import type { PageKeywordMap, PageKeywordProjection } from '../../shared/types/workspace.ts';
 
 import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 const log = createLogger('rewrite-chat');
+
+const PAGE_TRAFFIC_PROJECTION_DAYS = 28;
+const PAGE_TRAFFIC_PROJECTION_LIMIT = 500;
+
+function pageProjectionFrom(
+  keyword: PageKeywordMap | undefined,
+  monthlyTraffic: number | undefined,
+): PageKeywordProjection {
+  const projection: PageKeywordProjection = {};
+  if (keyword) {
+    if (keyword.primaryKeyword) projection.primaryKeyword = keyword.primaryKeyword;
+    projection.rank = keyword.currentPosition ?? null;
+    if (keyword.optimizationScore != null) projection.optimizationScore = keyword.optimizationScore;
+  }
+  if (monthlyTraffic != null) projection.monthlyTraffic = monthlyTraffic;
+  return projection;
+}
+
+async function loadOrganicTrafficProjectionMap(
+  workspace: { id: string; ga4PropertyId?: string },
+): Promise<Map<string, number>> {
+  if (!workspace.ga4PropertyId) return new Map();
+  try {
+    return await getGA4PageOrganicTrafficMap(
+      workspace.ga4PropertyId,
+      PAGE_TRAFFIC_PROJECTION_DAYS,
+      PAGE_TRAFFIC_PROJECTION_LIMIT,
+    );
+  } catch (err) {
+    log.warn({ err, workspaceId: workspace.id }, 'GA4 organic page traffic unavailable for rewrite load-page projection');
+    return new Map();
+  }
+}
 
 // ── Helper: strip HTML to readable text sections ──
 interface PageSection {
@@ -190,7 +227,8 @@ router.post('/api/rewrite-chat/:workspaceId/load-page', requireWorkspaceAccess('
     const { title, sections, bodyText, preamble } = extractPageSections(html);
 
     // Get audit issues for this page
-    const slug = new URL(url).pathname.replace(/^\//, '').replace(/\/$/, '');
+    const pagePath = normalizePageUrl(url);
+    const slug = pagePath === '/' ? '' : pagePath.replace(/^\//, '');
     let issues: SeoIssue[] = [];
     if (ws.webflowSiteId) {
       const snapshot = getLatestSnapshot(ws.webflowSiteId);
@@ -199,8 +237,11 @@ router.post('/api/rewrite-chat/:workspaceId/load-page', requireWorkspaceAccess('
         if (page) issues = page.issues;
       }
     }
+    const keyword = getPageKeyword(workspaceId, pagePath);
+    const trafficByPath = await loadOrganicTrafficProjectionMap(ws);
+    const projection = pageProjectionFrom(keyword, trafficByPath.get(pagePath.toLowerCase()));
 
-    res.json({ title, sections, bodyText, preamble, html: html.slice(0, 50000), issues, slug });
+    res.json({ title, sections, bodyText, preamble, html: html.slice(0, 50000), issues, slug, ...projection });
   } catch (err) {
     if (isExternalFetchError(err)) {
       const status = err.kind === 'http' ? 502 : 500;

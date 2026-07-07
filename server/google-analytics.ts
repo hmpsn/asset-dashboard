@@ -7,6 +7,7 @@
 import { getGlobalToken } from './google-auth.js';
 import { googleJson, isGoogleProviderError } from './google-provider-client.js';
 import { createLogger } from './logger.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import type { AnalyticsDateRange } from '../shared/types/analytics-contract.js';
 const log = createLogger('ga4');
 
@@ -612,6 +613,20 @@ export async function getGA4LandingPages(
       conversions: parseIntSafe(metricValue(r, 4)),
     };
   });
+}
+
+export async function getGA4PageOrganicTrafficMap(
+  propertyId: string,
+  days: number = 28,
+  limit: number = 500,
+  dateRange?: CustomDateRange,
+): Promise<Map<string, number>> {
+  const pages = await getGA4LandingPages(propertyId, days, limit, true, dateRange);
+  const trafficByPath = new Map<string, number>();
+  for (const page of pages) {
+    trafficByPath.set(normalizePageUrl(page.landingPage).toLowerCase(), page.sessions);
+  }
+  return trafficByPath;
 }
 
 export interface GA4OrganicOverview {
