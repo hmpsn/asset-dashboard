@@ -11,3 +11,7 @@ Living redirect map required by the Phase A plan. Every future route/tab move ad
 | `seo-audit?sub=aeo-review` planned out-move | held at `seo-audit?sub=aeo-review` until `ai-visibility` exists (DEF-site-audit-001) | W5 site-audit | 2026-07-07 |
 | `seo-audit` Performance-triage / CWV detail | `performance` | W5 site-audit consolidation | 2026-07-07 |
 | `seo-audit` Links-triage (dead-links / redirects / CSV) | `links?tab=dead-links` | W5 site-audit consolidation | 2026-07-07 |
+| `seo-strategy?tab=overview` | `seo-strategy?lens=spine` | W6 engine | 2026-07-07 |
+| `seo-strategy?tab=content` | `content-pipeline?tab=content-health` | W6 engine | 2026-07-07 |
+| `seo-strategy?tab=rankings` | `seo-keywords?lens=rankings` | W6 engine | 2026-07-07 |
+| `seo-strategy?tab=competitive` | `competitors` | W6 engine | 2026-07-07 |

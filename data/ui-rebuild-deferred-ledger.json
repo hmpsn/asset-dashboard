@@ -1413,6 +1413,62 @@
         "surface": "docs/ui-rebuild/phase-a/surfaces/cockpit.json:433-438,528-536",
         "backlog": "docs/ui-rebuild/phase-a/surfaces/cockpit.json:319-332"
       }
+    },
+    {
+      "id": "DEF-engine-001",
+      "surface": "engine",
+      "item": "strategy-command-center retirement and strategy-the-issue no-touch guard",
+      "decision": "Build the rebuilt seo-strategy surface additively behind ui-rebuild-shell. Defer destructive strategy-command-center retirement to an owner-gated follow-up and do not touch the client strategy-the-issue flag.",
+      "class": "behavior",
+      "upgradeTrigger": "Owner approves a separate flag-retirement PR with OFF-branch deletion, override cleanup migration, and strategy-the-issue lifecycle audit.",
+      "owner": "Joshua",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {}
+    },
+    {
+      "id": "DEF-engine-002",
+      "surface": "engine",
+      "item": "Graduation writes from Engine",
+      "decision": "Defer graduation writes wholesale per AD-004; Engine ships parity/read-only curation behavior and does not add bridge writes or status mutations.",
+      "class": "behavior",
+      "upgradeTrigger": "Graduation seam is approved as a shared contract with tests and cross-surface write ownership.",
+      "owner": "Joshua",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {}
+    },
+    {
+      "id": "DEF-engine-003",
+      "surface": "engine",
+      "item": "Promote client request to strategy signal/backing move",
+      "decision": "Defer E-Q9 and AD-023 promote-to-signal path; keep existing feedback-approve and manual recommendation flows in this ticket.",
+      "class": "behavior",
+      "upgradeTrigger": "A flagged, contract-backed promote-to-signal follow-up defines source snapshots, attribution, events, tests, and inbox/request ownership.",
+      "owner": "Joshua",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {}
+    },
+    {
+      "id": "DEF-engine-004",
+      "surface": "engine",
+      "item": "Admin what-the-client-sees spine preview",
+      "decision": "Defer SB-039/E9 preview spine; Engine v1 does not add a client preview without a read-safe admin source.",
+      "class": "data",
+      "upgradeTrigger": "Owner approves the admin preview contract and read path, including public-boundary parity tests and no-client-claim copy review.",
+      "owner": "Joshua",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {}
     }
   ]
 }
