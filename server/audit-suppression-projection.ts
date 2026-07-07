@@ -1,5 +1,6 @@
 import type { SeoAuditResult } from './seo-audit.js';
 import { applySuppressionsToAudit, type AuditSuppression } from './seo-audit-suppressions.js';
+import { enrichAuditCategoryScoring } from './audit-category-scores.js';
 
 function hasSuppressions(suppressions: AuditSuppression[] | undefined): suppressions is AuditSuppression[] {
   return Array.isArray(suppressions) && suppressions.length > 0;
@@ -21,7 +22,7 @@ export function getEffectiveAudit(
   const normalized = normalizeAuditShape(audit);
   return hasSuppressions(suppressions)
     ? applySuppressionsToAudit(normalized, suppressions)
-    : normalized;
+    : enrichAuditCategoryScoring(normalized);
 }
 
 export function hasAuditSuppressions(

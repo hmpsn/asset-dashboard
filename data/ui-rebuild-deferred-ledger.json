@@ -1282,6 +1282,64 @@
         "surface": "docs/ui-rebuild/phase-a/surfaces/seo-editor.json:439",
         "serverBacklog": "docs/ui-rebuild/phase-a/server-backlog.json:7"
       }
+    },
+    {
+      "id": "DEF-site-audit-001",
+      "surface": "site-audit",
+      "item": "AeoReview / AI Search Ready relocation to AI Visibility",
+      "decision": "Keep AeoReview reachable inside Site Audit until an ai-visibility Page id and receiver exist; do not drop or retarget the sub-tool in W5.",
+      "class": "behavior",
+      "upgradeTrigger": "Owner creates the AI Visibility route/home and signs the AeoReview relocation contract, including D8 redirect and receiver tests.",
+      "owner": "Joshua",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "delta": "DELTA 1",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/site-audit.json:709",
+        "currentSubtool": "src/components/SeoAudit.tsx:364-371",
+        "backlog": "SB-009"
+      }
+    },
+    {
+      "id": "DEF-site-audit-002",
+      "surface": "site-audit",
+      "item": "sitehealth.js cross-client roll-up and batch-fix",
+      "decision": "Defer the book-level site-health matrix and all cross-client batch-fix behavior to W6 Global Ops; W5 does not ship even the read-only matrix.",
+      "class": "data",
+      "upgradeTrigger": "W6 Global Ops signs the cross-client read/write safety review and implements SB-013/SB-060 with performance and activity-log coverage.",
+      "owner": "Joshua",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "delta": "DELTA 2",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/site-audit.json:626-630",
+        "readBacklog": "SB-013",
+        "jobBacklog": "SB-060",
+        "existingScaffold": "server/routes/workspaces.ts:107-124"
+      }
+    },
+    {
+      "id": "DEF-site-audit-003",
+      "surface": "site-audit",
+      "item": "Audit findings graduation to Insights Engine",
+      "decision": "Do not build a Site Audit-only graduation write; keep audit parity and wait for the C3 owner-signed cross-surface graduation seam.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-001 lands a shared graduation endpoint with InsightType registration, source provenance, activity logging, broadcasts, and receiver UI.",
+      "owner": "Joshua",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-004",
+        "phaseA": "docs/ui-rebuild/phase-a/PHASE_A_DECISIONS.md:13,28-30",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/site-audit.json:212-215",
+        "backlog": "SB-001"
+      }
     }
   ]
 }

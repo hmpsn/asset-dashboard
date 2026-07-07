@@ -63,6 +63,7 @@ import {
   workspaceContextJobErrorResponse,
 } from '../workspace-context-generation-job.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import type { AuditCategoryScore } from '../../shared/types/seo-audit.js';
 import { computeTrialState } from '../billing/trial-state.js';
 import { toAdminWorkspaceView } from '../serializers/admin-workspace-view.js';
 import { addActivity } from '../activity-log.js';
@@ -109,7 +110,16 @@ router.get('/api/workspace-overview', (req, res) => {
   const workspaces = listVisibleWorkspaces(req);
   const overview = workspaces.map(ws => {
     // Audit
-    let audit: { score: number; totalPages: number; errors: number; warnings: number; previousScore?: number; lastAuditDate?: string } | null = null;
+    let audit: {
+      score: number;
+      totalPages: number;
+      errors: number;
+      warnings: number;
+      previousScore?: number;
+      lastAuditDate?: string;
+      categoryScoreVersion?: 1;
+      categoryScores?: AuditCategoryScore[];
+    } | null = null;
     if (ws.webflowSiteId) {
       const snap = getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions || []);
       if (snap) {
@@ -121,6 +131,8 @@ router.get('/api/workspace-overview', (req, res) => {
           warnings: filtered.warnings,
           previousScore: snap.previousScore,
           lastAuditDate: snap.createdAt,
+          categoryScoreVersion: filtered.categoryScoreVersion,
+          categoryScores: filtered.categoryScores,
         };
       }
     }

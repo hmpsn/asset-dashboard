@@ -361,7 +361,7 @@ describe('ContentDecay: Refresh brief and Review page buttons', () => {
 // ---------------------------------------------------------------------------
 
 describe('ContentPipeline: decay banner clickthrough', () => {
-  it('decay banner is wrapped in ClickableRow that navigates to seo-audit?sub=content-decay', async () => {
+  it('decay banner is wrapped in ClickableRow that navigates to content-pipeline?tab=content-health (AD-013 acting-home retarget)', async () => {
     const { readFileSync } = await import('fs');
     const { join } = await import('path');
     const src = readFileSync(
@@ -371,9 +371,10 @@ describe('ContentPipeline: decay banner clickthrough', () => {
 
     // The banner must use ClickableRow (not a plain div)
     expect(src).toContain('ClickableRow');
-    // The onClick must navigate to seo-audit with sub=content-decay
-    expect(src).toContain('seo-audit');
-    expect(src).toContain('sub=content-decay');
+    // W5 AD-013: Content Pipeline is the acting decay home; the sender retargets to
+    // content-pipeline?tab=content-health (the diagnostic view stays in Site Audit).
+    expect(src).toContain('content-pipeline');
+    expect(src).toContain('tab=content-health');
   });
 
   it('dismissal uses e.stopPropagation() to prevent navigation on dismiss', async () => {

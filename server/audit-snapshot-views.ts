@@ -26,10 +26,16 @@ export function toEffectiveAuditSnapshot(
   snapshot: AuditSnapshot,
   suppressions: AuditSuppression[] | undefined,
 ): AuditSnapshot {
-  if (!hasAuditSuppressions(suppressions)) return snapshot;
+  const audit = getEffectiveAudit(snapshot.audit, suppressions);
+  if (!hasAuditSuppressions(suppressions)) {
+    return {
+      ...snapshot,
+      audit,
+    };
+  }
   return {
     ...snapshot,
-    audit: getEffectiveAudit(snapshot.audit, suppressions),
+    audit,
     previousScore: getEffectivePreviousScore(snapshot, suppressions),
   };
 }

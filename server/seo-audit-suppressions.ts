@@ -1,4 +1,5 @@
 import type { SeoAuditResult } from './seo-audit.js';
+import { enrichAuditCategoryScoring } from './audit-category-scores.js';
 import { CRITICAL_CHECKS, MODERATE_CHECKS, computePageScore } from '../shared/scoring.js';
 
 export const CRITICAL_CHECKS_SET = new Set(CRITICAL_CHECKS);
@@ -17,7 +18,7 @@ export function applySuppressionsToAudit(
   audit: SeoAuditResult,
   suppressions: AuditSuppression[],
 ): SeoAuditResult {
-  if (!suppressions || suppressions.length === 0) return audit;
+  if (!suppressions || suppressions.length === 0) return enrichAuditCategoryScoring(audit);
 
   const exactSupps = suppressions.filter(s => !s.pagePattern);
   const suppSet = new Set(exactSupps.map(s => `${s.check}::${s.pageSlug}`));
@@ -60,14 +61,15 @@ export function applySuppressionsToAudit(
     ? Math.round(indexedPages.reduce((s, r) => s + r.score, 0) / indexedPages.length)
     : 100;
 
-  return {
+  return enrichAuditCategoryScoring({
+    ...audit,
     siteScore,
     totalPages: filteredPages.length,
     errors: totalErrors,
     warnings: totalWarnings,
-    infos: audit.infos !== undefined ? totalInfos : totalInfos,
+    infos: totalInfos,
     pages: filteredPages,
     siteWideIssues: audit.siteWideIssues,
     cwvSummary: audit.cwvSummary,
-  };
+  });
 }

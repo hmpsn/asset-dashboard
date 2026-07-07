@@ -11,6 +11,15 @@ export { useWorkspaceOverviewData } from './useWorkspaceOverview';
 export { useWorkspaceBadges } from './useWorkspaceBadges';
 export { useAuditTrafficMap, useAuditSuppressions, useAuditSchedule, useSchemaSnapshot, useWebflowPages } from './useAdminSeo';
 export { useSeoAuditWorkflow } from './useSeoAuditWorkflow';
+export { useSiteAuditRebuilt } from './useSiteAuditRebuilt';
+export type {
+  AuditIssueGroup,
+  AuditIssueInstance,
+  SiteAuditIssue,
+  SiteAuditPage,
+  SiteAuditResult,
+  SiteAuditSortMode,
+} from './useSiteAuditRebuilt';
 export { useWebflowAssets, useAssetAudit, useCmsImages } from './useAdminAssets';
 export { useWorkspaces, useCreateWorkspace, useDeleteWorkspace, useLinkSite, useUnlinkSite, WORKSPACES_KEY } from './useWorkspaces';
 export { useHealthCheck, HEALTH_KEY } from './useHealthCheck';

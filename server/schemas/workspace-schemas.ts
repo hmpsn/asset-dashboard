@@ -9,6 +9,10 @@ import {
   EEAT_RECOMMENDATION_SURFACE,
   TRUST_SIGNAL_SEVERITY,
 } from '../../shared/types/eeat-assets.js';
+import {
+  AUDIT_CATEGORY_SCORE_VERSION,
+  AUDIT_DISPLAY_CATEGORIES,
+} from '../../shared/types/seo-audit.js';
 
 // ── Event config ──
 
@@ -475,11 +479,23 @@ const seoIssueSchema = z.object({
   check: z.string(),
   severity: z.enum(['error', 'warning', 'info']),
   category: z.string().optional(),
+  displayCategory: z.enum(AUDIT_DISPLAY_CATEGORIES).optional(),
   message: z.string().optional(),
   recommendation: z.string().optional(),
   value: z.string().optional(),
   suggestedFix: z.string().optional(),
   affectedPages: z.array(z.string()).optional(),
+}).passthrough();
+
+const auditCategoryScoreSchema = z.object({
+  category: z.enum(AUDIT_DISPLAY_CATEGORIES),
+  label: z.string(),
+  score: z.number(),
+  denominatorPages: z.number(),
+  affectedPages: z.number(),
+  errors: z.number(),
+  warnings: z.number(),
+  infos: z.number(),
 }).passthrough();
 
 const pageSeoResultSchema = z.object({
@@ -538,6 +554,8 @@ export const seoAuditResultSchema = z.object({
   infos: z.number().optional().default(0),
   pages: z.array(pageSeoResultSchema).catch([]),
   siteWideIssues: z.array(seoIssueSchema).catch([]),
+  categoryScoreVersion: z.literal(AUDIT_CATEGORY_SCORE_VERSION).optional(),
+  categoryScores: z.array(auditCategoryScoreSchema).optional().catch(undefined),
   cwvSummary: cwvSummarySchema.optional(),
   deadLinkSummary: z.object({
     total: z.number(),
