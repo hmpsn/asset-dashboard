@@ -50,8 +50,11 @@ export function useSeoEditorApprovalWorkflow({
   const [sendingPage, setSendingPage] = useState<Set<string>>(new Set());
   const [sentPage, setSentPage] = useState<Set<string>>(new Set());
 
-  const selectAllForApproval = useCallback(() => {
-    setApprovalSelected(prev => toggleSelectAllInSet(prev, filteredPageIds));
+  // Optional `ids` lets the caller pass the currently-visible/filtered id set (matching the
+  // CMS toggleSelectAllInCollection pattern); defaults to the workflow's filteredPageIds so
+  // the legacy SeoEditor caller (no arg) is unchanged.
+  const selectAllForApproval = useCallback((ids?: string[]) => {
+    setApprovalSelected(prev => toggleSelectAllInSet(prev, ids ?? filteredPageIds));
   }, [filteredPageIds]);
 
   const sendPageToClient = useCallback(async (pageId: string) => {
