@@ -59,8 +59,8 @@ router.post('/api/auth/setup', express.json(), async (req, res) => {
     const { email, password, name } = req.body;
     if (!email || !password || !name) return res.status(400).json({ error: 'email, password, and name are required' });
     if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
-    // First user gets all workspaces
-    const allWs = listWorkspaces().map(w => w.id);
+    // First user gets all workspaces — including archived, so the owner retains access to restore them
+    const allWs = listWorkspaces({ includeArchived: true }).map(w => w.id);
     const user = await createUser(email, password, name, 'owner', allWs);
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
     res.cookie('token', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000, secure: IS_PROD });
