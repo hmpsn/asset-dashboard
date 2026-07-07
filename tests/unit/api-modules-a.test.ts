@@ -1190,17 +1190,10 @@ describe('workOrders.list', () => {
 // src/api/misc.ts — redirects
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('redirects.list', () => {
-  it('calls getSafe with webflow redirects endpoint', async () => {
-    await redirects.list('site-1');
-    expect(mockGetSafe).toHaveBeenCalledWith('/api/webflow/redirects/site-1', []);
-  });
-});
-
-describe('redirects.save', () => {
-  it('calls post with redirect body', async () => {
-    await redirects.save('site-1', { from: '/old-path', to: '/new-path' });
-    expect(mockPost).toHaveBeenCalledWith('/api/webflow/redirects/site-1', { from: '/old-path', to: '/new-path' });
+describe('redirects retired orphaned wrappers', () => {
+  it('does not expose list/save wrappers for nonexistent webflow redirect routes', () => {
+    expect('list' in redirects).toBe(false);
+    expect('save' in redirects).toBe(false);
   });
 });
 

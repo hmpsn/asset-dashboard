@@ -111,7 +111,7 @@ All four land before W2 dispatch. Contracts (shared/types fields + Zod schemas) 
 | W1.1 Money-frame projection | SB-003 (M, AD-003) | GPT-5.5 (cross-context: cron + outcomes) | `server/outcome-tracking.ts` adjacents, new cron in `cron-registry.ts`, `shared/types/outcome-tracking.ts` | `valueAtStake` / `recoveredSoFar` + `basis: 'estimate'\|'measured'\|'actual'` — cron-precomputed, read-only at render |
 | W1.2 Verdict fields | SB-006 (S) + SB-038 (S) (AD-002) | GPT-5.4 | performance/content verdict projections + strategy-POV payload | `verdict: 'win'\|'early'\|'flat'` from outcome vocab; `verdictHeadline: string` server-templated |
 | W1.3 Per-page projection | SB-005 (M) | GPT-5.4 | page-row payload assemblers (`server/` page-intelligence/keyword joins) | keyword/rank/traffic/optimization-score fields on page rows — single query join, NO N-per-row fan-out |
-| W1.4 Webflow redirect-create | SB-026 (M) | GPT-5.4 | Webflow provider + `server/routes/` links/seo-editor seam | fixes the orphaned `redirects.save` wrappers; FM-2 error test mandatory |
+| W1.4 Webflow redirect-create | SB-026 (M, REVISED owner 2026-07-06) | GPT-5.4 | Frontend-only: DeadLinkPanel redirect CSV export + `src/api/misc.ts` cleanup | REVISED (owner 2026-07-06): no Webflow create endpoint (Enterprise-gated); ships a client-side redirect CSV export + removes the orphaned redirects.save/list wrappers and the live 404 CTA. Frontend-only; CSV util carries into the W3 Links rebuild. |
 
 SB-004 (work-queue classification, L) deliberately rides W6.0, per the ratified note — its only consumers are cockpit + global-ops.
 
