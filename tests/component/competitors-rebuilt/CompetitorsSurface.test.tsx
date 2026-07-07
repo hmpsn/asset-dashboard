@@ -251,9 +251,12 @@ describe('CompetitorsSurface', () => {
     expect(screen.getByRole('button', { name: /Send to client/i })).toBeInTheDocument();
     expect(Object.keys(capturedWorkspaceHandlers)).toContain('strategy:updated');
 
-    await waitFor(async () => {
-      await expectNoA11yViolations(container);
+    // Every section loads independently; wait for ALL skeletons to clear so axe
+    // never runs against a mid-settle DOM (the source of the intermittent a11y flake).
+    await waitFor(() => {
+      expect(container.querySelectorAll('.animate-pulse').length).toBe(0);
     });
+    await expectNoA11yViolations(container);
   });
 
   it('shows the provider setup state without rendering live tables when SEO data is unavailable', async () => {
