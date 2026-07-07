@@ -524,6 +524,344 @@
       }
     },
     {
+      "id": "DEF-performance-001",
+      "surface": "performance",
+      "item": "Per-asset in-place Compress action from Page Weight asset rows is not built; the surface ships the Asset Manager deep-link sender only.",
+      "decision": "Ship the Asset Manager deep-link sender only; defer in-place compression until the receiver and a per-asset action contract are proven.",
+      "class": "behavior",
+      "upgradeTrigger": "Asset Manager exposes a verified asset-id/filter receiver plus a per-asset compression action contract.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/performance.md"
+      }
+    },
+    {
+      "id": "DEF-performance-002",
+      "surface": "performance",
+      "item": "Per-opportunity Fix routing from the PageSpeed opportunities list is not built; the list renders with savings but no Fix buttons.",
+      "decision": "Render the opportunities list with savings now; defer Fix buttons because destination ownership is undefined.",
+      "class": "behavior",
+      "upgradeTrigger": "A signed fix-target routing contract names the owning surface for each PageSpeed opportunity class.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/performance.md"
+      }
+    },
+    {
+      "id": "DEF-performance-003",
+      "surface": "performance",
+      "item": "Lighthouse accessibility / best-practices / SEO category bars are not shown; only the performance score + full Core Web Vitals ship.",
+      "decision": "Defer the extra Lighthouse categories; ship the existing performance score and full Core Web Vitals parity first.",
+      "class": "data",
+      "upgradeTrigger": "SB-024 fetches and persists extra Lighthouse categories on the PageSpeed snapshot shape.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/performance.md",
+        "sb": "SB-024"
+      }
+    },
+    {
+      "id": "DEF-performance-004",
+      "surface": "performance",
+      "item": "Automatic content-win graduation to the Insights Engine is not built; the surface renders verdicts but does not graduate them.",
+      "decision": "Defer the automatic insight write to the owner-signed C3 graduation seam; do not build an ad-hoc Performance-only endpoint.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-001 lands the shared graduation write contract (InsightType registration, broadcast, activity log, snapshot provenance).",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/performance.md",
+        "ad": "AD-004",
+        "sb": "SB-001"
+      }
+    },
+    {
+      "id": "DEF-performance-005",
+      "surface": "performance",
+      "item": "Engagement / impressions lift percent versus a pre-publish baseline is not shown; the server reads only one trailing 90-day window.",
+      "decision": "Do not fabricate lift percentages from the trailing 90-day read; defer until a real pre/post baseline derivation exists.",
+      "class": "data",
+      "upgradeTrigger": "SB-008 adds pre/post-publish GA4 and GSC window reads and serializes the lift fields.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/performance.md",
+        "sb": "SB-008"
+      }
+    },
+    {
+      "id": "DEF-links-001",
+      "surface": "links",
+      "item": "Insert internal link directly into a Webflow source page",
+      "decision": "Ship copy-HTML/manual implementation parity now; defer direct insertion because it is a new Webflow write path under AD-017.",
+      "class": "behavior",
+      "upgradeTrigger": "A signed seo-editor write-target contract adds a safe Webflow insert-internal-link path with preview, auth, activity log, and rollback semantics.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-017",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/links.json:350-352",
+        "head": "src/components/InternalLinks.tsx:342-350,381-389"
+      }
+    },
+    {
+      "id": "DEF-links-002",
+      "surface": "links",
+      "item": "Per-suggestion internal-link client sends",
+      "decision": "Keep the HEAD batched internal_link action plus optional note; defer per-suggestion sends because they change the Inbox payload contract.",
+      "class": "behavior",
+      "upgradeTrigger": "Owner signs a new per-item client-action payload contract and the client Inbox renderer supports both batch and item-level review.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-027",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/links.json:324-328",
+        "clientRenderer": "src/components/client/decision-renderers.tsx:356-410"
+      }
+    },
+    {
+      "id": "DEF-links-003",
+      "surface": "links",
+      "item": "Persisted reviewed or suppressed state for dead links",
+      "decision": "Ship Reviewed as session-state row feedback only; defer durable suppression until a Links-owned store and toggle endpoint exist.",
+      "class": "data",
+      "upgradeTrigger": "SB-027 lands the reviewed/suppressed store, POST toggle endpoint, and link-check snapshot serialization.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "backlog": "SB-027",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/links.json:365-368,437-440",
+        "server": "docs/ui-rebuild/phase-a/server-backlog.json:377-387"
+      }
+    },
+    {
+      "id": "DEF-links-004",
+      "surface": "links",
+      "item": "Background jobs and scheduled crawls for link, redirect, and internal-link scans",
+      "decision": "Keep manual synchronous GET scans for parity and honest freshness; defer job migration and recurring crawl scheduling.",
+      "class": "perf",
+      "upgradeTrigger": "SB-045 moves the three scans to the background-job platform and, if scheduled crawl is adopted, registers the cron with the registry census test.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-001",
+        "backlog": "SB-045",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/links.json:360-363,443-446",
+        "server": "docs/ui-rebuild/phase-a/server-backlog.json:607-617"
+      }
+    },
+    {
+      "id": "DEF-links-005",
+      "surface": "links",
+      "item": "Direct Webflow redirect-create action from Dead Links or Redirects",
+      "decision": "Ship export, copy, send-to-client, and pre-stage flows; defer direct Webflow redirect creation because the server route is missing and write paths require AD-017 treatment.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-026 adds the redirect-create endpoint and the Links surface has an owner-signed write UX with activity logging and failure states.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-017",
+        "backlog": "SB-026",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/links.json:242-245",
+        "server": "docs/ui-rebuild/phase-a/server-backlog.json:364-374"
+      }
+    },
+    {
+      "id": "DEF-links-006",
+      "surface": "links",
+      "item": "Links-to-Insights Engine graduation bridge",
+      "decision": "Do not build a Links-only insight write; defer graduation to the C3 owner-signed cross-surface seam required by AD-004.",
+      "class": "behavior",
+      "upgradeTrigger": "The C3 graduation contract explicitly includes Links signals and defines InsightType registration, broadcast, activity log, and source provenance.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-004",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/links.json:375-378",
+        "phaseA": "docs/ui-rebuild/phase-a/PHASE_A_DECISIONS.md:13,28-30"
+      }
+    },
+    {
+      "id": "DEF-links-007",
+      "surface": "links",
+      "item": "Architecture gap Add-page CTA",
+      "decision": "Relocate the existing Architecture view now; defer the prototype-only Add-page CTA until a destination and write contract are signed.",
+      "class": "behavior",
+      "upgradeTrigger": "A Content Pipeline or strategy-planning receiver is named for creating planned pages from architecture gaps, including route params and ownership.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "surface": "docs/ui-rebuild/phase0/surfaces/links.md:95",
+        "architecture": "src/components/SiteArchitecture.tsx:353-391"
+      }
+    },
+    {
+      "id": "DEF-schema-001",
+      "surface": "schema",
+      "item": "Missing-schema Site Audit count omitted from the Schema summary strip until the audit check taxonomy and projection are fixed.",
+      "decision": "Ship the summary strip with an honest absent state for this one stat; do not derive from mismatched client-only check ids.",
+      "class": "data",
+      "upgradeTrigger": "SB-011 defines or remaps the schema audit finding producer and serializes a per-workspace missing-schema count.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "backlog": "SB-011",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/schema.json:363-367,400-402,481-485",
+        "server": "server/audit-page.ts:177-181,377-388",
+        "frontend": "src/components/SeoAudit.tsx:547-551"
+      }
+    },
+    {
+      "id": "DEF-schema-002",
+      "surface": "schema",
+      "item": "Automatic schema-win graduation to Insights Engine after schema deploys prove a rich result or AI citation.",
+      "decision": "Defer the insight write to the owner-signed C3 graduation seam; this rebuild carries impact display only.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-001 lands the shared graduation write contract with InsightType registration, broadcast, activity log, and snapshot provenance.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-004",
+        "backlog": "SB-001",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/schema.json:351-355,410-412",
+        "source": "docs/ui-rebuild/phase0/surfaces/schema.md:135,163"
+      }
+    },
+    {
+      "id": "DEF-schema-003",
+      "surface": "schema",
+      "item": "Rich-result and AI-citation detection source for schema outcome scoring and graduation.",
+      "decision": "Do not add client-side detection or scrape logic in the rebuilt surface; wait for the server outcome-measurement provider.",
+      "class": "data",
+      "upgradeTrigger": "SB-021 adds the detection provider that can set rich_result_appearing true for schema_deployed outcomes.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "backlog": "SB-021",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/schema.json:487-490",
+        "serverBacklog": "docs/ui-rebuild/phase-a/server-backlog.json:296-308"
+      }
+    },
+    {
+      "id": "DEF-schema-004",
+      "surface": "schema",
+      "item": "Shared Site Audit category score omitted from Schema until SB-010 provides the Site Audit-owned projection.",
+      "decision": "Do not invent a Schema-local audit scorer; consume the shared category score only after the Site Audit backlog item lands.",
+      "class": "data",
+      "upgradeTrigger": "SB-010 ships per-category audit scoring with the six-category taxonomy and exposes the schema category score for consumers.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "backlog": "SB-010",
+        "serverBacklog": "docs/ui-rebuild/phase-a/server-backlog.json:142-157",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/schema.json:464-491"
+      }
+    },
+    {
+      "id": "DEF-schema-005",
+      "surface": "schema",
+      "item": "Schema Site Plan first-class redesign deferred while SchemaPlanPanel is bridge-mounted as T1 carry-over.",
+      "decision": "Mount the existing plan machinery inside the rebuilt surface now; defer a full DS-native plan redesign until after parity is proven.",
+      "class": "primitive",
+      "upgradeTrigger": "A follow-up design spec replaces the bridge with a DS-native plan sub-view without changing plan lifecycle semantics.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-010",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/schema.json:331-337",
+        "head": "src/components/schema/SchemaPlanPanel.tsx:100-580"
+      }
+    },
+    {
+      "id": "DEF-schema-006",
+      "surface": "schema",
+      "item": "Orphaned SchemaHealthDashboard and legacy SchemaReviewTab/Modal cleanup deferred outside the admin rebuild surface.",
+      "decision": "Do not port or resurrect the orphaned client/schema-review surfaces in W3; leave cleanup to the AD-030 dead-code pass.",
+      "class": "behavior",
+      "upgradeTrigger": "AD-030 cleanup pass is scheduled and can safely delete or retire orphaned schema client/review files with route tests.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-030",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/schema.json:221-224,286-289,375-379",
+        "source": "docs/ui-rebuild/phase0/surfaces/schema.md:101,124,167"
+      }
+    },
+    {
+      "id": "DEF-schema-007",
+      "surface": "schema",
+      "item": "Reload-durable Sent publication tag derived from approvals rather than session-only sent state.",
+      "decision": "Render session-backed sent feedback now; defer a durable Sent tag until the approvals-derived read is verified and tested.",
+      "class": "data",
+      "upgradeTrigger": "A schema approvals read joins open/recent schema batches to page rows and survives reload without changing deliverable shapes.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "surfaceUnknown": "docs/ui-rebuild/phase-a/surfaces/schema.json:464-466",
+        "workflow": "src/components/schema/useSchemaSuggesterPublishingWorkflow.ts:31-35,82-105,191-217"
+      }
+    },
+    {
       "id": "DEF-brand-ai-001",
       "surface": "brand-ai",
       "item": "Numeric brand-context completeness score for the Brand AI overview cockpit",

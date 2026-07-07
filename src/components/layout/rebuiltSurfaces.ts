@@ -35,6 +35,15 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'local-seo': lazyWithRetry(() =>
     import('../local-presence-rebuilt/LocalPresenceSurface').then(m => ({ default: m.LocalPresenceSurface })),
   ),
+  'performance': lazyWithRetry(() =>
+    import('../performance-rebuilt/PerformanceSurface').then(m => ({ default: m.PerformanceSurface })),
+  ),
+  'links': lazyWithRetry(() =>
+    import('../links-rebuilt/LinksSurface').then(m => ({ default: m.LinksSurface })),
+  ),
+  'seo-schema': lazyWithRetry(() =>
+    import('../schema-rebuilt/SchemaSurface').then(m => ({ default: m.SchemaSurface })),
+  ),
   'brand': lazyWithRetry(() =>
     import('../brand-ai-rebuilt/BrandAiSurface').then(m => ({ default: m.BrandAiSurface })),
   ),
