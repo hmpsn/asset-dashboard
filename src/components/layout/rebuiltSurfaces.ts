@@ -35,4 +35,7 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'local-seo': lazyWithRetry(() =>
     import('../local-presence-rebuilt/LocalPresenceSurface').then(m => ({ default: m.LocalPresenceSurface })),
   ),
+  'brand': lazyWithRetry(() =>
+    import('../brand-ai-rebuilt/BrandAiSurface').then(m => ({ default: m.BrandAiSurface })),
+  ),
 };

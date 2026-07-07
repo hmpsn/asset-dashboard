@@ -522,6 +522,114 @@
         "ticket": "docs/ui-rebuild/phase-a/tickets/local-presence.md",
         "sb": "SB-056"
       }
+    },
+    {
+      "id": "DEF-brand-ai-001",
+      "surface": "brand-ai",
+      "item": "Numeric brand-context completeness score for the Brand AI overview cockpit",
+      "decision": "Ship qualitative Ready/Partial/Needs setup from field presence; defer a trusted numeric percent until SB-033 extends ai-context-check.",
+      "class": "data",
+      "upgradeTrigger": "SB-033 adds brand-scoped sources to server/ai-context-check.ts and exposes tested per-group scores.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "docs/ui-rebuild/phase-a/owner-decisions.json:280-288",
+        "backlog": "docs/ui-rebuild/phase-a/server-backlog.json:454-465",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/brand-ai.json:280-284"
+      }
+    },
+    {
+      "id": "DEF-brand-ai-002",
+      "surface": "brand-ai",
+      "item": "Founder interview Q&A store and AI draft-from-docs endpoint",
+      "decision": "Defer the interview flow; ship Discovery with existing source ingestion and extraction review only.",
+      "class": "data",
+      "upgradeTrigger": "SB-034 opens with a migration, AI operation contract, and Discovery flow design.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "docs/ui-rebuild/phase-a/owner-decisions.json:280-288",
+        "backlog": "docs/ui-rebuild/phase-a/server-backlog.json:467-477",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/brand-ai.json:262-266"
+      }
+    },
+    {
+      "id": "DEF-brand-ai-003",
+      "surface": "brand-ai",
+      "item": "Source-fed knowledge-base regeneration from Discovery sources and extractions",
+      "decision": "Keep the existing website-crawl knowledge-base job; defer source-fed regeneration until SB-035.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-035 adds a background-job variant that reads discovery sources/extractions.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "docs/ui-rebuild/phase-a/owner-decisions.json:280-288",
+        "backlog": "docs/ui-rebuild/phase-a/server-backlog.json:479-488",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/brand-ai.json:423-475"
+      }
+    },
+    {
+      "id": "DEF-brand-ai-004",
+      "surface": "brand-ai",
+      "item": "PDF DOCX and XLSX discovery-source upload parsing",
+      "decision": "Keep .txt and .md only in Wave 3 because the server rejects other types and has no binary parser.",
+      "class": "data",
+      "upgradeTrigger": "SB-036 adds parser dependencies, upload validation, fixtures, and extraction tests.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "backlog": "docs/ui-rebuild/phase-a/server-backlog.json:491-500",
+        "server": "server/routes/discovery-ingestion.ts:91-110",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/brand-ai.json:470-473"
+      }
+    },
+    {
+      "id": "DEF-brand-ai-005",
+      "surface": "brand-ai",
+      "item": "Single-deliverable brand identity export from generator modal",
+      "decision": "Keep Export All approved deliverables; defer per-item export endpoint and modal action.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-037 adds an item-scoped export route or type parameter with tests.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "backlog": "docs/ui-rebuild/phase-a/server-backlog.json:503-512",
+        "server": "server/routes/brand-identity.ts:67-78",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/brand-ai.json:286-290"
+      }
+    },
+    {
+      "id": "DEF-brand-ai-006",
+      "surface": "brand-ai",
+      "item": "Brand-docs upload UI placement for the existing headless ingestion API",
+      "decision": "Do not invent placement without owner sign-off; preserve the API and folder hints until Q9 is resolved.",
+      "class": "behavior",
+      "upgradeTrigger": "Owner resolves Q9 by choosing Discovery dropzone home or intentionally API-only documentation.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "surface": "docs/ui-rebuild/phase-a/surfaces/brand-ai.json:292-296",
+        "api": "server/routes/brand-docs.ts:25-109",
+        "contract": "docs/rules/brand-engine.md:11-19"
+      }
     }
   ]
 }
