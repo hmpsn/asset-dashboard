@@ -314,6 +314,23 @@
         "ticket": "docs/ui-rebuild/phase-a/tickets/page-rewriter.md",
         "sb": "SB-030"
       }
+    },
+    {
+      "id": "DEF-competitors-001",
+      "surface": "competitors",
+      "item": "Competitor\u2192insight graduation write is not built; the rebuilt surface renders existing insightId linkage only, it does not create/graduate insights.",
+      "decision": "AD-004 defers all 'graduate to Insights Engine' writes wholesale to the one C3-era owner-signed cross-surface contract; no surface builds an ad-hoc graduation write.",
+      "class": "behavior",
+      "upgradeTrigger": "The C3 cross-surface insight-graduation contract lands.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/competitors.md",
+        "ad": "AD-004"
+      }
     }
   ]
 }

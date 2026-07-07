@@ -71,6 +71,11 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM competitor_snapshots WHERE workspace_id = ? AND competitor_domain = ?
      ORDER BY snapshot_date DESC LIMIT 1`,
   ),
+  getLatestSnapshotDate: db.prepare<[string]>(
+    `SELECT MAX(snapshot_date) AS latest_snapshot_date
+     FROM competitor_snapshots
+     WHERE workspace_id = ?`,
+  ),
   insertSnapshot: db.prepare(
     `INSERT INTO competitor_snapshots (id, workspace_id, competitor_domain, snapshot_date, keyword_count, organic_traffic, top_keywords)
      VALUES (@id, @workspace_id, @competitor_domain, @snapshot_date, @keyword_count, @organic_traffic, @top_keywords)`,
@@ -256,6 +261,11 @@ export function listUnlinkedCompetitorAlerts(workspaceId: string): CompetitorAle
 export function listCompetitorAlerts(workspaceId: string, limit = 50): CompetitorAlert[] {
   const rows = stmts().listAlerts.all(workspaceId, limit) as AlertRow[];
   return rows.map(rowToAlert);
+}
+
+export function getLatestCompetitorSnapshotDate(workspaceId: string): string | null {
+  const row = stmts().getLatestSnapshotDate.get(workspaceId) as { latest_snapshot_date: string | null } | undefined;
+  return row?.latest_snapshot_date ?? null;
 }
 
 export function linkAlertToInsight(alertId: string, insightId: string, workspaceId: string): void {

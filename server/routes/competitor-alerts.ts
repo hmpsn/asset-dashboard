@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
-import { listCompetitorAlerts, type CompetitorAlert } from '../competitor-snapshot-store.js';
+import {
+  getLatestCompetitorSnapshotDate,
+  listCompetitorAlerts,
+  type CompetitorAlert,
+} from '../competitor-snapshot-store.js';
 import { createLogger } from '../logger.js';
 import type {
   CompetitorAlertView,
@@ -10,7 +14,16 @@ import type {
 const log = createLogger('competitor-alerts-routes');
 const router = Router();
 
-function toView(alert: CompetitorAlert): CompetitorAlertView {
+type CompetitorAlertViewWithInsight = CompetitorAlertView & {
+  insightId: string | null;
+};
+
+type CompetitorAlertsResponseWithSnapshot = CompetitorAlertsResponse & {
+  alerts: CompetitorAlertViewWithInsight[];
+  lastSnapshotDate: string | null;
+};
+
+function toView(alert: CompetitorAlert): CompetitorAlertViewWithInsight {
   return {
     id: alert.id,
     competitorDomain: alert.competitorDomain,
@@ -22,6 +35,7 @@ function toView(alert: CompetitorAlert): CompetitorAlertView {
     volume: alert.volume ?? null,
     severity: alert.severity,
     snapshotDate: alert.snapshotDate,
+    insightId: alert.insightId ?? null,
     createdAt: alert.createdAt,
   };
 }
@@ -39,7 +53,11 @@ router.get(
     const { workspaceId } = req.params;
     try {
       const alerts = listCompetitorAlerts(workspaceId).map(toView);
-      const response: CompetitorAlertsResponse = { workspaceId, alerts };
+      const response: CompetitorAlertsResponseWithSnapshot = {
+        workspaceId,
+        alerts,
+        lastSnapshotDate: getLatestCompetitorSnapshotDate(workspaceId),
+      };
       res.json(response);
     } catch (err) {
       log.error({ err, workspaceId }, 'Failed to list competitor alerts');

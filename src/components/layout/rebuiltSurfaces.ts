@@ -23,4 +23,7 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'rewrite': lazyWithRetry(() =>
     import('../page-rewriter-rebuilt/PageRewriterSurface').then(m => ({ default: m.PageRewriterSurface })),
   ),
+  'competitors': lazyWithRetry(() =>
+    import('../competitors-rebuilt/CompetitorsSurface').then(m => ({ default: m.CompetitorsSurface })),
+  ),
 };
