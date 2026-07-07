@@ -465,16 +465,6 @@ describe('src/api/seo — seoChangeTracker', () => {
 // ── pageWeight ───────────────────────────────────────────────────────────────
 
 describe('src/api/seo — pageWeight', () => {
-  it('pageWeight.get uses getOptional', async () => {
-    await pageWeight.get('ws-1');
-    expect(mockedGetOptional).toHaveBeenCalledWith('/api/pagespeed/ws-1');
-  });
-
-  it('pageWeight.analyze uses post', async () => {
-    await pageWeight.analyze('ws-1');
-    expect(mockedPost).toHaveBeenCalledWith('/api/pagespeed/ws-1/analyze');
-  });
-
   it('pageWeight.pagespeedSnapshot defaults to mobile strategy', async () => {
     await pageWeight.pagespeedSnapshot('site-1', 'ws-1');
     const [url] = mockedGetOptional.mock.calls[0];

@@ -426,12 +426,6 @@ export const seoChangeTracker = {
 
 // ── Page weight ─────────────────────────────────────────────────
 export const pageWeight = {
-  get: (wsId: string) =>
-    getOptional<unknown>(`/api/pagespeed/${wsId}`),
-
-  analyze: (wsId: string) =>
-    post<unknown>(`/api/pagespeed/${wsId}/analyze`),
-
   webflowPageWeight: (siteId: string, workspaceId?: string) =>
     get<unknown>(`/api/webflow/page-weight/${siteId}${workspaceQuery(workspaceId)}`),
 
