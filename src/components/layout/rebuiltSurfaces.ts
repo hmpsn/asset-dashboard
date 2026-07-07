@@ -59,4 +59,7 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'home': lazyWithRetry(() =>
     import('../cockpit-rebuilt/CockpitSurface').then(m => ({ default: m.CockpitSurface })),
   ),
+  'seo-strategy': lazyWithRetry(() =>
+    import('../engine-rebuilt/EngineSurface').then(m => ({ default: m.EngineSurface })),
+  ),
 };
