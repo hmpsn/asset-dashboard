@@ -138,6 +138,15 @@ const analyticsDataState = vi.hoisted(() => ({
   countries: [{ country: 'usa', clicks: 90, impressions: 900 }],
   types: [{ searchType: 'web', clicks: 95, impressions: 950 }],
   comparison: { current: { clicks: 100 }, previous: { clicks: 80 } },
+  brandedDemand: {
+    status: 'ready' as const,
+    denominator: 'impressions' as const,
+    tokens: ['example'],
+    queryRowsSampled: 3,
+    total: { clicks: 100, impressions: 1000 },
+    branded: { clicks: 40, impressions: 400, sharePct: 40 },
+    nonBranded: { clicks: 60, impressions: 600, sharePct: 60 },
+  },
   shouldThrow: false,
 }));
 
@@ -146,6 +155,7 @@ vi.mock('../../server/analytics-data.js', () => ({
     if (analyticsDataState.shouldThrow) throw new Error('Search overview API error');
     return analyticsDataState.overview;
   }),
+  fetchBrandedDemandSplit: vi.fn(async () => analyticsDataState.brandedDemand),
   fetchPerformanceTrend: vi.fn(async () => analyticsDataState.trend),
   fetchSearchDevices: vi.fn(async () => analyticsDataState.devices),
   fetchSearchCountries: vi.fn(async () => analyticsDataState.countries),
