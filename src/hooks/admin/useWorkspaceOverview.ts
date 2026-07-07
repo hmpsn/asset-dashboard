@@ -1,33 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { get, getSafe, getOptional } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
-
-interface WorkspaceSummary {
-  id: string;
-  name: string;
-  webflowSiteId: string | null;
-  webflowSiteName: string | null;
-  hasGsc: boolean;
-  hasGa4: boolean;
-  hasPassword: boolean;
-  audit: {
-    score: number;
-    totalPages: number;
-    errors: number;
-    warnings: number;
-    previousScore?: number;
-    lastAuditDate?: string;
-  } | null;
-  requests: { total: number; new: number; active: number; latestDate: string | null };
-  approvals: { pending: number; total: number };
-  contentRequests?: { pending: number; inProgress: number; delivered: number; total: number };
-  workOrders?: { pending: number; total: number };
-  churnSignals?: { critical: number; warning: number };
-  pageStates?: { issueDetected: number; inReview: number; approved: number; rejected: number; live: number; total: number };
-  tier?: 'free' | 'growth' | 'premium';
-  isTrial?: boolean;
-  trialDaysRemaining?: number;
-}
+import type { WorkspaceOverviewItem } from '../../../shared/types/workspace-overview';
 
 interface ActivityEntry {
   id: string;
@@ -51,14 +25,14 @@ interface AnomalySummary {
 type PresenceMap = Record<string, Array<{ userId: string; email: string; name?: string; role: string; connectedAt: string; lastSeen: string }>>;
 
 export interface WorkspaceOverviewData {
-  workspaces: WorkspaceSummary[];
+  workspaces: WorkspaceOverviewItem[];
   recentActivity: ActivityEntry[];
   anomalies: AnomalySummary[];
   presence: PresenceMap;
   timeSaved: { totalHoursSaved: number; operationCount: number } | null;
 }
 
-export type { WorkspaceSummary, ActivityEntry, AnomalySummary, PresenceMap };
+export type { WorkspaceOverviewItem as WorkspaceSummary, ActivityEntry, AnomalySummary, PresenceMap };
 
 /**
  * Single aggregated query for the workspace overview (command center).
@@ -69,7 +43,7 @@ export function useWorkspaceOverviewData() {
     queryKey: queryKeys.admin.workspaceOverview(),
     queryFn: async () => {
       const [workspaces, recentActivity, anomalies, presence, timeSaved] = await Promise.all([
-        get<WorkspaceSummary[]>('/api/workspace-overview'),
+        get<WorkspaceOverviewItem[]>('/api/workspace-overview'),
         getSafe<ActivityEntry[]>('/api/activity?limit=15', []),
         getSafe<AnomalySummary[]>('/api/anomalies', []),
         getOptional<PresenceMap>('/api/presence').then(v => v ?? {}).catch(() => ({} as PresenceMap)),

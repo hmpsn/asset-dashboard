@@ -29,6 +29,7 @@ import type {
   OutcomeCoverageProvenance,
 } from '../shared/types/outcome-tracking.js';
 import type { ROIHighlight } from '../shared/types/narrative.js';
+import type { WorkspaceOverviewOutcomeValue } from '../shared/types/workspace-overview.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import { fireBridge, withWorkspaceLock, debouncedOutcomeReweight } from './bridge-infrastructure.js';
 import { broadcastToWorkspace } from './broadcast.js';
@@ -81,7 +82,7 @@ const stmts = createStmtCache(() => ({
   // The correlated subquery deduplicates: an action with wins at day 30 AND day 60
   // emits only the day-60 row instead of appearing twice in the client digest.
   getWinsWithValueByWorkspace: db.prepare(`
-    SELECT ao.*, ta.page_url, ta.action_type
+    SELECT ao.*, ta.page_url, ta.action_type, ta.attribution
     FROM action_outcomes ao
     JOIN tracked_actions ta ON ta.id = ao.action_id
     WHERE ta.workspace_id = ?
@@ -892,6 +893,83 @@ export function getTopWinsFromActions(
  */
 export function getTopWinsForWorkspace(workspaceId: string, limit = 10): TopWin[] {
   return getTopWinsFromActions(getActionsByWorkspace(workspaceId), limit);
+}
+
+export interface OutcomeValueWin {
+  actionId: string;
+  actionType: string;
+  pageUrl: string | null;
+  delta: DeltaSummary;
+  attributedValue: number | null;
+  attribution: Attribution;
+  measuredAt: string;
+}
+
+interface WinWithValueRow extends ActionOutcomeRow {
+  page_url: string | null;
+  action_type: string;
+  attribution: string;
+}
+
+function rowToOutcomeValueWin(row: WinWithValueRow): OutcomeValueWin {
+  return {
+    actionId: row.action_id,
+    actionType: row.action_type,
+    pageUrl: row.page_url ?? null,
+    delta: parseJsonFallback<DeltaSummary>(row.delta_summary, {
+      primary_metric: '',
+      baseline_value: 0,
+      current_value: 0,
+      delta_absolute: 0,
+      delta_percent: 0,
+      direction: 'stable',
+    }),
+    attributedValue: typeof row.attributed_value === 'number' ? row.attributed_value : null,
+    attribution: row.attribution as Attribution,
+    measuredAt: row.measured_at,
+  };
+}
+
+/**
+ * Attribution-honest win-value read path. The underlying statement excludes
+ * `not_acted_on`, so proposal outcomes never inflate client-facing or
+ * cross-workspace value roll-ups.
+ */
+export function getWinsWithValueByWorkspace(workspaceId: string, limit = 100): OutcomeValueWin[] {
+  const rows = stmts().getWinsWithValueByWorkspace.all(workspaceId, limit) as WinWithValueRow[];
+  return rows.map(rowToOutcomeValueWin);
+}
+
+export function getWorkspaceOutcomeValueRollup(workspaceId: string, limit = 100): WorkspaceOverviewOutcomeValue {
+  const wins = getWinsWithValueByWorkspace(workspaceId, limit);
+  return wins.reduce<WorkspaceOverviewOutcomeValue>(
+    (summary, win) => {
+      const deltaAbsolute = typeof win.delta.delta_absolute === 'number' && Number.isFinite(win.delta.delta_absolute)
+        ? win.delta.delta_absolute
+        : 0;
+      const attributedValue = typeof win.attributedValue === 'number' && Number.isFinite(win.attributedValue)
+        ? win.attributedValue
+        : null;
+      summary.wins += 1;
+      if (win.delta.primary_metric === 'clicks') summary.clicks += Math.max(0, Math.round(deltaAbsolute));
+      if (attributedValue != null) {
+        summary.valuePerMonth += attributedValue;
+        summary.withValue += 1;
+      }
+      if (win.attribution === 'externally_executed') summary.externallyExecuted += 1;
+      if (win.attribution === 'platform_executed') summary.platformExecuted += 1;
+      return summary;
+    },
+    {
+      valuePerMonth: 0,
+      clicks: 0,
+      wins: 0,
+      withValue: 0,
+      platformExecuted: 0,
+      externallyExecuted: 0,
+      notActedOnExcluded: true,
+    },
+  );
 }
 
 /**
