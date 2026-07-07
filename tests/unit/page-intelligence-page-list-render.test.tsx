@@ -96,6 +96,25 @@ describe('PageIntelligencePageList rendering', () => {
     expect(onTrackKeyword).toHaveBeenCalledWith('pricing keyword');
   });
 
+  it('never nests a <button> inside the clickable row (invalid HTML / hydration error guard)', () => {
+    // The row toggle is a div[role="button"] specifically so the inline Track
+    // IconButton (a real <button>) is not a descendant of another <button>.
+    // Render both collapsed and expanded to cover the row + details subtree.
+    const { container } = render(
+      <PageIntelligencePageList
+        {...baseProps}
+        expandedPageId="page-pricing"
+        analyses={{ 'page-pricing': analysis }}
+      />,
+    );
+
+    expect(container.querySelectorAll('button button')).toHaveLength(0);
+    // The row toggle is exposed as an accessible button via role, and the Track
+    // action remains a real button that is not swallowed by the row.
+    expect(screen.getByRole('button', { name: /Expand|Collapse/i })).toBeTruthy();
+    expect(screen.getAllByTitle('Track in Rank Tracker').length).toBeGreaterThan(0);
+  });
+
   it('renders expanded analysis actions and delegates navigation callbacks', () => {
     const onOpenSeoEditor = vi.fn();
     const onCreateBrief = vi.fn();

@@ -49,7 +49,7 @@ export function MetricTile({
       onClick={onClick}
       className={cn(
         'flex-1 min-w-[130px] w-full text-left bg-[var(--surface-2)] border border-[var(--brand-border)]',
-        'rounded-[var(--radius-lg)] px-[15px] py-[13px] transition-colors',
+        'rounded-[var(--radius-signature)] px-[15px] py-[13px] transition-colors',
         onClick ? 'cursor-pointer hover:border-[var(--brand-border-hover)]' : 'cursor-default',
         className,
       )}

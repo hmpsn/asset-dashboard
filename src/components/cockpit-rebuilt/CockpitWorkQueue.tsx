@@ -5,8 +5,8 @@ import {
   Button,
   EmptyState,
   FilterChip,
-  GroupBlock,
   Icon,
+  SectionCard,
   WorkQueueRow,
   WorkStreamSelector,
   type SelectableWorkStream,
@@ -173,20 +173,30 @@ export function CockpitWorkQueue({
         )}
       </div>
 
-      {grouped.length > 0 ? (
-        <div className="grid gap-3 xl:grid-cols-2">
-          {grouped.map(([streamId, rows]) => {
-            const meta = STREAM_META[streamId];
-            return (
-              <GroupBlock
-                key={streamId}
-                title={meta.groupTitle}
-                meta={`${rows.length} item${rows.length === 1 ? '' : 's'}`}
-                icon={meta.icon}
-                iconColor={meta.color}
-                stats={[{ label: 'stream', value: workQueue.streams[streamId], color: meta.color }]}
-              >
-                <div className="-mx-2 -my-1 overflow-hidden rounded-[var(--radius-md)] border border-[var(--brand-border)]">
+      {grouped.some(([, rows]) => rows.length > 0) ? (
+        <SectionCard
+          title={`${clientName}'s work queue`}
+          titleIcon={<Icon name="bell" size="sm" className="text-[var(--teal)]" />}
+          titleExtra={<span className="t-caption-sm text-[var(--brand-text-muted)]">Everything this client needs, grouped by kind</span>}
+          noPadding
+        >
+          <div className="flex flex-col">
+            {grouped.map(([streamId, rows]) => {
+              if (rows.length === 0) return null;
+              const meta = STREAM_META[streamId];
+              return (
+                <div key={streamId} className="border-t border-[var(--brand-border)] first:border-t-0">
+                  {/* co-grp — light inline group header */}
+                  <div className="flex items-center gap-2 px-4 pb-1.5 pt-3 t-label" style={{ color: meta.color }}>
+                    <Icon name={meta.iconName} size="sm" />
+                    <span>{meta.label}</span>
+                    <span
+                      className="rounded-full px-1.5 t-caption-sm font-semibold tabular-nums"
+                      style={{ color: meta.color, backgroundColor: `color-mix(in srgb, ${meta.color} 14%, transparent)` }}
+                    >
+                      {rows.length}
+                    </span>
+                  </div>
                   {rows.map((item) => (
                     <WorkQueueRow
                       key={`${item.stream}-${item.id}`}
@@ -198,17 +208,17 @@ export function CockpitWorkQueue({
                     />
                   ))}
                 </div>
-              </GroupBlock>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </SectionCard>
       ) : (
         <EmptyState
           icon={EmptyQueueIcon}
           title="No queue rows match this view"
           description="Clear filters or switch streams to review the shared work queue."
           action={activeSourceTypes.size > 0 ? <Button variant="secondary" size="sm" onClick={onClearSourceTypes}>Clear filters</Button> : undefined}
-          className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]"
+          className="rounded-[var(--radius-signature-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]"
         />
       )}
     </div>

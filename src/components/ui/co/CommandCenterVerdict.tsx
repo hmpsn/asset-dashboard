@@ -33,7 +33,7 @@ export function CommandCenterVerdict({
     <section
       id={id}
       className={cn(
-        'relative overflow-hidden rounded-[var(--radius-lg)] border border-[var(--brand-border)]',
+        'relative overflow-hidden rounded-[var(--radius-signature-lg)] border border-[var(--brand-border)]',
         'bg-[var(--surface-2)] px-5 py-4',
         className,
       )}

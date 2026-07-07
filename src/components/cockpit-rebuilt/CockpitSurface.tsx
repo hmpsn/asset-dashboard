@@ -12,11 +12,9 @@ import {
   Avatar,
   Badge,
   Button,
-  CommandCenterVerdict,
   ErrorState,
   Icon,
   InlineBanner,
-  MetricTile,
   OnboardingChecklist,
   PageContainer,
   PageHeader,
@@ -228,16 +226,45 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
         />
       )}
 
-      <PageHeader
-        title="Cockpit"
-        subtitle={workspaceName}
-        icon={<Avatar initials={workspaceInitials} label={workspaceName} size="md" tone="teal" />}
-        actions={
-          <Button variant="secondary" size="sm" icon={Settings} onClick={() => navigate(routes.settings)}>
-            Settings
-          </Button>
-        }
-      />
+      {/* co-eye — client context / freshness line */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 t-caption-sm">
+          <Avatar initials={workspaceInitials} label={workspaceName} size="sm" tone="teal" />
+          <span className="font-semibold text-[var(--brand-text-bright)]">Client cockpit</span>
+          <span className="text-[var(--brand-text-muted)]">· {workspaceName}</span>
+          <span className="text-[var(--brand-text-dim)]">· Today, scoped to one</span>
+        </div>
+        <Button variant="secondary" size="sm" icon={Settings} onClick={() => navigate(routes.settings)}>
+          Settings
+        </Button>
+      </div>
+
+      {/* co-head — verdict hero headline */}
+      <div className="flex items-start justify-between gap-6">
+        <div className="min-w-0">
+          <h1 className="t-h2 max-w-[44ch] font-bold text-[var(--brand-text-bright)]">
+            {cockpit.verdict?.headline ?? 'Cockpit verdict unavailable'}
+          </h1>
+          <p className="t-body mt-2 max-w-[72ch] text-[var(--brand-text)]">
+            {cockpit.verdict?.narrative ?? 'The server has not returned a Cockpit verdict for this workspace yet.'}
+          </p>
+        </div>
+        <div className="flex flex-none flex-wrap items-center justify-end gap-2 pt-1">
+          <Badge
+            label={cockpit.verdict?.status?.replace(/_/g, ' ') ?? 'not available'}
+            tone={statusTone}
+            variant="soft"
+            shape="pill"
+          />
+          <Badge
+            label={cockpit.kpis.overallHealth.label}
+            tone={cockpit.kpis.overallHealth.label === 'On track' ? 'emerald' : cockpit.kpis.overallHealth.label === 'At risk' ? 'amber' : 'zinc'}
+            variant="outline"
+            shape="pill"
+            ariaLabel={cockpit.kpis.overallHealth.score == null ? 'Client signals health score unavailable' : `Client signals health score ${cockpit.kpis.overallHealth.score} of 100`}
+          />
+        </div>
+      </div>
 
       {state.retiredTab === 'meeting-brief' && (
         <InlineBanner
@@ -256,30 +283,6 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
           data-testid="cockpit-invalid-tab-fallback"
         />
       )}
-
-      <CommandCenterVerdict
-        eyebrow="Operator verdict"
-        iconName={cockpit.verdict?.status === 'at_risk' ? 'alert' : 'gauge'}
-        title={cockpit.verdict?.headline ?? 'Cockpit verdict unavailable'}
-        description={cockpit.verdict?.narrative ?? 'The server has not returned a Cockpit verdict for this workspace yet.'}
-        meta={
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Badge
-              label={cockpit.verdict?.status?.replace(/_/g, ' ') ?? 'not available'}
-              tone={statusTone}
-              variant="soft"
-              shape="pill"
-            />
-            <Badge
-              label={cockpit.kpis.overallHealth.label}
-              tone={cockpit.kpis.overallHealth.label === 'On track' ? 'emerald' : cockpit.kpis.overallHealth.label === 'At risk' ? 'amber' : 'zinc'}
-              variant="outline"
-              shape="pill"
-              ariaLabel={cockpit.kpis.overallHealth.score == null ? 'Client signals health score unavailable' : `Client signals health score ${cockpit.kpis.overallHealth.score} of 100`}
-            />
-          </div>
-        }
-      />
 
       <Toolbar label="Cockpit toolbar" className="w-full">
         <Button variant="ghost" size="sm" onClick={() => setActivityOpen(true)}>
@@ -324,55 +327,58 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
 
       {cockpit.homeData?.weeklySummary && <WeeklyAccomplishments summary={cockpit.homeData.weeklySummary} />}
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <MetricTile
-          label="Value at stake"
-          value={formatMoney(cockpit.moneyFrame?.valueAtStake)}
-          sub={basis ? `${basis} provenance` : 'Outcome value frame'}
-          accent="var(--brand-text-bright)"
-        />
-        <MetricTile
-          label="Recovered so far"
-          value={formatMoney(cockpit.moneyFrame?.recoveredSoFar)}
-          sub="Executed and reconciled work"
-          accent="var(--blue)"
-        />
-        <MetricTile
-          label="Client signals"
-          value={cockpit.kpis.overallHealth.score == null ? '—' : `${cockpit.kpis.overallHealth.score}/100`}
-          sub={cockpit.kpis.overallHealth.label}
-          accent={cockpit.kpis.overallHealth.score == null ? 'var(--brand-text-muted)' : 'var(--teal)'}
-        />
+      {/* co-grid — main work queue + right rail */}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.62fr)_minmax(320px,1fr)]">
+        <div className="min-w-0">
+          <CockpitWorkQueue
+            workQueue={workQueue}
+            stream={state.stream}
+            onStreamChange={state.setStream}
+            activeSourceTypes={state.activeSourceTypes}
+            sourceTypeCounts={sourceTypeCounts}
+            onToggleSourceType={state.toggleSourceType}
+            onClearSourceTypes={state.clearSourceTypes}
+            clientName={workspaceName}
+            clientInitials={workspaceInitials}
+            onOpenItem={handleOpenQueueItem}
+          />
+        </div>
+
+        <div className="flex flex-col gap-4">
+          {/* money-frame folded into a compact rail strip (dropped the top KPI row per decision A) */}
+          <div className="rounded-[var(--radius-signature)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)]">Value at stake</div>
+                <div className="t-stat-sm text-[var(--brand-text-bright)]">{formatMoney(cockpit.moneyFrame?.valueAtStake)}</div>
+              </div>
+              <div className="text-right">
+                <div className="t-caption-sm text-[var(--brand-text-muted)]">Recovered</div>
+                <div className="t-stat-sm text-[var(--blue)]">{formatMoney(cockpit.moneyFrame?.recoveredSoFar)}</div>
+              </div>
+            </div>
+            <div className="t-caption-sm mt-2 text-[var(--brand-text-dim)]">
+              {basis ? `${basis} provenance · stored frame only` : 'Stored money frame only'}
+            </div>
+          </div>
+
+          <CockpitEvidenceRail
+            workspaceId={workspaceId}
+            workspaceName={workspaceName}
+            workspaceInitials={workspaceInitials}
+            hasGsc={!!cockpit.workspace?.gscPropertyUrl}
+            healthTone={healthTone(cockpit.kpis.overallHealth.score)}
+            workQueue={workQueue}
+            requests={cockpit.requests}
+            ranks={cockpit.ranks}
+            kpis={cockpit.kpis}
+            view={state.view}
+            onViewChange={state.setView}
+            onOpenRoute={openRoute}
+            route={routes}
+          />
+        </div>
       </div>
-
-      <CockpitWorkQueue
-        workQueue={workQueue}
-        stream={state.stream}
-        onStreamChange={state.setStream}
-        activeSourceTypes={state.activeSourceTypes}
-        sourceTypeCounts={sourceTypeCounts}
-        onToggleSourceType={state.toggleSourceType}
-        onClearSourceTypes={state.clearSourceTypes}
-        clientName={workspaceName}
-        clientInitials={workspaceInitials}
-        onOpenItem={handleOpenQueueItem}
-      />
-
-      <CockpitEvidenceRail
-        workspaceId={workspaceId}
-        workspaceName={workspaceName}
-        workspaceInitials={workspaceInitials}
-        hasGsc={!!cockpit.workspace?.gscPropertyUrl}
-        healthTone={healthTone(cockpit.kpis.overallHealth.score)}
-        workQueue={workQueue}
-        requests={cockpit.requests}
-        ranks={cockpit.ranks}
-        kpis={cockpit.kpis}
-        view={state.view}
-        onViewChange={state.setView}
-        onOpenRoute={openRoute}
-        route={routes}
-      />
 
       <CockpitKpiStrip
         kpis={cockpit.kpis}

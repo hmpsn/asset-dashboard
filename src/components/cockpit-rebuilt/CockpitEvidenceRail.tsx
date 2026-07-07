@@ -83,7 +83,7 @@ export function CockpitEvidenceRail({
   const pipelinePercent = pipeline.percent ?? 0;
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]" data-testid="cockpit-evidence-rail">
+    <div className="flex flex-col gap-4" data-testid="cockpit-evidence-rail">
       <div className="flex min-w-0 flex-col gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <Segmented

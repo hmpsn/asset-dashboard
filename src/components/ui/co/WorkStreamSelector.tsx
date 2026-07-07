@@ -81,7 +81,7 @@ export function WorkStreamSelector({
             onKeyDown={itemProps.onKeyDown}
             onClick={itemProps.onClick}
             className={cn(
-              'min-h-[126px] rounded-[var(--radius-lg)] border px-4 py-3 text-left',
+              'min-h-[126px] rounded-[var(--radius-signature)] border px-4 py-3 text-left',
               'transition-[border-color,background-color,transform] duration-[var(--dur-fast)] ease-[var(--ease-out)]',
               active ? 'border-[color-mix(in_srgb,var(--teal)_45%,var(--brand-border))] bg-[var(--surface-2)]' : 'border-[var(--brand-border)] bg-[var(--surface-2)]',
               'hover:border-[var(--brand-border-hover)]',
