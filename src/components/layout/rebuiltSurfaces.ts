@@ -44,4 +44,7 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'seo-schema': lazyWithRetry(() =>
     import('../schema-rebuilt/SchemaSurface').then(m => ({ default: m.SchemaSurface })),
   ),
+  'brand': lazyWithRetry(() =>
+    import('../brand-ai-rebuilt/BrandAiSurface').then(m => ({ default: m.BrandAiSurface })),
+  ),
 };
