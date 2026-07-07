@@ -26,4 +26,7 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'competitors': lazyWithRetry(() =>
     import('../competitors-rebuilt/CompetitorsSurface').then(m => ({ default: m.CompetitorsSurface })),
   ),
+  'media': lazyWithRetry(() =>
+    import('../asset-manager-rebuilt/AssetManagerSurface').then(m => ({ default: m.AssetManagerSurface })),
+  ),
 };

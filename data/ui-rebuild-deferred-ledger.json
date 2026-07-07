@@ -331,6 +331,58 @@
         "ticket": "docs/ui-rebuild/phase-a/tickets/competitors.md",
         "ad": "AD-004"
       }
+    },
+    {
+      "id": "DEF-asset-manager-001",
+      "surface": "asset-manager",
+      "item": "Compression graduation insight (CWV-move on a compress pass) is not built; the rebuilt surface ships compression parity without writing a graduation insight.",
+      "decision": "AD-004 defers all 'graduate to Insights Engine' writes wholesale to the one C3-era owner-signed cross-surface contract; no surface builds an ad-hoc graduation write (SB-023 could register through the SB-001 seam once it lands).",
+      "class": "behavior",
+      "upgradeTrigger": "The C3 cross-surface insight-graduation contract lands (SB-023 / SB-001 seam).",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/asset-manager.md",
+        "ad": "AD-004",
+        "sb": "SB-023"
+      }
+    },
+    {
+      "id": "DEF-asset-manager-002",
+      "surface": "asset-manager",
+      "item": "Server-side compression savings estimate (sharp dry-run) is not built; the surface ships a client-side ~55% heuristic labelled 'estimate' (no fabricated numbers).",
+      "decision": "Quick-win is the client heuristic computed from the already-fetched asset list; defer the server dry-run unless the heuristic is rejected as inaccurate.",
+      "class": "data",
+      "upgradeTrigger": "The client 55% savings heuristic is rejected as inaccurate (SB-059).",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/asset-manager.md",
+        "sb": "SB-059"
+      }
+    },
+    {
+      "id": "DEF-asset-manager-003",
+      "surface": "asset-manager",
+      "item": "Asset dimensions (w×h) are omitted from cards/table until SB-022's background-derived field is populated; the list render never fires an N+1 per-asset dimension fetch.",
+      "decision": "The Webflow list-assets payload carries no original w×h; derive lazily/batched in the background and show dimensions only once the field is backfilled (probes.md Probe 1 / SB-022 at M).",
+      "class": "data",
+      "upgradeTrigger": "SB-022 background dimension-derivation lands and backfills the width/height field.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/asset-manager.md",
+        "sb": "SB-022"
+      }
     }
   ]
 }

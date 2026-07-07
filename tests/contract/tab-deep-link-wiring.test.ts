@@ -440,3 +440,42 @@ describe('?post= deep-link wiring (ContentCalendar → ContentManager)', () => {
     ).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// ?tab= / ?filter= deep-link wiring: rebuilt Asset Manager (Page `media`)
+// ---------------------------------------------------------------------------
+//
+// The rebuilt Asset Manager is a new ?tab=/?filter= receiver (lens + filter are
+// URL-driven). It mounts via the rebuiltSurfaces registry, not App.tsx's if-chain,
+// so the auto-discovery routeMap above resolves `media` to the legacy MediaTab and
+// cannot see this receiver. Assert the receiver half explicitly (mirrors the ?post=
+// block): the surface state hook consumes ?tab= (lens) and ?filter=.
+
+describe('?tab=/?filter= deep-link wiring (rebuilt Asset Manager `media`)', () => {
+  const stateHookFile = join(SRC_DIR, 'components/asset-manager-rebuilt/useAssetManagerSurfaceState.ts');
+
+  it('asset-manager surface state hook file exists', () => {
+    expect(existsSync(stateHookFile)).toBe(true);
+  });
+
+  it('reads the "tab" search param to drive the active lens (receiver half)', () => {
+    const src = readFileSync(stateHookFile, 'utf8'); // readFile-ok — intentional static analysis
+    expect(src).toContain('useSearchParams');
+    expect(
+      src.includes("params.get('tab')") ||
+      src.includes('params.get("tab")') ||
+      src.includes("searchParams.get('tab')") ||
+      src.includes('searchParams.get("tab")')
+    ).toBe(true);
+  });
+
+  it('reads the "filter" search param (browse + audit filter deep-link)', () => {
+    const src = readFileSync(stateHookFile, 'utf8'); // readFile-ok — intentional static analysis
+    expect(
+      src.includes("params.get('filter')") ||
+      src.includes('params.get("filter")') ||
+      src.includes("searchParams.get('filter')") ||
+      src.includes('searchParams.get("filter")')
+    ).toBe(true);
+  });
+});
