@@ -1,3 +1,4 @@
+// @ds-rebuilt
 import { getTrackedKeywords } from '../../rank-tracking.js';
 import { getTaxonomyForIndustry } from '../../service-taxonomy.js';
 import { getWorkspace } from '../../workspaces.js';
@@ -29,6 +30,7 @@ export function getLocalSeoCompetitorBrands(workspaceId: string, lookbackDays = 
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return [];
   const snapshots = listLocalSeoCompetitorSnapshots(workspaceId, lookbackDays);
+  const checkedSnapshotCount = snapshots.length;
 
   const TOP_LIMIT = 10;
   const MIN_APPEARANCES = 2;
@@ -45,10 +47,23 @@ export function getLocalSeoCompetitorBrands(workspaceId: string, lookbackDays = 
 
   for (const row of snapshots) {
     const clientLost = !row.businessFound && row.localPackPresent;
+    // Dedup competitor titles WITHIN a snapshot before counting: a franchise / duplicate
+    // business name can appear more than once in one snapshot's topCompetitors, and
+    // counting each occurrence would push totalAppearances (and thus map-pack SoV) above
+    // the checked-snapshot count — i.e. an impossible >100% share. totalAppearances is a
+    // per-snapshot appearance count, so each competitor counts at most once per snapshot.
+    const countedThisRow = new Set<string>();
     for (const competitor of row.topCompetitors) {
       const key = competitor.title.toLowerCase().trim();
       if (!key) continue;
       const existing = map.get(key);
+      if (countedThisRow.has(key)) {
+        // Already counted this competitor for this snapshot — still backfill a domain if
+        // this duplicate row carries one, but do not re-increment the appearance count.
+        if (existing && !existing.domain && competitor.domain) existing.domain = competitor.domain;
+        continue;
+      }
+      countedThisRow.add(key);
       if (existing) {
         existing.totalAppearances += 1;
         if (clientLost) existing.winsAgainstClient += 1;
@@ -80,14 +95,20 @@ export function getLocalSeoCompetitorBrands(workspaceId: string, lookbackDays = 
       suggestedTrackingKeywords.push(`${title} vs ${workspace.name.trim()}`);
     }
     if (activeMarketCity) suggestedTrackingKeywords.push(`${title} ${activeMarketCity}`);
-    results.push({
+    const mapPackShareOfVoicePct = checkedSnapshotCount > 0
+      ? Math.round((acc.totalAppearances / checkedSnapshotCount) * 1000) / 10
+      : 0;
+    const result: LocalSeoRepeatCompetitor = {
       title,
       domain: acc.domain,
       totalAppearances: acc.totalAppearances,
       winsAgainstClient: acc.winsAgainstClient,
       markets: Array.from(acc.markets),
       suggestedTrackingKeywords,
-    });
+      mapPackShareOfVoicePct,
+      mapPackShareOfVoiceBasis: checkedSnapshotCount,
+    };
+    results.push(result);
   }
 
   results.sort((a, b) =>

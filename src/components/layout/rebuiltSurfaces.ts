@@ -26,4 +26,7 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'competitors': lazyWithRetry(() =>
     import('../competitors-rebuilt/CompetitorsSurface').then(m => ({ default: m.CompetitorsSurface })),
   ),
+  'local-seo': lazyWithRetry(() =>
+    import('../local-presence-rebuilt/LocalPresenceSurface').then(m => ({ default: m.LocalPresenceSurface })),
+  ),
 };
