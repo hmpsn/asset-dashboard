@@ -38,4 +38,7 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'performance': lazyWithRetry(() =>
     import('../performance-rebuilt/PerformanceSurface').then(m => ({ default: m.PerformanceSurface })),
   ),
+  'links': lazyWithRetry(() =>
+    import('../links-rebuilt/LinksSurface').then(m => ({ default: m.LinksSurface })),
+  ),
 };

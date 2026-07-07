@@ -606,6 +606,133 @@
         "ticket": "docs/ui-rebuild/phase-a/tickets/performance.md",
         "sb": "SB-008"
       }
+    },
+    {
+      "id": "DEF-links-001",
+      "surface": "links",
+      "item": "Insert internal link directly into a Webflow source page",
+      "decision": "Ship copy-HTML/manual implementation parity now; defer direct insertion because it is a new Webflow write path under AD-017.",
+      "class": "behavior",
+      "upgradeTrigger": "A signed seo-editor write-target contract adds a safe Webflow insert-internal-link path with preview, auth, activity log, and rollback semantics.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-017",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/links.json:350-352",
+        "head": "src/components/InternalLinks.tsx:342-350,381-389"
+      }
+    },
+    {
+      "id": "DEF-links-002",
+      "surface": "links",
+      "item": "Per-suggestion internal-link client sends",
+      "decision": "Keep the HEAD batched internal_link action plus optional note; defer per-suggestion sends because they change the Inbox payload contract.",
+      "class": "behavior",
+      "upgradeTrigger": "Owner signs a new per-item client-action payload contract and the client Inbox renderer supports both batch and item-level review.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-027",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/links.json:324-328",
+        "clientRenderer": "src/components/client/decision-renderers.tsx:356-410"
+      }
+    },
+    {
+      "id": "DEF-links-003",
+      "surface": "links",
+      "item": "Persisted reviewed or suppressed state for dead links",
+      "decision": "Ship Reviewed as session-state row feedback only; defer durable suppression until a Links-owned store and toggle endpoint exist.",
+      "class": "data",
+      "upgradeTrigger": "SB-027 lands the reviewed/suppressed store, POST toggle endpoint, and link-check snapshot serialization.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "backlog": "SB-027",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/links.json:365-368,437-440",
+        "server": "docs/ui-rebuild/phase-a/server-backlog.json:377-387"
+      }
+    },
+    {
+      "id": "DEF-links-004",
+      "surface": "links",
+      "item": "Background jobs and scheduled crawls for link, redirect, and internal-link scans",
+      "decision": "Keep manual synchronous GET scans for parity and honest freshness; defer job migration and recurring crawl scheduling.",
+      "class": "perf",
+      "upgradeTrigger": "SB-045 moves the three scans to the background-job platform and, if scheduled crawl is adopted, registers the cron with the registry census test.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-001",
+        "backlog": "SB-045",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/links.json:360-363,443-446",
+        "server": "docs/ui-rebuild/phase-a/server-backlog.json:607-617"
+      }
+    },
+    {
+      "id": "DEF-links-005",
+      "surface": "links",
+      "item": "Direct Webflow redirect-create action from Dead Links or Redirects",
+      "decision": "Ship export, copy, send-to-client, and pre-stage flows; defer direct Webflow redirect creation because the server route is missing and write paths require AD-017 treatment.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-026 adds the redirect-create endpoint and the Links surface has an owner-signed write UX with activity logging and failure states.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-017",
+        "backlog": "SB-026",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/links.json:242-245",
+        "server": "docs/ui-rebuild/phase-a/server-backlog.json:364-374"
+      }
+    },
+    {
+      "id": "DEF-links-006",
+      "surface": "links",
+      "item": "Links-to-Insights Engine graduation bridge",
+      "decision": "Do not build a Links-only insight write; defer graduation to the C3 owner-signed cross-surface seam required by AD-004.",
+      "class": "behavior",
+      "upgradeTrigger": "The C3 graduation contract explicitly includes Links signals and defines InsightType registration, broadcast, activity log, and source provenance.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "decision": "AD-004",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/links.json:375-378",
+        "phaseA": "docs/ui-rebuild/phase-a/PHASE_A_DECISIONS.md:13,28-30"
+      }
+    },
+    {
+      "id": "DEF-links-007",
+      "surface": "links",
+      "item": "Architecture gap Add-page CTA",
+      "decision": "Relocate the existing Architecture view now; defer the prototype-only Add-page CTA until a destination and write contract are signed.",
+      "class": "behavior",
+      "upgradeTrigger": "A Content Pipeline or strategy-planning receiver is named for creating planned pages from architecture gaps, including route params and ownership.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-08-18",
+      "links": {
+        "surface": "docs/ui-rebuild/phase0/surfaces/links.md:95",
+        "architecture": "src/components/SiteArchitecture.tsx:353-391"
+      }
     }
   ]
 }
