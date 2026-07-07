@@ -50,4 +50,7 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'content-pipeline': lazyWithRetry(() =>
     import('../content-pipeline-rebuilt/ContentPipelineSurface').then(m => ({ default: m.ContentPipelineSurface })),
   ),
+  'seo-editor': lazyWithRetry(() =>
+    import('../seo-editor-rebuilt/SeoEditorSurface').then(m => ({ default: m.SeoEditorSurface })),
+  ),
 };

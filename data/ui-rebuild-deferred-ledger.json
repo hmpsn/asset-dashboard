@@ -1157,6 +1157,131 @@
         "ticket": "docs/ui-rebuild/phase-a/tickets/content-pipeline.md",
         "performanceTicket": "docs/ui-rebuild/phase-a/tickets/performance.md"
       }
+    },
+    {
+      "id": "DEF-seo-editor-001",
+      "surface": "seo-editor",
+      "item": "Noindex quick-filter chip and per-row indexability status",
+      "decision": "Drop the Noindex chip in W4 instead of deriving indexability in the client; add it after SB-028 serializes an audit/crawl-backed field.",
+      "class": "data",
+      "upgradeTrigger": "SB-028 lands per-page index/noindex status on the all-pages row payload.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "surface": "docs/ui-rebuild/phase-a/surfaces/seo-editor.json:369",
+        "serverBacklog": "docs/ui-rebuild/phase-a/server-backlog.json:390"
+      }
+    },
+    {
+      "id": "DEF-seo-editor-002",
+      "surface": "seo-editor",
+      "item": "H1 and URL slug editing with automatic redirect",
+      "decision": "Render H1 and slug as read-only/reference in W4; writable controls wait for SB-029 plus the redirect-create prerequisite in SB-026.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-029 and SB-026 land behind an owner-approved Webflow write-path rollout.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ownerDecision": "docs/ui-rebuild/phase-a/owner-decisions.json:233",
+        "h1SlugBacklog": "docs/ui-rebuild/phase-a/server-backlog.json:404",
+        "redirectBacklog": "docs/ui-rebuild/phase-a/server-backlog.json:364"
+      }
+    },
+    {
+      "id": "DEF-seo-editor-003",
+      "surface": "seo-editor",
+      "item": "Server-persisted per-page SEO drafts",
+      "decision": "Carry localStorage/session drafts and the existing server suggestions panel in W4; defer the seo_drafts table and endpoints to SB-030.",
+      "class": "data",
+      "upgradeTrigger": "SB-030 adds the seo_drafts table and route contract for durable per-page draft storage.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "surface": "docs/ui-rebuild/phase-a/surfaces/seo-editor.json:357",
+        "serverBacklog": "docs/ui-rebuild/phase-a/server-backlog.json:416",
+        "headPersistence": "src/components/editor/seoEditorPersistence.ts:32"
+      }
+    },
+    {
+      "id": "DEF-seo-editor-004",
+      "surface": "seo-editor",
+      "item": "Manual-row Add Redirect CTA and redirect-create write path",
+      "decision": "Keep manual sitemap-only rows read-only in W4; defer direct redirect creation because the Webflow redirect-create server route is missing.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-026 lands a backed redirect-create endpoint and the D3 manual-row handoff copy is approved.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "writeTargets": "docs/rules/seo-editor-write-targets.md:9",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/seo-editor.json:429",
+        "serverBacklog": "docs/ui-rebuild/phase-a/server-backlog.json:364"
+      }
+    },
+    {
+      "id": "DEF-seo-editor-005",
+      "surface": "seo-editor",
+      "item": "Direct target-keyword assignment from SEO Editor",
+      "decision": "Show joined target keywords and deep-link to Keyword Hub; do not add a second keyword writer in the W4 SEO Editor rebuild.",
+      "class": "behavior",
+      "upgradeTrigger": "Owner signs a shared-writer keyword mutation contract or Keyword Hub exposes an explicit assignment deep-link API.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "surface": "docs/ui-rebuild/phase-a/surfaces/seo-editor.json:375",
+        "crossSurface": "docs/ui-rebuild/phase-a/surfaces/seo-editor.json:491",
+        "headJoin": "src/components/SeoEditor.tsx:53"
+      }
+    },
+    {
+      "id": "DEF-seo-editor-006",
+      "surface": "seo-editor",
+      "item": "Full keyboard review queue with admin approve/request triage",
+      "decision": "Ship seven-state visibility and Send/Publish/Skip only; reject admin Approve in W4 so client approval states remain authoritative.",
+      "class": "behavior",
+      "upgradeTrigger": "Owner signs a state-machine change that allows admin triage without corrupting client approval semantics.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ownerDecision": "docs/ui-rebuild/phase-a/owner-decisions.json:247",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/seo-editor.json:404",
+        "statusConfig": "src/components/ui/statusConfig.ts:3"
+      }
+    },
+    {
+      "id": "DEF-seo-editor-007",
+      "surface": "seo-editor",
+      "item": "SEO publish graduation note into Insights Engine",
+      "decision": "Do not build a SEO Editor-only graduation note or insight write; defer the narrative to AD-004's shared C3 graduation seam.",
+      "class": "behavior",
+      "upgradeTrigger": "SB-001 or its C3 successor defines the shared insight-graduation write contract for SEO publish signals.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "phaseDecision": "docs/ui-rebuild/phase-a/PHASE_A_DECISIONS.md:13",
+        "surface": "docs/ui-rebuild/phase-a/surfaces/seo-editor.json:439",
+        "serverBacklog": "docs/ui-rebuild/phase-a/server-backlog.json:7"
+      }
     }
   ]
 }
