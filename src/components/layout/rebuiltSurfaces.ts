@@ -20,6 +20,9 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'seo-keywords': lazyWithRetry(() =>
     import('../keywords-rebuilt/KeywordsSurface').then(m => ({ default: m.KeywordsSurface })),
   ),
+  'rewrite': lazyWithRetry(() =>
+    import('../page-rewriter-rebuilt/PageRewriterSurface').then(m => ({ default: m.PageRewriterSurface })),
+  ),
   'competitors': lazyWithRetry(() =>
     import('../competitors-rebuilt/CompetitorsSurface').then(m => ({ default: m.CompetitorsSurface })),
   ),

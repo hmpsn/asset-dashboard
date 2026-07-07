@@ -265,6 +265,57 @@
       }
     },
     {
+      "id": "DEF-page-rewriter-001",
+      "surface": "page-rewriter",
+      "item": "Save-draft / publish spine \u2014 full-page Webflow write-back (SB-032) is not built; the rebuilt surface is export-only v1 (.docx/.pdf + push-to-draft-target).",
+      "decision": "AD-017 export-only parity v1; any new Webflow write path is a flagged, owner-signed follow-up. Rewrites export out rather than writing back to the CMS.",
+      "class": "behavior",
+      "upgradeTrigger": "Owner signs off the seo-editor-write-targets contract + a dark-launch flag for CMS write-back.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/page-rewriter.md",
+        "sb": "SB-032"
+      }
+    },
+    {
+      "id": "DEF-page-rewriter-002",
+      "surface": "page-rewriter",
+      "item": "Rewrite-playbook writes (SB-031) deferred; v1 renders the playbook patterns as static read-only chips.",
+      "decision": "Playbook read may already be serialized (admin-workspace-view); write/edit of playbook patterns is out of export-only v1 scope.",
+      "class": "behavior",
+      "upgradeTrigger": "Playbook editing prioritized on the roadmap.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/page-rewriter.md",
+        "sb": "SB-031"
+      }
+    },
+    {
+      "id": "DEF-page-rewriter-003",
+      "surface": "page-rewriter",
+      "item": "Server-persisted rewrite drafts (SB-030) deferred; v1 keeps drafts in localStorage (the existing quick-win).",
+      "decision": "localStorage draft is the v1 persistence; server-persisted drafts are a later tier.",
+      "class": "data",
+      "upgradeTrigger": "Cross-device draft persistence requested, or the write spine (DEF-page-rewriter-001) lands.",
+      "owner": "josh",
+      "status": "open",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-07",
+      "reviewBy": "2026-09-15",
+      "links": {
+        "ticket": "docs/ui-rebuild/phase-a/tickets/page-rewriter.md",
+        "sb": "SB-030"
+      }
+    },
+    {
       "id": "DEF-competitors-001",
       "surface": "competitors",
       "item": "Competitor\u2192insight graduation write is not built; the rebuilt surface renders existing insightId linkage only, it does not create/graduate insights.",
