@@ -175,7 +175,7 @@ function RedirectRecommendations({
     sendToClient.mutate({
       sourceId: `redirects:${data.scannedAt}`,
       title: `Redirect recommendations (${acceptedRules.length})`,
-      summary: `Review ${acceptedRules.length} redirect proposal${acceptedRules.length !== 1 ? 's' : ''}. These are manual or agency-executed for v1 and are not written directly to Webflow by the client.`,
+      summary: `Review ${acceptedRules.length} redirect proposal${acceptedRules.length !== 1 ? 's' : ''}. These are reviewed here, then exported or sent for approval before implementation.`,
       priority: acceptedRules.length > 3 ? 'high' : 'medium',
       clientNote: note.trim() || undefined,
       payload: {
@@ -553,10 +553,10 @@ export function RedirectsLens({
 
       {(summary?.chainsDetected ?? 0) > 0 || (summary?.notFound ?? 0) > 0 || rules.some((rule) => rule.accepted) ? (
         <InlineBanner tone="info" title="How to apply these fixes">
-          <div className="space-y-1 t-caption-sm text-[var(--brand-text-muted)]">
-            {(summary?.chainsDetected ?? 0) > 0 && <p>Update internal links so they point directly to the final destination.</p>}
-            {(summary?.notFound ?? 0) > 0 && <p>Create 301 redirects in Webflow Settings, Hosting, 301 Redirects for broken URLs worth preserving.</p>}
-            {rules.some((rule) => rule.accepted) && <p>Export accepted rules as CSV or send the batch to the client for approval.</p>}
+          <div className="space-y-1">
+            {(summary?.chainsDetected ?? 0) > 0 && <p className="t-body text-[var(--brand-text-muted)]">Update internal links so they point directly to the final destination.</p>}
+            {(summary?.notFound ?? 0) > 0 && <p className="t-body text-[var(--brand-text-muted)]">Create 301 redirects in Webflow Settings, Hosting, 301 Redirects for broken URLs worth preserving.</p>}
+            {rules.some((rule) => rule.accepted) && <p className="t-body text-[var(--brand-text-muted)]">Export accepted rules as CSV or send the batch to the client for approval.</p>}
           </div>
         </InlineBanner>
       ) : null}

@@ -118,6 +118,7 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
     mutationFn: (url) => post<PageRewriterPageData>(`/api/rewrite-chat/${workspaceId}/load-page`, { url }),
     onMutate: (url) => {
       setPageError(null);
+      setPageData(null);
       setLastAttemptedPageUrl(url);
       if (docBodyRef.current) docBodyRef.current.dataset.pageKey = '';
     },
@@ -355,6 +356,7 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
     const retryUrl = lastAttemptedPageUrl || pageUrl || initialPageUrl;
     if (retryUrl) loadPage(retryUrl);
   }, [initialPageUrl, lastAttemptedPageUrl, loadPage, pageUrl]);
+  const loadingPage = loadPageMutation.isPending && !pageData && !pageError;
 
   return {
     pageUrl,
@@ -362,7 +364,7 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
     pageError,
     pageErrorMessage: pageError ? mutationErrorMessage(pageError, 'Failed to load page') : '',
     pageErrorStatus: pageError instanceof ApiError ? pageError.status : null,
-    loadingPage: loadPageMutation.isPending,
+    loadingPage,
     invalidPageUrlParam,
     messages,
     input,

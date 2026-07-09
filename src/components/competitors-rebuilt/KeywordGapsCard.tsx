@@ -248,20 +248,20 @@ export function KeywordGapsCard({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 id="keyword-gaps-title" className="t-ui font-semibold text-[var(--brand-text-bright)]">
-              Raw Competitor Evidence
+              Keyword gaps
             </h2>
             <Badge label="Evidence only" tone="orange" variant="soft" size="sm" />
             {usingFallback && <Badge label="from strategy" tone="amber" variant="soft" size="sm" />}
           </div>
           <p className="t-caption-sm text-[var(--brand-text-muted)]">
-            Provider terms competitors rank for. Strategy actions stay routed through Keyword Hub and Briefs.
+            High-value terms competitors rank for and you do not. Use Hub or briefs to turn a gap into work.
           </p>
         </div>
         <Badge label={`${rows.length} opportunities`} tone="blue" variant="soft" size="sm" />
       </div>
 
       {liveError && usingFallback && (
-        <InlineBanner tone="warning" title="Live fetch failed - showing cached data.">
+        <InlineBanner tone="warning" title="Showing the last strategy run">
           Keyword gaps are from the last stored strategy run.
         </InlineBanner>
       )}
@@ -274,7 +274,7 @@ export function KeywordGapsCard({
           <EmptyState
             icon={EmptyIcon}
             title="No competitor gaps returned"
-            description="The provider did not return gap evidence for this competitor set."
+            description="The latest scan did not return gap evidence for this competitor set."
           />
         )}
       />

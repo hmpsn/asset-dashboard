@@ -33,6 +33,9 @@ interface SearchTrafficSurfaceProps {
   workspaceId: string;
 }
 
+const PAGE_SUBTITLE = 'Search visibility, site traffic, timeline context, and anomaly review.';
+const HEADER_WRAP_CLASS = 'flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible [&_p]:text-clip';
+
 const LENS_ICONS: Record<SearchTrafficLens, typeof BarChart3> = {
   overview: BarChart3,
   search: Search,
@@ -118,7 +121,7 @@ export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps)
   if (workspaces.isError && !workspace) {
     return (
       <div className="flex min-h-full flex-col gap-5">
-        <PageHeader title="Search & Traffic" subtitle="Search Console, GA4, annotations, and anomaly review." />
+        <PageHeader title="Search & Traffic" subtitle={PAGE_SUBTITLE} className={HEADER_WRAP_CLASS} />
         <ErrorState
           type="data"
           title="Workspace details did not load"
@@ -133,7 +136,7 @@ export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps)
   if (!workspace) {
     return (
       <div className="flex min-h-full flex-col gap-5">
-        <PageHeader title="Search & Traffic" subtitle="Search Console, GA4, annotations, and anomaly review." />
+        <PageHeader title="Search & Traffic" subtitle={PAGE_SUBTITLE} className={HEADER_WRAP_CLASS} />
         <ErrorState type="data" title="Workspace not found" message="Choose a workspace before reviewing analytics." className="min-h-[420px]" />
       </div>
     );
@@ -142,7 +145,7 @@ export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps)
   if (!siteId) {
     return (
       <div className="flex min-h-full flex-col gap-5">
-        <PageHeader title="Search & Traffic" subtitle="Search Console, GA4, annotations, and anomaly review." />
+        <PageHeader title="Search & Traffic" subtitle={PAGE_SUBTITLE} className={HEADER_WRAP_CLASS} />
         <ErrorState
           type="permission"
           title="Connect a site first"
@@ -159,10 +162,11 @@ export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps)
     <div className="flex min-h-full flex-col gap-5">
       <PageHeader
         title="Search & Traffic"
-        subtitle="Search Console, GA4, annotations, and anomaly review."
+        subtitle={PAGE_SUBTITLE}
+        className={HEADER_WRAP_CLASS}
         actions={(
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="t-caption-sm text-[var(--brand-text-muted)]">
+            <span className="t-ui text-[var(--brand-text-muted)]">
               {lastUpdated ? `Data as of ${lastUpdated}` : dateRangeLabel(dataWindow)}
             </span>
             <Button size="sm" variant="secondary" onClick={invalidateAnalytics}>
@@ -246,4 +250,3 @@ export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps)
 }
 
 export default SearchTrafficSurface;
-

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RebuiltSidebar } from '../../../src/components/layout/RebuiltSidebar';
-import { NAV_REGISTRY, NAV_REGISTRY_BY_ID } from '../../../src/lib/navRegistry';
+import { NAV_REGISTRY_BY_ID } from '../../../src/lib/navRegistry';
 import { queryKeys } from '../../../src/lib/queryKeys';
 import type { Workspace } from '../../../src/components/WorkspaceSelector';
 import type { FeatureFlagKey } from '../../../shared/types/feature-flags';
@@ -83,28 +83,61 @@ describe('RebuiltSidebar', () => {
     NAV_REGISTRY_BY_ID.features.flagBehavior = undefined;
   });
 
-  it('renders registry groups in the legacy sidebar order', async () => {
+  it('renders rebuilt sidebar destinations in the prototype zone order', async () => {
     const { container } = renderSidebar();
 
-    const monitoring = screen.getByRole('button', { name: 'MONITORING' });
-    const siteHealth = screen.getByRole('button', { name: 'SITE HEALTH' });
-    const strategy = screen.getByRole('button', { name: 'STRATEGY' });
+    const cockpit = screen.getByRole('button', { name: 'Cockpit' });
+    const engine = screen.getByRole('button', { name: 'Insights Engine' });
+    const strategyContent = screen.getByRole('button', { name: 'STRATEGY & CONTENT' });
+    const searchHealth = screen.getByRole('button', { name: 'SEARCH & SITE HEALTH' });
     const optimization = screen.getByRole('button', { name: 'OPTIMIZATION' });
-    const content = screen.getByRole('button', { name: 'CONTENT' });
+    const clientFacing = screen.getByRole('button', { name: 'CLIENT-FACING' });
     const admin = screen.getByRole('button', { name: 'ADMIN' });
 
-    expectBefore(monitoring, siteHealth);
-    expectBefore(siteHealth, strategy);
-    expectBefore(strategy, optimization);
-    expectBefore(optimization, content);
-    expectBefore(content, admin);
+    expectBefore(cockpit, engine);
+    expectBefore(engine, strategyContent);
+    expectBefore(strategyContent, searchHealth);
+    expectBefore(searchHealth, optimization);
+    expectBefore(optimization, clientFacing);
+    expectBefore(clientFacing, admin);
 
-    const renderedLabels = new Set(['MONITORING', 'SITE HEALTH', 'STRATEGY', 'OPTIMIZATION', 'CONTENT', 'ADMIN']);
-    const nonUtilityGroups = new Set(NAV_REGISTRY.map((entry) => entry.group).filter((group) => group !== 'utility'));
-    expect(nonUtilityGroups).toEqual(new Set(['home', 'monitoring', 'site-health', 'seo-strategy', 'optimization', 'content', 'admin']));
-    for (const label of renderedLabels) expect(screen.getByText(label)).toBeInTheDocument();
+    for (const label of ['Keywords', 'Competitors', 'Content Pipeline', 'Local Presence', 'Asset Manager', 'Action Results']) {
+      expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole('button', { name: 'MONITORING' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'CONTENT' })).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
   }, 15_000);
+
+  it('uses styleguide nav roles and token accents for the rebuilt sidebar chrome', () => {
+    renderSidebar();
+
+    const strategyContent = screen.getByRole('button', { name: 'STRATEGY & CONTENT' });
+    const searchHealth = screen.getByRole('button', { name: 'SEARCH & SITE HEALTH' });
+    const optimization = screen.getByRole('button', { name: 'OPTIMIZATION' });
+    const clientFacing = screen.getByRole('button', { name: 'CLIENT-FACING' });
+    expect(strategyContent).toHaveClass('t-label');
+    expect(searchHealth).toHaveClass('t-label');
+    expect(optimization).toHaveClass('t-label');
+    expect(clientFacing).toHaveClass('t-label');
+    expect(strategyContent.parentElement?.style.getPropertyValue('--nav-group-accent')).toBe('var(--blue)');
+    expect(searchHealth.parentElement?.style.getPropertyValue('--nav-group-accent')).toBe('var(--cyan)');
+    expect(optimization.parentElement?.style.getPropertyValue('--nav-group-accent')).toBe('var(--teal)');
+    expect(clientFacing.parentElement?.style.getPropertyValue('--nav-group-accent')).toBe('var(--brand-yellow)');
+
+    const keywords = screen.getByRole('button', { name: 'Keywords' });
+    const search = screen.getByRole('button', { name: 'Search & Traffic' });
+    const editor = screen.getByRole('button', { name: 'SEO Editor' });
+    const outcomes = screen.getByRole('button', { name: 'Action Results' });
+    expect(keywords).toHaveClass('t-ui');
+    expect(search).toHaveClass('t-ui');
+    expect(editor).toHaveClass('t-ui');
+    expect(outcomes).toHaveClass('t-ui');
+    expect(keywords.style.getPropertyValue('--nav-accent')).toBe('var(--blue)');
+    expect(search.style.getPropertyValue('--nav-accent')).toBe('var(--cyan)');
+    expect(editor.style.getPropertyValue('--nav-accent')).toBe('var(--teal)');
+    expect(outcomes.style.getPropertyValue('--nav-accent')).toBe('var(--brand-yellow)');
+  });
 
   it('disables needsSite items without a linked site and enables them once a site exists', () => {
     const { rerender } = renderSidebar({ selected: WORKSPACES[1] });
@@ -123,25 +156,25 @@ describe('RebuiltSidebar', () => {
   }, 15_000);
 
   it('auto-expands the group containing the active tab and marks the item current', async () => {
-    localStorage.setItem('admin-sidebar-collapsed', JSON.stringify(['MONITORING']));
+    localStorage.setItem('admin-sidebar-collapsed', JSON.stringify(['SEARCH & SITE HEALTH']));
     renderSidebar({ tab: 'analytics-hub' });
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Search & Traffic' })).toHaveAttribute('aria-current', 'page');
     });
-    expect(screen.getByRole('button', { name: 'MONITORING' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'SEARCH & SITE HEALTH' })).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('persists group collapse state in the shared legacy localStorage key', async () => {
     const user = userEvent.setup();
     renderSidebar();
 
-    await user.click(screen.getByRole('button', { name: 'CONTENT' }));
+    await user.click(screen.getByRole('button', { name: 'CLIENT-FACING' }));
 
     await waitFor(() => {
-      expect(localStorage.getItem('admin-sidebar-collapsed')).toContain('CONTENT');
+      expect(localStorage.getItem('admin-sidebar-collapsed')).toContain('CLIENT-FACING');
     });
-    expect(screen.queryByRole('button', { name: 'Pipeline' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Action Results' })).not.toBeInTheDocument();
   });
 
   it('does not render registry entries hidden by a resolved feature flag', () => {
@@ -162,11 +195,11 @@ describe('RebuiltSidebar', () => {
     const user = userEvent.setup();
     renderSidebar();
 
-    const home = screen.getByRole('button', { name: 'Home' });
-    home.focus();
+    const cockpit = screen.getByRole('button', { name: 'Cockpit' });
+    cockpit.focus();
     await user.keyboard('{ArrowDown}{Enter}');
 
-    expect(mockNavigate).toHaveBeenCalledWith('/ws/ws-1/analytics-hub');
+    expect(mockNavigate).toHaveBeenCalledWith('/ws/ws-1/seo-strategy');
     // Single-fire: roving onKeyDown preventDefaults, so the native button click must NOT
     // also fire — a regression that drops preventDefault would double-navigate (review PR #1478).
     expect(mockNavigate).toHaveBeenCalledTimes(1);
@@ -186,14 +219,14 @@ describe('RebuiltSidebar', () => {
     const user = userEvent.setup();
     renderSidebar({ pendingContentRequests: 4 });
 
-    await user.click(screen.getByRole('button', { name: 'CONTENT' }));
+    await user.click(screen.getByRole('button', { name: 'STRATEGY & CONTENT' }));
 
     // The content-pipeline item (with its own badge) is now hidden — the count must survive
     // on the collapsed group header (review PR #1478).
     await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'Pipeline' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Content Pipeline' })).not.toBeInTheDocument();
     });
-    const header = screen.getByRole('button', { name: /CONTENT/ });
+    const header = screen.getByRole('button', { name: /STRATEGY & CONTENT/ });
     expect(header).toHaveTextContent('4');
   });
 
@@ -201,14 +234,14 @@ describe('RebuiltSidebar', () => {
     const user = userEvent.setup();
     renderSidebar({ selected: WORKSPACES[1] });
 
-    const home = screen.getByRole('button', { name: 'Home' });
-    home.focus();
+    const cockpit = screen.getByRole('button', { name: 'Cockpit' });
+    cockpit.focus();
     await user.keyboard('{ArrowDown}');
 
-    expect(document.activeElement).toHaveTextContent('Action Results');
+    expect(document.activeElement).toHaveTextContent('Asset Manager');
 
     await user.keyboard('{Enter}');
 
-    expect(mockNavigate).toHaveBeenCalledWith('/ws/ws-2/outcomes');
+    expect(mockNavigate).toHaveBeenCalledWith('/ws/ws-2/media');
   });
 });

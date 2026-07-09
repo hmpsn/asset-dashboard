@@ -424,6 +424,9 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     expect(await screen.findByRole('radio', { name: /Published/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByTestId('content-pipeline-published-lens')).toBeInTheDocument();
     expect(mocks.contentPerformanceHook).toHaveBeenCalledWith(workspaceId);
+    expect(screen.getByText('Published proof queue')).toBeInTheDocument();
+    expect(screen.getByText('1 win ready')).toBeInTheDocument();
+    expect(screen.getByText(/Wins with measured lift graduate into Insights Engine/i)).toHaveClass('t-body');
     expect(screen.getByText('Dental implant guide')).toBeInTheDocument();
     expect(screen.getAllByText('45,000').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('72% covered')).toBeInTheDocument();
@@ -467,6 +470,22 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     renderSurface(`/ws/${workspaceId}/content-pipeline?tab=subscriptions`);
     expect(await screen.findByTestId('legacy-subscriptions')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Publish' })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('keeps internal rebuild and migration language out of the visible shell', async () => {
+    const { container } = renderSurface(`/ws/${workspaceId}/content-pipeline?tab=briefs`);
+
+    expect(await screen.findByRole('heading', { name: 'Content Pipeline' })).toBeInTheDocument();
+    expect(container).not.toHaveTextContent(/receiver|carried-over|carry-over|mounted below|shell owns|subscriptions alias|\?tab=|legacy|migration|rebuild/i);
+  });
+
+  it('keeps header actions stackable on narrow viewports', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=briefs`);
+
+    const actionGroup = await screen.findByTestId('content-pipeline-header-actions');
+    expect(actionGroup).toHaveClass('flex-col');
+    expect(actionGroup).toHaveClass('sm:flex-row');
+    expect(actionGroup).toHaveClass('max-w-full');
   });
 
   it('renders one page title per carried-over lens while preserving embedded controls', async () => {

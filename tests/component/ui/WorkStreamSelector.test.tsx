@@ -16,6 +16,8 @@ describe('WorkStreamSelector', () => {
 
     expect(screen.getByRole('radiogroup', { name: 'Work stream' })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /Optimizations/ })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('4')).toHaveClass('t-h1');
+    expect(screen.getByText('What needs fixing?')).toHaveClass('t-body');
 
     fireEvent.click(screen.getByRole('radio', { name: /To send/ }));
     expect(onChange).toHaveBeenCalledWith('send');

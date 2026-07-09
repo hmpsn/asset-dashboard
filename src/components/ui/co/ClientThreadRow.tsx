@@ -55,7 +55,7 @@ export function ClientThreadRow({
           <Badge label={meta.label} tone={meta.tone} variant="soft" shape="pill" />
           {when && <span className="ml-auto t-caption-sm text-[var(--brand-text-muted)]">{when}</span>}
         </div>
-        <p className="m-0 mt-1 t-caption text-[var(--brand-text)]">{message}</p>
+        <p className="m-0 mt-1 t-body text-[var(--brand-text)]">{message}</p>
         {onPromote && (
           <button
             type="button"

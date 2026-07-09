@@ -209,13 +209,17 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
       )}
 
       {/* co-eye — client context / freshness line */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 t-caption-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="flex min-w-0 items-start gap-2 t-caption-sm sm:items-center">
           <Avatar initials={workspaceInitials} label={workspaceName} size="sm" tone="teal" />
-          <span className="font-[family-name:var(--font-mono)] font-semibold tracking-[0.14em] text-[var(--teal)]">Client cockpit · {workspaceName}</span>
-          <span className="text-[var(--brand-text-dim)]">· Today, scoped to one</span>
+          <div className="min-w-0">
+            <div className="truncate font-[family-name:var(--font-mono)] font-semibold tracking-[0.08em] text-[var(--teal)] sm:tracking-[0.14em]">
+              Client cockpit · {workspaceName}
+            </div>
+            <div className="text-[var(--brand-text-dim)]">Today, scoped to one</div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           {/* muted-tier-ok: freshness/date is tertiary metadata (matches prototype's dim eyebrow date) */}
           <span
             className={`t-caption-sm ${isStale ? 'text-[var(--amber)]' : 'text-[var(--brand-text-dim)]'}`}

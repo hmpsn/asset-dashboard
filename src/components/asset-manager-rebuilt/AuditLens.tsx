@@ -77,6 +77,43 @@ function healthTone(score: number): string {
   return scoreColor(score);
 }
 
+function repairTitle(filter: AuditIssueFilter): string {
+  if (filter === 'oversized' || filter === 'unoptimized-png' || filter === 'legacy-format') {
+    return 'Oversized image repair';
+  }
+  if (filter === 'missing-alt' || filter === 'low-quality-alt' || filter === 'duplicate-alt') {
+    return 'Alt text repair';
+  }
+  if (filter === 'unused') return 'Unused asset cleanup';
+  if (filter === 'duplicate') return 'Duplicate asset review';
+  return `${issueLabel(filter)} repair`;
+}
+
+function repairAction(filter: AuditIssueFilter): string {
+  if (filter === 'oversized' || filter === 'unoptimized-png' || filter === 'legacy-format') {
+    return 'Use Compress all or row-level Compress to write optimized assets back to Webflow, then retest.';
+  }
+  if (filter === 'missing-alt' || filter === 'low-quality-alt' || filter === 'duplicate-alt') {
+    return 'Use Generate all alt or row-level Generate alt to write stronger alt text back to Webflow.';
+  }
+  if (filter === 'unused') {
+    return 'Review usage first, then delete unused assets only when the source library is safe to clean.';
+  }
+  if (filter === 'duplicate') {
+    return 'Open each asset before cleanup so canonical files and CMS references stay intact.';
+  }
+  return 'Run the audit, review the filtered rows, and apply the source fix from this workshop.';
+}
+
+function AuditRepairContext({ activeFilter }: { activeFilter: AuditIssueFilter | null }) {
+  if (!activeFilter) return null;
+  return (
+    <InlineBanner tone="info" title={repairTitle(activeFilter)}>
+      This drill-in is the source-fix step for PageSpeed or Site Audit findings. {repairAction(activeFilter)}
+    </InlineBanner>
+  );
+}
+
 export function AuditLens({
   siteId,
   workspaceId,
@@ -435,17 +472,20 @@ export function AuditLens({
 
   if (!hasRun && !loading) {
     return (
-      <EmptyState
-        icon={AuditEmptyIcon}
-        title="Run an asset audit"
-        description="Scan published pages, CMS fields, CSS, and the Webflow asset library for missing alt text, oversized files, duplicates, legacy formats, and unused assets."
-        action={(
-          <Button size="md" variant="primary" onClick={() => void runAudit()}>
-            <Icon as={RefreshCw} size="sm" />
-            Run Asset Audit
-          </Button>
-        )}
-      />
+      <div className="flex flex-col gap-4">
+        <AuditRepairContext activeFilter={activeFilter} />
+        <EmptyState
+          icon={AuditEmptyIcon}
+          title="Run an asset audit"
+          description="Scan published pages, CMS fields, CSS, and the Webflow asset library for missing alt text, oversized files, duplicates, legacy formats, and unused assets."
+          action={(
+            <Button size="md" variant="primary" onClick={() => void runAudit()}>
+              <Icon as={RefreshCw} size="sm" />
+              Run Asset Audit
+            </Button>
+          )}
+        />
+      </div>
     );
   }
 
@@ -472,6 +512,8 @@ export function AuditLens({
 
   return (
     <div className="flex flex-col gap-4">
+      <AuditRepairContext activeFilter={activeFilter} />
+
       {result && (
         <InlineBanner tone={result.tone} title={result.title} onDismiss={() => setResult(null)}>
           {result.message}
@@ -494,7 +536,7 @@ export function AuditLens({
 
       {serverScore == null && (
         <InlineBanner tone="info" title="Server score unavailable">
-          This rebuild does not derive a health score in the browser. The meter appears when the audit endpoint provides an authoritative score.
+          Audit health score appears when the audit returns an authoritative score.
         </InlineBanner>
       )}
 

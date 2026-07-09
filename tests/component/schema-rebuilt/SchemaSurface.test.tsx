@@ -18,7 +18,7 @@ const publishingMock = vi.fn();
 const cmsMock = vi.fn();
 const validationsMock = vi.fn();
 const graphValidationMock = vi.fn();
-const recommendationsMock = vi.fn();
+const adminRecommendationsMock = vi.fn();
 let capturedWorkspaceHandlers: Record<string, () => void> = {};
 
 const workspace = {
@@ -137,9 +137,20 @@ vi.mock('../../../src/hooks/admin/useSchemaValidation', () => ({
   useSchemaGraphValidation: (...args: unknown[]) => graphValidationMock(...args),
 }));
 
-vi.mock('../../../src/hooks/useRecommendations', () => ({
-  useRecommendations: (...args: unknown[]) => recommendationsMock(...args),
+vi.mock('../../../src/hooks/admin/useAdminRecommendations', () => ({
+  useAdminRecommendationSet: (...args: unknown[]) => adminRecommendationsMock(...args),
 }));
+
+vi.mock('../../../src/hooks/useRecommendations', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/hooks/useRecommendations')>('../../../src/hooks/useRecommendations');
+  return {
+    ...actual,
+    useRecommendations: vi.fn(() => ({
+      loaded: true,
+      forPage: () => [],
+    })),
+  };
+});
 
 vi.mock('../../../src/hooks/useWorkspaceEvents', () => ({
   useWorkspaceEvents: (_workspaceId: string, handlers: Record<string, () => void>) => {
@@ -292,9 +303,9 @@ function setupMocks() {
     data: { status: 'valid', nodeCount: 3, referenceCount: 2, findings: [] },
     isFetching: false,
   });
-  recommendationsMock.mockReturnValue({
-    loaded: true,
-    forPage: () => [],
+  adminRecommendationsMock.mockReturnValue({
+    data: { recommendations: [] },
+    isSuccess: true,
   });
 }
 
@@ -332,11 +343,29 @@ describe('SchemaSurface rebuilt admin surface', () => {
   it('receives ?tab=guide and invalid tab values at runtime', () => {
     renderSchema('/ws/ws-1/seo-schema?tab=guide');
     expect(screen.getByRole('heading', { name: 'Schema' })).toBeInTheDocument();
-    expect(screen.getByText('Client delivery boundary')).toBeInTheDocument();
+    expect(screen.getByText('Client review handoff')).toBeInTheDocument();
 
     renderSchema('/ws/ws-1/seo-schema?tab=unknown');
     expect(screen.getByText('Schema Site Plan bridge')).toBeInTheDocument();
     expect(screen.getByText('Dental Implants')).toBeInTheDocument();
+  });
+
+  it('renders the prototype five-phase workflow in the guide', () => {
+    renderSchema('/ws/ws-1/seo-schema?tab=guide');
+
+    const workflow = screen.getByLabelText('Schema guide workflow');
+    for (const phase of ['Scan', 'Review', 'Edit', 'Publish', 'Validate']) {
+      expect(within(workflow).getByText(phase)).toBeInTheDocument();
+    }
+    expect(within(workflow).getByText('Crawl the site, read the active schema plan, and detect which pages need structured data.')).toHaveClass('t-body');
+    expect(within(workflow).getByText('Generate the site plan first')).toHaveClass('t-ui');
+    expect(screen.getByText('The page shows these safeguards when generation, validation, publishing, and client review run.')).toHaveClass('t-body');
+    expect(screen.getByText('Architecture-aware BreadcrumbList output')).toHaveClass('t-ui');
+
+    expect(within(workflow).queryByText('Plan')).not.toBeInTheDocument();
+    expect(within(workflow).queryByText('Coverage')).not.toBeInTheDocument();
+    expect(within(workflow).queryByText('Prioritize')).not.toBeInTheDocument();
+    expect(within(workflow).queryByText('Step 6')).not.toBeInTheDocument();
   });
 
   it('writes the validated tab state when switching lenses', () => {
@@ -345,7 +374,7 @@ describe('SchemaSurface rebuilt admin surface', () => {
 
     fireEvent.click(screen.getByRole('radio', { name: /Workflow Guide/ }));
     expect(screen.getByTestId('location-search')).toHaveTextContent('?tab=guide');
-    expect(screen.getByText('Client delivery boundary')).toBeInTheDocument();
+    expect(screen.getByText('Client review handoff')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('radio', { name: /Generator/ }));
     expect(screen.getByTestId('location-search')).toHaveTextContent('');
@@ -360,10 +389,31 @@ describe('SchemaSurface rebuilt admin surface', () => {
     const drawer = screen.getByRole('dialog', { name: 'Dental Implants' });
     expect(drawer).toBeInTheDocument();
     expect(within(drawer).getByText('JSON-LD workspace')).toBeInTheDocument();
+    expect(within(drawer).getByText('Review generated markup, compare existing JSON-LD, or edit the effective schema.')).toHaveClass('t-body');
     expect(within(drawer).getByRole('button', { name: /Copy script/ })).toBeInTheDocument();
     expect(within(drawer).getByRole('button', { name: /Publish to CMS field/ })).toBeInTheDocument();
+    expect(within(drawer).getByText('Validate graph safety, publish to Webflow or CMS, or send the effective schema to the client.')).toHaveClass('t-body');
     expect(within(drawer).getByRole('button', { name: /Send to client/ })).toBeInTheDocument();
     expect(within(drawer).getByRole('button', { name: /Version history and rollback/ })).toBeInTheDocument();
+  });
+
+  it('uses operator-facing schema copy without internal rebuild terms', () => {
+    const internalTerms = /T1 carry-over|server-owned|server-side|shared domain services|Admin rebuild only|deliverable shapes|schema_item|schema_plan|No schema-review page|Awaiting server projection|Server-owned coverage|proven machinery|publish through existing services/i;
+
+    const generator = renderSchema('/ws/ws-1/seo-schema?tab=generator');
+    expect(screen.getByText('Dental Implants')).toBeInTheDocument();
+    expect(generator.container).not.toHaveTextContent(internalTerms);
+    generator.unmount();
+
+    const guide = renderSchema('/ws/ws-1/seo-schema?tab=guide');
+    expect(screen.getByText('Client review handoff')).toBeInTheDocument();
+    expect(guide.container).not.toHaveTextContent(internalTerms);
+  });
+
+  it('uses the admin recommendations read path for page schema recommendation context', () => {
+    renderSchema('/ws/ws-1/seo-schema?tab=generator');
+
+    expect(adminRecommendationsMock).toHaveBeenCalledWith('ws-1', { enabled: true });
   });
 
   it('uses the real useFeatureFlag hook through loading to loaded before mounting schema', async () => {

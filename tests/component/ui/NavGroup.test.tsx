@@ -14,6 +14,7 @@ describe('NavGroup', () => {
 
     const header = screen.getByRole('button', { name: 'MONITORING' });
     expect(header).toHaveAttribute('aria-expanded', 'false');
+    expect(header).toHaveClass('t-label');
     expect(screen.getByRole('region', { hidden: true })).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
@@ -103,6 +104,7 @@ describe('NavGroup', () => {
     );
     const badge = screen.getByText('3');
     expect(badge).toBeInTheDocument();
+    expect(badge).toHaveClass('t-mono');
     expect(badge.closest('[hidden]')).toBeNull();
   });
 });

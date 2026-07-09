@@ -20,6 +20,7 @@ interface LocalPresenceOverviewProps {
   data: LocalSeoReadResponse;
   gbp?: GbpReviewsReadResponse;
   onOpenSetup: () => void;
+  showCompetitors?: boolean;
 }
 
 // The map-pack share-of-voice fields live on the shared LocalSeoRepeatCompetitor type
@@ -89,7 +90,7 @@ const COMPETITOR_COLUMNS: DataColumn[] = [
       const row = (record as CompetitorRecord).source;
       return (
         <div className="min-w-0">
-          <span className="block truncate font-semibold text-[var(--brand-text-bright)]">{row.title}</span>
+          <span className="block truncate t-ui font-semibold text-[var(--brand-text-bright)]">{row.title}</span>
           <span className="block truncate t-caption-sm text-[var(--brand-text-muted)]">{row.domain ?? 'No domain captured'}</span>
         </div>
       );
@@ -105,7 +106,7 @@ const COMPETITOR_COLUMNS: DataColumn[] = [
       const row = (record as CompetitorRecord).source;
       return (
         <div className="flex flex-col items-end gap-1">
-          <span className="tabular-nums font-semibold text-[var(--blue)]">
+          <span className="t-ui tabular-nums font-semibold text-[var(--blue)]">
             {formatPercent(row.mapPackShareOfVoicePct)}
           </span>
           <span className="t-caption-sm text-[var(--brand-text-muted)]">
@@ -138,12 +139,18 @@ const COMPETITOR_COLUMNS: DataColumn[] = [
     width: 'minmax(160px, 1fr)',
     render: (_value, record) => {
       const row = (record as CompetitorRecord).source;
-      return <span className="t-caption-sm text-[var(--brand-text-muted)]">{row.markets.join(', ') || '—'}</span>;
+      return <span className="t-ui text-[var(--brand-text-muted)]">{row.markets.join(', ') || '—'}</span>;
     },
   },
 ];
 
-export function LocalPresenceOverview({ workspaceId, data, gbp, onOpenSetup }: LocalPresenceOverviewProps) {
+export function LocalPresenceOverview({
+  workspaceId,
+  data,
+  gbp,
+  onOpenSetup,
+  showCompetitors = true,
+}: LocalPresenceOverviewProps) {
   const navigate = useNavigate();
   const report = data.report;
   const owned = gbp?.owned ?? null;
@@ -160,11 +167,11 @@ export function LocalPresenceOverview({ workspaceId, data, gbp, onOpenSetup }: L
           <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="t-ui font-semibold text-[var(--brand-text-bright)]">Local operating status</h2>
-              <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">{report.setupDetail}</p>
+              <p className="mt-1 t-body text-[var(--brand-text-muted)]">{report.setupDetail}</p>
             </div>
             <Badge label={report.workspacePosture.replace(/_/g, ' ')} tone={setupTone(report.setupState)} variant="outline" shape="pill" />
           </div>
-          <p className="t-caption font-semibold text-[var(--brand-text-bright)]">{report.setupLabel}</p>
+          <p className="t-ui font-semibold text-[var(--brand-text-bright)]">{report.setupLabel}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {data.markets.length > 0 ? data.markets.slice(0, 6).map((market) => (
               <Badge
@@ -196,7 +203,7 @@ export function LocalPresenceOverview({ workspaceId, data, gbp, onOpenSetup }: L
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <h2 className="t-ui font-semibold text-[var(--brand-text-bright)]">GBP aggregate</h2>
-              <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">Rating, reviews, and the three profile signals currently available.</p>
+              <p className="mt-1 t-body text-[var(--brand-text-muted)]">Rating, reviews, and the three profile signals currently available.</p>
             </div>
             <Badge label="Aggregate only" tone="zinc" variant="soft" shape="pill" />
           </div>
@@ -214,23 +221,25 @@ export function LocalPresenceOverview({ workspaceId, data, gbp, onOpenSetup }: L
               </div>
             </div>
           ) : (
-            <p className="mt-4 t-caption-sm text-[var(--brand-text-muted)]">Run a GBP + reviews refresh to capture aggregate profile health.</p>
+            <p className="mt-4 t-body text-[var(--brand-text-muted)]">Run a GBP + reviews refresh to capture aggregate profile health.</p>
           )}
         </div>
       </div>
 
-      <DataTable
-        columns={COMPETITOR_COLUMNS}
-        rows={competitorRows}
-        getRowKey={(record) => (record as CompetitorRecord).source.title}
-        empty={(
-          <EmptyState
-            icon={EmptyCompetitorIcon}
-            title="No repeat map-pack competitors yet"
-            description="Competitor share of voice appears after local-pack snapshots capture the same competitor at least twice."
-          />
-        )}
-      />
+      {showCompetitors && (
+        <DataTable
+          columns={COMPETITOR_COLUMNS}
+          rows={competitorRows}
+          getRowKey={(record) => (record as CompetitorRecord).source.title}
+          empty={(
+            <EmptyState
+              icon={EmptyCompetitorIcon}
+              title="No repeat map-pack competitors yet"
+              description="Competitor share of voice appears after local-pack snapshots capture the same competitor at least twice."
+            />
+          )}
+        />
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricTile label="Markets" value={report.activeMarketCount} sub={`${report.configuredMarketCount} configured`} accent="var(--blue)" icon={MapPin} />

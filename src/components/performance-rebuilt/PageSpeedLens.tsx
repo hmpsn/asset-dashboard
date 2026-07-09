@@ -1,5 +1,6 @@
 // @ds-rebuilt
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   useAdminPageSpeedBulk,
   useAdminPageSpeedSingle,
@@ -34,6 +35,7 @@ import {
   ToolbarSpacer,
   type DataColumn,
 } from '../ui';
+import { adminPath } from '../../routes';
 import { scoreColor } from '../ui/constants';
 import { mutationErrorMessage } from './performanceMutationFeedback';
 import {
@@ -219,7 +221,7 @@ function ScoreSummary({
             <Badge label={label} tone="teal" variant="soft" size="sm" />
             <ProvenanceBadge fieldDataAvailable={fieldDataAvailable} />
           </div>
-          <p className="mt-2 t-caption text-[var(--brand-text-muted)]">
+          <p className="mt-2 t-body text-[var(--brand-text-muted)]">
             Lighthouse performance score plus the full Core Web Vitals set.
           </p>
         </div>
@@ -299,7 +301,7 @@ function PageSpeedDetail({ result }: { result: PageSpeedResult }) {
       <ScoreSummary result={result} label={strategyLabel(result.strategy)} fieldDataAvailable={result.fieldDataAvailable} />
       <GroupBlock
         title={`Opportunities (${result.opportunities.length})`}
-        meta="Savings reported by PageSpeed Insights. Fix routing is deferred to a shared destination contract."
+        meta="Savings reported by PageSpeed Insights. Most speed opportunities resolve in Asset Manager after review."
         collapsible
         defaultOpen={false}
       >
@@ -383,6 +385,7 @@ function StrategySnapshotCard({
 }
 
 export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [mode, setMode] = useState<PageSpeedMode>('single');
   const [strategy, setStrategy] = useState<PageSpeedStrategy>('mobile');
@@ -578,7 +581,7 @@ export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
           </div>
         ) : (
           <div className="flex min-w-0 flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-3">
-            <p className="t-caption text-[var(--brand-text-muted)]">
+            <p className="t-body text-[var(--brand-text-muted)]">
               Bulk tests the top published pages and persists the averaged strategy snapshot.
             </p>
             <div className="flex flex-wrap items-center gap-2">
@@ -601,6 +604,20 @@ export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
           className="self-start"
         />
       </div>
+
+      <InlineBanner tone="info" title="Speed fixes start in Asset Manager">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="t-body">Use PageSpeed to detect Core Web Vitals issues. For image-heavy opportunities, compress oversized files before retesting.</span>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => navigate(`${adminPath(workspaceId, 'media')}?tab=audit&filter=oversized`)}
+          >
+            <Icon name="image" size="sm" />
+            Open assets
+          </Button>
+        </div>
+      </InlineBanner>
 
       {busy && (
         <InlineBanner tone="info" title="Running PageSpeed analysis">

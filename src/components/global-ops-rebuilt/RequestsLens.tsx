@@ -35,7 +35,7 @@ export function RequestsLens({ workspaceId }: RequestsLensProps) {
         <EmptyState
           icon={({ className }) => <Icon name="message" className={className} />}
           title="Choose a workspace"
-          description="The Requests feed needs a workspace-scoped route before deliverables, signals, and client actions can load."
+          description="Choose a workspace to load deliverables, client signals, all requests, and client actions."
         />
       </PageContainer>
     );
@@ -55,7 +55,7 @@ export function RequestsLens({ workspaceId }: RequestsLensProps) {
         <PageHeader
           title="Requests"
           subtitle="Unified operator feed for deliverables, client signals, all requests, and client actions."
-          actions={<Badge label="Promote to signal deferred" tone="amber" variant="soft" />}
+          actions={<Badge label="Strategy handoff planned" tone="amber" variant="soft" />}
         />
 
         {state.invalidTab && (

@@ -16,8 +16,8 @@ export const SERIES = {
   impressions: 'var(--cyan)',
   ctr: 'var(--amber)',
   position: 'var(--red)',
-  users: 'var(--teal)',
-  sessions: 'var(--blue)',
+  users: 'var(--blue)',
+  sessions: 'var(--cyan)',
   pageviews: 'var(--emerald)',
   duration: 'var(--cyan)',
   previous: 'var(--brand-text-muted)',
@@ -80,4 +80,3 @@ export function buildSparkline<T>(rows: T[], accessor: (row: T) => number | null
 export function categoryMeta(category: string) {
   return ANNOTATION_CATEGORIES.find((item) => item.id === category) ?? ANNOTATION_CATEGORIES[3];
 }
-

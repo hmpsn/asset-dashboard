@@ -353,7 +353,7 @@ export function PageWeightLens({ workspaceId, siteId }: PageWeightLensProps) {
       {scan.isError && data && (
         <InlineBanner tone="warning" title="Page weight may be stale">
           <div className="flex flex-wrap items-center gap-2">
-            <span>Page weight data did not refresh, so the last loaded scan is still shown.</span>
+            <span className="t-body">Page weight data did not refresh, so the last loaded scan is still shown.</span>
             <Button size="sm" variant="secondary" onClick={runScan}>Retry scan</Button>
           </div>
         </InlineBanner>
@@ -369,7 +369,7 @@ export function PageWeightLens({ workspaceId, siteId }: PageWeightLensProps) {
       {heavyPages > 0 && (
         <InlineBanner tone="warning" title={`${heavyPages} heavy page${heavyPages === 1 ? '' : 's'} found`}>
           <div className="flex flex-wrap items-center gap-2">
-            <span>Open Asset Manager's audit lens to review oversized files and compression candidates.</span>
+            <span className="t-body">Open Asset Manager's audit lens to review oversized files and compression candidates.</span>
             <Button
               size="sm"
               variant="secondary"
@@ -420,7 +420,7 @@ export function PageWeightLens({ workspaceId, siteId }: PageWeightLensProps) {
               <MetricTile label="Assets" value={selectedPage.assetCount} accent="var(--blue)" />
               <MetricTile label="Source" value={pageSourceLabel(pageSource(selectedPage.page))} accent="var(--teal)" />
             </div>
-            <p className="t-caption text-[var(--brand-text-muted)]">
+            <p className="t-body text-[var(--brand-text-muted)]">
               Assets over 500KB are emphasized because they are strong compression candidates.
             </p>
             <DataTable

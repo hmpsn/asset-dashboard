@@ -71,8 +71,8 @@ function TechRow({
         <Icon name={iconName} size="sm" aria-hidden="true" />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[12.5px] font-semibold text-[var(--brand-text-bright)]">{title}</div>
-        <div className="truncate text-[10.5px] text-[var(--brand-text-dim)]">{meta}</div>
+        <div className="truncate t-ui font-semibold text-[var(--brand-text-bright)]">{title}</div>
+        <div className="truncate t-caption-sm text-[var(--brand-text-muted)]">{meta}</div>
       </div>
       <span
         className="flex-none rounded-[var(--radius-pill)] px-[7px] py-0.5 t-caption-sm font-bold uppercase tracking-[0.04em]"
@@ -108,7 +108,7 @@ function KeywordRow({ rank }: { rank: CockpitRankRow }) {
   return (
     <div className="flex items-center gap-[11px] border-t border-[var(--brand-border)] px-4 py-2 first:border-t-0">
       <span className="min-w-0 flex-1 truncate t-ui text-[var(--brand-text-bright)]">{rank.query}</span>
-      <span className="flex-none font-[family-name:var(--font-display)] text-[15px] font-bold text-[var(--brand-text-bright)] tabular-nums">{/* // arbitrary-text-ok: bespoke rail rank number, prototype .ck-kpos 15px DIN Pro, not a StatCard */}
+      <span className="flex-none t-body font-bold text-[var(--brand-text-bright)] tabular-nums">
         {rank.position == null ? '—' : `#${rank.position}`}
       </span>
       <span className="flex-none w-10 text-right t-caption-sm font-semibold tabular-nums" style={{ color: moveColor }}>
@@ -123,7 +123,7 @@ function FunnelStage({ count, label, color }: { count: number; label: string; co
   return (
     <div className="flex-1 text-center">
       <span className="mx-auto mb-1 block h-1.5 w-1.5 rounded-[var(--radius-pill)]" style={{ background: color }} aria-hidden="true" />
-      <div className="font-[family-name:var(--font-display)] text-[19px] font-extrabold leading-none text-[var(--brand-text-bright)] tabular-nums">{/* // arbitrary-text-ok: bespoke funnel stage number, prototype .co-mstage 19px DIN Pro, not a StatCard */}{count}</div>
+      <div className="t-stat-sm font-extrabold leading-none text-[var(--brand-text-bright)] tabular-nums">{count}</div> {/* stat-primitive-ok: compact content-funnel stage count inside the Cockpit evidence rail, not a labeled StatCard/CompactStatBar metric grid */}
       <div className="mt-0.5 t-label text-[var(--brand-text-dim)]">{label}</div>
     </div>
   );
@@ -220,7 +220,7 @@ export function CockpitEvidenceRail({
             ))}
           </div>
         ) : (
-          <div className="px-4 py-3 text-[11.5px] text-[var(--brand-text-muted)]">No open client requests in this workspace.</div>
+          <div className="px-4 py-3 t-caption text-[var(--brand-text-muted)]">No open client requests in this workspace.</div>
         )}
       </SectionCard>
 
@@ -248,7 +248,7 @@ export function CockpitEvidenceRail({
             ))}
           </div>
         ) : (
-          <div className="px-4 py-3 text-[11.5px] text-[var(--brand-text-muted)]">No technical issues flagged right now.</div>
+          <div className="px-4 py-3 t-caption text-[var(--brand-text-muted)]">No technical issues flagged right now.</div>
         )}
       </SectionCard>
 
@@ -268,7 +268,7 @@ export function CockpitEvidenceRail({
             ))}
           </div>
         ) : (
-          <div className="px-4 py-3 text-[11.5px] text-[var(--brand-text-muted)]">No tracked rankings yet.</div>
+          <div className="px-4 py-3 t-caption text-[var(--brand-text-muted)]">No tracked rankings yet.</div>
         )}
       </SectionCard>
 

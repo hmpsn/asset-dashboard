@@ -54,7 +54,7 @@ function WorkspaceMissingState() {
       <EmptyState
         icon={({ className }) => <Icon name="settings" className={className} />}
         title="Choose a workspace"
-        description="Workspace Settings needs a workspace-scoped route before connection, publishing, and dashboard controls can load."
+        description="Choose a workspace to load connection, publishing, and dashboard controls."
       />
     </PageContainer>
   );
@@ -239,7 +239,7 @@ export function WorkspaceSettingsLens({ workspaceId }: WorkspaceSettingsLensProp
 
           <SectionCard
             title={TAB_LABELS[state.tab]}
-            titleExtra={<Badge label="Carry-over parity" tone="blue" variant="soft" />}
+            titleExtra={<Badge label="Live settings" tone="blue" variant="soft" />}
             noPadding
           >
             <div className="p-4">

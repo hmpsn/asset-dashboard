@@ -80,10 +80,10 @@ const SEVERITY_TONE: Record<Severity, 'red' | 'amber' | 'blue'> = {
 };
 
 const CATEGORY_ACCENT: Record<AuditDisplayCategory, string> = {
-  index: 'var(--teal)',
+  index: 'var(--blue)',
   onpage: 'var(--blue)',
   schema: 'var(--emerald)',
-  links: 'var(--teal)',
+  links: 'var(--blue)',
   perf: 'var(--amber)',
   mobile: 'var(--blue)',
 };
@@ -188,7 +188,7 @@ function DeadLinksPanel({
     >
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3 px-2 pt-1">
-          <p className="t-caption text-[var(--brand-text-muted)]">
+          <p className="t-body text-[var(--brand-text-muted)]">
             Redirect creation and dead-link CSV export live in the Links workshop.
           </p>
           <Button size="sm" variant="secondary" onClick={onOpenLinks}>
@@ -346,8 +346,8 @@ function IssueDetailDrawer({
           </div>
 
           <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-4">
-            <div className="t-caption font-semibold text-[var(--brand-text-bright)]">Recommendation</div>
-            <p className="t-caption text-[var(--brand-text-muted)] mt-1">{group.recommendation}</p>
+            <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Recommendation</div>
+            <p className="t-body text-[var(--brand-text-muted)] mt-1">{group.recommendation}</p>
             {firstPage && firstIssue?.suggestedFix && (
               <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--brand-mint-dim)] bg-[var(--brand-mint-dim)] p-3">
                 <div className="t-micro text-[var(--teal)]">AI suggestion</div>
@@ -370,7 +370,7 @@ function IssueDetailDrawer({
           {firstPage && firstIssue && (
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-2">
-                <div className="t-caption font-semibold text-[var(--brand-text-bright)]">Send to client</div>
+                <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Send to client</div>
                 {flaggedIssues.has(taskKey) && <Badge label="Sent" tone="emerald" variant="soft" />}
               </div>
               <FormTextarea
@@ -406,14 +406,14 @@ function IssueDetailDrawer({
           )}
 
           <div>
-            <div className="t-caption font-semibold text-[var(--brand-text-bright)] mb-2">Affected pages</div>
+            <div className="t-ui font-semibold text-[var(--brand-text-bright)] mb-2">Affected pages</div>
             <div className="space-y-2">
               {group.instances.slice(0, 12).map((instance) => (
                 <div key={instance.id} className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
                   <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="t-caption text-[var(--brand-text-bright)] truncate">
+                        <span className="t-ui text-[var(--brand-text-bright)] truncate">
                           {instance.page?.page ?? 'Site-wide issue'}
                         </span>
                         {instance.page?.noindex && <Badge label="noindex excluded" tone="zinc" variant="outline" />}
@@ -443,7 +443,7 @@ function IssueDetailDrawer({
                 </div>
               ))}
               {group.instances.length > 12 && (
-                <div className="t-caption-sm text-[var(--brand-text-muted)]">
+                <div className="t-caption text-[var(--brand-text-muted)]">
                   {group.instances.length - 12} more affected pages are included in batch actions.
                 </div>
               )}
@@ -452,7 +452,7 @@ function IssueDetailDrawer({
 
           {audit.pageStates.summary.total > 0 && (
             <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
-              <div className="t-caption font-semibold text-[var(--brand-text-bright)]">Edit-state summary</div>
+              <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Edit-state summary</div>
               <div className="mt-2 grid grid-cols-3 gap-2">
                 <MetricTile label="In review" value={audit.pageStates.summary.inReview} />
                 <MetricTile label="Approved" value={audit.pageStates.summary.approved} />
@@ -502,9 +502,9 @@ function AuditLens({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <Badge label={group.severity} tone={SEVERITY_TONE[group.severity]} variant="soft" />
-              <span className="t-caption font-semibold text-[var(--brand-text-bright)] truncate">{group.message}</span>
+              <span className="t-ui font-semibold text-[var(--brand-text-bright)] truncate">{group.message}</span>
             </div>
-            <div className="t-caption-sm text-[var(--brand-text-muted)] truncate mt-1">{group.recommendation}</div>
+            <div className="t-caption text-[var(--brand-text-muted)] truncate mt-1">{group.recommendation}</div>
           </div>
         );
       },
@@ -599,7 +599,7 @@ function AuditLens({
           <div className="t-body font-semibold text-[var(--brand-text-bright)]">
             {audit.workflow.runningAuditJob?.message ?? 'Analyzing site health...'}
           </div>
-          <p className="t-caption text-[var(--brand-text-muted)] mt-1">The background job saves a snapshot when it finishes.</p>
+          <p className="t-body text-[var(--brand-text-muted)] mt-1">The background job saves a snapshot when it finishes.</p>
         </div>
         {progress !== null && (
           <div className="w-full max-w-sm">
@@ -642,7 +642,7 @@ function AuditLens({
           </div>
           <div className="mt-4 text-center">
             <h3 className={cn('t-h2', scoreColorClass(data.siteScore))}>Overall Site Score</h3>
-            <p className="t-caption text-[var(--brand-text-muted)] mt-1">
+            <p className="t-body text-[var(--brand-text-muted)] mt-1">
               {data.totalPages} pages analyzed. Noindex pages stay out of score denominators.
             </p>
           </div>
@@ -707,7 +707,7 @@ function AuditLens({
           {audit.suppressions.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-3 py-2">
               <Badge label={`${audit.suppressions.length} suppressed`} tone="zinc" variant="outline" />
-              <span className="t-caption-sm text-[var(--brand-text-muted)]">Hidden findings are excluded from effective scores.</span>
+              <span className="t-body text-[var(--brand-text-muted)]">Hidden findings are excluded from effective scores.</span>
               <Button
                 size="sm"
                 variant="ghost"
@@ -729,7 +729,7 @@ function AuditLens({
           {audit.workflow.showNextSteps && (
             <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="t-caption font-semibold text-[var(--brand-text-bright)]">Next actions</span>
+                <span className="t-ui font-semibold text-[var(--brand-text-bright)]">Next actions</span>
                 <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('errors')} loading={audit.batchCreating}>
                   Add error tasks
                 </Button>
@@ -743,7 +743,7 @@ function AuditLens({
                   Accept AI suggestions
                 </Button>
                 {bulkApplying && (
-                  <span className="t-caption-sm text-[var(--brand-text-muted)]">
+                  <span className="t-ui text-[var(--brand-text-muted)]">
                     {bulkProgress ? `${bulkProgress.done}/${bulkProgress.total}` : 'Starting...'}
                   </span>
                 )}
@@ -804,7 +804,7 @@ function AuditLens({
           ))}
         </div>
 
-        <div className="t-caption-sm text-[var(--brand-text-muted)]">
+        <div className="t-ui text-[var(--brand-text-muted)]">
           Showing {filteredGroups.length} of {audit.issueGroups.length} issue groups
         </div>
 
@@ -822,6 +822,16 @@ function AuditLens({
             />
           )}
         />
+      </div>
+
+      <div className="flex items-start gap-3 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-4 py-3">
+        <Icon name="trophy" size="md" className="mt-0.5 text-[var(--emerald)]" />
+        <div>
+          <div className="t-ui font-semibold text-[var(--brand-text-bright)]">From fix to proof</div>
+          <p className="mt-1 t-body text-[var(--brand-text-muted)]">
+            Technical fixes stay in Site Audit and Cockpit until traffic, crawlability, or Core Web Vitals recovery is measurable.
+          </p>
+        </div>
       </div>
 
       {(data as SiteAuditResult & { snapshotId?: string }).snapshotId && (
@@ -1017,6 +1027,7 @@ export function SiteAuditSurface({ workspaceId }: SiteAuditSurfaceProps) {
           title="Site Audit"
           subtitle={`${audit.siteName || 'Connected site'} · technical health, content quality, and search readiness`}
           icon={<Icon name="gauge" size="lg" className="text-[var(--teal)]" />}
+          className="flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible"
         />
 
         <Toolbar label="Site Audit lenses" className="w-full">
@@ -1026,6 +1037,7 @@ export function SiteAuditSurface({ workspaceId }: SiteAuditSurfaceProps) {
             value={state.sub}
             onChange={(value) => state.setSub(value as SiteAuditSub)}
             size="sm"
+            className="w-full flex-wrap sm:w-fit sm:flex-nowrap"
           />
         </Toolbar>
 

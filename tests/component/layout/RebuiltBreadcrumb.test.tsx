@@ -45,6 +45,7 @@ describe('RebuiltBreadcrumb', () => {
     expect(screen.getByText('Command Center')).toBeInTheDocument();
     expect(screen.getByText('acme.com')).toBeInTheDocument();
     expect(screen.getByText('Site Audit')).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByLabelText('Breadcrumb')).toHaveClass('t-ui');
     await expectNoA11yViolations(container);
   });
 

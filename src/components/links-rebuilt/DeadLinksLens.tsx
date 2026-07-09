@@ -163,7 +163,9 @@ function DeadLinkDrawer({
             {link.anchorText && <p className="mt-2 t-caption-sm text-[var(--teal)]">"{link.anchorText}"</p>}
           </div>
           <InlineBanner tone="info" title="Redirect action">
-            Direct Webflow redirect creation is deferred. Use Redirects to review suggested rules, or export this link-check CSV for manual repair.
+            <p className="t-body text-[var(--brand-text-muted)]">
+              Use Redirects to review 301 targets for internal broken links. For external links, update or remove the source link and export the CSV for a repair list.
+            </p>
           </InlineBanner>
         </div>
       )}
@@ -365,7 +367,9 @@ export function DeadLinksLens({
 
       {data.deadLinks.length === 0 && data.redirects.length === 0 && (
         <InlineBanner tone="success" title="All checked links are healthy">
-          No dead links or redirecting links were found for {cleanUrlLabel(data.crawledDomain ?? selectedDomain)}.
+          <p className="t-body text-[var(--brand-text-muted)]">
+            No dead links or redirecting links were found for {cleanUrlLabel(data.crawledDomain ?? selectedDomain)}.
+          </p>
         </InlineBanner>
       )}
 

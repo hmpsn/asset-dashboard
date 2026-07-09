@@ -83,11 +83,11 @@ function VariationList({
               className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 hover:border-[var(--teal)]"
             >
               <div className="flex min-w-0 flex-col gap-1">
-                <span className="t-caption-sm font-semibold text-[var(--brand-text-bright)]">
+                <span className="t-ui font-semibold text-[var(--brand-text-bright)]">
                   {index + 1}. {option}
                 </span>
                 {field === 'both' && (
-                  <span className="t-caption-sm text-[var(--brand-text-muted)]">{description}</span>
+                  <span className="t-body text-[var(--brand-text-muted)]">{description}</span>
                 )}
               </div>
             </ClickableRow>
@@ -135,11 +135,11 @@ function CmsVariationList({
               className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2 hover:border-[var(--teal)]"
             >
               <div className="flex min-w-0 flex-col gap-1">
-                <span className="t-caption-sm font-semibold text-[var(--brand-text-bright)]">
+                <span className="t-ui font-semibold text-[var(--brand-text-bright)]">
                   {index + 1}. {option}
                 </span>
                 {fieldSlug === 'both' && (
-                  <span className="t-caption-sm text-[var(--brand-text-muted)]">{description}</span>
+                  <span className="t-body text-[var(--brand-text-muted)]">{description}</span>
                 )}
               </div>
             </ClickableRow>
@@ -315,7 +315,7 @@ export function SeoEditorPagePanel({
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Page identity</div>
-                    <div className="t-caption-sm text-[var(--brand-text-muted)]">Page title can be renamed through the same page SEO endpoint. H1 and slug are reference-only in v1.</div>
+                    <div className="t-body text-[var(--brand-text-muted)]">Rename the page title here. H1 and slug stay read-only until a writable field is connected.</div>
                   </div>
                   <Button
                     size="sm"
@@ -336,12 +336,12 @@ export function SeoEditorPagePanel({
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <label className="block">
-                    <span className="t-caption-sm text-[var(--brand-text-muted)]">Page title</span>
+                    <span className="t-label text-[var(--brand-text-muted)]">Page title</span>
                     <FormInput value={pageTitleDraft} onChange={setPageTitleDraft} className="mt-1" />
                   </label>
                   <div className="grid gap-2">
                     <KeyValueRow label="Slug" value={resolvePagePath(row.staticPage)} />
-                    <KeyValueRow label="H1" value="Read-only in v1" />
+                    <KeyValueRow label="H1" value="Read-only here" />
                   </div>
                 </div>
               </div>
@@ -350,7 +350,7 @@ export function SeoEditorPagePanel({
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <div className="t-ui font-semibold text-[var(--brand-text-bright)]">SEO fields</div>
-                    <div className="t-caption-sm text-[var(--brand-text-muted)]">OpenGraph mirrors these fields through the existing save workflow.</div>
+                    <div className="t-body text-[var(--brand-text-muted)]">OpenGraph mirrors these fields when the page is saved.</div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="secondary" onClick={() => staticWorkflow.analyzePage(row.staticPage!.id)} loading={staticWorkflow.analyzing.has(row.staticPage.id)}>
@@ -372,13 +372,13 @@ export function SeoEditorPagePanel({
 
                 <div className="grid gap-3">
                   <label className="block">
-                    <span className="flex items-center justify-between gap-2 t-caption-sm text-[var(--brand-text-muted)]">
+                    <span className="flex items-center justify-between gap-2 t-label text-[var(--brand-text-muted)]">
                       SEO title <CharacterCounter current={row.edit.seoTitle.length} max={60} size="sm" />
                     </span>
                     <FormInput value={row.edit.seoTitle} onChange={(value) => staticWorkflow.updateField(row.staticPage!.id, 'seoTitle', value)} className="mt-1" />
                   </label>
                   <label className="block">
-                    <span className="flex items-center justify-between gap-2 t-caption-sm text-[var(--brand-text-muted)]">
+                    <span className="flex items-center justify-between gap-2 t-label text-[var(--brand-text-muted)]">
                       Meta description <CharacterCounter current={row.edit.seoDescription.length} max={160} size="sm" />
                     </span>
                     <FormTextarea rows={4} value={row.edit.seoDescription} onChange={(value) => staticWorkflow.updateField(row.staticPage!.id, 'seoDescription', value)} className="mt-1" />
@@ -407,7 +407,7 @@ export function SeoEditorPagePanel({
                   {row.keywordAssignment?.primaryKeyword && <Badge label={row.keywordAssignment.primaryKeyword} tone="teal" variant="soft" size="sm" />}
                   {(row.keywordAssignment?.secondaryKeywords ?? []).map((keyword) => <Badge key={keyword} label={keyword} tone="zinc" variant="outline" size="sm" />)}
                   {!row.keywordAssignment?.primaryKeyword && (row.keywordAssignment?.secondaryKeywords.length ?? 0) === 0 && (
-                    <span className="t-caption-sm text-[var(--brand-text-muted)]">No assigned keyword projection.</span>
+                    <span className="t-body text-[var(--brand-text-muted)]">No assigned keyword yet.</span>
                   )}
                 </div>
                 <Button size="sm" variant="link" className="mt-3" onClick={() => navigate(adminPath(workspaceId, 'seo-keywords'))}>
@@ -433,7 +433,7 @@ export function SeoEditorPagePanel({
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <div className="t-ui font-semibold text-[var(--brand-text-bright)]">CMS item fields</div>
-                  <div className="t-caption-sm text-[var(--brand-text-muted)]">Draft writes use the collection item PATCH route; publish stays collection-scoped.</div>
+                  <div className="t-body text-[var(--brand-text-muted)]">Draft changes save to the collection item; publishing remains collection-scoped.</div>
                 </div>
                 <Button
                   size="sm"
@@ -460,12 +460,12 @@ export function SeoEditorPagePanel({
 
               <div className="grid gap-3">
                 <label className="block">
-                  <span className="t-caption-sm text-[var(--brand-text-muted)]">Item name</span>
+                  <span className="t-label text-[var(--brand-text-muted)]">Item name</span>
                   <FormInput value={row.cmsEdit?.name ?? String(row.cmsItem.fieldData.name ?? '')} onChange={(value) => cmsWorkflow.updateField(cmsTarget!.itemId, 'name', value)} className="mt-1" />
                 </label>
                 {cmsFields.titleField ? (
                   <label className="block">
-                    <span className="flex items-center justify-between gap-2 t-caption-sm text-[var(--brand-text-muted)]">
+                    <span className="flex items-center justify-between gap-2 t-label text-[var(--brand-text-muted)]">
                       {cmsFields.titleField.displayName} <span>{fieldLengthLabel(row.cmsEdit?.[cmsFields.titleField.slug] ?? '', 60)}</span>
                     </span>
                     <FormInput value={row.cmsEdit?.[cmsFields.titleField.slug] ?? ''} onChange={(value) => cmsWorkflow.updateField(cmsTarget!.itemId, cmsFields.titleField!.slug, value)} className="mt-1" />
@@ -475,7 +475,7 @@ export function SeoEditorPagePanel({
                 )}
                 {cmsFields.descField ? (
                   <label className="block">
-                    <span className="flex items-center justify-between gap-2 t-caption-sm text-[var(--brand-text-muted)]">
+                    <span className="flex items-center justify-between gap-2 t-label text-[var(--brand-text-muted)]">
                       {cmsFields.descField.displayName} <span>{fieldLengthLabel(row.cmsEdit?.[cmsFields.descField.slug] ?? '', 160)}</span>
                     </span>
                     <FormTextarea rows={4} value={row.cmsEdit?.[cmsFields.descField.slug] ?? ''} onChange={(value) => cmsWorkflow.updateField(cmsTarget!.itemId, cmsFields.descField!.slug, value)} className="mt-1" />

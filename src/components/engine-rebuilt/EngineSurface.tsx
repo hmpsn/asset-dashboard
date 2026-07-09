@@ -16,6 +16,7 @@ import {
   CommandCenterVerdict,
   EmptyState,
   ErrorState,
+  GroupBlock,
   Icon,
   InlineBanner,
   LensSwitcher,
@@ -77,6 +78,90 @@ function moneyFrameMeta(precomputedAt: string | undefined): string {
 
 function EngineEmptyIcon({ className }: { className?: string }) {
   return <Icon name="target" className={className} />;
+}
+
+function ClientTrustSpinePreview({
+  workspaceName,
+  verdict,
+  explanation,
+  valueAtStake,
+  recoveredSoFar,
+  basis,
+  stagedCount,
+  curatedCount,
+  totalMoves,
+}: {
+  workspaceName: string;
+  verdict: string | undefined;
+  explanation: string | undefined;
+  valueAtStake: string;
+  recoveredSoFar: string;
+  basis: ReturnType<typeof provenanceBasis>;
+  stagedCount: number;
+  curatedCount: number;
+  totalMoves: number;
+}) {
+  const displayedVerdict = verdict || 'Draft the client-facing verdict before sending the update.';
+  const displayedExplanation = explanation || 'The client preview will combine the verdict, value frame, and proof once a point of view is drafted.';
+  const moveCount = totalMoves > 0 ? `${curatedCount} / ${totalMoves}` : '—';
+
+  return (
+    <div data-testid="engine-trust-spine-preview">
+      <GroupBlock
+        title={`What ${workspaceName} sees - the trust spine`}
+        meta="Verdict first, dollar value, then proof"
+        headingLevel="h2"
+      >
+        <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)]">
+          <div className="flex h-8 items-center gap-2 border-b border-[var(--brand-border)] bg-[var(--surface-3)] px-3">
+            <span className="h-2 w-2 bg-[var(--red)]" style={{ borderRadius: 'var(--radius-pill)' }} aria-hidden="true" />
+            <span className="h-2 w-2 bg-[var(--amber)]" style={{ borderRadius: 'var(--radius-pill)' }} aria-hidden="true" />
+            <span className="h-2 w-2 bg-[var(--emerald)]" style={{ borderRadius: 'var(--radius-pill)' }} aria-hidden="true" />
+            <span className="ml-1 truncate t-micro text-[var(--brand-text-muted)]">client portal preview</span>
+            <span className="ml-auto flex-none">
+              {basis ? <ProvenanceChip basis={basis} /> : <Badge label="proof pending" tone="zinc" variant="soft" size="sm" />}
+            </span>
+          </div>
+          <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,.8fr)]">
+            <div className="min-w-0">
+              <div className="t-label text-[var(--teal)]">Where {workspaceName} stands this quarter</div>
+              <h3 className="mt-2 t-page font-semibold text-[var(--brand-text-bright)]">{displayedVerdict}</h3>
+              <p className="mt-2 max-w-[64ch] t-body text-[var(--brand-text-muted)]">{displayedExplanation}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Badge label={`${stagedCount} staged`} tone="teal" variant="soft" size="sm" />
+                <Badge label={`${curatedCount} with client`} tone="blue" variant="soft" size="sm" />
+              </div>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+              <MetricTile
+                label="Pipeline value at stake"
+                value={valueAtStake}
+                accent="var(--brand-text-bright)"
+              />
+              <MetricTile
+                label="Recovered so far"
+                value={recoveredSoFar}
+                accent="var(--teal)"
+              />
+              <MetricTile
+                label="Backing moves live"
+                value={moveCount}
+                accent="var(--blue)"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 border-t border-[var(--brand-border)] bg-[var(--surface-2)] px-5 py-3">
+            <Icon name="trophy" size="md" className="mt-0.5 text-[var(--emerald)]" />
+            <p className="m-0 t-body text-[var(--brand-text-muted)]">
+              The client sees the verdict, value frame, and proof before this update is sent.
+            </p>
+          </div>
+        </div>
+      </GroupBlock>
+    </div>
+  );
 }
 
 export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
@@ -245,16 +330,18 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
           title="Insights Engine"
           subtitle={headerSubtitle}
           icon={<Icon name="target" size="lg" className="text-[var(--teal)]" />}
+          className="flex-col items-start gap-3 sm:flex-row sm:items-center [&>div:last-child]:w-full sm:[&>div:last-child]:w-auto"
           actions={(
-            <div className="flex flex-col items-end gap-1">
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                {headerActions}
-                <span className="t-caption-sm text-[var(--brand-text-muted)] tabular-nums">
+            <div data-testid="engine-header-actions" className="flex w-full max-w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
+              <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                <div className="w-full min-w-0 sm:w-auto">{headerActions}</div>
+                <span className="t-caption-sm text-[var(--brand-text-muted)] tabular-nums sm:text-right">
                   {engine.stagedCount} staged · {engine.curatedCount} already with client
                 </span>
                 <Button
                   variant="primary"
                   size="md"
+                  className="w-full sm:w-auto"
                   disabled={!canSendIssue || engine.issueBulkSend.isPending}
                   loading={engine.issueBulkSend.isPending}
                   onClick={engine.sendIssue}
@@ -264,7 +351,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
                 </Button>
               </div>
               {!canSendIssue && (
-                <span className="t-caption-sm text-[var(--brand-text-muted)]">
+                <span className="t-caption-sm text-[var(--brand-text-muted)] sm:text-right">
                   Stage moves below to send.
                 </span>
               )}
@@ -450,6 +537,17 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
                   onStage={engine.toggleStage}
                   onStageMany={engine.stageMany}
                   onAddRec={() => setAddRecOpen(true)}
+                />
+                <ClientTrustSpinePreview
+                  workspaceName={workspaceName}
+                  verdict={engine.strategyPov.pov?.verdictHeadline}
+                  explanation={engine.strategyPov.pov?.situation || engine.strategyPov.pov?.leadSentence}
+                  valueAtStake={formatMoney(moneyFrame?.valueAtStake)}
+                  recoveredSoFar={formatMoney(moneyFrame?.recoveredSoFar)}
+                  basis={basis}
+                  stagedCount={engine.stagedCount}
+                  curatedCount={engine.curatedCount}
+                  totalMoves={engine.cockpitRecs.length}
                 />
               </div>
             )}

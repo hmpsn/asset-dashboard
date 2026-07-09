@@ -241,7 +241,7 @@ export function RoadmapLens() {
         <PageHeader
           title="Roadmap"
           subtitle="Sprint execution, backlog triage, velocity, and status-cycle operations."
-          actions={<Badge label="Uses ?view=" tone="blue" variant="soft" />}
+          actions={<Badge label="Sprint + backlog" tone="blue" variant="soft" />}
         />
 
         {state.invalidView && (

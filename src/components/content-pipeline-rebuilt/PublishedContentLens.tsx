@@ -320,7 +320,9 @@ export function PublishedContentLens({ workspaceId, siteLabel }: PublishedConten
     impressions: items.reduce((sum, item) => sum + (item.gsc?.impressions ?? 0), 0),
     sessions: items.reduce((sum, item) => sum + (item.ga4?.sessions ?? 0), 0),
     outcomes: items.filter((item) => item.outcome).length,
+    wins: items.filter((item) => item.outcome?.score === 'win').length,
   }), [items]);
+  const readyLabel = `${totals.wins} win${totals.wins === 1 ? '' : 's'} ready`;
 
   const handleRefresh = () => {
     toast('Content performance refresh started', 'info');
@@ -464,6 +466,25 @@ export function PublishedContentLens({ workspaceId, siteLabel }: PublishedConten
         <MetricTile label="Sessions" value={formatInteger(totals.sessions)} accent="var(--teal)" />
         <MetricTile label="Avg Position" value={averagePosition(items)} accent="var(--blue)" />
       </div>
+
+      <GroupBlock
+        title="Published proof queue"
+        meta="Outcome readback and client-story graduation"
+        stats={[
+          { label: 'wins ready', value: totals.wins, color: totals.wins > 0 ? 'var(--emerald)' : 'var(--brand-text-muted)' },
+          { label: 'readbacks', value: totals.outcomes, color: 'var(--blue)' },
+        ]}
+      >
+        <div className="flex items-start gap-3 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-4 py-3">
+          <Icon name="trophy" size="md" className="mt-0.5 text-[var(--emerald)]" />
+          <div className="min-w-0">
+            <Badge label={readyLabel} tone={totals.wins > 0 ? 'emerald' : 'zinc'} variant="soft" size="sm" />
+            <p className="mt-2 t-body text-[var(--brand-text-muted)]">
+              Wins with measured lift graduate into Insights Engine as client-facing proof once the story is ready to send.
+            </p>
+          </div>
+        </div>
+      </GroupBlock>
 
       <DataTable
         columns={columns}

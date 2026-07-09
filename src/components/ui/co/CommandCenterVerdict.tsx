@@ -53,9 +53,9 @@ export function CommandCenterVerdict({
           <Icon name={iconName} size="md" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {eyebrow && <p className="t-label m-0 text-[var(--teal)]">{eyebrow}</p>}
-            {meta && <div className="ml-auto t-caption-sm text-[var(--brand-text-muted)]">{meta}</div>}
+            {meta && <div className="w-full t-caption-sm text-[var(--brand-text-muted)] sm:ml-auto sm:w-auto">{meta}</div>}
           </div>
           <h2 className="t-page m-0 mt-1 max-w-[48rem] font-semibold text-[var(--brand-text-bright)]">
             {title}

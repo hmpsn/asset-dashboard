@@ -78,7 +78,7 @@ export function CompetitorDetailDrawer({ domains, selectedDomain, onClose }: Com
       open={Boolean(competitor)}
       onClose={onClose}
       title={competitor?.domain ?? 'Competitor'}
-      subtitle="Domain comparison and the provider's top keyword evidence."
+      subtitle="Domain comparison and top keyword evidence."
       width={560}
     >
       {competitor && (

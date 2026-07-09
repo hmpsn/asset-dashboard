@@ -103,7 +103,7 @@ function TrafficBreakdowns({ data }: { data: SearchTrafficGa4Data }) {
             return (
               <div key={label} className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <span className="t-caption font-semibold text-[var(--brand-text-bright)]">{label}</span>
+                  <span className="t-ui font-semibold text-[var(--brand-text-bright)]">{label}</span>
                   <Badge label={`${formatPercent(safeShare(row.sessions, totalSessions))}`} tone="blue" variant="soft" size="sm" />
                 </div>
                 <Meter value={row.sessions} max={Math.max(totalSessions, 1)} color={SERIES.sessions} ariaLabel={`${label} share of sessions`} />
@@ -150,4 +150,3 @@ export function BreakdownsDrawer({ open, onClose, lens, search, ga4 }: Breakdown
     </Drawer>
   );
 }
-

@@ -10,16 +10,14 @@ import { WS_EVENTS } from '../../lib/wsEvents';
 import { adminPath } from '../../routes';
 import { useStrategySettings } from '../strategy/hooks/useStrategySettings';
 import {
+  Badge,
   Button,
   EmptyState,
   ErrorState,
-  FilterChip,
   Icon,
   InlineBanner,
   PageHeader,
   Skeleton,
-  Toolbar,
-  ToolbarSpacer,
 } from '../ui';
 import { BacklinkProfileCard } from './BacklinkProfileCard';
 import { CompetitorAlerts } from './CompetitorAlerts';
@@ -32,6 +30,8 @@ import type { KeywordGap } from './types';
 interface CompetitorsSurfaceProps {
   workspaceId: string;
 }
+
+const HEADER_WRAP_CLASS = 'flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible [&_p]:text-clip';
 
 const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -53,6 +53,52 @@ function EmptyIcon({ className }: { className?: string }) {
 
 function ProviderIcon({ className }: { className?: string }) {
   return <Icon name="key" className={className} />;
+}
+
+function CompetitorSetSummary({
+  competitorList,
+  ownDomain,
+  lastScanned,
+  onEditSet,
+}: {
+  competitorList: string[];
+  ownDomain: string | null;
+  lastScanned: string | null;
+  onEditSet: () => void;
+}) {
+  const scopeLabel = ownDomain ?? `${competitorList.length} competitor${competitorList.length === 1 ? '' : 's'}`;
+  const scanLabel = lastScanned ? `Last scanned ${lastScanned}` : 'Ready for next scan';
+
+  return (
+    <section
+      aria-label="Competitive intelligence summary"
+      className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]/40 px-4 py-3 sm:flex-row sm:items-center"
+    >
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex h-1.5 w-1.5 rounded-[var(--radius-pill)] bg-[var(--orange)]" aria-hidden="true" />
+          <span className="t-label text-[var(--orange)]">Competitive intelligence</span>
+          <span className="t-caption-sm text-[var(--brand-text-muted)]">·</span>
+          <span className="truncate t-caption-sm font-semibold text-[var(--brand-text-bright)]">{scopeLabel}</span>
+          <Badge label="Weekly check" tone="zinc" variant="soft" size="sm" />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {competitorList.length > 0 ? (
+            competitorList.map((domain) => (
+              <Badge key={domain} label={domain} tone="orange" variant="outline" size="sm" dot />
+            ))
+          ) : (
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">No competitor domains configured</span>
+          )}
+          <span className="t-caption-sm text-[var(--brand-text-muted)]">{scanLabel}</span>
+        </div>
+      </div>
+      <Button size="sm" variant="secondary" onClick={onEditSet} className="self-start sm:self-center">
+        <Icon name="settings" size="sm" />
+        Edit set
+      </Button>
+    </section>
+  );
 }
 
 function formatScanTime(value: string | null | undefined): string | null {
@@ -80,6 +126,7 @@ export function CompetitorsSurface({ workspaceId }: CompetitorsSurfaceProps) {
   const competitorSendEnabled = commandCenterEnabled && competitorSendFlag;
   const competitiveIntel = useCompetitiveIntel(workspaceId, competitorList, seoDataAvailable);
   const lastScanned = formatScanTime(competitiveIntel.data?.fetchedAt);
+  const ownDomain = competitiveIntel.data?.domains.find((domain) => domain.isOwn)?.domain ?? null;
 
   const invalidateCompetitors = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
@@ -125,9 +172,9 @@ export function CompetitorsSurface({ workspaceId }: CompetitorsSurfaceProps) {
       <PageHeader
         title="Competitors"
         subtitle="Share of voice, keyword gaps, backlinks, and competitor movement."
+        className={HEADER_WRAP_CLASS}
         actions={(
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {lastScanned && <span className="t-caption-sm text-[var(--brand-text-muted)]">Last scanned {lastScanned}</span>}
             <Button size="sm" variant="secondary" onClick={handleRescan} disabled={competitorList.length === 0 || !seoDataAvailable}>
               <Icon name="refresh" size="sm" />
               Re-scan
@@ -146,28 +193,18 @@ export function CompetitorsSurface({ workspaceId }: CompetitorsSurfaceProps) {
         </div>
       ) : (
         <>
-          <Toolbar label="Competitor set controls" className="w-full">
-            <div className="flex min-w-0 flex-wrap items-center gap-2" aria-label="Configured competitor set">
-              {competitorList.length > 0 ? (
-                competitorList.map((domain) => (
-                  <FilterChip key={domain} label={domain} />
-                ))
-              ) : (
-                <span className="t-caption-sm text-[var(--brand-text-muted)]">No competitor domains configured</span>
-              )}
-            </div>
-            <ToolbarSpacer />
-            <Button size="sm" variant="secondary" onClick={() => navigate(adminPath(workspaceId, 'workspace-settings'))}>
-              <Icon name="settings" size="sm" />
-              Edit set
-            </Button>
-          </Toolbar>
+          <CompetitorSetSummary
+            competitorList={competitorList}
+            ownDomain={ownDomain}
+            lastScanned={lastScanned}
+            onEditSet={() => navigate(adminPath(workspaceId, 'workspace-settings'))}
+          />
 
           {!seoDataAvailable ? (
             <EmptyState
               icon={ProviderIcon}
-              title="Competitive intelligence requires DataForSEO"
-              description="Configure a provider in Workspace Settings to load live domain, keyword, and backlink comparisons."
+              title="Connect an SEO data provider"
+              description="Connect DataForSEO in Workspace Settings to load live domain, keyword, and backlink comparisons."
               action={(
                 <Button size="sm" variant="primary" onClick={() => navigate(adminPath(workspaceId, 'workspace-settings'))}>
                   <Icon name="settings" size="sm" />

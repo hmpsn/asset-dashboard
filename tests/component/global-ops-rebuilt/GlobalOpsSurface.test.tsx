@@ -9,6 +9,7 @@ import {
   AiUsageBusinessSurface,
   DiagnosticsSurface,
   GlobalSettingsSurface,
+  OutcomeWorkspaceSurface,
   ProspectBusinessSurface,
   RequestsSurface,
   RevenueBusinessSurface,
@@ -259,5 +260,51 @@ describe('Global Ops rebuilt receivers', () => {
     expect(screen.getByTestId('requests-rebuilt')).toHaveAttribute('data-active-tab', 'deliverables');
     expect(screen.getByTestId('deliverables-pane')).toBeInTheDocument();
     expect(screen.getByTestId('requests-invalid-tab-fallback')).toBeInTheDocument();
+  });
+
+  it('does not expose internal rebuild or migration language', () => {
+    const forbidden = [
+      /additive aliases/i,
+      /legacy parity/i,
+      /carry-over parity/i,
+      /deferred/i,
+      /\?view=/i,
+      /workspace-scoped route/i,
+    ];
+    const assertVisibleCopy = () => {
+      const visibleText = document.body.textContent ?? '';
+      forbidden.forEach((pattern) => expect(visibleText).not.toMatch(pattern));
+    };
+
+    let result = renderWithProviders(<BusinessLens defaultTab="revenue" />, '/revenue');
+    assertVisibleCopy();
+    result.unmount();
+
+    result = renderWithProviders(<WorkspaceSettingsSurface workspaceId="ws-1" />, '/ws/ws-1/workspace-settings?tab=dashboard');
+    assertVisibleCopy();
+    result.unmount();
+
+    result = renderWithProviders(<WorkspaceSettingsSurface />, '/workspace-settings');
+    assertVisibleCopy();
+    result.unmount();
+
+    result = renderWithProviders(<RoadmapSurface />, '/roadmap');
+    assertVisibleCopy();
+    result.unmount();
+
+    result = renderWithProviders(<RequestsSurface workspaceId="ws-1" />, '/ws/ws-1/requests?tab=actions');
+    assertVisibleCopy();
+    result.unmount();
+
+    result = renderWithProviders(<RequestsSurface />, '/requests');
+    assertVisibleCopy();
+    result.unmount();
+
+    result = renderWithProviders(<DiagnosticsSurface />, '/diagnostics');
+    assertVisibleCopy();
+    result.unmount();
+
+    result = renderWithProviders(<OutcomeWorkspaceSurface />, '/outcomes');
+    assertVisibleCopy();
   });
 });

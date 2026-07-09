@@ -1,13 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '../../../src/components/Toast';
 import { SearchTrafficSurface } from '../../../src/components/search-traffic-rebuilt/SearchTrafficSurface';
+import { useFeatureFlag } from '../../../src/hooks/useFeatureFlag';
 import { queryKeys } from '../../../src/lib/queryKeys';
+import type { FeatureFlagKey } from '../../../shared/types/feature-flags';
 import { expectNoA11yViolations } from '../a11y';
 
 const getMock = vi.fn();
+const featureFlagsListMock = vi.fn();
 let capturedWorkspaceHandlers: Record<string, (data?: unknown) => void> = {};
 
 const workspace = {
@@ -50,6 +53,9 @@ const ga4Overview = {
   bounceRate: 41.2,
   newUserPercentage: 64,
   dateRange: { start: '2026-06-01', end: '2026-06-28' },
+};
+const featureFlagResponse: Partial<Record<FeatureFlagKey, boolean>> = {
+  'ui-rebuild-shell': true,
 };
 
 beforeAll(() => {
@@ -194,6 +200,9 @@ vi.mock('../../../src/api/keyword-strategy', () => ({
 }));
 
 vi.mock('../../../src/api/misc', () => ({
+  featureFlags: {
+    list: () => featureFlagsListMock(),
+  },
   analyticsAnnotations: {
     create: vi.fn(),
     update: vi.fn(),
@@ -211,7 +220,7 @@ vi.mock('../../../src/components/insights', () => ({
 
 function renderSurface(initialEntry = '/ws/ws-1/analytics-hub') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  queryClient.setQueryData(queryKeys.shared.featureFlags(), { 'ui-rebuild-shell': true });
+  queryClient.setQueryData(queryKeys.shared.featureFlags(), featureFlagResponse);
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
@@ -223,20 +232,59 @@ function renderSurface(initialEntry = '/ws/ws-1/analytics-hub') {
   );
 }
 
+function FlaggedSearchTraffic() {
+  const enabled = useFeatureFlag('ui-rebuild-shell');
+  return enabled ? <SearchTrafficSurface workspaceId="ws-1" /> : <div data-testid="legacy-search-traffic">Legacy analytics</div>;
+}
+
+function renderFlagged(initialEntry = '/ws/ws-1/analytics-hub') {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return {
+    queryClient,
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <ToastProvider>
+            <FlaggedSearchTraffic />
+          </ToastProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    ),
+  };
+}
+
 beforeEach(() => {
+  vi.clearAllMocks();
   getMock.mockResolvedValue([
     { date: '2026-05-01', clicks: 12, impressions: 300, ctr: 4, position: 9 },
     { date: '2026-05-02', clicks: 10, impressions: 280, ctr: 3.6, position: 9.2 },
   ]);
+  featureFlagsListMock.mockReturnValue(new Promise(() => {}));
   capturedWorkspaceHandlers = {};
 });
 
 describe('SearchTrafficSurface', () => {
+  it('mounts through a real feature-flag loading to loaded transition', async () => {
+    const { queryClient } = renderFlagged();
+
+    expect(screen.getByTestId('legacy-search-traffic')).toBeInTheDocument();
+
+    act(() => {
+      queryClient.setQueryData(queryKeys.shared.featureFlags(), featureFlagResponse);
+    });
+
+    expect(await screen.findByRole('heading', { name: 'Search & Traffic' })).toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-search-traffic')).not.toBeInTheDocument();
+    expect(screen.getByText('Demand mix')).toBeInTheDocument();
+  });
+
   it('renders the overview lens with a seeded QueryClient feature-flag cache', async () => {
     renderSurface();
 
     expect(await screen.findByRole('heading', { name: 'Search & Traffic' })).toBeInTheDocument();
     expect(screen.getByText('Demand mix')).toBeInTheDocument();
+    expect(screen.getByText(/Data as of/)).toHaveClass('t-ui');
+    expect(screen.getByText('Share uses impressions as the denominator; missing query rows remain in the non-branded remainder.')).toHaveClass('t-body');
     expect(screen.getByTestId('annotated-trend-chart')).toHaveTextContent('chart 2');
     expect(Object.keys(capturedWorkspaceHandlers)).toContain('annotation:bridge_created');
   });
@@ -246,8 +294,50 @@ describe('SearchTrafficSurface', () => {
 
     expect(await screen.findByRole('radio', { name: /Search Performance/i })).toHaveAttribute('aria-checked', 'true');
     await waitFor(() => expect(getMock).toHaveBeenCalled());
-    expect(screen.getByText('1 page rows')).toBeInTheDocument();
+    expect(screen.getByText('1 page rows')).toHaveClass('t-ui');
+    expect(screen.getByText('Open Keyword Hub')).toHaveClass('t-ui');
     expect(screen.getByText('/cosmetic-dentistry')).toBeInTheDocument();
+  });
+
+  it('keeps the reporting modes visible without implementation labels', async () => {
+    const { container } = renderSurface('/ws/ws-1/analytics-hub?lens=search');
+
+    expect(await screen.findByRole('radio', { name: /Search Performance/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /Site Traffic/i })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Annotations/i })).toBeInTheDocument();
+    expect(container).not.toHaveTextContent(/mover link in Keyword Hub|cached data|projection|migration|rebuild|mounted below|T1|carry-over/i);
+  });
+
+  it('opens the search breakdowns drawer exactly once and closes cleanly', async () => {
+    renderSurface('/ws/ws-1/analytics-hub?lens=search');
+
+    expect(await screen.findByRole('heading', { name: 'Search & Traffic' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Breakdowns/i }));
+
+    const dialogs = await screen.findAllByRole('dialog', { name: 'Search breakdowns' });
+    expect(dialogs).toHaveLength(1);
+    expect(screen.getByText('Devices')).toBeInTheDocument();
+    expect(screen.getByText('Search types')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Search breakdowns' })).not.toBeInTheDocument());
+  });
+
+  it('shows conversion evidence by default on the Site Traffic lens', async () => {
+    renderSurface('/ws/ws-1/analytics-hub?lens=traffic');
+
+    expect(await screen.findByRole('radio', { name: /Site Traffic/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('2026-06-01 - 2026-06-28')).toHaveClass('t-ui');
+    expect(screen.getByText('Events & conversions')).toBeInTheDocument();
+    expect(screen.getByText('form submit')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide' }));
+    expect(screen.getByText('1 tracked conversion event available.')).toHaveClass('t-body');
+
+    fireEvent.click(screen.getByRole('button', { name: /Breakdowns/i }));
+    const dialogs = await screen.findAllByRole('dialog', { name: 'Traffic breakdowns' });
+    expect(dialogs).toHaveLength(1);
+    expect(screen.getByText('google / organic')).toHaveClass('t-ui');
   });
 
   it('meets the a11y floor after skeletons clear', async () => {

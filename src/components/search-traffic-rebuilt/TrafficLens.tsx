@@ -63,7 +63,7 @@ const conversionColumns: DataColumn[] = [
 
 export function TrafficLens({ workspaceId, ga4PropertyId, days, data, onOpenBreakdowns }: TrafficLensProps) {
   const [activeLines, toggleLine] = useToggleSet(['users', 'sessions']);
-  const [eventsOpen, setEventsOpen] = useState(false);
+  const [eventsOpen, setEventsOpen] = useState(true);
   const overviewData = useAnalyticsOverview(workspaceId, undefined, undefined, ga4PropertyId, days);
   const { feed, isLoading: feedLoading } = useInsightFeed(workspaceId);
 
@@ -112,7 +112,7 @@ export function TrafficLens({ workspaceId, ga4PropertyId, days, data, onOpenBrea
       <AnomalyAlerts workspaceId={workspaceId} isAdmin />
 
       <div className="flex items-center justify-between gap-3">
-        <span className="t-caption text-[var(--brand-text-muted)]">{dateRangeLabel(data.overview.dateRange)}</span>
+        <span className="t-ui text-[var(--brand-text-muted)]">{dateRangeLabel(data.overview.dateRange)}</span>
         <Button size="sm" variant="secondary" onClick={onOpenBreakdowns}>
           <TableProperties size={14} aria-hidden="true" />
           Breakdowns
@@ -221,7 +221,7 @@ export function TrafficLens({ workspaceId, ga4PropertyId, days, data, onOpenBrea
                 divider={index !== 0}
               />
             )) : (
-              <p className="t-caption text-[var(--brand-text-muted)]">GA4 did not return new/returning rows.</p>
+              <p className="t-body text-[var(--brand-text-muted)]">GA4 did not return new/returning rows.</p>
             )}
           </div>
         </GroupBlock>
@@ -280,7 +280,7 @@ export function TrafficLens({ workspaceId, ga4PropertyId, days, data, onOpenBrea
             empty={<EmptyState icon={Zap} title="No conversions" description="GA4 did not return key event rows for this window." />}
           />
         ) : (
-          <div className="t-caption text-[var(--brand-text-muted)]">
+          <div className="t-body text-[var(--brand-text-muted)]">
             {data.conversions.length} tracked conversion event{data.conversions.length === 1 ? '' : 's'} available.
           </div>
         )}

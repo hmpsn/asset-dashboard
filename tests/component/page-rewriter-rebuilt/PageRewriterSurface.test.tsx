@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../src/api/client';
 import { ToastProvider } from '../../../src/components/Toast';
 import { PageRewriterSurface } from '../../../src/components/page-rewriter-rebuilt/PageRewriterSurface';
+import { useFeatureFlag } from '../../../src/hooks/useFeatureFlag';
 import { queryKeys } from '../../../src/lib/queryKeys';
 import type { FeatureFlagKey } from '../../../shared/types/feature-flags';
 import { expectNoA11yViolations } from '../a11y';
@@ -13,6 +14,7 @@ import { expectNoA11yViolations } from '../a11y';
 const apiGetMock = vi.fn();
 const apiPostMock = vi.fn();
 const navigateMock = vi.fn();
+const featureFlagsListMock = vi.fn();
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -25,6 +27,16 @@ vi.mock('../../../src/api/client', async () => {
     ...actual,
     get: (...args: unknown[]) => apiGetMock(...args),
     post: (...args: unknown[]) => apiPostMock(...args),
+  };
+});
+
+vi.mock('../../../src/api/misc', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/api/misc')>('../../../src/api/misc');
+  return {
+    ...actual,
+    featureFlags: {
+      list: () => featureFlagsListMock(),
+    },
   };
 });
 
@@ -91,6 +103,26 @@ function renderSurface(
   );
 }
 
+function FlaggedPageRewriter() {
+  const enabled = useFeatureFlag('ui-rebuild-shell');
+  return enabled ? <PageRewriterSurface workspaceId="ws-1" /> : <div data-testid="legacy-rewrite">Legacy Page Rewriter</div>;
+}
+
+function renderFlagged(queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
+  return {
+    queryClient,
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/ws/ws-1/rewrite']}>
+          <ToastProvider>
+            <FlaggedPageRewriter />
+          </ToastProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    ),
+  };
+}
+
 describe('PageRewriterSurface rebuilt', () => {
   beforeAll(() => {
     window.print = vi.fn();
@@ -98,7 +130,22 @@ describe('PageRewriterSurface rebuilt', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    featureFlagsListMock.mockReturnValue(new Promise(() => {}));
     setupApi();
+  });
+
+  it('mounts through a real feature-flag loading to loaded transition', async () => {
+    const { queryClient } = renderFlagged();
+
+    expect(screen.getByTestId('legacy-rewrite')).toBeInTheDocument();
+
+    act(() => {
+      queryClient.setQueryData(queryKeys.shared.featureFlags(), featureFlagResponse);
+    });
+
+    expect(await screen.findByRole('heading', { name: 'Page Rewriter' })).toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-rewrite')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Rewrite assistant' })).toBeInTheDocument();
   });
 
   it('mounts with a seeded feature-flag QueryClient and passes the a11y floor', async () => {
@@ -129,6 +176,61 @@ describe('PageRewriterSurface rebuilt', () => {
     });
     expect(screen.queryByText('Page link ignored')).not.toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Page rewrite document editor' })).toHaveTextContent('Dental Implants');
+  });
+
+  it('renders the prototype two-pane workspace without a top view switcher', async () => {
+    renderSurface('/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants');
+
+    expect(await screen.findByRole('heading', { name: 'Rewrite assistant' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Page rewrite document editor' })).toBeInTheDocument();
+    expect(screen.getByText('Export-only draft')).toBeInTheDocument();
+    expect(screen.getByText('Not saved or published to the CMS.')).toBeInTheDocument();
+    expect(screen.queryByTestId('page-rewriter-loading')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Save draft/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Publish rewrite/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
+    expect(screen.queryByText('Split')).not.toBeInTheDocument();
+  });
+
+  it('lets long playbook prompt chips wrap inside narrow assistant panes', () => {
+    renderSurface('/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants');
+
+    const prompt = screen.getByRole('button', { name: /Suggest an FAQ section with schema-ready Q&A pairs/i });
+    expect(prompt.closest('span')).toHaveClass('w-full', 'whitespace-normal');
+  });
+
+  it('maps the workspace copy to styleguide typography roles', async () => {
+    renderSurface('/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants');
+
+    await screen.findByRole('textbox', { name: 'Page rewrite document editor' });
+
+    expect(screen.getByText('Rewrite sections, reshape headings, and draft answer-first copy for the loaded page.')).toHaveClass('t-body');
+    expect(screen.getByText('This page is loaded with dental implants as the primary keyword.')).toHaveClass('t-body');
+    expect(screen.getAllByText('/services/implants').some((element) => element.classList.contains('t-ui'))).toBe(true);
+    expect(screen.getByText('Export-only draft')).toHaveClass('t-ui');
+    expect(screen.getByText('Not saved or published to the CMS.')).toHaveClass('t-body');
+
+    fireEvent.change(screen.getByPlaceholderText(/Ask for a rewrite/i), {
+      target: { value: 'Rewrite the benefits section' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send rewrite prompt' }));
+
+    const applyButton = await screen.findByRole('button', { name: /Apply to Benefits/i });
+    const rewriteBlock = applyButton.closest('.max-w-\\[88\\%\\]')?.querySelector('[contenteditable="true"]');
+    expect(rewriteBlock).not.toBeNull();
+    expect(rewriteBlock).toHaveClass('t-body');
+  });
+
+  it('keeps internal rebuild and projection language out of visible loaded states', async () => {
+    apiPostMock.mockImplementation((url: string, body: { url?: string; question?: string }) => {
+      if (url.endsWith('/load-page')) return Promise.resolve({ ...pagePayload, optimizationScore: null, url: body.url });
+      return Promise.resolve({ answer: 'Rewrite answer' });
+    });
+
+    renderSurface('/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants');
+
+    expect(await screen.findByText('No optimization score is available for this page yet.')).toBeInTheDocument();
+    expect(screen.queryByText(/page-keyword projection|T1|carry-over|rebuild|migration|server-backed|endpoint/i)).not.toBeInTheDocument();
   });
 
   it('rejects an invalid pageUrl param without calling the load-page endpoint', () => {

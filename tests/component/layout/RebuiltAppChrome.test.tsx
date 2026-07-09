@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RebuiltAppChrome, useRebuildShellEnabled } from '../../../src/components/layout/RebuiltAppChrome';
@@ -39,6 +39,22 @@ const chromeProps = {
   onLogout: vi.fn(),
 };
 
+function mockMatchMedia(matches: boolean) {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
+
 function FlaggedShellProbe() {
   const enabled = useRebuildShellEnabled();
   if (!enabled) return <div data-testid="legacy-shell">legacy shell</div>;
@@ -64,6 +80,7 @@ describe('RebuiltAppChrome', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    mockMatchMedia(false);
   });
 
   it('keeps ui-rebuild-shell default OFF', () => {
@@ -81,7 +98,29 @@ describe('RebuiltAppChrome', () => {
     expect(screen.getByText('Skip to content')).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Admin' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument();
-    expect(screen.getAllByText('Keyword Hub').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByRole('navigation', { name: 'Admin' })).toHaveTextContent('Keywords');
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Keyword Hub');
+  });
+
+  it('forces the sidebar rail on narrow viewports and opens mobile navigation without changing the saved desktop preference', async () => {
+    localStorage.setItem('admin-sidebar-rail', '0');
+    mockMatchMedia(true);
+
+    renderProbe();
+
+    await waitFor(() => {
+      expect(screen.getByText('Keyword pilot body')).toBeInTheDocument();
+    });
+
+    const expandButton = screen.getByRole('button', { name: 'Expand sidebar' });
+    expect(expandButton).toBeEnabled();
+    expect(screen.getByLabelText('Workspace Acme. Expand to switch.')).toBeEnabled();
+
+    fireEvent.click(expandButton);
+
+    expect(screen.getByRole('dialog', { name: 'Navigation' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toBeInTheDocument();
+    expect(localStorage.getItem('admin-sidebar-rail')).toBe('0');
   });
 
   it('has no accessibility violations once the rebuilt shell is mounted', async () => {

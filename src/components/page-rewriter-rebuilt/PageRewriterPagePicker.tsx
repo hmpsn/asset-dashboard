@@ -65,8 +65,8 @@ export function PageRewriterPagePicker({
       <div className="flex items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2">
         <Icon name="doc" size="sm" className="flex-none text-[var(--brand-text-dim)]" />
         <div className="min-w-0 flex-1">
-          <p className="truncate t-caption font-semibold text-[var(--brand-text-bright)]">{currentLabel}</p>
-          {pageData?.title && <p className="truncate t-caption-sm text-[var(--brand-text-muted)]">{pageData.title}</p>}
+          <p className="truncate t-ui font-semibold text-[var(--brand-text-bright)]">{currentLabel}</p>
+          {pageData?.title && <p className="truncate t-caption text-[var(--brand-text-muted)]">{pageData.title}</p>}
         </div>
         <Button size="sm" variant="secondary" onClick={onOpenCombo}>
           {pageData ? 'Change' : 'Choose page'}
@@ -123,7 +123,7 @@ export function PageRewriterPagePicker({
                   aria-selected={index === comboIdx}
                   onClick={() => onSelectPage(page)}
                   onMouseEnter={() => onSetComboIdx(index)}
-                  className="flex items-center gap-2 border-l-2 border-transparent px-3 py-2 t-caption-sm text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]"
+                  className="flex items-center gap-2 border-l-2 border-transparent px-3 py-2 t-ui text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]"
                   style={{
                     paddingLeft: 12 + getIndentLevel(page.slug) * 12,
                     borderLeftColor: index === comboIdx ? 'var(--teal)' : 'transparent',
@@ -132,14 +132,14 @@ export function PageRewriterPagePicker({
                 >
                   <Icon name="file" size="sm" className="flex-none text-[var(--brand-text-dim)]" />
                   <span className="min-w-0 flex-1 truncate">{pageLabel(page)}</span>
-                  {page.title && <span className="hidden max-w-[260px] truncate text-[var(--brand-text-muted)] md:inline">{page.title}</span>}
+                  {page.title && <span className="hidden max-w-[260px] truncate t-caption-sm text-[var(--brand-text-muted)] md:inline">{page.title}</span>}
                 </ClickableRow>
               ))}
             </div>
           )}
 
           {!comboQueryIsUrl && filteredPages.length === 0 && (
-            <div className="px-3 py-3 t-caption-sm text-[var(--brand-text-muted)]">
+            <div className="px-3 py-3 t-ui text-[var(--brand-text-muted)]">
               {sitemapPages.length > 0 ? `No pages match "${comboQuery}"` : 'No sitemap - paste a full URL above'}
             </div>
           )}

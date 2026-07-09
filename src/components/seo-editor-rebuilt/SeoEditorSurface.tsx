@@ -195,7 +195,7 @@ export function SeoEditorSurface({ workspaceId }: SeoEditorSurfaceProps) {
   if (data.isError && !data.workspace) {
     return (
       <div className="flex min-h-full flex-col gap-5">
-        <PageHeader title="SEO Editor" subtitle="Edit static pages and CMS item metadata through the existing Webflow write paths." />
+        <PageHeader title="SEO Editor" subtitle="Edit static pages and CMS item metadata through Webflow-backed write paths." />
         <ErrorState
           type="data"
           title="Workspace details did not load"
@@ -210,7 +210,7 @@ export function SeoEditorSurface({ workspaceId }: SeoEditorSurfaceProps) {
   if (!data.workspace || !data.siteId) {
     return (
       <div className="flex min-h-full flex-col gap-5">
-        <PageHeader title="SEO Editor" subtitle="Edit static pages and CMS item metadata through the existing Webflow write paths." />
+        <PageHeader title="SEO Editor" subtitle="Edit static pages and CMS item metadata through Webflow-backed write paths." />
         <ErrorState
           type="permission"
           title="Connect a Webflow site first"
@@ -226,13 +226,17 @@ export function SeoEditorSurface({ workspaceId }: SeoEditorSurfaceProps) {
       <PageHeader
         title="SEO Editor"
         subtitle="Static pages, CMS items, and sitemap-only manual rows in one metadata worksheet."
+        className="flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible [&>div:last-child]:w-full sm:[&>div:last-child]:w-auto"
         actions={(
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="secondary" onClick={() => data.refetchAll()}>
+          <div
+            data-testid="seo-editor-header-actions"
+            className="flex w-full max-w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end"
+          >
+            <Button size="sm" variant="secondary" className="w-full sm:w-auto" onClick={() => data.refetchAll()}>
               <Icon as={RefreshCw} size="sm" />
               Refresh
             </Button>
-            <Button size="sm" variant="primary" onClick={workflows.publishSite} loading={workflows.publishing}>
+            <Button size="sm" variant="primary" className="w-full sm:w-auto" onClick={workflows.publishSite} loading={workflows.publishing}>
               <Icon as={workflows.published ? Check : Upload} size="sm" />
               {workflows.published ? 'Published' : 'Publish Site'}
             </Button>
@@ -260,7 +264,7 @@ export function SeoEditorSurface({ workspaceId }: SeoEditorSurfaceProps) {
         <SearchField
           value={state.searchInput}
           onChange={state.setSearchInput}
-          placeholder="Search pages and CMS items"
+          placeholder="Search targets..."
           className="min-w-[240px] flex-1"
           icon={Search}
         />
@@ -296,10 +300,10 @@ export function SeoEditorSurface({ workspaceId }: SeoEditorSurfaceProps) {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricTile label="Rows" value={rowsWithDrafts.length} sub="All sources" accent="var(--blue)" />
-        <MetricTile label="Static" value={sourceCounts.get(SEO_EDITOR_TARGET_TYPES.staticPage) ?? 0} accent="var(--teal)" />
+        <MetricTile label="Static" value={sourceCounts.get(SEO_EDITOR_TARGET_TYPES.staticPage) ?? 0} accent="var(--brand-text-muted)" />
         <MetricTile label="CMS" value={sourceCounts.get(SEO_EDITOR_TARGET_TYPES.cmsItem) ?? 0} accent="var(--blue)" />
         <MetricTile label="Manual" value={sourceCounts.get(SEO_EDITOR_TARGET_TYPES.manual) ?? 0} accent="var(--amber)" />
-        <MetricTile label="Unsaved" value={filterCounts.get('unsaved') ?? 0} accent="var(--emerald)" />
+        <MetricTile label="Unsaved" value={filterCounts.get('unsaved') ?? 0} accent="var(--blue)" />
       </div>
 
       {data.isError && (
@@ -313,14 +317,14 @@ export function SeoEditorSurface({ workspaceId }: SeoEditorSurfaceProps) {
 
       {selectedMissing && (
         <InlineBanner tone="warning" title="Deep-linked page was not found" onDismiss={state.closePage}>
-          The requested page is not in the current static, CMS, or manual row projection. The worksheet remains available below.
+          The requested page is not in the current static, CMS, or manual target list. The worksheet remains available below.
         </InlineBanner>
       )}
 
       {state.tab === 'research' && (
         <GroupBlock
           title="Research mode"
-          meta="Uses the existing analysis and keyword projection. Assignments remain owned by Keyword Hub."
+          meta="Review page analysis, keyword matches, content gaps, and handoffs for the selected target."
           collapsible
           defaultOpen
         >
@@ -328,7 +332,7 @@ export function SeoEditorSurface({ workspaceId }: SeoEditorSurfaceProps) {
             <div className="grid gap-3 lg:grid-cols-2">
               <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
                 <div className="t-ui font-semibold text-[var(--brand-text-bright)]">{selectedRow.target.title}</div>
-                <div className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">{selectedRow.target.canonicalPath}</div>
+                <div className="mt-1 t-caption text-[var(--brand-text-muted)]">{selectedRow.target.canonicalPath}</div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {selectedRow.keywordAssignment?.primaryKeyword && <FilterChip label={selectedRow.keywordAssignment.primaryKeyword} active />}
                   {(selectedRow.keywordAssignment?.secondaryKeywords ?? []).map((keyword) => <FilterChip key={keyword} label={keyword} />)}
@@ -337,7 +341,7 @@ export function SeoEditorSurface({ workspaceId }: SeoEditorSurfaceProps) {
               <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
                 <div className="t-label text-[var(--brand-text-muted)]">Metadata recommendations</div>
                 {selectedRow.recommendations.length === 0 ? (
-                  <p className="mt-2 t-caption-sm text-[var(--brand-text-muted)]">No metadata recommendations are attached to this row.</p>
+                  <p className="mt-2 t-body text-[var(--brand-text-muted)]">No metadata recommendations are attached to this row.</p>
                 ) : (
                   <div className="mt-2 grid gap-2">
                     {selectedRow.recommendations.map((recommendation) => (
@@ -350,7 +354,7 @@ export function SeoEditorSurface({ workspaceId }: SeoEditorSurfaceProps) {
               </div>
             </div>
           ) : (
-            <p className="t-caption-sm text-[var(--brand-text-muted)]">Open a row to review its page-specific research context.</p>
+            <p className="t-body text-[var(--brand-text-muted)]">Open a row to review its page-specific research context.</p>
           )}
         </GroupBlock>
       )}
@@ -358,7 +362,7 @@ export function SeoEditorSurface({ workspaceId }: SeoEditorSurfaceProps) {
       {workflows.suggestions.length > 0 && (
         <GroupBlock
           title="Drafts and AI suggestions"
-          meta="Bulk rewrite suggestions from the existing server-backed suggestion queue."
+          meta="Review rewrite suggestions before applying them to the worksheet."
           collapsible
           defaultOpen
         >
@@ -379,8 +383,8 @@ export function SeoEditorSurface({ workspaceId }: SeoEditorSurfaceProps) {
       />
 
       <GroupBlock
-        title="Bulk static workflows"
-        meta="Existing static-page jobs for missing fields, analysis, pattern preview, and server suggestion generation."
+        title="Static bulk actions"
+        meta="Draft missing tags, analyze remaining pages, preview patterns, and generate suggestions."
         stats={[
           { label: 'Missing titles', value: workflows.bulkWorkflow.missingTitles, color: 'var(--amber)' },
           { label: 'Missing meta', value: workflows.bulkWorkflow.missingDescs, color: 'var(--red)' },

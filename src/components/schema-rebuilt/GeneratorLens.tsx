@@ -4,7 +4,8 @@ import { CheckCircle, FileJson, Plus, RefreshCw, Send, ShieldCheck, Upload } fro
 import type { BusinessProfileContact } from '../../../shared/types/workspace';
 import type { FixContext } from '../../types/fix-context';
 import { mutationErrorMessage } from './schemaMutationFeedback';
-import { useRecommendations } from '../../hooks/useRecommendations';
+import { recommendationAppliesToPage } from '../../hooks/useRecommendations';
+import { useAdminRecommendationSet } from '../../hooks/admin/useAdminRecommendations';
 import { useSchemaGraphValidation, useSchemaValidations } from '../../hooks/admin/useSchemaValidation';
 import { MAX_SCHEMA_MAPPING_COLLECTIONS, useSchemaSuggesterCmsWorkflow } from '../schema/useSchemaSuggesterCmsWorkflow';
 import { useSchemaSuggesterGeneration } from '../schema/useSchemaSuggesterGeneration';
@@ -87,7 +88,7 @@ export function GeneratorLens({
   intelligenceProfile,
 }: GeneratorLensProps) {
   const { toast } = useToast();
-  const { forPage: recsForPage, loaded: recsLoaded } = useRecommendations(workspaceId);
+  const recommendations = useAdminRecommendationSet(workspaceId, { enabled: !!workspaceId });
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [pageTypeErrors, setPageTypeErrors] = useState<Record<string, string>>({});
   const [bulkSendNote, setBulkSendNote] = useState('');
@@ -139,6 +140,15 @@ export function GeneratorLens({
 
   const pages = generation.data ?? [];
   const selectedPage = pages.find((page) => page.pageId === selectedPageId) ?? null;
+  const recommendationRows = useMemo(() => recommendations.data?.recommendations ?? [], [recommendations.data?.recommendations]);
+  const selectedPageSchemaRecs = useMemo(() => {
+    if (!selectedPage || !recommendations.isSuccess) return [];
+    const pageIdentity = selectedPage.url || selectedPage.slug || selectedPage.publishedPath || '';
+    if (!pageIdentity) return [];
+    return recommendationRows
+      .filter((recommendation) => recommendation.type === 'schema')
+      .filter((recommendation) => recommendationAppliesToPage(recommendation, pageIdentity));
+  }, [recommendationRows, recommendations.isSuccess, selectedPage]);
   const stats = useMemo(() => summarizeSchemaPages(pages), [pages]);
   const localBusinessIntent = inferLocalBusinessIntent(businessProfile, intelligenceProfile);
 
@@ -496,7 +506,7 @@ export function GeneratorLens({
             <MetricTile label="Validated" value={`${stats.pages - stats.pagesWithErrors}/${stats.pages}`} sub={stats.pagesWithErrors > 0 ? `${stats.pagesWithErrors} with errors` : stats.pagesWithWarnings > 0 ? `${stats.pagesWithWarnings} warnings` : 'No blocking errors'} accent={stats.pagesWithErrors > 0 ? 'var(--amber)' : 'var(--emerald)'} icon={ShieldCheck} />
             <MetricTile label="Existing schema" value={stats.pagesWithExisting} sub="Pages already carrying JSON-LD" accent="var(--emerald)" icon={CheckCircle} />
             <MetricTile label="Rich eligible" value={stats.richEligible} sub="Eligible rich-result features" accent="var(--teal)" icon={FileJson} />
-            <MetricTile label="Coverage" value="—" sub="Awaiting server projection" accent="var(--blue)" icon={ShieldCheck} />
+            <MetricTile label="Coverage" value="Pending" sub="Verified after the next crawl" accent="var(--blue)" icon={ShieldCheck} />
           </div>
 
           <SchemaInventoryAbsentBanner />
@@ -563,7 +573,7 @@ export function GeneratorLens({
         editedSchemaJson={selectedPage ? publishing.editedSchemaJson[selectedPage.pageId] : undefined}
         schemaParseError={selectedPage ? publishing.schemaParseError[selectedPage.pageId] : undefined}
         showDiff={selectedPage ? publishing.showDiff.has(selectedPage.pageId) : false}
-        schemaRecs={selectedPage && recsLoaded ? recsForPage(selectedPage.url || selectedPage.slug).filter((rec) => rec.type === 'schema') : []}
+        schemaRecs={selectedPageSchemaRecs}
         pageType={selectedPage ? generation.pageTypes[selectedPage.pageId] || 'auto' : 'auto'}
         savingTemplate={publishing.savingTemplate}
         templateSaved={publishing.templateSaved}

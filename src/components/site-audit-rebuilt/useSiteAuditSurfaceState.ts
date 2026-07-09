@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 export const SITE_AUDIT_SUBS = [
-  { id: 'audit', label: 'Audit' },
+  { id: 'audit', label: 'Site Audit' },
   { id: 'history', label: 'History' },
   { id: 'aeo-review', label: 'AI Search Ready' },
   { id: 'content-decay', label: 'Content Health' },
@@ -28,7 +28,11 @@ export function useSiteAuditSurfaceState() {
   const setSub = useCallback((nextSub: SiteAuditSub) => {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
-      next.set(SUB_PARAM, nextSub);
+      if (nextSub === DEFAULT_SUB) {
+        next.delete(SUB_PARAM);
+      } else {
+        next.set(SUB_PARAM, nextSub);
+      }
       return next;
     }, { replace: true });
   }, [setSearchParams]);

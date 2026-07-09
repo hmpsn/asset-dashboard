@@ -1,10 +1,644 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **541 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **588 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
+
+### 664. UI Rebuild sidebar prototype-zone alignment 2026-07-09
+
+**Status:** Implemented in `codex/ui-prototype-alignment` under the flag-gated rebuilt shell.
+
+**What it does:** Refactors `RebuiltSidebar` so rebuilt admin navigation follows the prototype zones instead of the old production grouping: Cockpit / Insights, Strategy & Content, Search & Site Health, Optimization, Client-facing, and Admin. The change is presentation-local: route ids, global `NAV_REGISTRY`, `NON_REGISTRY_PAGES`, and legacy shell behavior stay intact. Sidebar-only labels now match the prototype more closely (`Cockpit`, `Insights Engine`, `Keywords`, `Content Pipeline`, `Asset Manager`), and Competitors is surfaced as a rebuilt-sidebar-only item in Strategy & Content. Optimization keeps teal rather than prototype purple to preserve the Four Laws.
+
+**Why it matters to the agency:** The left nav is the orientation layer for every rebuilt page. Matching the prototype zones makes the rebuild feel coherent across surfaces without waiting for every individual page to be rebuilt or merged.
+
+**Why it matters to clients:** Indirectly improves delivery quality by making operator workflows easier to find and by keeping client-facing work, strategy/content work, health work, and optimization work grouped consistently.
+
+**Tests/docs:** `tests/component/layout/RebuiltSidebar.test.tsx` now asserts prototype zone order, sidebar-only labels, Competitors presence, token-backed accents, keyboard navigation, disabled-route skipping, collapsed-group persistence, content-pipeline badge survival, and the a11y floor. `docs/ui-rebuild/parity/coverage-audit.md`, `README.md`, `owner-decision-packet.md`, `parity-backlog.md`, `rebuilt-surface-inventory.md`, and `BRAND_DESIGN_LANGUAGE.md` document the accepted `ODP-011` direction.
+
+---
+
+### 663. UI Rebuild parity coverage audit — route/nav/interior-state accounting 2026-07-09
+
+**Status:** Added in `codex/ui-prototype-alignment` as parity-process documentation plus sidebar chrome test coverage.
+
+**What it does:** Adds `docs/ui-rebuild/parity/coverage-audit.md` as the route/nav census for the rebuilt admin parity sweep. It distinguishes all admin `Page` values from mounted rebuilt surfaces, documents that `page-intelligence` and `content-perf` are standalone nav entries not currently in `REBUILT_SURFACES`, and records folded/redirect-only pages (`seo-briefs`, `content`, `calendar`, `subscriptions`) separately from rebuilt route receivers (`competitors`, `workspace-settings`). It also audited the rebuilt sidebar against `mockup/nav.js`; follow-up feature 664 implements the accepted prototype-zone sidebar correction.
+
+**Why it matters:** Prevents the parity loop from overstating progress. "All rebuilt surfaces have contracts" is now explicitly different from "all admin pages have been rebuilt," and the nav/sidebar question has owner-gated decisions before broad layout churn.
+
+**Tests/docs:** Initial coverage added `tests/component/layout/RebuiltSidebar.test.tsx` assertions for `.t-label` group headers, `.t-ui` nav rows, and token-backed group/item accents. `docs/ui-rebuild/parity/README.md`, `rebuilt-surface-inventory.md`, `parity-backlog.md`, and `owner-decision-packet.md` link the audit and add `ODP-011` / `ODP-012`; feature 664 marks `ODP-011` accepted.
+
+---
+
+### 662. UI Rebuild Links workshop typography role alignment 2026-07-09
+
+**What it does:** Aligns the rebuilt Links workshop's repair, implementation, and measured-outcome guidance to the styleguide typography role contract without changing the Redirects / Internal Links / Dead Links / Architecture modes, `?tab=` behavior, legacy `dead` alias, detail drawers, CSV/export actions, client-send flows, or the owner-gated row-level Insert decision. Redirect apply guidance, internal-link implementation guidance, internal-link drawer rationale, dead-link drawer repair guidance, architecture gap explanations, architecture next steps, and the measured-outcome footer now use `t-body`.
+
+**Why it matters to the agency:** Links is a workshop, not a metadata report. Operators need redirect, internal-link, dead-link, and architecture instructions to read as workflow guidance while path snippets and crawl metadata stay compact.
+
+**Why it matters to clients:** Indirectly improves client outcomes by making link repairs easier to route into real implementation work before measured traffic, crawlability, or link-equity wins graduate into Insights Engine.
+
+**Tests:** Added Links component assertions that Redirects repair instructions, Internal Links implementation guidance, the measured-outcome footer, Dead Links drawer guidance, and Architecture next steps/gap explanations use the expected styleguide roles. The targeted Links component suite and typography token parity contract pass.
+
+**Files:** `src/components/links-rebuilt/LinksSurface.tsx`; `src/components/links-rebuilt/RedirectsLens.tsx`; `src/components/links-rebuilt/InternalLinksLens.tsx`; `src/components/links-rebuilt/DeadLinksLens.tsx`; `src/components/links-rebuilt/ArchitectureLens.tsx`; `tests/component/links-rebuilt/LinksSurface.test.tsx`; `docs/ui-rebuild/parity/links-contract.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/README.md`; `BRAND_DESIGN_LANGUAGE.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 661. UI Rebuild Performance detect/repair typography role alignment 2026-07-09
+
+**What it does:** Aligns the rebuilt Performance surface's speed-detection and Asset Manager repair guidance to the styleguide typography role contract without changing the Page Weight / Page Speed modes, `?tab=` behavior, detail drawers, PageSpeed scan actions, snapshot reads, or Asset Manager handoff URL. Page Weight stale/repair guidance, Page Weight drawer compression explanation, PageSpeed score context, bulk-test guidance, and PageSpeed Asset Manager handoff copy now use `t-body`.
+
+**Why it matters to the agency:** Performance is the detect side of the speed workflow. Operators need to understand which issues belong in PageSpeed diagnostics and which move to Asset Manager for source repair without reading that guidance as small metadata.
+
+**Why it matters to clients:** Indirectly improves client outcomes by making speed opportunities easier to route into real repair work before they become measured Core Web Vitals or LCP wins.
+
+**Tests:** Added Performance component assertions that Page Weight repair guidance, drawer compression guidance, PageSpeed score context, and PageSpeed Asset Manager handoff copy use the expected styleguide roles. The full targeted Performance component suite passes.
+
+**Files:** `src/components/performance-rebuilt/PageWeightLens.tsx`; `src/components/performance-rebuilt/PageSpeedLens.tsx`; `tests/component/performance-rebuilt/PerformanceSurface.test.tsx`; `docs/ui-rebuild/parity/performance-contract.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/README.md`; `BRAND_DESIGN_LANGUAGE.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 660. UI Rebuild Schema workflow typography role alignment 2026-07-09
+
+**What it does:** Aligns the rebuilt Schema guide and page-detail drawer to the styleguide typography role contract without changing the Generator / Workflow Guide modes, `?tab=` behavior, validation gate, page detail Drawer, publish/send actions, or legacy schema capability homes. Primary guide phase descriptions, pipeline safeguards, client handoff, measurement explanation, drawer JSON-LD guidance, drawer publish/send guidance, and empty setup instructions now use `t-body`; guide action and safeguard rows use `t-ui`.
+
+**Why it matters to the agency:** Structured-data work is a judgment workflow, not just a table of technical metadata. Operators need the scan, review, edit, publish, and validate sequence to read as the core workflow so they can safely move schema from generation to client review or Webflow publish.
+
+**Why it matters to clients:** Indirectly improves client trust by making schema work easier to validate and explain before it becomes a client-facing approval, rich-result opportunity, or measured win.
+
+**Tests:** Added Schema component assertions that guide workflow explanations, guide action rows, pipeline safeguards, and drawer publish/review guidance use the expected styleguide roles. The full targeted Schema component suite passes.
+
+**Files:** `src/components/schema-rebuilt/WorkflowGuideLens.tsx`; `src/components/schema-rebuilt/SchemaPageDrawer.tsx`; `src/components/schema-rebuilt/SchemaSupportPanels.tsx`; `tests/component/schema-rebuilt/SchemaSurface.test.tsx`; `docs/ui-rebuild/parity/schema-contract.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/README.md`; `BRAND_DESIGN_LANGUAGE.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 659. UI Rebuild Keyword Hub typography role alignment 2026-07-09
+
+**What it does:** Aligns the rebuilt Keyword Hub's feedback, measurement, SERP, and local-evidence copy to the styleguide typography roles without changing lenses, URL state, drawer behavior, mutation flows, bulk actions, client feedback handling, or deferred data-backed trend/KPI decisions. Client feedback keywords now use `t-ui`, feedback reasons and measurement disclosures use `t-body`, and drawer SERP/local evidence uses `t-ui` / `t-body` instead of caption-only sizing.
+
+**Why it matters to the agency:** Keyword Hub is a dense operator workbench, but evidence and client direction still need to read as decision material rather than metadata. This keeps the prototype-aligned five-lens workflow readable without pretending unavailable sparkline/KPI data exists.
+
+**Why it matters to clients:** Indirectly improves client outcomes by making keyword requests, SERP proof, and local visibility evidence easier for operators to interpret before moving work into strategy or content.
+
+**Tests:** Added Keyword Hub component assertions that client feedback, measurement context, live SERP proof, top local-result evidence, and local visibility explanation use the expected styleguide roles. The full targeted Keyword Hub component suite passes.
+
+**Files:** `src/components/keywords-rebuilt/KeywordsSurface.tsx`; `src/components/keywords-rebuilt/KeywordsTable.tsx`; `src/components/keywords-rebuilt/KeywordDrawer.tsx`; `tests/component/keywords-rebuilt/KeywordsSurface.test.tsx`; `docs/ui-rebuild/parity/keywords-contract.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/README.md`; `BRAND_DESIGN_LANGUAGE.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 658. UI Rebuild Asset Manager source-fix proof framing 2026-07-09
+
+**What it does:** Adds the prototype's source-fix framing to the rebuilt Asset Manager Browse workshop without changing the owner-gated Browse/Audit/Upload IA, route state, Webflow asset read path, audit workflow, upload queue, drawer behavior, or mutation contracts. Browse now states that media actions fix Webflow/CMS references at the source and closes with a measured-proof frame for Core Web Vitals or page-speed wins graduating into Insights Engine.
+
+**Why it matters to the agency:** Asset Manager should not feel like a generic image library. Operators need to understand why compression, alt text, and smart rename work belongs here after Performance or Site Audit detects the issue.
+
+**Why it matters to clients:** Indirectly improves client trust by keeping media work connected to measured outcomes, so a successful compression pass can become a credible proof point instead of invisible maintenance.
+
+**Tests:** Added Asset Manager component assertions that Browse renders the source-fix banner and measured-proof footer with readable `t-body` copy. Browser smoke captured the running Assets page with the new copy visible, no internal labels, and no horizontal overflow.
+
+**Files:** `src/components/asset-manager-rebuilt/AssetManagerSurface.tsx`; `tests/component/asset-manager-rebuilt/AssetManagerSurface.test.tsx`; `docs/ui-rebuild/parity/media-contract.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/README.md`; `BRAND_DESIGN_LANGUAGE.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 657. UI Rebuild Local Presence rank/profile typography role alignment 2026-07-09
+
+**What it does:** Aligns the rebuilt Local Presence rank/profile workspace to the styleguide typography roles without changing route ids, `?lens=` / legacy `?tab=` receivers, the setup drawer, review workflow, manual refresh actions, or exact-once legacy visibility panel mounting. Market setup guidance, GBP aggregate guidance, empty trend copy, and market trend readouts now use `t-body`; competitor titles, share-of-voice values, market labels, and suggested keywords use `t-ui`; read-only snapshot counts use blue data color instead of teal action color.
+
+**Why it matters to the agency:** Local Presence is an operator evidence surface. Market posture and GBP/rank explanations need to be readable enough to guide setup and refresh decisions, while compact labels still stay dense enough for repeated scan work.
+
+**Why it matters to clients:** Indirectly improves the quality of local SEO decisions by making the operator's rank/profile evidence easier to read without fabricating unavailable prototype metrics such as geo-grid nodes or GBP Performance calls/directions.
+
+**Tests:** Added Local Presence component assertions for setup guidance, GBP guidance, competitor labels, market labels, and trend readouts using the expected styleguide type roles; reran the typography token parity contract. Browser smoke captured desktop rank/profile, visibility deep link, setup drawer, and light mobile states with no internal labels or horizontal overflow.
+
+**Files:** `src/components/local-presence-rebuilt/LocalPresenceOverview.tsx`; `src/components/local-presence-rebuilt/LocalPresenceVisibility.tsx`; `tests/component/local-presence-rebuilt/LocalPresenceSurface.test.tsx`; `docs/ui-rebuild/parity/local-seo-contract.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/README.md`; `BRAND_DESIGN_LANGUAGE.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 656. UI Rebuild Page Rewriter typography role alignment 2026-07-09
+
+**What it does:** Aligns the rebuilt Page Rewriter workspace to the styleguide typography roles without changing its route state, export-only status, page picker, AI assistant, document editor, or unsupported Save/Publish boundaries. Assistant guidance and generated rewrite text now use `t-body`; page picker and document controls use `t-ui`; the export-only footer keeps important status copy at readable body/UI scale.
+
+**Why it matters to the agency:** Page Rewriter is an operator drafting workspace, not a metadata panel. Prompts, AI answers, page selection, and export status need to read clearly while operators are editing copy and deciding what to apply.
+
+**Why it matters to clients:** Indirectly improves rewrite quality by making the operator's editing and export decisions easier to read, while staying honest that this slice does not publish to the CMS.
+
+**Tests:** Added Page Rewriter component assertions for assistant copy, page picker path, generated editable rewrite text, and export-only footer typography roles; reran the typography token parity contract. Browser smoke captured loaded desktop, export menu open, and light mobile loaded states with no overflow, no duplicate editor, no skeleton, no internal labels, and Save draft / Publish rewrite still absent.
+
+**Files:** `src/components/page-rewriter-rebuilt/PageRewriterPagePicker.tsx`; `src/components/page-rewriter-rebuilt/PageRewriterChatPane.tsx`; `src/components/page-rewriter-rebuilt/PageRewriterDocumentPane.tsx`; `tests/component/page-rewriter-rebuilt/PageRewriterSurface.test.tsx`; `docs/ui-rebuild/parity/page-rewriter-contract.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/README.md`; `BRAND_DESIGN_LANGUAGE.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 655. UI Rebuild Competitors alert-feed parity polish 2026-07-09
+
+**What it does:** Converts the rebuilt Competitors alert section from a generic sortable table into a prototype-style alert feed inside the existing DS `SectionCard`, while preserving the same alert read path, loading/error/empty states, severity badges, movement metadata, and detail Drawer behavior.
+
+**Why it matters to the agency:** Competitive movement should scan like an operator alert feed, not table machinery. The section now leads with the competitor domain, alert type, keyword, position change, volume, freshness, and severity in the same research-stack rhythm as the prototype.
+
+**Why it matters to clients:** Indirectly improves the quality of client recommendations by helping operators identify competitor gains and losses faster before they become briefs, Keyword Hub actions, or strategy updates.
+
+**Tests:** Updated the Competitors component test to assert the alert feed renders as a list, no alert grid is present, and domain/keyword/movement copy uses styleguide typography roles. Fixture-backed browser smoke captured the populated alert feed and existing detail Drawer with no overflow, duplicate panels, or internal labels.
+
+**Files:** `src/components/competitors-rebuilt/CompetitorAlerts.tsx`; `tests/component/competitors-rebuilt/CompetitorsSurface.test.tsx`; `docs/ui-rebuild/parity/competitors-contract.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `docs/ui-rebuild/parity/README.md`; `BRAND_DESIGN_LANGUAGE.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 654. UI Rebuild shared shell typography role calibration 2026-07-09
+
+**What it does:** Aligns the rebuilt shared shell chrome to the documented styleguide type roles without changing route behavior, sidebar grouping, collapse state, or shell layout. Sidebar group headers now use `t-label`, nav item labels and breadcrumbs use `t-ui`, nav badges/meta use `t-mono`, and Cockpit stream-card descriptions use `t-body` instead of caption treatment.
+
+**Why it matters to the agency:** The shell frames every rebuilt admin surface. Keeping shared navigation and breadcrumb text on the styleguide scale prevents each page from feeling smaller than the prototype before the page-specific parity pass even starts.
+
+**Why it matters to clients:** Indirectly improves operator speed and accuracy by making navigation, current workspace context, and command-center stream copy easier to read while preserving the dense admin cockpit.
+
+**Tests:** Updated shared primitive tests for `NavGroup`, `NavItem`, `RebuiltBreadcrumb`, and `WorkStreamSelector` to assert the expected styleguide classes, and reran the typography token parity contract. Browser smoke captured the Command Center shell with no substantive visible text below 13px outside true label/mono/initial cases.
+
+**Files:** `src/components/ui/layout/NavGroup.tsx`; `src/components/ui/layout/NavItem.tsx`; `src/components/layout/RebuiltBreadcrumb.tsx`; `src/components/ui/co/WorkStreamSelector.tsx`; `tests/component/ui/NavGroup.test.tsx`; `tests/component/ui/NavItem.test.tsx`; `tests/component/layout/RebuiltBreadcrumb.test.tsx`; `tests/component/ui/WorkStreamSelector.test.tsx`; `docs/ui-rebuild/parity/README.md`; `docs/ui-rebuild/parity/cockpit-contract.md`; `BRAND_DESIGN_LANGUAGE.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 653. UI Rebuild Content Pipeline published proof queue alignment 2026-07-09
+
+**What it does:** Adds the prototype's published readback-to-Insights framing to the rebuilt Content Pipeline Published lens without changing the owner-gated lifecycle-board IA, existing `?tab=` contract, or legacy receiver homes. Published mode now summarizes readbacks and wins ready to graduate, then explains that measured lifts become client-facing proof in Insights Engine.
+
+**Why it matters to the agency:** Content Pipeline should not end at "published." Operators need to see which live pieces have become proof worth telling, while keeping actual execution and readback data in the content surface.
+
+**Why it matters to clients:** Indirectly improves client updates by making published content wins easier to carry into the next Insights Engine story instead of leaving them buried in a performance table.
+
+**Tests:** Updated `tests/component/content-pipeline-rebuilt/ContentPipelineSurface.test.tsx` test-first to assert Published mode renders the proof queue, win-ready label, and `t-body` graduation copy. Browser smoke captured `/content-pipeline?tab=published` with no horizontal overflow or internal implementation labels.
+
+**Files:** `src/components/content-pipeline-rebuilt/PublishedContentLens.tsx`; `tests/component/content-pipeline-rebuilt/ContentPipelineSurface.test.tsx`; `docs/ui-rebuild/parity/content-pipeline-contract.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/README.md`; `BRAND_DESIGN_LANGUAGE.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 652. UI Rebuild Insights Engine trust-spine preview alignment 2026-07-09
+
+**What it does:** Adds the prototype's client trust-spine preview to the rebuilt Insights Engine spine lens without collapsing the owner-gated top-level lens IA. The preview shows what the client will see before send: verdict, value frame, proof status, staged/with-client counts, and backing-move progress, using the existing strategy POV and money-frame data.
+
+**Why it matters to the agency:** The Insights Engine is supposed to orient operator work around the client story, not only the internal queue. Showing the trust-spine preview in the current flow gives operators a clearer send boundary while preserving existing route state, move lifecycle, and current curation workflows.
+
+**Why it matters to clients:** Indirectly improves client communication quality by keeping the update framed as verdict → value → proof before it reaches the portal.
+
+**Tests:** Updated `tests/component/engine-rebuilt/EngineSurface.test.tsx` test-first to assert the trust-spine preview renders in the spine lens and uses expected styleguide roles for label, headline, body, stat, and proof copy. Browser smoke captured the preview in the local strategy workspace with no horizontal overflow or visible internal implementation terms.
+
+**Files:** `src/components/engine-rebuilt/EngineSurface.tsx`; `tests/component/engine-rebuilt/EngineSurface.test.tsx`; `docs/ui-rebuild/parity/engine-contract.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/README.md`; `BRAND_DESIGN_LANGUAGE.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 651. UI Rebuild Site Audit typography and proof framing alignment 2026-07-09
+
+**What it does:** Aligns the rebuilt Site Audit decision console, schedule drawer, and issue drawer to the styleguide typography roles without changing the owner-gated diagnostic-lens IA, route state, or audit actions. Important audit explanations now use `t-body`, table and drawer work labels use `t-ui`, compact issue recommendations stay at `t-caption`, category data accents move off action teal, and the audit table now closes with a prototype-style "From fix to proof" footer.
+
+**Why it matters to the agency:** Site Audit is a high-trust technical workflow. Operators need the health score context, affected-page details, and client-send guidance to read as working UI instead of fine print, while the table remains dense enough for triage.
+
+**Why it matters to clients:** Indirectly improves client trust by making technical fixes easier to connect to measurable proof before they are promoted into Cockpit, Insights, or client-facing reporting.
+
+**Tests:** Updated `tests/component/site-audit-rebuilt/SiteAuditSurface.test.tsx` test-first to assert score context, issue labels, drawer sections, schedule guidance, and the proof footer use expected styleguide roles. Browser smoke captured desktop overview, schedule drawer, and issue drawer states with no horizontal overflow or internal implementation terms.
+
+**Files:** `src/components/site-audit-rebuilt/SiteAuditSurface.tsx`; `src/components/site-audit-rebuilt/ScheduleDrawer.tsx`; `tests/component/site-audit-rebuilt/SiteAuditSurface.test.tsx`; `docs/ui-rebuild/parity/site-audit-contract.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/README.md`; `BRAND_DESIGN_LANGUAGE.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 650. UI Rebuild SEO Editor typography role alignment 2026-07-09
+
+**What it does:** Aligns the rebuilt SEO Editor table/drawer shell to the styleguide typography roles without changing the owner-gated workbench IA, write-target contracts, URL state, or legacy workflow mounting. Worksheet row counts and primary page/SEO values now use `t-ui`; secondary table summaries use `t-caption`; research empty/no-recommendation copy and drawer guidance use `t-body`; field labels use `t-label`.
+
+**Why it matters to the agency:** SEO Editor is a high-throughput operator workbench. Primary editable metadata and drawer instructions need to read as working UI, not fine-print metadata, while the table remains dense enough for volume review.
+
+**Why it matters to clients:** Indirectly improves the quality and speed of client-ready SEO edits by making the operator's review, save, and send decisions easier to scan without changing the underlying Webflow/CMS write safety.
+
+**Tests:** Updated `tests/component/seo-editor-rebuilt/SeoEditorSurface.test.tsx` test-first to assert worksheet status, primary metadata, research empty states, and detail-drawer guidance use the expected styleguide roles. Browser smoke captured desktop overview and detail drawer states in the running preview with no horizontal overflow or internal implementation terms.
+
+**Files:** `src/components/seo-editor-rebuilt/SeoEditorSurface.tsx`; `src/components/seo-editor-rebuilt/SeoEditorWorksheet.tsx`; `src/components/seo-editor-rebuilt/SeoEditorPagePanel.tsx`; `tests/component/seo-editor-rebuilt/SeoEditorSurface.test.tsx`; `docs/ui-rebuild/parity/seo-editor-contract.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/README.md`; `BRAND_DESIGN_LANGUAGE.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 649. UI Rebuild Search & Traffic typography role alignment 2026-07-09
+
+**What it does:** Aligns the rebuilt Search & Traffic report shell to the styleguide typography roles without changing the owner-gated IA, route state, analytics contracts, or drawer behavior. The report window, table counts, Keyword Hub handoff, and Traffic source labels now use `t-ui`, while explanatory report copy and collapsed conversion context use `t-body` instead of caption treatment.
+
+**Why it matters to the agency:** Analytics is a high-trust reporting surface. Important report context should read like operator-facing workflow information, not tiny metadata. This keeps the surface dense like the prototype while making the report hierarchy auditable alongside Cockpit and Brand & AI.
+
+**Why it matters to clients:** Indirectly improves client reporting quality by making the operator's search and traffic evidence easier to scan before wins, anomalies, and proof points graduate into the Insights Engine or client portal.
+
+**Tests:** Updated `tests/component/search-traffic-rebuilt/SearchTrafficSurface.test.tsx` test-first to assert the report window, Demand mix explanation, Search deep-link count, Keyword Hub action, Traffic date window, collapsed conversion note, and Traffic breakdown source label use the expected styleguide roles. Browser smoke captured overview, Search deep link, and Traffic breakdown drawer states with deterministic analytics fixtures.
+
+**Files:** `src/components/search-traffic-rebuilt/SearchTrafficSurface.tsx`; `src/components/search-traffic-rebuilt/OverviewLens.tsx`; `src/components/search-traffic-rebuilt/SearchLens.tsx`; `src/components/search-traffic-rebuilt/TrafficLens.tsx`; `src/components/search-traffic-rebuilt/BreakdownsDrawer.tsx`; `tests/component/search-traffic-rebuilt/SearchTrafficSurface.test.tsx`; `docs/ui-rebuild/parity/analytics-hub-contract.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 648. UI Rebuild Cockpit typography role calibration 2026-07-09
+
+**What it does:** Removes raw pixel text-size shims from the rebuilt Cockpit calibration path and maps the shared CO primitives back onto styleguide typography roles. Work stream numbers now use `t-h1`, technical rail titles use `t-ui`, rail metadata uses `t-caption-sm`, rank/funnel numerals use `t-body` / `t-stat-sm`, empty rail copy uses `t-caption`, and client-thread messages use `t-body`.
+
+**Why it matters to the agency:** Cockpit is the visual and behavioral rubric for the rest of the rebuilt admin UI. If its rail and stream copy stay outside the styleguide scale, every later parity judgment drifts compact. This keeps the calibration surface dense like the prototype while making the type roles auditable and reusable.
+
+**Why it matters to clients:** Indirectly improves operator review quality: client replies, technical handoffs, and queue signals are easier to scan before decisions are sent or work is prioritized.
+
+**Tests:** Updated Cockpit and shared CO primitive tests test-first to assert the stream selector, technical rail, rank position, and client-thread message use styleguide typography roles. Browser smoke captured desktop overview and send-stream states with no horizontal overflow, no visible internal labels, no raw pixel text classes, and expected computed type sizes.
+
+**Files:** `src/components/cockpit-rebuilt/CockpitEvidenceRail.tsx`; `src/components/ui/co/ClientThreadRow.tsx`; `src/components/ui/co/WorkStreamSelector.tsx`; `tests/component/cockpit-rebuilt/CockpitSurface.test.tsx`; `tests/component/ui/ClientThreadRow.test.tsx`; `tests/component/ui/WorkStreamSelector.test.tsx`; `docs/ui-rebuild/parity/cockpit-contract.md`; `docs/ui-rebuild/parity/README.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 647. UI Rebuild Brand & AI typography role alignment 2026-07-09
+
+**What it does:** Tightens the rebuilt Brand & AI surface against the current styleguide typography roles without changing tokens, routes, modal behavior, aliases, or carried legacy panels. Operator-facing labels now use `t-ui`, explanatory row/modal/rail copy uses `t-body`, and caption-sized text stays reserved for compact metadata such as counts, badges, timestamps, and small control chrome.
+
+**Why it matters to the agency:** Addresses the "everything feels exceptionally small" read at the page level while keeping the typography token scale stable. Brand & AI is the proof surface for the parity loop, so it now demonstrates both the prototype interaction model and the intended desktop reading hierarchy.
+
+**Why it matters to clients:** Indirectly improves quality by making the admin context work easier to scan and review before AI outputs, recommendations, schema, and content work inherit that context.
+
+**Tests:** Updated `tests/component/brand-ai-rebuilt/BrandAiSurface.test.tsx` test-first to assert Brand & AI overview labels/snippets, rail copy, and modal workflow framing use page-appropriate typography roles instead of caption roles.
+
+**Files:** `src/components/brand-ai-rebuilt/BrandAiSurface.tsx`; `tests/component/brand-ai-rebuilt/BrandAiSurface.test.tsx`; `docs/ui-rebuild/parity/brand-ai-contract.md`; `docs/ui-rebuild/parity/README.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 646. UI Rebuild Asset Manager repair-handoff context 2026-07-09
+
+**What it does:** Adds prototype-style source-fix context to deep-linked Asset Manager audit repair filters. When Performance or Site Audit sends an operator to `?tab=audit&filter=oversized` or another audit repair filter, the Audit lens now explains that Asset Manager is the source-fix step and names the expected bulk or row-level action, such as Compress all / Compress for oversized images or Generate all alt / Generate alt for alt-text repairs.
+
+**Why it matters to the agency:** Strengthens the media-performance loop without collapsing the owner-gated Browse / Audit / Upload IA yet. Operators landing from PageSpeed or audit findings immediately know they are in the repair workshop, not just another report.
+
+**Why it matters to clients:** Indirectly improves trust by reducing the chance that detected media issues stay as findings instead of becoming source fixes that can be retested and later reported as measured outcomes.
+
+**Tests:** Updated `tests/component/asset-manager-rebuilt/AssetManagerSurface.test.tsx` test-first to assert the oversized audit drill-in shows the source-fix context before running the audit and still initializes the filtered audit results.
+
+**Files:** `src/components/asset-manager-rebuilt/AuditLens.tsx`; `tests/component/asset-manager-rebuilt/AssetManagerSurface.test.tsx`; `docs/ui-rebuild/parity/media-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 645. UI Rebuild typography token calibration 2026-07-09
+
+**What it does:** Restores the live `.t-*` typography utilities to the documented design-system token scale. The rebuilt admin pages now inherit the intended `t-page`/`t-body` 15.5px reading scale, `t-caption`/`t-caption-sm` 13.5px supporting-copy scale, and stat sizes from `src/tokens.css` instead of the drifted compact values that made page subtitles, banners, and lens controls feel exceptionally small. The static styleguide CSS was synced to the same values.
+
+**Why it matters to the agency:** Gives the parity sweep a trustworthy typography baseline before continuing page-by-page visual polish. Operators should judge rebuilt pages against the prototype and DS scale, not against accidentally shrunken utility classes.
+
+**Why it matters to clients:** Indirectly improves readability and trust by making admin-authored workflows easier to scan and less brittle before client-facing work is generated or sent.
+
+**Tests:** Added `tests/contract/typography-token-parity.test.ts` to assert every `.t-*` utility font size stays aligned to the authoritative token value in `src/tokens.css`, including `t-caption-sm` sharing the caption token.
+
+**Files:** `src/index.css`; `public/styleguide.css`; `tests/contract/typography-token-parity.test.ts`; `docs/ui-rebuild/parity/README.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `BRAND_DESIGN_LANGUAGE.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 644. UI Rebuild Performance PageSpeed Asset Manager handoff polish 2026-07-09
+
+**What it does:** Adds the prototype's visible speed-repair handoff to the rebuilt PageSpeed workflow. PageSpeed now explains that it detects Core Web Vitals issues while image-heavy fixes start in Asset Manager, and it routes operators to the existing Asset Manager audit lens with oversized-file filtering before retesting.
+
+**Why it matters to the agency:** Keeps Performance aligned with the prototype's media-performance loop without inventing direct row-level fix actions or changing backend contracts. Operators can see the repair destination from the PageSpeed body, not only inside a detail drawer.
+
+**Why it matters to clients:** Indirectly improves trust because speed work is framed as detect, repair, retest instead of implying an automatic fix that has not happened.
+
+**Tests:** Updated `tests/component/performance-rebuilt/PerformanceSurface.test.tsx` test-first to assert the PageSpeed handoff copy is visible and the `Open assets` action routes to the Asset Manager audit home with the oversized filter.
+
+**Files:** `src/components/performance-rebuilt/PageSpeedLens.tsx`; `tests/component/performance-rebuilt/PerformanceSurface.test.tsx`; `docs/ui-rebuild/parity/performance-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 643. UI Rebuild Links outcome-footer prototype polish 2026-07-09
+
+**What it does:** Adds the prototype's common link-workshop outcome framing to the rebuilt Links surface. Redirects, internal links, dead-link checks, and architecture now share a DS footer that clarifies Links is the repair workshop; measured traffic or crawlability lift graduates into Insights Engine after analytics or Search Console proves impact.
+
+**Why it matters to the agency:** Keeps operators from treating a repair queue as the final reporting outcome while making Links feel closer to the prototype. The page now preserves current HTML copy/client-send capabilities without implying an unapproved row-level insert or outcome-write path.
+
+**Why it matters to clients:** Indirectly improves trust by separating implementation work from evidence-backed wins. Clients should hear about link fixes as outcomes only after measurable impact exists.
+
+**Tests:** Updated `tests/component/links-rebuilt/LinksSurface.test.tsx` test-first to assert the outcome footer appears in the rebuilt link workshop and frames measured wins as belonging in Insights Engine.
+
+**Files:** `src/components/links-rebuilt/LinksSurface.tsx`; `tests/component/links-rebuilt/LinksSurface.test.tsx`; `docs/ui-rebuild/parity/links-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 642. UI Rebuild Schema guide five-phase workflow polish 2026-07-09
+
+**What it does:** Aligns the rebuilt Schema Workflow Guide with the prototype's primary five-phase structured-data flow: Scan, Review, Edit, Publish, Validate. The guide keeps production safeguards such as schema-plan authority, client review, version history, rollback, and measurement as supporting context instead of replacing the prototype workflow with a different six-step framing.
+
+**Why it matters to the agency:** Keeps Schema aligned with the prototype's operator mental model without changing routes, backend contracts, publish workflows, or the current page-detail Drawer. Operators see the same five-phase workflow in the guide that the generator uses.
+
+**Why it matters to clients:** Indirectly improves trust by making schema work easier to review and explain: scan the site, review generated markup, edit if needed, publish or send for approval, then validate and measure.
+
+**Tests:** Updated `tests/component/schema-rebuilt/SchemaSurface.test.tsx` to assert the guide's primary workflow renders Scan, Review, Edit, Publish, and Validate while old primary guide labels are absent from that workflow. Browser smoke captured desktop and mobile guide states with the five phases visible, no internal labels, no overflow, and no console errors.
+
+**Files:** `src/components/schema-rebuilt/WorkflowGuideLens.tsx`; `tests/component/schema-rebuilt/SchemaSurface.test.tsx`; `docs/ui-rebuild/parity/schema-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 641. UI Rebuild Brand & AI remaining modal workflow framing 2026-07-09
+
+**What it does:** Adds DS workflow context frames to the remaining rebuilt Brand & AI modal workflows for Context editors, Voice calibration, and Strategy intelligence. Each modal now opens with a clear prototype-style frame before the carried legacy editor panel: reusable AI context, voice DNA calibration, and strategy inputs. The modal-first state model, `?tab=` deep links, legacy aliases, and exact-once carried panel mounting stay intact.
+
+**Why it matters to the agency:** Closes the remaining Brand & AI modal-shell gaps without rewriting legacy panels or making a risky backend/IA call. Operators see why each context area matters before editing the data that informs AI writing, recommendations, schema, and strategy work.
+
+**Why it matters to clients:** Indirectly improves client-facing AI quality by making reusable context, voice DNA, and strategic inputs more explicit before they influence generated deliverables.
+
+**Tests:** Updated `tests/component/brand-ai-rebuilt/BrandAiSurface.test.tsx` to assert Context editors, Voice calibration, and Strategy intelligence modal states render their workflow context before the carried panel and still mount the matching legacy panel exactly once. Browser smoke captured Context desktop, Voice desktop, and Strategy Intelligence mobile modal states with one dialog, expected workflow frames, no internal labels, no overflow, and no console errors.
+
+**Files:** `src/components/brand-ai-rebuilt/BrandAiSurface.tsx`; `tests/component/brand-ai-rebuilt/BrandAiSurface.test.tsx`; `docs/ui-rebuild/parity/brand-ai-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 640. UI Rebuild Page Rewriter export-only footer polish 2026-07-09
+
+**What it does:** Adds a prototype-style document footer/status bar to the rebuilt Page Rewriter document pane. The export menu now lives with the editable document, the artifact is labeled `Export-only draft`, the status badge says `Not live`, and supporting copy says `Not saved or published to the CMS.` Save draft and Publish rewrite remain absent because the full draft/publish write spine is not approved or implemented.
+
+**Why it matters to the agency:** Makes the Page Rewriter feel closer to the prototype while preserving operator trust. The UI now makes the current capability boundary explicit instead of implying that edits are persisted or pushed to a CMS.
+
+**Why it matters to clients:** Indirectly protects client work by reducing the chance that an operator mistakes an exported rewrite for a saved or published page change.
+
+**Tests:** Updated `tests/component/page-rewriter-rebuilt/PageRewriterSurface.test.tsx` to assert the two-pane prototype workspace shows the export-only footer, clears the loading skeleton, keeps Save draft and Publish rewrite absent, and still avoids the old top view switcher. Added App-level coverage that `/ws/:id/rewrite` mounts the rebuilt Page Rewriter instead of legacy rewrite chat when the rebuilt shell is enabled. Browser smoke on `127.0.0.1:5175` now captures the loaded desktop footer, export popover, and mobile footer states with one document editor, zero loading skeletons, no horizontal overflow, and no console warnings/errors.
+
+**Files:** `src/components/page-rewriter-rebuilt/PageRewriterDocumentPane.tsx`; `src/components/page-rewriter-rebuilt/usePageRewriterSurfaceState.ts`; `tests/component/page-rewriter-rebuilt/PageRewriterSurface.test.tsx`; `tests/component/App.test.tsx`; `docs/ui-rebuild/parity/page-rewriter-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 639. UI Rebuild Competitors prototype header summary polish 2026-07-09
+
+**What it does:** Folds the rebuilt Competitors saved-domain controls out of a separate toolbar and into a prototype-style `Competitive intelligence` header summary. The summary shows the current competitive set as orange read-only domain badges, weekly cadence, scan freshness, and the existing Edit set route to Workspace Settings while preserving the single section stack, detail Drawer, Keyword Hub deep link, Create brief, and flag-gated Send to client workflows.
+
+**Why it matters to the agency:** Makes the competitive-intelligence page feel materially closer to the prototype without changing backend contracts or moving production capabilities. Operators see the scope and cadence of the competitor watch at the top of the work area instead of parsing a separate control strip.
+
+**Why it matters to clients:** Indirectly improves confidence in competitor reporting by making the watched competitor set and refresh state obvious before operators review alerts, share of voice, keyword gaps, and backlink evidence.
+
+**Tests:** Updated `tests/component/competitors-rebuilt/CompetitorsSurface.test.tsx` to assert the `Competitive intelligence` summary renders the saved set, weekly cadence, scan freshness, and Edit set route while the old `Competitor set controls` toolbar is absent. Browser smoke on the Rinse Dental workspace captured desktop and mobile provider-setup states with the new summary visible, no obsolete toolbar, no internal labels, no horizontal overflow, and no console errors; populated section stack and detail Drawer behavior remain covered by component tests because local provider credentials are unavailable.
+
+**Files:** `src/components/competitors-rebuilt/CompetitorsSurface.tsx`; `tests/component/competitors-rebuilt/CompetitorsSurface.test.tsx`; `docs/ui-rebuild/parity/competitors-contract.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 638. UI Rebuild Brand & AI bespoke-flow modal framing 2026-07-09
+
+**What it does:** Adds prototype-style workflow context frames to the rebuilt Brand & AI modal workflows for Discovery, Brandscript, Trust evidence, and Business facts. Each modal now opens with a DS-framed summary of the prototype flow before the carried legacy editor panel: source intake, seven-part narrative, E-E-A-T proof signals, and locations/service-area facts. The existing `?tab=` state, `business-profile`/`locations` aliases, modal shell, focus behavior, and exact-once legacy panel mounting stay intact.
+
+**Why it matters to the agency:** Moves Brand & AI closer to the actual prototype interaction model without rewriting the legacy editors or making a risky IA/backend call. Operators get the missing flow context at the point of work, not just a generic modal title above an old panel.
+
+**Why it matters to clients:** Indirectly improves quality control by making source material, narrative structure, trust proof, and local fact review more explicit before those inputs feed AI writing, schema, and strategy work.
+
+**Tests:** Updated `tests/component/brand-ai-rebuilt/BrandAiSurface.test.tsx` to assert Discovery, Brandscript, Trust evidence, and Business facts modal states render their workflow context before the carried panel and still mount the matching legacy panel exactly once. Browser smoke captured Discovery desktop/mobile and Business facts alias modal states with exactly one dialog, expected workflow frame present, no internal labels, no overflow, and no console errors.
+
+**Files:** `src/components/brand-ai-rebuilt/BrandAiSurface.tsx`; `tests/component/brand-ai-rebuilt/BrandAiSurface.test.tsx`; `docs/ui-rebuild/parity/brand-ai-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 637. UI Rebuild Brand & AI generator-modal lifecycle polish 2026-07-08
+
+**What it does:** Tightens the rebuilt Brand & AI modal-first parity by adding a prototype-style `Generator workflow` frame to the Brand identity modal. The frame shows the generator lifecycle — Generate, Refine, Edit, Approve, Export — before the carried identity editor panel, matching the canonical Brand modal prototype while keeping the existing `?tab=` state, modal shell, focus behavior, and exact-once legacy panel mount intact.
+
+**Why it matters to the agency:** Gives operators a clearer sense of where Brand identity generation sits in the approve-before-use workflow without rewriting the underlying identity editor or inventing new backend behavior.
+
+**Why it matters to clients:** Indirectly improves quality control: identity deliverables are framed as reviewable/approvable context before they feed AI writing and strategy work.
+
+**Tests:** Updated `tests/component/brand-ai-rebuilt/BrandAiSurface.test.tsx` to assert the Brand identity modal renders the generator workflow frame and five lifecycle steps, both from direct `?tab=identity` deep links and from the Voice & Messaging generator disclosure, while still mounting the carried identity panel exactly once. Browser smoke captured desktop and mobile identity modal states with exactly one dialog, lifecycle frame present, no internal labels, no overflow, and no console/network errors.
+
+**Files:** `src/components/brand-ai-rebuilt/BrandAiSurface.tsx`; `tests/component/brand-ai-rebuilt/BrandAiSurface.test.tsx`; `docs/ui-rebuild/parity/brand-ai-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 636. UI Rebuild parity owner-decision packet 2026-07-08
+
+**What it does:** Adds a consolidated owner-decision packet for the rebuilt UI parity sweep. The packet turns the remaining owner-gated behavior and capability risks into answerable decisions with options, recommended defaults, risk if wrong, and safe interim work for Insights Engine, Content Pipeline, SEO Editor, Site Audit, Analytics Hub, Media, Page Rewriter, Local Presence, and Global Ops.
+
+**Why it matters to the agency:** Prevents the parity loop from drifting into subjective styling passes or accidental product decisions. Codex can keep making low-risk local calls while clearly deferring route, IA, backend, shared-contract, and high-trust workflow choices to Joshua.
+
+**Why it matters to clients:** Indirectly protects client trust by keeping live operator workflows, capability homes, reporting surfaces, and write actions from being hidden or reframed without an explicit product decision.
+
+**Tests:** Docs/process slice only. `npm run pr-check` verifies the repository rules still pass. Browser smoke is not applicable because no runtime UI behavior changed.
+
+**Files:** `docs/ui-rebuild/parity/owner-decision-packet.md`; `docs/ui-rebuild/parity/README.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 635. UI Rebuild Global Ops parity contract and operator-copy cleanup 2026-07-08
+
+**What it does:** Adds the behavior-first parity contract for the rebuilt Global Ops route family: Settings, Workspace Settings, Roadmap, Business, Outcomes, Diagnostics, and Requests. The contract compares the prototype mockups and W6 ledgers against the current rebuilt implementation, confirms the safest current grade as capability risk, and records the owner decisions required before exact IA collapse. The implementation slice removes visible process/migration language from the rebuilt shells while preserving existing route receivers and live legacy machinery mounts. Browser smoke also found and this slice fixes the workspace-less global-route mount bug that made `/settings`, `/roadmap`, `/revenue`, and `/outcomes-overview` fall through to legacy even when `ui-rebuild-shell` was enabled.
+
+**Why it matters to the agency:** Global Ops contains sensitive operator workflows: billing, storage cleanup, workspace setup, roadmap execution, outcome proof, diagnostics, and request management. The contract prevents those workflows from being silently dropped or duplicated while prototype parity continues.
+
+**Why it matters to clients:** Indirectly improves trust by keeping client-facing operations, requests, reporting setup, and outcome evidence reachable while removing internal rebuild vocabulary from the operator UI.
+
+**Tests:** Updated `tests/component/global-ops-rebuilt/GlobalOpsSurface.test.tsx` to assert the real flag loading transition, route receiver behavior for Business, Workspace Settings, Roadmap, Diagnostics, and Requests, rebuilt a11y, and absence of visible internal process terms across Global Ops shell states. Added App-level coverage proving rebuilt global routes mount with first-workspace chrome context when `ui-rebuild-shell` is ON.
+
+**Files:** `src/App.tsx`; `src/components/global-ops-rebuilt/BusinessLens.tsx`; `src/components/global-ops-rebuilt/WorkspaceSettingsLens.tsx`; `src/components/global-ops-rebuilt/RoadmapLens.tsx`; `src/components/global-ops-rebuilt/OutcomeWorkspaceLens.tsx`; `src/components/global-ops-rebuilt/DiagnosticsLens.tsx`; `src/components/global-ops-rebuilt/RequestsLens.tsx`; `tests/component/App.test.tsx`; `tests/component/global-ops-rebuilt/GlobalOpsSurface.test.tsx`; `docs/ui-rebuild/parity/global-ops-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 634. UI Rebuild Keyword Hub parity contract and empty-state copy cleanup 2026-07-08
+
+**What it does:** Adds the behavior-first parity contract for the rebuilt `seo-keywords` / Keywords surface. The contract compares the prototype's five-lens workflow against the rebuilt pilot, records the current grade as aligned enough, and makes the intentional production carry-over explicit: status filters, advanced filters, bulk lifecycle actions, protected-keyword safeguards, hard delete eligibility, live SERP evidence, local visibility evidence, client keyword feedback, and URL-backed `?lens=` / legacy `?tab=` / `?q=` behavior all remain reachable. The slice also removes old visible empty-copy from the drawer and locked state (`No CPC`, command-center wording, and source-label jargon) and fixes the mobile header squeeze found in browser smoke.
+
+**Why it matters to the agency:** Keyword Hub is the operating layer for keyword lifecycle, ranking, opportunity triage, and client feedback. This contract prevents the team from mistaking visual simplification for parity and protects the live mutation/safety workflows that the prototype does not show.
+
+**Why it matters to clients:** Indirectly improves trust: operators see clearer keyword value, provenance, and lifecycle evidence without fabricated money values or internal product vocabulary leaking into the workflow.
+
+**Tests:** Updated `tests/component/keywords-rebuilt/KeywordsSurface.test.tsx` to assert drawer empty money/source states avoid `No CPC`, `Keyword command center`, and `No source labels`, while preserving the existing URL/deep-link, five-lens, drawer, bulk, feedback, live-event, flag-transition, and a11y coverage. Browser smoke covers desktop overview, Opportunities deep link, populated Clusters lens, populated drawer deep link, and mobile overview with no forbidden labels, no console errors, and no horizontal overflow.
+
+**Files:** `src/components/keywords-rebuilt/KeywordsSurface.tsx`; `src/components/keywords-rebuilt/KeywordDrawer.tsx`; `tests/component/keywords-rebuilt/KeywordsSurface.test.tsx`; `docs/ui-rebuild/parity/keywords-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 633. UI Rebuild Local Presence mode parity and capability contract 2026-07-08
+
+**What it does:** Adds the behavior-first parity contract for the rebuilt `local-seo` / Local Presence surface and corrects the visible IA to match the prototype's two operator modes: `Rank & profile` and `Reviews & replies`. The slice keeps existing `?lens=` and legacy `?tab=` receivers, maps `overview` and `visibility` into the rank/profile workspace, treats `setup` as drawer-open state instead of an inline setup page, and keeps the legacy local visibility panel mounted exactly once inside the real-data rank/profile body.
+
+**Why it matters to the agency:** Local Presence is the operator home for local-pack visibility, GBP profile posture, market setup, and review-response operations. The corrected shell now follows the prototype interaction model while honestly documenting the capability gap: exact geo-grid and GBP performance parity require backend/data-source work that should be owner-approved rather than simulated.
+
+**Why it matters to clients:** Indirect but important — clearer local presence workflows help operators explain map-pack ranking, profile health, and review work without exposing implementation language or inventing unavailable local visibility metrics.
+
+**Tests:** Extended `tests/component/local-presence-rebuilt/LocalPresenceSurface.test.tsx` to assert prototype mode labels, absence of legacy peer tabs, setup drawer-only compatibility state, legacy visibility deep link behavior, reviews mode switching, real `useFeatureFlag('local-gbp')` loading transition, flag-off availability copy without backend/flag language, exact-once legacy panel mounting, no internal terms, and rebuilt a11y.
+
+**Files:** `src/components/local-presence-rebuilt/LocalPresenceSurface.tsx`; `src/components/local-presence-rebuilt/LocalPresenceOverview.tsx`; `src/components/local-presence-rebuilt/LocalPresenceVisibility.tsx`; `src/components/local-presence-rebuilt/LocalPresenceReviewsPipeline.tsx`; `tests/component/local-presence-rebuilt/LocalPresenceSurface.test.tsx`; `docs/ui-rebuild/parity/local-seo-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 632. UI Rebuild Analytics Hub parity contract and reporting cleanup 2026-07-08
+
+**What it does:** Adds the behavior-first parity contract for the rebuilt `analytics-hub` / Search & Traffic surface. The contract compares the actual prototype `mockup/traffic.js`, Phase 0 ledger, Phase A ticket, and current rebuilt implementation, then grades the surface as a behavior mismatch because the prototype defaults to a per-client Search performance report with Site traffic and Annotations as peer modes, while the current rebuilt route still defaults to a cross-source Overview lens. The safe implementation slice preserves production capabilities but removes the visible `mover link in Keyword Hub` implementation label, opens Events & conversions by default on Site Traffic, retints users/sessions away from teal action color, improves the header copy, and wraps the loaded header for mobile.
+
+**Why it matters to the agency:** Search & Traffic is the reporting console operators use to explain performance. It needs to keep GSC, GA4, annotations, anomalies, and conversion evidence reachable while the team decides whether the current Overview lens remains a visible default, moves into the report body, or becomes a compatibility-only deep link.
+
+**Why it matters to clients:** Indirect but important — clearer analytics reporting helps operators turn traffic movement into trustworthy client stories without leaking implementation wording or hiding conversion evidence.
+
+**Tests:** Extended `tests/component/search-traffic-rebuilt/SearchTrafficSurface.test.tsx` to assert the real feature-flag loading transition, validated `?lens=`/`?view=` deep-link state, visible reporting modes without internal labels, exact-once Breakdowns Drawer behavior, conversion evidence visible by default, workspace-event wiring, and rebuilt a11y.
+
+**Files:** `src/components/search-traffic-rebuilt/SearchTrafficSurface.tsx`; `src/components/search-traffic-rebuilt/SearchLens.tsx`; `src/components/search-traffic-rebuilt/TrafficLens.tsx`; `src/components/search-traffic-rebuilt/searchTrafficUtils.ts`; `tests/component/search-traffic-rebuilt/SearchTrafficSurface.test.tsx`; `docs/ui-rebuild/parity/analytics-hub-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 631. UI Rebuild Competitors parity contract and operator-copy cleanup 2026-07-08
+
+**What it does:** Adds the behavior-first parity contract for the rebuilt `competitors` surface. The contract compares the actual prototype `mockup/competitors.js`, Phase 0 ledger, Phase A ticket, and current rebuilt implementation, then grades the surface aligned enough because it already follows the prototype's single competitive-intelligence stack: saved competitor set, weekly alerts, share of voice, head-to-head comparison, keyword gaps, and backlink profile. The safe implementation slice restores the prototype `Keyword gaps` label, removes implementation-oriented `provider terms` / `cached data` wording from loaded states, wraps the header copy on narrow screens, keeps Workspace Settings as the competitor-set edit home, and retints backlink metrics as blue read-only data.
+
+**Why it matters to the agency:** Competitors is a research console, not a settings page. Operators need to scan movement, share of voice, gap evidence, competitor detail, and backlink signals in one route while keeping actions routed to the proper homes: Keyword Hub, Briefs, Workspace Settings, and the existing send-to-client flow.
+
+**Why it matters to clients:** Indirect but useful — cleaner competitor research helps operators find credible content and SEO opportunities without exposing implementation language or duplicating keyword/write workflows.
+
+**Tests:** Extended `tests/component/competitors-rebuilt/CompetitorsSurface.test.tsx` to assert the real feature-flag loading transition, prototype section stack with no tabs/lenses, absence of internal implementation labels in loaded states, exact-once competitor detail Drawer behavior, View in Hub and Create brief handoffs, provider setup state, workspace-event wiring, and rebuilt a11y.
+
+**Files:** `src/components/competitors-rebuilt/CompetitorsSurface.tsx`; `src/components/competitors-rebuilt/KeywordGapsCard.tsx`; `src/components/competitors-rebuilt/HeadToHeadTable.tsx`; `src/components/competitors-rebuilt/CompetitorDetailDrawer.tsx`; `src/components/competitors-rebuilt/BacklinkProfileCard.tsx`; `tests/component/competitors-rebuilt/CompetitorsSurface.test.tsx`; `docs/ui-rebuild/parity/competitors-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 630. UI Rebuild Page Rewriter parity contract and two-pane workspace cleanup 2026-07-08
+
+**What it does:** Adds the behavior-first parity contract for the rebuilt `rewrite` / Page Rewriter surface. The contract compares the actual prototype `mockup/rewrite.js`, Phase 0 ledger, and Phase A ticket against the rebuilt Page Rewriter and records the main unresolved risks: Focus mode is present in the legacy/prototype flow but not yet bridged into the rebuilt shell, and the prototype's Save draft / Publish rewrite spine would require new backend write/draft capabilities. The safe implementation slice removes the extra `Split` / `Chat` / `Document` view switcher so the visible page opens directly into the prototype's two-pane assistant + live-document workspace, preserves `?pageUrl=` auto-load behavior, replaces internal projection copy with operator-facing optimization-score language, and wraps long playbook prompt chips on mobile.
+
+**Why it matters to the agency:** Page Rewriter is an AI-heavy operator workbench. Operators need page selection, chat, editable rewrite suggestions, section apply, inline document editing, audit chips, and export to remain in one coherent workspace without fake publish promises or internal implementation labels.
+
+**Why it matters to clients:** Indirect but useful — cleaner rewrite workflows help operators produce stronger page copy while avoiding accidental claims that a draft has been saved or published when the current slice is export-only.
+
+**Tests:** Extended `tests/component/page-rewriter-rebuilt/PageRewriterSurface.test.tsx` to assert real feature-flag loading transition, `?pageUrl=` receiver behavior, invalid URL guard, prototype two-pane workspace without a top view switcher, absence of internal rebuild/projection terms, keyboard page picker loading, editable rewrite apply, quota lock behavior, Back to audit navigation, and rebuilt a11y. Browser smoke is recorded in `docs/ui-rebuild/parity/page-rewriter-contract.md`.
+
+**Files:** `src/components/page-rewriter-rebuilt/PageRewriterSurface.tsx`; `src/components/page-rewriter-rebuilt/PageRewriterChatPane.tsx`; `src/components/page-rewriter-rebuilt/PageRewriterDocumentPane.tsx`; `tests/component/page-rewriter-rebuilt/PageRewriterSurface.test.tsx`; `docs/ui-rebuild/parity/page-rewriter-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 629. UI Rebuild Media parity contract and asset-workshop decision gate 2026-07-08
+
+**What it does:** Adds the behavior-first parity contract for the rebuilt `media` / Assets surface. The contract compares the actual prototype `mockup/assets.js` against the rebuilt Asset Manager and records the main unresolved mismatch: the prototype is a single media workshop where filters and bulk repair actions are the navigation surface, while the rebuilt surface exposes Browse, Audit, and Upload as peer lenses. The safe implementation slice keeps the current production capabilities intact, clears default Browse URL state when returning from another lens, removes visible audit implementation language, reframes the header around source fixes in Webflow assets, and wraps the current toolbar controls cleanly on mobile.
+
+**Why it matters to the agency:** Asset Manager is the fix side of the speed and site-audit media loop. Operators need oversized, missing-alt, unused, CMS, compression, rename, upload, and audit workflows to remain reachable while the team decides whether those workflows collapse into the prototype's single-workshop IA.
+
+**Why it matters to clients:** Indirect but useful — cleaner media repair workflows help operators reduce page weight and improve image accessibility without overstating what has already been compressed or published.
+
+**Tests:** Extended `tests/component/asset-manager-rebuilt/AssetManagerSurface.test.tsx` to assert real feature-flag loading transition, default Browse URL cleanup, Browse and Audit deep-link receivers, exact-once asset drawer deep link, absence of internal implementation language in the audit fallback, CMS filter behavior, AI quota lock behavior, no-site state, and rebuilt a11y. Browser smoke is recorded in `docs/ui-rebuild/parity/media-contract.md`.
+
+**Files:** `src/components/asset-manager-rebuilt/useAssetManagerSurfaceState.ts`; `src/components/asset-manager-rebuilt/AssetManagerSurface.tsx`; `src/components/asset-manager-rebuilt/AuditLens.tsx`; `tests/component/asset-manager-rebuilt/AssetManagerSurface.test.tsx`; `docs/ui-rebuild/parity/media-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+---
+
+### 628. UI Rebuild Performance parity contract and speed-workflow cleanup 2026-07-08
+
+**What it does:** Adds the behavior-first parity contract for the rebuilt `performance` surface. The contract compares the actual prototype `mockup/performance.js` against the rebuilt Performance surface and grades it aligned enough because both use the same two-mode speed workflow: Page Weight for heavy asset detection and Page Speed for Core Web Vitals/PageSpeed diagnostics. The safe implementation slice keeps the default route clean by clearing `?tab=weight` when returning to Page Weight, preserves `?tab=weight` and `?tab=speed`, and replaces visible PageSpeed implementation/deferred language with operator-facing Asset Manager repair framing.
+
+**Why it matters to the agency:** Performance is the detect side of the media optimization loop. Operators need to find heavy pages, inspect oversized assets, run PageSpeed tests, and route image-heavy wins to Asset Manager without seeing internal implementation notes or fake fix promises.
+
+**Why it matters to clients:** Indirect but useful — clearer speed diagnostics help operators turn page-weight and Core Web Vitals findings into credible performance fixes without overstating what has already been changed.
+
+**Tests:** Extended `tests/component/performance-rebuilt/PerformanceSurface.test.tsx` to assert default URL clearing, non-default tab URL state, PageSpeed detail copy without internal implementation language, real feature-flag loading transition, deep-link behavior, Page Weight detail inspection, PageSpeed single/bulk scan behavior, and rebuilt a11y. Browser smoke is recorded in `docs/ui-rebuild/parity/performance-contract.md`.
+
+**Files:** `src/components/performance-rebuilt/usePerformanceSurfaceState.ts`; `src/components/performance-rebuilt/PageSpeedLens.tsx`; `tests/component/performance-rebuilt/PerformanceSurface.test.tsx`; `docs/ui-rebuild/parity/performance-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+### 627. UI Rebuild Links parity contract and link-workshop cleanup 2026-07-08
+
+**What it does:** Adds the behavior-first parity contract for the rebuilt `links` surface. The contract compares the actual prototype `mockup/links.js` against the rebuilt Links surface and grades it aligned enough because both use the same four-mode workshop model: Redirects, Internal Links, Dead Links, and Architecture. The safe implementation slice keeps the default route clean by clearing `?tab=redirects` when returning to Redirects, preserves `?tab=internal`, `?tab=dead-links`, `?tab=architecture`, and the legacy `?tab=dead` alias, and replaces visible implementation/deferred language in the dead-link drawer and architecture banner with operator-facing repair steps. It also removes `v1` implementation language from redirect proposal summaries.
+
+**Why it matters to the agency:** Links is the repair bench behind Site Audit: operators need to accept/export redirects, review internal-link opportunities, inspect dead links, and understand architecture gaps without seeing implementation scaffolding or fake capabilities.
+
+**Why it matters to clients:** Indirect but important — cleaner Links workflows help operators turn broken-link and internal-link findings into client-ready repair batches without overstating what has been inserted or published.
+
+**Tests:** Extended `tests/component/links-rebuilt/LinksSurface.test.tsx` to assert default URL clearing, non-default tab URL state, legacy `dead` alias preservation, dead-link drawer behavior, absence of internal implementation language in drawer/architecture states, real feature-flag loading transition, and rebuilt a11y. Browser smoke is recorded in `docs/ui-rebuild/parity/links-contract.md`.
+
+**Files:** `src/components/links-rebuilt/useLinksSurfaceState.ts`; `src/components/links-rebuilt/RedirectsLens.tsx`; `src/components/links-rebuilt/DeadLinksLens.tsx`; `src/components/links-rebuilt/ArchitectureLens.tsx`; `tests/component/links-rebuilt/LinksSurface.test.tsx`; `docs/ui-rebuild/parity/links-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+### 626. UI Rebuild Site Audit parity contract and diagnostic-lens decision gate 2026-07-08
+
+**What it does:** Adds the behavior-first parity contract for the rebuilt `seo-audit` surface. The contract compares the actual prototype `mockup/audit.js` against the current rebuilt `SiteAuditSurface` and confirms the core audit workflow is present: health score, category meters, Core Web Vitals, issue groups, issue detail drawer, affected pages, dead-link handoff, schedule drawer, export/share, re-run, and history. The safe implementation slice renames the default lens from `Audit` to `Site Audit`, clears `?sub=audit` when returning to the default route while still accepting the legacy deep link, and wraps the loaded header cleanly on mobile. It also records the unresolved IA mismatch: the rebuilt surface exposes `AI Search Ready`, `Content Health`, and `Guide` as peer lenses, while the prototype treats them as evidence or guidance inside the audit workflow.
+
+**Why it matters to the agency:** Site Audit is a high-trust diagnostic surface. Operators need the page to feel like a single technical decision console, not a collection of unrelated receivers, while still preserving existing diagnostic capabilities until their proper home is confirmed.
+
+**Why it matters to clients:** Indirect but important — clearer audit IA helps operators turn technical issues into credible fixes, tasks, or client-ready explanations without over-weighting internal diagnostic views.
+
+**Tests:** Extended `tests/component/site-audit-rebuilt/SiteAuditSurface.test.tsx` to assert prototype URL behavior, `Site Audit` default labeling, exact-once schedule and issue drawers, absence of visible migration/rebuild terms, real feature-flag loading transition, and rebuilt a11y. Browser smoke is recorded in `docs/ui-rebuild/parity/site-audit-contract.md`.
+
+**Files:** `src/components/site-audit-rebuilt/SiteAuditSurface.tsx`; `src/components/site-audit-rebuilt/useSiteAuditSurfaceState.ts`; `tests/component/site-audit-rebuilt/SiteAuditSurface.test.tsx`; `docs/ui-rebuild/parity/site-audit-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+### 625. UI Rebuild Schema parity contract and admin-safe cleanup 2026-07-08
+
+**What it does:** Adds the behavior-first parity contract for the rebuilt `seo-schema` surface and moves Schema out of the capability-risk bucket. The contract compares the actual prototype `mockup/schema.js` against the rebuilt `SchemaSurface` and confirms the core workflow is already aligned enough: Generator / Workflow Guide modes, five-step scan→review→edit→publish→validate framing, schema site plan bridge, graph validation gate, page review, publish/send actions, CMS mapping, manual fallback, version history, rollback, and impact readout. The safe implementation slice removes visible migration/rebuild language from the guide and generator, changes the admin generator to use the admin recommendations read path instead of the client-gated public route, and lets the loaded Schema header wrap correctly on mobile.
+
+**Why it matters to the agency:** Schema publish and validation are high-trust workflows; this proves the rebuilt surface keeps the production safety rails while avoiding internal implementation labels. It also prevents admin browser sessions from hitting client-only recommendation routes during schema review.
+
+**Why it matters to clients:** Indirect but important — clients keep receiving schema plans and page schema reviews through the same Inbox > Reviews approval path, while operators can safely publish or send structured data without ambiguity.
+
+**Tests:** Extended `tests/component/schema-rebuilt/SchemaSurface.test.tsx` to assert operator-facing copy, absence of internal rebuild terms, admin recommendations read path, guide/deep-link behavior, detail drawer affordances, real feature-flag loading transition, workspace-event invalidation, and rebuilt a11y. Browser smoke captured desktop overview, guide deep link, detail drawer, and mobile overview for `ws_2ceaeb6c-0820-4da5-941e-ad9eae643993` with no internal labels, no page-level overflow, no duplicate drawer, no console errors, and no failed responses.
+
+**Files:** `src/components/schema-rebuilt/SchemaSurface.tsx`; `src/components/schema-rebuilt/GeneratorLens.tsx`; `src/components/schema-rebuilt/SchemaPageDrawer.tsx`; `src/components/schema-rebuilt/SchemaSupportPanels.tsx`; `src/components/schema-rebuilt/WorkflowGuideLens.tsx`; `tests/component/schema-rebuilt/SchemaSurface.test.tsx`; `docs/ui-rebuild/parity/schema-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+### 624. UI Rebuild SEO Editor parity contract and workbench decision gate 2026-07-08
+
+**What it does:** Adds the behavior-first parity contract for the rebuilt `seo-editor` surface. The contract compares the actual prototype `mockup/editor.js` and parity-ledger notes against the current rebuilt `SeoEditorSurface` and identifies the main remaining mismatch: the prototype is a source-grouped write-target workbench with inline spreadsheet editing, page-intelligence detail, sticky selected-row actions, and a keyboard `Review pending` queue, while the current rebuilt surface preserves the important Static/CMS/Manual write workflows inside a table + drawer shell. The safe implementation slice removes visible implementation copy such as `existing`, `server-backed`, `endpoint`, `v1`, `PATCH route`, and `projection`; replaces raw URL enum labels like `cms-item` and `needs-meta` with operator-facing labels; fixes singular row copy; stacks header actions on mobile; retints source badges/metrics so Static is neutral, CMS is blue, Manual is amber, and teal stays reserved for actions; and switches the rebuilt admin hook to the admin recommendations read path so browser smoke no longer hits the client-gated public route.
+
+**Why it matters to the agency:** SEO Editor controls live metadata writes, client approval, and CMS publishing, so parity cannot be rushed as a visual-only rewrite. This gives the team a concrete owner decision before changing the write workflow, while immediately removing rough implementation language that made the rebuilt shell feel less like the prototype.
+
+**Why it matters to clients:** Indirect but high-trust — operators are less likely to misread write-target state, send the wrong item for approval, or publish from a confusing shell when Static, CMS, Manual, and approval states remain clear.
+
+**Tests:** Extended `tests/component/seo-editor-rebuilt/SeoEditorSurface.test.tsx` to assert operator-facing source/filter labels, absence of implementation language in the loaded worksheet and detail drawer, and continued deep-link/detail behavior. Existing coverage still proves real feature-flag loading transition, validated URL state, safe invalid-state fallback, manual rows as visible-only, Static/CMS saves routed through their workflow props, and rebuilt a11y. Browser smoke captured empty-demo baseline, rowful desktop/mobile, source deep link, and detail drawer states with no internal labels, no page-level overflow, no duplicate drawer, no console errors, and no failed responses.
+
+**Files:** `src/components/seo-editor-rebuilt/SeoEditorSurface.tsx`; `src/components/seo-editor-rebuilt/SeoEditorWorksheet.tsx`; `src/components/seo-editor-rebuilt/SeoEditorPagePanel.tsx`; `src/components/seo-editor-rebuilt/useSeoEditorSurfaceState.ts`; `src/hooks/admin/useSeoEditorRebuilt.ts`; `tests/component/seo-editor-rebuilt/SeoEditorSurface.test.tsx`; `docs/ui-rebuild/parity/seo-editor-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+### 623. UI Rebuild Content Pipeline parity contract and lifecycle-board decision gate 2026-07-08
+
+**What it does:** Adds the behavior-first parity contract for the rebuilt `content-pipeline` surface. The contract compares the actual prototype `mockup/pipeline.js` and `mockup/brief-workspace.js` against the current rebuilt `ContentPipelineSurface` and identifies the next major mismatch: the prototype is a lifecycle board with Intake, active work columns, mode controls, Brief/Draft workspaces, Published readback, and subscription drawer behavior, while the current rebuilt surface still uses peer tab receivers that mount legacy workspaces inline. The safe implementation slice removes visible implementation scaffolding such as `?tab= receiver`, `subscriptions alias`, `mounted below`, `carried-over mode`, `shell owns`, and `Post receiver` while preserving current `?tab=`, legacy alias, post deep-link, fix-context, and exact-once receiver behavior. It also stacks header actions and lets the subtitle wrap on mobile so the current shell remains readable while the lifecycle-board decision is pending.
+
+**Why it matters to the agency:** Content Pipeline owns briefs, drafts, scheduling, subscription capacity, health signals, and published readback, so parity cannot be judged by cleaner cards alone. The contract gives the team a concrete owner decision before changing a high-impact production workflow, while the safe cleanup makes the current shell less confusing immediately.
+
+**Why it matters to clients:** Indirect but important — operators are less likely to lose or duplicate content work when the page eventually matches the prototype's single lifecycle model. The current safe cleanup also removes internal language that could undermine confidence during admin review or screen sharing.
+
+**Tests:** Extended `tests/component/content-pipeline-rebuilt/ContentPipelineSurface.test.tsx` to assert that the loaded shell does not show internal rebuild/migration vocabulary and that header actions stay stackable on narrow viewports. Existing coverage continues to prove the real feature-flag loading transition, `?tab=published`, calendar-to-post deep links, intake-to-brief fix context, invalid-tab fallback, `subscriptions` alias, exact-once embedded receiver mounting, and the rebuilt a11y floor. Browser smoke captured desktop overview, mobile overview, Published deep link, and Guide drawer states with no internal labels, no page-level horizontal overflow, and no console errors; the screenshots were captured with project Playwright after the in-app browser connector timed out during navigation.
+
+**Files:** `src/components/content-pipeline-rebuilt/ContentPipelineSurface.tsx`; `tests/component/content-pipeline-rebuilt/ContentPipelineSurface.test.tsx`; `docs/ui-rebuild/parity/content-pipeline-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+### 622. UI Rebuild Insights Engine parity contract and IA decision gate 2026-07-08
+
+**What it does:** Adds the behavior-first parity contract for the rebuilt `seo-strategy` / Insights Engine surface. The contract compares the actual prototype `mockup/strategy.js` against the current rebuilt `EngineSurface` and identifies the first major mismatch: the prototype is a single strategy spine, while the current rebuilt surface splits the same workflow across top-level lenses. The contract records required sections, URL/deep-link preservation, carry-over capability homes, browser-smoke checklist, automated test floor, and an explicit owner-decision gate before collapsing the visible lenses. Safe current-state work also fixes mobile readability by stacking Engine header actions on narrow viewports and letting `CommandCenterVerdict` meta wrap below the eyebrow on mobile.
+
+**Why it matters to the agency:** This keeps the parity loop from repeating the Brand & AI mistake at a higher-risk strategy surface. Engine owns recommendations, POV, staged sends, signals, and cross-surface hand-offs, so the team needs an explicit decision before changing its IA.
+
+**Why it matters to clients:** Indirect but high leverage — if the admin strategy spine is aligned, operators are less likely to send fragmented or poorly-evidenced work to the client-facing issue.
+
+**Tests:** Extended `tests/component/engine-rebuilt/EngineSurface.test.tsx` to pin safe current-state behavior while the IA decision is pending: internal rebuild/migration labels are absent, move rows open `EngineMoveDrawer` exactly once, the Add Recommendation modal opens exactly once, send remains disabled until staged moves exist, the docked send action appears when staged, legacy `?tab=` redirects still work, the mobile header action group keeps its stackable wrapper, and rebuilt a11y still passes. Browser smoke captured desktop, mobile, signals deep link, legacy rankings redirect, Add Recommendation modal, and move drawer baselines; the final mobile screenshot used the project Playwright runtime after the in-app browser connector timed out during refreshed capture. Future coverage will need to prove `?lens=` section-focus behavior if the single-spine direction is approved.
+
+**Files:** `src/components/engine-rebuilt/EngineSurface.tsx`; `src/components/ui/co/CommandCenterVerdict.tsx`; `tests/component/engine-rebuilt/EngineSurface.test.tsx`; `docs/ui-rebuild/parity/engine-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+### 621. UI Rebuild Cockpit calibration smoke completion 2026-07-08
+
+**What it does:** Completes the Cockpit calibration proof for the rebuilt parity loop. The Cockpit contract now records regenerated desktop, loaded mobile, activity drawer, work-order modal, and `stream=send` deep-link smoke captures. During mobile smoke, the loaded viewport exposed a second responsive issue after the shell rail fix: the client-context line squeezed into vertical word fragments beside the toolbar. `CockpitSurface` now stacks the client context and toolbar on narrow viewports, lowers the mobile mono tracking, and preserves the desktop orientation row. The work-order carry-over is explicitly accepted as the existing full-screen legacy modal instead of wrapping it in a second overlay.
+
+**Why it matters to the agency:** Cockpit is the rubric for the rest of the parity sweep, so its proof needs to cover behavior, route state, overlays, and responsive layout rather than just a polished desktop screenshot. The new smoke evidence gives the team a concrete baseline for judging the remaining rebuilt surfaces.
+
+**Why it matters to clients:** Indirect but important — operators can use the rebuilt command center on smaller screens without the navigation rail or context header crushing the actual work surface.
+
+**Tests:** Extended `tests/component/cockpit-rebuilt/CockpitSurface.test.tsx` to assert exact-once Activity and Work Order overlay mounting plus absence of internal rebuild/migration labels. Browser smoke captured desktop overview, loaded mobile overview, Activity drawer, Work Order modal using seeded `ws_demo_growth`, and `stream=send` deep link with no horizontal overflow, duplicate overlay, internal labels, or console errors.
+
+**Files:** `src/components/cockpit-rebuilt/CockpitSurface.tsx`; `tests/component/cockpit-rebuilt/CockpitSurface.test.tsx`; `docs/ui-rebuild/parity/cockpit-contract.md`; `docs/ui-rebuild/parity/parity-backlog.md`; `docs/ui-rebuild/parity/rebuilt-surface-inventory.md`; `FEATURE_AUDIT.md`.
+
+### 620. UI Rebuild Brand & AI modal-first parity correction 2026-07-08
+
+**What it does:** Corrects the rebuilt Brand & AI surface from inline active-panel switching to the prototype's grouped context layout plus modal workflows. The overview now mirrors the prototype taxonomy — Voice & Messaging, Knowledge, Audience, and Business Facts & Trust — with a compact context-completeness cockpit, section rows that launch the relevant workflow, and the "How this context is used" rail. The legacy top tab strip is removed from the overview so the grouped context inventory is the navigation surface. Voice & Messaging now carries the prototype-style Brand identity generators disclosure for tagline, voice guidelines, archetypes, traits, pillars, differentiators, and tone examples. Brandscript, Discovery, Voice calibration, Brand identity, Business facts, Trust evidence, Context editors, and Strategy intelligence open in the existing DS `Modal` shell. The existing `?tab=` contract, `business-profile`/`locations` aliases, focus params, and legacy child panels are preserved, with each child panel mounted exactly once. The admin chat launcher now sits below the modal layer so mobile dialogs are not covered by the floating widget.
+
+**Why it matters to the agency:** Aligns the rebuilt page with the hmpsn studio prototype's actual layout and interaction model instead of only its surface polish. Operators keep their existing Brand & AI tools, but the workflow now behaves like the prototype: scan the four context groups, choose a piece, work in a contained modal, and close back to the context cockpit.
+
+**Why it matters to clients:** Indirect but meaningful — brand setup work is less likely to feel scattered or duplicated, which helps operators maintain clearer, more trustworthy AI context before client-facing strategy and copy are generated.
+
+**Tests:** Updated `tests/component/brand-ai-rebuilt/BrandAiSurface.test.tsx` to prove the overview renders the four prototype groups and rail with no dialog, no top tab radiogroup, no legacy child panel, and exactly one Voice & Messaging Brand identity generator disclosure. Deep links open the expected modal titles, overview rows and generator rows open the correct modal, Brand & AI aliases pass the correct focus receiver, modal close returns to overview, real feature-flag loading survives, internal migration terms stay absent, child panels mount exactly once, and the modal state passes the rebuilt a11y floor.
+
+**Files:** `src/components/brand-ai-rebuilt/BrandAiSurface.tsx`; `src/components/AdminChat.tsx`; `tests/component/brand-ai-rebuilt/BrandAiSurface.test.tsx`; `docs/ui-rebuild/parity/brand-ai-contract.md`; `docs/ui-rebuild/parity/brand-ai-corrective-plan.md`; `FEATURE_AUDIT.md`.
+
+### 619. UI Rebuild parity recovery — Cockpit-led prototype contracts 2026-07-08
+
+**What it does:** Establishes a behavior-first parity process for the rebuilt admin UI, using Cockpit as the calibration surface and Brand & AI as the first corrective target. Adds reusable prototype parity contracts under `docs/ui-rebuild/parity/`, a Cockpit contract, a modal-first Brand & AI contract, a Brand corrective implementation plan, a registry-level surface triage, and a prioritized parity backlog. Also fixes the rebuilt shell mobile squeeze found during Cockpit smoke by using the icon rail on narrow viewports and opening full navigation in a left drawer without changing the saved desktop sidebar preference.
+
+**Why it matters to the agency:** Turns the hmpsn studio prototype from a visual reference into a repeatable acceptance contract. This directly addresses the Brand & AI miss: a page is not considered aligned just because it looks cleaner if the prototype interaction model opens workflows in modals and the rebuilt page mounts them inline.
+
+**Why it matters to clients:** Indirect but important — operators get interfaces that preserve the intended workflow, route state, and capability homes, which lowers the chance of dropped work, duplicate panels, or confusing navigation during client delivery.
+
+**Tests:** Added `RebuiltAppChrome` coverage proving narrow viewports keep the compact sidebar rail, open mobile navigation on demand, and preserve the saved desktop preference. Parity docs define the required component and browser-smoke tests for Cockpit and the next Brand & AI corrective pass.
+
+**Files:** `src/components/layout/RebuiltAppChrome.tsx`; `src/components/layout/RebuiltSidebar.tsx`; `tests/component/layout/RebuiltAppChrome.test.tsx`; `docs/ui-rebuild/parity/*`; `FEATURE_AUDIT.md`.
+
+### 618. UI Rebuild Brand & AI prototype alignment slice 2026-07-08
+
+**What it does:** Reframes the rebuilt Brand & AI admin surface from migration scaffolding into a prototype-aligned operator view. The page now leads with an AI readiness/context-completeness panel, a brand context score ring, four readiness areas (voice, business facts, trust evidence, strategy intelligence), and polished work-area copy while preserving the existing `?tab=` deep-link contract and child-panel mounting.
+
+**Why it matters to the agency:** Gives the UI rebuild a higher-fidelity proof slice beyond Command Center, showing how the hmpsn studio prototype language can carry into real production surfaces without new APIs or destabilizing the current Brand & AI tools.
+
+**Why it matters to clients:** Indirect but useful — operators get a clearer view of whether the platform has enough brand context to generate specific, trustworthy strategy and copy for a client.
+
+**Tests:** Extended `tests/component/brand-ai-rebuilt/BrandAiSurface.test.tsx` to cover the readiness panel, absence of internal migration copy, legacy alias preservation, lens switching, single panel mounting, feature-flag loading transition, and rebuilt a11y floor.
+
+**Files:** `src/components/brand-ai-rebuilt/BrandAiSurface.tsx`; `tests/component/brand-ai-rebuilt/BrandAiSurface.test.tsx`; `FEATURE_AUDIT.md`.
 
 ### 617. Meeting Brief RETIRED — server-unit deletion + table archive 2026-07-06
 

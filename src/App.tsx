@@ -260,6 +260,11 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     if (!urlWorkspaceId) return null;
     return workspaces.find(w => w.id === urlWorkspaceId) || null;
   }, [urlWorkspaceId, workspaces]);
+  const chromeWorkspace = useMemo(() => {
+    if (selected) return selected;
+    if (GLOBAL_TABS.has(tab)) return workspaces[0] ?? null;
+    return null;
+  }, [selected, tab, workspaces]);
 
   // Rewrite tab is always a full-height two-pane layout (independent scroll per pane).
   // Focus mode additionally hides the sidebar, but height containment is needed in both modes.
@@ -457,13 +462,13 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     return <Navigate to={adminPath(selected.id, 'home')} replace />;
   };
 
-  const RebuiltSurface = rebuildShellEnabled && selected ? REBUILT_SURFACES[tab] : undefined;
-  if (RebuiltSurface && selected) {
+  const RebuiltSurface = rebuildShellEnabled && chromeWorkspace ? REBUILT_SURFACES[tab] : undefined;
+  if (RebuiltSurface && chromeWorkspace) {
     return (
       <>
         <RebuiltAppChrome
           workspaces={workspaces}
-          selected={selected}
+          selected={chromeWorkspace}
           tab={tab}
           theme={theme}
           pendingContentRequests={pendingContentRequests}
@@ -476,7 +481,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
         >
           <ErrorBoundary label={tab}>
             <Suspense fallback={<ChunkFallback />}>
-              <RebuiltSurface workspaceId={selected.id} />
+              <RebuiltSurface workspaceId={selected?.id ?? chromeWorkspace.id} />
             </Suspense>
           </ErrorBoundary>
         </RebuiltAppChrome>
@@ -485,14 +490,14 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
             ⌘K + admin chat). StatusBar needs an AppShell footer slot → DEF-shell-005. */}
         <CommandPalette
           workspaces={workspaces}
-          selectedWorkspace={selected}
+          selectedWorkspace={chromeWorkspace}
           onSelectWorkspace={(ws) => navigate(adminPath(ws.id))}
         />
         {health.hasOpenAIKey && (
           <ErrorBoundary label="Admin Chat">
             <AdminChat
-              workspaceId={selected.id}
-              workspaceName={selected.webflowSiteName || selected.name}
+              workspaceId={chromeWorkspace.id}
+              workspaceName={chromeWorkspace.webflowSiteName || chromeWorkspace.name}
             />
           </ErrorBoundary>
         )}

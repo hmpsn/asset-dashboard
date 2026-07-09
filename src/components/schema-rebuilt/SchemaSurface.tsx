@@ -98,13 +98,15 @@ export function SchemaSurface({ workspaceId }: SchemaSurfaceProps) {
       <PageHeader
         title="Schema"
         subtitle={state.tab === 'guide'
-          ? 'Workflow reference for plan, generation, validation, publishing, delivery, and measurement.'
-          : 'Generate JSON-LD, review page-level evidence, validate graph safety, and publish through existing schema services.'}
+          ? 'Review the structured-data workflow from scan to validation, publishing, client review, and measurement.'
+          : 'Generate JSON-LD, review page-level evidence, validate graph safety, and publish safely.'}
+        className="flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible [&>div:last-child]:w-full sm:[&>div:last-child]:w-auto"
         actions={(
           <Button
             size="sm"
             variant="secondary"
             onClick={refreshSchema}
+            className="w-full sm:w-auto"
           >
             <Icon as={RefreshCw} size="sm" />
             Refresh

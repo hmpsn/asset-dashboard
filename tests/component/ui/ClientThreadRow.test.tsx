@@ -18,6 +18,7 @@ describe('ClientThreadRow', () => {
     );
 
     expect(screen.getByText('Can we prioritize the services page?')).toBeInTheDocument();
+    expect(screen.getByText('Can we prioritize the services page?')).toHaveClass('t-body');
     fireEvent.click(screen.getByRole('button', { name: /Promote to signal/ }));
     expect(onPromote).toHaveBeenCalledOnce();
     await expectNoA11yViolations(container);

@@ -1,6 +1,6 @@
 // @ds-rebuilt
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BarChart3, MapPin, Settings2, Star, type LucideIcon } from 'lucide-react';
+import { MapPin, Star, type LucideIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
 import { useGbpReviews, useLocalGbpRefresh, useLocalSeo, useLocalSeoRefresh } from '../../hooks/admin';
@@ -27,13 +27,10 @@ import {
 } from '../ui';
 import { LocalPresenceOverview } from './LocalPresenceOverview';
 import { LocalPresenceReviewsPipeline } from './LocalPresenceReviewsPipeline';
-import { LocalPresenceSetup } from './LocalPresenceSetup';
 import { LocalPresenceVisibility } from './LocalPresenceVisibility';
 import { mutationErrorMessage } from './localPresenceMutationFeedback';
 import {
   LOCAL_PRESENCE_FILTERS,
-  LOCAL_PRESENCE_LENSES,
-  type LocalPresenceLens,
   useLocalPresenceSurfaceState,
 } from './useLocalPresenceSurfaceState';
 
@@ -48,11 +45,16 @@ const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
   minute: '2-digit',
 });
 
-const LENS_ICONS: Record<LocalPresenceLens, LucideIcon> = {
-  overview: MapPin,
-  visibility: BarChart3,
+const LOCAL_PRESENCE_MODES = [
+  { id: 'presence', label: 'Rank & profile' },
+  { id: 'reviews', label: 'Reviews & replies' },
+] as const;
+
+type LocalPresenceMode = typeof LOCAL_PRESENCE_MODES[number]['id'];
+
+const MODE_ICONS: Record<LocalPresenceMode, LucideIcon> = {
+  presence: MapPin,
   reviews: Star,
-  setup: Settings2,
 };
 
 function isLockedError(error: unknown): boolean {
@@ -143,11 +145,6 @@ export function LocalPresenceSurface({ workspaceId }: LocalPresenceSurfaceProps)
     setSetupOpen(true);
   }, [data?.featureEnabled, state.lens]);
 
-  const handleSetLens = (lens: LocalPresenceLens) => {
-    state.setLens(lens);
-    if (lens === 'setup' && data?.featureEnabled) setSetupOpen(true);
-  };
-
   const startLocalRescan = () => {
     localRefresh.mutate({}, {
       onSuccess: () => toast('Local visibility re-scan started', 'success'),
@@ -217,6 +214,16 @@ export function LocalPresenceSurface({ workspaceId }: LocalPresenceSurfaceProps)
 
   const activeFilter = LOCAL_PRESENCE_FILTERS.find((filter) => filter.id === state.filter)?.label ?? 'All';
   const owned = gbpAggregateEnabled ? gbp?.owned ?? null : null;
+  const activeMode: LocalPresenceMode = state.lens === 'reviews' ? 'reviews' : 'presence';
+
+  const handleSetMode = (mode: LocalPresenceMode) => {
+    state.setLens(mode === 'reviews' ? 'reviews' : 'overview');
+  };
+
+  const closeSetup = () => {
+    setSetupOpen(false);
+    if (state.lens === 'setup') state.setLens('overview');
+  };
 
   return (
     <div className="flex min-h-full flex-col gap-5">
@@ -228,20 +235,14 @@ export function LocalPresenceSurface({ workspaceId }: LocalPresenceSurfaceProps)
       <Toolbar label="Local Presence view controls" className="w-full">
         <LensSwitcher
           id="local-presence-rebuilt-lens"
-          options={LOCAL_PRESENCE_LENSES.map((lens) => ({
-            value: lens.id,
-            label: lens.label,
-            icon: LENS_ICONS[lens.id],
-            count: lens.id === 'reviews'
-              ? undefined
-              : lens.id === 'visibility'
-                ? report.checkedKeywordCount
-                : lens.id === 'setup'
-                  ? report.configuredMarketCount
-                  : report.activeMarketCount,
+          options={LOCAL_PRESENCE_MODES.map((mode) => ({
+            value: mode.id,
+            label: mode.label,
+            icon: MODE_ICONS[mode.id],
+            count: mode.id === 'presence' ? report.checkedKeywordCount : undefined,
           }))}
-          value={state.lens}
-          onChange={(value) => handleSetLens(value as LocalPresenceLens)}
+          value={activeMode}
+          onChange={(value) => handleSetMode(value as LocalPresenceMode)}
           size="sm"
         />
         <SearchField
@@ -262,24 +263,28 @@ export function LocalPresenceSurface({ workspaceId }: LocalPresenceSurfaceProps)
         )}
       </Toolbar>
 
-      <div className="flex flex-wrap gap-2" aria-label="Local Presence filters">
-        {LOCAL_PRESENCE_FILTERS.map((filter) => (
-          <FilterChip
-            key={filter.id}
-            label={filter.label}
-            active={state.filter === filter.id}
-            onClick={() => state.setFilter(filter.id)}
-          />
-        ))}
-      </div>
+      {activeMode === 'presence' && (
+        <div className="flex flex-wrap gap-2" aria-label="Local Presence filters">
+          {LOCAL_PRESENCE_FILTERS.map((filter) => (
+            <FilterChip
+              key={filter.id}
+              label={filter.label}
+              active={state.filter === filter.id}
+              onClick={() => state.setFilter(filter.id)}
+            />
+          ))}
+        </div>
+      )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricTile label="Markets" value={report.activeMarketCount} sub={`${report.configuredMarketCount} configured`} accent="var(--blue)" />
-        <MetricTile label="Checked" value={report.checkedKeywordCount} sub={activeFilter} accent="var(--blue)" />
-        <MetricTile label="Visible" value={report.visibleCount} sub="local matches" accent="var(--emerald)" />
-        <MetricTile label={gbpAggregateEnabled ? 'Reviews' : 'Local packs'} value={gbpAggregateEnabled ? (owned?.reviewCount ?? '—') : report.localPackPresentCount} sub={gbpAggregateEnabled ? `${formatRating(owned?.rating)} rating` : 'packs detected'} accent="var(--blue)" />
-        <MetricTile label="Needs review" value={report.possibleMatchCount + report.notVisibleCount + report.degradedCount} sub="posture issues" accent="var(--amber)" />
-      </div>
+      {activeMode === 'presence' && (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <MetricTile label="Markets" value={report.activeMarketCount} sub={`${report.configuredMarketCount} configured`} accent="var(--blue)" />
+          <MetricTile label="Checked" value={report.checkedKeywordCount} sub={activeFilter} accent="var(--blue)" />
+          <MetricTile label="Visible" value={report.visibleCount} sub="local matches" accent="var(--emerald)" />
+          <MetricTile label={gbpAggregateEnabled ? 'Reviews' : 'Local packs'} value={gbpAggregateEnabled ? (owned?.reviewCount ?? '—') : report.localPackPresentCount} sub={gbpAggregateEnabled ? `${formatRating(owned?.rating)} rating` : 'packs detected'} accent="var(--blue)" />
+          <MetricTile label="Needs review" value={report.possibleMatchCount + report.notVisibleCount + report.degradedCount} sub="posture issues" accent="var(--amber)" />
+        </div>
+      )}
 
       {localSeo.isError && data && (
         <InlineBanner tone="warning" title="Summary may be stale">
@@ -292,23 +297,24 @@ export function LocalPresenceSurface({ workspaceId }: LocalPresenceSurfaceProps)
         </InlineBanner>
       )}
 
-      {state.lens === 'overview' && (
-        <LocalPresenceOverview
-          workspaceId={workspaceId}
-          data={data}
-          gbp={gbp}
-          onOpenSetup={() => setSetupOpen(true)}
-        />
+      {activeMode === 'presence' && (
+        <div className="flex flex-col gap-4">
+          <LocalPresenceOverview
+            workspaceId={workspaceId}
+            data={data}
+            gbp={gbp}
+            onOpenSetup={() => setSetupOpen(true)}
+            showCompetitors={false}
+          />
+          <LocalPresenceVisibility
+            workspaceId={workspaceId}
+            data={data}
+            search={state.search}
+            filter={state.filter}
+          />
+        </div>
       )}
-      {state.lens === 'visibility' && (
-        <LocalPresenceVisibility
-          workspaceId={workspaceId}
-          data={data}
-          search={state.search}
-          filter={state.filter}
-        />
-      )}
-      {state.lens === 'reviews' && (
+      {activeMode === 'reviews' && (
         <LocalPresenceReviewsPipeline
           workspaceId={workspaceId}
           desk={state.desk}
@@ -316,19 +322,11 @@ export function LocalPresenceSurface({ workspaceId }: LocalPresenceSurfaceProps)
           search={state.search}
         />
       )}
-      {state.lens === 'setup' && (
-        <LocalPresenceSetup
-          workspaceId={workspaceId}
-          data={data}
-          onOpenSetup={() => setSetupOpen(true)}
-        />
-      )}
-
       <LocalSeoMarketSetupDrawer
         workspaceId={workspaceId}
         data={data}
         open={setupOpen}
-        onClose={() => setSetupOpen(false)}
+        onClose={closeSetup}
       />
     </div>
   );

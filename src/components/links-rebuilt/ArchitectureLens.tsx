@@ -383,7 +383,7 @@ export function ArchitectureLens({
                   </div>
                   <Badge label={gap.priority} tone={PRIORITY_TONE[gap.priority] ?? 'zinc'} variant="soft" />
                 </div>
-                <p className="mt-2 t-caption-sm text-[var(--brand-text-muted)]">{gap.reason}</p>
+                <p className="mt-2 t-body text-[var(--brand-text-muted)]">{gap.reason}</p>
               </div>
             ))}
           </div>
@@ -416,8 +416,10 @@ export function ArchitectureLens({
         </div>
       </div>
 
-      <InlineBanner tone="info" title="Architecture relocation">
-        This tab carries the existing architecture readout into Links. Creating new pages from gaps is deferred until a signed write target exists.
+      <InlineBanner tone="info" title="Architecture next steps">
+        <p className="t-body text-[var(--brand-text-muted)]">
+          Use gaps as page-planning inputs. Create approved hub pages from the content workflow, then refresh Links to confirm the URL tree.
+        </p>
       </InlineBanner>
     </div>
   );

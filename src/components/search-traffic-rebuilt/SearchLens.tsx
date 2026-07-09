@@ -87,7 +87,7 @@ function queryColumns(strategyKeywords: Set<string>, badgeMap: Map<string, Retur
             {strategyKeywords.has(query.toLowerCase()) && <Star size={13} className="flex-none text-[var(--teal)]" aria-label="Strategy keyword" />}
             <span className="whitespace-normal break-words text-[var(--brand-text-bright)]">{query}</span>
             {badge && <Badge label={badge.label} tone={badge.tone} variant="soft" size="sm" />}
-            {row.position != null && Number(row.position) <= 20 && <Badge label="mover link in Keyword Hub" tone="teal" variant="outline" size="sm" />}
+            {row.position != null && Number(row.position) <= 20 && <Badge label="Top 20" tone="blue" variant="soft" size="sm" />}
           </div>
         );
       },
@@ -282,7 +282,7 @@ export function SearchLens({ workspaceId, data, tableMode, onTableModeChange, on
         )}
       </ChartCard>
 
-      <ChartCard title="Search insights" action={<Link className="t-caption-sm text-[var(--teal)] hover:text-[var(--brand-mint-light)]" to={adminPath(workspaceId, 'seo-keywords')}>Open Keyword Hub</Link>}>
+      <ChartCard title="Search insights" action={<Link className="t-ui text-[var(--teal)] hover:text-[var(--brand-mint-light)]" to={adminPath(workspaceId, 'seo-keywords')}>Open Keyword Hub</Link>}>
         <InsightFeed
           feed={feed}
           loading={feedLoading}
@@ -303,7 +303,7 @@ export function SearchLens({ workspaceId, data, tableMode, onTableModeChange, on
           value={tableMode}
           onChange={(value) => onTableModeChange(value as SearchTrafficTableMode)}
         />
-        <span className="t-caption text-[var(--brand-text-muted)]">
+        <span className="t-ui text-[var(--brand-text-muted)]">
           {tableMode === 'queries' ? `${data.overview.topQueries.length} query rows` : `${data.overview.topPages.length} page rows`}
         </span>
       </div>

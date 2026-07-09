@@ -93,12 +93,12 @@ export function WorkStreamSelector({
               <Icon name={option.iconName ?? tone.icon} size="md" aria-hidden="true" />
             </span>
             <span className="block">
-              <span className="flex items-baseline gap-1.5 font-[family-name:var(--font-display)] text-[28px] font-extrabold leading-none tracking-[-0.03em] text-[var(--brand-text-bright)]">{/* // arbitrary-text-ok: prototype .snum hero stat number, 28px DIN Pro */}
+              <span className="flex items-baseline gap-1.5 t-h1 font-extrabold leading-none text-[var(--brand-text-bright)]">
                 {option.count}
                 {option.unit && <span className="t-caption-sm font-semibold text-[var(--brand-text-dim)]">{option.unit}</span>}
               </span>
               <span className="t-ui mt-2 block font-semibold text-[var(--brand-text-bright)]">{option.label}</span>
-              <span className="t-caption-sm mt-1 block text-[var(--brand-text)]">{option.description}</span>
+              <span className="t-body mt-1 block text-[var(--brand-text)]">{option.description}</span>
             </span>
           </button>
         );

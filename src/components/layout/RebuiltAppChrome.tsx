@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { Page } from '../../routes';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import type { Workspace } from '../WorkspaceSelector';
-import { AppShell, PageContainer, Toolbar } from '../ui';
+import { AppShell, Drawer, PageContainer, Toolbar } from '../ui';
 import { RebuiltBreadcrumb } from './RebuiltBreadcrumb';
 import { RebuiltSidebar } from './RebuiltSidebar';
 
@@ -31,6 +31,7 @@ export function useRebuildShellEnabled(): boolean {
 }
 
 const SIDEBAR_RAIL_KEY = 'admin-sidebar-rail';
+const NARROW_SHELL_QUERY = '(max-width: 720px)';
 
 function readRail(): boolean {
   try {
@@ -38,6 +39,27 @@ function readRail(): boolean {
   } catch {
     return false;
   }
+}
+
+function readNarrowViewport(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  return window.matchMedia(NARROW_SHELL_QUERY).matches;
+}
+
+function useNarrowViewportRail(): boolean {
+  const [isNarrow, setIsNarrow] = useState(readNarrowViewport);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+
+    const query = window.matchMedia(NARROW_SHELL_QUERY);
+    const handleChange = () => setIsNarrow(query.matches);
+    handleChange();
+    query.addEventListener('change', handleChange);
+    return () => query.removeEventListener('change', handleChange);
+  }, []);
+
+  return isNarrow;
 }
 
 export function RebuiltAppChrome({
@@ -55,6 +77,9 @@ export function RebuiltAppChrome({
   children,
 }: RebuiltAppChromeProps) {
   const [rail, setRail] = useState(readRail);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const narrowViewportRail = useNarrowViewportRail();
+  const effectiveRail = rail || narrowViewportRail;
   useEffect(() => {
     try {
       localStorage.setItem(SIDEBAR_RAIL_KEY, rail ? '1' : '0');
@@ -62,12 +87,58 @@ export function RebuiltAppChrome({
       /* localStorage unavailable — rail state stays in-memory only */
     }
   }, [rail]);
-  const toggleRail = useCallback(() => setRail((prev) => !prev), []);
+  const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
+  const toggleRail = useCallback(() => {
+    if (narrowViewportRail) {
+      setMobileNavOpen(true);
+      return;
+    }
+    setRail((prev) => !prev);
+  }, [narrowViewportRail]);
 
   return (
-    <AppShell
-      rail={rail}
-      sidebar={
+    <>
+      <AppShell
+        rail={effectiveRail}
+        sidebar={
+          <RebuiltSidebar
+            workspaces={workspaces}
+            selected={selected}
+            tab={tab}
+            theme={theme}
+            pendingContentRequests={pendingContentRequests}
+            onCreate={onCreate}
+            onDelete={onDelete}
+            onLinkSite={onLinkSite}
+            onUnlinkSite={onUnlinkSite}
+            toggleTheme={toggleTheme}
+            onLogout={onLogout}
+            rail={effectiveRail}
+            onToggleRail={toggleRail}
+          />
+        }
+        topbar={
+          <Toolbar label="Breadcrumb" wrap={false} style={{ width: '100%' }}>
+            <RebuiltBreadcrumb
+              workspaces={workspaces}
+              selected={selected}
+              tab={tab}
+              pendingContentRequests={pendingContentRequests}
+            />
+          </Toolbar>
+        }
+      >
+        <PageContainer as="main" width="wide">
+          {children}
+        </PageContainer>
+      </AppShell>
+      <Drawer
+        open={narrowViewportRail && mobileNavOpen}
+        onClose={closeMobileNav}
+        side="left"
+        width="min(320px, 88vw)"
+        title="Navigation"
+      >
         <RebuiltSidebar
           workspaces={workspaces}
           selected={selected}
@@ -80,24 +151,11 @@ export function RebuiltAppChrome({
           onUnlinkSite={onUnlinkSite}
           toggleTheme={toggleTheme}
           onLogout={onLogout}
-          rail={rail}
-          onToggleRail={toggleRail}
+          rail={false}
+          onToggleRail={closeMobileNav}
+          onNavigate={closeMobileNav}
         />
-      }
-      topbar={
-        <Toolbar label="Breadcrumb" wrap={false} style={{ width: '100%' }}>
-          <RebuiltBreadcrumb
-            workspaces={workspaces}
-            selected={selected}
-            tab={tab}
-            pendingContentRequests={pendingContentRequests}
-          />
-        </Toolbar>
-      }
-    >
-      <PageContainer as="main" width="wide">
-        {children}
-      </PageContainer>
-    </AppShell>
+      </Drawer>
+    </>
   );
 }

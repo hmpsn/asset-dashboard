@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -68,11 +68,18 @@ vi.mock('../../../src/components/strategy/issue/DraftedPovEditor', () => ({
 }));
 
 vi.mock('../../../src/components/strategy/issue/BackingMovesQueue', () => ({
-  BackingMovesQueue: () => <div data-testid="backing-moves-queue">Backing moves</div>,
+  BackingMovesQueue: ({ onAddRec }: { onAddRec: () => void }) => (
+    <div data-testid="backing-moves-queue">
+      Backing moves
+      <button type="button" onClick={onAddRec}>Add a recommendation</button>
+    </div>
+  ),
 }));
 
 vi.mock('../../../src/components/strategy/issue/AddRecommendationModal', () => ({
-  AddRecommendationModal: ({ open }: { open: boolean }) => open ? <div role="dialog">Add recommendation</div> : null,
+  AddRecommendationModal: ({ open }: { open: boolean }) => open
+    ? <div role="dialog" aria-label="Add recommendation" data-testid="add-recommendation-modal">Add recommendation</div>
+    : null,
 }));
 
 vi.mock('../../../src/components/strategy/CurationMeter', () => ({
@@ -108,7 +115,9 @@ vi.mock('../../../src/components/strategy/issue/KeywordTargetsLens', () => ({
 }));
 
 vi.mock('../../../src/components/engine-rebuilt/EngineMoveDrawer', () => ({
-  EngineMoveDrawer: ({ open }: { open: boolean }) => open ? <div role="dialog">Move drawer</div> : null,
+  EngineMoveDrawer: ({ open }: { open: boolean }) => open
+    ? <div role="dialog" aria-label="Move drawer" data-testid="engine-move-drawer">Move drawer</div>
+    : null,
 }));
 
 vi.mock('../../../src/components/local-seo/LocalSeoMarketSetupDrawer', () => ({
@@ -415,6 +424,11 @@ function renderFlagHarness(client = createClient()) {
   );
 }
 
+function expectScopedTextWithClass(scope: HTMLElement, text: string | RegExp, className: string) {
+  const matches = within(scope).getAllByText(text);
+  expect(matches.some((element) => element.classList.contains(className))).toBe(true);
+}
+
 describe('EngineSurface rebuilt', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -466,6 +480,96 @@ describe('EngineSurface rebuilt', () => {
 
     expect(await screen.findByTestId('engine-invalid-lens-fallback')).toBeInTheDocument();
     expect(screen.getByTestId('engine-lens-spine')).toBeInTheDocument();
+  });
+
+  it('keeps internal rebuild and migration language out of the visible Engine UI', async () => {
+    const { container } = renderSurface();
+
+    expect(await screen.findByTestId('engine-rebuilt-surface')).toBeInTheDocument();
+
+    const visibleText = container.textContent ?? '';
+    expect(visibleText).not.toMatch(/rebuild/i);
+    expect(visibleText).not.toMatch(/migration/i);
+    expect(visibleText).not.toMatch(/carry-over/i);
+    expect(visibleText).not.toMatch(/route tab/i);
+    expect(visibleText).not.toMatch(/url state/i);
+    expect(visibleText).not.toMatch(/legacy aliases/i);
+    expect(visibleText).not.toMatch(/mounted below/i);
+  });
+
+  it('keeps the Engine header actions stackable on narrow screens', async () => {
+    renderSurface();
+
+    const actionGroup = await screen.findByTestId('engine-header-actions');
+    expect(actionGroup).toHaveClass('w-full');
+    expect(actionGroup).toHaveClass('max-w-full');
+    expect(actionGroup).toHaveClass('flex-col');
+    expect(actionGroup).toHaveClass('items-stretch');
+    expect(actionGroup).toHaveClass('sm:items-end');
+    expect(screen.getByRole('button', { name: 'Send issue' })).toHaveClass('w-full');
+  });
+
+  it('opens the move drawer exactly once from the moves lens', async () => {
+    renderSurface('/ws/ws-engine/seo-strategy?lens=moves');
+
+    expect(await screen.findByTestId('engine-lens-moves')).toBeInTheDocument();
+    const queues = Array.from(document.querySelectorAll<HTMLElement>('[data-testid="engine-work-queue"]'));
+    const moveQueue = queues.find((queue) => queue.textContent?.includes('Move drawer index'));
+    expect(moveQueue).toBeTruthy();
+
+    fireEvent.click(within(moveQueue!).getByRole('button', { name: 'Open' }));
+
+    expect(await screen.findByTestId('engine-move-drawer')).toBeInTheDocument();
+    expect(screen.getAllByTestId('engine-move-drawer')).toHaveLength(1);
+    expect(screen.getAllByRole('dialog', { name: 'Move drawer' })).toHaveLength(1);
+  });
+
+  it('opens the Add Recommendation modal exactly once from the backing moves queue', async () => {
+    renderSurface('/ws/ws-engine/seo-strategy?lens=spine');
+
+    expect(await screen.findByTestId('backing-moves-queue')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Add a recommendation' }));
+
+    expect(await screen.findByTestId('add-recommendation-modal')).toBeInTheDocument();
+    expect(screen.getAllByTestId('add-recommendation-modal')).toHaveLength(1);
+    expect(screen.getAllByRole('dialog', { name: 'Add recommendation' })).toHaveLength(1);
+  });
+
+  it('renders the prototype trust-spine preview in the spine lens with styleguide roles', async () => {
+    renderSurface('/ws/ws-engine/seo-strategy?lens=spine');
+
+    const preview = await screen.findByTestId('engine-trust-spine-preview');
+    expect(within(preview).getByText('What Acme Dental sees - the trust spine')).toBeInTheDocument();
+    expect(within(preview).getByText('Verdict first, dollar value, then proof')).toBeInTheDocument();
+    expectScopedTextWithClass(preview, 'Where Acme Dental stands this quarter', 't-label');
+    expectScopedTextWithClass(preview, 'Refresh implant content before the next issue goes out.', 't-page');
+    expectScopedTextWithClass(preview, 'Search demand is moving toward implant pages.', 't-body');
+    expectScopedTextWithClass(preview, 'Pipeline value at stake', 't-caption');
+    expectScopedTextWithClass(preview, '$18,450', 't-stat');
+    expectScopedTextWithClass(preview, 'Recovered so far', 't-caption');
+    expectScopedTextWithClass(preview, '$2,760', 't-stat');
+    expectScopedTextWithClass(preview, 'Backing moves live', 't-caption');
+    expectScopedTextWithClass(preview, '0 / 1', 't-stat');
+    expectScopedTextWithClass(preview, /The client sees the verdict, value frame, and proof/, 't-body');
+  });
+
+  it('keeps the send action disabled until staged moves exist, then shows the docked send action', async () => {
+    const first = renderSurface();
+
+    expect(await screen.findByTestId('engine-rebuilt-surface')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send issue' })).toBeDisabled();
+    expect(screen.queryByTestId('engine-docked-send-bar')).not.toBeInTheDocument();
+
+    first.unmount();
+    mocks.engineState = makeEngineState({
+      stagedRecIds: new Set(['rec-1']),
+      stagedSendableIds: ['rec-1'],
+      stagedCount: 1,
+    });
+    renderSurface();
+
+    expect(await screen.findByTestId('engine-docked-send-bar')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send 1 staged' })).toBeEnabled();
   });
 
   it.each([

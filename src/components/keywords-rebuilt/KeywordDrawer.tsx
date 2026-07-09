@@ -77,7 +77,7 @@ function isServerAction(type: KeywordCommandCenterNextActionType): type is Keywo
 }
 
 function money(value: number | undefined): string {
-  return typeof value === 'number' ? `${MONEY_FORMAT.format(value)}/mo` : 'No CPC';
+  return typeof value === 'number' ? `${MONEY_FORMAT.format(value)}/mo` : '—';
 }
 
 function numberOrEmpty(value: number | undefined, prefix = ''): string {
@@ -231,7 +231,7 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
         open={open}
         onClose={onClose}
         title={row?.keyword ?? keyword ?? 'Keyword details'}
-        subtitle={row?.assignment?.pageTitle ?? row?.assignment?.pagePath ?? 'Keyword command center'}
+        subtitle={row?.assignment?.pageTitle ?? row?.assignment?.pagePath ?? 'Keyword detail'}
         eyebrow="Keyword detail"
         width={520}
         footer={row && (
@@ -347,7 +347,7 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
                     variant="outline"
                   />
                 ))}
-                {row.sourceLabels.length === 0 && <Badge label="No source labels" tone="zinc" variant="outline" />}
+                {row.sourceLabels.length === 0 && <Badge label="No sources linked" tone="zinc" variant="outline" />}
               </div>
             </div>
 
@@ -356,14 +356,14 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
               <div className="mt-2 flex items-center gap-3">
                 <Sparkline data={sparklineData} width={180} height={44} area label={`${row.keyword} rank history`} />
                 <div className="min-w-0">
-                  <p className="t-caption text-[var(--brand-text-muted)]">
+                  <p className="t-ui text-[var(--brand-text-muted)]">
                     {rankHistory.isLoading ? 'Loading snapshots...' : sparklineData.length > 1 ? `${sparklineData.length} snapshots` : 'Not enough snapshots yet'}
                   </p>
                   {row.metrics.nationalPosition != null && (
-                    <p className="t-caption-sm text-[var(--blue)]">Live SERP #{row.metrics.nationalPosition}</p>
+                    <p className="t-ui text-[var(--blue)]">Live SERP #{row.metrics.nationalPosition}</p>
                   )}
                   {row.metrics.matchedUrl && (
-                    <p className="t-caption-sm text-[var(--brand-text-muted)] truncate">{row.metrics.matchedUrl}</p>
+                    <p className="t-ui text-[var(--brand-text-muted)] truncate">{row.metrics.matchedUrl}</p>
                   )}
                 </div>
               </div>
@@ -388,7 +388,7 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
                     )}
                   </div>
                   {row.metrics.matchedUrl && (
-                    <p className="mt-2 truncate t-caption-sm text-[var(--brand-text-muted)]">
+                    <p className="mt-2 truncate t-ui text-[var(--brand-text-muted)]">
                       Ranking URL: <span className="text-[var(--brand-text)]">{row.metrics.matchedUrl}</span>
                     </p>
                   )}
@@ -406,11 +406,11 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
                       <div key={market.marketId} className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="t-caption font-semibold text-[var(--brand-text-bright)]">{market.marketLabel}</p>
-                            <p className="t-caption-sm text-[var(--brand-text-muted)]">
+                            <p className="t-ui font-semibold text-[var(--brand-text-bright)]">{market.marketLabel}</p>
+                            <p className="t-ui text-[var(--brand-text-muted)]">
                               {typeof market.localRank === 'number' ? `Pack rank #${market.localRank}` : market.label}
                             </p>
-                            <p className="t-caption-sm text-[var(--brand-text-muted)]">{market.detail}</p>
+                            <p className="t-body text-[var(--brand-text-muted)]">{market.detail}</p>
                           </div>
                           <LocalSeoVisibilityBadge visibility={market} />
                         </div>
@@ -426,10 +426,10 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
                   <div className="mt-2 rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="t-caption font-semibold text-[var(--brand-text-bright)]">
+                        <p className="t-ui font-semibold text-[var(--brand-text-bright)]">
                           {row.localSeoState.marketLabel ?? row.localSeoState.lifecycleLabel}
                         </p>
-                        <p className="t-caption-sm text-[var(--brand-text-muted)]">{row.localSeoState.detail}</p>
+                        <p className="t-body text-[var(--brand-text-muted)]">{row.localSeoState.detail}</p>
                       </div>
                       <div className="flex flex-wrap justify-end gap-1.5">
                         <Badge label={row.localSeoState.priorityLabel} tone={localPriorityTone(row.localSeoState.priority)} variant="outline" shape="pill" />
@@ -459,20 +459,20 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
                 ) : null}
                 {row.localSeo?.topCompetitors && row.localSeo.topCompetitors.length > 0 && (
                   <div className="mt-2 rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
-                    <p className="t-caption-sm font-semibold text-[var(--brand-text-bright)]">Top local result evidence</p>
+                    <p className="t-ui font-semibold text-[var(--brand-text-bright)]">Top local result evidence</p>
                     <div className="mt-2 flex flex-col gap-1.5">
                       {row.localSeo.topCompetitors.slice(0, 3).map((result) => (
                         <div key={`${result.rank ?? 'rank'}-${result.title}`} className="flex items-center justify-between gap-3">
-                          <p className="truncate t-caption-sm text-[var(--brand-text)]">
+                          <p className="truncate t-ui text-[var(--brand-text)]">
                             {result.rank ? `#${result.rank} ` : ''}{result.title}
                           </p>
-                          {result.domain && <span className="truncate t-caption-sm text-[var(--blue)]">{result.domain}</span>}
+                          {result.domain && <span className="truncate t-ui text-[var(--blue)]">{result.domain}</span>}
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
-                <p className="mt-2 t-caption-sm text-[var(--brand-text-muted)]">
+                <p className="mt-2 t-body text-[var(--brand-text-muted)]">
                   Local SEO is market-specific local-pack visibility. Rank Tracker remains Search Console measurement.
                 </p>
               </div>

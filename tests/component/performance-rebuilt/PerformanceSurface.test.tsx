@@ -1,7 +1,7 @@
 // @ds-rebuilt
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '../../../src/components/Toast';
 import { PerformanceSurface } from '../../../src/components/performance-rebuilt/PerformanceSurface';
@@ -159,11 +159,17 @@ function renderSurface(path = '/ws/ws-1/performance?tab=weight', queryClient = c
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[path]}>
         <ToastProvider>
+          <LocationProbe />
           <PerformanceSurface workspaceId="ws-1" />
         </ToastProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <span data-testid="location-search" hidden>{location.search}</span>;
 }
 
 function FlaggedPerformance() {
@@ -227,6 +233,7 @@ describe('PerformanceSurface rebuilt admin surface', () => {
     expect(await screen.findByText('Pages with Assets')).toBeInTheDocument();
     expect(screen.getByText('page:/services')).toBeInTheDocument();
     expect(screen.getByText(/Last scanned Jul 6, 2026/)).toBeInTheDocument();
+    expect(screen.getByText("Open Asset Manager's audit lens to review oversized files and compression candidates.")).toHaveClass('t-body');
 
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'implant' } });
     await waitFor(() => expect(screen.queryByText('page:/services')).not.toBeInTheDocument());
@@ -241,6 +248,7 @@ describe('PerformanceSurface rebuilt admin surface', () => {
     const dialog = await screen.findByRole('dialog', { name: /page:\/services/i });
     expect(within(dialog).getByText('hero-services.jpg')).toBeInTheDocument();
     expect(within(dialog).getByText('>500KB')).toBeInTheDocument();
+    expect(within(dialog).getByText('Assets over 500KB are emphasized because they are strong compression candidates.')).toHaveClass('t-body');
   });
 
   it('receives the Page Speed deep link and runs single-page and bulk PageSpeed tests', async () => {
@@ -250,6 +258,7 @@ describe('PerformanceSurface rebuilt admin surface', () => {
     expect(await screen.findByLabelText('PageSpeed page')).toBeInTheDocument();
     expect(screen.getByText('Mobile average')).toBeInTheDocument();
     expect(screen.getByText('Field data')).toBeInTheDocument();
+    expect(screen.getAllByText('Lighthouse performance score plus the full Core Web Vitals set.')[0]).toHaveClass('t-body');
 
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'services' } });
     fireEvent.change(screen.getByLabelText('PageSpeed page'), { target: { value: 'page-services' } });
@@ -269,6 +278,18 @@ describe('PerformanceSurface rebuilt admin surface', () => {
     expect(screen.getByText('Home')).toBeInTheDocument();
   });
 
+  it('keeps the PageSpeed workflow connected to the Asset Manager repair home', async () => {
+    renderSurface('/ws/ws-1/performance?tab=speed');
+
+    expect(await screen.findByLabelText('PageSpeed page')).toBeInTheDocument();
+    expect(screen.getByText('Speed fixes start in Asset Manager')).toBeInTheDocument();
+    expect(screen.getByText(/Use PageSpeed to detect Core Web Vitals issues/i)).toHaveClass('t-body');
+    expect(screen.getByText(/compress oversized files before retesting/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open assets' }));
+    expect(screen.getByTestId('location-search')).toHaveTextContent('?tab=audit&filter=oversized');
+  });
+
   it('falls back from a bad tab to Page Weight and can switch lenses at runtime', async () => {
     renderSurface('/ws/ws-1/performance?tab=unknown');
 
@@ -276,6 +297,32 @@ describe('PerformanceSurface rebuilt admin surface', () => {
     fireEvent.click(screen.getByRole('radio', { name: /Page Speed/i }));
     expect(await screen.findByRole('radio', { name: /Page Speed/i })).toHaveAttribute('aria-checked', 'true');
     expect(await screen.findByLabelText('PageSpeed page')).toBeInTheDocument();
+  });
+
+  it('writes prototype tab state and clears the default Page Weight URL', async () => {
+    renderSurface('/ws/ws-1/performance');
+
+    expect(await screen.findByRole('radio', { name: /Page Weight/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId('location-search')).toBeEmptyDOMElement();
+
+    fireEvent.click(screen.getByRole('radio', { name: /Page Speed/i }));
+    await screen.findByLabelText('PageSpeed page');
+    expect(screen.getByTestId('location-search')).toHaveTextContent('?tab=speed');
+
+    fireEvent.click(screen.getByRole('radio', { name: /Page Weight/i }));
+    expect(await screen.findByText('Pages with Assets')).toBeInTheDocument();
+    expect(screen.getByTestId('location-search')).toBeEmptyDOMElement();
+  });
+
+  it('keeps internal implementation language out of PageSpeed detail copy', async () => {
+    renderSurface('/ws/ws-1/performance?tab=speed');
+
+    const servicesRows = await screen.findAllByText('Services');
+    fireEvent.click(servicesRows[0]);
+    const dialog = await screen.findByRole('dialog', { name: /services/i });
+
+    expect(within(dialog).queryByText(/deferred|shared destination contract/i)).not.toBeInTheDocument();
+    expect(within(dialog).getByText(/Most speed opportunities resolve in Asset Manager/i)).toBeInTheDocument();
   });
 
   it('meets the a11y floor after skeletons clear', async () => {

@@ -135,7 +135,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
 
   // ── Container classes ──
   const containerCls = cn(
-    'shadow-2xl shadow-black/40 z-[var(--z-modal)] flex flex-col',
+    'shadow-2xl shadow-black/40 z-[var(--z-tooltip)] flex flex-col',
     docked
       ? 'fixed top-0 right-0 h-screen border-l border-[var(--brand-border)] bg-[var(--surface-2)]'
       : 'fixed bottom-6 right-6 bg-[var(--surface-2)] rounded-[var(--radius-xl)] border border-[var(--brand-border)] overflow-hidden'
@@ -146,7 +146,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
       {/* ── Floating trigger button ── */}
       {!open && (
         <Button onClick={() => setOpen(true)} variant="primary" size="lg" icon={Bot}
-          className="fixed bottom-6 right-6 rounded-[var(--radius-pill)] shadow-lg shadow-black/30 z-[var(--z-modal)]">
+          className="fixed bottom-6 right-6 hidden rounded-[var(--radius-pill)] shadow-lg shadow-black/30 z-[var(--z-tooltip)] sm:inline-flex">
           Admin Insights
         </Button>
       )}

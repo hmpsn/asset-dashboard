@@ -60,6 +60,9 @@ interface AssetManagerSurfaceProps {
   workspaceId: string;
 }
 
+const HEADER_WRAP_CLASS = 'flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible [&_p]:text-clip';
+const ASSETS_SUBTITLE = 'Browse, compress, rename, and add alt text to Webflow assets at the source.';
+
 interface WorkspaceData {
   id: string;
   name: string;
@@ -746,7 +749,7 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
   if (workspaceQuery.isError || !workspace) {
     return (
       <div className="flex min-h-full flex-col gap-5">
-        <PageHeader title="Assets" subtitle="Browse, audit, and upload Webflow media." />
+        <PageHeader title="Assets" subtitle={ASSETS_SUBTITLE} className={HEADER_WRAP_CLASS} />
         <ErrorState
           type="data"
           title="Workspace did not load"
@@ -760,7 +763,7 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
   if (!siteId) {
     return (
       <div className="flex min-h-full flex-col gap-5">
-        <PageHeader title="Assets" subtitle="Browse, audit, and upload Webflow media." />
+        <PageHeader title="Assets" subtitle={ASSETS_SUBTITLE} className={HEADER_WRAP_CLASS} />
         <EmptyState
           icon={LockedIcon}
           title="Link a Webflow site"
@@ -781,7 +784,8 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
     <div className="flex min-h-full flex-col gap-5">
       <PageHeader
         title="Assets"
-        subtitle="Browse Webflow media, run asset audits, and send uploads through the existing processing pipeline."
+        subtitle={ASSETS_SUBTITLE}
+        className={HEADER_WRAP_CLASS}
         actions={(
           <div className="flex flex-wrap items-center justify-end gap-2">
             {lastUpdated && <span className="t-caption-sm text-[var(--brand-text-muted)]">Data as of {lastUpdated}</span>}
@@ -798,13 +802,14 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
           options={lensOptions}
           value={state.lens}
           onChange={(value) => state.setLens(value as typeof state.lens)}
+          className="flex-wrap"
         />
         {(state.lens === 'browse' || state.lens === 'audit') && (
           <SearchField
             value={state.searchInput}
             onChange={state.setSearchInput}
             placeholder={state.lens === 'audit' ? 'Search issues...' : 'Search filename or alt text...'}
-            className="min-w-[260px]"
+            className="w-full min-w-0 sm:w-auto sm:min-w-[260px]"
           />
         )}
         <ToolbarSpacer />
@@ -884,6 +889,12 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
             )}
           </div>
 
+          <InlineBanner tone="info" title="Fixes the source, not the symptom.">
+            <p className="t-body">
+              Compressing writes optimized assets back to Webflow and updates selected CMS references, so PageSpeed and Site Audit media findings clear from the source.
+            </p>
+          </InlineBanner>
+
           {isCmsFilter && cmsQuery.data?.collections && (
             <CmsFieldSelector
               collections={cmsQuery.data.collections}
@@ -961,6 +972,12 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
               onClearFilters={state.clearAll}
             />
           )}
+
+          <InlineBanner tone="success" title="From media fix to proof">
+            <p className="t-body">
+              A compression pass that improves Core Web Vitals or page speed can graduate into Insights Engine once the measured lift lands.
+            </p>
+          </InlineBanner>
         </>
       )}
 

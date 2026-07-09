@@ -239,7 +239,7 @@ export function SchemaPageDrawer({
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--brand-border)] px-4 py-3">
               <div>
                 <div className="t-ui font-semibold text-[var(--brand-text-bright)]">JSON-LD workspace</div>
-                <div className="t-caption-sm text-[var(--brand-text-muted)]">Review generated markup, compare existing JSON-LD, or edit the effective schema.</div>
+                <div className="t-body text-[var(--brand-text-muted)]">Review generated markup, compare existing JSON-LD, or edit the effective schema.</div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {page.existingSchemaJson && page.existingSchemaJson.length > 0 && (
@@ -326,7 +326,7 @@ export function SchemaPageDrawer({
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Publish and send</div>
-              <div className="t-caption-sm text-[var(--brand-text-muted)]">Validate the graph gate, publish through existing services, or send the effective schema to the client.</div>
+              <div className="t-body text-[var(--brand-text-muted)]">Validate graph safety, publish to Webflow or CMS, or send the effective schema to the client.</div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {published ? (

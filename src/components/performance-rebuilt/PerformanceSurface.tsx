@@ -10,6 +10,9 @@ interface PerformanceSurfaceProps {
   workspaceId: string;
 }
 
+const HEADER_WRAP_CLASS = 'flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible [&_p]:text-clip';
+const PERFORMANCE_SUBTITLE = 'Page weight and Core Web Vitals. Heavy pages fix in Asset Manager.';
+
 export function PerformanceSurface({ workspaceId }: PerformanceSurfaceProps) {
   const state = usePerformanceSurfaceState();
   const workspaces = useWorkspaces();
@@ -34,7 +37,8 @@ export function PerformanceSurface({ workspaceId }: PerformanceSurfaceProps) {
       <div className="flex min-h-full flex-col gap-5">
         <PageHeader
           title="Performance"
-          subtitle="Page weight, Core Web Vitals, and PageSpeed diagnostics."
+          subtitle={PERFORMANCE_SUBTITLE}
+          className={HEADER_WRAP_CLASS}
         />
         <ErrorState
           type="data"
@@ -52,7 +56,8 @@ export function PerformanceSurface({ workspaceId }: PerformanceSurfaceProps) {
       <div className="flex min-h-full flex-col gap-5">
         <PageHeader
           title="Performance"
-          subtitle="Page weight, Core Web Vitals, and PageSpeed diagnostics."
+          subtitle={PERFORMANCE_SUBTITLE}
+          className={HEADER_WRAP_CLASS}
         />
         <ErrorState
           type="permission"
@@ -68,7 +73,8 @@ export function PerformanceSurface({ workspaceId }: PerformanceSurfaceProps) {
     <div className="flex min-h-full flex-col gap-5">
       <PageHeader
         title="Performance"
-        subtitle="Page weight, Core Web Vitals, and PageSpeed diagnostics."
+        subtitle={PERFORMANCE_SUBTITLE}
+        className={HEADER_WRAP_CLASS}
       />
 
       <Toolbar label="Performance view controls" className="w-full">

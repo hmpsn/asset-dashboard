@@ -71,7 +71,7 @@ function toRecords(domains: CompetitiveDomain[]): DomainRecord[] {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'SEO provider data is temporarily unavailable.';
+  return error instanceof Error ? error.message : 'SEO data is temporarily unavailable.';
 }
 
 export function HeadToHeadTable({
@@ -190,13 +190,13 @@ export function HeadToHeadTable({
       </div>
 
       {data?.degraded && (
-        <InlineBanner tone="warning" title="Some live provider data is unavailable">
-          Showing the metrics that loaded. {data.providerFailures?.length ? `${data.providerFailures.length} provider read(s) degraded.` : null}
+        <InlineBanner tone="warning" title="Some live competitor data is unavailable">
+          Showing the metrics that loaded. {data.providerFailures?.length ? `${data.providerFailures.length} competitor data read(s) degraded.` : null}
         </InlineBanner>
       )}
 
       {isError && data && (
-        <InlineBanner tone="warning" title="Live fetch failed - showing cached data.">
+        <InlineBanner tone="warning" title="Showing the last loaded competitor data">
           <div className="flex flex-wrap items-center gap-2">
             <span>{errorMessage(error)}</span>
             <Button size="sm" variant="secondary" onClick={onRetry}>Retry</Button>
@@ -219,7 +219,7 @@ export function HeadToHeadTable({
         <EmptyState
           icon={EmptyIcon}
           title="No competitive metrics returned"
-          description="The provider did not return usable domain comparison data for this set."
+          description="The latest scan did not return usable domain comparison data for this set."
         />
       ) : (
         <DataTable

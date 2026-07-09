@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { SiteAuditSurface } from '../../../src/components/site-audit-rebuilt/SiteAuditSurface';
 import { ToastProvider } from '../../../src/components/Toast';
 import { useFeatureFlag } from '../../../src/hooks/useFeatureFlag';
@@ -221,10 +221,21 @@ function renderSurface(initialEntry = '/ws/ws-1/seo-audit') {
       <MemoryRouter initialEntries={[initialEntry]}>
         <ToastProvider>
           <SiteAuditSurface workspaceId="ws-1" />
+          <LocationProbe />
         </ToastProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <span data-testid="location-search">{location.search}</span>;
+}
+
+function expectTextWithClass(text: string | RegExp, className: string) {
+  const matches = screen.getAllByText(text);
+  expect(matches.some((element) => element.classList.contains(className))).toBe(true);
 }
 
 function FlaggedHarness() {
@@ -252,6 +263,66 @@ describe('SiteAuditSurface rebuilt', () => {
   it('falls back to audit for an invalid sub param', async () => {
     renderSurface('/ws/ws-1/seo-audit?sub=unknown');
     expect(await screen.findByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();
+  });
+
+  it('writes prototype sub state and clears the default audit URL', async () => {
+    renderSurface('/ws/ws-1/seo-audit');
+    expect(await screen.findByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();
+    expect(screen.getByTestId('location-search')).toHaveTextContent('');
+    expect(screen.getByRole('radio', { name: /Site Audit/ })).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.click(screen.getByRole('radio', { name: /History/ }));
+    expect(screen.getByTestId('location-search')).toHaveTextContent('?sub=history');
+    expect(await screen.findByTestId('site-audit-history-view')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('radio', { name: /Site Audit/ }));
+    expect(screen.getByTestId('location-search')).toHaveTextContent('');
+    expect(await screen.findByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();
+  });
+
+  it('opens schedule and issue detail drawers exactly once', async () => {
+    renderSurface('/ws/ws-1/seo-audit');
+    expect(await screen.findByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Schedule/ }));
+    expect(screen.getByRole('dialog', { name: /Scheduled Audits/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expectTextWithClass('Enabled schedules run in the background and reuse the same snapshot history.', 't-body');
+    expectTextWithClass('Run every', 't-label');
+    expectTextWithClass('Alert on score drop', 't-label');
+    expectTextWithClass('Schedules are additive to manual runs. Operators can still run an on-demand audit at any time.', 't-body');
+
+    fireEvent.click(screen.getByRole('button', { name: /Cancel/ }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Missing title'));
+    expect(screen.getByRole('dialog', { name: 'title' })).toBeInTheDocument();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(screen.getByText('Affected pages')).toBeInTheDocument();
+    expectTextWithClass('Recommendation', 't-ui');
+    expectTextWithClass('Add a specific page title.', 't-body');
+    expectTextWithClass('Send to client', 't-ui');
+    expectTextWithClass('Affected pages', 't-ui');
+    expectTextWithClass('Home', 't-ui');
+  });
+
+  it('uses styleguide roles for the audit decision console', async () => {
+    renderSurface('/ws/ws-1/seo-audit');
+
+    expect(await screen.findByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();
+    expectTextWithClass('2 pages analyzed. Noindex pages stay out of score denominators.', 't-body');
+    expectTextWithClass('Missing title', 't-ui');
+    expectTextWithClass('Add a specific page title.', 't-caption');
+    expectTextWithClass('Showing 2 of 2 issue groups', 't-ui');
+    expectTextWithClass('From fix to proof', 't-ui');
+    expectTextWithClass(/Technical fixes stay in Site Audit and Cockpit until traffic, crawlability, or Core Web Vitals recovery is measurable./i, 't-body');
+  });
+
+  it('keeps internal rebuild and migration language out of the visible audit shell', async () => {
+    const { container } = renderSurface('/ws/ws-1/seo-audit?sub=audit');
+    expect(await screen.findByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();
+
+    expect(container).not.toHaveTextContent(/receiver|subview|\bT1\b|carry-over|mounted below|legacy alias|rebuild|migration|URL state|route tab/i);
   });
 
   it('mounts behind a real useFeatureFlag loading to loaded transition', async () => {

@@ -136,7 +136,7 @@ function SuggestionDrawer({
             <p className="mt-1 break-all t-caption-sm text-[var(--brand-text-muted)]">{suggestion.toPage}</p>
           </div>
           <InlineBanner tone="info" title="Why this link">
-            {suggestion.reason}
+            <p className="t-body text-[var(--brand-text-muted)]">{suggestion.reason}</p>
           </InlineBanner>
           <pre className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-3 py-2 t-caption-sm text-[var(--brand-text)]">
             {htmlForSuggestion(suggestion)}
@@ -463,7 +463,9 @@ export function InternalLinksLens({
 
       {data.attemptedPageCount && data.attemptedPageCount !== data.pageCount && (
         <InlineBanner tone={data.pageCount < data.attemptedPageCount * 0.5 ? 'warning' : 'info'} title="Partial page fetch">
-          Analyzed {data.pageCount} of {data.attemptedPageCount} attempted pages. Password gates or unreachable pages can make results incomplete.
+          <p className="t-body text-[var(--brand-text-muted)]">
+            Analyzed {data.pageCount} of {data.attemptedPageCount} attempted pages. Password gates or unreachable pages can make results incomplete.
+          </p>
         </InlineBanner>
       )}
 
@@ -524,13 +526,17 @@ export function InternalLinksLens({
 
       {data.suggestions.length === 0 && (
         <InlineBanner tone="success" title="No internal-link gaps detected">
-          Your site has good internal-link coverage for the pages that were analyzed.
+          <p className="t-body text-[var(--brand-text-muted)]">
+            Your site has good internal-link coverage for the pages that were analyzed.
+          </p>
         </InlineBanner>
       )}
 
       {data.suggestions.length > 0 && (
         <InlineBanner tone="info" title="How to implement">
-          Copy the generated HTML, open the source page in Webflow or the SEO Editor, and place the link naturally in the body copy.
+          <p className="t-body text-[var(--brand-text-muted)]">
+            Copy the generated HTML, open the source page in Webflow or the SEO Editor, and place the link naturally in the body copy.
+          </p>
         </InlineBanner>
       )}
 

@@ -25,7 +25,6 @@ import {
   PageHeader,
   Skeleton,
   Toolbar,
-  ToolbarSpacer,
   WorkflowStepper,
   type MenuItem,
   type Tier,
@@ -245,25 +244,26 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
       <div className="flex min-h-full flex-col gap-5" data-rebuild-flag={shellFlagEnabled ? 'on' : 'default'}>
         <PageHeader
           title="Content Pipeline"
-          subtitle="Plan, brief, draft, publish, and read back content performance from one admin cockpit."
+          subtitle="Move content from opportunity to published proof without losing the next action."
+          className="flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible [&>div:last-child]:w-full sm:[&>div:last-child]:w-auto"
           actions={(
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {dataAsOf !== '—' && <span className="t-caption-sm text-[var(--brand-text-muted)]">Workspace since {dataAsOf}</span>}
+            <div data-testid="content-pipeline-header-actions" className="flex w-full max-w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+              {dataAsOf !== '—' && <span className="block w-full t-caption-sm text-[var(--brand-text-muted)] sm:w-auto">Workspace since {dataAsOf}</span>}
               <Menu
                 align="end"
                 trigger={(
-                  <Button size="sm" variant="secondary">
+                  <Button size="sm" variant="secondary" className="w-full sm:w-auto">
                     <Icon name="download" size="sm" />
                     Export
                   </Button>
                 )}
                 items={exportMenuItems}
               />
-              <Button size="sm" variant="secondary" onClick={() => void handleRefresh()} disabled={pipelineQuery.isFetching || intelligence.isFetching}>
+              <Button size="sm" variant="secondary" className="w-full sm:w-auto" onClick={() => void handleRefresh()} disabled={pipelineQuery.isFetching || intelligence.isFetching}>
                 <Icon name="refresh" size="sm" />
                 Refresh
               </Button>
-              <Button size="sm" variant="secondary" onClick={() => setGuideOpen(true)}>
+              <Button size="sm" variant="secondary" className="w-full sm:w-auto" onClick={() => setGuideOpen(true)}>
                 <Icon name="info" size="sm" />
                 Guide
               </Button>
@@ -279,8 +279,6 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
             onChange={(value) => state.setTab(value as ContentPipelineTab)}
             size="sm"
           />
-          <ToolbarSpacer />
-          <Badge label={state.rawTab === 'subscriptions' ? 'subscriptions alias' : '?tab= receiver'} tone="zinc" variant="soft" size="sm" />
         </Toolbar>
 
         {pipelineQuery.isLoading && !pipelineData ? (
@@ -300,11 +298,11 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
         <WorkflowStepper steps={workflowSteps} compact />
 
         <GroupBlock
-          title="Cockpit"
-          meta="Every current content subsystem is mounted below as a carried-over mode; the shell owns routing and summaries only."
+          title="Pipeline map"
+          meta="Choose the workspace that matches the next step: plan, brief, draft, publish, repair, or read back results."
           stats={[
-            { label: 'Active tab', value: CONTENT_PIPELINE_TABS.find((tab) => tab.id === state.tab)?.label ?? state.tab, color: TAB_ACCENT[state.tab] },
-            { label: 'Post receiver', value: state.postId ? 'armed' : 'idle', color: state.postId ? 'var(--teal)' : 'var(--blue)' },
+            { label: 'Current view', value: CONTENT_PIPELINE_TABS.find((tab) => tab.id === state.tab)?.label ?? state.tab, color: TAB_ACCENT[state.tab] },
+            { label: 'Open draft', value: state.postId ? 'selected' : 'none', color: state.postId ? 'var(--teal)' : 'var(--blue)' },
           ]}
           collapsible
           defaultOpen={state.tab === 'briefs'}
@@ -324,7 +322,7 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
 
         {state.postId && state.tab === 'posts' && (
           <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2">
-            <KeyValueRow label="Post deep-link receiver" value={state.postId} divider={false} mono />
+            <KeyValueRow label="Selected draft" value={state.postId} divider={false} mono />
           </div>
         )}
 
@@ -346,7 +344,7 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
           open={guideOpen}
           onClose={() => setGuideOpen(false)}
           title="Content Pipeline Guide"
-          subtitle="Carry-over workflow guide for planner, briefs, posts, subscriptions, and exports."
+          subtitle="Workflow guide for planning, briefs, drafts, subscriptions, and exports."
           eyebrow="Workflow guide"
           width={560}
         >

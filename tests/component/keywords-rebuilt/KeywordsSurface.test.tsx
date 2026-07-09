@@ -622,7 +622,9 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByText('2 selected')).toBeInTheDocument();
 
     expect(screen.getByText('Client keyword feedback')).toBeInTheDocument();
-    expect(screen.getByText('dental implants')).toBeInTheDocument();
+    expect(screen.getByText('dental implants')).toHaveClass('t-ui');
+    expect(screen.getByText('Client wants this service prioritized.')).toHaveClass('t-body');
+    expect(screen.getByText(/Clicks & impressions:/)).toHaveClass('t-body');
     fireEvent.click(screen.getAllByRole('button', { name: 'Add to strategy' }).at(-1)!);
     expect(rowActionMutateMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -680,11 +682,13 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(within(dialog).getByText('$2,400/mo')).toBeInTheDocument();
     expect(within(dialog).getByText('strategy primary')).toBeInTheDocument();
     expect(within(dialog).getAllByText('Austin').length).toBeGreaterThan(0);
-    expect(within(dialog).getByText('Live SERP #4')).toBeInTheDocument();
+    expect(within(dialog).getByText('Live SERP #4')).toHaveClass('t-ui');
     expect(within(dialog).getByText('Cited in AI Overview')).toBeInTheDocument();
     expect(within(dialog).getByText('Snippet')).toBeInTheDocument();
     expect(within(dialog).getByText('Visible #2')).toBeInTheDocument();
-    expect(within(dialog).getByText(/Austin Smile Studio/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Austin Smile Studio/)).toHaveClass('t-ui');
+    expect(within(dialog).getByText('Top local result evidence')).toHaveClass('t-ui');
+    expect(within(dialog).getByText(/Local SEO is market-specific local-pack visibility/)).toHaveClass('t-body');
     expect(within(dialog).getByRole('button', { name: 'Generate brief' })).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
@@ -695,6 +699,11 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('heading', { name: 'emergency dentist' })).toBeInTheDocument();
     expect(within(dialog).getByText('Tracked client keyword')).toBeInTheDocument();
+    expect(within(dialog).getByText('No sources linked')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('—').length).toBeGreaterThan(0);
+    expect(within(dialog).queryByText('No CPC')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Keyword command center/i)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/No source labels/i)).not.toBeInTheDocument();
   });
 
   it('invalidates the keyword command-center prefix for live workspace events', () => {
@@ -851,6 +860,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     renderSurface('/ws/ws-1/seo-keywords');
 
     expect(screen.getByText('Keyword intelligence is locked')).toBeInTheDocument();
+    expect(screen.queryByText(/command-center access/i)).not.toBeInTheDocument();
     expect(screen.queryByText('cosmetic dentistry')).not.toBeInTheDocument();
   });
 

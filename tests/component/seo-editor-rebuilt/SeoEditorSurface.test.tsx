@@ -316,6 +316,11 @@ function StateProbe() {
   );
 }
 
+function expectTextWithClass(text: string | RegExp, className: string) {
+  const matches = screen.getAllByText(text);
+  expect(matches.some((element) => element.classList.contains(className))).toBe(true);
+}
+
 describe('SeoEditorSurface rebuilt', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -365,6 +370,56 @@ describe('SeoEditorSurface rebuilt', () => {
     expect(screen.getByRole('radio', { name: 'Research' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('dialog', { name: 'Services' })).toBeInTheDocument();
     expect(screen.getByText('Metadata recommendations')).toBeInTheDocument();
+    expectTextWithClass('Rename the page title here. H1 and slug stay read-only until a writable field is connected.', 't-body');
+    expectTextWithClass('OpenGraph mirrors these fields when the page is saved.', 't-body');
+  });
+
+  it('uses operator-facing source and filter labels for URL state', () => {
+    const { unmount } = renderWithProviders(<SeoEditorSurface workspaceId="ws-1" />, '/ws/ws-1/seo-editor?source=cms-item');
+
+    expect(screen.getByText(/1 row · CMS/i)).toBeInTheDocument();
+    expectTextWithClass(/1 row · CMS/i, 't-ui');
+    expect(screen.queryByText(/cms-item|needs-meta|static-page/i)).not.toBeInTheDocument();
+
+    unmount();
+    renderWithProviders(<SeoEditorSurface workspaceId="ws-1" />, '/ws/ws-1/seo-editor?filter=needs-meta');
+
+    expect(screen.getByText(/1 row · Missing meta/i)).toBeInTheDocument();
+    expectTextWithClass(/1 row · Missing meta/i, 't-ui');
+    expect(screen.queryByText(/cms-item|needs-meta|static-page/i)).not.toBeInTheDocument();
+  });
+
+  it('uses styleguide typography roles for worksheet primary data', () => {
+    renderWithProviders(<SeoEditorSurface workspaceId="ws-1" />);
+
+    expectTextWithClass(/3 rows/i, 't-ui');
+    expectTextWithClass('Services', 't-ui');
+    expectTextWithClass('Services SEO', 't-ui');
+    expectTextWithClass('Book local services.', 't-caption');
+  });
+
+  it('uses readable body copy in research empty and no-recommendation states', () => {
+    const { unmount } = renderWithProviders(<SeoEditorSurface workspaceId="ws-1" />, '/ws/ws-1/seo-editor?tab=research');
+
+    expectTextWithClass('Open a row to review its page-specific research context.', 't-body');
+
+    unmount();
+    renderWithProviders(<SeoEditorSurface workspaceId="ws-1" />, '/ws/ws-1/seo-editor?tab=research&page=item-1');
+
+    expectTextWithClass('No metadata recommendations are attached to this row.', 't-body');
+  });
+
+  it('does not expose implementation language in the loaded worksheet or detail drawer', () => {
+    const { unmount } = renderWithProviders(<SeoEditorSurface workspaceId="ws-1" />, '/ws/ws-1/seo-editor?tab=research&page=page-1');
+
+    expect(screen.getByRole('dialog', { name: 'Services' })).toBeInTheDocument();
+    expect(screen.queryByText(/existing|server-backed|endpoint|v1|PATCH route|projection/i)).not.toBeInTheDocument();
+
+    unmount();
+    renderWithProviders(<SeoEditorSurface workspaceId="ws-1" />, '/ws/ws-1/seo-editor?page=item-1');
+
+    expect(screen.getByRole('dialog', { name: 'CMS Post' })).toBeInTheDocument();
+    expect(screen.queryByText(/existing|server-backed|endpoint|v1|PATCH route|projection/i)).not.toBeInTheDocument();
   });
 
   it('filters sources and preserves manual rows as visible-only', () => {

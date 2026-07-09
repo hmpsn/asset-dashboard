@@ -16,7 +16,7 @@ export function DiagnosticsLens({ workspaceId }: DiagnosticsLensProps) {
         <EmptyState
           icon={({ className }) => <Icon name="gauge" className={className} />}
           title="Choose a workspace"
-          description="Diagnostics need a workspace-scoped route before reports can load."
+          description="Choose a workspace to inspect diagnostic reports and run history."
         />
       </PageContainer>
     );

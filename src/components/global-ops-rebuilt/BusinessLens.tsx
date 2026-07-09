@@ -108,7 +108,7 @@ export function BusinessLens({ defaultTab }: BusinessLensProps) {
         <PageHeader
           title="Business"
           subtitle="Revenue, AI cost, feature catalog, and prospect audit operations."
-          actions={<Badge label="Additive aliases" tone="blue" variant="soft" />}
+          actions={<Badge label="Unified business view" tone="blue" variant="soft" />}
         />
 
         {invalidTab && (
@@ -143,7 +143,7 @@ export function BusinessLens({ defaultTab }: BusinessLensProps) {
         <SectionCard
           title={TAB_LABELS[tab]}
           titleIcon={<Icon name={tab === 'revenue' ? 'trophy' : tab === 'ai-usage' ? 'zap' : tab === 'features' ? 'layers' : 'globe'} size="md" className="text-[var(--teal)]" />}
-          titleExtra={<Badge label="Legacy parity carried over" tone="zinc" variant="soft" />}
+          titleExtra={<Badge label="Live operations" tone="zinc" variant="soft" />}
           noPadding
         >
           <div className="p-4">{activeContent}</div>

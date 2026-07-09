@@ -1,9 +1,8 @@
 // @ds-rebuilt
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminPath } from '../../routes';
 import { useToast } from '../Toast';
-import { Button, Icon, InlineBanner, LensSwitcher, PageHeader, Toolbar, ToolbarSpacer } from '../ui';
+import { Button, Icon, InlineBanner, PageHeader } from '../ui';
 import { PageRewriterChatPane } from './PageRewriterChatPane';
 import { PageRewriterDocumentPane } from './PageRewriterDocumentPane';
 import { PageRewriterPagePicker } from './PageRewriterPagePicker';
@@ -13,35 +12,20 @@ interface PageRewriterSurfaceProps {
   workspaceId: string;
 }
 
-type PageRewriterView = 'split' | 'chat' | 'document';
-
-const VIEW_OPTIONS: Array<{ value: PageRewriterView; label: string }> = [
-  { value: 'split', label: 'Split' },
-  { value: 'chat', label: 'Chat' },
-  { value: 'document', label: 'Document' },
-];
-
-function isPageRewriterView(value: string): value is PageRewriterView {
-  return VIEW_OPTIONS.some((option) => option.value === value);
-}
+const HEADER_WRAP_CLASS = 'flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible [&_p]:text-clip';
+const WORKSPACE_GRID_CLASS = 'grid gap-4 xl:grid-cols-[minmax(360px,44%)_minmax(0,1fr)]';
 
 export function PageRewriterSurface({ workspaceId }: PageRewriterSurfaceProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const state = usePageRewriterSurfaceState({ workspaceId, toast });
-  const [view, setView] = useState<PageRewriterView>('split');
-
-  const showChat = view === 'split' || view === 'chat';
-  const showDocument = view === 'split' || view === 'document';
-  const gridClass = view === 'split'
-    ? 'grid gap-4 xl:grid-cols-[minmax(360px,44%)_minmax(0,1fr)]'
-    : 'grid gap-4';
 
   return (
     <div className="flex min-h-full flex-col gap-5">
       <PageHeader
         title="Page Rewriter"
         subtitle="Load a live page, rewrite sections with page intelligence, and export the edited draft."
+        className={HEADER_WRAP_CLASS}
         actions={(
           <Button
             size="sm"
@@ -53,24 +37,6 @@ export function PageRewriterSurface({ workspaceId }: PageRewriterSurfaceProps) {
           </Button>
         )}
       />
-
-      <Toolbar label="Page rewriter controls" className="w-full">
-        <LensSwitcher
-          id="page-rewriter-view"
-          options={VIEW_OPTIONS}
-          value={view}
-          onChange={(value) => {
-            if (isPageRewriterView(value)) setView(value);
-          }}
-          size="sm"
-        />
-        <ToolbarSpacer />
-        {state.pageData?.primaryKeyword && (
-          <span className="t-caption text-[var(--brand-text-muted)]">
-            Primary keyword: <span className="font-semibold text-[var(--teal)]">{state.pageData.primaryKeyword}</span>
-          </span>
-        )}
-      </Toolbar>
 
       <PageRewriterPagePicker
         pageData={state.pageData}
@@ -95,13 +61,13 @@ export function PageRewriterSurface({ workspaceId }: PageRewriterSurfaceProps) {
 
       {state.invalidPageUrlParam && (
         <InlineBanner tone="warning" size="sm" title="Page link ignored">
-          The pageUrl parameter must be a full http or https URL.
+          The page link in this URL must be a full http or https address.
         </InlineBanner>
       )}
 
-      <div className={gridClass}>
-        {showChat && <PageRewriterChatPane state={state} />}
-        {showDocument && <PageRewriterDocumentPane state={state} onOpenPicker={state.openCombo} />}
+      <div className={WORKSPACE_GRID_CLASS}>
+        <PageRewriterChatPane state={state} />
+        <PageRewriterDocumentPane state={state} onOpenPicker={state.openCombo} />
       </div>
     </div>
   );

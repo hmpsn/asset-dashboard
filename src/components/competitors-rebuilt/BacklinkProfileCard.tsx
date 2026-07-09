@@ -104,7 +104,7 @@ export function BacklinkProfileCard({ workspaceId }: BacklinkProfileCardProps) {
           Backlink profile
         </h2>
         <p className="t-caption-sm text-[var(--brand-text-muted)]">
-          Authority footprint and the top referring domains currently visible to the provider.
+          Authority footprint and the top referring domains for this site.
         </p>
       </div>
 
@@ -115,7 +115,7 @@ export function BacklinkProfileCard({ workspaceId }: BacklinkProfileCardProps) {
       ) : errorMessage ? (
         <InlineBanner
           tone={errorMessage.includes('No SEO data provider configured') ? 'warning' : 'error'}
-          title={errorMessage.includes('No SEO data provider configured') ? 'Backlink data requires DataForSEO' : 'Backlink profile did not load'}
+          title={errorMessage.includes('No SEO data provider configured') ? 'Backlink data needs SEO provider credentials' : 'Backlink profile did not load'}
         >
           {errorMessage.includes('No SEO data provider configured') ? (
             <span>
@@ -134,24 +134,24 @@ export function BacklinkProfileCard({ workspaceId }: BacklinkProfileCardProps) {
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricTile label="Total backlinks" value={NUMBER_FORMAT.format(data.overview.totalBacklinks)} accent="var(--blue)" />
-            <MetricTile label="Ref. domains" value={NUMBER_FORMAT.format(data.overview.referringDomains)} accent="var(--teal)" />
+            <MetricTile label="Ref. domains" value={NUMBER_FORMAT.format(data.overview.referringDomains)} accent="var(--blue)" />
             <MetricTile
               label="Follow links"
               value={`${Math.round((data.overview.followLinks / Math.max(1, data.overview.totalBacklinks)) * 100)}%`}
               sub={`${NUMBER_FORMAT.format(data.overview.followLinks)} follow`}
-              accent="var(--emerald)"
+              accent="var(--blue)"
             />
             <MetricTile
               label="Link types"
               value={`${NUMBER_FORMAT.format(data.overview.textLinks)} text`}
               sub={`${NUMBER_FORMAT.format(data.overview.imageLinks)} image`}
-              accent="var(--amber)"
+              accent="var(--blue)"
             />
           </div>
 
           {data.referringDomains.length === 0 ? (
             <InlineBanner tone="info" title="No referring domains returned">
-              The provider returned backlink totals but no domain-level rows.
+              The backlink scan returned totals but no domain-level rows.
             </InlineBanner>
           ) : (
             <DataTable

@@ -55,15 +55,15 @@ export function PageRewriterChatPane({ state }: PageRewriterChatPaneProps) {
         <div className="flex flex-wrap items-center gap-2">
           <Icon name="sparkle" size="md" className="text-[var(--teal)]" />
           <h2 className="t-ui font-semibold text-[var(--brand-text-bright)]">Rewrite assistant</h2>
-          {keyword && <Badge label={`Target: ${keyword}`} tone="teal" variant="soft" shape="pill" />}
+          {keyword && <Badge label={`Target: ${keyword}`} tone="blue" variant="soft" shape="pill" />}
         </div>
-        <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">
+        <p className="mt-1 t-body text-[var(--brand-text-muted)]">
           Rewrite sections, reshape headings, and draft answer-first copy for the loaded page.
         </p>
       </div>
 
       <div className="border-b border-[var(--brand-border)] px-4 py-3">
-        <div className="flex flex-wrap gap-2" aria-label="Rewrite playbook prompts">
+        <div className="grid gap-2 sm:flex sm:flex-wrap" aria-label="Rewrite playbook prompts">
           {QUICK_PROMPTS.map((prompt) => {
             const chip = (
               <FilterChip
@@ -71,6 +71,7 @@ export function PageRewriterChatPane({ state }: PageRewriterChatPaneProps) {
                 label={prompt}
                 active={false}
                 onClick={assistantDisabled ? undefined : () => void state.sendMessage(prompt)}
+                className="w-full justify-start whitespace-normal text-left leading-snug sm:w-auto [&>button]:min-w-0 [&>button]:whitespace-normal [&>button]:text-left"
               />
             );
             if (!state.aiDisabledReason) return chip;
@@ -106,7 +107,7 @@ export function PageRewriterChatPane({ state }: PageRewriterChatPaneProps) {
             </div>
             <div className="max-w-md">
               <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Start with a page-specific rewrite</h3>
-              <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">
+              <p className="mt-1 t-body text-[var(--brand-text-muted)]">
                 {state.pageData
                   ? keyword
                     ? `This page is loaded with ${keyword} as the primary keyword.`
@@ -133,7 +134,7 @@ export function PageRewriterChatPane({ state }: PageRewriterChatPaneProps) {
                         <div
                           contentEditable
                           suppressContentEditableWarning
-                          className="rounded-[var(--radius-md)] border border-transparent p-1 -m-1 t-caption leading-relaxed text-[var(--brand-text-bright)] focus:outline-none focus-visible:border-[var(--teal)] focus-visible:ring-2 focus-visible:ring-[var(--brand-mint-glow)]"
+                          className="rounded-[var(--radius-md)] border border-transparent p-1 -m-1 t-body leading-relaxed text-[var(--brand-text-bright)] focus:outline-none focus-visible:border-[var(--teal)] focus-visible:ring-2 focus-visible:ring-[var(--brand-mint-glow)]"
                           onInput={(event) => state.setMsgEdits((prev) => ({ ...prev, [index]: event.currentTarget.innerText }))}
                           ref={(el) => {
                             if (el && !el.dataset.initialized) {
@@ -163,7 +164,7 @@ export function PageRewriterChatPane({ state }: PageRewriterChatPaneProps) {
                       </>
                     ) : message.role === 'assistant' ? (
                       <>
-                        <div className="t-caption leading-relaxed text-[var(--brand-text-bright)]">
+                        <div className="t-body leading-relaxed text-[var(--brand-text-bright)]">
                           <RenderMarkdown text={message.content} />
                         </div>
                         <div className="mt-3 flex items-center gap-2 border-t border-[var(--brand-border)] pt-2">
@@ -174,7 +175,7 @@ export function PageRewriterChatPane({ state }: PageRewriterChatPaneProps) {
                         </div>
                       </>
                     ) : (
-                      <p className="whitespace-pre-wrap t-caption leading-relaxed text-[var(--brand-text-bright)]">{message.content}</p>
+                      <p className="whitespace-pre-wrap t-body leading-relaxed text-[var(--brand-text-bright)]">{message.content}</p>
                     )}
                   </div>
                 </div>
@@ -184,7 +185,7 @@ export function PageRewriterChatPane({ state }: PageRewriterChatPaneProps) {
               <div className="flex justify-start">
                 <div className="flex items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-3)] px-4 py-3">
                   <Icon name="refresh" size="sm" className="animate-spin text-[var(--teal)]" />
-                  <span className="t-caption-sm text-[var(--brand-text)]">Analyzing page context...</span>
+                  <span className="t-ui text-[var(--brand-text)]">Analyzing page context...</span>
                 </div>
               </div>
             )}

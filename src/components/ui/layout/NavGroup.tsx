@@ -75,6 +75,7 @@ export function NavGroup({
         aria-expanded={!collapsed}
         aria-controls={regionId}
         onClick={onToggleCollapse}
+        className="t-label"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -86,11 +87,6 @@ export function NavGroup({
           background: 'transparent',
           color: 'var(--nav-group-accent)',
           cursor: 'pointer',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 10,
-          fontWeight: 600,
-          letterSpacing: '0.11em',
-          textTransform: 'uppercase',
           opacity: 0.9,
           transition: 'color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
         }}
@@ -98,9 +94,9 @@ export function NavGroup({
         <span>{label}</span>
         {badge != null && (
           <span
+            className="t-mono"
             style={{
               flexShrink: 0,
-              fontSize: 10,
               fontWeight: 700,
               minWidth: 18,
               textAlign: 'center',

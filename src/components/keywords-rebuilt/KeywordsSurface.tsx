@@ -116,10 +116,10 @@ function FeedbackRow({
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <Badge label={row.status} tone={FEEDBACK_TONE[row.status]} variant="soft" size="sm" />
-          <span className="t-caption font-semibold text-[var(--brand-text-bright)]">{row.keyword}</span>
+          <span className="t-ui font-semibold text-[var(--brand-text-bright)]">{row.keyword}</span>
           {date && <span className="t-mono text-[var(--brand-text-dim)]">{date}</span>}
         </div>
-        {row.reason && <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">{row.reason}</p>}
+        {row.reason && <p className="mt-1 t-body text-[var(--brand-text-muted)]">{row.reason}</p>}
       </div>
       {row.status === 'requested' && onAdd && (
         <Button size="sm" variant="secondary" disabled={disabled} onClick={() => onAdd(row.keyword)}>
@@ -240,7 +240,7 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
         <ErrorState
           type="permission"
           title="Keyword intelligence is locked"
-          message="This workspace plan does not include keyword command-center access yet. Upgrade the workspace or choose a workspace with keyword access."
+          message="This workspace plan does not include keyword intelligence yet. Upgrade the workspace or choose a workspace with keyword access."
           className="min-h-[420px]"
         />
       </div>
@@ -252,8 +252,9 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
       <PageHeader
         title="Keywords"
         subtitle="Rankings, opportunities, pages, clusters, and lifecycle for every tracked keyword."
+        className="flex-col items-start gap-3 sm:flex-row sm:items-center"
         actions={(
-          <div className="flex min-w-[280px] items-center gap-2">
+          <div className="flex w-full max-w-[360px] items-center gap-2 sm:min-w-[280px]">
             <FormInput
               value={addKeywordValue}
               onChange={setAddKeywordValue}
@@ -368,7 +369,7 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
         defaultOpen={feedback.rows.length > 0}
       >
         {feedback.rows.length === 0 ? (
-          <p className="t-caption-sm text-[var(--brand-text-muted)]">No client keyword feedback submitted yet.</p>
+          <p className="t-body text-[var(--brand-text-muted)]">No client keyword feedback submitted yet.</p>
         ) : (
           <div className="flex flex-col gap-4">
             {feedbackData.requested.length > 0 && (

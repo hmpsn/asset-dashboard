@@ -127,20 +127,20 @@ export function PageRewriterDocumentPane({ state, onOpenPicker }: PageRewriterDo
         <Toolbar label="Document controls" className="w-full">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate t-ui font-semibold text-[var(--brand-text-bright)]">{title}</h2>
+              <h2 className="truncate t-body font-semibold text-[var(--brand-text-bright)]">{title}</h2>
               {state.pageUrl && (
                 <a
                   href={state.pageUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 t-caption-sm text-[var(--teal)] hover:opacity-90"
+                  className="inline-flex items-center gap-1 t-ui text-[var(--teal)] hover:opacity-90"
                 >
                   Open live page
                   <Icon name="external" size="sm" />
                 </a>
               )}
             </div>
-            <p className="mt-1 truncate t-caption-sm text-[var(--brand-text-muted)]">{pageAddress || 'Search pages or paste a URL above.'}</p>
+            <p className="mt-1 truncate t-ui text-[var(--brand-text-muted)]">{pageAddress || 'Search pages or paste a URL above.'}</p>
           </div>
           <ToolbarSpacer />
           {pageData && (
@@ -157,7 +157,6 @@ export function PageRewriterDocumentPane({ state, onOpenPicker }: PageRewriterDo
                 <Icon name="x" size="sm" />
                 Clear
               </Button>
-              <ExportMenu onExport={state.handleExport} />
             </>
           )}
         </Toolbar>
@@ -196,7 +195,7 @@ export function PageRewriterDocumentPane({ state, onOpenPicker }: PageRewriterDo
             <MetricTile
               label="Primary Keyword"
               value={pageData.primaryKeyword ?? '—'}
-              accent="var(--teal)"
+              accent="var(--blue)"
             />
             <MetricTile
               label="Rank"
@@ -219,7 +218,7 @@ export function PageRewriterDocumentPane({ state, onOpenPicker }: PageRewriterDo
                 gradient
               />
               {pageData.optimizationScore == null && (
-                <p className="mt-2 t-caption-sm text-[var(--brand-text-muted)]">No score in page-keyword projection.</p>
+                <p className="mt-2 t-body text-[var(--brand-text-muted)]">No optimization score is available for this page yet.</p>
               )}
             </div>
           </div>
@@ -236,8 +235,24 @@ export function PageRewriterDocumentPane({ state, onOpenPicker }: PageRewriterDo
             contentEditable
             suppressContentEditableWarning
             spellCheck
-            className="min-h-[440px] flex-1 overflow-y-auto px-6 py-5 text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mint-glow)]"
+            className="min-h-[440px] flex-1 overflow-y-auto px-6 py-5 t-body text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mint-glow)]"
           />
+
+          <div className="flex flex-col gap-3 border-t border-[var(--brand-border)] bg-[var(--surface-1)] px-4 py-3 sm:flex-row sm:items-center">
+            <div className="flex min-w-0 flex-1 items-start gap-2">
+              <Icon name="check" size="sm" className="mt-0.5 flex-none text-[var(--brand-text-muted)]" />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="t-ui font-semibold text-[var(--brand-text-bright)]">Export-only draft</span>
+                  <Badge label="Not live" tone="zinc" variant="soft" size="sm" />
+                </div>
+                <p className="mt-0.5 t-body text-[var(--brand-text-muted)]">Not saved or published to the CMS.</p>
+              </div>
+            </div>
+            <div className="flex flex-none items-center justify-start sm:justify-end">
+              <ExportMenu onExport={state.handleExport} />
+            </div>
+          </div>
         </>
       )}
     </section>

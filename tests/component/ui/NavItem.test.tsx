@@ -10,6 +10,7 @@ describe('NavItem', () => {
     const { container } = render(<NavItem icon={Globe} label="Site Audit" />);
 
     expect(screen.getByRole('button', { name: 'Site Audit' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Site Audit' })).toHaveClass('t-ui');
     expect(screen.getByText('Site Audit')).toBeInTheDocument();
     expect(document.querySelector('svg')).toBeInTheDocument();
     await expectNoA11yViolations(container);
@@ -49,7 +50,9 @@ describe('NavItem', () => {
     render(<NavItem label="Pipeline" badge={<span>5</span>} meta="NEW" />);
 
     expect(screen.getByText('5')).toBeInTheDocument();
+    expect(screen.getByText('5').closest('.t-mono')).toBeInTheDocument();
     expect(screen.getByText('NEW')).toBeInTheDocument();
+    expect(screen.getByText('NEW')).toHaveClass('t-mono');
   });
 
   it('fires onClick from keyboard activation when rendered as a button', async () => {

@@ -127,7 +127,7 @@ export function LocalPresenceReviewsPipeline({ workspaceId, desk, setDesk, searc
   if (!connectionEnabled) {
     return (
       <InlineBanner tone="info" title="Google Business Profile connection is not enabled">
-        Authenticated GBP connection is governed by the backend feature lifecycle. Aggregate GBP benchmark data may still appear in Overview.
+        Authenticated GBP connection is not available for this workspace yet. Aggregate GBP benchmark data may still appear in Rank & profile.
       </InlineBanner>
     );
   }
@@ -193,7 +193,7 @@ function LocalPresenceReviewsConnected({
 
       {!reviewsEnabled ? (
         <InlineBanner tone="info" title="Authenticated review sync is not enabled">
-          Review sync remains backend lifecycle-governed and is hidden until the feature flag is active.
+          Review sync appears after this workspace has authenticated GBP review access.
         </InlineBanner>
       ) : (
         <AuthenticatedReviewSync workspaceId={workspaceId} connected={connected} mappedCount={mappedCount} />
@@ -201,7 +201,7 @@ function LocalPresenceReviewsConnected({
 
       {!responsesEnabled ? (
         <InlineBanner tone="info" title="Review response workflow is not enabled">
-          Drafting, client approval, and publishing stay hidden until the backend response flag is active.
+          Drafting, client approval, and publishing appear after review response workflows are available for this workspace.
         </InlineBanner>
       ) : (
         <ReviewResponseWorkflow workspaceId={workspaceId} desk={desk} setDesk={setDesk} search={search} />

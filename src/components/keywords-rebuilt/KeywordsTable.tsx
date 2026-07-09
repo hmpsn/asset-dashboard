@@ -251,7 +251,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
         const row = (record as KeywordsTableRecord).source;
         return (
           <div className="min-w-0">
-            <span className="block truncate font-semibold text-[var(--brand-text-bright)]">{row.keyword}</span>
+            <span className="block truncate t-ui font-semibold text-[var(--brand-text-bright)]">{row.keyword}</span>
             <span className="block truncate t-caption-sm text-[var(--brand-text-muted)]">
               {row.assignment?.pageTitle ?? row.assignment?.pagePath ?? 'No page assigned'}
             </span>
@@ -401,7 +401,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
         const kdMeta = typeof row.metrics.difficulty === 'number' ? ` · KD ${row.metrics.difficulty}` : '';
         return (
           <div className="min-w-0">
-            <span className="block truncate font-semibold text-[var(--brand-text-bright)]">{row.keyword}</span>
+            <span className="block truncate t-ui font-semibold text-[var(--brand-text-bright)]">{row.keyword}</span>
             <span className="block truncate t-caption-sm text-[var(--brand-text-muted)]">{rankMeta}{kdMeta}</span>
           </div>
         );
@@ -487,7 +487,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
         </span>
       </Toolbar>
 
-      <p className="t-caption text-[var(--brand-text-muted)]">
+      <p className="t-body text-[var(--brand-text-muted)]">
         Clicks &amp; impressions: last {GSC_METRIC_WINDOW_DAYS} days. Rank: {GSC_METRIC_WINDOW_DAYS}-day average. Volume: provider estimate.
       </p>
 

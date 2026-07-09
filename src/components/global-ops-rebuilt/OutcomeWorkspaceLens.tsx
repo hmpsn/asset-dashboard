@@ -13,7 +13,7 @@ export function OutcomeWorkspaceLens({ workspaceId }: OutcomeWorkspaceLensProps)
         <EmptyState
           icon={({ className }) => <Icon name="trophy" className={className} />}
           title="Choose a workspace"
-          description="The workspace outcomes dashboard needs a workspace-scoped route."
+          description="Choose a workspace to load wins, scorecards, playbooks, learnings, and coverage."
         />
       </PageContainer>
     );

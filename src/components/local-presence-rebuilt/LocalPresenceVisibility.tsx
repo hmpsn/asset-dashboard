@@ -130,7 +130,7 @@ export function LocalPresenceVisibility({ workspaceId, data, search, filter }: L
         const row = (record as CompetitorRecord).source;
         return (
           <div className="min-w-0">
-            <span className="block truncate font-semibold text-[var(--brand-text-bright)]">{row.title}</span>
+            <span className="block truncate t-ui font-semibold text-[var(--brand-text-bright)]">{row.title}</span>
             <span className="block truncate t-caption-sm text-[var(--brand-text-muted)]">{row.domain ?? 'No domain captured'}</span>
           </div>
         );
@@ -146,7 +146,7 @@ export function LocalPresenceVisibility({ workspaceId, data, search, filter }: L
         const row = (record as CompetitorRecord).source;
         return (
           <div className="flex flex-col items-end gap-1">
-            <span className="tabular-nums font-semibold text-[var(--blue)]">{formatPercent(row.mapPackShareOfVoicePct)}</span>
+            <span className="t-ui tabular-nums font-semibold text-[var(--blue)]">{formatPercent(row.mapPackShareOfVoicePct)}</span>
             <span className="t-caption-sm text-[var(--brand-text-muted)]">
               {typeof row.mapPackShareOfVoiceBasis === 'number' ? `${row.totalAppearances}/${row.mapPackShareOfVoiceBasis}` : 'No basis'}
             </span>
@@ -168,7 +168,7 @@ export function LocalPresenceVisibility({ workspaceId, data, search, filter }: L
       width: 'minmax(160px, 1fr)',
       render: (_value, record) => {
         const row = (record as CompetitorRecord).source;
-        return <span className="t-caption-sm text-[var(--brand-text-muted)]">{row.markets.join(', ') || '—'}</span>;
+        return <span className="t-ui text-[var(--brand-text-muted)]">{row.markets.join(', ') || '—'}</span>;
       },
     },
     {
@@ -178,7 +178,7 @@ export function LocalPresenceVisibility({ workspaceId, data, search, filter }: L
       render: (_value, record) => {
         const row = (record as CompetitorRecord).source;
         const keyword = row.suggestedTrackingKeywords[0];
-        if (!keyword) return <span className="t-caption-sm text-[var(--brand-text-muted)]">—</span>;
+        if (!keyword) return <span className="t-ui text-[var(--brand-text-muted)]">—</span>;
         const pending = trackingPending.has(keyword);
         const tracked = trackedKeywords.has(keyword);
         const error = trackingErrors.get(keyword);
@@ -188,7 +188,7 @@ export function LocalPresenceVisibility({ workspaceId, data, search, filter }: L
               <Icon name={tracked ? 'check' : 'plus'} size="sm" />
               {tracked ? 'Tracked' : 'Track'}
             </Button>
-            <span className="truncate t-caption-sm text-[var(--brand-text-muted)]">{keyword}</span>
+            <span className="truncate t-ui text-[var(--brand-text-muted)]">{keyword}</span>
             {error && <span role="alert" className="t-caption-sm text-[var(--red)]">{error}</span>}
           </div>
         );
@@ -201,7 +201,7 @@ export function LocalPresenceVisibility({ workspaceId, data, search, filter }: L
       <InlineBanner tone={setupTone(report.setupState)} title={setupTitle(report.setupState)}>
         <div className="flex flex-col gap-1">
           <span>{report.setupDetail}</span>
-          <span>Keyword and ranking data were not changed by setup-state reads.</span>
+          <span>Changing market setup will not overwrite keyword or ranking history.</span>
         </div>
       </InlineBanner>
 
@@ -210,7 +210,7 @@ export function LocalPresenceVisibility({ workspaceId, data, search, filter }: L
         <MetricTile label="Possible" value={report.possibleMatchCount} sub="needs review" accent="var(--amber)" icon={AlertTriangle} />
         <MetricTile label="Not visible" value={report.notVisibleCount} sub={`${report.localPackPresentCount} packs found`} accent="var(--red)" icon={XCircle} />
         <MetricTile label="Local packs" value={report.localPackPresentCount} sub="detected packs" accent="var(--blue)" icon={MapPin} />
-        <MetricTile label="Provider degraded" value={report.degradedCount} sub="warnings" accent="var(--amber)" icon={BarChart3} />
+        <MetricTile label="Scan warnings" value={report.degradedCount} sub="needs attention" accent="var(--amber)" icon={BarChart3} />
       </div>
 
       <GroupBlock
@@ -218,11 +218,11 @@ export function LocalPresenceVisibility({ workspaceId, data, search, filter }: L
         meta="Visible keyword counts from retained local visibility snapshots."
         stats={[
           { label: 'Markets', value: data.visibilityTrend.length, color: 'var(--blue)' },
-          { label: 'Snapshots', value: report.latestSnapshotCount, color: 'var(--teal)' },
+          { label: 'Snapshots', value: report.latestSnapshotCount, color: 'var(--blue)' },
         ]}
       >
         {data.visibilityTrend.length === 0 ? (
-          <p className="px-3 py-4 t-caption-sm text-[var(--brand-text-muted)]">No retained local visibility snapshots yet. Re-scan after markets are configured.</p>
+          <p className="px-3 py-4 t-body text-[var(--brand-text-muted)]">No retained local visibility snapshots yet. Re-scan after markets are configured.</p>
         ) : (
           <div className="grid gap-2 p-2 md:grid-cols-2">
             {data.visibilityTrend.map((series) => {
@@ -234,7 +234,7 @@ export function LocalPresenceVisibility({ workspaceId, data, search, filter }: L
                 <div key={series.marketId} className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate t-caption font-semibold text-[var(--brand-text-bright)]">{series.marketLabel}</p>
+                      <p className="truncate t-ui font-semibold text-[var(--brand-text-bright)]">{series.marketLabel}</p>
                       <p className="t-caption-sm text-[var(--brand-text-muted)]">
                         {series.points.length > 1 ? `${series.points.length} snapshots` : series.points.length === 1 ? '1 snapshot' : 'Not enough snapshots yet'}
                       </p>
@@ -242,7 +242,7 @@ export function LocalPresenceVisibility({ workspaceId, data, search, filter }: L
                     <Sparkline data={points} area label={`${series.marketLabel} visible keyword trend`} />
                   </div>
                   {latest && (
-                    <p className="mt-2 t-caption-sm text-[var(--brand-text-muted)]">
+                    <p className="mt-2 t-body text-[var(--brand-text-muted)]">
                       {latest.visibleCount}/{latest.checkedCount} visible on {latest.date}
                     </p>
                   )}

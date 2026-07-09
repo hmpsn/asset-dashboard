@@ -58,6 +58,7 @@ export function NavItem({
   const [isInteractive, setIsInteractive] = useState(false);
   const interactive = isInteractive && !active && !disabled;
   const Component = href ? 'a' : 'button';
+  const mergedClassName = ['t-ui', className].filter(Boolean).join(' ');
   const mergedStyle: NavItemStyle = {
     '--nav-accent': accent,
     position: 'relative',
@@ -77,10 +78,6 @@ export function NavItem({
     outline: 'none',
     cursor: disabled ? 'not-allowed' : 'pointer',
     pointerEvents: disabled ? 'none' : undefined,
-    fontFamily: 'var(--font-sans)',
-    fontSize: '13px',
-    fontWeight: 500,
-    lineHeight: 1.2,
     background: active
       ? 'color-mix(in srgb, var(--nav-accent) 12%, transparent)'
       : interactive
@@ -104,7 +101,7 @@ export function NavItem({
 
   const commonProps = {
     id,
-    className,
+    className: mergedClassName || undefined,
     title,
     style: mergedStyle,
     // In the rail the visible text label is hidden, so the icon-only control needs
@@ -190,9 +187,9 @@ export function NavItem({
         />
       ) : (
         <span
+          className="t-mono"
           style={{
             flexShrink: 0,
-            fontSize: 10,
             fontWeight: 700,
             minWidth: 20,
             textAlign: 'center',
@@ -208,10 +205,9 @@ export function NavItem({
       ))}
       {!collapsed && meta && (
         <span
+          className="t-mono"
           style={{
             flexShrink: 0,
-            fontFamily: 'var(--font-mono)',
-            fontSize: 9,
             fontWeight: 600,
             color: 'var(--brand-text-dim)',
             opacity: 0.82,

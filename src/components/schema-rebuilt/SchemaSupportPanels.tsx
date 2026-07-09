@@ -333,7 +333,7 @@ export function SchemaSitePlanBridge({ siteId, workspaceId }: SitePlanBridgeProp
       icon={Globe}
       iconColor="var(--teal)"
       title="Schema site plan"
-      meta="T1 carry-over: role assignment, canonical entities, send, activate, and retract stay on the proven machinery."
+      meta="Set page roles, canonical entities, client approval, activation, and retraction from one reviewed plan."
       collapsible
       defaultOpen
     >
@@ -352,7 +352,7 @@ export function SchemaHowToFooter() {
           <Icon as={FileJson} size="md" style={{ color: 'var(--blue)' }} />
         </span>
         <div className="min-w-0">
-          <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Publishing contract</div>
+          <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Publishing paths</div>
           <div className="mt-1 grid gap-1.5 md:grid-cols-3">
             <KeyValueRow label="Webflow pages" value="Custom code publish, with manual fallback" />
             <KeyValueRow label="CMS items" value="Mapped schema field publish" />
@@ -377,7 +377,7 @@ export function SchemaGeneratorEmptySetup({ onRunScan }: EmptySetupProps) {
         </span>
         <div>
           <h2 className="t-h2 text-[var(--brand-text-bright)]">Schema generator</h2>
-          <p className="mt-1 t-caption text-[var(--brand-text-muted)]">Generate structured data across the connected Webflow site, then review, edit, validate, send, or publish page by page.</p>
+          <p className="mt-1 t-body text-[var(--brand-text-muted)]">Generate structured data across the connected Webflow site, then review, edit, validate, send, or publish page by page.</p>
         </div>
         <Button size="md" variant="primary" onClick={onRunScan}>
           <Icon as={Layers} size="sm" />
@@ -390,8 +390,8 @@ export function SchemaGeneratorEmptySetup({ onRunScan }: EmptySetupProps) {
 
 export function SchemaInventoryAbsentBanner() {
   return (
-    <InlineBanner tone="info" size="sm" title="Server-owned coverage is pending">
-      Coverage and missing-schema counts are intentionally absent until the schema snapshot and Site Audit projections provide authoritative values.
+    <InlineBanner tone="info" size="sm" title="Coverage is being verified">
+      Coverage and missing-schema counts appear after the next trusted schema snapshot and Site Audit readout.
     </InlineBanner>
   );
 }

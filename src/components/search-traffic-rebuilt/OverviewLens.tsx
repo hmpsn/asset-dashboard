@@ -217,12 +217,12 @@ export function OverviewLens({
               <KeyValueRow label="Branded clicks" value={formatNumber(brandedDemand.branded?.clicks)} valueColor="var(--teal)" divider={false} />
               <KeyValueRow label="Non-branded clicks" value={formatNumber(brandedDemand.nonBranded?.clicks)} valueColor="var(--blue)" />
               <KeyValueRow label="Rows sampled" value={formatNumber(brandedDemand.queryRowsSampled)} />
-              <p className="t-caption-sm text-[var(--brand-text-muted)]">
+              <p className="t-body text-[var(--brand-text-muted)]">
                 Share uses impressions as the denominator; missing query rows remain in the non-branded remainder.
               </p>
             </div>
           ) : (
-            <div className="px-2 pb-2 t-caption text-[var(--brand-text-muted)]">
+            <div className="px-2 pb-2 t-body text-[var(--brand-text-muted)]">
               {brandedDemand?.status === 'error' ? 'Split unavailable for this refresh.' : 'Brand tokens were not available for this workspace.'}
             </div>
           )}

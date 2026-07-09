@@ -296,12 +296,39 @@ describe('CockpitSurface rebuilt', () => {
     expect(screen.queryByText('Close Core Web Vitals cleanup')).not.toBeInTheDocument();
   });
 
+  it('keeps internal rebuild and migration language out of the visible Cockpit UI', async () => {
+    const { container } = renderSurface();
+
+    expect(await screen.findByTestId('cockpit-rebuilt-surface')).toBeInTheDocument();
+
+    const visibleText = container.textContent ?? '';
+    expect(visibleText).not.toMatch(/rebuild/i);
+    expect(visibleText).not.toMatch(/migration/i);
+    expect(visibleText).not.toMatch(/carry-over/i);
+    expect(visibleText).not.toMatch(/route tab/i);
+    expect(visibleText).not.toMatch(/url state/i);
+    expect(visibleText).not.toMatch(/legacy aliases/i);
+    expect(visibleText).not.toMatch(/mounted below/i);
+  });
+
+  it('keeps Cockpit calibration copy on styleguide typography roles', async () => {
+    renderSurface();
+
+    expect(await screen.findByText('Client-facing work is ready to review and send.')).toHaveClass('t-h2');
+    expect(screen.getByText('One send item and optimization work are waiting in the shared work queue.')).toHaveClass('t-body');
+    expect(screen.getByText('1 error in site audit')).toHaveClass('t-ui');
+    expect(screen.getByText('3 warnings · score 82')).toHaveClass('t-caption-sm');
+    expect(screen.getByText('#3')).toHaveClass('t-body');
+  });
+
   it('opens the carried-over work-order panel from a work-order queue row', async () => {
     renderSurface();
 
     fireEvent.click(await screen.findByRole('button', { name: /Open panel/i }));
 
     expect(await screen.findByTestId('work-order-panel')).toHaveTextContent(`Work orders for ${workspaceId}`);
+    expect(screen.getAllByTestId('work-order-panel')).toHaveLength(1);
+    expect(screen.getAllByRole('dialog', { name: /Work orders/i })).toHaveLength(1);
   });
 
   it('opens the activity drawer from the toolbar', async () => {
@@ -310,6 +337,7 @@ describe('CockpitSurface rebuilt', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Activity/i }));
 
     expect(await screen.findByRole('dialog', { name: /Recent activity/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('dialog', { name: /Recent activity/i })).toHaveLength(1);
     expect(screen.getByTestId('activity-feed')).toHaveTextContent('Published July article');
   });
 });

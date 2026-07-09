@@ -20,6 +20,7 @@ import {
   ErrorState,
   FormSelect,
   Icon,
+  InlineBanner,
   LensSwitcher,
   PageHeader,
   SearchField,
@@ -59,6 +60,17 @@ function lensCount(tab: LinksSurfaceTab, data: {
   if (tab === 'internal') return data.internalCount;
   if (tab === 'dead-links') return data.deadCount;
   return data.architectureCount;
+}
+
+function LinkOutcomeFooter() {
+  return (
+    <InlineBanner tone="info" title="Link fixes become outcomes after measurement">
+      <p className="t-body text-[var(--brand-text-muted)]">
+        Use Links for redirects, internal links, and dead-link repair. When analytics or Search Console proves lift,
+        graduate the measured win into Insights Engine instead of treating the workshop itself as the outcome.
+      </p>
+    </InlineBanner>
+  );
 }
 
 export function LinksSurface({ workspaceId }: LinksSurfaceProps) {
@@ -245,6 +257,7 @@ export function LinksSurface({ workspaceId }: LinksSurfaceProps) {
       <PageHeader
         title="Links"
         subtitle="Redirects, internal-link opportunities, dead-link checks, and architecture."
+        className="flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible"
       />
 
       <Toolbar label="Links view controls" className="w-full">
@@ -254,6 +267,7 @@ export function LinksSurface({ workspaceId }: LinksSurfaceProps) {
           value={state.tab}
           onChange={(value) => state.setTab(value as LinksSurfaceTab)}
           size="sm"
+          className="w-full flex-wrap sm:w-fit sm:flex-nowrap"
         />
         <SearchField
           value={state.search}
@@ -333,6 +347,8 @@ export function LinksSurface({ workspaceId }: LinksSurfaceProps) {
           clearSearch={state.clearSearch}
         />
       )}
+
+      <LinkOutcomeFooter />
     </div>
   );
 }

@@ -25,6 +25,10 @@ import type {
 } from './seoEditorSurfaceTypes';
 import type { SeoEditorQuickFilter, SeoEditorSourceScope } from './useSeoEditorSurfaceState';
 import {
+  seoEditorQuickFilterLabel,
+  seoEditorSourceScopeLabel,
+} from './useSeoEditorSurfaceState';
+import {
   formatCount,
   formatFreshness,
   formatRank,
@@ -152,8 +156,8 @@ export function SeoEditorWorksheet({
           <div className="flex min-w-0 items-start gap-2">
             <Icon as={IconSource} size="sm" className="mt-0.5 text-[var(--brand-text-muted)]" />
             <div className="min-w-0">
-              <span className="block truncate font-semibold text-[var(--brand-text-bright)]">{row.target.title}</span>
-              <span className="block truncate t-caption-sm text-[var(--brand-text-muted)]">{row.target.canonicalPath}</span>
+              <span className="block truncate t-ui font-semibold text-[var(--brand-text-bright)]">{row.target.title}</span>
+              <span className="block truncate t-caption text-[var(--brand-text-muted)]">{row.target.canonicalPath}</span>
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                 {row.dirty && <Badge label="Unsaved" tone="blue" variant="soft" size="sm" />}
                 {missing && <Badge label={missing} tone="amber" variant="soft" size="sm" />}
@@ -172,8 +176,8 @@ export function SeoEditorWorksheet({
       render: (_value, record) => {
         const row = (record as SeoEditorTableRecord).row;
         const tone = row.target.targetType === SEO_EDITOR_TARGET_TYPES.staticPage
-          ? 'blue'
-          : row.target.targetType === SEO_EDITOR_TARGET_TYPES.cmsItem ? 'teal' : 'amber';
+          ? 'zinc'
+          : row.target.targetType === SEO_EDITOR_TARGET_TYPES.cmsItem ? 'blue' : 'amber';
         return <Badge label={formatSourceLabel(row.target.targetType)} tone={tone} variant="outline" size="sm" />;
       },
     },
@@ -187,8 +191,8 @@ export function SeoEditorWorksheet({
         const description = row.edit?.seoDescription ?? row.cmsEdit?.[row.target.targetType === SEO_EDITOR_TARGET_TYPES.cmsItem ? row.target.descriptionFieldSlug ?? '' : ''] ?? row.target.seo.description;
         return (
           <div className="min-w-0">
-            <span className="block truncate t-caption-sm text-[var(--brand-text-bright)]">{title || '—'}</span>
-            <span className="block truncate t-caption-sm text-[var(--brand-text-muted)]">{description || '—'}</span>
+            <span className="block truncate t-ui text-[var(--brand-text-bright)]">{title || '—'}</span>
+            <span className="block truncate t-caption text-[var(--brand-text-muted)]">{description || '—'}</span>
           </div>
         );
       },
@@ -201,7 +205,7 @@ export function SeoEditorWorksheet({
         const row = (record as SeoEditorTableRecord).row;
         const primary = row.keywordAssignment?.primaryKeyword;
         const secondary = row.keywordAssignment?.secondaryKeywords ?? [];
-        if (!primary && secondary.length === 0) return <span className="t-caption-sm text-[var(--brand-text-muted)]">—</span>;
+        if (!primary && secondary.length === 0) return <span className="t-caption text-[var(--brand-text-muted)]">—</span>;
         return (
           <div className="flex min-w-0 flex-wrap gap-1">
             {primary && <Badge label={primary} tone="teal" variant="soft" size="sm" />}
@@ -247,7 +251,7 @@ export function SeoEditorWorksheet({
       sortable: true,
       render: (_value, record) => {
         const value = (record as SeoEditorTableRecord).lastEditedAt;
-        return <span className="t-caption-sm text-[var(--brand-text-muted)]">{value ? formatFreshness(value) : '—'}</span>;
+        return <span className="t-caption text-[var(--brand-text-muted)]">{value ? formatFreshness(value) : '—'}</span>;
       },
     },
     {
@@ -273,10 +277,10 @@ export function SeoEditorWorksheet({
   return (
     <div className="flex flex-col gap-3">
       <Toolbar label="SEO worksheet controls" className="w-full">
-        <span className="t-caption text-[var(--brand-text-muted)]">
-          {formatCount(records.length)} rows
-          {source !== 'all' ? ` · ${source}` : ''}
-          {filter !== 'all' ? ` · ${filter}` : ''}
+        <span className="t-ui text-[var(--brand-text-muted)]">
+          {formatCount(records.length)} {records.length === 1 ? 'row' : 'rows'}
+          {source !== 'all' ? ` · ${seoEditorSourceScopeLabel(source)}` : ''}
+          {filter !== 'all' ? ` · ${seoEditorQuickFilterLabel(filter)}` : ''}
         </span>
         <ToolbarSpacer />
         {visibleStaticIds.length > 0 && (

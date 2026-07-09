@@ -140,7 +140,7 @@ export function useAssetManagerSurfaceState(): UseAssetManagerSurfaceStateReturn
       tab: nextLens === DEFAULT_LENS ? null : nextLens,
       filter: null,
       asset: null,
-      sort: nextLens === 'audit' ? DEFAULT_AUDIT_SORT : DEFAULT_ASSET_SORT,
+      sort: nextLens === 'audit' ? DEFAULT_AUDIT_SORT : null,
     });
   }, [updateParams]);
 
