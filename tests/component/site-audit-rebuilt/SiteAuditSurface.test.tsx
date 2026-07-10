@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { SiteAuditSurface } from '../../../src/components/site-audit-rebuilt/SiteAuditSurface';
@@ -238,6 +238,10 @@ function expectTextWithClass(text: string | RegExp, className: string) {
   expect(matches.some((element) => element.classList.contains(className))).toBe(true);
 }
 
+function auditModeSwitcher() {
+  return within(screen.getByRole('toolbar', { name: 'Site Audit lenses' }));
+}
+
 function FlaggedHarness() {
   const enabled = useFeatureFlag('ui-rebuild-shell');
   return enabled ? <SiteAuditSurface workspaceId="ws-1" /> : <div data-testid="flag-off" />;
@@ -252,12 +256,25 @@ describe('SiteAuditSurface rebuilt', () => {
   it.each([
     ['/ws/ws-1/seo-audit?sub=audit', 'site-audit-rebuilt-audit'],
     ['/ws/ws-1/seo-audit?sub=history', 'site-audit-history-view'],
-    ['/ws/ws-1/seo-audit?sub=aeo-review', 'site-audit-aeo-view'],
-    ['/ws/ws-1/seo-audit?sub=content-decay', 'site-audit-content-decay-view'],
-    ['/ws/ws-1/seo-audit?sub=guide', 'site-audit-guide-view'],
-  ])('renders receiver subview for %s', async (entry, testId) => {
+  ])('renders peer mode for %s', async (entry, testId) => {
     renderSurface(entry);
     expect(await screen.findByTestId(testId)).toBeInTheDocument();
+  });
+
+  it.each([
+    ['/ws/ws-1/seo-audit?sub=aeo-review', 'AI Search Ready', 'site-audit-aeo-view'],
+    ['/ws/ws-1/seo-audit?sub=content-decay', 'Content Health', 'site-audit-content-decay-view'],
+    ['/ws/ws-1/seo-audit?sub=guide', 'Audit Guide', 'site-audit-guide-view'],
+  ])('opens the in-flow %s receiver for compatibility deep link %s', async (entry, summary, testId) => {
+    renderSurface(entry);
+
+    expect(await screen.findByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();
+    const receiver = await screen.findByTestId(testId);
+    expect(receiver).toBeInTheDocument();
+    expect(auditModeSwitcher().getAllByRole('radio')).toHaveLength(2);
+    expect(auditModeSwitcher().getByRole('radio', { name: /Site Audit/ })).toHaveAttribute('aria-checked', 'true');
+    expect(receiver.closest('details')).toHaveTextContent(summary);
+    expect(receiver.closest('details')).toHaveAttribute('open');
   });
 
   it('falls back to audit for an invalid sub param', async () => {
@@ -265,17 +282,28 @@ describe('SiteAuditSurface rebuilt', () => {
     expect(await screen.findByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();
   });
 
+  it('keeps each supporting diagnostic reachable once inside Site Audit', async () => {
+    renderSurface('/ws/ws-1/seo-audit');
+
+    expect(await screen.findByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();
+    expect(screen.getAllByTestId('site-audit-aeo-view')).toHaveLength(1);
+    expect(screen.getAllByTestId('site-audit-content-decay-view')).toHaveLength(1);
+    expect(screen.getAllByTestId('site-audit-guide-view')).toHaveLength(1);
+  });
+
   it('writes prototype sub state and clears the default audit URL', async () => {
     renderSurface('/ws/ws-1/seo-audit');
     expect(await screen.findByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();
     expect(screen.getByTestId('location-search')).toHaveTextContent('');
-    expect(screen.getByRole('radio', { name: /Site Audit/ })).toHaveAttribute('aria-checked', 'true');
+    expect(auditModeSwitcher().getAllByRole('radio')).toHaveLength(2);
+    expect(auditModeSwitcher().getByRole('radio', { name: /Site Audit/ })).toHaveAttribute('aria-checked', 'true');
+    expect(auditModeSwitcher().queryByRole('radio', { name: /AI Search Ready|Content Health|Guide/ })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('radio', { name: /History/ }));
+    fireEvent.click(auditModeSwitcher().getByRole('radio', { name: /History/ }));
     expect(screen.getByTestId('location-search')).toHaveTextContent('?sub=history');
     expect(await screen.findByTestId('site-audit-history-view')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('radio', { name: /Site Audit/ }));
+    fireEvent.click(auditModeSwitcher().getByRole('radio', { name: /Site Audit/ }));
     expect(screen.getByTestId('location-search')).toHaveTextContent('');
     expect(await screen.findByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();
   });

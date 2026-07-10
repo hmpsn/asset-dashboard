@@ -28,6 +28,7 @@ import {
   CharacterCounter,
   ClickableRow,
   DataTable,
+  Disclosure,
   Drawer,
   EmptyState,
   ErrorState,
@@ -53,7 +54,12 @@ import {
 import { ScheduleDrawer } from './ScheduleDrawer';
 import { formatCompactNumber, formatInteger, formatScore } from './siteAuditFormatters';
 import { mutationErrorMessage } from './siteAuditMutationFeedback';
-import { SITE_AUDIT_SUBS, type SiteAuditSub, useSiteAuditSurfaceState } from './useSiteAuditSurfaceState';
+import {
+  SITE_AUDIT_VISIBLE_SUBS,
+  type SiteAuditEvidenceSub,
+  type SiteAuditVisibleSub,
+  useSiteAuditSurfaceState,
+} from './useSiteAuditSurfaceState';
 
 const AeoReview = lazyWithRetry(() => import('../AeoReview').then((module) => ({ default: module.default })));
 const ContentDecay = lazyWithRetry(() => import('../ContentDecay').then((module) => ({ default: module.default })));
@@ -466,10 +472,66 @@ function IssueDetailDrawer({
   );
 }
 
+function AuditEvidence({
+  workspaceId,
+  activeEvidence,
+}: {
+  workspaceId: string;
+  activeEvidence: SiteAuditEvidenceSub | null;
+}) {
+  return (
+    <GroupBlock
+      title="Search readiness and guidance"
+      meta="Supporting diagnostics for the technical audit"
+    >
+      <div key={activeEvidence ?? 'audit'} className="space-y-3 p-2">
+        <Disclosure
+          summary="AI Search Ready"
+          badges={[{ label: 'Search evidence', tone: 'blue' }]}
+          defaultOpen={activeEvidence === 'aeo-review'}
+        >
+          <p className="mb-3 t-body text-[var(--brand-text-muted)]">
+            Review how the site presents its expertise and entities to AI search systems.
+          </p>
+          <Suspense fallback={<Skeleton className="h-[320px] w-full" />}>
+            <AeoReview workspaceId={workspaceId} />
+          </Suspense>
+        </Disclosure>
+
+        <Disclosure
+          summary="Content Health"
+          badges={[{ label: 'Content evidence', tone: 'blue' }]}
+          defaultOpen={activeEvidence === 'content-decay'}
+        >
+          <p className="mb-3 t-body text-[var(--brand-text-muted)]">
+            Review pages whose freshness or performance needs attention alongside technical findings.
+          </p>
+          <Suspense fallback={<Skeleton className="h-[320px] w-full" />}>
+            <ContentDecay workspaceId={workspaceId} />
+          </Suspense>
+        </Disclosure>
+
+        <Disclosure
+          summary="Audit Guide"
+          badges={[{ label: 'Guidance', tone: 'teal' }]}
+          defaultOpen={activeEvidence === 'guide'}
+        >
+          <p className="mb-3 t-body text-[var(--brand-text-muted)]">
+            Use the audit guide to interpret findings and choose the next technical action.
+          </p>
+          <SeoAuditGuide />
+        </Disclosure>
+      </div>
+    </GroupBlock>
+  );
+}
+
 function AuditLens({
   audit,
+  activeEvidence,
 }: {
   audit: ReturnType<typeof useSiteAuditRebuilt>;
+  activeEvidence: SiteAuditEvidenceSub | null;
 }) {
   const { toast } = useToast();
   const [search, setSearch] = useState('');
@@ -612,24 +674,27 @@ function AuditLens({
 
   if (!data) {
     return (
-      <EmptyState
-        icon={SurfaceIcon}
-        title="Run a site audit"
-        description="Analyze titles, metadata, indexing, schema, links, performance, and mobile readiness."
-        action={(
-          <div className="flex flex-col items-center gap-3">
-            <Button onClick={handleRunAudit} disabled={!audit.siteId}>
-              <Icon name="refresh" size="sm" />
-              Run SEO Audit
-            </Button>
-            <Toggle
-              checked={!audit.workflow.skipLinkCheck}
-              onChange={(checked) => audit.workflow.setSkipLinkCheck(!checked)}
-              label="Include dead-link scan"
-            />
-          </div>
-        )}
-      />
+      <div className="space-y-5" data-testid="site-audit-rebuilt-audit">
+        <EmptyState
+          icon={SurfaceIcon}
+          title="Run a site audit"
+          description="Analyze titles, metadata, indexing, schema, links, performance, and mobile readiness."
+          action={(
+            <div className="flex flex-col items-center gap-3">
+              <Button onClick={handleRunAudit} disabled={!audit.siteId}>
+                <Icon name="refresh" size="sm" />
+                Run SEO Audit
+              </Button>
+              <Toggle
+                checked={!audit.workflow.skipLinkCheck}
+                onChange={(checked) => audit.workflow.setSkipLinkCheck(!checked)}
+                label="Include dead-link scan"
+              />
+            </div>
+          )}
+        />
+        <AuditEvidence workspaceId={audit.workspace?.id ?? ''} activeEvidence={activeEvidence} />
+      </div>
     );
   }
 
@@ -761,6 +826,8 @@ function AuditLens({
       />
 
       <CwvStrip data={data} />
+
+      <AuditEvidence workspaceId={audit.workspace?.id ?? ''} activeEvidence={activeEvidence} />
 
       {data.deadLinkDetails && data.deadLinkDetails.length > 0 && (
         <DeadLinksPanel links={data.deadLinkDetails} onOpenLinks={audit.openDeadLinks} />
@@ -931,8 +998,16 @@ function AuditLens({
   );
 }
 
-function LensBody({ sub, audit }: { sub: SiteAuditSub; audit: ReturnType<typeof useSiteAuditRebuilt> }) {
-  if (sub === 'history') {
+function LensBody({
+  visibleSub,
+  evidenceSub,
+  audit,
+}: {
+  visibleSub: SiteAuditVisibleSub;
+  evidenceSub: SiteAuditEvidenceSub | null;
+  audit: ReturnType<typeof useSiteAuditRebuilt>;
+}) {
+  if (visibleSub === 'history') {
     return (
       <AuditHistory
         siteId={audit.siteId}
@@ -941,29 +1016,14 @@ function LensBody({ sub, audit }: { sub: SiteAuditSub; audit: ReturnType<typeof 
       />
     );
   }
-  if (sub === 'guide') return <SeoAuditGuide />;
-  if (sub === 'aeo-review') {
-    return (
-      <Suspense fallback={<Skeleton className="h-[320px] w-full" />}>
-        <AeoReview workspaceId={audit.workspace?.id ?? ''} />
-      </Suspense>
-    );
-  }
-  if (sub === 'content-decay') {
-    return (
-      <Suspense fallback={<Skeleton className="h-[320px] w-full" />}>
-        <ContentDecay workspaceId={audit.workspace?.id ?? ''} />
-      </Suspense>
-    );
-  }
-  return <AuditLens audit={audit} />;
+  return <AuditLens audit={audit} activeEvidence={evidenceSub} />;
 }
 
 export function SiteAuditSurface({ workspaceId }: SiteAuditSurfaceProps) {
   const state = useSiteAuditSurfaceState();
   const audit = useSiteAuditRebuilt(workspaceId);
 
-  const lensOptions = useMemo(() => SITE_AUDIT_SUBS.map((sub) => ({
+  const lensOptions = useMemo(() => SITE_AUDIT_VISIBLE_SUBS.map((sub) => ({
     value: sub.id,
     label: sub.label,
     count: sub.id === 'audit'
@@ -1034,8 +1094,8 @@ export function SiteAuditSurface({ workspaceId }: SiteAuditSurfaceProps) {
           <LensSwitcher
             id="site-audit-sub-switcher"
             options={lensOptions}
-            value={state.sub}
-            onChange={(value) => state.setSub(value as SiteAuditSub)}
+            value={state.visibleSub}
+            onChange={(value) => state.setSub(value as SiteAuditVisibleSub)}
             size="sm"
             className="w-full flex-wrap sm:w-fit sm:flex-nowrap"
           />
@@ -1050,7 +1110,7 @@ export function SiteAuditSurface({ workspaceId }: SiteAuditSurfaceProps) {
           />
         )}
 
-        <LensBody sub={state.sub} audit={audit} />
+        <LensBody visibleSub={state.visibleSub} evidenceSub={state.evidenceSub} audit={audit} />
       </div>
     </ErrorBoundary>
   );
