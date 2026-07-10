@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
   routerPost: vi.fn(),
+  routerGet: vi.fn(),
+  routerDelete: vi.fn(),
   postHandler: null as null | ((req: any, res: any) => Promise<void>),
+  getHandler: null as null | ((req: any, res: any) => void),
+  deleteHandler: null as null | ((req: any, res: any) => void),
   mcpAuthMiddleware: vi.fn(),
   handleMcpRequest: vi.fn(),
   loggerError: vi.fn(),
@@ -12,6 +16,12 @@ vi.mock('express', () => ({
   Router: () => ({
     post: h.routerPost.mockImplementation((_path: string, _mw: unknown, handler: (req: any, res: any) => Promise<void>) => {
       h.postHandler = handler;
+    }),
+    get: h.routerGet.mockImplementation((_path: string, handler: (req: any, res: any) => void) => {
+      h.getHandler = handler;
+    }),
+    delete: h.routerDelete.mockImplementation((_path: string, handler: (req: any, res: any) => void) => {
+      h.deleteHandler = handler;
     }),
   }),
 }));
@@ -55,6 +65,22 @@ describe('mcp router', () => {
     expect(h.loggerError).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({ error: 'Internal server error' });
+  });
+
+  it('registers GET / and DELETE / that return 405 with an Allow: POST header', () => {
+    expect(h.routerGet).toHaveBeenCalledWith('/', expect.any(Function));
+    expect(h.routerDelete).toHaveBeenCalledWith('/', expect.any(Function));
+
+    for (const handler of [h.getHandler, h.deleteHandler]) {
+      const res = {
+        set: vi.fn().mockReturnThis(),
+        status: vi.fn().mockReturnThis(),
+        json: vi.fn().mockReturnThis(),
+      };
+      handler!({}, res);
+      expect(res.set).toHaveBeenCalledWith('Allow', 'POST');
+      expect(res.status).toHaveBeenCalledWith(405);
+    }
   });
 
   it('skips response write when headers are already sent', async () => {

@@ -76,14 +76,29 @@ function buildPrompt(context?: string): string {
   return prompt;
 }
 
+// SVG is XML text, not raster pixels. Detect it from the file's leading bytes so a
+// mis-extensioned tmp file is still handled correctly: the alt-text routes name the
+// tmp file from the asset URL, and a hashed/extensionless Webflow CDN URL silently
+// falls back to `.jpg` even when the bytes are SVG. Extension-only routing then sent
+// those SVG bytes to sharp (which cannot rasterize them here) → null alt text, i.e.
+// the reported "it can't see the image". Content-sniffing fixes every caller at once.
+function fileLooksLikeSvg(filePath: string): boolean {
+  try {
+    const head = fs.readFileSync(filePath).subarray(0, 512).toString('utf-8').toLowerCase();
+    return head.includes('<svg');
+  } catch { // catch-ok: unreadable/missing file → treat as not-SVG and let the raster path handle it
+    return false;
+  }
+}
+
 export async function generateAltText(filePath: string, context?: string): Promise<string | null> {
   const openai = getClient();
   if (!openai) return null;
 
   const ext = path.extname(filePath).slice(1).toLowerCase();
 
-  // SVGs: read as text and describe
-  if (ext === 'svg') {
+  // SVGs: read as text and describe (by extension, or by content for mis-named tmp files)
+  if (ext === 'svg' || fileLooksLikeSvg(filePath)) {
     let svgContent = fs.readFileSync(filePath, 'utf-8');
     // Strip verbose path/polygon data to reduce token count — keep structure and text elements
     svgContent = svgContent.replace(/\bd="[^"]{200,}"/g, 'd="..."');
