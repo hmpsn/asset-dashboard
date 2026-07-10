@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '../../../src/components/Toast';
 import { SearchTrafficSurface } from '../../../src/components/search-traffic-rebuilt/SearchTrafficSurface';
@@ -224,6 +224,7 @@ function renderSurface(initialEntry = '/ws/ws-1/analytics-hub') {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
+        <LocationProbe />
         <ToastProvider>
           <SearchTrafficSurface workspaceId="ws-1" />
         </ToastProvider>
@@ -237,6 +238,15 @@ function FlaggedSearchTraffic() {
   return enabled ? <SearchTrafficSurface workspaceId="ws-1" /> : <div data-testid="legacy-search-traffic">Legacy analytics</div>;
 }
 
+function LocationProbe() {
+  const location = useLocation();
+  return <output aria-hidden="true" data-testid="location">{`${location.pathname}${location.search}`}</output>;
+}
+
+function reportModes() {
+  return within(screen.getByRole('toolbar', { name: 'Search and traffic controls' })).getAllByRole('radio');
+}
+
 function renderFlagged(initialEntry = '/ws/ws-1/analytics-hub') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return {
@@ -244,6 +254,7 @@ function renderFlagged(initialEntry = '/ws/ws-1/analytics-hub') {
     ...render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={[initialEntry]}>
+          <LocationProbe />
           <ToastProvider>
             <FlaggedSearchTraffic />
           </ToastProvider>
@@ -275,18 +286,42 @@ describe('SearchTrafficSurface', () => {
 
     expect(await screen.findByRole('heading', { name: 'Search & Traffic' })).toBeInTheDocument();
     expect(screen.queryByTestId('legacy-search-traffic')).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Search Performance/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByText('Demand mix')).toBeInTheDocument();
   });
 
-  it('renders the overview lens with a seeded QueryClient feature-flag cache', async () => {
+  it('uses Search Performance for bare and invalid lenses with exactly three visible report modes', async () => {
     renderSurface();
 
     expect(await screen.findByRole('heading', { name: 'Search & Traffic' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Search Performance/i })).toHaveAttribute('aria-checked', 'true');
+    expect(reportModes()).toHaveLength(3);
+    expect(screen.queryByRole('radio', { name: /Overview/i })).not.toBeInTheDocument();
     expect(screen.getByText('Demand mix')).toBeInTheDocument();
+    expect(screen.getByText('Priority insights')).toBeInTheDocument();
+    expect(screen.queryByText('Search + traffic trend')).not.toBeInTheDocument();
     expect(screen.getByText(/Data as of/)).toHaveClass('t-ui');
     expect(screen.getByText('Share uses impressions as the denominator; missing query rows remain in the non-branded remainder.')).toHaveClass('t-body');
-    expect(screen.getByTestId('annotated-trend-chart')).toHaveTextContent('chart 2');
     expect(Object.keys(capturedWorkspaceHandlers)).toContain('annotation:bridge_created');
+  });
+
+  it('normalizes an invalid lens to the default while preserving validated report params', async () => {
+    renderSurface('/ws/ws-1/analytics-hub?lens=not-a-report&days=90&view=pages');
+
+    expect(await screen.findByRole('radio', { name: /Search Performance/i })).toHaveAttribute('aria-checked', 'true');
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/ws/ws-1/analytics-hub?days=90&view=pages'));
+    expect(screen.queryByRole('radio', { name: /Overview/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps the Overview receiver hidden while rendering its cross-source content once', async () => {
+    renderSurface('/ws/ws-1/analytics-hub?lens=overview');
+
+    expect(await screen.findByText('Search + traffic trend')).toBeInTheDocument();
+    expect(screen.getAllByText('Demand mix')).toHaveLength(1);
+    expect(screen.getAllByText('Priority insights')).toHaveLength(1);
+    expect(reportModes()).toHaveLength(3);
+    expect(reportModes().filter((radio) => radio.getAttribute('aria-checked') === 'true')).toHaveLength(0);
+    expect(screen.queryByRole('radio', { name: /Overview/i })).not.toBeInTheDocument();
   });
 
   it('honors the lens deep link and table view params', async () => {
@@ -299,12 +334,24 @@ describe('SearchTrafficSurface', () => {
     expect(screen.getByText('/cosmetic-dentistry')).toBeInTheDocument();
   });
 
+  it('returns to Search with canonical URL state while preserving days and view', async () => {
+    renderSurface('/ws/ws-1/analytics-hub?lens=traffic&days=90&view=pages');
+
+    expect(await screen.findByRole('radio', { name: /Site Traffic/i })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('radio', { name: /Search Performance/i }));
+
+    await waitFor(() => expect(screen.getByRole('radio', { name: /Search Performance/i })).toHaveAttribute('aria-checked', 'true'));
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/ws/ws-1/analytics-hub?days=90&view=pages'));
+  });
+
   it('keeps the reporting modes visible without implementation labels', async () => {
     const { container } = renderSurface('/ws/ws-1/analytics-hub?lens=search');
 
     expect(await screen.findByRole('radio', { name: /Search Performance/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: /Site Traffic/i })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /Annotations/i })).toBeInTheDocument();
+    expect(reportModes()).toHaveLength(3);
+    expect(screen.queryByRole('radio', { name: /Overview/i })).not.toBeInTheDocument();
     expect(container).not.toHaveTextContent(/mover link in Keyword Hub|cached data|projection|migration|rebuild|mounted below|T1|carry-over/i);
   });
 
@@ -338,6 +385,13 @@ describe('SearchTrafficSurface', () => {
     const dialogs = await screen.findAllByRole('dialog', { name: 'Traffic breakdowns' });
     expect(dialogs).toHaveLength(1);
     expect(screen.getByText('google / organic')).toHaveClass('t-ui');
+  });
+
+  it('keeps the Annotations deep link as a visible peer report', async () => {
+    renderSurface('/ws/ws-1/analytics-hub?lens=annotations');
+
+    expect(await screen.findByRole('radio', { name: /Annotations/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('button', { name: 'Add annotation' })).toBeInTheDocument();
   });
 
   it('meets the a11y floor after skeletons clear', async () => {

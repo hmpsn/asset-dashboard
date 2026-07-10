@@ -27,6 +27,7 @@ import type { DataColumn } from '../ui';
 import type { FeedInsight } from '../../../shared/types/insights';
 import type { SearchPage, SearchQuery } from '../../../shared/types/analytics';
 import { SparkMetricTile } from './SparkMetricTile';
+import { SearchContextBand } from './SearchContextBand';
 import type { SearchTrafficSearchData, SearchTrafficTableMode } from './types';
 import {
   SERIES,
@@ -130,7 +131,7 @@ function pageColumns(badgeMap: Map<string, ReturnType<typeof badgeFor>>): DataCo
 
 export function SearchLens({ workspaceId, data, tableMode, onTableModeChange, onOpenBreakdowns, configured }: SearchLensProps) {
   const [activeLines, toggleLine] = useToggleSet(['clicks', 'impressions']);
-  const { feed, isLoading: feedLoading } = useInsightFeed(workspaceId);
+  const { feed, summary, isLoading: feedLoading } = useInsightFeed(workspaceId);
   const { data: annotations = [] } = useAnalyticsAnnotations(workspaceId);
   const createAnnotation = useCreateAnnotation(workspaceId);
   const strategySet = useQuery({
@@ -313,6 +314,14 @@ export function SearchLens({ workspaceId, data, tableMode, onTableModeChange, on
         rows={rows as unknown as Record<string, unknown>[]}
         getRowKey={(row, index) => `${tableMode}-${String(row.query ?? row.page)}-${index}`}
         empty={<EmptyState icon={Search} title={tableMode === 'queries' ? 'No queries' : 'No pages'} description="No row-level Search Console data returned for this window." />}
+      />
+
+      <SearchContextBand
+        workspaceId={workspaceId}
+        brandedDemand={data.overview.brandedDemand}
+        feed={feed}
+        summary={summary}
+        loading={feedLoading}
       />
     </div>
   );
