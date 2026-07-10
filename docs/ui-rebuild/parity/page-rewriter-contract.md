@@ -2,7 +2,7 @@
 
 Surface: `rewrite` / Page Rewriter  
 Owner: optimization / AI rewrite workspace  
-Status: `ODP-007 A` implemented 2026-07-09; shell focus bridge verified, export-only v1 retained
+Status: `behavior-safe / visual-unverified`; `ODP-007 A` behavior checkpoint implemented 2026-07-09, shell focus bridge verified, export-only v1 retained
 Primary route: `/ws/:workspaceId/rewrite`
 
 ## Prototype References
@@ -37,7 +37,7 @@ Prototype-critical structure:
 
 ## Current Parity Grade
 
-Grade: `aligned enough` for the accepted export-only v1.
+Visual status: `behavior-safe / visual-unverified` for the accepted export-only v1.
 
 Why:
 

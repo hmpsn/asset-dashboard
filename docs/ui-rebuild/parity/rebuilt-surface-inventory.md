@@ -2,13 +2,13 @@
 
 Source of truth for mounted rebuilt surfaces: `src/components/layout/rebuiltSurfaces.ts`.
 
-This is an initial behavior-first triage, not a final design review. A surface can look polished and still be a behavior mismatch if it uses the wrong interaction model.
+This inventory began as behavior-first triage. Under the current visual goal, every row outside an explicitly approved surface is `behavior-safe / visual-unverified`; historical implementation acceptance is not visual approval.
 
 Accepted directions and their circle-back triggers for the behavior mismatch and capability risk buckets are recorded in `docs/ui-rebuild/parity/owner-decision-packet.md`.
 
 Route coverage note: this inventory grades mounted rebuilt route families, not every admin `Page` value. `docs/ui-rebuild/parity/coverage-audit.md` is the current route/nav census. It shows that `page-intelligence` and `content-perf` are standalone nav entries that are not in `REBUILT_SURFACES`; `seo-briefs`, `content`, and `calendar` are folded or redirect-only; `subscriptions` remains a standalone legacy receiver while its Content Pipeline query alias folds into publish/capacity state; `workspace-settings` remains a per-workspace settings receiver, not a main sidebar item. `competitors` is still globally `NON_REGISTRY_PAGES`, but the rebuilt sidebar now surfaces it in the prototype `Strategy & Content` zone because the rebuilt shell is flag-gated.
 
-## Aligned Enough
+## Behavior-Safe / Visual-Unverified
 
 | Surface | Reason | Next check |
 |---|---|---|
@@ -42,8 +42,8 @@ Route coverage note: this inventory grades mounted rebuilt route families, not e
 
 All currently mounted rebuilt admin route families have an initial behavior-first contract. Continue adding packets when new rebuilt routes are mounted in `REBUILT_SURFACES`.
 
-## Visual-Only Mismatch
+## Owner-Approved
 
 | Surface | Reason | Required correction |
 |---|---|---|
-| `seo-strategy` / Insights Engine | Calibration accepted: one 1180px strategy spine, responsive anchored/open `?lens=` receivers, exact-once overlays/actions, read-only detail for every move type, truthful four-group stance geometry, staged-and-sendable projections, query-authoritative keeper state, honest attention/error states, locally light horizontal client preview, and preserved legacy redirects. Joshua and seven fresh Sol review rounds found composition, truthfulness, responsiveness, and capability-placement gaps; every recorded finding is corrected, and the final independent Sol Ultra review returned `PASS`. | Use as the Wave 2 worker rubric. Keep owner visual re-review logged as a circle-back without inferring sign-off. |
+| `seo-strategy` / Insights Engine | Status: `owner-approved`. Joshua approved `ODP-001-V1` through `ODP-001-V6` as recommended. The final surface has one 1180px strategy spine, anchored/open `?lens=` receivers, exact-once topbar actions and overlays, compact POV/full-editor Drawer, compact Signals and move rows, staged-and-sendable projections, truthful preview content, collapsed Operations, mobile overflow coverage, and preserved legacy redirects. | Complete. Preserve V4–V6 as approved exceptions; use the rendered Engine as the next-surface desktop calibration reference without silently extending its exceptions elsewhere. |

@@ -14,9 +14,9 @@ import {
   Button,
   CommandCenterVerdict,
   Disclosure,
+  Drawer,
   EmptyState,
   ErrorState,
-  GroupBlock,
   Icon,
   InlineBanner,
   LensSwitcher,
@@ -30,6 +30,7 @@ import {
   Toolbar,
   ProvenanceChip,
 } from '../ui';
+import { RebuiltTopbarActions } from '../layout/RebuiltAppChrome';
 import {
   StrategyHeaderActions,
   StrategyStalenessNudges,
@@ -75,6 +76,11 @@ const PROJECTION_LENSES = [
 
 type ProjectionLens = typeof PROJECTION_LENSES[number]['id'];
 
+const ENGINE_PAGE_STYLE = {
+  maxWidth: 'calc(var(--page-max) - (2 * var(--page-pad-x)))',
+  padding: 0,
+} as const;
+
 function initialsFor(name: string): string {
   const parts = name.split(/\s+/).filter(Boolean).slice(0, 2);
   return (parts.map((part) => part[0]).join('') || 'WS').toUpperCase();
@@ -116,11 +122,13 @@ function EngineProjectionLenses({
       data-testid="engine-section-projections"
       tabIndex={-1}
       className="outline-none"
+      style={{ outline: 'none' }}
     >
       <SectionCard
         title="What each staged move becomes"
         subtitle="Staged moves project into targets and work orders, then link to the owning surface"
         titleIcon={<Icon name="layers" size="md" className="text-[var(--teal)]" />}
+        className="[&>div:first-child]:flex-col [&>div:first-child]:items-stretch [&>div:first-child]:gap-3 sm:[&>div:first-child]:flex-row sm:[&>div:first-child]:items-center max-sm:[&>div:first-child_.t-body]:whitespace-normal max-sm:[&>div:first-child_.t-body]:overflow-visible max-sm:[&>div:first-child_.t-body]:text-clip"
         iconChip
         noPadding
         action={(
@@ -133,6 +141,7 @@ function EngineProjectionLenses({
             value={projectionLens}
             onChange={(value) => setProjectionLens(value as ProjectionLens)}
             size="sm"
+            className="w-full overflow-x-auto sm:w-fit max-sm:[&>button]:min-w-0 max-sm:[&>button]:flex-1 max-sm:[&>button]:whitespace-normal"
           />
         )}
       >
@@ -142,6 +151,7 @@ function EngineProjectionLenses({
             theIssueEnabled
             embedded
             includedRecIds={stagedRecIds}
+            presentation="engine-spine"
           />
         ) : (
           <ContentWorkOrderLens
@@ -149,6 +159,7 @@ function EngineProjectionLenses({
             theIssueEnabled
             embedded
             includedRecIds={stagedRecIds}
+            presentation="engine-spine"
           />
         )}
       </SectionCard>
@@ -183,10 +194,12 @@ function ClientTrustSpinePreview({
 
   return (
     <div data-testid="engine-trust-spine-preview">
-      <GroupBlock
-        title={`What ${workspaceName} sees - the trust spine`}
-        meta="Verdict first, dollar value, then proof"
-        headingLevel="h2"
+      <SectionCard
+        title={`What ${workspaceName} sees — the trust spine`}
+        subtitle="Verdict first, dollar value, then the proof"
+        titleIcon={<Icon name="eye" size="md" className="text-[var(--teal)]" />}
+        className="max-sm:[&>div:first-child_.t-body]:whitespace-normal max-sm:[&>div:first-child_.t-body]:overflow-visible max-sm:[&>div:first-child_.t-body]:text-clip"
+        iconChip
       >
         <div
           data-testid="engine-client-portal-frame"
@@ -196,7 +209,9 @@ function ClientTrustSpinePreview({
             <span className="h-2 w-2 bg-[var(--red)]" style={{ borderRadius: 'var(--radius-pill)' }} aria-hidden="true" />
             <span className="h-2 w-2 bg-[var(--amber)]" style={{ borderRadius: 'var(--radius-pill)' }} aria-hidden="true" />
             <span className="h-2 w-2 bg-[var(--emerald)]" style={{ borderRadius: 'var(--radius-pill)' }} aria-hidden="true" />
-            <span className="ml-1 truncate t-micro text-[var(--brand-text-muted)]">client portal preview</span>
+            <span className="ml-1 truncate t-micro text-[var(--brand-text-muted)]">
+              Client portal preview · {workspaceName}
+            </span>
             <span className="ml-auto flex-none">
               {basis ? <ProvenanceChip basis={basis} /> : <Badge label="proof pending" tone="zinc" variant="soft" size="sm" />}
             </span>
@@ -204,17 +219,29 @@ function ClientTrustSpinePreview({
           <div className="p-5">
             <div className="min-w-0">
               <div className="t-label text-[var(--teal)]">Where you stand this quarter</div>
-              <h3 className="mt-2 t-page font-semibold text-[var(--brand-text-bright)]">{displayedVerdict}</h3>
-              <p className="mt-2 max-w-[64ch] t-body text-[var(--brand-text-muted)]">{displayedExplanation}</p>
+              <h3 className="mt-2 max-w-[26ch] t-stat-sm font-bold text-[var(--brand-text-bright)]">{displayedVerdict}</h3>
+              <p className="mt-2 max-w-[52ch] t-ui text-[var(--brand-text-muted)]">{displayedExplanation}</p>
             </div>
 
-            <div data-testid="engine-client-proof-row" className="mt-5 grid gap-3 sm:grid-cols-3">
-              <MetricTile
-                label="Recovered so far"
-                value={recoveredSoFar}
-                sub={`of ${valueAtStake} targeted`}
-                accent="var(--teal)"
-              />
+            <div data-testid="engine-client-proof-row" className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div
+                data-testid="engine-preview-recovered"
+                className="min-w-[130px] overflow-hidden rounded-[var(--radius-signature)] border"
+                style={{
+                  background: 'color-mix(in srgb, var(--teal) 8%, var(--surface-2))',
+                  border: '1px solid color-mix(in srgb, var(--teal) 28%, var(--brand-border))',
+                  borderColor: 'color-mix(in srgb, var(--teal) 28%, var(--brand-border))',
+                }}
+              >
+                <MetricTile
+                  label="Recovered so far"
+                  value={recoveredSoFar}
+                  sub={`of ${valueAtStake} targeted`}
+                  accent="var(--teal)"
+                  className="min-w-0 border-0 bg-transparent"
+                  style={{ background: 'transparent', borderColor: 'transparent' }}
+                />
+              </div>
               <MetricTile
                 label="Pipeline value at stake"
                 value={valueAtStake}
@@ -228,15 +255,9 @@ function ClientTrustSpinePreview({
               />
             </div>
 
-            <div className="mt-4 flex items-start gap-2 border-t border-[var(--brand-border)] pt-4">
-              <Icon name="trophy" size="md" className="mt-0.5 text-[var(--emerald)]" />
-              <p className="m-0 t-body text-[var(--brand-text-muted)]">
-                The client sees the verdict, value frame, and proof before this update is sent.
-              </p>
-            </div>
           </div>
         </div>
-      </GroupBlock>
+      </SectionCard>
     </div>
   );
 }
@@ -250,6 +271,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
   const [selectedMoveId, setSelectedMoveId] = useState<string | null>(null);
   const [addRecOpen, setAddRecOpen] = useState(false);
   const [localSeoSetupOpen, setLocalSeoSetupOpen] = useState(false);
+  const [povEditorOpen, setPovEditorOpen] = useState(false);
 
   const workspaceName = engine.workspace?.webflowSiteName || engine.workspace?.name || 'Workspace';
   const workspaceInitials = initialsFor(workspaceName);
@@ -307,6 +329,34 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
       }
     });
   };
+
+  const topbarActions = (
+    <>
+      <div className="min-w-max">{headerActions}</div>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={handleRefresh}
+        loading={engine.homeQuery.isFetching || engine.keywordQuery.isFetching}
+      >
+        <Icon name="refresh" size="sm" />
+        Refresh
+      </Button>
+      {canSendIssue && (
+        <Button
+          variant="primary"
+          size="sm"
+          loading={engine.issueBulkSend.isPending}
+          disabled={engine.issueBulkSend.isPending}
+          onClick={engine.sendIssue}
+          data-testid="engine-topbar-send-btn"
+        >
+          <Icon name="send" size="sm" />
+          Send {engine.stagedCount} staged
+        </Button>
+      )}
+    </>
+  );
 
   const handleOpenSharedQueueItem = (item: WorkQueueItem) => {
     switch (item.sourceType) {
@@ -388,7 +438,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
 
   if ((engine.keywordQuery.isLoading || engine.homeQuery.isLoading) && !engine.keywordQuery.data) {
     return (
-      <PageContainer width="default" className="min-h-full">
+      <PageContainer width="default" className="min-h-full" style={ENGINE_PAGE_STYLE}>
         <div data-testid="engine-rebuilt-loading" className="flex flex-col gap-5">
           <Skeleton className="h-[72px] w-full" />
           <Skeleton className="h-[148px] w-full" />
@@ -405,7 +455,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
 
   if (engine.keywordQuery.isError && !engine.keywordQuery.data) {
     return (
-      <PageContainer width="default" className="min-h-full">
+      <PageContainer width="default" className="min-h-full" style={ENGINE_PAGE_STYLE}>
         <PageHeader title="Insights Engine" subtitle="Operator strategy, curation, and evidence." />
         <ErrorState
           type="data"
@@ -419,37 +469,20 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
   }
 
   return (
-    <PageContainer width="default" className="min-h-full" gap={false}>
-      <div data-testid="engine-rebuilt-surface" className="flex flex-col gap-[var(--section-gap)]">
-        <Toolbar label="Insights Engine controls" className="w-full" align="flex-start">
-          <div className="min-w-0 flex-1">
-            <h1 className="t-label m-0 text-[var(--teal)]">
-              Insights Engine · {workspaceName}
-            </h1>
-            <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">
-              {headerSubtitle}
-              {' · '}
-              {engine.homeQuery.dataUpdatedAt
-                ? `Data as of ${formatDate(new Date(engine.homeQuery.dataUpdatedAt))}`
-                : 'Freshness unavailable'}
-            </p>
-          </div>
-          <div
-            data-testid="engine-header-actions"
-            className="flex w-full max-w-full flex-col items-stretch gap-2 sm:ml-auto sm:w-auto sm:items-end"
-          >
-            <div className="w-full min-w-0 sm:w-auto">{headerActions}</div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleRefresh}
-              loading={engine.homeQuery.isFetching || engine.keywordQuery.isFetching}
+    <PageContainer width="default" className="min-h-full" gap={false} style={ENGINE_PAGE_STYLE}>
+      <div data-testid="engine-rebuilt-surface" className="flex flex-col gap-[var(--space-4)]">
+        <RebuiltTopbarActions
+          fallback={(
+            <div
+              data-testid="engine-topbar-actions-fallback"
+              className="flex max-w-full items-center justify-end gap-2 overflow-x-auto"
             >
-              <Icon name="refresh" size="sm" />
-              Refresh
-            </Button>
-          </div>
-        </Toolbar>
+              {topbarActions}
+            </div>
+          )}
+        >
+          {topbarActions}
+        </RebuiltTopbarActions>
 
         {state.invalidLens && (
           <InlineBanner
@@ -468,59 +501,82 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
           />
         )}
 
-        <section
-          id={ENGINE_SECTION_IDS.spine}
-          data-testid="engine-section-orientation"
-          tabIndex={-1}
-          className="space-y-3 outline-none"
-        >
-          <div id={ENGINE_SECTION_IDS.changes} data-testid="engine-section-changes" tabIndex={-1} className="outline-none">
-            <StrategyDiff
-              key={state.lens === 'changes' && state.rawLens ? 'changes-open' : 'changes-default'}
-              workspaceId={workspaceId}
-              defaultExpanded={state.lens === 'changes' && !!state.rawLens}
+        <div data-testid="engine-opening-cluster" className="flex flex-col gap-0">
+          <Toolbar label="Insights Engine controls" className="w-full" align="center">
+            <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-3">
+              <h1 className="t-label m-0 flex-none text-[var(--teal)]">
+                Insights Engine · {workspaceName}
+              </h1>
+              <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)] sm:mt-0">
+                {headerSubtitle}
+                {' · '}
+                {engine.homeQuery.dataUpdatedAt
+                  ? `Data as of ${formatDate(new Date(engine.homeQuery.dataUpdatedAt))}`
+                  : 'Freshness unavailable'}
+              </p>
+            </div>
+          </Toolbar>
+
+          <section
+            id={ENGINE_SECTION_IDS.spine}
+            data-testid="engine-section-orientation"
+            tabIndex={-1}
+            className="space-y-[var(--space-4)] outline-none"
+            style={{ outline: 'none' }}
+          >
+            <div
+              id={ENGINE_SECTION_IDS.changes}
+              data-testid="engine-section-changes"
+              tabIndex={-1}
+              className="outline-none"
+              style={{ outline: 'none' }}
+            >
+              <StrategyDiff
+                key={state.lens === 'changes' && state.rawLens ? 'changes-open' : 'changes-default'}
+                workspaceId={workspaceId}
+                defaultExpanded={state.lens === 'changes' && !!state.rawLens}
+                presentation="engine-spine"
+              />
+            </div>
+            <StrategyStalenessNudges
+              hasVolumeValidation={engine.metrics.hasVolumeValidation}
+              localSyncApplies={!!engine.localSync?.applies}
+              strategyStaleVsLocal={!!engine.localSync?.strategyStaleVsLocal}
+              lastLocalRefreshAt={engine.localSync?.lastLocalRefreshAt}
+              lastStrategyGeneratedAt={engine.localSync?.lastStrategyGeneratedAt}
+              dismissedRefreshAt={engine.generation.dismissedRefreshAt}
+              onDismiss={() => engine.generation.setDismissedRefreshAt(engine.localSync?.lastLocalRefreshAt ?? null)}
+              onGenerate={() => engine.generation.generateStrategy('full')}
             />
-          </div>
-          <StrategyStalenessNudges
-            hasVolumeValidation={engine.metrics.hasVolumeValidation}
-            localSyncApplies={!!engine.localSync?.applies}
-            strategyStaleVsLocal={!!engine.localSync?.strategyStaleVsLocal}
-            lastLocalRefreshAt={engine.localSync?.lastLocalRefreshAt}
-            lastStrategyGeneratedAt={engine.localSync?.lastStrategyGeneratedAt}
-            dismissedRefreshAt={engine.generation.dismissedRefreshAt}
-            onDismiss={() => engine.generation.setDismissedRefreshAt(engine.localSync?.lastLocalRefreshAt ?? null)}
-            onGenerate={() => engine.generation.generateStrategy('full')}
-          />
-          <CommandCenterVerdict
-            iconName={null}
-            title={verdictTitle ?? 'No strategy verdict drafted yet'}
-            description={
-              verdictTitle
-                ? verdictExplanation
-                : 'Generate or refresh the point of view to draft the opening verdict.'
-            }
-            meta={(
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                {basis ? <ProvenanceChip basis={basis} /> : <Badge label="value proof pending" tone="zinc" variant="soft" size="sm" />}
-                {moneyFrame?.precomputedAt && (
-                  <span className="t-caption-sm text-[var(--brand-text-muted)]">
-                    {formatDate(moneyFrame.precomputedAt)}
-                  </span>
-                )}
-              </div>
-            )}
-          />
-        </section>
+            <CommandCenterVerdict
+              iconName={null}
+              title={(
+                <span className="block max-w-[26ch] font-bold">
+                  {verdictTitle ?? 'No strategy verdict drafted yet'}
+                </span>
+              )}
+              description={(
+                <span className="t-page">
+                  {verdictTitle
+                    ? verdictExplanation
+                    : 'Generate or refresh the point of view to draft the opening verdict.'}
+                </span>
+              )}
+              className="px-7 py-6"
+            />
+          </section>
+        </div>
 
         <section
           id="engine-value-frame"
           data-testid="engine-section-value-frame"
           tabIndex={-1}
           className="space-y-3 outline-none"
+          style={{ outline: 'none' }}
         >
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.3fr_repeat(3,minmax(0,1fr))]">
             <StatCard
-              label="Value at stake"
+              label="Pipeline value at stake"
               value={formatMoney(moneyFrame?.valueAtStake)}
               sub={moneyFrameMeta(moneyFrame?.precomputedAt)}
               size="hero"
@@ -600,6 +656,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
               data-testid="engine-section-pov"
               tabIndex={-1}
               className="space-y-4 outline-none"
+              style={{ outline: 'none' }}
             >
               <DraftedPovEditor
                 pov={engine.strategyPov.pov}
@@ -609,6 +666,9 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
                 struckRecIds={engine.struckRecIds}
                 onRegenerate={engine.strategyPov.regenerate}
                 isGenerating={engine.strategyPov.isGenerating}
+                presentation="engine-summary"
+                stagedCount={engine.stagedCount}
+                onOpenEditor={() => setPovEditorOpen(true)}
               />
               {povMayBeStale && (
                 <InlineBanner
@@ -629,15 +689,21 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
               )}
             </section>
 
-            <section id="engine-stance" data-testid="engine-section-stance" tabIndex={-1} className="outline-none">
-              <GroupBlock
+            <section
+              id="engine-stance"
+              data-testid="engine-section-stance"
+              tabIndex={-1}
+              className="outline-none"
+              style={{ outline: 'none' }}
+            >
+              <SectionCard
                 title="How we are spending the effort"
-                meta="Where this quarter's work is allocated"
-                icon={Network}
-                headingLevel="h2"
+                subtitle="Where this quarter's work is allocated"
+                titleIcon={<Icon name="filter" size="md" className="text-[var(--teal)]" />}
+                iconChip
               >
                 <StanceBar recs={engine.cockpitRecs} />
-              </GroupBlock>
+              </SectionCard>
             </section>
 
             <section
@@ -645,12 +711,14 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
               data-testid="engine-section-strategy-evidence"
               tabIndex={-1}
               className="space-y-4 outline-none"
+              style={{ outline: 'none' }}
             >
               <IntelligenceSignals
                 workspaceId={workspaceId}
                 title="Signals the Engine is watching"
                 subtitle="Strategy-relevant patterns detected across rankings, content, and intent"
                 initialLimit={4}
+                presentation="engine-spine"
               />
               <LostQueryRecoveryCard workspaceId={workspaceId} />
             </section>
@@ -660,9 +728,21 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
               data-testid="engine-section-backing-moves"
               tabIndex={-1}
               className="space-y-5 outline-none"
+              style={{ outline: 'none' }}
             >
-              <CurationMeter sentThisCycle={sentThisCycle} />
-              <NeedsAttentionStrip items={attentionItems} onAct={handleAttentionAct} />
+              {(sentThisCycle > 0 || attentionItems.length > 0) && (
+                <div
+                  data-testid="engine-move-support-row"
+                  className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-start"
+                >
+                  <CurationMeter sentThisCycle={sentThisCycle} presentation="engine-spine" />
+                  <NeedsAttentionStrip
+                    items={attentionItems}
+                    onAct={handleAttentionAct}
+                    presentation="engine-spine"
+                  />
+                </div>
+              )}
               <BackingMovesQueue
                 workspaceId={workspaceId}
                 recs={engine.cockpitRecs}
@@ -679,30 +759,8 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
                 onStageMany={engine.stageMany}
                 onAddRec={() => setAddRecOpen(true)}
                 onOpenDetails={setSelectedMoveId}
+                presentation="engine-spine"
               />
-
-              {canSendIssue && (
-                <div
-                  className="sticky bottom-4 z-[var(--z-sticky)] flex items-center justify-between gap-4 rounded-[var(--radius-lg)] border bg-[var(--surface-2)] px-4 py-3 shadow-[var(--shadow-lg)]"
-                  style={{ borderColor: 'color-mix(in srgb, var(--teal) 35%, var(--brand-border))' }}
-                  data-testid="engine-backing-send-bar"
-                >
-                  <span className="t-caption-sm text-[var(--brand-text-muted)] tabular-nums">
-                    {engine.stagedCount} staged · {engine.curatedCount} already with client
-                  </span>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    loading={engine.issueBulkSend.isPending}
-                    disabled={engine.issueBulkSend.isPending}
-                    onClick={engine.sendIssue}
-                    data-testid="engine-backing-send-btn"
-                  >
-                    <Icon name="send" size="sm" />
-                    Send {engine.stagedCount} staged
-                  </Button>
-                </div>
-              )}
 
             </section>
 
@@ -728,6 +786,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
           data-testid="engine-section-operations"
           tabIndex={-1}
           className="outline-none"
+          style={{ outline: 'none' }}
         >
           <Disclosure
             key={state.lens === 'operations' && state.rawLens ? 'operations-open' : 'operations-closed'}
@@ -772,6 +831,24 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
           cannibalizationEntries={strategy?.cannibalization ?? []}
           onClose={() => setSelectedMoveId(null)}
         />
+
+        <Drawer
+          open={povEditorOpen}
+          onClose={() => setPovEditorOpen(false)}
+          title={`Edit the point of view we send ${workspaceName}`}
+          subtitle="Edit the complete client narrative or regenerate it from the current strategy."
+          width="min(620px, 94vw)"
+        >
+          <DraftedPovEditor
+            pov={engine.strategyPov.pov}
+            title="Point of view details"
+            subtitle="Situation, lead move, wins, and flags"
+            onEdit={engine.strategyPov.edit}
+            struckRecIds={engine.struckRecIds}
+            onRegenerate={engine.strategyPov.regenerate}
+            isGenerating={engine.strategyPov.isGenerating}
+          />
+        </Drawer>
 
         <AddRecommendationModal
           open={addRecOpen}

@@ -2,7 +2,7 @@
 
 Surface: `brand` / Brand & AI  
 Owner: `brand-engine`  
-Status: modal-first correction implemented in `codex/ui-prototype-alignment`; generator, bespoke-flow, remaining workflow modal interior polish, and overview typography-role alignment implemented  
+Status: `behavior-safe / visual-unverified`; modal-first behavior checkpoint implemented in `codex/ui-prototype-alignment`, with generator, bespoke-flow, remaining workflow modal interiors, and overview typography roles preserved
 Primary route: `/ws/:workspaceId/brand`
 
 ## Prototype References

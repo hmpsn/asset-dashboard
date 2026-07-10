@@ -1,7 +1,7 @@
 # Admin Rebuilt Route Coverage Audit
 
-Status: route, nav, interior-state, and layout accounting pass complete; `ODP-001` through `ODP-012` accepted
-Last updated: 2026-07-09
+Audit state: route, nav, interior-state, and layout accounting complete; `ODP-001` through `ODP-012` record accepted behavior/IA directions, not visual approvals
+Last updated: 2026-07-10
 Source of truth files: `src/routes.ts`, `src/lib/navRegistry.tsx`, `src/components/layout/rebuiltSurfaces.ts`, and `hmpsn studio Design System/mockup/nav.js`
 
 This audit answers four questions that the per-surface contracts do not answer by themselves:
@@ -88,34 +88,33 @@ Browser smoke evidence:
 
 Interior state has been checked in contracts, component tests, and smoke for the rebuilt route families. The remaining question is not whether tabs/lenses exist, but whether each surface's visible navigation model should keep matching production or collapse further toward the prototype.
 
-| Contract | Route ids covered | Interior states accounted for | Grade |
+| Contract | Route ids covered | Interior states accounted for | Visual status / constraint |
 |---|---|---|---|
-| Cockpit | `home` | Stream selector, work queue, activity drawer, work-order modal, `stream=` deep link | Aligned enough |
-| Brand & AI | `brand` | Overview sections, modal workflows, `?tab=` aliases, Voice-only generators | Aligned enough |
-| Schema | `seo-schema` | Generator, Workflow Guide, page detail Drawer, publish/send/history | Aligned enough |
-| Links | `links` | Redirects, Internal Links, Dead Links, Architecture, detail Drawer, legacy alias | Aligned enough |
-| Performance | `performance` | Page Weight, Page Speed, weight Drawer, speed handoff | Aligned enough |
-| Competitors | `competitors` | Competitive stack, alert feed, detail Drawer, Hub/brief/send actions | Aligned enough |
-| Keyword Hub | `seo-keywords` | Rankings, Opportunities, Pages, Clusters, Lifecycle, detail Drawer | Aligned enough |
-| Insights Engine | `seo-strategy` | Spine, changes, signals, POV, moves, operations | Aligned enough behavior; owner visual circle-back remains open |
-| Content Pipeline | `content-pipeline` | Board, Intake, Calendar, Published, Content Health, Matrix, Briefs/Posts/capacity/guide receiver state | Aligned enough first phase; item-backed workspaces and capacity Drawer deferred |
-| SEO Editor | `seo-editor` | Static/CMS/Manual source groups, table filters, selection actions, page Drawer, URL filters | Aligned enough first phase; inline editing/review queue deferred |
-| Site Audit | `seo-audit` | Site Audit, History, compatibility evidence disclosures, schedule/issue drawers | Aligned enough |
-| Search & Traffic | `analytics-hub` | Search Performance, Site Traffic, Annotations, hidden Overview receiver, Breakdowns Drawer | Aligned enough |
-| Assets | `media` | Browse workshop, repair filters/results, Upload and asset Drawers, repair handoffs | Aligned enough |
-| Page Rewriter | `rewrite` | Two-pane workspace, shell focus mode, page picker, export menu, `?pageUrl=` | Aligned enough for export-only v1; draft/publish remains a separate backend project |
-| Local Presence | `local-seo` | Rank/profile, Reviews/replies, setup Drawer, legacy visibility receiver | Capability risk: geo-grid and GBP Performance data not available |
-| Global Ops | `settings`, `workspace-settings`, `roadmap`, `revenue`, `ai-usage`, `features`, `prospect`, `outcomes-overview`, `outcomes`, `diagnostics`, `requests` | Global settings, workspace settings tabs, roadmap views, business tabs, outcomes, diagnostics, requests tabs | Capability risk: accepted additive shell with explicit `GO-*` deferrals |
+| Cockpit | `home` | Stream selector, work queue, activity drawer, work-order modal, `stream=` deep link | `behavior-safe / visual-unverified` |
+| Brand & AI | `brand` | Overview sections, modal workflows, `?tab=` aliases, Voice-only generators | `behavior-safe / visual-unverified`; legacy modal interiors remain |
+| Schema | `seo-schema` | Generator, Workflow Guide, page detail Drawer, publish/send/history | `behavior-safe / visual-unverified` |
+| Links | `links` | Redirects, Internal Links, Dead Links, Architecture, detail Drawer, legacy alias | `behavior-safe / visual-unverified` |
+| Performance | `performance` | Page Weight, Page Speed, weight Drawer, speed handoff | `behavior-safe / visual-unverified` |
+| Competitors | `competitors` | Competitive stack, alert feed, detail Drawer, Hub/brief/send actions | `behavior-safe / visual-unverified` |
+| Keyword Hub | `seo-keywords` | Rankings, Opportunities, Pages, Clusters, Lifecycle, detail Drawer | `behavior-safe / visual-unverified` |
+| Insights Engine | `seo-strategy` | Spine, changes, signals, compact POV/full-editor Drawer, moves/More menu, projections, client preview, collapsed operations, staged topbar send | `owner-approved`; V1–V3 implemented, V4–V6 approved exceptions |
+| Content Pipeline | `content-pipeline` | Board, Intake, Calendar, Published, Content Health, Matrix, Briefs/Posts/capacity/guide receiver state | `behavior-safe / visual-unverified`; item workspaces/capacity deferred |
+| SEO Editor | `seo-editor` | Static/CMS/Manual source groups, table filters, selection actions, page Drawer, URL filters | `behavior-safe / visual-unverified`; inline workbench/review queue deferred |
+| Site Audit | `seo-audit` | Site Audit, History, compatibility evidence disclosures, schedule/issue drawers | `behavior-safe / visual-unverified` |
+| Search & Traffic | `analytics-hub` | Search Performance, Site Traffic, Annotations, hidden Overview receiver, Breakdowns Drawer | `behavior-safe / visual-unverified` |
+| Assets | `media` | Browse workshop, repair filters/results, Upload and asset Drawers, repair handoffs | `behavior-safe / visual-unverified` |
+| Page Rewriter | `rewrite` | Two-pane workspace, shell focus mode, page picker, export menu, `?pageUrl=` | `behavior-safe / visual-unverified`; draft/publish needs backend scope |
+| Local Presence | `local-seo` | Rank/profile, Reviews/replies, setup Drawer, legacy visibility receiver | `behavior-safe / visual-unverified`; geo-grid/GBP Performance unavailable |
+| Global Ops | `settings`, `workspace-settings`, `roadmap`, `revenue`, `ai-usage`, `features`, `prospect`, `outcomes-overview`, `outcomes`, `diagnostics`, `requests` | Global settings, workspace settings tabs, roadmap views, business tabs, outcomes, diagnostics, requests tabs | `behavior-safe / visual-unverified`; explicit `GO-*` constraints remain |
 
 ## Layout Coverage
 
-The current parity sweep has looked at actual layout for every mounted rebuilt route family enough to assign a behavior-first grade. It has not completed side-by-side visual parity for every interior state, and it has not rebuilt or visually audited the two non-rebuilt main-nav routes (`page-intelligence`, `content-perf`).
+The behavior checkpoint accounted for layout and route state across every mounted rebuilt route family. It did not complete side-by-side owner-approved visual parity, and it did not rebuild or visually audit the two non-rebuilt main-nav routes (`page-intelligence`, `content-perf`).
 
 Current layout buckets:
 
-- Aligned enough: Cockpit, Brand & AI, Schema, Links, Performance, Competitors, Keyword Hub, Content Pipeline first phase, SEO Editor first phase, Site Audit, Search & Traffic, Assets, and Page Rewriter export-only v1.
-- Owner visual circle-back: Insights Engine behavior is accepted, but Joshua has not accepted the final composition as visually matched.
-- Capability risk: Local Presence and the Global Ops route family.
+- `owner-approved`: Insights Engine, including the explicit V4–V6 production/backend exceptions.
+- `behavior-safe / visual-unverified`: every other mounted surface; the table retains each known capability constraint.
 - Receiving-home proof pending: Page Intelligence stays standalone; Content Pipeline Published is the proposed Content Performance receiver. Both standalone route ids remain intact.
 - Redirect/folded only: SEO Briefs, Content, and Calendar.
 - Preserved legacy standalone receiver: Subscriptions; its Content Pipeline query alias is accounted for separately.

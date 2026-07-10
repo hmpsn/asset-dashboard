@@ -30,26 +30,35 @@ export interface KeywordTargetsLensProps {
   embedded?: boolean;
   /** Optional local curation set. When present, project only rows whose recommendation is staged. */
   includedRecIds?: ReadonlySet<string>;
+  /** Opt-in compact composition for the Engine spine. */
+  presentation?: 'default' | 'engine-spine';
 }
 
 /** A single keyword/topic target row: label + sent/proposed badge + Keyword Hub deep-link. */
 function TargetRow({
   row,
   onOpen,
+  compact,
 }: {
   row: KeywordTargetRow;
   onOpen: (keyword: string) => void;
+  compact: boolean;
 }) {
   const canDeepLink = row.deepLinkKeyword != null;
   return (
-    <div className="flex items-center justify-between gap-4 py-3">
+    <div
+      data-testid="keyword-target-row"
+      className={compact
+        ? 'flex flex-col items-stretch gap-2 py-2 sm:flex-row sm:items-center sm:justify-between'
+        : 'flex items-center justify-between gap-4 py-3'}
+    >
       <div className="min-w-0">
         <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{row.label}</div>
         <div className="t-caption-sm mt-0.5 text-[var(--brand-text-muted)]">
           {row.type === 'topic_cluster' ? 'Topic cluster' : 'Keyword gap'}
         </div>
       </div>
-      <div className="flex items-center gap-3 shrink-0">
+      <div className={compact ? 'flex flex-wrap items-center gap-2 sm:shrink-0' : 'flex items-center gap-3 shrink-0'}>
         <Badge
           tone={row.sent ? 'teal' : 'zinc'}
           variant="soft"
@@ -86,12 +95,14 @@ export function KeywordTargetsLens({
   theIssueEnabled = false,
   embedded = false,
   includedRecIds,
+  presentation = 'default',
 }: KeywordTargetsLensProps) {
   const navigate = useNavigate();
   const { keywordTargets, isLoading, isError } = useIssueLenses(workspaceId, theIssueEnabled);
   const visibleTargets = includedRecIds
     ? keywordTargets.filter((row) => includedRecIds.has(row.recId))
     : keywordTargets;
+  const engineSpine = presentation === 'engine-spine';
 
   const openInHub = (keyword: string) => {
     navigate(adminPath(workspaceId, 'seo-keywords') + buildHubDeepLinkQuery({ keyword }));
@@ -101,16 +112,18 @@ export function KeywordTargetsLens({
 
   const content = (
     <>
-      <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">
-        Staged keyword &amp; topic targets — open each in the Keyword Hub to act.
-      </p>
+      {!engineSpine && (
+        <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">
+          Staged keyword &amp; topic targets — open each in the Keyword Hub to act.
+        </p>
+      )}
 
       {isLoading ? (
-        <p className="t-caption-sm text-[var(--brand-text-muted)] py-4 text-center">
+        <p className={`t-caption-sm text-[var(--brand-text-muted)] ${engineSpine ? 'py-3' : 'py-4'} text-center`}>
           Projecting curated targets…
         </p>
       ) : isError ? (
-        <p className="t-caption-sm text-red-400/80 py-4 text-center">
+        <p className={`t-caption-sm text-red-400/80 ${engineSpine ? 'py-3' : 'py-4'} text-center`}>
           Couldn't load keyword targets. It'll retry shortly.
         </p>
       ) : visibleTargets.length === 0 ? (
@@ -118,11 +131,12 @@ export function KeywordTargetsLens({
           icon={Search}
           title="No keyword targets yet"
           description="Stage a keyword-gap or topic-cluster move above, then open it here to act in the Keyword Hub."
+          className={engineSpine ? '!py-6 [&>div:first-child]:h-10 [&>div:first-child]:w-10' : undefined}
         />
       ) : (
         <div className="divide-y divide-[var(--brand-border)]">
           {visibleTargets.map((row) => (
-            <TargetRow key={row.recId} row={row} onOpen={openInHub} />
+            <TargetRow key={row.recId} row={row} onOpen={openInHub} compact={engineSpine} />
           ))}
         </div>
       )}
@@ -130,7 +144,14 @@ export function KeywordTargetsLens({
   );
 
   if (embedded) {
-    return <div className="px-4 py-3">{content}</div>;
+    return (
+      <div
+        data-testid="keyword-targets-embedded"
+        className={engineSpine ? 'px-2 py-1.5' : 'px-4 py-3'}
+      >
+        {content}
+      </div>
+    );
   }
 
   return (

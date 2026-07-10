@@ -2,7 +2,7 @@
 
 Surface: `competitors` / Competitors  
 Owner: strategy / competitive intelligence  
-Status: aligned enough after operator-copy cleanup, header-summary polish, and alert-feed parity polish  
+Status: `behavior-safe / visual-unverified` after operator-copy cleanup, header-summary polish, and alert-feed parity polish
 Primary route: `/ws/:workspaceId/competitors`
 
 ## Prototype References
@@ -43,7 +43,7 @@ Production carry-over that intentionally exceeds the prototype:
 
 ## Current Parity Grade
 
-Grade: `aligned enough`.
+Visual status: `behavior-safe / visual-unverified`.
 
 Why:
 

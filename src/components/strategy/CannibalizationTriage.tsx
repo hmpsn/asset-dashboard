@@ -135,12 +135,12 @@ export function CannibalizationTriage({ entries, workspaceId }: CannibalizationT
           const sending = sendingKey === sourceId;
           return (
             <div key={`${item.keyword}-${i}`} className="px-3 py-2.5 bg-[var(--surface-3)]/40 rounded-[var(--radius-lg)] border border-[var(--brand-border)]">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <Icon as={AlertTriangle} size="sm" className={item.severity === 'high' ? 'text-accent-danger' : item.severity === 'medium' ? 'text-accent-warning' : 'text-[var(--brand-text-muted)]'} />
                   <span className="t-body font-medium text-[var(--brand-text-bright)] truncate">&ldquo;{item.keyword}&rdquo;</span>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-shrink-0 sm:justify-end">
                   <Badge tone={SEV_TONE[item.severity]} size="sm" label={item.severity} />
                   {item.action && <span className="t-caption-sm text-[var(--brand-text-muted)]">{ACTION_LABEL[item.action]}</span>}
                   {sent ? (
@@ -178,7 +178,7 @@ export function CannibalizationTriage({ entries, workspaceId }: CannibalizationT
                 {item.pages.map((page, pi) => {
                   const isKeeper = keeperPath ? matchPageIdentity(page.path, keeperPath) : pi === 0;
                   return (
-                    <div key={`${page.path}-${pi}`} className="flex items-center justify-between gap-2">
+                    <div key={`${page.path}-${pi}`} className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="t-mono text-[var(--brand-text)] truncate">{page.path}</span>
                         {page.position != null && <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">#{Math.round(page.position)}</span>}

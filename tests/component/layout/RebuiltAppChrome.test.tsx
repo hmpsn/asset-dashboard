@@ -1,9 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { RebuiltAppChrome, useRebuildShellEnabled, useRebuiltFocusMode } from '../../../src/components/layout/RebuiltAppChrome';
+import {
+  RebuiltAppChrome,
+  RebuiltTopbarActions,
+  useRebuildShellEnabled,
+  useRebuiltFocusMode,
+} from '../../../src/components/layout/RebuiltAppChrome';
 import type { Workspace } from '../../../src/components/WorkspaceSelector';
 import { FEATURE_FLAGS } from '../../../shared/types/feature-flags';
 import { expectNoA11yViolations } from '../a11y';
@@ -94,6 +99,20 @@ function ControlledFocusShell() {
   );
 }
 
+function TopbarActionProbe() {
+  const [visible, setVisible] = useState(true);
+  return (
+    <RebuiltAppChrome {...chromeProps}>
+      {visible && (
+        <RebuiltTopbarActions fallback={<button type="button">Inline fallback</button>}>
+          <button type="button">Portaled Engine action</button>
+        </RebuiltTopbarActions>
+      )}
+      <button type="button" onClick={() => setVisible(false)}>Remove portaled action</button>
+    </RebuiltAppChrome>
+  );
+}
+
 function renderProbe() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -180,6 +199,39 @@ describe('RebuiltAppChrome', () => {
 
     expect(screen.getByTestId('rebuilt-focus-state')).toHaveTextContent('standard');
     expect(screen.getByRole('textbox', { name: 'Unsaved focus draft' })).toHaveValue('keep this edit');
+  });
+
+  it('hosts surface actions in the topbar without a nested toolbar and cleans up the portal', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/ws/ws-1/seo-keywords']}>
+          <TopbarActionProbe />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const host = screen.getByTestId('rebuilt-topbar-action-host');
+    expect(screen.getByTestId('rebuilt-topbar-shell')).toHaveClass('flex-nowrap', 'overflow-x-auto');
+    expect(within(host).getByRole('button', { name: 'Portaled Engine action' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Inline fallback' })).not.toBeInTheDocument();
+    expect(host.closest('header')).toBeInTheDocument();
+    expect(host.closest('[role="toolbar"]')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove portaled action' }));
+    expect(screen.queryByRole('button', { name: 'Portaled Engine action' })).not.toBeInTheDocument();
+    expect(host).toBeEmptyDOMElement();
+  });
+
+  it('uses an explicit inline fallback only when no rebuilt chrome provider exists', () => {
+    render(
+      <RebuiltTopbarActions fallback={<button type="button">Isolated fallback</button>}>
+        <button type="button">Unhosted action</button>
+      </RebuiltTopbarActions>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Isolated fallback' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Unhosted action' })).not.toBeInTheDocument();
   });
 
   it('has no accessibility violations once the rebuilt shell is mounted', async () => {

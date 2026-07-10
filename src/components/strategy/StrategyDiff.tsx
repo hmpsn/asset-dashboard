@@ -12,9 +12,14 @@ import { strategyNextActionTarget } from '../../lib/strategyNextActionTarget';
 export interface StrategyDiffProps {
   workspaceId: string;
   defaultExpanded?: boolean;
+  presentation?: 'default' | 'engine-spine';
 }
 
-export function StrategyDiff({ workspaceId, defaultExpanded = false }: StrategyDiffProps) {
+export function StrategyDiff({
+  workspaceId,
+  defaultExpanded = false,
+  presentation = 'default',
+}: StrategyDiffProps) {
   const navigate = useNavigate();
   const [expandedOverride, setExpandedOverride] = useState<boolean | null>(null);
   const expanded = expandedOverride ?? defaultExpanded;
@@ -81,7 +86,11 @@ export function StrategyDiff({ workspaceId, defaultExpanded = false }: StrategyD
         className="flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50"
       >
         <div className="flex items-center gap-2">
-          <Icon as={RefreshCw} size="md" className="text-amber-400" />
+          {presentation === 'engine-spine' ? (
+            <Icon name="clock" size="md" className="text-amber-400" />
+          ) : (
+            <Icon as={RefreshCw} size="md" className="text-amber-400" />
+          )}
           <span className="t-body font-semibold text-amber-300">What Changed</span>
           <span className="t-caption-sm text-[var(--brand-text-muted)]">
             {totalChanges} strategy update{totalChanges !== 1 ? 's' : ''} since {formatDate(diff.previousGeneratedAt)}

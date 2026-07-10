@@ -2,7 +2,7 @@
 
 This packet records the owner choices that govern the rebuilt admin parity sweep.
 
-Owner recommendations were accepted on 2026-07-09. The accepted direction is authoritative for implementation, while each circle-back trigger preserves the places where real usage or missing contracts may change the decision.
+The behavior and information-architecture recommendations below were accepted on 2026-07-09. They remain authoritative implementation guardrails, but they are not owner visual-parity approvals. Under the visual-parity goal started on 2026-07-10, a surface is complete only after Joshua explicitly approves its paired desktop comparison or explicitly approves a documented exception.
 
 ## Decision Protocol
 
@@ -10,7 +10,9 @@ Codex may proceed without owner feedback when the change is local, frontend-only
 
 Codex must ask or defer when a parity correction would change IA, route contracts, legacy capability homes, backend requirements, shared types, feature flags, or a high-trust production workflow.
 
-When deferring, Codex should keep working on non-blocked parity slices and record the decision here or in the surface contract.
+Use only these visual statuses: `behavior-safe / visual-unverified`, `visual revision in progress`, `awaiting owner approval`, and `owner-approved`.
+
+When a surface reaches an owner decision, record the decision here and in its surface contract. Do not begin the next major surface until Joshua approves or explicitly defers the current one.
 
 ## Accepted Decision Log
 
@@ -42,9 +44,9 @@ Global Ops sub-decisions accepted 2026-07-09:
 | `GO-007` | Keep client onboarding out of Global Ops; retain admin enable/reset only until the client-portal phase. | Revisit with the client-portal contract. |
 | `GO-008` | Keep temporary LLMs.txt access in Workspace Settings until the AI Visibility receiver is verified. | Revisit after the receiving route, deep link, and capability smoke pass. |
 
-Aligned-enough defaults also accepted: keep Schema detail in the Drawer, keep Links on copy/send until an insert target exists, keep the current Performance detail workflow until the Asset Manager handoff is proven, and defer Keyword Hub trend/KPI visuals until server-owned read models exist.
+Behavior-safe defaults also accepted: keep Schema detail in the Drawer, keep Links on copy/send until an insert target exists, keep the current Performance detail workflow until the Asset Manager handoff is proven, and defer Keyword Hub trend/KPI visuals until server-owned read models exist. These defaults remain `behavior-safe / visual-unverified` until their turn in the current visual-parity sequence.
 
-## Accepted Implementation Order
+## Accepted Behavior-Checkpoint Implementation Order
 
 1. `ODP-001` Insights Engine single strategy spine.
 2. `ODP-002` Content Pipeline lifecycle board.
@@ -58,6 +60,21 @@ Aligned-enough defaults also accepted: keep Schema detail in the Drawer, keep Li
 10. `ODP-010` Rebuilt page-header typography scale.
 11. `ODP-011` Rebuilt sidebar prototype zone parity.
 12. `ODP-012` Page Intelligence / Content Perf rebuilt coverage.
+
+## Current Visual-Parity Order
+
+1. Insights Engine.
+2. Brand & AI.
+3. Content Pipeline.
+4. SEO Editor.
+5. Search & Traffic.
+6. Asset Manager, Performance, and Site Audit as one repair-flow cluster.
+7. Schema, Links, Competitors, and Keyword Hub.
+8. Cockpit final calibration, Local Presence, and Global Ops.
+9. Page Intelligence and Content Performance receiving-home decisions.
+10. Registry-wide final visual audit.
+
+Do not start the next major surface until Joshua records `owner-approved` or explicitly defers the active surface.
 
 ## P1 Behavior Decisions
 
@@ -80,7 +97,20 @@ Risk if wrong: choosing A too early could disrupt high-trust strategy review hab
 
 Implementation guardrail: remove the visible lens split without rewriting the underlying strategy capabilities; preserve exact-once overlays, send behavior, deep links, and section focus.
 
-Circle-back log, 2026-07-09: triggered during the first Wave 1 preview. Joshua found that the interaction model was corrected but the composition still did not mirror the prototype closely enough. Sol returned the surface to `revise`, stopped Wave 2 dispatch, and applied a second prototype-led pass covering opening order, verdict/value hierarchy, section labels, calm signal/move density, unified projection framing, and collapsed operations. Seven fresh Sol reviews then required the 1180px prototype spine, compact eyebrow/control cluster, responsive Changes deep link, canonical operations disclosure, read-only move detail, blue read-only counts, four-group 34px stance, locally light horizontal trust preview, reproducible screenshots, removal of cannibalization write controls from the evidence Drawer, staged-and-sendable projection truthfulness, query-authoritative keeper handoff with rollback, exact stance geometry, move actions that stay stacked through intermediate sidebar widths, an honest discussion CTA, and a distinct comparison-error state. Those corrections are implemented without changing decision A or its route/capability guardrails. A final independent Sol Ultra acceptance review returned `PASS`; Joshua's instruction to continue clears the corrected Engine for use as the Wave 2 calibration rubric. Owner visual re-review remains an open circle-back, not an inferred visual sign-off.
+Behavior-checkpoint log, 2026-07-09: Joshua found that the interaction model was corrected but the composition still did not mirror the prototype closely enough. The subsequent implementation and independent-review cycle corrected the recorded behavior, truthfulness, responsiveness, and capability-placement findings without changing decision A or its route/capability guardrails. The resulting reviewer `PASS` applies only to the accepted behavior checkpoint; it is not a visual approval and does not make Engine a visual rubric.
+
+Visual-parity log, 2026-07-10 — status: `owner-approved`. A source-led desktop pass matched the prototype spine geometry, opening hierarchy, Signals and move density, projection framing, preview chrome, overlays, and mobile overflow floor. Joshua approved all six recommended directions; V1–V3 are implemented, and V4–V6 are explicit approved exceptions. Final paired/interior evidence at both required desktop viewports plus the mobile floor passed a fresh Sol rendered review with no safe-local defects.
+
+| ID | Owner decision | Recommended direction | Why it is owner-gated |
+|---|---|---|---|
+| `ODP-001-V1` | Compact prototype POV or full structured production POV in the primary spine. | Keep a compact narrated POV in the spine and disclose the existing full editor in a Drawer. | This changes the hierarchy and editing workflow rather than local styling. |
+| `ODP-001-V2` | Engine actions in the page body or the shared topbar. | Use the shared topbar as the single action home if its existing contract can preserve every action exactly once. | Moving controls changes the shell/action composition and can hide or duplicate capability. |
+| `ODP-001-V3` | Placement of Curation / Needs Attention and disclosure of secondary move lifecycle controls. | Keep Stage inline; group Curation and Needs Attention beside the queue; disclose secondary lifecycle controls without removing them. | Two plausible prototype readings materially change operator scan and action flow. |
+| `ODP-001-V4` | Exact prototype preview height or truthful live preview content. | Approve truthful live copy and metrics as a documented height/content exception. | Truncating or relabeling the live client story would change the content contract. |
+| `ODP-001-V5` | Production-only provider evidence and Operations composition. | Approve both as documented production-capability exceptions. | The prototype has no equivalent home, and removal would hide production capabilities. |
+| `ODP-001-V6` | Restore Lost visibility in this frontend goal or separate its read-contract repair. | Record a separate backend task; keep the frontend truthful until the admin-authorized read exists. | `/api/public/insights/:workspaceId` returns `401` in admin context, so this requires backend scope. |
+
+Owner resolution, 2026-07-10: **“Approve Insights Engine with V1–V6 as recommended.”** V1–V3 are implemented exactly as recorded; V4–V6 remain explicit exceptions. Final status: `owner-approved`.
 
 ### ODP-002 Content Pipeline Lifecycle Board
 
@@ -101,7 +131,7 @@ Risk if wrong: choosing A without enough workflow proof could hide or confuse br
 
 Implementation guardrail: build the board overview first. Keep legacy receivers reachable and do not imply subscription-drawer or Brief/Draft behavior that is not wired in the current slice.
 
-Implementation log, 2026-07-09: the first phase is complete. Bare/default and `briefs` now open the aggregate lifecycle Board; Intake expands in place; Calendar, Published, Content Health, and Matrix remain peer modes; existing Briefs/Posts/capacity workflows launch exact once. Browser smoke preserved aliases, post/fix-context behavior, Guide, and clean console/overflow. An independent review found that zero-count Brief/Draft columns could strand their workspaces and that some Board copy exposed implementation framing; persistent launch cards, one shared Briefs opener, and operator-facing copy corrected both findings. A fresh independent review returned `PASS`. Full item workspaces and capacity Drawer remain deferred, so the circle-back is not triggered.
+Implementation log, 2026-07-09: the first phase is complete. Bare/default and `briefs` now open the aggregate lifecycle Board; Intake expands in place; Calendar, Published, Content Health, and Matrix remain peer modes; existing Briefs/Posts/capacity workflows launch exact once. Browser smoke preserved aliases, post/fix-context behavior, Guide, and clean console/overflow. An independent review found that zero-count Brief/Draft columns could strand their workspaces and that some Board copy exposed implementation framing; persistent launch cards, one shared Briefs opener, and operator-facing copy corrected both findings. A fresh independent behavior-checkpoint review returned `PASS`. Full item workspaces and capacity Drawer remain deferred; visual status remains `behavior-safe / visual-unverified`.
 
 ### ODP-003 SEO Editor Workbench And Review Queue
 
@@ -122,7 +152,7 @@ Risk if wrong: implementing the full queue/workbench too quickly could change ho
 
 Implementation guardrail: limit the first slice to source grouping and selected-row actions. Do not add mock review queue affordances or change write semantics.
 
-Implementation log, 2026-07-09: Static, CMS, and Manual targets now render in explicit groups while continuing to feed the existing single selected-action region. The 503-row fixture resolved to 21/217/265 rows, one Research Drawer, and clean console/overflow. No inline edit, Approve, Publish, AI-fix, or review-queue semantics were introduced; both independent reviews found no SEO Editor defect, and the final reviewer returned `PASS`, so the write-path circle-back is not triggered.
+Implementation log, 2026-07-09: Static, CMS, and Manual targets now render in explicit groups while continuing to feed the existing single selected-action region. The 503-row fixture resolved to 21/217/265 rows, one Research Drawer, and clean console/overflow. No inline edit, Approve, Publish, AI-fix, or review-queue semantics were introduced; both independent behavior-checkpoint reviews found no SEO Editor defect, and the final reviewer returned `PASS`. Visual status remains `behavior-safe / visual-unverified`.
 
 ### ODP-004 Site Audit Diagnostic Lens Demotion
 
@@ -143,7 +173,7 @@ Risk if wrong: choosing A could bury useful diagnostics if their new homes are t
 
 Implementation guardrail: preserve every diagnostic receiver and capability while demoting the visible peer modes; do not add new peer modes.
 
-Implementation log, 2026-07-09: only Site Audit and History remain visible peers. AI Search Ready, Content Health, and Audit Guide are exact-once disclosures after Core Web Vitals, and their `?sub=` URLs open the intended evidence while retaining the audit body. The first independent review found that audit progress temporarily hid compatibility evidence; progress and evidence now render together, with a dedicated running-state regression test. The Rinse fixture passed overview, AEO receiver, History, and Schedule smoke without mutations, and a fresh independent review returned `PASS`; discoverability remains the standing circle-back trigger.
+Implementation log, 2026-07-09: only Site Audit and History remain visible peers. AI Search Ready, Content Health, and Audit Guide are exact-once disclosures after Core Web Vitals, and their `?sub=` URLs open the intended evidence while retaining the audit body. The first independent review found that audit progress temporarily hid compatibility evidence; progress and evidence now render together, with a dedicated running-state regression test. The Rinse fixture passed overview, AEO receiver, History, and Schedule smoke without mutations, and a fresh independent behavior-checkpoint review returned `PASS`; visual status remains `behavior-safe / visual-unverified`.
 
 ### ODP-005 Analytics Hub Default Report
 
@@ -313,7 +343,7 @@ Implementation log, 2026-07-09: Content Pipeline Published is accepted as the pr
 
 ## Optional Later Decisions
 
-These aligned-enough defaults were accepted on 2026-07-09 and should not block the behavior-first sweep:
+These behavior-safe defaults were accepted on 2026-07-09. They remain `behavior-safe / visual-unverified` until their turn in the current sequence:
 
 - Schema exact inline page cards versus the current detail Drawer.
 - Links row-level Insert versus current copy/send until write target is explicit.
@@ -322,4 +352,4 @@ These aligned-enough defaults were accepted on 2026-07-09 and should not block t
 
 ## Next Implementation Slice
 
-Complete the registry-wide final audit and extract reviewed work into the shipping manifest. Insights Engine remains an explicit owner visual circle-back even though its behavior contract passed; Page Intelligence and the standalone Content Performance route remain protected until later surface-scoped shipping slices prove their receiving homes.
+Begin Brand & AI source inventory and paired desktop comparison. Preserve the owner-approved Insights Engine commit as an atomic calibration surface; do not push, open a PR, or start staging extraction during this goal.

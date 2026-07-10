@@ -2,7 +2,7 @@
 
 Surface: `seo-schema` / Schema  
 Owner: optimization / structured-data workflow  
-Status: aligned enough after safe cleanup and guide workflow polish; exact inline-card detail is a lower-risk owner choice  
+Status: `behavior-safe / visual-unverified` after safe cleanup and guide workflow polish; exact inline-card detail is a lower-risk owner choice
 Primary route: `/ws/:workspaceId/seo-schema`
 
 ## Prototype References
@@ -29,7 +29,7 @@ The prototype page body includes a coverage/readiness hero, a stepper, summary m
 
 ## Current Parity Grade
 
-Grade: `aligned enough`.
+Visual status: `behavior-safe / visual-unverified`.
 
 Why:
 

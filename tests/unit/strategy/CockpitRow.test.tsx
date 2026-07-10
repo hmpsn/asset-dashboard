@@ -164,4 +164,73 @@ describe('CockpitRow', () => {
     expect(screen.getByTestId('cockpit-row-actions')).not.toHaveClass('sm:shrink-0');
     expect(screen.getByTestId('cockpit-row-actions')).not.toHaveClass('lg:shrink-0');
   });
+
+  it('keeps Stage and Details inline while disclosing compact Engine lifecycle actions once', () => {
+    const actions = makeActions();
+    const onEditWording = vi.fn();
+    const { container } = render(
+      <CockpitRow
+        rec={makeRec()}
+        actions={actions}
+        density="compact"
+        selected={false}
+        onToggleSelect={vi.fn()}
+        onOpenDetails={vi.fn()}
+        onEditWording={onEditWording}
+        onStage={vi.fn()}
+        sendLabel="Stage for issue"
+      />,
+    );
+
+    expect(container.firstChild).toHaveAttribute('data-density', 'compact');
+    expect(container.firstChild).toHaveClass('py-2.5', 'pl-3', 'pr-2.5');
+    expect(screen.getByTestId('cockpit-row-rail')).toHaveClass('w-0.5', 'opacity-50');
+    expect(screen.getByTestId('cockpit-row-primary')).toHaveClass('gap-2');
+    expect(screen.getByTestId('cockpit-row-value-tag')).toHaveTextContent('value 80');
+    expect(screen.getByRole('checkbox', { name: /select: write the pricing post/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View details for Write the pricing post' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Stage for issue' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit wording' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Fix' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Park' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Write the pricing post' }));
+    expect(screen.getAllByRole('menuitem')).toHaveLength(3);
+    expect(screen.getByRole('menuitem', { name: 'Edit wording' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Fix' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Park' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Fix' }));
+    expect(actions.fix).toHaveBeenCalledWith('r1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Write the pricing post' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit wording' }));
+    expect(screen.getByRole('textbox', { name: 'Edit title for Write the pricing post' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Write the pricing post' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Park' }));
+    expect(screen.getByRole('button', { name: '7 days' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Strike instead' })).toBeInTheDocument();
+  });
+
+  it('retains the compact Park to Strike instead to confirm interception', () => {
+    const actions = makeActions();
+    render(
+      <CockpitRow
+        rec={makeRec()}
+        actions={actions}
+        density="compact"
+        onEditWording={vi.fn()}
+        onStage={vi.fn()}
+        sendLabel="Stage for issue"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Write the pricing post' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Park' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Strike instead' }));
+    expect(actions.strike).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
+    expect(actions.strike).toHaveBeenCalledWith('r1');
+  });
 });

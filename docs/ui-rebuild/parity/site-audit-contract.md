@@ -2,7 +2,7 @@
 
 Surface: `seo-audit` / Site Audit  
 Owner: optimization / technical-health workflow  
-Status: `ODP-004 A` diagnostic-lens demotion accepted; canonical Asset Manager repair handoff implemented and verified
+Status: `behavior-safe / visual-unverified`; `ODP-004 A` diagnostic-lens behavior direction accepted, canonical Asset Manager repair handoff implemented and verified
 Primary route: `/ws/:workspaceId/seo-audit`
 
 ## Prototype References

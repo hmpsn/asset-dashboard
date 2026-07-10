@@ -2,7 +2,7 @@
 
 Surface: `seo-keywords` / Keywords  
 Owner: keyword lifecycle / rank intelligence  
-Status: aligned enough after pilot contract pass; exact KPI/trend polish remains deferred  
+Status: `behavior-safe / visual-unverified` after pilot contract pass; exact KPI/trend polish remains deferred
 Primary route: `/ws/:workspaceId/seo-keywords`
 
 ## Prototype References
@@ -40,7 +40,7 @@ Prototype-critical behavior:
 
 ## Current Parity Grade
 
-Grade: `aligned enough`.
+Visual status: `behavior-safe / visual-unverified`.
 
 Why:
 

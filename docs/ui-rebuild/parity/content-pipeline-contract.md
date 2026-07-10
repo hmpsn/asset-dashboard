@@ -2,7 +2,7 @@
 
 Surface: `content-pipeline` / Content Pipeline  
 Owner: content strategy / content production workflow  
-Status: `ODP-002 C` first slice implemented, browser-smoked, integration-gated, and independently accepted; full Brief/Draft workspaces remain deferred
+Status: `behavior-safe / visual-unverified`; `ODP-002 C` first behavior slice implemented, with full Brief/Draft workspaces deferred
 Primary route: `/ws/:workspaceId/content-pipeline`
 
 ## Prototype References

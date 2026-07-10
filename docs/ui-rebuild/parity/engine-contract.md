@@ -2,7 +2,7 @@
 
 Surface: `seo-strategy` / Insights Engine  
 Owner: `workspace-command-center` with strategy/recommendation context ownership  
-Status: calibration accepted by final independent Sol Ultra review; owner visual re-review remains an open circle-back
+Status: `owner-approved`
 Primary route: `/ws/:workspaceId/seo-strategy`
 
 ## Prototype References
@@ -82,7 +82,7 @@ The behavior mismatch is corrected:
 - An explicitly requested Changes receiver shows an honest no-comparison/no-change state instead of focusing a blank wrapper. A failed comparison request renders a distinct retryable error state rather than masquerading as empty history.
 - Discussion attention uses the honest `Review move` action and opens the canonical move evidence workflow; it does not promise a reply thread that the surface does not provide.
 
-Joshua's first Wave 1 review returned `revise`: the initial single-spine build preserved too much production-panel composition and did not mirror the prototype closely enough. The corrective composition pass now moves change history above the verdict, uses the existing hero `StatCard` for value at stake, restores a four-cell value frame, applies prototype section labels/subtitles, limits Signals to four initial rows, limits Backing moves to one initial row per archetype with full expansion retained, and unifies the projection wrapper. Seven fresh Sol review rounds then found the wide shell, duplicate page header, collapsed Changes receiver, duplicate move lifecycle controls, hand-rolled operations disclosure, six-bucket micro stance, dark/vertical client preview, mount-only Changes state, transient screenshot references, strategy-gated Operations, blank deep-linked Changes state, cannibalization writes in the evidence Drawer, unstaged or unsendable rows under the staged projection label, stale and locally shadowed keeper state, geometrically false stance segments, non-wrapping move actions, a premature responsive row switch at `sm`, a misleading reply-thread CTA, and comparison failures presented as empty history. Every recorded finding is now corrected. Owner visual re-review remains the acceptance gate.
+Joshua's first Wave 1 review returned `revise`: the initial single-spine build preserved too much production-panel composition and did not mirror the prototype closely enough. The corrective composition pass now moves change history above the verdict, uses the existing hero `StatCard` for value at stake, restores a four-cell value frame, applies prototype section labels/subtitles, limits Signals to four initial rows, limits Backing moves to one initial row per archetype with full expansion retained, and unifies the projection wrapper. Seven fresh Sol review rounds then found the wide shell, duplicate page header, collapsed Changes receiver, duplicate move lifecycle controls, hand-rolled operations disclosure, six-bucket micro stance, dark/vertical client preview, mount-only Changes state, transient screenshot references, strategy-gated Operations, blank deep-linked Changes state, cannibalization writes in the evidence Drawer, unstaged or unsendable rows under the staged projection label, stale and locally shadowed keeper state, geometrically false stance segments, non-wrapping move actions, a premature responsive row switch at `sm`, a misleading reply-thread CTA, and comparison failures presented as empty history. Every recorded behavior-checkpoint finding in that historical review cycle is corrected. The six current visual/backend decisions below remain open, and Joshua's visual decision remains the acceptance gate.
 
 ## URL and Deep Links
 
@@ -139,8 +139,99 @@ Keep these capabilities reachable exactly once:
 - Sol review round 5 also returned `revise`; it is resolved by staged-set filtering in both projection lenses, immediate keeper propagation plus source-read invalidation, count-driven stance widths, and responsive move-action wrapping.
 - Sol review round 6 also returned `revise`; it is resolved by keeping move copy and actions stacked until `xl`, after the rebuilt sidebar and page have enough horizontal room for the full action set.
 - Sol review round 7 also returned `revise`; it is resolved by intersecting staging/projection with the sendable set, suppressing and filtering unavailable Stage actions, making keeper state optimistically query-authoritative with rollback, removing the local keeper overlay, replacing the dead-end reply CTA with `Review move`, distinguishing comparison errors from empty history, and strengthening the breakpoint regression assertions.
-- Final acceptance review: a fresh Sol Ultra reviewer returned `PASS` after explicitly rechecking the raw `KeywordStrategyRead` React Query cache boundary used by optimistic keeper updates. No behavior, capability, route, responsive, or test defect remains that blocks Wave 2.
-- Current owner question: does the revised opening, section framing, and calmer evidence/move density now clear the visual calibration bar? That visual re-review remains logged as a circle-back; the final independent pass and Joshua's instruction to continue clear Engine for use as the Wave 2 worker rubric without recording an owner visual sign-off that has not occurred.
+- Historical behavior-checkpoint review: a fresh Sol Ultra reviewer returned `PASS` after explicitly rechecking the raw `KeywordStrategyRead` React Query cache boundary used by optimistic keeper updates. That verdict covers behavior, capability, routes, responsiveness, and tests only.
+- Current visual status: `owner-approved`. Joshua approved V1–V6 as recommended; V1–V3 are implemented, V4–V6 remain explicit approved exceptions, and the final rendered pass received a fresh Sol `PASS`.
+
+## Desktop Visual-Parity Pass — 2026-07-09
+
+Status: `visual revision in progress`
+
+Direct source-and-browser comparison at `1600x1000` and `1440x900` supersedes the earlier automated-review wording. The production route is behavior-safe, but it is not owner-approved visual parity.
+
+| Seam | Prototype | Rebuilt baseline | First correction decision |
+|---|---|---|---|
+| Page boundary | One 1180px border box with 26px inline padding; content begins at x=258 | Rebuilt shell and Engine each apply `PageContainer` padding; content begins at x=284 | Remove the nested visual padding locally while retaining the shell container and token authority |
+| Opening rhythm | Eyebrow, Changes, verdict, value frame with no page-title block | A two-row body control block adds roughly 80px before Changes | Keep all controls reachable, but compose the body controls as one desktop row and join them to the opening cluster |
+| Deep-link focus | Receiver is scrolled into view without a visible ring around the whole section | Programmatic focus produces a 2px teal outline on Changes, POV, Signals, Moves, and Operations | Retain semantic focus and scrolling; suppress the ring only on the programmatically focused `tabIndex=-1` section |
+| Verdict | 26x28 padding, 26ch headline, no duplicate provenance in the verdict | 16x20 padding, 32ch headline, provenance repeated above the value card | Use the existing verdict primitive with roomier local padding and keep provenance in the value frame |
+| Stance and preview wrappers | Canonical asymmetric section-card header/body grammar with filter/eye chips | Symmetric `GroupBlock` wrappers with tighter 6x8 bodies | Recompose with existing `SectionCard` and Font Awesome semantic Icon keys |
+| POV interior | Compact narrated POV with one Edit POV action | Every structured field and every edit pencil is expanded by default | Preserve the current editor for this correction pass; compact-summary/edit composition remains an owner-visible difference |
+| Production-only operations | Not present | Disclosure, drawers, modal, readiness, and exact-once handoffs | Preserve all production capabilities; keep Operations below the prototype spine and document it as an intentional additive seam |
+| Color semantics | Prototype uses purple for Local allocation | Production law forbids purple outside admin AI | Keep canonical production hues; no rule exception is inferred from the prototype |
+
+Open owner circle-backs for this surface:
+
+- `ODP-001-V1`: compact narrated POV in the spine versus the full structured production POV/editor.
+- `ODP-001-V2`: Engine actions in the shared rebuilt-shell topbar versus the page body.
+- `ODP-001-V3`: Curation / Needs Attention placement and disclosure of secondary move lifecycle controls.
+- `ODP-001-V4`: exact prototype preview height versus truthful live preview copy and metrics.
+- `ODP-001-V5`: additive provider-evidence and Operations capability exceptions with no prototype equivalent.
+- `ODP-001-V6`: separate backend scope for the Lost visibility admin-read `401` versus an explicit missing-band exception.
+
+The canonical recommendations and owner-resolution record live in `owner-decision-packet.md`.
+
+First-pass review outcome:
+
+- A fresh read-only Sol review returned `REVISE`. This is implementation feedback, not owner approval.
+- Accepted first-pass gains: exact desktop spine geometry, prototype opening position, verdict hierarchy, removal of section-wide deep-link rings, canonical stance/preview wrappers, and a no-overflow mobile floor.
+- Straightforward local revision queue: compact divider treatment for Signals, calmer Backing-move row shells without removing controls, tighter empty-projection composition, closer preview chrome/metric emphasis, and non-truncating projection controls at the narrow usability floor.
+- Owner judgment remains required for all six circle-backs above before the interaction hierarchy can be treated as final.
+
+### Second local correction pass — 2026-07-10
+
+Status: `visual revision in progress`
+
+This pass addresses only prototype-clear, reversible presentation differences. It does not move the header actions, collapse the structured POV, rehome Curation/Needs Attention, or hide any move lifecycle control while those decisions await Joshua.
+
+| Seam | Second-pass correction | Remaining classification |
+|---|---|---|
+| Signals | Engine-only divided rows, 26px token-backed Font Awesome icon chips, compact typography, and collision-safe expansion keys; freshness, recompute, badges, count, and Show all remain | The prototype's Lost visibility band cannot render because the admin hook receives `401` from the portal-authenticated public insight feed; backend contract/owner scope |
+| Backing moves | Engine-only group and row density with compact labels/padding; selection, detail, edit, stage, fix, park/cut, shortlist, and bulk actions remain | Disclosing or moving the lifecycle rail is owner judgment |
+| Projection | Engine-only wrapper, row, loading/error, and empty-state density; redundant intro removed; mobile lens labels wrap without overflow | Populated parity depends on the local staged set; browser evidence stages one real move without a network mutation |
+| Client preview | Contextual workspace chrome, 18px verdict hierarchy, narrower explanation, recovered-value mint emphasis, tighter proof gap, and redundant footer removal | Replacing truthful production copy/metrics with unavailable prototype values is owner/backend scope |
+| Populated Operations | Repeated page evidence is normalized to one keeper option per page identity, eliminating duplicate React keys and duplicate keeper rows | Operations remains a production-only additive section |
+
+Browser evidence at `1440x900`, `1600x1000`, and the `390x844` usability floor confirms:
+
+- The desktop spine remains exactly x=258 / 1128px wide at both required desktop viewports.
+- Overview, Changes, Signals, POV, Moves, projections, client preview, and Operations have zero section overflow.
+- Projection radios, compact move action rows, Drawer, and Add Recommendation modal all report zero horizontal overflow at 390px.
+- A real local Stage action populates the keyword projection without issuing a POST/PUT/PATCH/DELETE request.
+- The populated route has no React page error or duplicate-key warning after the identity fixes. The dev-only WebSocket warning and portal-auth `401` remain separately classified above.
+
+Verification after implementation: 71 Engine presentation assertions plus the keeper-identity regression pass; hooks lint, project typecheck, Vite production build, pr-check, and `git diff --check` pass. Automated gates remain behavior evidence only, never visual approval.
+
+Second-pass evidence directory: `/tmp/asset-dashboard-codex-visual-parity/insights/second-pass/`. Paired files place the prototype on the left and rebuilt surface on the right. Operations, Drawer, Add Recommendation, and mobile captures are standalone because the prototype has no production-equivalent interior for those states.
+
+Consolidated owner-review sheet: `/tmp/asset-dashboard-codex-visual-parity/insights/second-pass/insights-owner-review-sheet.png` (2400x1580; overview, Changes, Signals, POV, Moves, projections, client preview, and the production-only Operations exception).
+
+Final second-pass review: a fresh read-only Sol reviewer returned `NEEDS OWNER CIRCLE-BACK`. It found no remaining material safe-local frontend correction. Joshua approved `ODP-001-V1` through `ODP-001-V6` as recommended on 2026-07-10. The owner-approved final pass below supersedes this intermediate status.
+
+## Owner-Approved Final Pass — 2026-07-10
+
+Status: `owner-approved`
+
+Joshua's exact resolution was: **“Approve Insights Engine with V1–V6 as recommended.”**
+
+- V1: the main spine now renders the compact situation/lead-move narrative with one `Edit POV` action; the complete structured editor, Regenerate action, wins, flags, and cut-to-sentence behavior remain in the canonical Drawer.
+- V2: Strategy generation/refresh, data refresh, and conditional staged-set Send render exact-once in the shared rebuilt-shell topbar. Isolated component mounts use an explicit inline fallback; the mounted chrome never flashes or duplicates it.
+- V3: compact Curation and Needs Attention state sits immediately above Backing moves. Details and Stage/Unstage remain inline on compact move rows; Edit wording, Fix, and Park are disclosed through the accessible More menu, with Park → Strike instead → confirmation preserved.
+- V4: truthful live preview copy, metrics, and resulting height are an approved content-composition exception.
+- V5: provider evidence and collapsed Operations are approved production-capability exceptions.
+- V6: the Lost visibility admin-read `401` is an approved missing-band exception and a separate backend-contract task; this frontend goal does not fabricate the unavailable state.
+
+Final evidence directory: `/tmp/asset-dashboard-codex-visual-parity/insights/final-approved-pass/`.
+
+- Paired prototype/rebuilt states: overview, Changes, Signals, POV, Moves, projections, and client preview at `1440x900`, with overview also at `1600x1000`.
+- Rebuilt-only approved interiors: full POV Drawer, move More menu, staged topbar Send, expanded Operations, and the `390x844` usability floor.
+- Consolidated sheets: `insights-final-owner-review-sheet.png` and `insights-final-approved-interiors.png`.
+- Desktop and mobile document widths equal their viewports: no page-level horizontal overflow at 1440, 1600, or 390.
+- Computed hierarchy remains on the approved DS scale: 28px operator verdict, 15.5px body/explanation roles, 13.5px compact UI/caption roles, and 11.5px eyebrow/label roles.
+- The only browser console error is the separately approved V6 `401`; no React page error or duplicate-key warning remains.
+
+Fresh final Sol verdict: `PASS`. It found no safe-local defect and explicitly confirmed V1–V3 composition, all required desktop/interior states, the mobile floor, and the truthful V4–V6 exceptions.
+
+Verification: 143 tests pass across 13 focused/integration files; `npm run lint:hooks`, `npm run typecheck`, `npx vite build`, `npm run pr-check`, and `git diff --check` pass. The React best-practices review confirms unconditional hooks, stable portal/context state, preserved accessibility/focus behavior, default-presentation compatibility, and no new key or TypeScript issues.
 
 ## Browser Smoke Checklist
 

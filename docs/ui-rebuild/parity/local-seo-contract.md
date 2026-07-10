@@ -2,7 +2,7 @@
 
 Surface: `local-seo` / Local Presence  
 Owner: local SEO / GBP operations  
-Status: `ODP-008 A` accepted 2026-07-09; current real-data v1 retained  
+Status: `behavior-safe / visual-unverified`; `ODP-008 A` behavior direction accepted 2026-07-09, current real-data v1 retained
 Primary route: `/ws/:workspaceId/local-seo`
 
 ## Prototype References
@@ -41,7 +41,7 @@ Production carry-over that intentionally exceeds or differs from the prototype:
 
 ## Current Parity Grade
 
-Grade: `capability risk`.
+Visual status: `behavior-safe / visual-unverified`; backend capability constraints remain.
 
 Why:
 

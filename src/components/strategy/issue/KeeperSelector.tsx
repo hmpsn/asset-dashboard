@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { Check } from 'lucide-react';
 import { Badge, Button, Icon } from '../../ui/index.js';
 import { useKeeperOverride } from '../../../hooks/admin/useKeeperOverride.js';
+import { normalizePageUrl } from '../../../../shared/page-address-utils.js';
 import type { CannibalizationItem } from '../../../../shared/types/workspace.js';
 
 export interface KeeperSelectorProps {
@@ -64,8 +65,21 @@ export function KeeperSelector({
     );
   }
 
+  // A producer can report the same page from keyword-map and GSC evidence. The keeper workflow is
+  // page-identity based, so render one option per normalized path and retain the strongest row.
+  const uniquePages = Array.from(item.pages.reduce((byPath, page) => {
+    const normalizedPath = normalizePageUrl(page.path);
+    const normalizedPage = { ...page, path: normalizedPath };
+    const current = byPath.get(normalizedPath);
+    const hasBetterPosition = (normalizedPage.position ?? Infinity) < (current?.position ?? Infinity);
+    const hasBetterImpressions = (normalizedPage.position ?? Infinity) === (current?.position ?? Infinity)
+      && (normalizedPage.impressions ?? 0) > (current?.impressions ?? 0);
+    if (!current || hasBetterPosition || hasBetterImpressions) byPath.set(normalizedPath, normalizedPage);
+    return byPath;
+  }, new Map<string, CannibalizationItem['pages'][number]>()).values());
+
   // Sort pages: keeper first, then by position (ascending), then by impressions (descending).
-  const sortedPages = [...item.pages].sort((a, b) => {
+  const sortedPages = uniquePages.sort((a, b) => {
     const aIsKeeper = a.path === currentKeeperPath;
     const bIsKeeper = b.path === currentKeeperPath;
     if (aIsKeeper && !bIsKeeper) return -1;

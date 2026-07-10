@@ -44,4 +44,29 @@ describe('NeedsAttentionStrip', () => {
     fireEvent.click(within(row!).getByRole('button', { name: 'Review move' }));
     expect(onAct).toHaveBeenCalledWith('r3', 'new_reply');
   });
+
+  it('discloses every compact Engine item with one reachable review action each', () => {
+    const onAct = vi.fn();
+    render(
+      <NeedsAttentionStrip
+        presentation="engine-spine"
+        items={[
+          { recId: 'r1', title: 'Old sent rec', kind: 'stale_sent', detail: 'No response in 20 days' },
+          { recId: 'r2', title: 'New client reply', kind: 'new_reply', detail: 'Client asked a question' },
+        ]}
+        onAct={onAct}
+      />,
+    );
+
+    const disclosure = screen.getByTestId('needs-attention-disclosure');
+    expect(within(disclosure).getByText('Needs your attention')).toBeInTheDocument();
+    expect(within(disclosure).getByText('2 moves to review')).toBeInTheDocument();
+    fireEvent.click(within(disclosure).getByText('Needs your attention').closest('summary')!);
+    expect(within(disclosure).getByText('Old sent rec')).toBeInTheDocument();
+    expect(within(disclosure).getByText('New client reply')).toBeInTheDocument();
+    expect(within(disclosure).getAllByRole('button', { name: /review/i })).toHaveLength(2);
+
+    fireEvent.click(within(disclosure).getByRole('button', { name: 'Review move' }));
+    expect(onAct).toHaveBeenCalledWith('r2', 'new_reply');
+  });
 });

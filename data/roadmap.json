@@ -15,7 +15,7 @@
           "status": "done",
           "createdAt": "2026-07-09",
           "owner": "workspace-command-center",
-          "notes": "Completed 2026-07-09 in the isolated codex/ui-prototype-alignment branch. The sandbox contains the reviewed integration cohorts for Cockpit calibration, Insights Engine, Brand & AI, Content Pipeline, SEO Editor, Site Audit, Search & Traffic, shell focus/Page Rewriter, Performance and Site Audit repair senders, Asset Manager, Global Ops corrections, route accounting, and the opt-in rebuilt-admin PageHeader pilot. Nine focused suites pass 120 tests; the branch-wide run passes 28,525 tests across 2,033 files; hooks lint, typecheck, Vite build, pr-check, deferred-ledger verification, browser smoke, and diff hygiene pass. A fresh independent Sol Ultra acceptance review returned PASS. This records integration acceptance only, not staging or production shipment."
+          "notes": "Completed 2026-07-09 in the isolated codex/ui-prototype-alignment branch. The sandbox contains the reviewed integration cohorts for Cockpit calibration, Insights Engine, Brand & AI, Content Pipeline, SEO Editor, Site Audit, Search & Traffic, shell focus/Page Rewriter, Performance and Site Audit repair senders, Asset Manager, Global Ops corrections, route accounting, and the opt-in rebuilt-admin PageHeader pilot. Nine focused suites pass 120 tests; the branch-wide run passes 28,525 tests across 2,033 files; hooks lint, typecheck, Vite build, pr-check, deferred-ledger verification, browser smoke, and diff hygiene pass. A fresh independent Sol Ultra review returned PASS for the historical integration/behavior checkpoint only. This records behavior acceptance, not owner-approved visual parity, staging, or production shipment."
         },
         {
           "id": "ui-rebuild-parity-staging-extraction",
@@ -26,7 +26,7 @@
           "status": "pending",
           "createdAt": "2026-07-09",
           "owner": "workspace-command-center",
-          "notes": "Start each shipping branch from staging and extract governance, typography authority, shell/nav, Brand & AI, then one behavior or capability surface per PR. Merge and verify each prerequisite before opening dependents. Do not open the integration sandbox itself as one giant PR."
+          "notes": "Dormant during the active visual-parity goal. Do not start staging extraction unless Joshua explicitly authorizes it after the owner-approval sequence. When authorized, start each shipping branch from staging and extract governance, typography authority, shell/nav, then one approved surface per PR; never open the integration sandbox itself as one giant PR."
         },
         {
           "id": "ui-rebuild-engine-owner-visual-recheck",
@@ -34,10 +34,10 @@
           "source": "ODP-001 circle-back trigger",
           "est": "S",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-07-09",
           "owner": "workspace-command-center",
-          "notes": "The single-spine interaction contract and independent reviews pass, but Joshua explicitly flagged that the result still did not mirror the prototype closely enough. Re-review the latest overview, Changes, Signals, Moves, Operations, and client-preview captures before treating ODP-001 as owner-accepted visual parity."
+          "notes": "Completed 2026-07-10 in codex/ui-visual-parity. Joshua explicitly approved Insights Engine with ODP-001-V1 through V6 as recommended. V1 now keeps the compact narrated POV in the spine and the complete editor in a Drawer; V2 moves Engine actions exact-once into the rebuilt topbar; V3 keeps Details and Stage inline while disclosing Edit/Fix/Park and placing compact curation/attention state beside the queue. V4-V6 are documented owner-approved exceptions for truthful live preview content, provider evidence plus collapsed Operations, and the separate Lost visibility backend read contract. Final matched 1440x900 and 1600x1000 evidence, overlays, Operations, staged-send, and the 390x844 overflow floor are in /tmp/asset-dashboard-codex-visual-parity/insights/final-approved-pass/. A fresh Sol review returned PASS with no safe-local defects; 143 focused/integration tests, hooks lint, typecheck, Vite build, pr-check, and diff hygiene pass. Status: owner-approved."
         }
       ]
     },

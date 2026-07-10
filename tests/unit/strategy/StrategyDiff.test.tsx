@@ -26,12 +26,15 @@ const diff = {
   ],
 };
 
-function renderDiff(defaultExpanded = false) {
+function renderDiff(
+  defaultExpanded = false,
+  presentation: 'default' | 'engine-spine' = 'default',
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = (expanded: boolean) => (
     <MemoryRouter>
       <QueryClientProvider client={queryClient}>
-        <StrategyDiff workspaceId="ws-1" defaultExpanded={expanded} />
+        <StrategyDiff workspaceId="ws-1" defaultExpanded={expanded} presentation={presentation} />
       </QueryClientProvider>
     </MemoryRouter>
   );
@@ -73,6 +76,19 @@ describe('StrategyDiff', () => {
 
     expect(await screen.findByRole('button', { name: /What Changed/i })).toHaveAttribute('aria-expanded', 'true');
     expect(await screen.findByText('Optimize page')).toBeInTheDocument();
+  });
+
+  it('uses the prototype clock icon only in the Engine-spine presentation', async () => {
+    const engine = renderDiff(false, 'engine-spine');
+    await waitFor(() => expect(screen.getByText('What Changed')).toBeInTheDocument());
+    expect(engine.container.querySelector('.fa-clock')).toBeInTheDocument();
+    expect(engine.container.querySelector('.lucide-refresh-cw')).not.toBeInTheDocument();
+    engine.unmount();
+
+    const legacy = renderDiff();
+    await waitFor(() => expect(screen.getByText('What Changed')).toBeInTheDocument());
+    expect(legacy.container.querySelector('.lucide-refresh-cw')).toBeInTheDocument();
+    expect(legacy.container.querySelector('.fa-clock')).not.toBeInTheDocument();
   });
 
   it('opens when an already-mounted receiver changes to the changes lens', async () => {

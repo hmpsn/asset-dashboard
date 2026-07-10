@@ -2,7 +2,7 @@
 
 Surface: `links` / Links  
 Owner: optimization / link-repair workflow  
-Status: aligned enough after safe cleanup; row-level insert is an owner choice  
+Status: `behavior-safe / visual-unverified` after safe cleanup; row-level insert is an owner choice
 Primary route: `/ws/:workspaceId/links`
 
 ## Prototype References
@@ -32,7 +32,7 @@ The rebuilt surface preserves all four as peer lenses, which matches the prototy
 
 ## Current Parity Grade
 
-Grade: `aligned enough`.
+Visual status: `behavior-safe / visual-unverified`.
 
 Why:
 

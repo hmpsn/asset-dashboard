@@ -2,7 +2,7 @@
 
 Surface: `performance` / Performance  
 Owner: site-health / speed-diagnostics workflow  
-Status: aligned enough; canonical Asset Manager repair handoff implemented and verified
+Status: `behavior-safe / visual-unverified`; canonical Asset Manager repair handoff implemented and verified
 Primary route: `/ws/:workspaceId/performance`
 
 ## Prototype References
@@ -28,7 +28,7 @@ The rebuilt surface preserves the same two-mode model and keeps production capab
 
 ## Current Parity Grade
 
-Grade: `aligned enough`.
+Visual status: `behavior-safe / visual-unverified`.
 
 Why:
 

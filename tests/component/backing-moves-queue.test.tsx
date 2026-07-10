@@ -315,6 +315,40 @@ describe('BackingMovesQueue', () => {
     expect(onStageMany).toHaveBeenCalledWith(['sendable']);
   });
 
+  it('uses the compact Engine-spine composition while preserving every move control', () => {
+    wrap(
+      <BackingMovesQueue
+        workspaceId="ws1"
+        recs={[makeRec('compact', 'content', 'Compact engine move')]}
+        actions={makeActions()}
+        onCut={vi.fn()}
+        onEditWording={vi.fn()}
+        stagedRecIds={new Set()}
+        stageableRecIds={new Set(['compact'])}
+        onStage={vi.fn()}
+        onAddRec={vi.fn()}
+        onOpenDetails={vi.fn()}
+        presentation="engine-spine"
+      />,
+    );
+
+    expect(screen.getByTestId('backing-moves-groups')).toHaveClass('space-y-4');
+    expect(screen.getByTestId('backing-move-group')).toHaveClass('space-y-1.5');
+    expect(screen.getByText(ARCHETYPE_LABELS.authority_bet).closest('h3')).toHaveClass('t-label', 'uppercase');
+    expect(document.querySelector('.fa-bolt')).toBeInTheDocument();
+    expect(screen.getByTestId('cockpit-row-primary').parentElement).toHaveAttribute('data-density', 'compact');
+    expect(screen.getByRole('button', { name: 'View details for Compact engine move' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Stage for issue' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Edit wording' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Compact engine move' }));
+
+    expect(screen.getByRole('menuitem', { name: 'Edit wording' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Fix' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Park' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add a recommendation' })).toBeInTheDocument();
+  });
+
   it('renders an empty state when recs array is empty', () => {
     wrap(
       <BackingMovesQueue

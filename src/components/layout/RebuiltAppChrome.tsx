@@ -1,9 +1,10 @@
 // @ds-rebuilt
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { Page } from '../../routes';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import type { Workspace } from '../WorkspaceSelector';
-import { AppShell, Drawer, PageContainer, Toolbar } from '../ui';
+import { AppShell, Drawer, PageContainer } from '../ui';
 import { RebuiltBreadcrumb } from './RebuiltBreadcrumb';
 import { RebuiltSidebar } from './RebuiltSidebar';
 
@@ -38,6 +39,28 @@ const RebuiltFocusModeContext = createContext<RebuiltFocusModeContextValue>({
   focusMode: false,
   setFocusMode: ignoreFocusModeChange,
 });
+
+interface RebuiltTopbarActionHostContextValue {
+  host: HTMLDivElement | null;
+}
+
+interface RebuiltTopbarActionsProps {
+  children: ReactNode;
+  /** Used by isolated surface mounts only. A mounted chrome provider never renders this fallback. */
+  fallback?: ReactNode;
+}
+
+// `null` means no provider. A provider value with host=null means the chrome is mounted but its
+// callback-ref host has not committed yet; that state intentionally renders nothing so actions
+// never flash twice between the page body and topbar.
+const RebuiltTopbarActionHostContext = createContext<RebuiltTopbarActionHostContextValue | null>(null);
+
+export function RebuiltTopbarActions({ children, fallback = null }: RebuiltTopbarActionsProps) {
+  const context = useContext(RebuiltTopbarActionHostContext);
+  if (!context) return fallback;
+  if (!context.host || typeof document === 'undefined') return null;
+  return createPortal(children, context.host);
+}
 
 export function useRebuiltFocusMode(): RebuiltFocusModeContextValue {
   return useContext(RebuiltFocusModeContext);
@@ -97,6 +120,7 @@ export function RebuiltAppChrome({
 }: RebuiltAppChromeProps) {
   const [rail, setRail] = useState(readRail);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [topbarActionHost, setTopbarActionHost] = useState<HTMLDivElement | null>(null);
   const narrowViewportRail = useNarrowViewportRail();
   const effectiveRail = rail || narrowViewportRail;
   const shellRail = effectiveRail || focusMode;
@@ -126,14 +150,69 @@ export function RebuiltAppChrome({
     focusMode,
     setFocusMode: onFocusModeChange ?? ignoreFocusModeChange,
   }), [focusMode, onFocusModeChange]);
+  const topbarActionHostContextValue = useMemo<RebuiltTopbarActionHostContextValue>(() => ({
+    host: topbarActionHost,
+  }), [topbarActionHost]);
+  const captureTopbarActionHost = useCallback((host: HTMLDivElement | null) => {
+    setTopbarActionHost(host);
+  }, []);
 
   return (
-    <RebuiltFocusModeContext.Provider value={focusModeContextValue}>
-      <AppShell
-        rail={shellRail}
-        focusMode={focusMode}
-        onFocusModeChange={onFocusModeChange}
-        sidebar={
+    <RebuiltTopbarActionHostContext.Provider value={topbarActionHostContextValue}>
+      <RebuiltFocusModeContext.Provider value={focusModeContextValue}>
+        <AppShell
+          rail={shellRail}
+          focusMode={focusMode}
+          onFocusModeChange={onFocusModeChange}
+          sidebar={(
+            <RebuiltSidebar
+              workspaces={workspaces}
+              selected={selected}
+              tab={tab}
+              theme={theme}
+              pendingContentRequests={pendingContentRequests}
+              onCreate={onCreate}
+              onDelete={onDelete}
+              onLinkSite={onLinkSite}
+              onUnlinkSite={onUnlinkSite}
+              toggleTheme={toggleTheme}
+              onLogout={onLogout}
+              rail={shellRail}
+              onToggleRail={handleShellRailToggle}
+            />
+          )}
+          topbar={(
+            <div
+              data-testid="rebuilt-topbar-shell"
+              className="flex h-full w-full min-w-0 flex-nowrap items-center gap-4 overflow-x-auto"
+            >
+              <div className="min-w-max flex-none">
+                <RebuiltBreadcrumb
+                  workspaces={workspaces}
+                  selected={selected}
+                  tab={tab}
+                  pendingContentRequests={pendingContentRequests}
+                />
+              </div>
+              <div
+                ref={captureTopbarActionHost}
+                data-testid="rebuilt-topbar-action-host"
+                className="ml-auto flex min-w-max flex-none items-center gap-2"
+              />
+            </div>
+          )}
+        >
+          <PageContainer as="main" width="wide">
+            {children}
+          </PageContainer>
+        </AppShell>
+        <Drawer
+          open={narrowViewportRail && mobileNavOpen}
+          onClose={closeMobileNav}
+          side="left"
+          width="min(320px, 88vw)"
+          title="Navigation"
+        >
           <RebuiltSidebar
             workspaces={workspaces}
             selected={selected}
@@ -146,49 +225,12 @@ export function RebuiltAppChrome({
             onUnlinkSite={onUnlinkSite}
             toggleTheme={toggleTheme}
             onLogout={onLogout}
-            rail={shellRail}
-            onToggleRail={handleShellRailToggle}
+            rail={false}
+            onToggleRail={closeMobileNav}
+            onNavigate={closeMobileNav}
           />
-        }
-        topbar={
-          <Toolbar label="Breadcrumb" wrap={false} style={{ width: '100%' }}>
-            <RebuiltBreadcrumb
-              workspaces={workspaces}
-              selected={selected}
-              tab={tab}
-              pendingContentRequests={pendingContentRequests}
-            />
-          </Toolbar>
-        }
-      >
-        <PageContainer as="main" width="wide">
-          {children}
-        </PageContainer>
-      </AppShell>
-      <Drawer
-        open={narrowViewportRail && mobileNavOpen}
-        onClose={closeMobileNav}
-        side="left"
-        width="min(320px, 88vw)"
-        title="Navigation"
-      >
-        <RebuiltSidebar
-          workspaces={workspaces}
-          selected={selected}
-          tab={tab}
-          theme={theme}
-          pendingContentRequests={pendingContentRequests}
-          onCreate={onCreate}
-          onDelete={onDelete}
-          onLinkSite={onLinkSite}
-          onUnlinkSite={onUnlinkSite}
-          toggleTheme={toggleTheme}
-          onLogout={onLogout}
-          rail={false}
-          onToggleRail={closeMobileNav}
-          onNavigate={closeMobileNav}
-        />
-      </Drawer>
-    </RebuiltFocusModeContext.Provider>
+        </Drawer>
+      </RebuiltFocusModeContext.Provider>
+    </RebuiltTopbarActionHostContext.Provider>
   );
 }

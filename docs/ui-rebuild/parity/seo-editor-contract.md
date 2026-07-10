@@ -2,7 +2,7 @@
 
 Surface: `seo-editor` / SEO Editor  
 Owner: optimization / Webflow write-target workflow  
-Status: `ODP-003 C` source-grouping slice implemented, browser-smoked, integration-gated, and independently accepted; inline editing/review queue remain deferred
+Status: `behavior-safe / visual-unverified`; `ODP-003 C` source-grouping behavior checkpoint is implemented, while inline editing/review queue remain deferred
 Primary route: `/ws/:workspaceId/seo-editor`
 
 ## Prototype References

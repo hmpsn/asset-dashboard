@@ -2,7 +2,7 @@
 
 Surface: `analytics-hub` / Search & Traffic  
 Owner: monitoring / analytics reporting  
-Status: `ODP-005 A + C` implemented 2026-07-09; Search-default and degraded-provider corrections verified
+Status: `behavior-safe / visual-unverified`; `ODP-005 A + C` behavior checkpoint implemented 2026-07-09, Search-default and degraded-provider corrections verified
 Primary route: `/ws/:workspaceId/analytics-hub`
 
 ## Prototype References
@@ -42,7 +42,7 @@ Production carry-over that intentionally exceeds the prototype:
 
 ## Current Parity Grade
 
-Grade: `aligned enough`.
+Visual status: `behavior-safe / visual-unverified`.
 
 Why:
 

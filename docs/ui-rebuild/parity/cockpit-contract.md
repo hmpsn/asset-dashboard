@@ -2,7 +2,7 @@
 
 Surface: `home` / Cockpit  
 Owner: `workspace-command-center`  
-Status: calibration contract accepted for the current parity pass  
+Status: `behavior-safe / visual-unverified`; historical calibration behavior contract accepted
 Primary route: `/ws/:workspaceId`
 
 ## Prototype References

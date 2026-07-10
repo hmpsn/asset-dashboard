@@ -32,6 +32,8 @@ export interface ContentWorkOrderLensProps {
   embedded?: boolean;
   /** Optional local curation set. When present, project only rows whose recommendation is staged. */
   includedRecIds?: ReadonlySet<string>;
+  /** Opt-in compact composition for the Engine spine. */
+  presentation?: 'default' | 'engine-spine';
 }
 
 /** Production-stage → badge tone + operator-legible label. */
@@ -50,20 +52,27 @@ const STAGE_BADGE: Record<ContentWorkOrderStage, { tone: BadgeTone; label: strin
 function WorkOrderRow({
   row,
   onOpen,
+  compact,
 }: {
   row: ContentWorkOrderRow;
   onOpen: (row: ContentWorkOrderRow) => void;
+  compact: boolean;
 }) {
   const stage = STAGE_BADGE[row.stage];
   return (
-    <div className="flex items-center justify-between gap-4 py-3">
+    <div
+      data-testid="content-work-order-row"
+      className={compact
+        ? 'flex flex-col items-stretch gap-2 py-2 sm:flex-row sm:items-center sm:justify-between'
+        : 'flex items-center justify-between gap-4 py-3'}
+    >
       <div className="min-w-0">
         <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{row.title}</div>
         <div className="t-caption-sm mt-0.5 text-[var(--brand-text-muted)]">
           {row.type === 'content_refresh' ? 'Content refresh' : 'New content'}
         </div>
       </div>
-      <div className="flex items-center gap-3 shrink-0">
+      <div className={compact ? 'flex flex-wrap items-center gap-2 sm:shrink-0' : 'flex items-center gap-3 shrink-0'}>
         <Badge tone={stage.tone} variant="soft" size="sm" label={stage.label} />
         <Button
           variant="link"
@@ -90,12 +99,14 @@ export function ContentWorkOrderLens({
   theIssueEnabled = false,
   embedded = false,
   includedRecIds,
+  presentation = 'default',
 }: ContentWorkOrderLensProps) {
   const navigate = useNavigate();
   const { contentWorkOrders, isLoading, isError } = useIssueLenses(workspaceId, theIssueEnabled);
   const visibleWorkOrders = includedRecIds
     ? contentWorkOrders.filter((row) => includedRecIds.has(row.recId))
     : contentWorkOrders;
+  const engineSpine = presentation === 'engine-spine';
 
   // Empty → null (Blocker 4): when there are no curated content work-orders, render nothing rather
   // than an empty SectionCard, so a cold workspace shows zero placeholder chrome (mirrors
@@ -110,16 +121,18 @@ export function ContentWorkOrderLens({
 
   const content = (
     <>
-      <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">
-        Staged content moves and where each stands in production.
-      </p>
+      {!engineSpine && (
+        <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">
+          Staged content moves and where each stands in production.
+        </p>
+      )}
 
       {isLoading ? (
-        <p className="t-caption-sm text-[var(--brand-text-muted)] py-4 text-center">
+        <p className={`t-caption-sm text-[var(--brand-text-muted)] ${engineSpine ? 'py-3' : 'py-4'} text-center`}>
           Projecting curated work-orders…
         </p>
       ) : isError ? (
-        <p className="t-caption-sm text-red-400/80 py-4 text-center">
+        <p className={`t-caption-sm text-red-400/80 ${engineSpine ? 'py-3' : 'py-4'} text-center`}>
           Couldn't load content work-orders. It'll retry shortly.
         </p>
       ) : visibleWorkOrders.length === 0 ? (
@@ -127,11 +140,12 @@ export function ContentWorkOrderLens({
           icon={ClipboardList}
           title="No content work orders yet"
           description="Stage a content or content-refresh move above to track it here and open it in Content Pipeline."
+          className={engineSpine ? '!py-6 [&>div:first-child]:h-10 [&>div:first-child]:w-10' : undefined}
         />
       ) : (
         <div className="divide-y divide-[var(--brand-border)]">
           {visibleWorkOrders.map((row) => (
-            <WorkOrderRow key={row.recId} row={row} onOpen={openInPipeline} />
+            <WorkOrderRow key={row.recId} row={row} onOpen={openInPipeline} compact={engineSpine} />
           ))}
         </div>
       )}
@@ -139,7 +153,14 @@ export function ContentWorkOrderLens({
   );
 
   if (embedded) {
-    return <div className="px-4 py-3">{content}</div>;
+    return (
+      <div
+        data-testid="content-work-orders-embedded"
+        className={engineSpine ? 'px-2 py-1.5' : 'px-4 py-3'}
+      >
+        {content}
+      </div>
+    );
   }
 
   return (

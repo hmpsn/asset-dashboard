@@ -2,7 +2,7 @@
 
 Baseline: the integration checkpoint commit that introduces this file on `codex/ui-prototype-alignment`.
 
-This commit is the immutable fork point for the parallel parity goal. It is intentionally broader than a shipping PR. Never open it as one PR; extract reviewed cohorts from `staging` in the dependency order below.
+This commit is the immutable fork point for the earlier behavior checkpoint. It is intentionally broader than a shipping PR. It does not establish owner-approved visual parity for any surface. Never open it as one PR; extract reviewed cohorts from `staging` in the dependency order below.
 
 ## Baseline Verification
 
@@ -41,6 +41,8 @@ This commit is the immutable fork point for the parallel parity goal. It is inte
 
 ## Extraction Rules
 
+These rules are dormant during the active visual-parity goal. Do not start staging extraction unless Joshua explicitly authorizes it after the owner-approval sequence.
+
 - Create each shipping branch from current `staging`; never cherry-pick this baseline wholesale.
 - Apply only the semantic/path cohort being shipped, then run its targeted tests and all final gates.
 - Preserve route ids, feature-flag behavior, URL receivers, legacy aliases, and exact-once capability homes.
@@ -53,7 +55,7 @@ The integration sandbox has advanced beyond the baseline through reviewed, surfa
 
 | Cohort | Integration reference | Shipping boundary |
 |---|---|---|
-| Insights Engine | `588eada03` | Engine component/state/tests and its parity record only; keep the owner visual circle-back open. |
+| Insights Engine | `588eada03` plus the owner-approved `codex/ui-visual-parity` surface commit | V1–V3 visual composition plus the Engine-owned tests/docs only; retain V4–V6 as explicit approved exceptions. Shipping remains dormant during this goal. |
 | SEO Editor | `cb536234b` | Source-grouped worksheet and matching tests only. |
 | Site Audit | `3e4cec39e`, `4d1fd9592` | Diagnostic demotion first; canonical Asset repair sender only after Asset receiver work is available. |
 | Content Pipeline | `15eec15f3`, `4024ff87e` | Board-first slice and review fixes; keep later item workspaces deferred. |
@@ -62,6 +64,6 @@ The integration sandbox has advanced beyond the baseline through reviewed, surfa
 | Performance repair sender | `8cfc4ae78` | Canonical Asset filter sender; pair with the Asset receiver PR dependency. |
 | Asset Manager | `241f54a25`, `9bf362d21` | Single Browse workshop first; repair-first placement, overlay precedence, All/weight metrics, and final tests in the closeout reference. |
 | PageHeader pilot | `9bf362d21` | Shared opt-in variant plus Performance-only adoption/tests; do not bulk-migrate other surfaces. |
-| Final parity audit | `9bf362d21` | Cockpit, Global Ops, Local Presence, Performance color, route census, docs/roadmap, browser evidence, and independent `PASS`; extract only the owning surface from this mixed closeout commit. |
+| Final behavior audit | `9bf362d21` | Cockpit, Global Ops, Local Presence, Performance color, route census, docs/roadmap, browser evidence, and an independent behavior-review `PASS`; extract only the owning surface from this mixed closeout commit. This is not an owner visual-parity approval. |
 
 Route-home decision: Content Pipeline Published is the proposed Content Performance receiver because it already consumes shared readback data, but `/content-perf` remains standalone. Page Intelligence remains standalone until a later SEO Editor Research/detail slice proves every capability. No route migration belongs in the current extraction set.

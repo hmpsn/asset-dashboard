@@ -2,7 +2,7 @@
 
 This is the implementation plan for the next Brand & AI pass. It supersedes a purely inline readiness-panel alignment slice.
 
-Status: implemented in `codex/ui-prototype-alignment` as the modal-first parity correction slice.
+Status: `behavior-safe / visual-unverified`; modal-first behavior correction implemented in `codex/ui-prototype-alignment`.
 
 ## Goal
 

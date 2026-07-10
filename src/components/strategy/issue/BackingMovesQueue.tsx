@@ -83,6 +83,8 @@ export interface BackingMovesQueueProps {
   onOpenDetails?: (recId: string) => void;
   /** Optional prototype-style context line beneath the queue title. */
   subtitle?: string;
+  /** Opt-in compact composition for the Engine spine. */
+  presentation?: 'default' | 'engine-spine';
 }
 
 /**
@@ -102,6 +104,7 @@ function ArchetypeGroup({
   stageableRecIds,
   onStage,
   onOpenDetails,
+  compact,
 }: {
   archetype: Archetype;
   recs: Recommendation[];
@@ -120,6 +123,7 @@ function ArchetypeGroup({
   stageableRecIds?: ReadonlySet<string>;
   onStage?: (recId: string) => void;
   onOpenDetails?: (recId: string) => void;
+  compact: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -137,14 +141,14 @@ function ArchetypeGroup({
   };
 
   return (
-    <div className="space-y-2">
+    <div data-testid="backing-move-group" className={compact ? 'space-y-1.5' : 'space-y-2'}>
       {/* Group header */}
       <div className="flex items-center gap-2">
         <span
           className={`inline-block h-2 w-2 rounded-[var(--radius-pill)] shrink-0 ${ARCHETYPE_ACCENT[archetype]}`}
           aria-hidden
         />
-        <h3 className="t-caption font-semibold text-[var(--brand-text-bright)]">
+        <h3 className={`${compact ? 't-label uppercase tracking-wide' : 't-caption'} font-semibold text-[var(--brand-text-bright)]`}>
           {ARCHETYPE_LABELS[archetype]}
           <span className="ml-1.5 t-caption-sm text-[var(--brand-text-muted)] font-normal">
             {recs.length}
@@ -168,6 +172,7 @@ function ArchetypeGroup({
             staged={stagedRecIds?.has(r.id) ?? false}
             stageUnavailable={!!onStage && !canStage}
             onOpenDetails={onOpenDetails}
+            density={compact ? 'compact' : 'default'}
           />
         );
       })}
@@ -214,7 +219,9 @@ export function BackingMovesQueue({
   onAddRec,
   onOpenDetails,
   subtitle,
+  presentation = 'default',
 }: BackingMovesQueueProps) {
+  const compact = presentation === 'engine-spine';
   // Group recs by archetype, preserving ARCHETYPE_ORDER
   const groups = useMemo(() => {
     // Sort by value within each group (consistent with the plain cockpit's default sort)
@@ -240,7 +247,9 @@ export function BackingMovesQueue({
 
   const bulk = useRecBulkMutation(workspaceId);
 
-  const titleIcon = <Icon as={Target} size="md" className="text-accent-brand" />;
+  const titleIcon = compact
+    ? <Icon name="zap" size="md" className="text-accent-brand" />
+    : <Icon as={Target} size="md" className="text-accent-brand" />;
 
   // Blocker 5 live counter, rendered as part of the SectionCard action slot. N and M share the
   // orchestrator's single rec set + the shared isCuratedForClient predicate
@@ -292,7 +301,7 @@ export function BackingMovesQueue({
   return (
     <>
       <SectionCard title="Backing moves" titleIcon={titleIcon} subtitle={subtitle} iconChip={!!subtitle} action={counterEl}>
-        <div className="space-y-6">
+        <div data-testid="backing-moves-groups" className={compact ? 'space-y-4' : 'space-y-6'}>
           {groups.map(({ archetype, recs: groupRecs }) => (
             <ArchetypeGroup
               key={archetype}
@@ -308,6 +317,7 @@ export function BackingMovesQueue({
               stageableRecIds={stageableRecIds}
               onStage={onStage}
               onOpenDetails={onOpenDetails}
+              compact={compact}
             />
           ))}
         </div>

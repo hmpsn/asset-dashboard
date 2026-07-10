@@ -47,8 +47,20 @@ vi.mock('../../../src/components/strategy', () => ({
 }));
 
 vi.mock('../../../src/components/strategy/StrategyDiff', () => ({
-  StrategyDiff: ({ defaultExpanded }: { defaultExpanded?: boolean }) => (
-    <div data-testid="strategy-diff" data-default-expanded={defaultExpanded}>What changed</div>
+  StrategyDiff: ({
+    defaultExpanded,
+    presentation,
+  }: {
+    defaultExpanded?: boolean;
+    presentation?: 'default' | 'engine-spine';
+  }) => (
+    <div
+      data-testid="strategy-diff"
+      data-default-expanded={defaultExpanded}
+      data-presentation={presentation}
+    >
+      What changed
+    </div>
   ),
 }));
 
@@ -57,16 +69,19 @@ vi.mock('../../../src/components/strategy/IntelligenceSignals', () => ({
     title,
     subtitle,
     initialLimit,
+    presentation,
   }: {
     title?: string;
     subtitle?: string;
     initialLimit?: number;
+    presentation?: 'default' | 'engine-spine';
   }) => (
     <div
       data-testid="intelligence-signals"
       data-title={title}
       data-subtitle={subtitle}
       data-initial-limit={initialLimit}
+      data-presentation={presentation}
     >
       Signals
     </div>
@@ -82,8 +97,37 @@ vi.mock('../../../src/components/strategy/issue/StanceBar', () => ({
 }));
 
 vi.mock('../../../src/components/strategy/issue/DraftedPovEditor', () => ({
-  DraftedPovEditor: ({ title, subtitle }: { title?: string; subtitle?: string }) => (
-    <div data-testid="drafted-pov-editor" data-title={title} data-subtitle={subtitle}>POV editor</div>
+  DraftedPovEditor: ({
+    title,
+    subtitle,
+    presentation = 'default',
+    stagedCount,
+    onOpenEditor,
+    onRegenerate,
+  }: {
+    title?: string;
+    subtitle?: string;
+    presentation?: 'default' | 'engine-summary';
+    stagedCount?: number;
+    onOpenEditor?: () => void;
+    onRegenerate?: () => void;
+  }) => (
+    <div
+      data-testid="drafted-pov-editor"
+      data-title={title}
+      data-subtitle={subtitle}
+      data-presentation={presentation}
+      data-staged-count={stagedCount}
+    >
+      {presentation === 'engine-summary' ? (
+        <button type="button" onClick={onOpenEditor}>Edit POV</button>
+      ) : (
+        <>
+          <span>Full POV editor</span>
+          <button type="button" onClick={onRegenerate}>Regenerate</button>
+        </>
+      )}
+    </div>
   ),
 }));
 
@@ -93,13 +137,20 @@ vi.mock('../../../src/components/strategy/issue/BackingMovesQueue', () => ({
     onOpenDetails,
     subtitle,
     shortlistCap,
+    presentation,
   }: {
     onAddRec: () => void;
     onOpenDetails: (recId: string) => void;
     subtitle?: string;
     shortlistCap?: number;
+    presentation?: 'default' | 'engine-spine';
   }) => (
-    <div data-testid="backing-moves-queue" data-subtitle={subtitle} data-shortlist-cap={shortlistCap}>
+    <div
+      data-testid="backing-moves-queue"
+      data-subtitle={subtitle}
+      data-shortlist-cap={shortlistCap}
+      data-presentation={presentation}
+    >
       Backing moves
       <button type="button" onClick={onAddRec}>Add a recommendation</button>
       <button type="button" onClick={() => onOpenDetails('rec-1')}>View move details</button>
@@ -114,11 +165,15 @@ vi.mock('../../../src/components/strategy/issue/AddRecommendationModal', () => (
 }));
 
 vi.mock('../../../src/components/strategy/CurationMeter', () => ({
-  CurationMeter: () => <div data-testid="curation-meter">Curation meter</div>,
+  CurationMeter: ({ presentation }: { presentation?: 'default' | 'engine-spine' }) => (
+    <div data-testid="curation-meter" data-presentation={presentation}>Curation meter</div>
+  ),
 }));
 
 vi.mock('../../../src/components/strategy/NeedsAttentionStrip', () => ({
-  NeedsAttentionStrip: () => <div data-testid="needs-attention-strip">Needs attention</div>,
+  NeedsAttentionStrip: ({ presentation }: { presentation?: 'default' | 'engine-spine' }) => (
+    <div data-testid="needs-attention-strip" data-presentation={presentation}>Needs attention</div>
+  ),
 }));
 
 vi.mock('../../../src/components/strategy/StrategyConfigPanel', () => ({
@@ -163,16 +218,36 @@ vi.mock('../../../src/components/strategy/issue/KeeperSelector', () => ({
 }));
 
 vi.mock('../../../src/components/strategy/issue/ContentWorkOrderLens', () => ({
-  ContentWorkOrderLens: ({ includedRecIds }: { includedRecIds?: ReadonlySet<string> }) => (
-    <div data-testid="content-work-order-lens" data-included-rec-ids={[...(includedRecIds ?? [])].join(',')}>
+  ContentWorkOrderLens: ({
+    includedRecIds,
+    presentation,
+  }: {
+    includedRecIds?: ReadonlySet<string>;
+    presentation?: 'default' | 'engine-spine';
+  }) => (
+    <div
+      data-testid="content-work-order-lens"
+      data-included-rec-ids={[...(includedRecIds ?? [])].join(',')}
+      data-presentation={presentation}
+    >
       Content work-orders
     </div>
   ),
 }));
 
 vi.mock('../../../src/components/strategy/issue/KeywordTargetsLens', () => ({
-  KeywordTargetsLens: ({ includedRecIds }: { includedRecIds?: ReadonlySet<string> }) => (
-    <div data-testid="keyword-targets-lens" data-included-rec-ids={[...(includedRecIds ?? [])].join(',')}>
+  KeywordTargetsLens: ({
+    includedRecIds,
+    presentation,
+  }: {
+    includedRecIds?: ReadonlySet<string>;
+    presentation?: 'default' | 'engine-spine';
+  }) => (
+    <div
+      data-testid="keyword-targets-lens"
+      data-included-rec-ids={[...(includedRecIds ?? [])].join(',')}
+      data-presentation={presentation}
+    >
       Keyword targets
     </div>
   ),
@@ -585,34 +660,102 @@ describe('EngineSurface rebuilt', () => {
   });
 
   it('uses the prototype opening order, hierarchy, labels, and calm queue density', async () => {
+    mocks.engineState = makeEngineState({
+      cockpitRecs: [
+        { ...baseRec, clientStatus: 'sent', sentAt: '2099-01-01T00:00:00.000Z' },
+        { ...baseRec, id: 'rec-2', title: 'Review the implant FAQ', clientStatus: 'discussing' },
+      ],
+    });
     renderSurface();
 
     const surface = await screen.findByTestId('engine-rebuilt-surface');
-    expect(surface.parentElement).toHaveStyle({ maxWidth: 'var(--page-max)' });
+    expect(surface.parentElement).toHaveStyle({
+      maxWidth: 'calc(var(--page-max) - (2 * var(--page-pad-x)))',
+      padding: '0px',
+    });
+    expect(surface).toHaveClass('gap-[var(--space-4)]');
+    const opening = screen.getByTestId('engine-opening-cluster');
+    expect(opening).toHaveClass('gap-0');
     const identity = screen.getByRole('heading', { name: 'Insights Engine · Acme Dental' });
     const orientation = await screen.findByTestId('engine-section-orientation');
     const changed = screen.getByTestId('strategy-diff');
+    expect(changed).toHaveAttribute('data-presentation', 'engine-spine');
     const verdict = within(orientation).getByRole('heading', { name: 'Refresh implant content before the next issue goes out.' });
+    expect(opening).toContainElement(identity);
+    expect(opening).toContainElement(orientation);
+    expect(orientation).toHaveClass('space-y-[var(--space-4)]');
+    expect(verdict.closest('section')).toHaveClass('px-7', 'py-6');
+    expect(verdict.firstElementChild).toHaveClass('block', 'max-w-[26ch]', 'font-bold');
+    expect(within(orientation).getByText('Search demand is moving toward implant pages.')).toHaveClass('t-page');
     expect(identity.compareDocumentPosition(changed) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(changed.compareDocumentPosition(verdict) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(orientation).queryByText('Insights Engine · Acme Dental')).not.toBeInTheDocument();
 
     const valueFrame = screen.getByTestId('engine-section-value-frame');
+    expect(within(valueFrame).getByText('Pipeline value at stake')).toBeInTheDocument();
     expect(within(valueFrame).getByText('$18,450')).toHaveClass('t-stat-lg');
 
     const pov = screen.getByTestId('drafted-pov-editor');
     expect(pov).toHaveAttribute('data-title', 'The point of view we send Acme Dental');
     expect(pov).toHaveAttribute('data-subtitle', 'The plain-language read the client opens with');
+    expect(pov).toHaveAttribute('data-presentation', 'engine-summary');
+    expect(pov).toHaveAttribute('data-staged-count', '0');
 
     const signals = screen.getByTestId('intelligence-signals');
     expect(signals).toHaveAttribute('data-title', 'Signals the Engine is watching');
     expect(signals).toHaveAttribute('data-initial-limit', '4');
+    expect(signals).toHaveAttribute('data-presentation', 'engine-spine');
 
     const backingMoves = screen.getByTestId('backing-moves-queue');
     expect(backingMoves).toHaveAttribute('data-subtitle', 'The recommendations staged to back this point of view');
     expect(backingMoves).toHaveAttribute('data-shortlist-cap', '1');
+    expect(backingMoves).toHaveAttribute('data-presentation', 'engine-spine');
+    const supportRow = screen.getByTestId('engine-move-support-row');
+    expect(within(supportRow).getByTestId('curation-meter')).toHaveAttribute('data-presentation', 'engine-spine');
+    expect(within(supportRow).getByTestId('needs-attention-strip')).toHaveAttribute('data-presentation', 'engine-spine');
+    expect(supportRow.compareDocumentPosition(backingMoves) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByRole('toolbar', { name: 'Engine refresh controls' })).not.toBeInTheDocument();
-    expect(within(screen.getByTestId('engine-header-actions')).getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+    expect(screen.queryByTestId('engine-header-actions')).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('engine-topbar-actions-fallback')).getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+  });
+
+  it('opens one canonical full POV editor Drawer and restores focus to Edit POV on close', async () => {
+    renderSurface();
+
+    const edit = await screen.findByRole('button', { name: 'Edit POV' });
+    edit.focus();
+    fireEvent.click(edit);
+
+    const drawer = screen.getByRole('dialog', { name: 'Edit the point of view we send Acme Dental' });
+    expect(within(drawer).getByText('Full POV editor')).toBeInTheDocument();
+    expect(within(drawer).getAllByRole('button', { name: 'Regenerate' })).toHaveLength(1);
+    expect(screen.getAllByTestId('drafted-pov-editor')).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Edit POV' })).toHaveLength(1);
+
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Edit the point of view we send Acme Dental' })).not.toBeInTheDocument());
+    expect(edit).toHaveFocus();
+    expect(screen.getAllByTestId('drafted-pov-editor')).toHaveLength(1);
+  });
+
+  it('does not reserve an empty move-support row when no curation or attention state exists', async () => {
+    renderSurface();
+
+    expect(await screen.findByTestId('engine-section-backing-moves')).toBeInTheDocument();
+    expect(screen.queryByTestId('engine-move-support-row')).not.toBeInTheDocument();
+  });
+
+  it('keeps the stale-POV warning directly adjacent to the compact POV summary', async () => {
+    mocks.engineState = makeEngineState({ struckRecIds: ['rec-1'] });
+    renderSurface();
+
+    const povSection = await screen.findByTestId('engine-section-pov');
+    const summary = within(povSection).getByTestId('drafted-pov-editor');
+    const warning = within(povSection).getByText('Point of view may be out of date').closest('[role="status"]')
+      ?? within(povSection).getByText('Point of view may be out of date').parentElement;
+    expect(warning).not.toBeNull();
+    expect(summary.compareDocumentPosition(warning!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(povSection).getAllByRole('button', { name: 'Edit POV' })).toHaveLength(1);
   });
 
   it('keeps operational tools collapsed until requested, while the operations deep link opens them', async () => {
@@ -729,6 +872,7 @@ describe('EngineSurface rebuilt', () => {
     const target = await screen.findByTestId(targetTestId);
     expectSpineOrder(SPINE_SECTION_TEST_IDS);
     await waitFor(() => expect(target).toHaveFocus());
+    expect(target).toHaveStyle({ outline: 'none' });
     expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
     if (entry.includes('lens=changes')) {
       expect(screen.getByTestId('strategy-diff')).toHaveAttribute('data-default-expanded', 'true');
@@ -757,15 +901,14 @@ describe('EngineSurface rebuilt', () => {
     expect(visibleText).not.toMatch(/mounted below/i);
   });
 
-  it('keeps the Engine header actions stackable on narrow screens', async () => {
+  it('keeps isolated Engine actions in one non-wrapping horizontal fallback', async () => {
     renderSurface();
 
-    const actionGroup = await screen.findByTestId('engine-header-actions');
-    expect(actionGroup).toHaveClass('w-full');
+    const actionGroup = await screen.findByTestId('engine-topbar-actions-fallback');
     expect(actionGroup).toHaveClass('max-w-full');
-    expect(actionGroup).toHaveClass('flex-col');
-    expect(actionGroup).toHaveClass('items-stretch');
-    expect(actionGroup).toHaveClass('sm:items-end');
+    expect(actionGroup).toHaveClass('items-center');
+    expect(actionGroup).toHaveClass('overflow-x-auto');
+    expect(actionGroup).not.toHaveClass('flex-col');
     expect(screen.getByTestId('strategy-header-actions')).toBeInTheDocument();
     expect(within(actionGroup).getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Send issue' })).not.toBeInTheDocument();
@@ -801,20 +944,46 @@ describe('EngineSurface rebuilt', () => {
     const preview = await screen.findByTestId('engine-trust-spine-preview');
     const portalFrame = within(preview).getByTestId('engine-client-portal-frame');
     const proofRow = within(preview).getByTestId('engine-client-proof-row');
+    const recoveredTile = within(preview).getByTestId('engine-preview-recovered');
     expect(portalFrame).toHaveClass('dashboard-light');
+    expect(preview.firstElementChild).toHaveClass(
+      'max-sm:[&>div:first-child_.t-body]:whitespace-normal',
+      'max-sm:[&>div:first-child_.t-body]:overflow-visible',
+      'max-sm:[&>div:first-child_.t-body]:text-clip',
+    );
     expect(proofRow).toHaveClass('sm:grid-cols-3');
-    expect(within(preview).getByText('What Acme Dental sees - the trust spine')).toBeInTheDocument();
-    expect(within(preview).getByText('Verdict first, dollar value, then proof')).toBeInTheDocument();
+    expect(proofRow).toHaveClass('mt-4');
+    expect(recoveredTile).toHaveStyle({
+      background: 'color-mix(in srgb, var(--teal) 8%, var(--surface-2))',
+    });
+    expect(recoveredTile.style.borderColor).toBe(
+      'color-mix(in srgb, var(--teal) 28%, var(--brand-border))',
+    );
+    expect(within(preview).getByText('What Acme Dental sees — the trust spine')).toBeInTheDocument();
+    expect(within(preview).getByText('Verdict first, dollar value, then the proof')).toBeInTheDocument();
+    expect(within(preview).getByText('Client portal preview · Acme Dental')).toBeInTheDocument();
+    expect(preview.querySelector('.fa-eye')).toBeInTheDocument();
     expectScopedTextWithClass(preview, 'Where you stand this quarter', 't-label');
-    expectScopedTextWithClass(preview, 'Refresh implant content before the next issue goes out.', 't-page');
-    expectScopedTextWithClass(preview, 'Search demand is moving toward implant pages.', 't-body');
+    expectScopedTextWithClass(preview, 'Refresh implant content before the next issue goes out.', 't-stat-sm');
+    expectScopedTextWithClass(preview, 'Refresh implant content before the next issue goes out.', 'font-bold');
+    expectScopedTextWithClass(preview, 'Search demand is moving toward implant pages.', 't-ui');
+    expectScopedTextWithClass(preview, 'Search demand is moving toward implant pages.', 'max-w-[52ch]');
     expectScopedTextWithClass(preview, 'Pipeline value at stake', 't-caption');
     expectScopedTextWithClass(preview, '$18,450', 't-stat');
     expectScopedTextWithClass(preview, 'Recovered so far', 't-caption');
     expectScopedTextWithClass(preview, '$2,760', 't-stat');
     expectScopedTextWithClass(preview, 'Backing moves live', 't-caption');
     expectScopedTextWithClass(preview, '0 / 1', 't-stat');
-    expectScopedTextWithClass(preview, /The client sees the verdict, value frame, and proof/, 't-body');
+    expect(within(preview).queryByText(/The client sees the verdict, value frame, and proof/)).not.toBeInTheDocument();
+  });
+
+  it('uses the prototype section-card shell for the stance allocation', async () => {
+    renderSurface();
+
+    const stance = await screen.findByTestId('engine-section-stance');
+    expect(within(stance).getByText('How we are spending the effort')).toBeInTheDocument();
+    expect(stance.querySelector('.fa-filter')).toBeInTheDocument();
+    expect(stance.firstElementChild).toHaveStyle({ borderRadius: 'var(--radius-signature-lg)' });
   });
 
   it('switches the only visible lens control inside the staged-move projection section', async () => {
@@ -827,8 +996,24 @@ describe('EngineSurface rebuilt', () => {
     renderSurface();
 
     const projections = await screen.findByTestId('engine-section-projections');
+    expect(projections.firstElementChild).toHaveClass(
+      '[&>div:first-child]:flex-col',
+      '[&>div:first-child]:items-stretch',
+      'sm:[&>div:first-child]:flex-row',
+      'max-sm:[&>div:first-child_.t-body]:whitespace-normal',
+      'max-sm:[&>div:first-child_.t-body]:overflow-visible',
+      'max-sm:[&>div:first-child_.t-body]:text-clip',
+    );
+    const projectionSwitcher = within(projections).getByRole('radiogroup');
+    expect(projectionSwitcher).toHaveClass('w-full', 'overflow-x-auto', 'sm:w-fit');
+    expect(projectionSwitcher).toHaveClass(
+      'max-sm:[&>button]:min-w-0',
+      'max-sm:[&>button]:flex-1',
+      'max-sm:[&>button]:whitespace-normal',
+    );
     expect(within(projections).getByRole('radio', { name: 'Keyword targets' })).toHaveAttribute('aria-checked', 'true');
     expect(within(projections).getByTestId('keyword-targets-lens')).toHaveAttribute('data-included-rec-ids', 'rec-1');
+    expect(within(projections).getByTestId('keyword-targets-lens')).toHaveAttribute('data-presentation', 'engine-spine');
     expect(within(projections).queryByTestId('content-work-order-lens')).not.toBeInTheDocument();
     expect(screen.getAllByTestId('keyword-targets-lens')).toHaveLength(1);
     expect(within(projections).getAllByRole('radiogroup')).toHaveLength(1);
@@ -836,6 +1021,7 @@ describe('EngineSurface rebuilt', () => {
     fireEvent.click(within(projections).getByRole('radio', { name: 'Content work orders' }));
 
     expect(await within(projections).findByTestId('content-work-order-lens')).toHaveAttribute('data-included-rec-ids', 'rec-1');
+    expect(within(projections).getByTestId('content-work-order-lens')).toHaveAttribute('data-presentation', 'engine-spine');
     expect(within(projections).queryByTestId('keyword-targets-lens')).not.toBeInTheDocument();
     expect(screen.getAllByTestId('content-work-order-lens')).toHaveLength(1);
   });
@@ -855,7 +1041,7 @@ describe('EngineSurface rebuilt', () => {
     expect(within(projections).getByTestId('keyword-targets-lens')).toHaveAttribute('data-included-rec-ids', '');
   });
 
-  it('keeps the one primary send action attached to the staged backing-moves queue', async () => {
+  it('keeps the staged-set send action exact-once in the topbar action host fallback', async () => {
     const first = renderSurface();
 
     expect(await screen.findByTestId('engine-rebuilt-surface')).toBeInTheDocument();
@@ -870,10 +1056,13 @@ describe('EngineSurface rebuilt', () => {
     });
     renderSurface();
 
-    const backingMoves = await screen.findByTestId('engine-section-backing-moves');
-    expect(within(backingMoves).getByTestId('engine-backing-send-bar')).toBeInTheDocument();
-    expect(within(backingMoves).getByRole('button', { name: 'Send 1 staged' })).toBeEnabled();
+    await screen.findByTestId('engine-section-backing-moves');
+    const fallback = screen.getByTestId('engine-topbar-actions-fallback');
+    expect(screen.queryByTestId('engine-backing-send-bar')).not.toBeInTheDocument();
+    expect(within(fallback).getByRole('button', { name: 'Send 1 staged' })).toBeEnabled();
     expect(screen.getAllByRole('button', { name: /Send(?: 1 staged| issue)/ })).toHaveLength(1);
+    fireEvent.click(within(fallback).getByRole('button', { name: 'Send 1 staged' }));
+    expect(mocks.sendIssue).toHaveBeenCalledTimes(1);
   });
 
   it('opens the Local SEO setup drawer exactly once from operational disclosures', async () => {

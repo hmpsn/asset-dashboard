@@ -2,7 +2,7 @@
 
 Surface family: `settings`, `workspace-settings`, `roadmap`, `revenue`, `ai-usage`, `features`, `prospect`, `outcomes-overview`, `outcomes`, `diagnostics`, `requests`  
 Owner: global operations / workspace administration  
-Status: `ODP-009 A` and `GO-001` through `GO-008` accepted 2026-07-09; additive shell retained  
+Status: `behavior-safe / visual-unverified`; `ODP-009 A` and `GO-001` through `GO-008` behavior directions accepted 2026-07-09, additive shell retained
 Primary mounts: global routes plus workspace-scoped operator routes behind `ui-rebuild-shell`
 
 ## Prototype References
@@ -40,7 +40,7 @@ Global Ops is a route family, not a single rebuilt surface. Parity requires pres
 
 ## Current Parity Grade
 
-Grade: `capability risk`.
+Visual status: `behavior-safe / visual-unverified`; capability constraints remain.
 
 Why:
 

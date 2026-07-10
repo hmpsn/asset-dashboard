@@ -2,7 +2,7 @@
 
 Surface: `media` / Assets  
 Owner: media optimization / Webflow asset workflow  
-Status: `ODP-006 C` implemented 2026-07-09; repair-first circle-back resolved and browser-verified
+Status: `behavior-safe / visual-unverified`; `ODP-006 C` behavior checkpoint implemented 2026-07-09, repair-first circle-back resolved and browser-verified
 Primary route: `/ws/:workspaceId/media`
 
 ## Prototype References
@@ -32,7 +32,7 @@ Prototype-critical capabilities:
 
 ## Current Parity Grade
 
-Grade: `aligned enough`.
+Visual status: `behavior-safe / visual-unverified`.
 
 Why:
 
