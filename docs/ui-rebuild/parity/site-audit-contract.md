@@ -2,7 +2,7 @@
 
 Surface: `seo-audit` / Site Audit  
 Owner: optimization / technical-health workflow  
-Status: `ODP-004 A` accepted 2026-07-09; diagnostic-lens demotion approved  
+Status: `ODP-004 A` diagnostic-lens demotion implemented, browser-smoked, integration-gated, and independently accepted
 Primary route: `/ws/:workspaceId/seo-audit`
 
 ## Prototype References
@@ -28,7 +28,7 @@ The prototype has two visible sub-tabs: `Site Audit` and `History`. Performance,
 
 ## Current Parity Grade
 
-Grade: `behavior mismatch`.
+Initial grade: `behavior mismatch`.
 
 Why:
 
@@ -40,6 +40,15 @@ Accepted direction:
 
 - Demote `AI Search Ready`, `Content Health`, and `Guide` out of the top peer lens strip into evidence/diagnostic sections or a related-work area, while preserving the existing `?sub=` deep links as compatibility open-state.
 - Circle back if browser/operator review shows any demoted diagnostic is no longer discoverable.
+
+Wave 2 correction implemented:
+
+- The visible mode switcher now contains only `Site Audit` and `History`.
+- `AI Search Ready`, `Content Health`, and `Audit Guide` live in one `Search readiness and guidance` evidence group after Core Web Vitals, each in the canonical `Disclosure` primitive.
+- `?sub=aeo-review`, `?sub=content-decay`, and `?sub=guide` keep the full audit console rendered, mark Site Audit active, and open only the requested evidence disclosure.
+- The same exact-once evidence group remains available alongside background-audit progress, so a valid compatibility URL does not disappear during a run.
+- The three diagnostic workflows remain reachable exactly once; run, schedule, history, issue detail, dead-link handoff, export/share, suppression, and action-item capabilities are unchanged.
+- Current behavior grade: aligned for the accepted diagnostic-demotion slice. Discoverability remains the circle-back trigger.
 
 ## URL and Deep Links
 
@@ -96,6 +105,14 @@ Clean fixture target: `ws_2ceaeb6c-0820-4da5-941e-ad9eae643993`.
 
 Result: passed with local Playwright after the in-app browser connector timed out during page capture. Desktop overview, History deep link, schedule drawer, issue detail drawer, and mobile overview had no visible internal labels, no page-level horizontal overflow, no duplicate dialogs, no console errors, and no failed responses. The smoke temporarily seeded a disabled schedule for the fixture and deleted it afterward to avoid the API's intentional 404 response for "no schedule yet."
 
+Wave 2 in-app browser result:
+
+- `/ws/ws_2ceaeb6c-0820-4da5-941e-ad9eae643993/seo-audit` shows only Site Audit and History as peer radios, with AI Search Ready, Content Health, and Audit Guide discoverable as collapsed evidence disclosures.
+- `?sub=aeo-review` keeps one audit body, leaves Site Audit selected, and opens only AI Search Ready.
+- `?sub=history` selects History and renders the four saved audits without the evidence group.
+- Schedule opens as exactly one `Scheduled Audits` dialog and was closed without saving or changing fixture data.
+- All reviewed states have no page/main overflow, internal labels, duplicate dialogs, or new console warnings/errors. State evidence: `/tmp/asset-dashboard-codex-parity-captures/wave2-parity-browser-state.json`.
+
 Typography/proof-framing evidence:
 
 - Desktop overview: `/tmp/asset-dashboard-codex-parity-captures/site-audit-typography-role-overview-desktop.png`
@@ -118,3 +135,7 @@ Existing/current branch coverage proves:
 - Internal migration/rebuild terms are absent from the visible Site Audit UI.
 - Real `useFeatureFlag('ui-rebuild-shell')` loading-to-loaded transition mounts Site Audit.
 - The rebuilt a11y floor passes.
+- The visible mode switcher has exactly two radios.
+- Every compatibility diagnostic URL keeps the audit body and opens its intended disclosure.
+- AI Search Ready, Content Health, and Audit Guide each mount exactly once inside the Site Audit flow.
+- Running-audit state preserves the requested open disclosure and all three exact-once diagnostic homes.

@@ -277,6 +277,32 @@ describe('SiteAuditSurface rebuilt', () => {
     expect(receiver.closest('details')).toHaveAttribute('open');
   });
 
+  it('keeps compatibility evidence available while an audit is running', async () => {
+    const audit = makeAuditState();
+    mockUseSiteAuditRebuilt.mockReturnValue({
+      ...audit,
+      workflow: {
+        ...audit.workflow,
+        loading: true,
+        runningAuditJob: {
+          message: 'Crawling site pages...',
+          progress: 4,
+          total: 10,
+        },
+      },
+    });
+
+    renderSurface('/ws/ws-1/seo-audit?sub=aeo-review');
+
+    expect(await screen.findByText('Crawling site pages...')).toBeInTheDocument();
+    expect(screen.getByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();
+    const receiver = screen.getByTestId('site-audit-aeo-view');
+    expect(receiver.closest('details')).toHaveAttribute('open');
+    expect(screen.getAllByTestId('site-audit-aeo-view')).toHaveLength(1);
+    expect(screen.getAllByTestId('site-audit-content-decay-view')).toHaveLength(1);
+    expect(screen.getAllByTestId('site-audit-guide-view')).toHaveLength(1);
+  });
+
   it('falls back to audit for an invalid sub param', async () => {
     renderSurface('/ws/ws-1/seo-audit?sub=unknown');
     expect(await screen.findByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();

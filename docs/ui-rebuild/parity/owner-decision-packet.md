@@ -101,6 +101,8 @@ Risk if wrong: choosing A without enough workflow proof could hide or confuse br
 
 Implementation guardrail: build the board overview first. Keep legacy receivers reachable and do not imply subscription-drawer or Brief/Draft behavior that is not wired in the current slice.
 
+Implementation log, 2026-07-09: the first phase is complete. Bare/default and `briefs` now open the aggregate lifecycle Board; Intake expands in place; Calendar, Published, Content Health, and Matrix remain peer modes; existing Briefs/Posts/capacity workflows launch exact once. Browser smoke preserved aliases, post/fix-context behavior, Guide, and clean console/overflow. An independent review found that zero-count Brief/Draft columns could strand their workspaces and that some Board copy exposed implementation framing; persistent launch cards, one shared Briefs opener, and operator-facing copy corrected both findings. A fresh independent review returned `PASS`. Full item workspaces and capacity Drawer remain deferred, so the circle-back is not triggered.
+
 ### ODP-003 SEO Editor Workbench And Review Queue
 
 Surface: `seo-editor` / SEO Editor
@@ -120,6 +122,8 @@ Risk if wrong: implementing the full queue/workbench too quickly could change ho
 
 Implementation guardrail: limit the first slice to source grouping and selected-row actions. Do not add mock review queue affordances or change write semantics.
 
+Implementation log, 2026-07-09: Static, CMS, and Manual targets now render in explicit groups while continuing to feed the existing single selected-action region. The 503-row fixture resolved to 21/217/265 rows, one Research Drawer, and clean console/overflow. No inline edit, Approve, Publish, AI-fix, or review-queue semantics were introduced; both independent reviews found no SEO Editor defect, and the final reviewer returned `PASS`, so the write-path circle-back is not triggered.
+
 ### ODP-004 Site Audit Diagnostic Lens Demotion
 
 Surface: `seo-audit` / Site Audit
@@ -138,6 +142,8 @@ Recommendation: choose A. The prototype has only Site Audit and History as peer 
 Risk if wrong: choosing A could bury useful diagnostics if their new homes are too subtle; choosing B keeps the technical audit visibly out of prototype IA.
 
 Implementation guardrail: preserve every diagnostic receiver and capability while demoting the visible peer modes; do not add new peer modes.
+
+Implementation log, 2026-07-09: only Site Audit and History remain visible peers. AI Search Ready, Content Health, and Audit Guide are exact-once disclosures after Core Web Vitals, and their `?sub=` URLs open the intended evidence while retaining the audit body. The first independent review found that audit progress temporarily hid compatibility evidence; progress and evidence now render together, with a dedicated running-state regression test. The Rinse fixture passed overview, AEO receiver, History, and Schedule smoke without mutations, and a fresh independent review returned `PASS`; discoverability remains the standing circle-back trigger.
 
 ### ODP-005 Analytics Hub Default Report
 

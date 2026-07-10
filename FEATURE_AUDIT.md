@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **589 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **590 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 666. UI Rebuild Wave 2 behavior-first parity corrections 2026-07-09
+
+**Status:** Content Pipeline, SEO Editor, and Site Audit corrections are implemented and browser-smoked in `codex/ui-prototype-alignment`. All integration gates pass; an initial independent Sol Ultra review returned `REVISE`, its three findings were corrected, and a fresh independent Sol Ultra review returned `PASS`.
+
+**What it does:** Applies the Cockpit/Insights Engine parity rubric to three rebuilt operator surfaces without changing backend, route, or write contracts. Content Pipeline now opens on an aggregate lifecycle Board with Intake plus Queued, Brief, Draft, and Review stages; existing workspaces launch from that board or five primary modes exactly once. SEO Editor now groups its existing worksheet into Static, CMS, and Manual work areas while retaining one shared selected-action region, the existing Detail Drawer, and current write semantics. Site Audit now exposes only Site Audit and History as peer modes; AI Search Ready, Content Health, and Audit Guide live as exact-once evidence disclosures inside the audit console, with their existing `?sub=` URLs preserved as open state.
+
+**Why it matters:** The rebuilt pages now follow the prototype's workflow hierarchy instead of presenting every compatibility receiver as equal navigation. Operators get a clearer lifecycle, source authority, and audit evidence model while legacy capabilities, deep links, feature-flag loading behavior, and accessibility remain protected. The implementation also keeps known gaps honest: item-backed Brief/Draft workspaces, the capacity drawer, SEO inline editing, and the review queue remain documented follow-up slices rather than simulated controls.
+
+**Tests and verification:** The three focused component suites pass 40 tests, covering real feature-flag transitions, URL/deep-link receivers, exact-once legacy mounts, source grouping, Board launch state, zero-count Brief/Draft reachability, shared Briefs intents, two-mode audit behavior, evidence during an in-progress audit, internal-label absence, and the rebuilt a11y floor. The final branch-wide suite passes 28,497 tests across 2,033 files; hooks lint, typecheck, Vite build, pr-check, deferred-ledger verification, and diff hygiene all pass. Browser smoke covers Content Pipeline Board/Intake/capacity/Guide, SEO Editor's stable 503-row grouped worksheet/selection/Research Drawer, and Site Audit's overview/AEO receiver/History/Schedule states with no page overflow, duplicate dialogs, internal labels, fixture mutations, or new console errors. Evidence is recorded in `/tmp/asset-dashboard-codex-parity-captures/wave2-parity-browser-state.json`.
+
+**Files:** `src/components/content-pipeline-rebuilt/{ContentPipelineSurface,ContentLifecycleBoard}.tsx`; `src/components/seo-editor-rebuilt/SeoEditorWorksheet.tsx`; `src/components/site-audit-rebuilt/{SiteAuditSurface,useSiteAuditSurfaceState}.ts*`; matching component tests; Wave 2 parity contracts and decision records; `BRAND_DESIGN_LANGUAGE.md`.
 
 ---
 

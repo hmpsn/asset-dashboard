@@ -2,7 +2,7 @@
 
 Surface: `seo-editor` / SEO Editor  
 Owner: optimization / Webflow write-target workflow  
-Status: `ODP-003 C` accepted 2026-07-09; phased workbench correction approved  
+Status: `ODP-003 C` source-grouping slice implemented, browser-smoked, integration-gated, and independently accepted; inline editing/review queue remain deferred
 Primary route: `/ws/:workspaceId/seo-editor`
 
 ## Prototype References
@@ -58,7 +58,15 @@ But the primary interaction model is still different from the prototype:
 - There is no `Review pending` keyboard queue for approval triage.
 - Bulk actions exist, but not the prototype's exact selected-row action bar with Approve, Send to client, Publish, and AI-fix missing in one sticky strip.
 
-Initial grade: `behavior mismatch` plus `capability risk`, with the phased workbench correction approved and queued.
+Initial grade: `behavior mismatch` plus `capability risk`.
+
+Wave 2 correction implemented:
+
+- Edit mode now renders explicit `Static pages`, `CMS collection items`, and `Manual URLs` workbench groups using the existing table records and source authority.
+- Each group carries truthful source framing and counts; Static stays neutral, CMS uses blue data framing, and Manual uses amber read-only framing.
+- All groups continue to feed the existing single sticky selected-row action region. Static/CMS selection callbacks and Manual disabled state are unchanged.
+- The existing Detail Drawer, Edit/Research modes, URL params, fix-context handoff, save/analyze/rewrite/send flows, and approval panel remain unchanged and exact once.
+- This slice intentionally does not add inline title/meta editing, Approve, Publish, AI-fix, `Review pending`, or keyboard triage semantics.
 
 ## URL and Deep Links
 
@@ -103,9 +111,9 @@ Keep these production capabilities reachable exactly once:
 - Do not add backend APIs, migrations, shared types, route ids, or new feature flags for this parity slice.
 - Do not delete or materially rewrite legacy write workflows in the parity pass; re-home or wrap them first.
 
-## Needs Owner Decision
+## Implemented Owner Decision
 
-Decision: should the rebuilt SEO Editor move from the current table + drawer shell into the prototype workbench model now?
+Decision `ODP-003 C` is implemented for source grouping while preserving the current table, Drawer, and write workflows. Inline editing and the keyboard review queue remain blocked on a dedicated save/send/approve/publish review.
 
 Options:
 
@@ -161,6 +169,14 @@ Post-correction smoke, if the workbench/queue direction is approved:
 - `Review pending` queue with keyboard triage actions.
 - Deep links initialize edit/research/source/filter/page state.
 
+Wave 2 browser result:
+
+- `/ws/ws_1772641235973/seo-editor` resolves 503 rows into 21 Static, 217 CMS, and 265 Manual rows; selector counts and group counts agree after target resolution settles.
+- Selecting `Enterprise Pricing` produces one shared selected-action toolbar above the grouped tables.
+- `?tab=research&page=69c81206a62bec51004c55d1` opens exactly one `Enterprise Pricing` Drawer while keeping the grouped worksheet available.
+- The overview/detail states have no page/main overflow, raw URL enums, implementation labels, or new console warnings/errors. Horizontal table scroll remains contained inside each `DataTable`.
+- State evidence: `/tmp/asset-dashboard-codex-parity-captures/wave2-parity-browser-state.json`.
+
 ## Automated Test Floor
 
 Existing/current branch coverage proves:
@@ -176,10 +192,14 @@ Existing/current branch coverage proves:
 - Implementation language is absent from the loaded worksheet and detail drawer.
 - The rebuilt a11y floor passes.
 
-Required future coverage if the workbench/queue correction is approved:
+Wave 2 coverage now additionally proves:
 
-- Default edit mode renders source-grouped spreadsheet rows with inline writable title/meta controls.
-- Selected rows open one sticky action bar with AI-fix, approve, send, publish, and clear actions.
+- Default Edit renders all present source groups with truthful headings/counts.
+- Static and CMS rows preserve their existing selection callbacks; Manual rows stay disabled/read-only.
+- The single selected-row action region remains outside the source groups.
+
+Still required for later slices:
+
+- Inline writable title/meta controls, after the write paths are explicitly reviewed.
+- Any future AI-fix, approve, send, publish, and clear action changes beyond the existing action region.
 - `Review pending` opens exactly one queue state and keyboard shortcuts invoke the expected actions.
-- `?page=` initializes the selected detail state without duplicate drawers.
-- Static/CMS/Manual write-target distinctions remain enforced in both worksheet and detail views.

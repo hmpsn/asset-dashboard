@@ -2,7 +2,7 @@
 
 Surface: `content-pipeline` / Content Pipeline  
 Owner: content strategy / content production workflow  
-Status: `ODP-002 C` accepted 2026-07-09; staged lifecycle-board correction approved  
+Status: `ODP-002 C` first slice implemented, browser-smoked, integration-gated, and independently accepted; full Brief/Draft workspaces remain deferred
 Primary route: `/ws/:workspaceId/content-pipeline`
 
 ## Prototype References
@@ -54,13 +54,25 @@ The current rebuilt surface uses the right production components but a different
 - It has a WorkflowStepper and capability grid, but the actual unit of work is still spread across tabs.
 - It has no board-level card workflow, no prototype Brief Workspace/Draft Workspace opening model, and no subscription drawer attached to the capacity meter.
 
-Initial grade: `behavior mismatch` plus `capability risk`, with the staged lifecycle-board correction approved and queued.
+Initial grade: `behavior mismatch` plus `capability risk`.
+
+Wave 2 correction implemented:
+
+- Bare `/content-pipeline`, invalid-tab fallback, and `?tab=briefs` now open a real four-column lifecycle Board with Intake collapsed by default and Brief work focused.
+- The visible mode control is reduced to Board, Calendar, Published, Content Health, and Matrix. Draft/Post and subscription/capacity receivers are treated as workflow-open state rather than peer modes.
+- Board counts come only from the existing pipeline summary and intelligence slice. The aggregate cards launch the existing Intake, Briefs, or Posts workspace; no item-level data or mutation is fabricated.
+- Intake can be expanded directly from the default Board without an empty body, and `?tab=intake` opens the same existing Intake workflow in place.
+- Brief and Draft columns retain truthful launch cards when their counts are zero, so empty workspaces cannot strand either production capability.
+- Board cards, AI-suggested creation, and Content Health's `Draft brief` action converge on one Briefs opener and mount the workspace exactly once.
+- Content capacity is a dedicated header action. `?tab=publish` and the `subscriptions` alias still mount the existing subscription workflow exactly once.
+- Calendar, Published, Content Health, Matrix, post deep links, fix-context handoff, Guide, and every legacy capability remain reachable exactly once.
+- Full Brief Workspace, Draft Workspace, per-item board cards, and the prototype subscription drawer remain later slices under the accepted phased decision.
 
 ## URL and Deep Links
 
-Current route/state behavior:
+Implemented route/state behavior:
 
-- `/ws/:workspaceId/content-pipeline` opens the default `briefs` view.
+- `/ws/:workspaceId/content-pipeline` and `?tab=briefs` open Board with Brief focused and no inline Briefs receiver until the operator launches it.
 - Valid `?tab=` values are `planner`, `calendar`, `intake`, `briefs`, `posts`, `publish`, `content-health`, and `published`.
 - Invalid `?tab=` values fall back to `briefs`.
 - `?tab=subscriptions` is a legacy alias that resolves to `publish`.
@@ -75,10 +87,10 @@ Legacy route behavior outside this component:
 - `/calendar` redirects to `/content-pipeline?tab=calendar`.
 - `/subscriptions` still mounts `ContentSubscriptions` directly in the legacy admin route path and should be reviewed before any route retirement.
 
-Recommended parity direction, if approved:
+Implemented compatibility mapping:
 
-- Keep the existing `?tab=` values valid, but map them to prototype modes or focused states instead of exclusive peer receivers.
-- Recommended mapping:
+- Existing `?tab=` values remain valid and map to prototype modes or focused/open states instead of eight peer receivers.
+- Mapping:
   - no tab / `?tab=briefs` -> Board mode, brief stage focused.
   - `?tab=intake` -> Board mode with Intake expanded.
   - `?tab=posts&post=...` -> Board or Draft Workspace with the selected post opened.
@@ -114,9 +126,9 @@ The first approved slice keeps these homes reachable while the board overview is
 - Do not add backend APIs, migrations, shared types, route ids, or new feature flags for the parity pass unless the approved implementation proves a server-backed requirement.
 - Do not delete or materially rewrite `ContentBriefs`, `ContentManager`, `ContentCalendar`, or `ContentSubscriptions` in the parity slice. Wrap or re-home them first.
 
-## Needs Owner Decision
+## Implemented Owner Decision
 
-Decision: should the rebuilt Content Pipeline collapse the current top-level tab/receiver shell into the prototype lifecycle board now?
+Decision `ODP-002 C` is implemented for the Board-first slice. The risk boundary remains the same: existing receivers launch from the Board or mode control until dedicated Brief/Draft workspaces are separately reviewed.
 
 Options:
 
@@ -186,6 +198,14 @@ Post-correction smoke, if the lifecycle-board direction is approved:
 - Published mode/result detail drawer.
 - Deep links initialize the intended mode/focus/open state.
 
+Wave 2 browser result:
+
+- `/ws/ws_demo_premium/content-pipeline` renders one Board with Queued, Brief, Draft, and Review columns; Brief is focused and the legacy Briefs workspace is not mounted until launched.
+- The default Intake disclosure opens the existing AI Suggested workflow instead of an empty body.
+- `?tab=subscriptions` opens one Content capacity workflow and leaves all five primary mode radios unselected.
+- Guide opens as exactly one dialog. The Board, capacity alias, and guide states have no page/main overflow, visible internal labels, or new console warnings/errors.
+- State evidence: `/tmp/asset-dashboard-codex-parity-captures/wave2-parity-browser-state.json`.
+
 ## Automated Test Floor
 
 Existing/current branch coverage proves:
@@ -201,12 +221,17 @@ Existing/current branch coverage proves:
 - Internal rebuild/migration language is absent from the visible shell.
 - The rebuilt a11y floor passes.
 
-Required future coverage if the lifecycle-board IA is approved:
+Wave 2 coverage now additionally proves:
 
-- Default route renders Board mode rather than the Briefs receiver.
-- Intake card starts a board item or opens the Brief Workspace.
-- Queued/brief cards open Brief Workspace exactly once.
-- Draft/review cards open Draft Workspace exactly once.
-- Capacity meter opens subscription drawer exactly once.
-- `?tab=` compatibility values initialize the intended mode/focus/open state.
+- Default and `?tab=briefs` render Board instead of the Briefs receiver.
+- Intake expands from both the default Board and `?tab=intake`, with the existing workflow mounted exactly once.
+- Aggregate Brief and Draft launchers open the existing owning workspace exactly once without duplicating the page title.
+- Zero-count Brief and Draft columns retain their launch actions, and every Briefs intent uses the same exact-once opener.
+- Board, Calendar, Published, Content Health, Matrix, Posts, capacity, and legacy aliases preserve their URL/open-state contracts.
 - Existing legacy panels remain reachable exactly once while being re-homed.
+
+Still required for later slices:
+
+- Item-backed queued/brief cards opening the full Brief Workspace.
+- Item-backed draft/review cards opening the full Draft Workspace.
+- Capacity meter opening the prototype subscription drawer rather than the preserved subscription workspace.

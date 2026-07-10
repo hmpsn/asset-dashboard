@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { ContentPipelineSlice } from '../../../shared/types/intelligence';
 import { Badge, BoardCard, BoardColumn, Icon } from '../ui';
 import type { ContentPipelineData } from './ContentPipelineLenses';
@@ -42,10 +42,6 @@ export function ContentLifecycleBoard({
   const reviewCount = contentPipeline?.posts.byStatus.review ?? 0;
   const queuedCount = queuedRequests + suggestedBriefs + activeWorkOrders;
 
-  useEffect(() => {
-    setIntakeOpen(focus === 'intake');
-  }, [focus]);
-
   const intakeSummary = useMemo(() => {
     const items = [
       queuedRequests > 0 && pluralize(queuedRequests, 'client request'),
@@ -77,7 +73,7 @@ export function ContentLifecycleBoard({
             <span className="block t-ui font-semibold text-[var(--brand-text-bright)]">Intake</span>
             <span className="block truncate t-caption-sm text-[var(--brand-text-muted)]">{intakeSummary}</span>
           </span>
-          <Badge label={pluralize(queuedCount, 'item')} tone="teal" variant="soft" size="sm" />
+          <Badge label={pluralize(queuedCount, 'item')} tone="blue" variant="soft" size="sm" />
           <Icon name={intakeOpen ? 'chevronUp' : 'chevronDown'} size="sm" className="text-[var(--brand-text-muted)]" />
         </summary>
         {intakeOpen && (
@@ -92,7 +88,7 @@ export function ContentLifecycleBoard({
           <h3 className="t-page font-semibold text-[var(--brand-text-bright)]">Lifecycle board</h3>
           <p className="t-caption-sm text-[var(--brand-text-muted)]">Follow active content from triage through review. Scheduled and published work stays in its own mode.</p>
         </div>
-        <span className="hidden t-caption-sm text-[var(--brand-text-muted)] lg:block">Open a card to continue in its existing workspace.</span>
+        <span className="hidden t-caption-sm text-[var(--brand-text-muted)] lg:block">Open a card to continue the workflow.</span>
       </div>
 
       <div className="overflow-x-auto pb-2">
@@ -131,11 +127,13 @@ export function ContentLifecycleBoard({
               empty="No briefs are ready to open."
               className={stageClass(focus === 'brief')}
             >
-              {briefCount > 0 && (
-                <BoardCard title={pluralize(briefCount, 'brief')} meta="Briefs stay in the existing brief workspace" onClick={onOpenBriefs}>
-                  <span className="t-caption-sm text-[var(--teal)]">Open briefs</span>
-                </BoardCard>
-              )}
+              <BoardCard
+                title={briefCount > 0 ? pluralize(briefCount, 'brief') : 'Plan a new brief'}
+                meta={briefCount > 0 ? 'Review briefs and continue planning' : 'Open brief planning to start new content'}
+                onClick={onOpenBriefs}
+              >
+                <span className="t-caption-sm text-[var(--teal)]">Open briefs</span>
+              </BoardCard>
             </BoardColumn>
           </div>
 
@@ -146,22 +144,24 @@ export function ContentLifecycleBoard({
             accent="var(--teal)"
             empty="No drafts are in progress."
           >
-            {draftCount > 0 && (
-              <BoardCard title={pluralize(draftCount, 'draft')} meta="Draft status comes from the current posts workspace" onClick={onOpenDrafts}>
-                <span className="t-caption-sm text-[var(--teal)]">Open drafts</span>
-              </BoardCard>
-            )}
+            <BoardCard
+              title={draftCount > 0 ? pluralize(draftCount, 'draft') : 'Start a draft'}
+              meta={draftCount > 0 ? 'Continue writing and production work' : 'Open writing to begin a new draft'}
+              onClick={onOpenDrafts}
+            >
+              <span className="t-caption-sm text-[var(--teal)]">Open drafts</span>
+            </BoardCard>
           </BoardColumn>
 
           <BoardColumn
             id="content-pipeline-board-stage-review"
             title="Review"
             count={reviewCount}
-            accent="var(--emerald)"
+            accent="var(--amber)"
             empty="No drafts are marked for review."
           >
             {reviewCount > 0 && (
-              <BoardCard title={pluralize(reviewCount, 'draft')} meta="Review actions stay with the current posts workspace" onClick={onOpenDrafts}>
+              <BoardCard title={pluralize(reviewCount, 'draft')} meta="Continue editing and review checks" onClick={onOpenDrafts}>
                 <span className="t-caption-sm text-[var(--teal)]">Open drafts</span>
               </BoardCard>
             )}

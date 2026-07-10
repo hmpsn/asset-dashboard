@@ -434,6 +434,65 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     expect(screen.queryByTestId('legacy-briefs')).not.toBeInTheDocument();
   });
 
+  it('expands Intake from the default Board without opening an empty disclosure', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline`);
+
+    const intakeLabel = await screen.findByText('Intake');
+    const intakeSummary = intakeLabel.closest('summary');
+    expect(intakeSummary).not.toBeNull();
+    expect(screen.queryByTestId('legacy-intake')).not.toBeInTheDocument();
+
+    fireEvent.click(intakeSummary!);
+
+    expect(await screen.findByTestId('legacy-intake')).toBeInTheDocument();
+    expect(screen.getByTestId('content-pipeline-board')).toHaveAttribute('data-intake-state', 'expanded');
+  });
+
+  it('keeps Briefs and Drafts reachable from a zero-count lifecycle Board', async () => {
+    const emptyPipelineData = {
+      ...pipelineData,
+      summary: { ...pipelineData.summary, briefs: 0, posts: 0 },
+    };
+    const emptyContentPipeline = {
+      ...contentPipelineSlice,
+      briefs: { total: 0, byStatus: { draft: 0 } },
+      posts: { total: 0, byStatus: { draft: 0, review: 0 } },
+      requests: { pending: 0, inProgress: 0, delivered: 0 },
+      workOrders: { active: 0 },
+      suggestedBriefs: 0,
+    };
+    mocks.contentPipelineHook.mockReturnValue({
+      data: emptyPipelineData,
+      isLoading: false,
+      isFetching: false,
+      refetch: vi.fn().mockResolvedValue({ data: emptyPipelineData }),
+    });
+    mocks.intelligenceHook.mockReturnValue({
+      data: { contentPipeline: emptyContentPipeline },
+      isLoading: false,
+      isFetching: false,
+      refetch: vi.fn().mockResolvedValue({ data: { contentPipeline: emptyContentPipeline } }),
+    });
+
+    const briefsView = renderSurface(`/ws/${workspaceId}/content-pipeline`);
+    fireEvent.click(await screen.findByRole('button', { name: /Open briefs/i }));
+    expect(await screen.findAllByTestId('legacy-briefs')).toHaveLength(1);
+
+    briefsView.unmount();
+    renderSurface(`/ws/${workspaceId}/content-pipeline`);
+    fireEvent.click(await screen.findByRole('button', { name: /Open drafts/i }));
+    expect(await screen.findAllByTestId('legacy-posts')).toHaveLength(1);
+  });
+
+  it('routes Content Health brief creation through the shared Briefs opener', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=content-health`);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Draft brief' }));
+
+    expect(await screen.findAllByTestId('legacy-briefs')).toHaveLength(1);
+    expect(screen.getByRole('radio', { name: /Board/i })).toHaveAttribute('aria-checked', 'true');
+  });
+
   it('receives ?tab=published and renders the shared content-performance read', async () => {
     renderSurface(`/ws/${workspaceId}/content-pipeline?tab=published`);
 
@@ -493,7 +552,7 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     const { container } = renderSurface(`/ws/${workspaceId}/content-pipeline?tab=briefs`);
 
     expect(await screen.findByRole('heading', { name: 'Content Pipeline' })).toBeInTheDocument();
-    expect(container).not.toHaveTextContent(/receiver|carried-over|carry-over|mounted below|shell owns|subscriptions alias|\?tab=|legacy|migration|rebuild/i);
+    expect(container).not.toHaveTextContent(/receiver|carried-over|carry-over|mounted below|shell owns|subscriptions alias|\?tab=|legacy|migration|rebuild|existing (?:brief )?workspace|current posts workspace/i);
   });
 
   it('keeps header actions stackable on narrow viewports', async () => {

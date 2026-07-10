@@ -19,19 +19,19 @@ Accepted owner directions, circle-back triggers, and remaining risks are tracked
    - Deliverable: current branch now preserves `?lens=` as section focus/open state, uses the prototype's 1180px spine and compact client eyebrow, moves change history above the verdict, expands it for direct and in-place `?lens=changes`, distinguishes comparison errors from empty history, uses a hero value-at-stake cell and four-metric frame, applies prototype POV/signal/move labels, renders a truthfully proportional four-group 34px stance, limits Signals to four initial rows, limits Backing moves to one initial row per archetype with actions stacked until `xl`, filters the unified projection shell to the staged-and-sendable set, renders a locally light horizontal client proof preview, and keeps the canonical operations disclosure available even before strategy generation. Add Recommendation, read-only detail for every move type, truthful bulk Stage, staged-set send, local setup, legacy redirects, and all owning-surface handoffs remain reachable exactly once; cannibalization write controls live only under Operations, keeper state is query-authoritative with optimistic rollback, and discussion attention opens the honest move-review workflow. Do not mark visually accepted until Joshua re-reviews this pass.
 
 3. Content Pipeline lifecycle-board correction
-   - Status: `ODP-002 C` accepted; phased board overview is queued after Insights Engine.
+   - Status: `ODP-002 C` Board-first slice implemented, browser-smoked, integration-gated, and independently accepted; item-backed Brief/Draft workspaces and capacity drawer remain later slices.
    - Reason: The prototype is a lifecycle board with Intake, active work columns, mode controls, Brief/Draft workspaces, Published readback, and subscription drawer behavior. The rebuilt surface still uses top-level tab receivers that mount legacy panels inline.
-   - Deliverable: introduce the Board overview first while keeping legacy receivers reachable, then move Brief/Draft workspaces in later slices; preserve current `?tab=` values as mode, focus, or open-state compatibility. Current safe pre-work removes visible receiver/carry-over/rebuild vocabulary, keeps the mobile title/actions readable, adds the Published proof queue for readback-to-Insights framing, and keeps existing deep links, alias handling, exact-once receiver mounting, fix-context handoff, browser smoke, and a11y coverage green.
+   - Deliverable: bare/default now opens the four-column lifecycle Board with expandable Intake; five prototype modes replace eight receiver peers; aggregate launchers keep existing Briefs/Posts workspaces reachable exactly once; aliases, post state, fix context, Guide, Published proof, and a11y stay green. Full item workspaces and the capacity drawer remain deferred.
 
 4. SEO Editor phased workbench correction
-   - Status: `ODP-003 C` accepted; source grouping and sticky selected-row actions approved before inline editing/review queue.
+   - Status: `ODP-003 C` source-grouping slice implemented, browser-smoked, integration-gated, and independently accepted; inline editing/review queue remain deferred.
    - Reason: The prototype is a source-grouped write-target workbench with inline spreadsheet editing, page-intelligence detail, sticky selected-row actions, and a keyboard `Review pending` queue. The rebuilt surface preserves the source/write workflows, but still uses a table + drawer shell and lacks the queue.
-   - Deliverable: add stronger source grouping and selected-row actions while preserving current `?tab=`, `source`, `filter`, `collection`, `page`, and `search` params; defer inline editing and the review queue until save/send/approve/publish paths are reviewed.
+   - Deliverable: Static, CMS, and Manual rows now render in explicit workbench groups while preserving one existing selected-row action region, exact write semantics, every URL param, and the Detail Drawer. No Approve/Publish/inline-edit/review-queue semantics were added.
 
 5. Site Audit diagnostic-lens demotion
-   - Status: `ODP-004 A` accepted; diagnostic demotion approved.
+   - Status: `ODP-004 A` implemented, browser-smoked, integration-gated, and independently accepted.
    - Reason: The prototype has `Site Audit` and `History` as visible sub-tabs, while the rebuilt surface exposes `AI Search Ready`, `Content Health`, and `Guide` as peer lenses. The core audit workflow is present, but the top-level IA gives diagnostic evidence equal weight.
-   - Deliverable: demote the extra diagnostic lenses into evidence/related-work sections while preserving existing `?sub=` values as compatibility open-state and verifying discoverability in browser smoke.
+   - Deliverable: only Site Audit and History remain visible peers; AI Search Ready, Content Health, and Audit Guide now live in one evidence group and their `?sub=` compatibility URLs open the intended disclosure without replacing the audit console.
 
 6. Analytics Hub Search-default correction
    - Status: `ODP-005 A + C` accepted; Search performance default and Overview content rehome approved.

@@ -138,13 +138,6 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
     }
   };
 
-  const handleCreateBrief = (keyword: string, pageUrl?: string, _suggestedBriefId?: string) => {
-    setBriefFixContext(buildSignalPrefill(keyword, pageUrl));
-    setPrefillNonce((current) => current + 1);
-    setBoardBriefsOpen(true);
-    state.setTab('briefs');
-  };
-
   const clearBriefFixContext = () => setBriefFixContext(null);
   const lensOptions = MODE_OPTIONS.map((option) => ({
     value: option.value,
@@ -170,6 +163,29 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
   const openDrafts = () => {
     setBoardBriefsOpen(false);
     state.setTab('posts');
+  };
+
+  const openWorkflowTab = (tab: ContentPipelineTab) => {
+    if (tab === 'briefs') {
+      openBriefs();
+      return;
+    }
+    if (tab === 'intake') {
+      openIntake();
+      return;
+    }
+    if (tab === 'posts') {
+      openDrafts();
+      return;
+    }
+    setBoardBriefsOpen(false);
+    state.setTab(tab);
+  };
+
+  const handleCreateBrief = (keyword: string, pageUrl?: string, _suggestedBriefId?: string) => {
+    setBriefFixContext(buildSignalPrefill(keyword, pageUrl));
+    setPrefillNonce((current) => current + 1);
+    openBriefs();
   };
 
   return (
@@ -234,10 +250,11 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
 
         {(state.tab === 'briefs' || state.tab === 'intake') ? (
           <ContentLifecycleBoard
+            key={boardFocus}
             pipelineData={pipelineData}
             contentPipeline={contentPipeline}
             focus={boardFocus}
-            intakeContent={state.tab === 'intake' ? (
+            intakeContent={(
               <ContentPipelineLenses
                 workspaceId={workspaceId}
                 tab="intake"
@@ -249,9 +266,9 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
                 prefillNonce={prefillNonce}
                 clearBriefFixContext={clearBriefFixContext}
                 onCreateBrief={handleCreateBrief}
-                onOpenTab={state.setTab}
+                onOpenTab={openWorkflowTab}
               />
-            ) : undefined}
+            )}
             onOpenIntake={openIntake}
             onOpenBriefs={openBriefs}
             onOpenDrafts={openDrafts}
@@ -268,7 +285,7 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
             prefillNonce={prefillNonce}
             clearBriefFixContext={clearBriefFixContext}
             onCreateBrief={handleCreateBrief}
-            onOpenTab={state.setTab}
+            onOpenTab={openWorkflowTab}
           />
         )}
 
@@ -284,7 +301,7 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
             prefillNonce={prefillNonce}
             clearBriefFixContext={clearBriefFixContext}
             onCreateBrief={handleCreateBrief}
-            onOpenTab={state.setTab}
+            onOpenTab={openWorkflowTab}
           />
         )}
 

@@ -655,19 +655,22 @@ function AuditLens({
       ? Math.round((audit.workflow.runningAuditJob.progress / audit.workflow.runningAuditJob.total) * 100)
       : null;
     return (
-      <div className="flex min-h-[420px] flex-col items-center justify-center gap-4 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]">
-        <Icon name="refresh" size="xl" className="text-[var(--teal)] animate-spin" />
-        <div className="text-center">
-          <div className="t-body font-semibold text-[var(--brand-text-bright)]">
-            {audit.workflow.runningAuditJob?.message ?? 'Analyzing site health...'}
+      <div className="space-y-5" data-testid="site-audit-rebuilt-audit">
+        <div className="flex min-h-[420px] flex-col items-center justify-center gap-4 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]">
+          <Icon name="refresh" size="xl" className="text-[var(--teal)] animate-spin" />
+          <div className="text-center">
+            <div className="t-body font-semibold text-[var(--brand-text-bright)]">
+              {audit.workflow.runningAuditJob?.message ?? 'Analyzing site health...'}
+            </div>
+            <p className="t-body text-[var(--brand-text-muted)] mt-1">The background job saves a snapshot when it finishes.</p>
           </div>
-          <p className="t-body text-[var(--brand-text-muted)] mt-1">The background job saves a snapshot when it finishes.</p>
+          {progress !== null && (
+            <div className="w-full max-w-sm">
+              <Meter value={progress} showValue gradient ariaLabel="Audit progress" />
+            </div>
+          )}
         </div>
-        {progress !== null && (
-          <div className="w-full max-w-sm">
-            <Meter value={progress} showValue gradient ariaLabel="Audit progress" />
-          </div>
-        )}
+        <AuditEvidence workspaceId={audit.workspace?.id ?? ''} activeEvidence={activeEvidence} />
       </div>
     );
   }
