@@ -58,9 +58,10 @@ The integration sandbox has advanced beyond the baseline through reviewed, surfa
 | Site Audit | `3e4cec39e`, `4d1fd9592` | Diagnostic demotion first; canonical Asset repair sender only after Asset receiver work is available. |
 | Content Pipeline | `15eec15f3`, `4024ff87e` | Board-first slice and review fixes; keep later item workspaces deferred. |
 | Rebuilt focus bridge | `a690f25d3` | Shared shell focus API plus Page Rewriter consumer/tests; ship before any dependent focus consumer. |
-| Search & Traffic | `e24cb21a1` | Search-default report correction and tests only. |
+| Search & Traffic | `e24cb21a1`, `9bf362d21` | Search-default report first; degraded-provider homes and final color correction in the closeout reference. |
 | Performance repair sender | `8cfc4ae78` | Canonical Asset filter sender; pair with the Asset receiver PR dependency. |
-| Asset Manager | `241f54a25` | Single Browse workshop, Audit receiver, Upload Drawer, and matching tests. |
-| PageHeader pilot | uncommitted Wave 5 closeout | Shared opt-in variant plus Performance-only adoption/tests; do not bulk-migrate other surfaces. |
+| Asset Manager | `241f54a25`, `9bf362d21` | Single Browse workshop first; repair-first placement, overlay precedence, All/weight metrics, and final tests in the closeout reference. |
+| PageHeader pilot | `9bf362d21` | Shared opt-in variant plus Performance-only adoption/tests; do not bulk-migrate other surfaces. |
+| Final parity audit | `9bf362d21` | Cockpit, Global Ops, Local Presence, Performance color, route census, docs/roadmap, browser evidence, and independent `PASS`; extract only the owning surface from this mixed closeout commit. |
 
 Route-home decision: Content Pipeline Published is the proposed Content Performance receiver because it already consumes shared readback data, but `/content-perf` remains standalone. Page Intelligence remains standalone until a later SEO Editor Research/detail slice proves every capability. No route migration belongs in the current extraction set.
