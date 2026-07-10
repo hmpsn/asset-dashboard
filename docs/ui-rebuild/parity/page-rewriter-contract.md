@@ -2,7 +2,7 @@
 
 Surface: `rewrite` / Page Rewriter  
 Owner: optimization / AI rewrite workspace  
-Status: `ODP-007 A` accepted 2026-07-09; shell focus bridge approved, export-only v1 retained  
+Status: `ODP-007 A` implemented 2026-07-09; shell focus bridge verified, export-only v1 retained
 Primary route: `/ws/:workspaceId/rewrite`
 
 ## Prototype References
@@ -37,7 +37,7 @@ Prototype-critical structure:
 
 ## Current Parity Grade
 
-Grade: `capability risk`.
+Grade: `aligned enough` for the accepted export-only v1.
 
 Why:
 
@@ -46,12 +46,12 @@ Why:
 - The document pane now carries a prototype-style footer/status bar: export lives with the document, the draft state is explicit, and the UI says `Export-only draft`, `Not live`, and `Not saved or published to the CMS.` instead of implying persistence or CMS publication.
 - The current export-only workspace now maps working copy to the styleguide type roles: assistant guidance and generated rewrite text use `.t-body`, page picker/document controls use `.t-ui`, and true metadata remains in caption roles.
 - Existing production carry-over remains preserved: keyboard-operable page picker, arbitrary URL load, deep-link validation, audit issue chips, editable rewrite answers, named-section apply, live-page link, Markdown / HTML / `.md` / `.docx` / PDF export, quota handling, and a11y floor.
-- The missing Focus mode is an unresolved capability risk. Legacy Page Rewriter and the prototype both include Focus mode, but the rebuilt shell currently does not expose a surface-level way for `PageRewriterSurface` to toggle `AppShell` focus mode.
+- Focus mode is restored through the rebuilt shell's controlled context. Page Rewriter can enter and exit focus without remounting the editor, and Escape remains owned by `AppShell` on rebuilt routes.
 - Save draft / Publish rewrite / push-to-draft are prototype-only write-spine affordances. They are deliberately not implemented in this slice because there is no current full-page Webflow write path, draft table, migration, lifecycle, activity log, or broadcast contract.
 
 Accepted direction:
 
-- Restore Focus mode through one sanctioned shell context or prop bridge from `RebuiltAppChrome` to rebuilt surfaces, then let Page Rewriter consume it.
+- Implemented: one sanctioned controlled focus bridge runs from `App` through `RebuiltAppChrome` to Page Rewriter.
 - Keep export-only v1 and do not show Save draft / Publish until the backend write target and draft lifecycle exist.
 - Circle back on draft/publish only as a separately scoped backend lifecycle project.
 
@@ -64,6 +64,7 @@ Current route/state behavior:
 - Invalid `?pageUrl=` values are ignored with user-facing copy.
 - Selecting a page or loading a typed URL writes the validated `pageUrl` back to the URL.
 - The Back to audit action navigates to `/ws/:workspaceId/seo-audit` without carrying the page URL.
+- Focus mode is local shell state. Enter, exit, and Escape preserve the current route, validated `pageUrl`, loaded document, and editor identity.
 - This surface intentionally does not use `?tab=` because the prototype is a single workspace.
 
 Compatibility requirements:
@@ -80,6 +81,7 @@ Keep these capabilities reachable exactly once:
 - Page picker with sitemap list, typed URL load, slug/title search, hierarchy indentation, keyboard navigation, empty/no-match states, loading and error states.
 - Rewrite assistant with playbook chips, prompt input, Enter/Shift+Enter behavior, loading response state, Markdown answers, editable rewrite blocks, Apply to named section, Copy, quota lock, and first-429 banner.
 - Document pane with page metrics, target keyword, rank, traffic, optimization score, audit issue chips, live-page link, contenteditable document body, B/I/H2/H3/Clear formatting, export-only footer/status, export menu, and no-page empty state.
+- Surface focus control backed by the rebuilt shell; focus collapse and Escape exit preserve the current editor and `pageUrl` state.
 - Export modes: copy Markdown, copy HTML, download Markdown, download DOCX, and download PDF.
 
 ## Safe Work Completed
@@ -93,6 +95,7 @@ Keep these capabilities reachable exactly once:
 - Moved the export menu from the top toolbar into a document footer that labels the current artifact as an export-only draft, shows `Not live`, and keeps Save draft / Publish rewrite absent until a real write spine exists.
 - Fixed the rebuilt document pane's mixed loaded/pending state so a loaded page exits skeleton mode and shows the editor/footer even if the mutation pending flag lingers during local StrictMode/browser smoke.
 - Promoted Page Rewriter's page picker path, assistant guidance, empty assistant state, generated rewrite blocks, document controls, document body, loading copy, and export-only footer explanation to the appropriate `.t-ui` / `.t-body` roles.
+- Added the controlled rebuilt focus context, wired it through `AppShell`, and exposed one Page Rewriter enter/exit control. The real sidebar and shell grid collapse together; Escape exits focus only through the rebuilt shell authority.
 - Component tests assert the real `useFeatureFlag('ui-rebuild-shell')` loading-to-loaded transition, `?pageUrl=` receiver, invalid URL guard, no top view switcher, no visible internal rebuild/projection terms, page picker keyboard load, editable rewrite apply, quota lock, Back to audit behavior, and rebuilt a11y.
 
 ## Browser Smoke Evidence
@@ -127,6 +130,8 @@ Typography-role follow-up smoke:
 
 Result: clean. The smoke recorded one document editor, zero loading skeletons, no horizontal overflow on desktop or the 390px light mobile check, no internal migration/rebuild labels, `Export-only draft`, `Not live`, `Not saved or published to the CMS.`, and no Save draft / Publish rewrite affordances. Refined typography samples confirmed assistant copy and footer explanation at `.t-body` / 15.5px, with page picker and export status labels at `.t-ui` / 13.5px. Export opens one menu with all export actions and no console warnings/errors.
 
+Focus-bridge follow-up: `/tmp/asset-dashboard-codex-parity-captures/wave3-search-focus-smoke-state.json`. Entering focus collapsed the actual rebuilt sidebar and shell grid, preserved the loaded editor text and `pageUrl`, and showed one exit control. Escape restored the normal shell with the same URL, page key, and document length. Save draft and Publish remained absent, with no horizontal overflow or fresh console errors.
+
 ## Automated Test Floor
 
 Existing/current branch coverage proves:
@@ -142,4 +147,5 @@ Existing/current branch coverage proves:
 - Editable AI rewrite text applies to the named document section.
 - First-429 quota state disables AI actions.
 - Back to audit clears the pageUrl handoff.
+- Enter/exit focus state is controlled by the rebuilt shell; Escape exits focus while preserving the loaded editor and route state.
 - The rebuilt a11y floor passes.

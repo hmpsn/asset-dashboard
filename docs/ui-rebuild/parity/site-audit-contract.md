@@ -2,7 +2,7 @@
 
 Surface: `seo-audit` / Site Audit  
 Owner: optimization / technical-health workflow  
-Status: `ODP-004 A` diagnostic-lens demotion implemented, browser-smoked, integration-gated, and independently accepted
+Status: `ODP-004 A` diagnostic-lens demotion accepted; canonical Asset Manager repair handoff implemented and verified
 Primary route: `/ws/:workspaceId/seo-audit`
 
 ## Prototype References
@@ -48,6 +48,7 @@ Wave 2 correction implemented:
 - `?sub=aeo-review`, `?sub=content-decay`, and `?sub=guide` keep the full audit console rendered, mark Site Audit active, and open only the requested evidence disclosure.
 - The same exact-once evidence group remains available alongside background-audit progress, so a valid compatibility URL does not disappear during a run.
 - The three diagnostic workflows remain reachable exactly once; run, schedule, history, issue detail, dead-link handoff, export/share, suppression, and action-item capabilities are unchanged.
+- The loaded audit now names Asset Manager as the source-image repair owner and offers truthful oversized and missing-alt handoffs without claiming the current audit found either issue or inventing counts.
 - Current behavior grade: aligned for the accepted diagnostic-demotion slice. Discoverability remains the circle-back trigger.
 
 ## URL and Deep Links
@@ -59,6 +60,7 @@ Current route/state behavior:
 - `?sub=history` opens History and is written by the lens switcher.
 - `?sub=aeo-review`, `?sub=content-decay`, and `?sub=guide` remain accepted as compatibility receivers after their visible peer lenses are demoted.
 - Invalid `?sub=` values fall back to `Site Audit`.
+- Image source-repair actions navigate to `/ws/:workspaceId/media?filter=oversized` and `/ws/:workspaceId/media?filter=missing-alt`.
 
 Compatibility requirements:
 
@@ -77,6 +79,7 @@ Keep these capabilities reachable exactly once:
 - Issue grouping by severity/category and traffic sorting.
 - Issue detail drawer with affected pages and suppress/restore.
 - Dead-link handoff to Links.
+- Filter-only oversized and missing-alt handoffs to Asset Manager.
 - Report export/share.
 - AI Search Ready diagnostic content until re-homed.
 - Content Health diagnostic content until re-homed.
@@ -90,6 +93,7 @@ Keep these capabilities reachable exactly once:
 - The audit decision console, schedule drawer guidance, and issue drawer sections now use styleguide typography roles: substantive audit context uses `.t-body`, work labels use `.t-ui`, and compact issue metadata stays caption-sized.
 - Category accents for index/link findings now use the read-only data hue instead of action teal.
 - The issue table now closes with a prototype-style proof footer that connects technical fixes to measured recovery without changing audit actions or route state.
+- Added one compact image source-repair handoff after audit evidence. It states ownership without asserting fixture-dependent findings and emits only canonical Asset Manager filters, never the legacy `?tab=audit` sender state.
 - Component tests now prove the default URL behavior, schedule drawer, issue detail drawer, absence of internal migration terms, real feature-flag transition, and rebuilt a11y floor.
 
 ## Browser Smoke Evidence
@@ -112,6 +116,8 @@ Wave 2 in-app browser result:
 - `?sub=history` selects History and renders the four saved audits without the evidence group.
 - Schedule opens as exactly one `Scheduled Audits` dialog and was closed without saving or changing fixture data.
 - All reviewed states have no page/main overflow, internal labels, duplicate dialogs, or new console warnings/errors. State evidence: `/tmp/asset-dashboard-codex-parity-captures/wave2-parity-browser-state.json`.
+
+Canonical-handoff follow-up: `/tmp/asset-dashboard-codex-parity-captures/wave3-search-focus-smoke-state.json`. The loaded audit showed both source-repair actions; live clicks reached `/ws/ws_1772610244629/media?filter=oversized` and `/ws/ws_1772610244629/media?filter=missing-alt` with no fresh console errors.
 
 Typography/proof-framing evidence:
 

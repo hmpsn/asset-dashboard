@@ -2,7 +2,7 @@
 
 Surface: `analytics-hub` / Search & Traffic  
 Owner: monitoring / analytics reporting  
-Status: `ODP-005 A + C` accepted 2026-07-09; Search-default correction approved  
+Status: `ODP-005 A + C` implemented 2026-07-09; Search-default correction verified
 Primary route: `/ws/:workspaceId/analytics-hub`
 
 ## Prototype References
@@ -34,7 +34,7 @@ Prototype-critical structure:
 
 Production carry-over that intentionally exceeds the prototype:
 
-- The rebuilt Overview lens preserves the current unified cross-source trend, Demand mix, and Priority insights. Its final home needs owner confirmation.
+- The hidden `?lens=overview` compatibility receiver preserves the unified cross-source trend. Demand mix and Priority insights have an explicit lower-band home in Search performance and render once in the compatibility receiver.
 - Breakdowns open in the shared Drawer instead of inline cards so GSC devices/countries/types and GA4 top pages/sources/countries stay reachable without crowding the main report.
 - Search and Traffic lenses reuse the existing actionable `AnomalyAlerts` home per `docs/ui-rebuild/phase-a/CROSS_SURFACE_CONTRACTS.md` C-3.
 - Full annotation CRUD remains available; the prototype only stubs Add annotation.
@@ -42,27 +42,27 @@ Production carry-over that intentionally exceeds the prototype:
 
 ## Current Parity Grade
 
-Grade: `behavior mismatch`.
+Grade: `aligned enough`.
 
 Why:
 
-- The rebuilt surface preserves most production reporting capabilities and critical route state, but the default IA still exposes `Overview` as a peer lens. The prototype's per-client default is `Search performance`, and the Phase 0 ledger explicitly treats Overview fate as an open question.
-- Collapsing or demoting Overview changes an existing operator workflow, so Priority insights and Demand mix need explicit receiving homes during implementation.
-- Safe pre-work in this slice removes internal/implementation wording from loaded row states, opens conversion evidence by default, retints users/sessions away from teal action color, improves the header copy, maps report context/explanatory copy to styleguide typography roles, and locks the Breakdowns Drawer and feature-flag transition in tests.
+- The bare route now opens Search performance and exposes exactly three peer reports: Search performance, Site traffic, and Annotations.
+- `Overview` is no longer a visible peer. Its cross-source trend remains available through `?lens=overview`, while Demand mix and Priority insights live in a lower Search report band and mount exactly once in either state.
+- Production reporting capabilities, validated date/table state, drawers, annotations, anomaly actions, feature-flag transition, and workspace-event invalidation remain intact.
 
 Accepted direction:
 
-- Default the route to Search performance, preserve `?lens=overview` as a compatibility receiver, and keep Demand mix/Priority insights in a lower report band or an Insights Engine handoff.
-- Circle back after both cross-source content homes are visible and tested.
-- Risk if wrong: hiding Overview too aggressively can orphan cross-source diagnostics and Priority insights; keeping it as default keeps the rebuilt route visibly out of prototype order.
+- Implemented: Search performance is the default, `?lens=overview` is a hidden compatibility receiver, and Demand mix/Priority insights have a tested lower-band home.
+- Circle back only if operator evidence shows that the compatibility-only cross-source trend needs a new visible home.
+- Remaining visual work is report composition polish, not an IA or route blocker.
 
 ## URL and Deep Links
 
 Current route/state behavior:
 
-- `/ws/:workspaceId/analytics-hub` opens the current default `Overview` lens.
-- `?lens=overview`, `?lens=search`, `?lens=traffic`, and `?lens=annotations` initialize the corresponding lens.
-- Invalid `lens` values fall back to Overview.
+- `/ws/:workspaceId/analytics-hub` opens Search performance.
+- `?lens=traffic` and `?lens=annotations` initialize the corresponding visible report. `?lens=overview` initializes the hidden cross-source compatibility receiver.
+- `?lens=search` and invalid `lens` values normalize to the bare Search performance route while preserving validated secondary params.
 - `?days=` accepts validated date ranges.
 - Search table mode uses `?view=queries|pages`.
 - Search `Open Keyword Hub` routes to `seo-keywords`.
@@ -93,6 +93,9 @@ Keep these capabilities reachable exactly once:
 - Reframed the page subtitle around reporting jobs instead of listing provider names.
 - Wrapped the loaded PageHeader copy/actions for mobile.
 - Promoted report-window context, table counts, Keyword Hub handoff, Traffic source labels, Demand mix explanation, and collapsed conversion context onto `.t-ui` / `.t-body` roles so important report copy no longer reads as metadata.
+- Made Search performance the bare-route default and reduced the visible report selector to Search performance, Site traffic, and Annotations.
+- Retained `?lens=overview` as a hidden compatibility receiver and moved Demand mix plus Priority insights into a shared lower Search report band without duplicate mounts.
+- Canonicalized default/invalid lens URLs without dropping validated `days` or `view` state.
 - Extended component tests for real `useFeatureFlag('ui-rebuild-shell')` loading-to-loaded transition, lens deep links, Breakdowns Drawer exact-once behavior, default conversion evidence, absence of internal labels, workspace-event wiring, and rebuilt a11y.
 
 ## Browser Smoke Evidence
@@ -113,13 +116,16 @@ Result: clean. The populated state is fixture-backed so this smoke does not depe
 
 Typography role result: passed. Fixture-backed smoke confirmed no horizontal overflow, no internal migration/rebuild terms, overview and Search deep link states with no dialog, the Traffic breakdown Drawer with exactly one dialog, and sampled role sizes: `.t-ui` at 13.5px and `.t-body` at 15.5px. The only console warnings were local preview WebSocket disconnects; the only failed requests were route-change-aborted intelligence refreshes outside the Search & Traffic surface.
 
+Search-default correction smoke: `/tmp/asset-dashboard-codex-parity-captures/wave3-search-focus-smoke-state.json`. The populated bare route showed exactly three visible reports, Demand mix, Priority insights, no horizontal overflow, and no fresh console errors. The `?lens=overview` receiver selected no phantom report and retained the cross-source trend plus both lower-band homes exactly once. Screenshot capture timed out in the in-app browser on the chart-heavy page, so this pass records DOM, URL, layout, and console evidence rather than claiming a new image artifact.
+
 ## Automated Test Floor
 
 Current branch coverage proves:
 
 - Real `useFeatureFlag('ui-rebuild-shell')` loading-to-loaded transition mounts Search & Traffic.
-- `?lens=search&view=pages&days=90` initializes the expected lens and table mode.
-- Reporting modes remain visible.
+- Bare and invalid routes initialize Search performance; invalid/default lens state canonicalizes without dropping `days` or `view`.
+- Exactly three reporting modes remain visible, and Overview is absent from the selector.
+- `?lens=overview` remains a hidden compatibility receiver with the unified trend, Demand mix, and Priority insights mounted exactly once.
 - Internal rebuild/migration/projection/carry-over/cache labels are absent from visible loaded states.
 - The Search Breakdowns Drawer opens exactly once and closes cleanly.
 - Site Traffic shows conversion evidence by default.

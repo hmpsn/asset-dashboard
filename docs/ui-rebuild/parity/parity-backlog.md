@@ -34,9 +34,9 @@ Accepted owner directions, circle-back triggers, and remaining risks are tracked
    - Deliverable: only Site Audit and History remain visible peers; AI Search Ready, Content Health, and Audit Guide now live in one evidence group and their `?sub=` compatibility URLs open the intended disclosure without replacing the audit console.
 
 6. Analytics Hub Search-default correction
-   - Status: `ODP-005 A + C` accepted; Search performance default and Overview content rehome approved.
+   - Status: `ODP-005 A + C` implemented, browser-smoked, and integration-tested.
    - Reason: The prototype's per-client default is `Search performance` with `Site traffic` and `Annotations` as the other report modes. The rebuilt surface still defaults to a peer `Overview` lens that preserves cross-source trend, Demand mix, and Priority insights from the current product.
-   - Deliverable: default `/analytics-hub` to Search performance, preserve `?lens=overview`, and give Demand mix/Priority insights explicit lower-band or Insights Engine homes before removing the visible Overview peer.
+   - Deliverable: bare `/analytics-hub` now defaults to Search performance with exactly three visible reports; `?lens=overview` remains a hidden compatibility receiver; Demand mix and Priority insights live in a shared lower Search report band and mount exactly once.
 
 7. Media phased single-workshop correction
    - Status: `ODP-006 C` accepted; Browse-default, toolbar Upload, and compact Audit correction approved.
@@ -44,9 +44,9 @@ Accepted owner directions, circle-back triggers, and remaining risks are tracked
    - Deliverable: phase Browse/Audit/Upload into one workshop while preserving `?tab=audit`, `?tab=upload`, `filter`, `search`, `view`, `sort`, and `asset` as compatibility state; prove the Performance/Site Audit repair handoffs before full collapse.
 
 8. Page Rewriter focus bridge
-   - Status: `ODP-007 A` accepted; shell focus bridge approved and export-only v1 retained.
+   - Status: `ODP-007 A` implemented, browser-smoked, and integration-tested; export-only v1 retained.
    - Reason: The prototype and legacy Page Rewriter both include Focus mode, but the rebuilt shell currently has no surface-level focus-mode bridge. The prototype also shows Save draft / Publish rewrite / push-to-draft, which are new write-spine capabilities absent from the current backend.
-   - Deliverable: add one sanctioned `AppShell` focus bridge without forking shell behavior; keep Save draft / Publish rewrite absent until a separately approved backend write spine exists.
+   - Deliverable: one controlled `AppShell` focus bridge now reaches Page Rewriter, preserves loaded `pageUrl`/editor state, and exits through Escape; Save draft / Publish rewrite remain absent until a separately approved backend write spine exists.
 
 9. Local Presence real-data v1
    - Status: `ODP-008 A` accepted; current real-data/manual-refresh v1 retained.
