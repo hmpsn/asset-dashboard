@@ -607,11 +607,11 @@ export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
 
       <InlineBanner tone="info" title="Speed fixes start in Asset Manager">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="t-body">Use PageSpeed to detect Core Web Vitals issues. For image-heavy opportunities, compress oversized files before retesting.</span>
+          <span className="t-body">Use PageSpeed to identify Core Web Vitals issues. For image-heavy opportunities, repair oversized source files in Asset Manager before retesting.</span>
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => navigate(`${adminPath(workspaceId, 'media')}?tab=audit&filter=oversized`)}
+            onClick={() => navigate(`${adminPath(workspaceId, 'media')}?filter=oversized`)}
           >
             <Icon name="image" size="sm" />
             Open assets

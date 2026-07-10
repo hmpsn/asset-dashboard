@@ -169,7 +169,12 @@ function renderSurface(path = '/ws/ws-1/performance?tab=weight', queryClient = c
 
 function LocationProbe() {
   const location = useLocation();
-  return <span data-testid="location-search" hidden>{location.search}</span>;
+  return (
+    <>
+      <span data-testid="location-path" hidden>{location.pathname}</span>
+      <span data-testid="location-search" hidden>{location.search}</span>
+    </>
+  );
 }
 
 function FlaggedPerformance() {
@@ -233,7 +238,7 @@ describe('PerformanceSurface rebuilt admin surface', () => {
     expect(await screen.findByText('Pages with Assets')).toBeInTheDocument();
     expect(screen.getByText('page:/services')).toBeInTheDocument();
     expect(screen.getByText(/Last scanned Jul 6, 2026/)).toBeInTheDocument();
-    expect(screen.getByText("Open Asset Manager's audit lens to review oversized files and compression candidates.")).toHaveClass('t-body');
+    expect(screen.getByText('Open Asset Manager to repair oversized files at the source before re-scanning.')).toHaveClass('t-body');
 
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'implant' } });
     await waitFor(() => expect(screen.queryByText('page:/services')).not.toBeInTheDocument());
@@ -249,6 +254,14 @@ describe('PerformanceSurface rebuilt admin surface', () => {
     expect(within(dialog).getByText('hero-services.jpg')).toBeInTheDocument();
     expect(within(dialog).getByText('>500KB')).toBeInTheDocument();
     expect(within(dialog).getByText('Assets over 500KB are emphasized because they are strong compression candidates.')).toHaveClass('t-body');
+  });
+
+  it('sends Page Weight repairs to the canonical Asset Manager filter', async () => {
+    renderSurface('/ws/ws-1/performance?tab=weight');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open assets' }));
+    expect(screen.getByTestId('location-path')).toHaveTextContent('/ws/ws-1/media');
+    expect(screen.getByTestId('location-search')).toHaveTextContent(/^\?filter=oversized$/);
   });
 
   it('receives the Page Speed deep link and runs single-page and bulk PageSpeed tests', async () => {
@@ -283,11 +296,16 @@ describe('PerformanceSurface rebuilt admin surface', () => {
 
     expect(await screen.findByLabelText('PageSpeed page')).toBeInTheDocument();
     expect(screen.getByText('Speed fixes start in Asset Manager')).toBeInTheDocument();
-    expect(screen.getByText(/Use PageSpeed to detect Core Web Vitals issues/i)).toHaveClass('t-body');
-    expect(screen.getByText(/compress oversized files before retesting/i)).toBeInTheDocument();
+    expect(screen.getByText(/Use PageSpeed to identify Core Web Vitals issues/i)).toHaveClass('t-body');
+    expect(screen.getByText(/repair oversized source files in Asset Manager before retesting/i)).toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open assets' }));
-    expect(screen.getByTestId('location-search')).toHaveTextContent('?tab=audit&filter=oversized');
+  it('sends PageSpeed repairs to the canonical Asset Manager filter', async () => {
+    renderSurface('/ws/ws-1/performance?tab=speed');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open assets' }));
+    expect(screen.getByTestId('location-path')).toHaveTextContent('/ws/ws-1/media');
+    expect(screen.getByTestId('location-search')).toHaveTextContent(/^\?filter=oversized$/);
   });
 
   it('falls back from a bad tab to Page Weight and can switch lenses at runtime', async () => {

@@ -369,11 +369,11 @@ export function PageWeightLens({ workspaceId, siteId }: PageWeightLensProps) {
       {heavyPages > 0 && (
         <InlineBanner tone="warning" title={`${heavyPages} heavy page${heavyPages === 1 ? '' : 's'} found`}>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="t-body">Open Asset Manager's audit lens to review oversized files and compression candidates.</span>
+            <span className="t-body">Open Asset Manager to repair oversized files at the source before re-scanning.</span>
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => navigate(`${adminPath(workspaceId, 'media')}?tab=audit&filter=oversized`)}
+              onClick={() => navigate(`${adminPath(workspaceId, 'media')}?filter=oversized`)}
             >
               <Icon name="image" size="sm" />
               Open assets
