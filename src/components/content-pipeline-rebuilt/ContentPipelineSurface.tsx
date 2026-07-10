@@ -12,31 +12,26 @@ import { ContentPipelineGuide } from '../ContentPipelineGuide';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { useToast } from '../Toast';
 import {
-  Badge,
   Button,
-  ClickableRow,
   Drawer,
-  GroupBlock,
   Icon,
-  KeyValueRow,
   LensSwitcher,
   Menu,
   MetricTile,
   PageHeader,
   Skeleton,
   Toolbar,
-  WorkflowStepper,
   type MenuItem,
   type Tier,
 } from '../ui';
+import { ContentLifecycleBoard } from './ContentLifecycleBoard';
 import { ContentPipelineLenses } from './ContentPipelineLenses';
 import type { ContentPipelineData } from './ContentPipelineLenses';
 import {
-  CONTENT_PIPELINE_TABS,
   type ContentPipelineTab,
   useContentPipelineSurfaceState,
 } from './useContentPipelineSurfaceState';
-import { formatContentDate, formatInteger } from './contentPipelineFormatters';
+import { formatContentDate } from './contentPipelineFormatters';
 import { mutationErrorMessage } from './contentPipelineMutationFeedback';
 
 interface ContentPipelineSurfaceProps {
@@ -51,28 +46,6 @@ const EXPORTS = [
   { key: 'strategy', label: 'Keyword Strategy' },
 ] as const;
 
-const TAB_ACCENT: Record<ContentPipelineTab, string> = {
-  planner: 'var(--teal)',
-  calendar: 'var(--amber)',
-  intake: 'var(--teal)',
-  briefs: 'var(--blue)',
-  posts: 'var(--teal)',
-  publish: 'var(--emerald)',
-  'content-health': 'var(--amber)',
-  published: 'var(--blue)',
-};
-
-const TAB_DESCRIPTION: Record<ContentPipelineTab, string> = {
-  planner: 'Matrix and template planning',
-  calendar: 'Scheduling and item deep-links',
-  intake: 'AI-suggested opportunities',
-  briefs: 'Briefs and client requests',
-  posts: 'Drafting, review, and publish actions',
-  publish: 'Recurring content capacity',
-  'content-health': 'Decay and cannibalization acting home',
-  published: 'Performance readback',
-};
-
 function buildSignalPrefill(keyword: string, pageUrl?: string): FixContext {
   return {
     targetRoute: 'content-pipeline',
@@ -81,51 +54,20 @@ function buildSignalPrefill(keyword: string, pageUrl?: string): FixContext {
   };
 }
 
-function tabCount(tab: ContentPipelineTab, data: ContentPipelineData | undefined, suggestedBriefs: number | undefined): number | undefined {
-  const summary = data?.summary;
-  if (tab === 'planner') return summary?.matrices;
-  if (tab === 'briefs') return summary?.briefs;
-  if (tab === 'posts') return summary?.posts;
-  if (tab === 'intake') return suggestedBriefs;
-  if (tab === 'content-health') return (data?.decay?.totalDecaying ?? 0);
-  if (tab === 'published') return summary?.published;
-  return undefined;
-}
+type ContentPipelineMode = 'board' | 'calendar' | 'published' | 'content-health' | 'planner';
 
-function CapabilityRow({
-  tab,
-  active,
-  count,
-  onClick,
-}: {
-  tab: ContentPipelineTab;
-  active: boolean;
-  count?: number;
-  onClick: () => void;
-}) {
-  const label = CONTENT_PIPELINE_TABS.find((item) => item.id === tab)?.label ?? tab;
-  return (
-    <ClickableRow
-      active={active}
-      onClick={onClick}
-      className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-3 transition-colors duration-[var(--dur-fast)] hover:border-[var(--brand-border-hover)]"
-    >
-      <span className="flex items-start gap-3">
-        <span
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface-3)]"
-          style={{ color: TAB_ACCENT[tab] }}
-          aria-hidden="true"
-        >
-          <Icon name={tab === 'published' ? 'chart' : tab === 'content-health' ? 'gauge' : tab === 'calendar' ? 'clock' : tab === 'posts' ? 'doc' : tab === 'briefs' ? 'clipboard' : 'layers'} size="sm" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block t-caption font-semibold text-[var(--brand-text-bright)]">{label}</span>
-          <span className="mt-1 block t-caption-sm text-[var(--brand-text-muted)]">{TAB_DESCRIPTION[tab]}</span>
-        </span>
-        {count !== undefined && <Badge label={formatInteger(count)} tone="zinc" variant="soft" size="sm" />}
-      </span>
-    </ClickableRow>
-  );
+const MODE_OPTIONS: Array<{ value: ContentPipelineMode; label: string; count?: (data: ContentPipelineData | undefined) => number | undefined }> = [
+  { value: 'board', label: 'Board' },
+  { value: 'calendar', label: 'Calendar' },
+  { value: 'published', label: 'Published', count: (data) => data?.summary?.published },
+  { value: 'content-health', label: 'Content Health', count: (data) => data?.decay?.totalDecaying },
+  { value: 'planner', label: 'Matrix', count: (data) => data?.summary?.matrices },
+];
+
+function modeForTab(tab: ContentPipelineTab): ContentPipelineMode | undefined {
+  if (tab === 'briefs' || tab === 'intake' || tab === 'posts') return 'board';
+  if (tab === 'publish') return undefined;
+  return tab;
 }
 
 export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfaceProps) {
@@ -139,6 +81,7 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
   const [guideOpen, setGuideOpen] = useState(false);
   const [briefFixContext, setBriefFixContext] = useState<FixContext | null>(null);
   const [prefillNonce, setPrefillNonce] = useState(0);
+  const [boardBriefsOpen, setBoardBriefsOpen] = useState(false);
 
   const workspace = useMemo(
     () => workspaces.data?.find((item) => item.id === workspaceId),
@@ -148,8 +91,9 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
   const siteLabel = workspace?.gscPropertyUrl ?? workspace?.webflowSiteName ?? null;
   const contentPipeline = intelligence.data?.contentPipeline;
   const pipelineData = pipelineQuery.data as ContentPipelineData | undefined;
-  const suggestedBriefs = contentPipeline?.suggestedBriefs;
   const dataAsOf = formatContentDate(workspace?.createdAt);
+  const mode = modeForTab(state.tab);
+  const boardFocus = state.tab === 'intake' ? 'intake' : 'brief';
 
   const invalidateContentPipeline = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
@@ -197,47 +141,36 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
   const handleCreateBrief = (keyword: string, pageUrl?: string, _suggestedBriefId?: string) => {
     setBriefFixContext(buildSignalPrefill(keyword, pageUrl));
     setPrefillNonce((current) => current + 1);
+    setBoardBriefsOpen(true);
     state.setTab('briefs');
   };
 
   const clearBriefFixContext = () => setBriefFixContext(null);
-
-  const workflowSteps = [
-    {
-      number: 1,
-      label: 'Strategy',
-      completed: ['briefs', 'posts', 'publish', 'published'].includes(state.tab),
-      current: state.tab === 'planner',
-      onClick: () => state.setTab('planner'),
-    },
-    {
-      number: 2,
-      label: 'Briefs',
-      completed: ['posts', 'publish', 'published'].includes(state.tab),
-      current: state.tab === 'briefs' || state.tab === 'intake',
-      onClick: () => state.setTab('briefs'),
-    },
-    {
-      number: 3,
-      label: 'Drafts',
-      completed: ['publish', 'published'].includes(state.tab),
-      current: state.tab === 'posts',
-      onClick: () => state.setTab('posts'),
-    },
-    {
-      number: 4,
-      label: 'Publish',
-      completed: state.tab === 'published',
-      current: state.tab === 'publish' || state.tab === 'published',
-      onClick: () => state.setTab('publish'),
-    },
-  ];
-
-  const lensOptions = CONTENT_PIPELINE_TABS.map((tab) => ({
-    value: tab.id,
-    label: tab.label,
-    count: tabCount(tab.id, pipelineData, suggestedBriefs),
+  const lensOptions = MODE_OPTIONS.map((option) => ({
+    value: option.value,
+    label: option.label,
+    count: option.count?.(pipelineData),
   }));
+
+  const openMode = (nextMode: ContentPipelineMode) => {
+    setBoardBriefsOpen(false);
+    state.setTab(nextMode === 'board' ? 'briefs' : nextMode);
+  };
+
+  const openBriefs = () => {
+    setBoardBriefsOpen(true);
+    state.setTab('briefs');
+  };
+
+  const openIntake = () => {
+    setBoardBriefsOpen(false);
+    state.setTab('intake');
+  };
+
+  const openDrafts = () => {
+    setBoardBriefsOpen(false);
+    state.setTab('posts');
+  };
 
   return (
     <ErrorBoundary label="Content Pipeline rebuilt surface">
@@ -267,6 +200,10 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
                 <Icon name="info" size="sm" />
                 Guide
               </Button>
+              <Button size="sm" variant="secondary" className="w-full sm:w-auto" onClick={() => state.setTab('publish')} aria-pressed={state.tab === 'publish'}>
+                <Icon name="chart" size="sm" />
+                Content capacity
+              </Button>
             </div>
           )}
         />
@@ -275,8 +212,8 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
           <LensSwitcher
             id="content-pipeline-rebuilt-lens"
             options={lensOptions}
-            value={state.tab}
-            onChange={(value) => state.setTab(value as ContentPipelineTab)}
+            value={mode}
+            onChange={(value) => openMode(value as ContentPipelineMode)}
             size="sm"
           />
         </Toolbar>
@@ -295,50 +232,61 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
           </div>
         )}
 
-        <WorkflowStepper steps={workflowSteps} compact />
-
-        <GroupBlock
-          title="Pipeline map"
-          meta="Choose the workspace that matches the next step: plan, brief, draft, publish, repair, or read back results."
-          stats={[
-            { label: 'Current view', value: CONTENT_PIPELINE_TABS.find((tab) => tab.id === state.tab)?.label ?? state.tab, color: TAB_ACCENT[state.tab] },
-            { label: 'Open draft', value: state.postId ? 'selected' : 'none', color: state.postId ? 'var(--teal)' : 'var(--blue)' },
-          ]}
-          collapsible
-          defaultOpen={state.tab === 'briefs'}
-        >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {CONTENT_PIPELINE_TABS.map((tab) => (
-              <CapabilityRow
-                key={tab.id}
-                tab={tab.id}
-                active={state.tab === tab.id}
-                count={tabCount(tab.id, pipelineData, suggestedBriefs)}
-                onClick={() => state.setTab(tab.id)}
+        {(state.tab === 'briefs' || state.tab === 'intake') ? (
+          <ContentLifecycleBoard
+            pipelineData={pipelineData}
+            contentPipeline={contentPipeline}
+            focus={boardFocus}
+            intakeContent={state.tab === 'intake' ? (
+              <ContentPipelineLenses
+                workspaceId={workspaceId}
+                tab="intake"
+                pipelineData={pipelineData}
+                contentPipeline={contentPipeline}
+                workspaceTier={workspaceTier}
+                siteLabel={siteLabel}
+                briefFixContext={briefFixContext}
+                prefillNonce={prefillNonce}
+                clearBriefFixContext={clearBriefFixContext}
+                onCreateBrief={handleCreateBrief}
+                onOpenTab={state.setTab}
               />
-            ))}
-          </div>
-        </GroupBlock>
-
-        {state.postId && state.tab === 'posts' && (
-          <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2">
-            <KeyValueRow label="Selected draft" value={state.postId} divider={false} mono />
-          </div>
+            ) : undefined}
+            onOpenIntake={openIntake}
+            onOpenBriefs={openBriefs}
+            onOpenDrafts={openDrafts}
+          />
+        ) : (
+          <ContentPipelineLenses
+            workspaceId={workspaceId}
+            tab={state.tab}
+            pipelineData={pipelineData}
+            contentPipeline={contentPipeline}
+            workspaceTier={workspaceTier}
+            siteLabel={siteLabel}
+            briefFixContext={briefFixContext}
+            prefillNonce={prefillNonce}
+            clearBriefFixContext={clearBriefFixContext}
+            onCreateBrief={handleCreateBrief}
+            onOpenTab={state.setTab}
+          />
         )}
 
-        <ContentPipelineLenses
-          workspaceId={workspaceId}
-          tab={state.tab}
-          pipelineData={pipelineData}
-          contentPipeline={contentPipeline}
-          workspaceTier={workspaceTier}
-          siteLabel={siteLabel}
-          briefFixContext={briefFixContext}
-          prefillNonce={prefillNonce}
-          clearBriefFixContext={clearBriefFixContext}
-          onCreateBrief={handleCreateBrief}
-          onOpenTab={state.setTab}
-        />
+        {boardBriefsOpen && state.tab === 'briefs' && (
+          <ContentPipelineLenses
+            workspaceId={workspaceId}
+            tab="briefs"
+            pipelineData={pipelineData}
+            contentPipeline={contentPipeline}
+            workspaceTier={workspaceTier}
+            siteLabel={siteLabel}
+            briefFixContext={briefFixContext}
+            prefillNonce={prefillNonce}
+            clearBriefFixContext={clearBriefFixContext}
+            onCreateBrief={handleCreateBrief}
+            onOpenTab={state.setTab}
+          />
+        )}
 
         <Drawer
           open={guideOpen}

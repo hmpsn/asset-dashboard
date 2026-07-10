@@ -415,7 +415,23 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
 
     expect(await screen.findByRole('heading', { name: 'Content Pipeline' })).toBeInTheDocument();
     expect(screen.queryByTestId('legacy-content-pipeline')).not.toBeInTheDocument();
-    expect(screen.getByTestId('legacy-briefs')).toBeInTheDocument();
+    expect(screen.getByTestId('content-pipeline-board')).toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-briefs')).not.toBeInTheDocument();
+  });
+
+  it('opens bare and briefs URLs on the lifecycle Board with brief work focused', async () => {
+    const bare = renderSurface(`/ws/${workspaceId}/content-pipeline`);
+
+    expect(await screen.findByTestId('content-pipeline-board')).toHaveAttribute('data-board-focus', 'brief');
+    expect(screen.getByTestId('content-pipeline-board-stage-brief')).toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-briefs')).not.toBeInTheDocument();
+
+    bare.unmount();
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=briefs`);
+
+    expect(await screen.findByTestId('content-pipeline-board')).toHaveAttribute('data-board-focus', 'brief');
+    expect(screen.getByTestId('content-pipeline-board-stage-brief')).toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-briefs')).not.toBeInTheDocument();
   });
 
   it('receives ?tab=published and renders the shared content-performance read', async () => {
@@ -439,37 +455,38 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open scheduled post' }));
 
     expect(await screen.findByTestId('legacy-posts')).toHaveTextContent('post=post-calendar');
-    expect(screen.getByRole('radio', { name: /Drafts/i })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByText('post-calendar')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Board/i })).toHaveAttribute('aria-checked', 'true');
 
     fireEvent.click(screen.getByRole('button', { name: 'Close post' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('legacy-posts')).toHaveTextContent('post=none');
     });
-    expect(screen.getByRole('radio', { name: /Drafts/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /Board/i })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('routes AI-suggested intake into the Briefs workspace with fix-context intact', async () => {
     renderSurface(`/ws/${workspaceId}/content-pipeline?tab=intake`);
 
+    expect(await screen.findByTestId('content-pipeline-board')).toHaveAttribute('data-intake-state', 'expanded');
     expect(await screen.findByTestId('legacy-intake')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Create suggested brief' }));
 
     expect(await screen.findByTestId('legacy-briefs')).toHaveTextContent('decay keyword');
-    expect(screen.getByRole('radio', { name: /Briefs/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /Board/i })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('falls back from a bad tab and preserves the subscriptions alias', async () => {
     const firstRender = renderSurface(`/ws/${workspaceId}/content-pipeline?tab=unknown`);
 
-    expect(await screen.findByTestId('legacy-briefs')).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: /Briefs/i })).toHaveAttribute('aria-checked', 'true');
+    expect(await screen.findByTestId('content-pipeline-board')).toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-briefs')).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Board/i })).toHaveAttribute('aria-checked', 'true');
 
     firstRender.unmount();
     renderSurface(`/ws/${workspaceId}/content-pipeline?tab=subscriptions`);
     expect(await screen.findByTestId('legacy-subscriptions')).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Publish' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('button', { name: 'Content capacity' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('keeps internal rebuild and migration language out of the visible shell', async () => {
@@ -488,17 +505,22 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     expect(actionGroup).toHaveClass('max-w-full');
   });
 
-  it('renders one page title per carried-over lens while preserving embedded controls', async () => {
+  it('keeps legacy workspaces reachable exactly once without duplicating the page title', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline`);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Open briefs/i }));
+    expect(await screen.findByTestId('legacy-briefs')).toBeInTheDocument();
+    expect(screen.getAllByTestId('legacy-briefs')).toHaveLength(1);
+    expect(screen.getAllByRole('heading', { name: 'Content Pipeline' })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /Open drafts/i }));
+    expect(await screen.findByTestId('legacy-posts')).toBeInTheDocument();
+    expect(screen.getAllByTestId('legacy-posts')).toHaveLength(1);
+    expect(screen.getAllByRole('heading', { name: 'Content Pipeline' })).toHaveLength(1);
+  });
+
+  it('renders one page title per compatible mode while preserving embedded controls', async () => {
     const cases = [
-      {
-        tab: 'briefs',
-        testId: 'legacy-briefs',
-        legacyTitle: 'Content Briefs',
-        assertControls: () => {
-          expect(screen.getByLabelText('Search briefs')).toBeInTheDocument();
-          expect(screen.getByRole('button', { name: 'Newest' })).toBeInTheDocument();
-        },
-      },
       {
         tab: 'posts',
         testId: 'legacy-posts',
