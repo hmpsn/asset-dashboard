@@ -140,7 +140,7 @@ Risk if wrong:
 - Collapsing the receivers without approval may disrupt existing production workflows for briefs, posts, subscriptions, calendar scheduling, and published readback.
 - Keeping the receiver shell leaves the largest prototype mismatch unresolved and risks another page that looks cleaner but still behaves unlike the prototype.
 
-Safe work completed while awaiting decision:
+Pre-decision safe work completed:
 
 - Visible internal labels such as `?tab= receiver`, `subscriptions alias`, `mounted below`, `carried-over mode`, `shell owns`, and `Post receiver` were replaced with operator-facing language.
 - The header now stacks actions and lets the subtitle wrap on narrow viewports so the page title and explanatory copy remain readable on mobile.
@@ -148,7 +148,7 @@ Safe work completed while awaiting decision:
 - Component coverage now asserts that internal rebuild/migration terms are absent from the loaded shell.
 - Existing tests still prove flag transition, deep links, legacy alias, exact-once mounted receivers, fix-context handoff, and a11y.
 
-Safe work still available while awaiting decision:
+Later low-risk polish:
 
 - Responsive and typography polish that does not change capability homes.
 - Browser smoke of the current state for desktop, mobile, deep link, and guide drawer.
@@ -156,7 +156,7 @@ Safe work still available while awaiting decision:
 
 ## Browser Smoke Checklist
 
-Baseline smoke for the current receiver shell:
+Pre-correction baseline smoke for the receiver shell:
 
 - Desktop `/ws/ws_demo_premium/content-pipeline`.
 - Mobile `/ws/ws_demo_premium/content-pipeline`.
@@ -187,7 +187,7 @@ Smoke findings:
 - The in-app browser connector also timed out during the Published proof smoke, so the proof evidence was captured with bounded local Playwright. Local preview noise was limited to Vite WebSocket warnings and route-change-aborted intelligence requests.
 - The visible peer tab/receiver model remains the primary parity mismatch and should not be treated as resolved by the safe language/responsive fixes.
 
-Post-correction smoke, if the lifecycle-board direction is approved:
+Later full-workspace smoke, after item-backed workspaces are approved:
 
 - Desktop Board overview with Intake collapsed and lifecycle columns visible.
 - Mobile Board overview with no horizontal text clipping outside the intended board scroll.

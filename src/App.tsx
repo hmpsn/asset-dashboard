@@ -463,8 +463,10 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     return <Navigate to={adminPath(selected.id, 'home')} replace />;
   };
 
-  const RebuiltSurface = rebuildShellEnabled && chromeWorkspace ? REBUILT_SURFACES[tab] : undefined;
-  if (RebuiltSurface && chromeWorkspace) {
+  const canMountRebuiltSurface = chromeWorkspace !== null || GLOBAL_TABS.has(tab);
+  const RebuiltSurface = rebuildShellEnabled && canMountRebuiltSurface ? REBUILT_SURFACES[tab] : undefined;
+  if (RebuiltSurface && canMountRebuiltSurface) {
+    const rebuiltWorkspaceId = selected?.id ?? chromeWorkspace?.id ?? '';
     return (
       <>
         <RebuiltAppChrome
@@ -484,7 +486,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
         >
           <ErrorBoundary label={tab}>
             <Suspense fallback={<ChunkFallback />}>
-              <RebuiltSurface workspaceId={selected?.id ?? chromeWorkspace.id} />
+              <RebuiltSurface workspaceId={rebuiltWorkspaceId} />
             </Suspense>
           </ErrorBoundary>
         </RebuiltAppChrome>
@@ -496,7 +498,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
           selectedWorkspace={chromeWorkspace}
           onSelectWorkspace={(ws) => navigate(adminPath(ws.id))}
         />
-        {health.hasOpenAIKey && (
+        {health.hasOpenAIKey && chromeWorkspace && (
           <ErrorBoundary label="Admin Chat">
             <AdminChat
               workspaceId={chromeWorkspace.id}

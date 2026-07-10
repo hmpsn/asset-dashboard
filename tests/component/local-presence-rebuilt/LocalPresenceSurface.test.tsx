@@ -404,6 +404,9 @@ describe('LocalPresenceSurface', () => {
     expect(screen.queryByRole('radio', { name: /Visibility/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: /Setup/i })).not.toBeInTheDocument();
     expect(screen.getByText('Local operating status')).toBeInTheDocument();
+    expect(screen.getAllByText('Markets', { selector: 'span.t-caption' })).toHaveLength(1);
+    expect(screen.getAllByText('Checked', { selector: 'span.t-caption' })).toHaveLength(1);
+    expect(screen.getAllByText('Visible', { selector: 'span.t-caption' })).toHaveLength(2);
     expect(screen.getAllByTestId('legacy-local-seo-visibility-panel')).toHaveLength(1);
   });
 

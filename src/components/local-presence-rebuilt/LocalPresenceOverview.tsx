@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { BarChart3, CheckCircle2, MapPin, Search, Star } from 'lucide-react';
+import { Search, Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { LocalSeoReadResponse } from '../../../shared/types/local-seo';
 import type { GbpReviewsReadResponse } from '../../api/localSeo';
@@ -46,13 +46,6 @@ function setupTone(setupState: LocalSeoReadResponse['report']['setupState']): 'b
   if (setupState === 'ready_no_data') return 'blue';
   if (setupState === 'needs_market') return 'amber';
   return 'zinc';
-}
-
-function formatDate(value?: string): string {
-  if (!value) return 'No scan yet';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return 'No scan yet';
-  return parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function formatRating(value?: number): string {
@@ -240,13 +233,6 @@ export function LocalPresenceOverview({
           )}
         />
       )}
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricTile label="Markets" value={report.activeMarketCount} sub={`${report.configuredMarketCount} configured`} accent="var(--blue)" icon={MapPin} />
-        <MetricTile label="Checked" value={report.checkedKeywordCount} sub={formatDate(report.lastCapturedAt)} accent="var(--blue)" icon={BarChart3} />
-        <MetricTile label="Visible" value={report.visibleCount} sub="local matches" accent="var(--emerald)" icon={CheckCircle2} />
-        <MetricTile label="Local packs" value={report.localPackPresentCount} sub="packs detected" accent="var(--blue)" icon={Search} />
-      </div>
     </div>
   );
 }

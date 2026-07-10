@@ -34,14 +34,14 @@ Accepted owner directions, circle-back triggers, and remaining risks are tracked
    - Deliverable: only Site Audit and History remain visible peers; AI Search Ready, Content Health, and Audit Guide now live in one evidence group and their `?sub=` compatibility URLs open the intended disclosure without replacing the audit console.
 
 6. Analytics Hub Search-default correction
-   - Status: `ODP-005 A + C` implemented, browser-smoked, and integration-tested.
-   - Reason: The prototype's per-client default is `Search performance` with `Site traffic` and `Annotations` as the other report modes. The rebuilt surface still defaults to a peer `Overview` lens that preserves cross-source trend, Demand mix, and Priority insights from the current product.
-   - Deliverable: bare `/analytics-hub` now defaults to Search performance with exactly three visible reports; `?lens=overview` remains a hidden compatibility receiver; Demand mix and Priority insights live in a shared lower Search report band and mount exactly once.
+   - Status: `ODP-005 A + C` implemented, browser-smoked, integration-tested, and corrected for degraded-provider states.
+   - Reason: The prototype's per-client default is `Search performance` with `Site traffic` and `Annotations` as the other report modes. The prior rebuilt surface instead defaulted to a peer `Overview` lens that preserved cross-source trend, Demand mix, and Priority insights from the current product.
+   - Deliverable: bare `/analytics-hub` now defaults to Search performance with exactly three visible reports; `?lens=overview` remains a hidden compatibility receiver; Demand mix and Priority insights live in a shared lower Search report band and mount exactly once, including truthful unconfigured/empty/error GSC states. Annotations remains usable without analytics providers and branded data uses blue.
 
 7. Media phased single-workshop correction
-   - Status: `ODP-006 C` accepted; Browse-default, toolbar Upload, and compact Audit correction approved.
-   - Reason: The prototype is a single Asset Manager workshop with filters and bulk repair actions as the navigation surface. The rebuilt surface keeps Browse, Audit, and Upload as peer lenses, which preserves live production capabilities but does not match the prototype IA.
-   - Deliverable: phase Browse/Audit/Upload into one workshop while preserving `?tab=audit`, `?tab=upload`, `filter`, `search`, `view`, `sort`, and `asset` as compatibility state; prove the Performance/Site Audit repair handoffs before full collapse.
+   - Status: `ODP-006 C` implemented, browser-smoked, integration-tested, and corrected after the discoverability circle-back fired.
+   - Reason: The prototype is a single Asset Manager workshop with filters and bulk repair actions as the navigation surface. The prior rebuilt surface kept Browse, Audit, and Upload as peer lenses, which preserved live production capabilities but did not match the prototype IA.
+   - Deliverable: Browse is always rendered with no peer lenses; Repair results opens Audit once as the first work area above the library; Upload opens once in the shared Drawer; a valid asset deep link takes precedence over Upload; All, total media weight, blue savings, filter-only Performance/Site Audit senders, and legacy `?tab=` receivers are proven.
 
 8. Page Rewriter focus bridge
    - Status: `ODP-007 A` implemented, browser-smoked, and integration-tested; export-only v1 retained.
@@ -49,7 +49,7 @@ Accepted owner directions, circle-back triggers, and remaining risks are tracked
    - Deliverable: one controlled `AppShell` focus bridge now reaches Page Rewriter, preserves loaded `pageUrl`/editor state, and exits through Escape; Save draft / Publish rewrite remain absent until a separately approved backend write spine exists.
 
 9. Local Presence real-data v1
-   - Status: `ODP-008 A` accepted; current real-data/manual-refresh v1 retained.
+   - Status: `ODP-008 A` accepted; current real-data/manual-refresh v1 retained and the duplicate overview KPI row removed.
    - Reason: The prototype's local rank grid, profile views, and calls/directions require data sources that do not exist today: 49-point geo-grid scan nodes and GBP Performance API ingestion. The safe slice now keeps real current market posture, local visibility evidence, review operations, and setup drawer behavior aligned without fabricating unavailable metrics.
    - Deliverable: keep the current v1 and manual refresh controls; track geo-grid and GBP Performance as explicit backend capability work rather than frontend parity polish.
 
@@ -59,7 +59,7 @@ Accepted owner directions, circle-back triggers, and remaining risks are tracked
    - Deliverable: modal state, grouped context overview, no top tab strip, Voice-only Brand identity generators, `?tab=` alias preservation, generator workflow framing in the Brand identity modal, bespoke Discovery/Brandscript/Trust evidence/Business facts workflow framing, remaining Context/Voice/Strategy Intelligence workflow framing, and exact-once child panel mounting are covered by `tests/component/brand-ai-rebuilt/BrandAiSurface.test.tsx`.
 
 11. Cockpit overlay smoke completion
-   - Status: done for the current fixture set.
+   - Status: done for the current fixture set; the final Risk receiver audit is also corrected and browser-smoked.
    - Reason: Cockpit is the calibration surface, so overview, stream, activity, and work-order states all need browser evidence before it can serve as the rubric.
    - Deliverable: desktop overview, loaded mobile overview, activity drawer, work-order modal, and `stream=send` deep-link captures now live in `/tmp/asset-dashboard-codex-parity-captures/`. Work-order smoke uses seeded `ws_demo_growth`; the default premium demo workspace has no work-order queue row.
 
@@ -74,19 +74,19 @@ Accepted owner directions, circle-back triggers, and remaining risks are tracked
    - Deliverable: `RebuiltSidebar` uses prototype zones, local sidebar labels, a rebuilt-sidebar-only Competitors item, DS-safe Optimization teal instead of prototype purple, and token-backed group/item accents. Component coverage asserts zone order, labels, keyboard navigation, disabled-route skipping, collapsed-group persistence, content-pipeline badge survival, and a11y.
 
 14. Non-rebuilt route receiving-home mapping
-   - Status: `ODP-012 B` accepted; route/nav census complete and parent-workflow mapping approved.
-   - Reason: `page-intelligence` and `content-perf` are real standalone nav entries but are not in `REBUILT_SURFACES`, so they are not covered by the rebuilt parity contracts or smoke evidence. `seo-briefs`, `content`, `calendar`, and `subscriptions` are folded/redirect-only and accounted for separately.
-   - Deliverable: map Page Intelligence into SEO Editor / Insights Engine and Content Perf into Content Pipeline Published / Analytics Hub during those parent contracts; preserve old route ids as receivers until staging verifies the final homes.
+   - Status: `ODP-012 B` accepted; route/nav census complete, Content Pipeline Published proposed for Content Performance, and Page Intelligence intentionally retained standalone.
+   - Reason: `page-intelligence` and `content-perf` are real standalone nav entries but are not in `REBUILT_SURFACES`, so they are not covered by the rebuilt parity contracts or smoke evidence. `seo-briefs`, `content`, and `calendar` are folded/redirect-only; `/subscriptions` is a preserved standalone legacy receiver while `content-pipeline?tab=subscriptions` is the folded query alias.
+   - Deliverable: preserve both standalone route ids. Use Content Pipeline Published as the proposed Content Performance receiver in a later proof/extraction slice; keep Page Intelligence standalone until SEO Editor Research/detail proves every analyze, edit, job, and handoff capability.
 
 ## P2
 
 15. Cross-surface typography token calibration
-   - Status: done for the current rebuilt-surface sweep; Cockpit, Brand & AI, Schema, Links, Performance, Search & Traffic, SEO Editor, Site Audit, Competitors, Page Rewriter, Local Presence, Asset Manager, and Keyword Hub role cleanup added. Rebuilt page-header perceived scale is tracked separately in `ODP-010`.
+   - Status: done for the current rebuilt-surface role cleanup; the `ODP-010 C` PageHeader variant is implemented on Performance only, with broader migration still gated on visual comparison.
    - Reason: Browser inspection confirmed the rebuilt pages were using the current styleguide/app utilities, but those utilities had drifted below the token and `DESIGN_SYSTEM.md` scale. This made subtitles, banners, small controls, and body copy feel exceptionally small even when surfaces used DS classes correctly.
    - Verification: `.t-*` utility sizes in `src/index.css` and `public/styleguide.css` now match `src/tokens.css`; `tests/contract/typography-token-parity.test.ts` prevents future utility/token drift. Brand & AI, Cockpit, Schema, Links, Performance, Search & Traffic, SEO Editor, Site Audit, Competitors, Page Rewriter, Local Presence, Asset Manager, and Keyword Hub now assert important page/rail/modal/report/workbench/audit/feed/rewrite/rank-profile/source-fix/keyword-proof copy uses the right typography roles instead of raw pixel or caption-only sizing. Browser smoke evidence: `/tmp/asset-dashboard-codex-parity-captures/post-typography-smoke-state.json`, `/tmp/asset-dashboard-codex-parity-captures/post-typography-cockpit-desktop-overview.png`, `/tmp/asset-dashboard-codex-parity-captures/post-typography-brand-desktop.png`, `/tmp/asset-dashboard-codex-parity-captures/post-typography-performance-desktop.png`, `/tmp/asset-dashboard-codex-parity-captures/brand-ai-typography-role-smoke-state.json`, `/tmp/asset-dashboard-codex-parity-captures/cockpit-typography-role-smoke-state.json`, `/tmp/asset-dashboard-codex-parity-captures/schema-typography-role-smoke-state.json`, `/tmp/asset-dashboard-codex-parity-captures/search-traffic-typography-role-smoke-state.json`, `/tmp/asset-dashboard-codex-parity-captures/seo-editor-typography-role-smoke-state.json`, `/tmp/asset-dashboard-codex-parity-captures/site-audit-typography-role-smoke-state.json`, `/tmp/asset-dashboard-codex-parity-captures/competitors-alert-feed-smoke-state.json`, `/tmp/asset-dashboard-codex-parity-captures/page-rewriter-typography-smoke-state.json`, `/tmp/asset-dashboard-codex-parity-captures/local-seo-typography-smoke-state.json`, `/tmp/asset-dashboard-codex-parity-captures/media-source-proof-smoke-state.json`, `/tmp/asset-dashboard-codex-parity-captures/keywords-typography-role-smoke-state.json`, `/tmp/asset-dashboard-codex-parity-captures/performance-typography-role-smoke-state.json`, and `/tmp/asset-dashboard-codex-parity-captures/links-typography-role-smoke-state.json`.
 
 16. Global Ops route-family capability decisions
-   - Status: `ODP-009 A` and `GO-001` through `GO-008` accepted; additive shell retained with explicit revisit triggers.
+   - Status: `ODP-009 A` and `GO-001` through `GO-008` accepted; additive shell retained, unsupported portfolio totals removed, global zero-workspace mount covered, and explicit revisit triggers preserved.
    - Reason: Global Ops is a fan-out route family, not one surface. The current rebuilt shell preserves route receivers and live operator homes, but exact prototype collapse would affect Requests, Outcomes, Diagnostics, Business aliases, Workspace Settings grouping, client onboarding, and LLMs.txt ownership.
    - Deliverable: implement only the accepted additive-shell polish; revisit each `GO-*` move when its named receiving workflow or server contract exists.
 

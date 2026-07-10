@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -294,6 +294,18 @@ describe('CockpitSurface rebuilt', () => {
 
     expect(await screen.findByText('Approve July content plan')).toBeInTheDocument();
     expect(screen.queryByText('Close Core Web Vitals cleanup')).not.toBeInTheDocument();
+  });
+
+  it('keeps the Risk deep link truthful without selecting Optimizations', async () => {
+    renderSurface(`/ws/${workspaceId}?stream=unclassified`);
+
+    expect(await screen.findByText('Client has not viewed the portal')).toBeInTheDocument();
+    expect(screen.queryByText('Close Core Web Vitals cleanup')).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText('Queue filters')).getByRole('button', { name: /^Risk/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(screen.getByLabelText('Queue filters')).getByRole('button', { name: /Client risk/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('radio', { name: /Optimizations/ })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('radio', { name: /To send/ })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('radio', { name: /Monetization/ })).toHaveAttribute('aria-checked', 'false');
   });
 
   it('keeps internal rebuild and migration language out of the visible Cockpit UI', async () => {

@@ -10,7 +10,6 @@ import {
   DataTable,
   Icon,
   InlineBanner,
-  MetricTile,
   PageContainer,
   PageHeader,
   SectionCard,
@@ -35,19 +34,6 @@ export function OutcomesBookLens() {
     return map;
   }, [outcomeOverview.data]);
 
-  const totals = useMemo(() => {
-    return workspaces.reduce((acc, workspace) => {
-      const value = workspace.outcomeValue;
-      acc.valuePerMonth += value?.valuePerMonth ?? 0;
-      acc.wins += value?.wins ?? 0;
-      acc.external += value?.externallyExecuted ?? 0;
-      acc.platform += value?.platformExecuted ?? 0;
-      acc.clicks += workspace.gscRollup?.clicks ?? 0;
-      acc.issues += workspace.siteHealthIssueMatrix?.totalIssues ?? 0;
-      return acc;
-    }, { valuePerMonth: 0, wins: 0, external: 0, platform: 0, clicks: 0, issues: 0 });
-  }, [workspaces]);
-
   const rows = workspaces.map((workspace) => {
     const outcome = outcomeByWorkspace.get(workspace.id);
     const value = workspace.outcomeValue;
@@ -63,7 +49,9 @@ export function OutcomesBookLens() {
       winRate: outcome?.winRate,
       activeActions: outcome?.activeActions ?? 0,
       scoredLast30d: outcome?.scoredLast30d ?? 0,
-      coverage: value && value.wins > 0 ? `${Math.round((value.withValue / value.wins) * 100)}%` : '—',
+      coverage: outcome?.coverage && outcome.coverage.tracked > 0
+        ? `${outcome.coverage.reconciled} / ${outcome.coverage.tracked}`
+        : '—',
       attention: outcome?.attentionNeeded ? 'Needs attention' : 'OK',
     };
   });
@@ -73,26 +61,18 @@ export function OutcomesBookLens() {
       <div data-testid="outcomes-book-rebuilt" className="flex flex-col gap-[var(--section-gap)]">
         <PageHeader
           title="Outcomes Book"
-          subtitle="Cross-workspace outcome value, search rollups, issue matrix, and coverage attention."
+          subtitle="Workspace outcome value, search evidence, issue matrix, and coverage attention."
         />
 
         <InlineBanner
           tone="info"
-          title="Attribution-honest value"
-          message="Value columns come from the workspace-overview rollup: not-acted-on proposals are excluded, client-side work is labeled separately, and only platform-executed rows claim agency execution."
+          title="Server-owned workspace evidence"
+          message="Each row uses the workspace and outcome read models: not-acted-on proposals are excluded, client-side work is labeled separately, and only platform-executed rows claim agency execution. Portfolio totals stay unavailable until the server owns that rollup."
         />
-
-        <div className="grid gap-3 md:grid-cols-5">
-          <MetricTile label="Value / mo" value={formatMoney(totals.valuePerMonth)} accent="var(--amber)" />
-          <MetricTile label="Wins counted" value={formatNumber(totals.wins)} accent="var(--emerald)" />
-          <MetricTile label="Client-side called" value={formatNumber(totals.external)} accent="var(--blue)" />
-          <MetricTile label="GSC clicks" value={formatNumber(totals.clicks)} accent="var(--blue)" />
-          <MetricTile label="Open issues" value={formatNumber(totals.issues)} accent="var(--red)" />
-        </div>
 
         <DataTable
           columns={[
-            { key: 'workspace', label: 'Workspace', sortable: true, width: '1.3fr' },
+            { key: 'workspace', label: 'Workspace', sortable: true, width: 'minmax(180px, 1.3fr)' },
             { key: 'value', label: 'Value / mo', sortable: true, align: 'right', width: '130px', render: (value) => formatMoney(value as number) },
             { key: 'wins', label: 'Wins', sortable: true, align: 'right', width: '84px' },
             { key: 'attribution', label: 'Attribution', width: '180px' },

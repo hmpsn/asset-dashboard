@@ -172,7 +172,7 @@ Smoke findings:
 
 - `?lens=signals` renders the current signals lens state without duplicate dialogs, horizontal overflow, visible internal migration labels, or console errors.
 - `?tab=rankings` redirects to `/seo-keywords?lens=rankings`, preserving the dissolved legacy tab contract.
-- Add Recommendation and move detail still open as exactly one modal/drawer workflow in the current split-lens IA.
+- Add Recommendation and move detail open as exactly one modal/drawer workflow inside the post-correction single-spine IA.
 - The data workspace (`ws_1772610244629`) is more useful for Engine smoke than `ws_demo_premium`, whose default Engine state can be empty.
 - The in-app browser connector timed out during the final refreshed mobile screenshot after the code edits; the final mobile image was captured with the project Playwright runtime against the same local Vite server after the in-app connector had already captured the pre-fix states. Console and DOM state were checked with Playwright for the fallback capture.
 - The trust-spine preview smoke rendered on `/ws/ws_1772610244629/seo-strategy` with no horizontal overflow and no visible internal implementation labels. That local workspace had no cached money frame and no server verdict, so the browser evidence shows the preview's fallback state; the component fixture covers the populated value-frame state. The in-app browser connector timed out during this capture, so the preview evidence was captured with bounded local Playwright against the same running preview server.

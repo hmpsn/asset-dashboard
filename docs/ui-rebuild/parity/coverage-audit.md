@@ -32,14 +32,14 @@ Current census result:
 
 | Route id | Nav status | Rebuilt status | Current parity status |
 |---|---|---|---|
-| `page-intelligence` | Main nav entry | Not in `REBUILT_SURFACES` | `ODP-012 B` accepted: evaluate its receiving home inside SEO Editor / Insights Engine and preserve this route id as a compatibility receiver. Do not remove or redirect it until that parent contract passes. |
-| `content-perf` | Main nav entry | Not in `REBUILT_SURFACES` | `ODP-012 B` accepted: evaluate its receiving home inside Content Pipeline Published / Analytics Hub and preserve this route id as a compatibility receiver. Do not remove or redirect it until that parent contract passes. |
+| `page-intelligence` | Main nav entry | Not in `REBUILT_SURFACES` | `ODP-012 B` accepted: keep standalone until a later SEO Editor Research/detail slice proves every analyze, edit, job, and handoff capability. No redirect is approved. |
+| `content-perf` | Main nav entry | Not in `REBUILT_SURFACES` | `ODP-012 B` accepted: Content Pipeline Published is the proposed receiving home and already consumes shared readback data, but this route remains standalone until a shipping slice proves complete report/deep-link coverage. |
 | `competitors` | `NON_REGISTRY_PAGES` | Rebuilt | Still intentionally absent from the global registry, but now surfaced in the rebuilt sidebar's prototype `Strategy & Content` presentation because the rebuilt shell is flag-gated. Contract exists. |
 | `workspace-settings` | `NON_REGISTRY_PAGES` | Rebuilt | Intentional per-workspace settings receiver reached from workspace gear/settings paths, not the main sidebar list. Covered by Global Ops contract. |
 | `seo-briefs` | `NON_REGISTRY_PAGES` | Not rebuilt | Folded into `content-pipeline?tab=briefs`. |
 | `content` | `NON_REGISTRY_PAGES` | Not rebuilt | Folded into `content-pipeline?tab=posts`. |
 | `calendar` | `NON_REGISTRY_PAGES` | Not rebuilt | Redirects to `content-pipeline?tab=calendar`. |
-| `subscriptions` | `NON_REGISTRY_PAGES` | Not rebuilt | Folded into `content-pipeline` publish/subscription state. |
+| `subscriptions` | `NON_REGISTRY_PAGES` | Not rebuilt | Preserved standalone legacy `ContentSubscriptions` receiver. Separately, `content-pipeline?tab=subscriptions` aliases to the rebuilt pipeline's publish/capacity state. |
 
 Practical answer: the current contracts cover the rebuilt build, not the entire admin route universe. `page-intelligence` and `content-perf` are the two true nav routes still outside the rebuilt registry.
 
@@ -97,13 +97,13 @@ Interior state has been checked in contracts, component tests, and smoke for the
 | Performance | `performance` | Page Weight, Page Speed, weight Drawer, speed handoff | Aligned enough |
 | Competitors | `competitors` | Competitive stack, alert feed, detail Drawer, Hub/brief/send actions | Aligned enough |
 | Keyword Hub | `seo-keywords` | Rankings, Opportunities, Pages, Clusters, Lifecycle, detail Drawer | Aligned enough |
-| Insights Engine | `seo-strategy` | Spine, changes, signals, POV, moves, operations | Behavior mismatch: prototype wants one strategy spine |
-| Content Pipeline | `content-pipeline` | Planner, Calendar, Intake, Briefs, Posts, Publish, Content Health, Published, guide/subscription state | Behavior mismatch: prototype wants lifecycle board/workspace model |
-| SEO Editor | `seo-editor` | Table filters, source/write targets, page Drawer, URL filters | Behavior mismatch: prototype wants source-grouped workbench/review queue |
-| Site Audit | `seo-audit` | Site Audit, History, AI Search Ready, Content Health, Guide, schedule/issue drawers | Behavior mismatch: extra diagnostics are peer lenses |
-| Search & Traffic | `analytics-hub` | Overview, Search, Traffic, Annotations, Breakdowns Drawer | Behavior mismatch: prototype default is Search performance |
-| Assets | `media` | Browse, Audit, Upload, asset Drawer, repair handoffs | Behavior mismatch: prototype wants one asset workshop |
-| Page Rewriter | `rewrite` | Two-pane workspace, page picker, export menu, `?pageUrl=` | Capability risk: focus mode and write spine need owner/back-end decisions |
+| Insights Engine | `seo-strategy` | Spine, changes, signals, POV, moves, operations | Aligned enough behavior; owner visual circle-back remains open |
+| Content Pipeline | `content-pipeline` | Board, Intake, Calendar, Published, Content Health, Matrix, Briefs/Posts/capacity/guide receiver state | Aligned enough first phase; item-backed workspaces and capacity Drawer deferred |
+| SEO Editor | `seo-editor` | Static/CMS/Manual source groups, table filters, selection actions, page Drawer, URL filters | Aligned enough first phase; inline editing/review queue deferred |
+| Site Audit | `seo-audit` | Site Audit, History, compatibility evidence disclosures, schedule/issue drawers | Aligned enough |
+| Search & Traffic | `analytics-hub` | Search Performance, Site Traffic, Annotations, hidden Overview receiver, Breakdowns Drawer | Aligned enough |
+| Assets | `media` | Browse workshop, repair filters/results, Upload and asset Drawers, repair handoffs | Aligned enough |
+| Page Rewriter | `rewrite` | Two-pane workspace, shell focus mode, page picker, export menu, `?pageUrl=` | Aligned enough for export-only v1; draft/publish remains a separate backend project |
 | Local Presence | `local-seo` | Rank/profile, Reviews/replies, setup Drawer, legacy visibility receiver | Capability risk: geo-grid and GBP Performance data not available |
 | Global Ops | `settings`, `workspace-settings`, `roadmap`, `revenue`, `ai-usage`, `features`, `prospect`, `outcomes-overview`, `outcomes`, `diagnostics`, `requests` | Global settings, workspace settings tabs, roadmap views, business tabs, outcomes, diagnostics, requests tabs | Capability risk: accepted additive shell with explicit `GO-*` deferrals |
 
@@ -113,16 +113,17 @@ The current parity sweep has looked at actual layout for every mounted rebuilt r
 
 Current layout buckets:
 
-- Aligned enough: Cockpit, Brand & AI, Schema, Links, Performance, Competitors, Keyword Hub.
-- Behavior mismatch: Insights Engine, Content Pipeline, SEO Editor, Site Audit, Search & Traffic, Assets.
-- Capability risk: Page Rewriter, Local Presence, Global Ops route family.
-- Receiving-home mapping pending: Page Intelligence, Content Perf; standalone route ids remain compatibility receivers.
-- Redirect/folded only: SEO Briefs, Content, Calendar, Subscriptions.
+- Aligned enough: Cockpit, Brand & AI, Schema, Links, Performance, Competitors, Keyword Hub, Content Pipeline first phase, SEO Editor first phase, Site Audit, Search & Traffic, Assets, and Page Rewriter export-only v1.
+- Owner visual circle-back: Insights Engine behavior is accepted, but Joshua has not accepted the final composition as visually matched.
+- Capability risk: Local Presence and the Global Ops route family.
+- Receiving-home proof pending: Page Intelligence stays standalone; Content Pipeline Published is the proposed Content Performance receiver. Both standalone route ids remain intact.
+- Redirect/folded only: SEO Briefs, Content, and Calendar.
+- Preserved legacy standalone receiver: Subscriptions; its Content Pipeline query alias is accounted for separately.
 
 ## Accepted Scope Direction
 
 Accepted on 2026-07-09:
 
 - Keep the accepted rebuilt sidebar prototype-zone grouping. Continue small token/type/accessibility fixes without changing route ids or global registry semantics.
-- Map `page-intelligence` into SEO Editor / Insights Engine and `content-perf` into Content Pipeline Published / Analytics Hub during those parent-surface contracts; preserve both old route ids as receivers until staging verifies the final homes.
+- Keep `page-intelligence` standalone until SEO Editor Research/detail proves complete capability parity. Treat Content Pipeline Published as the proposed `content-perf` receiving home while preserving the standalone route until a surface-scoped shipping PR proves every report and deep link on staging.
 - Continue resolving P1 behavior mismatches first; do not spend broad visual polish time on pages whose IA is still known to disagree with the prototype.

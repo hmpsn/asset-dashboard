@@ -46,3 +46,21 @@ This commit is the immutable fork point for the parallel parity goal. It is inte
 - Preserve route ids, feature-flag behavior, URL receivers, legacy aliases, and exact-once capability homes.
 - Ship dependent cohorts only after their prerequisite PR is merged and verified on staging.
 - Keep local `/tmp/asset-dashboard-codex-parity-captures/` screenshots as review evidence; regenerate them for the shipping branch rather than committing local paths as baselines.
+
+## Current Integration Cohorts
+
+The integration sandbox has advanced beyond the baseline through reviewed, surface-scoped commits. Shipping still starts from `staging`; these hashes are semantic extraction references, not a request to cherry-pick the entire stack.
+
+| Cohort | Integration reference | Shipping boundary |
+|---|---|---|
+| Insights Engine | `588eada03` | Engine component/state/tests and its parity record only; keep the owner visual circle-back open. |
+| SEO Editor | `cb536234b` | Source-grouped worksheet and matching tests only. |
+| Site Audit | `3e4cec39e`, `4d1fd9592` | Diagnostic demotion first; canonical Asset repair sender only after Asset receiver work is available. |
+| Content Pipeline | `15eec15f3`, `4024ff87e` | Board-first slice and review fixes; keep later item workspaces deferred. |
+| Rebuilt focus bridge | `a690f25d3` | Shared shell focus API plus Page Rewriter consumer/tests; ship before any dependent focus consumer. |
+| Search & Traffic | `e24cb21a1` | Search-default report correction and tests only. |
+| Performance repair sender | `8cfc4ae78` | Canonical Asset filter sender; pair with the Asset receiver PR dependency. |
+| Asset Manager | `241f54a25` | Single Browse workshop, Audit receiver, Upload Drawer, and matching tests. |
+| PageHeader pilot | uncommitted Wave 5 closeout | Shared opt-in variant plus Performance-only adoption/tests; do not bulk-migrate other surfaces. |
+
+Route-home decision: Content Pipeline Published is the proposed Content Performance receiver because it already consumes shared readback data, but `/content-perf` remains standalone. Page Intelligence remains standalone until a later SEO Editor Research/detail slice proves every capability. No route migration belongs in the current extraction set.

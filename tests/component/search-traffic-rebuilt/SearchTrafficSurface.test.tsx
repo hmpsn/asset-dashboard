@@ -22,6 +22,11 @@ const workspace = {
   ga4PropertyId: '123',
 };
 
+type WorkspaceFixture = Omit<typeof workspace, 'gscPropertyUrl' | 'ga4PropertyId'> & {
+  gscPropertyUrl?: string;
+  ga4PropertyId?: string;
+};
+
 const searchOverview = {
   totalClicks: 1200,
   totalImpressions: 24000,
@@ -44,6 +49,10 @@ const searchOverview = {
     nonBranded: { clicks: 900, impressions: 21000, sharePct: 87.5 },
   },
 };
+
+let currentWorkspace: WorkspaceFixture = workspace;
+let currentSearchOverview: typeof searchOverview | null = searchOverview;
+let currentSearchError: string | null = null;
 
 const ga4Overview = {
   totalUsers: 900,
@@ -69,7 +78,7 @@ beforeAll(() => {
 
 vi.mock('../../../src/hooks/admin', () => ({
   useWorkspaces: () => ({
-    data: [workspace],
+    data: [currentWorkspace],
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
@@ -82,7 +91,7 @@ vi.mock('../../../src/hooks/admin', () => ({
 
 vi.mock('../../../src/hooks/admin/useAdminSearch', () => ({
   useAdminSearch: () => ({
-    overview: searchOverview,
+    overview: currentSearchOverview,
     trend: [
       { date: '2026-06-01', clicks: 20, impressions: 400, ctr: 5, position: 8 },
       { date: '2026-06-02', clicks: 24, impressions: 420, ctr: 5.7, position: 7.8 },
@@ -97,7 +106,7 @@ vi.mock('../../../src/hooks/admin/useAdminSearch', () => ({
       changePercent: { clicks: 20, impressions: 9.1, ctr: 11.1, position: -9.9 },
     },
     isLoading: false,
-    error: null,
+    error: currentSearchError,
   }),
 }));
 
@@ -266,6 +275,9 @@ function renderFlagged(initialEntry = '/ws/ws-1/analytics-hub') {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  currentWorkspace = workspace;
+  currentSearchOverview = searchOverview;
+  currentSearchError = null;
   getMock.mockResolvedValue([
     { date: '2026-05-01', clicks: 12, impressions: 300, ctr: 4, position: 9 },
     { date: '2026-05-02', clicks: 10, impressions: 280, ctr: 3.6, position: 9.2 },
@@ -392,6 +404,46 @@ describe('SearchTrafficSurface', () => {
 
     expect(await screen.findByRole('radio', { name: /Annotations/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: 'Add annotation' })).toBeInTheDocument();
+  });
+
+  it('keeps provider-independent Annotations CRUD mounted exactly once without analytics providers', async () => {
+    currentWorkspace = { ...workspace, gscPropertyUrl: undefined, ga4PropertyId: undefined };
+    renderSurface('/ws/ws-1/analytics-hub?lens=annotations');
+
+    expect(await screen.findByRole('radio', { name: /Annotations/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getAllByRole('button', { name: 'Add annotation' })).toHaveLength(1);
+  });
+
+  it('keeps Search Performance truthful and Annotations usable for a GA4-only workspace', async () => {
+    currentWorkspace = { ...workspace, gscPropertyUrl: undefined };
+    renderSurface();
+
+    expect(await screen.findByRole('radio', { name: /Search Performance/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('Search Console not configured')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('radio', { name: /Annotations/i }));
+    expect(screen.getAllByRole('button', { name: 'Add annotation' })).toHaveLength(1);
+  });
+
+  it('keeps the lower Search home mounted once when GSC returns no overview', async () => {
+    currentSearchOverview = null;
+    currentSearchError = 'Search Console returned no overview rows';
+    renderSurface();
+
+    expect(await screen.findByText('Search data unavailable')).toBeInTheDocument();
+    expect(screen.getAllByText('Demand mix')).toHaveLength(1);
+    expect(screen.getAllByText('Priority insights')).toHaveLength(1);
+    expect(screen.getByText('Search Console did not return overview data for this window.')).toBeInTheDocument();
+  });
+
+  it('uses blue for branded Demand mix share and click metrics', async () => {
+    renderSurface();
+
+    const brandedShare = within(screen.getByText('branded').parentElement as HTMLElement).getByText('12.5%');
+    const brandedClicks = within(screen.getByText('Branded clicks').parentElement as HTMLElement).getByText('300');
+
+    expect(brandedShare).toHaveStyle({ color: 'var(--blue)' });
+    expect(brandedClicks).toHaveStyle({ color: 'var(--blue)' });
   });
 
   it('meets the a11y floor after skeletons clear', async () => {

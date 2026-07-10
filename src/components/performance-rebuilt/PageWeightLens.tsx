@@ -363,7 +363,7 @@ export function PageWeightLens({ workspaceId, siteId }: PageWeightLensProps) {
         <MetricTile label="Pages with Assets" value={data?.totalPages ?? 0} accent="var(--blue)" />
         <MetricTile label="Total Asset Size" value={formatBytes(data?.totalAssetSize ?? 0)} accent="var(--blue)" />
         <MetricTile label="Heavy Pages" value={heavyPages} sub="Over 2MB" accent={heavyPages > 0 ? 'var(--orange)' : 'var(--emerald)'} />
-        <MetricTile label="Avg Page Weight" value={formatBytes(avgWeight)} accent="var(--teal)" />
+        <MetricTile label="Avg Page Weight" value={formatBytes(avgWeight)} accent="var(--blue)" />
       </div>
 
       {heavyPages > 0 && (

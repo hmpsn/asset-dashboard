@@ -2,7 +2,7 @@
 
 Surface: `analytics-hub` / Search & Traffic  
 Owner: monitoring / analytics reporting  
-Status: `ODP-005 A + C` implemented 2026-07-09; Search-default correction verified
+Status: `ODP-005 A + C` implemented 2026-07-09; Search-default and degraded-provider corrections verified
 Primary route: `/ws/:workspaceId/analytics-hub`
 
 ## Prototype References
@@ -48,6 +48,7 @@ Why:
 
 - The bare route now opens Search performance and exposes exactly three peer reports: Search performance, Site traffic, and Annotations.
 - `Overview` is no longer a visible peer. Its cross-source trend remains available through `?lens=overview`, while Demand mix and Priority insights live in a lower Search report band and mount exactly once in either state.
+- Provider availability is handled per report instead of gating the whole surface. Annotations remains available without GSC or GA4, and Search retains truthful unavailable framing plus the Demand mix / Priority insights home when GSC is unconfigured, empty, or unavailable.
 - Production reporting capabilities, validated date/table state, drawers, annotations, anomaly actions, feature-flag transition, and workspace-event invalidation remain intact.
 
 Accepted direction:
@@ -95,6 +96,9 @@ Keep these capabilities reachable exactly once:
 - Promoted report-window context, table counts, Keyword Hub handoff, Traffic source labels, Demand mix explanation, and collapsed conversion context onto `.t-ui` / `.t-body` roles so important report copy no longer reads as metadata.
 - Made Search performance the bare-route default and reduced the visible report selector to Search performance, Site traffic, and Annotations.
 - Retained `?lens=overview` as a hidden compatibility receiver and moved Demand mix plus Priority insights into a shared lower Search report band without duplicate mounts.
+- Removed the surface-wide provider gate. Annotations now remains independently usable for no-provider and GA4-only workspaces, while each data report owns its own unavailable state.
+- Kept the lower Search context band mounted once for unconfigured GSC and empty/error overview reads, with explicit unavailable copy instead of silently dropping Demand mix and Priority insights.
+- Retinted branded share and branded-click values from teal to blue because they are read-only data, not actions.
 - Canonicalized default/invalid lens URLs without dropping validated `days` or `view` state.
 - Extended component tests for real `useFeatureFlag('ui-rebuild-shell')` loading-to-loaded transition, lens deep links, Breakdowns Drawer exact-once behavior, default conversion evidence, absence of internal labels, workspace-event wiring, and rebuilt a11y.
 
@@ -118,6 +122,14 @@ Typography role result: passed. Fixture-backed smoke confirmed no horizontal ove
 
 Search-default correction smoke: `/tmp/asset-dashboard-codex-parity-captures/wave3-search-focus-smoke-state.json`. The populated bare route showed exactly three visible reports, Demand mix, Priority insights, no horizontal overflow, and no fresh console errors. The `?lens=overview` receiver selected no phantom report and retained the cross-source trend plus both lower-band homes exactly once. Screenshot capture timed out in the in-app browser on the chart-heavy page, so this pass records DOM, URL, layout, and console evidence rather than claiming a new image artifact.
 
+Final audit evidence, 2026-07-09:
+
+- Search performance default: `/tmp/asset-dashboard-codex-parity-captures/search-traffic-final-default.png`.
+- Hidden Overview receiver with unified trend plus Demand mix and Priority insights: `/tmp/asset-dashboard-codex-parity-captures/search-traffic-final-overview-receiver-v2.png`.
+- Final Search / Asset audit state: `/tmp/asset-dashboard-codex-parity-captures/final-search-asset-audit-state.json`.
+
+The populated default and hidden receiver had no horizontal overflow. Component fixtures separately prove no-provider, GA4-only, and empty/error GSC behavior because those provider combinations are not safely mutable in the shared browser workspace.
+
 ## Automated Test Floor
 
 Current branch coverage proves:
@@ -126,6 +138,9 @@ Current branch coverage proves:
 - Bare and invalid routes initialize Search performance; invalid/default lens state canonicalizes without dropping `days` or `view`.
 - Exactly three reporting modes remain visible, and Overview is absent from the selector.
 - `?lens=overview` remains a hidden compatibility receiver with the unified trend, Demand mix, and Priority insights mounted exactly once.
+- No-provider and GA4-only workspaces retain provider-independent Annotations exactly once.
+- Unconfigured and empty/error GSC states retain one truthful lower Search context band instead of losing the accepted receiving homes.
+- Branded share and click values use the blue read-only data token.
 - Internal rebuild/migration/projection/carry-over/cache labels are absent from visible loaded states.
 - The Search Breakdowns Drawer opens exactly once and closes cleanly.
 - Site Traffic shows conversion evidence by default.

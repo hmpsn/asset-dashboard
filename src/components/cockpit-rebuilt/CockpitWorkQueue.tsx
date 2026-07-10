@@ -90,8 +90,8 @@ function EmptyQueueIcon({ className }: { className?: string }) {
   return <Icon name="check" className={className} />;
 }
 
-export function toSelectableWorkStream(stream: CockpitStreamFilter): SelectableWorkStream {
-  return stream === 'send' || stream === 'money' || stream === 'opt' ? stream : 'opt';
+export function toSelectableWorkStream(stream: CockpitStreamFilter): SelectableWorkStream | null {
+  return stream === 'send' || stream === 'money' || stream === 'opt' ? stream : null;
 }
 
 function visibleItems(

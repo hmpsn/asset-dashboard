@@ -8,10 +8,8 @@ import { queryKeys } from '../../lib/queryKeys';
 import { WS_EVENTS } from '../../lib/wsEvents';
 import {
   Button,
-  EmptyState,
   ErrorState,
   FormSelect,
-  Icon,
   LensSwitcher,
   PageHeader,
   Skeleton,
@@ -52,10 +50,6 @@ const DATE_OPTIONS = [
   { value: '365', label: '1 year' },
   { value: '480', label: '16 months' },
 ];
-
-function SurfaceIcon({ className }: { className?: string }) {
-  return <Icon as={BarChart3} className={className} />;
-}
 
 export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps) {
   const queryClient = useQueryClient();
@@ -156,8 +150,6 @@ export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps)
     );
   }
 
-  const hasAnyIntegration = !!gscPropertyUrl || !!ga4PropertyId;
-
   return (
     <div className="flex min-h-full flex-col gap-5">
       <PageHeader
@@ -194,15 +186,7 @@ export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps)
         />
       </Toolbar>
 
-      {!hasAnyIntegration && (
-        <EmptyState
-          icon={SurfaceIcon}
-          title="Connect analytics providers"
-          description="Connect Search Console or GA4 in Workspace Settings to populate this surface."
-        />
-      )}
-
-      {hasAnyIntegration && state.lens === 'overview' && (
+      {state.lens === 'overview' && (
         <OverviewLens
           workspaceId={workspaceId}
           siteId={siteId}
@@ -213,7 +197,7 @@ export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps)
         />
       )}
 
-      {hasAnyIntegration && state.lens === 'search' && (
+      {state.lens === 'search' && (
         <SearchLens
           workspaceId={workspaceId}
           data={searchData}
@@ -224,7 +208,7 @@ export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps)
         />
       )}
 
-      {hasAnyIntegration && state.lens === 'traffic' && (
+      {state.lens === 'traffic' && (
         <TrafficLens
           workspaceId={workspaceId}
           ga4PropertyId={ga4PropertyId}
@@ -234,7 +218,7 @@ export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps)
         />
       )}
 
-      {hasAnyIntegration && state.lens === 'annotations' && (
+      {state.lens === 'annotations' && (
         <AnnotationsLens workspaceId={workspaceId} />
       )}
 

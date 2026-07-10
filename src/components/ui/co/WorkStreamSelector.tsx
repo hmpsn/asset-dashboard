@@ -19,7 +19,7 @@ export interface WorkStreamOption {
 
 export interface WorkStreamSelectorProps {
   options: WorkStreamOption[];
-  value: SelectableWorkStream;
+  value: SelectableWorkStream | null;
   onChange: (value: SelectableWorkStream) => void;
   ariaLabel?: string;
   className?: string;

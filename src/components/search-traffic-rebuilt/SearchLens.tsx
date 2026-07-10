@@ -142,14 +142,33 @@ export function SearchLens({ workspaceId, data, tableMode, onTableModeChange, on
   const strategyKeywords = useMemo(() => new Set((strategySet.data?.keywords ?? []).map((item) => item.keyword.toLowerCase())), [strategySet.data?.keywords]);
   const badgeMap = useMemo(() => buildBadgeMap(feed), [feed]);
   const [showAllInsights, setShowAllInsights] = useState(false);
+  const contextBand = (
+    <SearchContextBand
+      workspaceId={workspaceId}
+      brandedDemand={data.overview?.brandedDemand}
+      feed={feed}
+      summary={summary}
+      loading={feedLoading}
+      unavailableMessage={
+        !configured
+          ? 'Connect Search Console to calculate demand mix.'
+          : !data.overview
+            ? 'Search Console did not return overview data for this window.'
+            : undefined
+      }
+    />
+  );
 
   if (!configured) {
     return (
-      <EmptyState
-        icon={Search}
-        title="Search Console not configured"
-        description="Select a Search Console property in Workspace Settings to view search performance."
-      />
+      <div className="flex flex-col gap-4">
+        <EmptyState
+          icon={Search}
+          title="Search Console not configured"
+          description="Select a Search Console property in Workspace Settings to view search performance."
+        />
+        {contextBand}
+      </div>
     );
   }
 
@@ -166,11 +185,16 @@ export function SearchLens({ workspaceId, data, tableMode, onTableModeChange, on
 
   if (!data.overview) {
     return (
-      <EmptyState
-        icon={Search}
-        title="No search data"
-        description="Search Console did not return overview rows for this workspace and window."
-      />
+      <div className="flex flex-col gap-4">
+        <EmptyState
+          icon={Search}
+          title={data.error ? 'Search data unavailable' : 'No search data'}
+          description={data.error
+            ? `${data.error}. Search Console did not return overview data for this window.`
+            : 'Search Console did not return overview rows for this workspace and window.'}
+        />
+        {contextBand}
+      </div>
     );
   }
 
@@ -316,13 +340,7 @@ export function SearchLens({ workspaceId, data, tableMode, onTableModeChange, on
         empty={<EmptyState icon={Search} title={tableMode === 'queries' ? 'No queries' : 'No pages'} description="No row-level Search Console data returned for this window." />}
       />
 
-      <SearchContextBand
-        workspaceId={workspaceId}
-        brandedDemand={data.overview.brandedDemand}
-        feed={feed}
-        summary={summary}
-        loading={feedLoading}
-      />
+      {contextBand}
     </div>
   );
 }

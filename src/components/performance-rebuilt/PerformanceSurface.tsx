@@ -10,7 +10,6 @@ interface PerformanceSurfaceProps {
   workspaceId: string;
 }
 
-const HEADER_WRAP_CLASS = 'flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible [&_p]:text-clip';
 const PERFORMANCE_SUBTITLE = 'Page weight and Core Web Vitals. Heavy pages fix in Asset Manager.';
 
 export function PerformanceSurface({ workspaceId }: PerformanceSurfaceProps) {
@@ -38,7 +37,7 @@ export function PerformanceSurface({ workspaceId }: PerformanceSurfaceProps) {
         <PageHeader
           title="Performance"
           subtitle={PERFORMANCE_SUBTITLE}
-          className={HEADER_WRAP_CLASS}
+          variant="rebuilt-admin"
         />
         <ErrorState
           type="data"
@@ -57,7 +56,7 @@ export function PerformanceSurface({ workspaceId }: PerformanceSurfaceProps) {
         <PageHeader
           title="Performance"
           subtitle={PERFORMANCE_SUBTITLE}
-          className={HEADER_WRAP_CLASS}
+          variant="rebuilt-admin"
         />
         <ErrorState
           type="permission"
@@ -74,7 +73,7 @@ export function PerformanceSurface({ workspaceId }: PerformanceSurfaceProps) {
       <PageHeader
         title="Performance"
         subtitle={PERFORMANCE_SUBTITLE}
-        className={HEADER_WRAP_CLASS}
+        variant="rebuilt-admin"
       />
 
       <Toolbar label="Performance view controls" className="w-full">

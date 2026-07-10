@@ -82,7 +82,7 @@ Current route/state behavior:
 - `?search=<query>` hydrates the search field.
 - Fix-context navigation can open the matching row when page slug or page id matches.
 
-Recommended parity direction, if approved:
+Later owner-gated parity direction:
 
 - Keep all current URL params valid.
 - Keep `?tab=edit` as the fast-wide worksheet mode and `?tab=research` as a deep per-page focus mode.
@@ -125,7 +125,7 @@ Risk if wrong:
 - Implementing the queue/workbench without approval could change how operators save, send, approve, and publish SEO edits, which is a high-trust production workflow.
 - Keeping the current shell leaves the largest prototype mismatch unresolved and risks a surface that looks cleaner but still does not match the prototype's operating model.
 
-Safe work completed while awaiting decision:
+Pre-decision safe work completed:
 
 - Visible raw URL enum labels such as `cms-item` and `needs-meta` were replaced with operator-facing labels in the worksheet summary.
 - Visible implementation phrases such as `existing`, `server-backed`, `endpoint`, `v1`, `PATCH route`, and `projection` were removed from the loaded worksheet and detail drawer.
@@ -135,7 +135,7 @@ Safe work completed while awaiting decision:
 - The rebuilt admin hook now reads recommendations through the admin recommendations endpoint, so SEO Editor smoke no longer hits the client-gated public recommendations route.
 - Styleguide typography roles now distinguish primary workbench content from metadata: worksheet counts and primary page/SEO values use `t-ui`, secondary summaries use `t-caption`, drawer/research guidance uses `t-body`, and field labels use `t-label`.
 
-Safe work still available while awaiting decision:
+Later low-risk polish:
 
 - More responsive polish for table controls and drawer footer actions.
 - Better detail-pane copy and handoff buttons using existing routes, as long as the workbench model is not implied before it exists.
@@ -160,7 +160,7 @@ Current-state smoke evidence:
 - Detail drawer smoke captured at `/tmp/asset-dashboard-codex-parity-captures/seo-editor-estateably-detail-current.png`; state file `/tmp/asset-dashboard-codex-parity-captures/seo-editor-estateably-detail-state.json` recorded one dialog, no internal labels, no page-level horizontal overflow, no console errors, and no failed responses.
 - Typography-role smoke captured against `ws_1772610244629` at `/tmp/asset-dashboard-codex-parity-captures/seo-editor-typography-role-overview-desktop.png` and `/tmp/asset-dashboard-codex-parity-captures/seo-editor-typography-role-detail-desktop.png`; state file `/tmp/asset-dashboard-codex-parity-captures/seo-editor-typography-role-smoke-state.json` recorded 145 loaded rows, one detail dialog, no page-level horizontal overflow, no internal labels, `t-ui` row status at 13.5px/500, and `t-body` copy at 15.5px/500. Local preview console noise was limited to Vite WebSocket disconnect warnings plus a route-change-aborted intelligence refresh.
 
-Post-correction smoke, if the workbench/queue direction is approved:
+Later full-workbench smoke, after inline editing/review queue approval:
 
 - Desktop workbench with source-grouped spreadsheet rows.
 - Mobile workbench with controls readable and no page-level horizontal overflow outside the intended table scroll.

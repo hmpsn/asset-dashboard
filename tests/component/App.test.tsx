@@ -228,11 +228,11 @@ vi.mock('../../src/components/layout/RebuiltAppChrome', () => ({
     onFocusModeChange,
   }: {
     children: React.ReactNode;
-    selected: { id: string };
+    selected: { id: string } | null;
     focusMode?: boolean;
     onFocusModeChange?: (focusMode: boolean) => void;
   }) => (
-    <div data-testid="rebuilt-app-chrome" data-selected-workspace={selected.id} data-focus-mode={String(focusMode)}>
+    <div data-testid="rebuilt-app-chrome" data-selected-workspace={selected?.id ?? 'none'} data-focus-mode={String(focusMode)}>
       <button type="button" onClick={() => onFocusModeChange?.(!focusMode)}>Toggle rebuilt focus</button>
       {children}
     </div>
@@ -325,8 +325,7 @@ vi.mock('../../src/api/client', () => ({
   getOptional: vi.fn().mockResolvedValue(null),
 }));
 
-const mockWorkspaces = [
-  {
+const defaultMockWorkspace = {
     id: 'ws-1',
     name: 'Acme',
     folder: 'acme',
@@ -337,8 +336,9 @@ const mockWorkspaces = [
     ga4PropertyId: null,
     businessProfile: null,
     intelligenceProfile: null,
-  },
-];
+};
+
+const mockWorkspaces = [{ ...defaultMockWorkspace }];
 
 vi.mock('../../src/hooks/admin', () => ({
   useWorkspaces: () => ({ data: mockWorkspaces }),
@@ -395,6 +395,7 @@ beforeEach(() => {
   mockAuthState.required = false;
   mockAuthState.authenticated = true;
   rebuildShellMock.enabled = false;
+  mockWorkspaces.splice(0, mockWorkspaces.length, { ...defaultMockWorkspace });
 });
 
 // ── AdminApp auth states ──────────────────────────────────────────────────────
@@ -601,6 +602,26 @@ describe('Dashboard content rendering', () => {
     await waitFor(() => expect(screen.getByTestId('rebuilt-app-chrome')).toHaveAttribute('data-selected-workspace', 'ws-1'));
     await waitFor(() => expect(screen.getByTestId('global-settings-rebuilt')).toBeInTheDocument());
     expect(screen.getByTestId('global-settings-rebuilt')).toHaveAttribute('data-workspace-id', 'ws-1');
+    expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument();
+  });
+
+  it('mounts rebuilt global Settings when no workspace exists', async () => {
+    rebuildShellMock.enabled = true;
+    mockWorkspaces.splice(0, mockWorkspaces.length);
+    const { Dashboard } = await import('../../src/App');
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/settings']}>
+          <Routes>
+            <Route path="/*" element={<Dashboard onLogout={vi.fn()} theme="dark" toggleTheme={vi.fn()} />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('rebuilt-app-chrome')).toHaveAttribute('data-selected-workspace', 'none'));
+    expect(screen.getByTestId('global-settings-rebuilt')).toHaveAttribute('data-workspace-id', '');
     expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument();
   });
 

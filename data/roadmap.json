@@ -1,6 +1,47 @@
 {
   "sprints": [
     {
+      "id": "sprint-ui-rebuild-parity-recovery-2026-07-09",
+      "name": "UI Rebuild - prototype parity recovery and staged extraction",
+      "hours": "phased - isolated integration sandbox, then one staging PR per dependency",
+      "rationale": "Use Cockpit and the hmpsn studio prototype as behavior-first calibration surfaces. Prove interaction, routing, capability homes, typography, navigation, and desktop composition in an isolated flag-gated branch before extracting small staging PRs. Integration acceptance is not production shipment.",
+      "items": [
+        {
+          "id": "ui-rebuild-parity-integration-sandbox",
+          "title": "Prototype parity integration sandbox - calibrated surfaces, route census, and browser evidence",
+          "source": "Sol-orchestrated parallel UI parity sweep 2026-07-09",
+          "est": "phased",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-09",
+          "owner": "workspace-command-center",
+          "notes": "Completed 2026-07-09 in the isolated codex/ui-prototype-alignment branch. The sandbox contains the reviewed integration cohorts for Cockpit calibration, Insights Engine, Brand & AI, Content Pipeline, SEO Editor, Site Audit, Search & Traffic, shell focus/Page Rewriter, Performance and Site Audit repair senders, Asset Manager, Global Ops corrections, route accounting, and the opt-in rebuilt-admin PageHeader pilot. Nine focused suites pass 120 tests; the branch-wide run passes 28,525 tests across 2,033 files; hooks lint, typecheck, Vite build, pr-check, deferred-ledger verification, browser smoke, and diff hygiene pass. A fresh independent Sol Ultra acceptance review returned PASS. This records integration acceptance only, not staging or production shipment."
+        },
+        {
+          "id": "ui-rebuild-parity-staging-extraction",
+          "title": "Extract parity integration into dependency-ordered staging PRs",
+          "source": "docs/ui-rebuild/parity/shipping-manifest.md",
+          "est": "phased",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-07-09",
+          "owner": "workspace-command-center",
+          "notes": "Start each shipping branch from staging and extract governance, typography authority, shell/nav, Brand & AI, then one behavior or capability surface per PR. Merge and verify each prerequisite before opening dependents. Do not open the integration sandbox itself as one giant PR."
+        },
+        {
+          "id": "ui-rebuild-engine-owner-visual-recheck",
+          "title": "Insights Engine owner visual re-review against the prototype",
+          "source": "ODP-001 circle-back trigger",
+          "est": "S",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-07-09",
+          "owner": "workspace-command-center",
+          "notes": "The single-spine interaction contract and independent reviews pass, but Joshua explicitly flagged that the result still did not mirror the prototype closely enough. Re-review the latest overview, Changes, Signals, Moves, Operations, and client-preview captures before treating ODP-001 as owner-accepted visual parity."
+        }
+      ]
+    },
+    {
       "id": "sprint-seo-decision-engine-2026-06-23",
       "name": "SEO Decision Engine — close the data→decision gap (8-phase program)",
       "hours": "TBD — phased, one PR per phase, staging-first",

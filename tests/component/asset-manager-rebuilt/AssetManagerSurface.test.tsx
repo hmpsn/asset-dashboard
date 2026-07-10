@@ -8,6 +8,7 @@ import { AssetManagerSurface } from '../../../src/components/asset-manager-rebui
 import { ToastProvider } from '../../../src/components/Toast';
 import { useFeatureFlag } from '../../../src/hooks/useFeatureFlag';
 import { queryKeys } from '../../../src/lib/queryKeys';
+import { formatBytes } from '../../../src/utils/formatNumbers';
 import type { CmsImageScanResult } from '../../../shared/types/cms-images';
 import { expectNoA11yViolations } from '../a11y';
 
@@ -163,6 +164,12 @@ function LocationProbe() {
   return <span data-testid="location-search" hidden>{location.search}</span>;
 }
 
+function metricTile(label: string): HTMLElement {
+  const tile = screen.getByText(label, { selector: 'span.t-caption' }).parentElement?.parentElement;
+  if (!tile) throw new Error(`Metric tile not found for ${label}`);
+  return tile;
+}
+
 function FlaggedAssetManager() {
   const enabled = useFeatureFlag('ui-rebuild-shell');
   return enabled ? <AssetManagerSurface workspaceId="ws-1" /> : <div data-testid="legacy-media">Legacy Media</div>;
@@ -252,6 +259,36 @@ describe('AssetManagerSurface', () => {
     expect(screen.queryByRole('button', { name: /Run Asset Audit/i })).not.toBeInTheDocument();
   });
 
+  it('maps the prototype All filter to the canonical no-filter URL state', async () => {
+    renderSurface('/ws/ws-1/media?filter=oversized');
+
+    const filters = await screen.findByLabelText('Browse asset filters');
+    const all = within(filters).getByRole('button', { name: /^All\s*2$/i });
+    expect(all).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(all);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-search')).toBeEmptyDOMElement();
+    });
+    expect(within(filters).getByRole('button', { name: /^All\s*2$/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('hero.jpg')).toBeInTheDocument();
+    expect(screen.getByText('logo.svg')).toBeInTheDocument();
+  });
+
+  it('renders the prototype weight and estimate metrics as read-only blue data', async () => {
+    renderSurface('/ws/ws-1/media');
+
+    expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument();
+
+    const totalWeight = metricTile('Total media weight');
+    expect(within(totalWeight).getByText(formatBytes(912_000))).toHaveStyle({ color: 'var(--blue)' });
+    expect(within(metricTile('Assets')).getByText('2')).toBeInTheDocument();
+
+    const potentialSavings = metricTile('Potential savings');
+    expect(within(potentialSavings).getByText(formatBytes(495_000))).toHaveStyle({ color: 'var(--blue)' });
+  });
+
   it('frames Browse as the prototype source-fix workshop with readable proof copy', async () => {
     renderSurface('/ws/ws-1/media');
 
@@ -275,6 +312,8 @@ describe('AssetManagerSurface', () => {
     const repairResults = screen.getByRole('region', { name: 'Repair results' });
     expect(within(repairResults).getByRole('button', { name: /Run Asset Audit/i })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Run Asset Audit/i })).toHaveLength(1);
+    expect(repairResults.compareDocumentPosition(screen.getByLabelText('Asset grid')) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     fireEvent.click(within(repairResults).getByRole('button', { name: 'Close repair results' }));
     await waitFor(() => {
@@ -351,6 +390,22 @@ describe('AssetManagerSurface', () => {
     expect(await screen.findByRole('dialog', { name: 'Upload assets' })).toBeInTheDocument();
     expect(screen.getByLabelText('Browse asset filters')).toBeInTheDocument();
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
+  });
+
+  it('gives a valid asset deep link precedence over Upload and clears the conflict when closed', async () => {
+    renderSurface('/ws/ws-1/media?tab=upload&asset=asset-hero');
+
+    const assetDrawer = await screen.findByRole('dialog', { name: /hero\.jpg/i });
+    expect(screen.queryByRole('dialog', { name: 'Upload assets' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+
+    fireEvent.click(within(assetDrawer).getByRole('button', { name: 'Close' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-search')).toBeEmptyDOMElement();
+    });
+    expect(screen.queryAllByRole('dialog')).toHaveLength(0);
+    expect(screen.getByLabelText('Browse asset filters')).toBeInTheDocument();
   });
 
   it('keeps internal implementation language out of the audit score fallback', async () => {

@@ -195,9 +195,10 @@ Consistent top section for every page/tab.
 └──────────────────────────────────────────────────────┘
 ```
 
-- Title: `.t-h2 text-[var(--brand-text-bright)]`
-- Subtitle: `.t-caption-sm text-[var(--brand-text-muted)] mt-0.5`
-- Actions area: right-aligned flex row
+- Default title: `.t-h2 text-[var(--brand-text-bright)] truncate`
+- Default subtitle: `.t-caption-sm text-[var(--brand-text-muted)] mt-0.5 truncate`
+- `variant="rebuilt-admin"` is opt-in for rebuilt page-level headers: semantic `h2` with `.t-h1`, body-scale `.t-body` subtitle, natural wrapping, and wrapping actions. It does not change the default DOM or classes.
+- Actions area: right-aligned flex row by default; wrapping flex row in `rebuilt-admin`
 - No container (sits directly in page flow with `space-y-5` gap)
 
 ### 4. SectionCard

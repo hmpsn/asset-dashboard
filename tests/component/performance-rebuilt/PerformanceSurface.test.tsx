@@ -231,11 +231,20 @@ describe('PerformanceSurface rebuilt admin surface', () => {
     expect(screen.getByRole('radio', { name: /Page Weight/i })).toHaveAttribute('aria-checked', 'true');
   });
 
+  it('pilots the rebuilt admin page-header hierarchy', async () => {
+    renderSurface('/ws/ws-1/performance');
+
+    expect(await screen.findByRole('heading', { name: 'Performance', level: 2 })).toHaveClass('t-h1');
+    expect(screen.getByText('Page weight and Core Web Vitals. Heavy pages fix in Asset Manager.')).toHaveClass('t-body');
+  });
+
   it('receives the Page Weight deep link and supports search, source filtering, and detail inspection', async () => {
     renderSurface('/ws/ws-1/performance?tab=weight');
 
     expect(await screen.findByRole('radio', { name: /Page Weight/i })).toHaveAttribute('aria-checked', 'true');
     expect(await screen.findByText('Pages with Assets')).toBeInTheDocument();
+    const averageWeightTile = screen.getByText('Avg Page Weight').parentElement?.parentElement;
+    expect(averageWeightTile?.querySelector('.t-stat')).toHaveStyle({ color: 'var(--blue)' });
     expect(screen.getByText('page:/services')).toBeInTheDocument();
     expect(screen.getByText(/Last scanned Jul 6, 2026/)).toBeInTheDocument();
     expect(screen.getByText('Open Asset Manager to repair oversized files at the source before re-scanning.')).toHaveClass('t-body');

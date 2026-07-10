@@ -52,6 +52,7 @@ Prototype-critical overlays:
 - `/ws/:workspaceId` opens the Cockpit default overview.
 - `/ws/:workspaceId/home` remains a compatible route shape where the router produces it.
 - Cockpit must not overload top-level `?tab=` for stream filters. Use a separate query param such as `stream=opt|send|money|unclassified` if stream state becomes URL-addressable.
+- `stream=unclassified` is the Risk receiver: it filters the queue to Risk, presses the Risk chip, and leaves all three primary stream cards unselected. `stream=all` likewise leaves the primary cards unselected rather than falsely marking Optimizations active.
 - Existing outbound links keep the two-halves contract:
   - Client requests: `requests?tab=requests`
   - Content decay: `content-pipeline?tab=content-health`
@@ -86,6 +87,7 @@ Local captures from this recovery branch:
 - Desktop overview after typography-role cleanup: `/tmp/asset-dashboard-codex-parity-captures/cockpit-typography-role-desktop.png`
 - Desktop send-stream after typography-role cleanup: `/tmp/asset-dashboard-codex-parity-captures/cockpit-typography-role-send-stream-desktop.png`
 - Typography smoke state: `/tmp/asset-dashboard-codex-parity-captures/cockpit-typography-role-smoke-state.json`
+- Risk receiver after the final calibrated-surface audit: `/tmp/asset-dashboard-codex-parity-captures/cockpit-risk-stream-final.png`
 
 Resolved smoke findings:
 
@@ -95,6 +97,7 @@ Resolved smoke findings:
 - Work orders open as exactly one carried-over legacy full-screen modal. This is intentionally accepted as the current carry-over shell rather than wrapping `WorkOrderPanel` in a second drawer.
 - Browser smoke found no horizontal overflow, blank loaded panel, duplicate overlay, internal migration labels, or console errors.
 - Typography smoke found no horizontal overflow, no visible internal labels, no raw pixel text classes in the rebuilt Cockpit path, and sampled `.t-h1`, `.t-body`, `.t-ui`, and `.t-stat-sm` nodes computed at the expected styleguide sizes. Follow-up shell smoke also confirmed sidebar group headers use `.t-label`, breadcrumbs use `.t-ui`, stream-card descriptions use `.t-body`, and no substantive visible text below 13px remains outside true label/mono/initial cases. The local preview emitted websocket/auth notification noise while the backend stack was not attached; no Cockpit render failure was observed.
+- Final Risk-receiver smoke confirms all three primary stream radios are unchecked, the Risk queue chip is pressed, only Risk rows remain, and the page has no horizontal overflow.
 
 No open Cockpit smoke gaps remain for the current fixture set.
 
@@ -104,6 +107,7 @@ Required component coverage:
 
 - `ui-rebuild-shell` real hook loading-to-loaded transition mounts Cockpit shell.
 - Stream selector changes the active stream without losing the work queue.
+- The Risk compatibility deep link keeps the primary selector truthful and the source-level `Client risk` filter distinct from the stream filter.
 - Activity action opens the activity drawer.
 - Work-order row opens the carried-over work-order modal exactly once.
 - Key outbound deep links initialize their destination state.

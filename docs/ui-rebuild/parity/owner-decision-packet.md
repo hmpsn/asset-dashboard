@@ -164,6 +164,8 @@ Risk if wrong: hiding Overview too aggressively can lose cross-source diagnostic
 
 Implementation guardrail: give Demand mix and Priority insights tested receiving homes in the same slice before removing Overview from visible peer navigation.
 
+Final audit log, 2026-07-09: the first receiving-home implementation passed with populated GSC data but dropped the lower band in unconfigured and empty/error GSC states, and a surface-wide provider gate also hid provider-independent Annotations. The accepted correction handles availability per report, retains one truthful Demand mix / Priority insights band for degraded Search states, keeps Annotations available without analytics providers, and uses blue for branded read-only data. This resolves the `ODP-005` capability-home review without restoring Overview as a peer.
+
 ### ODP-006 Media Single Workshop
 
 Surface: `media` / Assets
@@ -182,6 +184,8 @@ Recommendation: choose B or C. Media has direct repair/upload/delete workflows, 
 Risk if wrong: collapsing too early may obscure audit and upload workflows; keeping the split means the surface remains behaviorally off-prototype.
 
 Implementation guardrail: phase the workshop and prove Upload, Audit, delete, detail, and repair handoffs before removing their compatibility receivers.
+
+Final audit log, 2026-07-09: the `ODP-006` discoverability trigger fired because Repair results was appended after the complete asset grid. Owner judgment is now locked: Repair results stays above filters, metrics, and the grid as the first work area while Browse remains visible below. The same correction adds the prototype-visible All and Total media weight controls, uses blue for savings estimates, and gives a valid asset deep link precedence over Upload so combined params never mount two Drawers. Browser smoke proved the repair-first order and canonical close behavior; peer tabs remain removed.
 
 ## Capability Decisions
 
@@ -242,6 +246,8 @@ Risk if wrong: aggressive collapse can hide billing, diagnostics, storage, reque
 
 Implementation guardrail: keep route receiver polish, operator copy cleanup, and smoke coverage additive. Destructive or billing workflows require their own explicit contract before moving.
 
+Implementation log, 2026-07-09: the final calibrated-surface audit enforced the accepted boundary rather than expanding it. Requests no longer advertises a future strategy handoff; Outcomes Book removed React-created portfolio totals and keeps server-owned workspace rows/coverage only; global rebuilt routes now mount even when the account has zero workspaces. `GO-004` remains open only for a future server-owned portfolio rollup.
+
 ## Design System Decisions
 
 ### ODP-010 Rebuilt Page-Header Typography Scale
@@ -249,9 +255,9 @@ Implementation guardrail: keep route receiver polish, operator copy cleanup, and
 Surface family: all rebuilt admin surfaces
 Contract: `DESIGN_SYSTEM.md` PageHeader, `docs/ui-rebuild/parity/README.md` Typography Calibration
 
-Accepted decision: **C as a rebuilt-admin variant pilot**; the side-by-side evidence gate remains required before broad migration.
+Accepted decision: **C as a rebuilt-admin variant pilot**; the Performance pilot is implemented, and the side-by-side evidence gate remains required before broad migration.
 
-Current finding: the live preview is using the documented styleguide scale. `PageHeader` titles render at `.t-h2` / 22px and subtitles at `.t-caption-sm` / 13.5px; body roles render at `.t-body` / 15.5px and `.t-ui` / 13.5px. That is styleguide-compliant, but the prototype may read larger because its first-viewport hierarchy appears closer to `.t-h1` / 28px plus body-scale context.
+Current finding: the compact default remains styleguide-compliant at `.t-h2` / 22px plus `.t-caption-sm` / 13.5px. The opt-in Performance pilot renders a semantic `h2` at `.t-h1` / 28px and its subtitle at `.t-body` / 15.5px with natural wrapping. In-browser computed evidence shows no horizontal overflow or fresh console errors; a visual side-by-side still decides whether other rebuilt surfaces adopt it.
 
 Options:
 
@@ -259,7 +265,7 @@ Options:
 - B. Change the default `PageHeader` title/subtitle scale app-wide to match the prototype more closely.
 - C. Recommended if the prototype truly needs stronger hierarchy: add an approved rebuilt-admin/header variant that uses `.t-h1` for page titles and body-scale subtitle/context copy, then migrate rebuilt surfaces intentionally.
 
-Recommendation: choose C only after reviewing a side-by-side screenshot against the prototype. The current styleguide scale is correct by contract; the open question is whether the prototype is asking for a stronger header pattern than the existing primitive provides.
+Recommendation: keep the Performance pilot, review it beside the prototype, and migrate no additional surfaces until that evidence confirms the stronger hierarchy improves orientation without harming density.
 
 Risk if wrong: choosing B can make legacy admin pages unexpectedly oversized; choosing A may leave rebuilt pages technically compliant but still visually underpowered; one-off per-surface overrides would reintroduce typography drift.
 
@@ -289,7 +295,7 @@ Contract: `docs/ui-rebuild/parity/coverage-audit.md`
 
 Accepted decision: **B**, subject to the `ODP-012` receiving-home review above.
 
-Current finding: both routes are standalone `NAV_REGISTRY` entries and real `Page` values, but neither is mounted in `REBUILT_SURFACES`. They are therefore accounted for by route/nav tests, but not by rebuilt parity contracts or browser smoke.
+Current finding: both routes remain standalone `NAV_REGISTRY` entries and real `Page` values, and neither is mounted in `REBUILT_SURFACES`. Content Pipeline Published now consumes the existing content-performance readback and gives that evidence a prototype-aligned proof-queue home, so it is the proposed receiving surface for `content-perf`; the standalone route remains intact until a shipping slice proves every report and deep link. Page Intelligence remains standalone because the current SEO Editor Research Drawer has not yet proved every analyze, edit, job, and handoff capability.
 
 Options:
 
@@ -297,11 +303,13 @@ Options:
 - B. Recommended for prototype parity review: decide whether Page Intelligence belongs inside SEO Editor / Insights Engine, and whether Content Perf belongs inside Content Pipeline Published / Analytics Hub, then preserve old route ids as compatibility receivers.
 - C. Keep both legacy for now and mark them out of scope for the rebuilt parity sweep.
 
-Recommendation rationale: the prototype appears to consolidate page-level intelligence into adjacent workbench/spine experiences and published content performance into readback/reporting workflows. Exact receiving homes still must be named in the parent contracts before route behavior changes.
+Recommendation rationale: the prototype consolidates published-content evidence into the lifecycle/readback workflow, and Content Pipeline now has that truthful home using existing data. Page Intelligence is a higher-risk fold because its analysis and handoff surface is broader than the current Research Drawer. Preserve both standalone routes while these receiving homes are proved rather than redirecting on visual similarity alone.
 
 Risk if wrong: standalone rebuilds may perpetuate prototype drift; aggressive folding may bury workflows operators still use directly.
 
-Implementation guardrail: do not build standalone visual rewrites. Keep route/nav accounting explicit and preserve both route ids until their parent surfaces pass staging smoke.
+Implementation guardrail: do not build standalone visual rewrites or add redirects in this integration branch. Keep route/nav accounting explicit and preserve both route ids until a surface-scoped shipping PR proves exact capability and deep-link coverage on staging.
+
+Implementation log, 2026-07-09: Content Pipeline Published is accepted as the proposed Content Performance receiver because its proof queue already reads the shared content-performance data; `/content-perf` remains a standalone production route. Page Intelligence remains standalone until a later SEO Editor Research/detail slice proves its complete workflow. No route id, registry entry, or redirect changed.
 
 ## Optional Later Decisions
 
@@ -314,4 +322,4 @@ These aligned-enough defaults were accepted on 2026-07-09 and should not block t
 
 ## Next Implementation Slice
 
-Start with `ODP-001`: update the Insights Engine contract and tests first, confirm the intended red failure, implement the smallest single-spine correction, run the targeted test plus `npm run lint:hooks`, `npm run typecheck`, `npx vite build`, and `npm run pr-check`, then browser-smoke desktop, overlay/open state, and deep link. Mobile remains a regression floor rather than a visual-parity priority for this product.
+Complete the registry-wide final audit and extract reviewed work into the shipping manifest. Insights Engine remains an explicit owner visual circle-back even though its behavior contract passed; Page Intelligence and the standalone Content Performance route remain protected until later surface-scoped shipping slices prove their receiving homes.

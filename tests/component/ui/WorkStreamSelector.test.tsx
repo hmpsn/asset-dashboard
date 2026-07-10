@@ -24,4 +24,13 @@ describe('WorkStreamSelector', () => {
 
     await expectNoA11yViolations(container);
   });
+
+  it('allows compatibility filters to leave every primary stream unselected', () => {
+    render(<WorkStreamSelector options={options} value={null} onChange={vi.fn()} />);
+
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+    screen.getAllByRole('radio').forEach((radio) => {
+      expect(radio).toHaveAttribute('aria-checked', 'false');
+    });
+  });
 });

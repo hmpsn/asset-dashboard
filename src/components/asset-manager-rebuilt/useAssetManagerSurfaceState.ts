@@ -76,6 +76,7 @@ export interface UseAssetManagerSurfaceStateReturn {
   setLens: (lens: AssetManagerLens) => void;
   browseFilters: Set<BrowseFilter>;
   toggleBrowseFilter: (filter: BrowseFilter) => void;
+  showAllBrowseAssets: () => void;
   clearBrowseFilters: () => void;
   auditFilter: AuditIssueFilter | null;
   setAuditFilter: (filter: AuditIssueFilter | null) => void;
@@ -164,6 +165,10 @@ export function useAssetManagerSurfaceState(): UseAssetManagerSurfaceStateReturn
     setSearchInput('');
   }, [updateParams]);
 
+  const showAllBrowseAssets = useCallback(() => {
+    updateParams({ filter: null });
+  }, [updateParams]);
+
   const setAuditFilter = useCallback((filter: AuditIssueFilter | null) => {
     updateParams({ filter });
   }, [updateParams]);
@@ -185,8 +190,8 @@ export function useAssetManagerSurfaceState(): UseAssetManagerSurfaceStateReturn
   }, [updateParams]);
 
   const closeAsset = useCallback(() => {
-    updateParams({ asset: null }, false);
-  }, [updateParams]);
+    updateParams(lens === 'upload' ? { asset: null, tab: null } : { asset: null }, false);
+  }, [lens, updateParams]);
 
   const clearAll = useCallback(() => {
     setSearchInput('');
@@ -200,6 +205,7 @@ export function useAssetManagerSurfaceState(): UseAssetManagerSurfaceStateReturn
     setLens,
     browseFilters,
     toggleBrowseFilter,
+    showAllBrowseAssets,
     clearBrowseFilters,
     auditFilter,
     setAuditFilter,
@@ -235,6 +241,7 @@ export function useAssetManagerSurfaceState(): UseAssetManagerSurfaceStateReturn
     setLens,
     setSearchInput,
     setView,
+    showAllBrowseAssets,
     toggleBrowseFilter,
     view,
   ]);

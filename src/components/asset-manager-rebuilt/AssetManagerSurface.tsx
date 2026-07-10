@@ -30,7 +30,6 @@ import {
   Toolbar,
   ToolbarSpacer,
   Tooltip,
-  scoreColor,
 } from '../ui';
 import { formatBytes } from '../../utils/formatNumbers';
 import { AssetDrawer } from './AssetDrawer';
@@ -278,6 +277,7 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
     ?? webflowAssets.find((asset) => asset.id === state.selectedAssetId)
     ?? cmsAssets.find((asset) => asset.id === state.selectedAssetId)
     ?? null;
+  const assetDetailOpen = selectedAsset !== null;
 
   useEffect(() => {
     if (!selectedAsset) return;
@@ -839,8 +839,42 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
         </InlineBanner>
       )}
 
+      {state.lens === 'audit' && (
+        <section aria-labelledby="asset-repair-results-title" className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 id="asset-repair-results-title" className="t-page text-[var(--brand-text-bright)]">Repair results</h3>
+              <p className="mt-1 t-caption text-[var(--brand-text-muted)]">Review and resolve media issues without leaving the asset library.</p>
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => state.setLens('browse')}>
+              Close repair results
+            </Button>
+          </div>
+          <AuditLens
+            siteId={siteId}
+            workspaceId={workspaceId}
+            search={state.search}
+            searchInput={state.searchInput}
+            onSearchChange={state.setSearchInput}
+            activeFilter={state.auditFilter}
+            onFilterChange={state.setAuditFilter}
+            sort={state.auditSort}
+            onSortChange={state.setAuditSort}
+            quotaLocked={quotaLocked}
+            quotaReason={quotaReason}
+            onQuotaHit={markQuotaHit}
+          />
+        </section>
+      )}
+
       <>
           <div className="flex flex-wrap gap-2" aria-label="Browse asset filters">
+            <FilterChip
+              label="All"
+              active={state.browseFilters.size === 0}
+              count={stats.total}
+              onClick={state.showAllBrowseAssets}
+            />
             {BROWSE_FILTERS.map((filter) => (
               <FilterChip
                 key={filter.id}
@@ -855,17 +889,18 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
             )}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
             {assetsQuery.isLoading ? (
-              Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-[92px] w-full" />)
+              Array.from({ length: 7 }).map((_, index) => <Skeleton key={index} className="h-[92px] w-full" />)
             ) : (
               <>
                 <MetricTile label="Assets" value={stats.total} accent="var(--blue)" icon={Image} />
+                <MetricTile label="Total media weight" value={formatBytes(stats.totalWeight)} accent="var(--blue)" icon={Database} />
                 <MetricTile label="Missing alt" value={stats.missingAlt} accent="var(--amber)" icon={Sparkles} />
                 <MetricTile label="Oversized" value={stats.oversized} accent="var(--blue)" icon={Minimize2} />
                 <MetricTile label="Unused" value={stats.unused} accent="var(--red)" icon={FolderOpen} />
                 <MetricTile label="CMS images" value={stats.cmsImages} accent="var(--blue)" icon={Database} sub={`${stats.cmsMissingAlt} missing alt`} />
-                <MetricTile label="Potential savings" value={formatBytes(stats.estimatedSavings)} accent={scoreColor(82)} icon={Minimize2} sub="estimate" />
+                <MetricTile label="Potential savings" value={formatBytes(stats.estimatedSavings)} accent="var(--blue)" icon={Minimize2} sub="estimate" />
               </>
             )}
           </div>
@@ -961,36 +996,8 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
           </InlineBanner>
       </>
 
-      {state.lens === 'audit' && (
-        <section aria-labelledby="asset-repair-results-title" className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 id="asset-repair-results-title" className="t-page text-[var(--brand-text-bright)]">Repair results</h3>
-              <p className="mt-1 t-caption text-[var(--brand-text-muted)]">Review and resolve media issues without leaving the asset library.</p>
-            </div>
-            <Button size="sm" variant="secondary" onClick={() => state.setLens('browse')}>
-              Close repair results
-            </Button>
-          </div>
-          <AuditLens
-            siteId={siteId}
-            workspaceId={workspaceId}
-            search={state.search}
-            searchInput={state.searchInput}
-            onSearchChange={state.setSearchInput}
-            activeFilter={state.auditFilter}
-            onFilterChange={state.setAuditFilter}
-            sort={state.auditSort}
-            onSortChange={state.setAuditSort}
-            quotaLocked={quotaLocked}
-            quotaReason={quotaReason}
-            onQuotaHit={markQuotaHit}
-          />
-        </section>
-      )}
-
       <Drawer
-        open={state.lens === 'upload'}
+        open={state.lens === 'upload' && !assetDetailOpen}
         onClose={() => state.setLens('browse')}
         title="Upload assets"
         subtitle="Add images to the existing Webflow asset workflow."
@@ -1002,7 +1009,7 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
 
       <AssetDrawer
         asset={selectedAsset}
-        open={!!selectedAsset}
+        open={assetDetailOpen}
         quotaLocked={quotaLocked}
         quotaReason={quotaReason}
         altDraft={altDraft}

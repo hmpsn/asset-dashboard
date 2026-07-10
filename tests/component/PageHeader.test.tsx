@@ -45,4 +45,29 @@ describe('PageHeader', () => {
     render(<PageHeader title="Heading" />);
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Heading');
   });
+
+  it('preserves the compact default typography and truncation contract', () => {
+    render(<PageHeader title="Legacy heading" subtitle="Legacy subtitle" />);
+
+    expect(screen.getByRole('heading', { level: 2 })).toHaveClass('t-h2', 'truncate');
+    expect(screen.getByText('Legacy subtitle')).toHaveClass('t-caption-sm', 'truncate');
+  });
+
+  it('offers an opt-in rebuilt admin hierarchy without changing heading semantics', () => {
+    const { container } = render(
+      <PageHeader
+        title="Performance across a long workspace name"
+        subtitle="Page weight and Core Web Vitals with source repair in Asset Manager."
+        actions={<button>Refresh</button>}
+        variant="rebuilt-admin"
+      />,
+    );
+
+    const heading = screen.getByRole('heading', { level: 2 });
+    expect(heading).toHaveClass('t-h1', 'break-words');
+    expect(heading).not.toHaveClass('truncate');
+    expect(screen.getByText(/Page weight and Core Web Vitals/)).toHaveClass('t-body', 'whitespace-normal');
+    expect(container.firstElementChild).toHaveClass('flex-wrap', 'items-start');
+    expect(screen.getByRole('button', { name: 'Refresh' }).parentElement).toHaveClass('flex-wrap');
+  });
 });

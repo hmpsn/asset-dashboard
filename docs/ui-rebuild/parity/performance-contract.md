@@ -76,7 +76,9 @@ Keep these capabilities reachable exactly once:
 - The loaded PageHeader now wraps on mobile and uses the prototype's Asset Manager speed-loop framing.
 - PageSpeed exposes the Asset Manager repair handoff in the main workflow body, not only in the detail Drawer, and routes operators to the canonical oversized source-repair filter.
 - Page Weight and Page Speed no longer emit the legacy `?tab=audit` receiver state. Both send the filter-only canonical repair URL while Asset Manager continues accepting the old alias.
+- Performance is the sole `PageHeader variant="rebuilt-admin"` pilot: the title keeps semantic `h2` while using `.t-h1`, and the subtitle uses wrapping `.t-body`. The shared compact default remains unchanged.
 - Page Weight repair guidance, Page Weight drawer compression context, PageSpeed score context, bulk-test guidance, and PageSpeed Asset Manager handoff copy now use `.t-body` so speed-routing guidance reads as workflow copy rather than caption metadata.
+- Avg Page Weight is read-only data and now uses the canonical blue metric accent rather than teal action color.
 - Component tests assert default URL behavior, deep-link behavior, detail drawer behavior, real feature-flag loading transition, absence of internal implementation language in PageSpeed detail, and rebuilt a11y.
 
 ## Browser Smoke Evidence
@@ -97,11 +99,13 @@ Clean fixture target: `ws_1772610244629` / Swish Dental.
 - Typography role Page Speed deep link: `/tmp/asset-dashboard-codex-parity-captures/performance-typography-speed-desktop.png`
 - Typography role state: `/tmp/asset-dashboard-codex-parity-captures/performance-typography-role-smoke-state.json`
 
-Result: passed with local browser smoke. Desktop overview, Page Speed deep link, Page Weight drawer, Page Speed drawer, and mobile overview had visible lens labels, no page-level horizontal overflow, no internal implementation labels, no duplicate dialogs, no console errors, and no failed responses. The PageSpeed Asset Manager handoff smoke also passed: desktop and the light mobile regression viewport both showed the handoff copy, the `Open assets` action routed to `/media?tab=audit&filter=oversized`, no internal implementation terms appeared, and console warnings/errors were empty.
+Result: passed with local browser smoke. Desktop overview, Page Speed deep link, Page Weight drawer, Page Speed drawer, and mobile overview had visible lens labels, no page-level horizontal overflow, no internal implementation labels, no duplicate dialogs, no console errors, and no failed responses. The PageSpeed Asset Manager handoff smoke also showed the handoff copy on desktop and the light mobile regression viewport; the canonical filter-only destination is verified by the follow-up below and component coverage.
 
 Typography result: passed for the live Performance detect/repair samples that render in the Swish fixture. Page Weight repair guidance, the Page Weight drawer compression note, and the PageSpeed Asset Manager handoff all rendered as `.t-body` at 15.5px with no horizontal overflow; the Page Weight drawer opened exactly once. The PageSpeed score-context sentence is covered by component test because the clean live fixture has no saved PageSpeed score result in that state. Local preview console noise was limited to the existing notification fetch failure when the full backend notification stack was not attached; the Performance route itself had no failed responses.
 
 Canonical-handoff follow-up: `/tmp/asset-dashboard-codex-parity-captures/wave3-search-focus-smoke-state.json`. The populated Page Weight workflow showed the source-repair explanation and its single `Open assets` action navigated live to `/ws/ws_1772610244629/media?filter=oversized` with no fresh console error. Component coverage pins the same URL for Page Speed.
+
+Header-pilot follow-up is recorded in the same state file and `/tmp/asset-dashboard-codex-parity-captures/performance-rebuilt-admin-header-pilot.png`. The live Performance heading remained semantic `H2`, computed at 28px/600 from `.t-h1`; the subtitle computed at 15.5px/500 from `.t-body`, wrapped normally, and produced no horizontal overflow or fresh console errors. A local Playwright screenshot was compared with `hmpsn studio Design System/screenshots/01-perf-weight.png`; the stronger hierarchy is accepted for this pilot only, because composition and eyebrow differences still require per-surface judgment before broader migration.
 
 Fixture note: the workspace already had real Page Weight data but no saved PageSpeed rows. The smoke temporarily inserted `pagespeed:mobile` and `pagespeed:desktop` snapshots for the Swish site, captured the PageSpeed states, then deleted both rows. Follow-up API checks returned `null` for both PageSpeed snapshots after cleanup.
 

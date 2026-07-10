@@ -4,7 +4,6 @@ import { ClientActionsTab } from '../admin/ClientActionsTab';
 import { ClientDeliverablesPane } from '../admin/ClientDeliverablesPane';
 import { RequestManager } from '../RequestManager';
 import {
-  Badge,
   EmptyState,
   Icon,
   InlineBanner,
@@ -55,7 +54,6 @@ export function RequestsLens({ workspaceId }: RequestsLensProps) {
         <PageHeader
           title="Requests"
           subtitle="Unified operator feed for deliverables, client signals, all requests, and client actions."
-          actions={<Badge label="Strategy handoff planned" tone="amber" variant="soft" />}
         />
 
         {state.invalidTab && (

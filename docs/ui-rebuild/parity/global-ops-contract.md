@@ -31,7 +31,7 @@ Global Ops is a route family, not a single rebuilt surface. Parity requires pres
 - `Workspace Settings` is the workspace administration workbench: connections, setup state, strategy inputs, feature/tier controls, portal and dashboard controls, publishing, exports, per-workspace flags, LLMs.txt carry-over, cold-start actions, and archive/restore.
 - `Roadmap` is a sprint/backlog workbench with status cycling, search, sort, velocity, and expandable item detail.
 - `Business` consolidates revenue, AI usage, feature library, and prospects into one operator bucket while retaining the existing route ids as aliases.
-- `Outcomes Book` is the cross-workspace results table with value, wins, GSC rollups, issue matrix, and additive admin outcome fields.
+- `Outcomes Book` is the workspace-by-workspace results table with server-owned value, wins, GSC evidence, issue matrix, coverage, and additive admin outcome fields. Portfolio totals remain absent until a server-owned book rollup exists.
 - `Outcome Dashboard` remains the per-workspace drill-in for Top Wins, Scorecard, Playbooks, Actions, Learnings, Coverage, and published-work recording.
 - `Diagnostics` remains both a list/run-history page and a `?report=` detail receiver.
 - `Requests` stays a hybrid: prototype-style operator feed direction, but the existing Deliverables, Signals, All Requests, and Client Actions homes must remain reachable.
@@ -47,9 +47,9 @@ Why:
 - The rebuilt shell correctly mounts every Global Ops route family entry behind `ui-rebuild-shell`.
 - The shell preserves the important URL receivers: Business `?tab=`, Workspace Settings `?tab=`, Roadmap `?view=`, Diagnostics `?report=`, and Requests `?tab=`.
 - The current implementation keeps dense legacy machinery mounted exactly once where that is safer than redesigning server-backed workflows in a visual parity sweep.
-- The route family still includes known product decisions that should not be guessed inside this goal loop: Requests promotion to strategy signal, Diagnostics stage/export, exact Outcomes value read models, Business alias route retirement, client onboarding rehome, and final LLMs.txt relocation.
+- The route family still includes known product decisions that should not be guessed inside this goal loop: Requests promotion to strategy signal, Diagnostics stage/export, portfolio-level Outcomes rollups, Business alias route retirement, client onboarding rehome, and final LLMs.txt relocation.
 - The current pass removes visible implementation/process language from the rebuilt Global Ops shell without changing capability homes.
-- Browser smoke found and this branch fixes a route-family mount bug: rebuilt global routes were registered but `/settings`, `/roadmap`, `/revenue`, and `/outcomes-overview` fell through to legacy because `App.tsx` only mounted rebuilt surfaces when a URL-selected workspace existed. Rebuilt global routes now borrow the first available workspace only for shell context.
+- Browser smoke found and this branch fixes a route-family mount bug: rebuilt global routes were registered but `/settings`, `/roadmap`, `/revenue`, and `/outcomes-overview` fell through to legacy because `App.tsx` only mounted rebuilt surfaces when a URL-selected workspace existed. Rebuilt global routes now use the first available workspace for shell context when one exists and still mount with null workspace context when the account has none.
 
 Intentional divergence from prototype:
 
@@ -93,7 +93,7 @@ Keep these capabilities reachable exactly once:
 - Revenue analytics plus destructive payment delete/purge controls inside the carried Revenue panel.
 - AI usage cost, calls, provider split, DataForSEO credits, and empty-zero behavior.
 - Feature Library search/grouping and Prospect report run/history/detail/printable report.
-- Outcomes Book additive value/GSC/site-health fields plus current win-rate/scored/coverage/attention fields.
+- Outcomes Book workspace rows with server-owned value/GSC/site-health and outcome coverage/attention fields. Do not render client-aggregated portfolio totals.
 - Per-workspace Outcome Dashboard tabs and `RecordPublishedWorkCard`.
 - Diagnostics list, running/failed/completed detail states, report receiver, and run diagnostic action.
 - Requests Deliverables, Signals, All Requests lifecycle management, and Client Actions.
@@ -116,8 +116,10 @@ Each item circles back only when the receiving workflow or missing server contra
 Judgment calls made in this pass:
 
 - Kept the current additive Global Ops shell rather than forcing a broad prototype collapse, because several exact prototype behaviors require product/backend decisions.
-- Replaced visible process terms with operator-facing copy: `Additive aliases`, `Legacy parity carried over`, `Carry-over parity`, `Uses ?view=`, `Promote to signal deferred`, and `workspace-scoped route` are no longer visible in the rebuilt Global Ops shell.
-- Let global rebuilt routes use the first available workspace as chrome context when the URL has no workspace id. This is a local mount fix, not an IA change: workspace-scoped routes still require their selected workspace.
+- Replaced visible process terms with operator-facing copy: `Additive aliases`, `Legacy parity carried over`, `Carry-over parity`, `Uses ?view=`, `Promote to signal deferred`, `Strategy handoff planned`, and `workspace-scoped route` are no longer visible in the rebuilt Global Ops shell.
+- Let global rebuilt routes use the first available workspace as chrome context when the URL has no workspace id, or null context when no workspaces exist. This is a shell mount fix, not an IA change: workspace-scoped routes still require their selected workspace.
+- Removed the React-created Outcomes Book portfolio totals. The table keeps server-owned workspace evidence and uses the outcome overview's tracked/reconciled coverage counts; the accepted `GO-004` server-authority boundary is now enforced instead of merely documented.
+- Gave the Outcomes workspace column a real 180px minimum so fixed evidence columns create table-local horizontal scrolling instead of collapsing workspace names to zero width.
 
 ## Browser Smoke Evidence
 
@@ -131,6 +133,8 @@ Smoke states captured:
 - Desktop Outcomes Book: `/tmp/asset-dashboard-codex-parity-captures/global-ops-outcomes-book-desktop.png` from `/outcomes-overview`.
 - Desktop Diagnostics: `/tmp/asset-dashboard-codex-parity-captures/global-ops-diagnostics-desktop.png` from `/ws/ws_demo_premium/diagnostics`.
 - Desktop Requests deep link: `/tmp/asset-dashboard-codex-parity-captures/global-ops-requests-actions-desktop.png` from `/ws/ws_demo_premium/requests?tab=actions`.
+- Outcomes Book after server-authority correction: `/tmp/asset-dashboard-codex-parity-captures/global-ops-outcomes-server-owned-final.png`.
+- Requests after deferred-process copy removal: `/tmp/asset-dashboard-codex-parity-captures/global-ops-requests-final.png`.
 - Mobile Settings: `/tmp/asset-dashboard-codex-parity-captures/global-ops-settings-mobile.png`.
 - Mobile Workspace Settings deep link: `/tmp/asset-dashboard-codex-parity-captures/global-ops-workspace-settings-dashboard-mobile.png`.
 - Smoke state: `/tmp/asset-dashboard-codex-parity-captures/global-ops-smoke-state.json`.
@@ -142,6 +146,7 @@ Result:
 - The storage cleanup dialog opened as the required open state.
 - No horizontal overflow on desktop or 390px mobile.
 - No visible internal process labels from the guarded list.
+- Final browser inspection found no portfolio summary tiles, showed server-owned coverage values such as `0 / 6`, kept the first workspace cell at 180px, removed `Strategy handoff planned`, and found no page-level horizontal overflow in either corrected state.
 - No console errors in the in-app browser smoke.
 
 ## Automated Test Floor
@@ -156,4 +161,6 @@ Current branch coverage proves:
 - Requests validates `?tab=`, preserves All Requests, and falls back to Deliverables.
 - A rebuilt Business tab passes the shared a11y floor.
 - Visible Global Ops shell copy does not expose internal process labels: additive aliases, legacy parity, carry-over parity, deferred, raw `?view=`, or workspace-scoped route wording.
-- App-level coverage proves rebuilt global routes mount with first-workspace chrome context when `ui-rebuild-shell` is ON, instead of falling through to legacy panels on workspace-less URLs.
+- Outcomes Book coverage comes from the server-owned outcome overview and no client-created portfolio total is rendered.
+- The Outcomes workspace column retains a 180px minimum before the table scrolls horizontally.
+- App-level coverage proves rebuilt global routes mount with first-workspace chrome context when available and with null context when `workspaces=[]`, instead of falling through to legacy panels.

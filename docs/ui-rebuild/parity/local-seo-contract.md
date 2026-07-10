@@ -94,6 +94,7 @@ Keep these capabilities reachable exactly once:
 - Kept `?tab=setup` / `?lens=setup` as drawer-open state and removed the inline setup receiver body.
 - Composed the rank/profile workspace from the current status/profile card plus the real visibility evidence panel.
 - Suppressed duplicate competitor tables when overview and visibility evidence appear together.
+- Removed the second Markets / Checked / Visible / Local packs KPI row from the overview body; the page-level summary is the sole owner while the lower visibility band retains its distinct match-quality metrics.
 - Replaced `Provider degraded` / setup-state implementation wording with operator-facing scan/setup copy.
 - Aligned current rank/profile and visibility evidence copy to the styleguide type-role contract: explanatory setup/GBP/trend copy uses `.t-body`, compact competitor/market/action labels use `.t-ui`, and read-only snapshot counts use blue data color.
 - Extended component tests for real feature-flag loading-to-loaded transition, prototype mode labels, setup drawer-only compatibility state, legacy visibility deep link, exact-once legacy panel mounting, reviews mode switching, no internal labels, and rebuilt a11y.
@@ -118,6 +119,7 @@ Typography-role smoke:
 - Setup drawer state: `/tmp/asset-dashboard-codex-parity-captures/local-seo-typography-setup-drawer.png`.
 - Light mobile regression floor: `/tmp/asset-dashboard-codex-parity-captures/local-seo-typography-rank-profile-mobile.png`.
 - State sample: `/tmp/asset-dashboard-codex-parity-captures/local-seo-typography-smoke-state.json`.
+- Single-summary desktop follow-up: `/tmp/asset-dashboard-codex-parity-captures/local-presence-single-summary-final.png`.
 
 Result: the sparse demo workspace confirms live GBP guidance and empty visibility copy render at `.t-body` / 15.5px, compact labels remain `.t-ui` / 13.5px, no internal rebuild/migration labels are visible, and there is no horizontal overflow. Component fixtures cover the populated `Map Pack Rival`, `Austin, TX`, and `2/4 visible on 2026-07-06` cases that the sparse demo data does not expose. The light mobile capture showed expected narrow-shell clipping in the mode control, but no blank panel or blocking layout failure; mobile remains a regression floor only per parity process.
 
@@ -132,4 +134,5 @@ Current branch coverage proves:
 - Real `useFeatureFlag('local-gbp')` loading-to-loaded transition survives.
 - Internal rebuild/migration/carry-over/provider/setup-state labels are absent from the loaded surface.
 - Rank/profile and visibility evidence copy uses the intended styleguide typography roles, and snapshots are styled as read-only blue data instead of teal action state.
+- Markets and Checked render once in the rank/profile page summary; Visible has only the page summary plus the distinct visibility-evidence metric.
 - The rebuilt a11y floor passes.
