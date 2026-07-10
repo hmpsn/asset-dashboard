@@ -9,6 +9,7 @@ import {
   Checkbox,
   DataTable,
   EmptyState,
+  GroupBlock,
   Icon,
   InlineBanner,
   StatusBadge,
@@ -59,6 +60,15 @@ type SeoEditorTableRecord = Record<string, unknown> & {
   status: string;
 };
 
+interface WorksheetSourceGroup {
+  id: 'static' | 'cms' | 'manual';
+  title: string;
+  meta: string;
+  icon: typeof FileText;
+  iconColor: string;
+  records: SeoEditorTableRecord[];
+}
+
 function sourceIcon(row: SeoEditorSurfaceRow) {
   if (row.target.targetType === SEO_EDITOR_TARGET_TYPES.staticPage) return FileText;
   if (row.target.targetType === SEO_EDITOR_TARGET_TYPES.cmsItem) return Database;
@@ -108,6 +118,32 @@ export function SeoEditorWorksheet({
   onClearFilters,
 }: SeoEditorWorksheetProps) {
   const records = useMemo(() => targetRowsToRecords(rows), [rows]);
+  const sourceGroups = useMemo<WorksheetSourceGroup[]>(() => [
+    {
+      id: 'static',
+      title: 'Static pages',
+      meta: 'Direct page-SEO writes',
+      icon: FileText,
+      iconColor: 'var(--brand-text-muted)',
+      records: records.filter((record) => record.row.target.targetType === SEO_EDITOR_TARGET_TYPES.staticPage),
+    },
+    {
+      id: 'cms',
+      title: 'CMS collection items',
+      meta: 'Publish-gated per collection',
+      icon: Database,
+      iconColor: 'var(--blue)',
+      records: records.filter((record) => record.row.target.targetType === SEO_EDITOR_TARGET_TYPES.cmsItem),
+    },
+    {
+      id: 'manual',
+      title: 'Manual URLs',
+      meta: 'Read-only',
+      icon: AlertTriangle,
+      iconColor: 'var(--amber)',
+      records: records.filter((record) => record.row.target.targetType === SEO_EDITOR_TARGET_TYPES.manual),
+    },
+  ], [records]);
   const staticSelectedCount = staticWorkflow.approvalSelected.size;
   const cmsSelectedCount = cmsWorkflow.approvalSelected.size;
   const selectedCount = staticSelectedCount + cmsSelectedCount;
@@ -364,13 +400,32 @@ export function SeoEditorWorksheet({
         </div>
       )}
 
-      <DataTable
-        columns={columns}
-        rows={records}
-        getRowKey={(record) => (record as SeoEditorTableRecord).row.id}
-        onRowClick={(record) => onOpenPage((record as SeoEditorTableRecord).row.id)}
-        empty={empty}
-      />
+      {records.length === 0 ? (
+        <DataTable
+          columns={columns}
+          rows={records}
+          getRowKey={(record) => (record as SeoEditorTableRecord).row.id}
+          onRowClick={(record) => onOpenPage((record as SeoEditorTableRecord).row.id)}
+          empty={empty}
+        />
+      ) : sourceGroups.map((group) => group.records.length > 0 && (
+        <GroupBlock
+          key={group.id}
+          title={group.title}
+          meta={group.meta}
+          icon={group.icon}
+          iconColor={group.iconColor}
+          stats={[{ label: group.records.length === 1 ? 'row' : 'rows', value: formatCount(group.records.length) }]}
+        >
+          <DataTable
+            columns={columns}
+            rows={group.records}
+            getRowKey={(record) => (record as SeoEditorTableRecord).row.id}
+            onRowClick={(record) => onOpenPage((record as SeoEditorTableRecord).row.id)}
+            className="border-0 rounded-none bg-transparent"
+          />
+        </GroupBlock>
+      ))}
     </div>
   );
 }

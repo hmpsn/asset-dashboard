@@ -398,6 +398,23 @@ describe('SeoEditorSurface rebuilt', () => {
     expectTextWithClass('Book local services.', 't-caption');
   });
 
+  it('groups the default edit worksheet by source without changing selection ownership', () => {
+    renderWithProviders(<SeoEditorSurface workspaceId="ws-1" />);
+
+    expect(screen.getByRole('heading', { name: 'Static pages' })).toBeInTheDocument();
+    expect(screen.getByText('Direct page-SEO writes')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'CMS collection items' })).toBeInTheDocument();
+    expect(screen.getByText('Publish-gated per collection')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Manual URLs' })).toBeInTheDocument();
+    expect(screen.getByText('Read-only')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Services' }));
+    expect(workflows.staticWorkflow.toggleApprovalSelect).toHaveBeenCalledWith('page-1');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select CMS Post' }));
+    expect(workflows.cmsWorkflow.toggleApprovalItem).toHaveBeenCalledWith('item-1');
+    expect(screen.getByRole('checkbox', { name: 'Unmapped CMS URL is visible only' })).toBeDisabled();
+  });
+
   it('uses readable body copy in research empty and no-recommendation states', () => {
     const { unmount } = renderWithProviders(<SeoEditorSurface workspaceId="ws-1" />, '/ws/ws-1/seo-editor?tab=research');
 
