@@ -22,7 +22,7 @@ import {
   FormSelect,
   Icon,
   InlineBanner,
-  LensSwitcher,
+  Drawer,
   MetricTile,
   PageHeader,
   SearchField,
@@ -41,7 +41,6 @@ import { OrganizeDrawer } from './OrganizeDrawer';
 import { UploadLens } from './UploadLens';
 import { mutationErrorMessage } from './assetManagerMutationFeedback';
 import {
-  ASSET_MANAGER_LENSES,
   BROWSE_FILTERS,
   CMS_FILTERS,
   type Asset,
@@ -92,12 +91,6 @@ interface CompressResponse {
   savings?: number;
   cmsUpdates?: { succeeded: number; failed: number };
 }
-
-const LENS_ICONS = {
-  browse: Image,
-  audit: Sparkles,
-  upload: Upload,
-};
 
 const SORT_OPTIONS = [
   { value: 'createdOn', label: 'Newest' },
@@ -773,13 +766,6 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
     );
   }
 
-  const lensOptions = ASSET_MANAGER_LENSES.map((lens) => ({
-    value: lens.id,
-    label: lens.label,
-    icon: LENS_ICONS[lens.id],
-    count: lens.id === 'browse' ? assets.length : lens.id === 'audit' ? unusedQuery.data?.size : queue.length,
-  }));
-
   return (
     <div className="flex min-h-full flex-col gap-5">
       <PageHeader
@@ -798,43 +784,39 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
       />
 
       <Toolbar label="Asset Manager controls">
-        <LensSwitcher
-          options={lensOptions}
-          value={state.lens}
-          onChange={(value) => state.setLens(value as typeof state.lens)}
-          className="flex-wrap"
+        <SearchField
+          value={state.searchInput}
+          onChange={state.setSearchInput}
+          placeholder="Search filename or alt text..."
+          className="w-full min-w-0 sm:w-auto sm:min-w-[260px]"
         />
-        {(state.lens === 'browse' || state.lens === 'audit') && (
-          <SearchField
-            value={state.searchInput}
-            onChange={state.setSearchInput}
-            placeholder={state.lens === 'audit' ? 'Search issues...' : 'Search filename or alt text...'}
-            className="w-full min-w-0 sm:w-auto sm:min-w-[260px]"
-          />
-        )}
         <ToolbarSpacer />
-        {state.lens === 'browse' && (
-          <>
-            <FormSelect
-              value={state.assetSort}
-              onChange={(value) => state.setAssetSort(value as AssetSort)}
-              options={SORT_OPTIONS}
-              className="w-[140px]"
-              aria-label="Sort assets"
-            />
-            <FormSelect
-              value={state.view}
-              onChange={(value) => state.setView(value as typeof state.view)}
-              options={VIEW_OPTIONS}
-              className="w-[120px]"
-              aria-label="Asset view"
-            />
-            <Button size="sm" variant="secondary" onClick={() => void handleOrganizePreview()}>
-              <Icon as={FolderOpen} size="sm" />
-              Organize
-            </Button>
-          </>
-        )}
+        <FormSelect
+          value={state.assetSort}
+          onChange={(value) => state.setAssetSort(value as AssetSort)}
+          options={SORT_OPTIONS}
+          className="w-[140px]"
+          aria-label="Sort assets"
+        />
+        <FormSelect
+          value={state.view}
+          onChange={(value) => state.setView(value as typeof state.view)}
+          options={VIEW_OPTIONS}
+          className="w-[120px]"
+          aria-label="Asset view"
+        />
+        <Button size="sm" variant="secondary" onClick={() => void handleOrganizePreview()}>
+          <Icon as={FolderOpen} size="sm" />
+          Organize
+        </Button>
+        <Button size="sm" variant="secondary" onClick={() => state.setLens('audit')}>
+          <Icon as={Sparkles} size="sm" />
+          Repair results
+        </Button>
+        <Button size="sm" variant="primary" onClick={() => state.setLens('upload')}>
+          <Icon as={Upload} size="sm" />
+          Upload
+        </Button>
       </Toolbar>
 
       {quotaLocked && !quotaDismissed && (
@@ -857,8 +839,7 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
         </InlineBanner>
       )}
 
-      {state.lens === 'browse' && (
-        <>
+      <>
           <div className="flex flex-wrap gap-2" aria-label="Browse asset filters">
             {BROWSE_FILTERS.map((filter) => (
               <FilterChip
@@ -978,29 +959,46 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
               A compression pass that improves Core Web Vitals or page speed can graduate into Insights Engine once the measured lift lands.
             </p>
           </InlineBanner>
-        </>
-      )}
+      </>
 
       {state.lens === 'audit' && (
-        <AuditLens
-          siteId={siteId}
-          workspaceId={workspaceId}
-          search={state.search}
-          searchInput={state.searchInput}
-          onSearchChange={state.setSearchInput}
-          activeFilter={state.auditFilter}
-          onFilterChange={state.setAuditFilter}
-          sort={state.auditSort}
-          onSortChange={state.setAuditSort}
-          quotaLocked={quotaLocked}
-          quotaReason={quotaReason}
-          onQuotaHit={markQuotaHit}
-        />
+        <section aria-labelledby="asset-repair-results-title" className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 id="asset-repair-results-title" className="t-page text-[var(--brand-text-bright)]">Repair results</h3>
+              <p className="mt-1 t-caption text-[var(--brand-text-muted)]">Review and resolve media issues without leaving the asset library.</p>
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => state.setLens('browse')}>
+              Close repair results
+            </Button>
+          </div>
+          <AuditLens
+            siteId={siteId}
+            workspaceId={workspaceId}
+            search={state.search}
+            searchInput={state.searchInput}
+            onSearchChange={state.setSearchInput}
+            activeFilter={state.auditFilter}
+            onFilterChange={state.setAuditFilter}
+            sort={state.auditSort}
+            onSortChange={state.setAuditSort}
+            quotaLocked={quotaLocked}
+            quotaReason={quotaReason}
+            onQuotaHit={markQuotaHit}
+          />
+        </section>
       )}
 
-      {state.lens === 'upload' && (
+      <Drawer
+        open={state.lens === 'upload'}
+        onClose={() => state.setLens('browse')}
+        title="Upload assets"
+        subtitle="Add images to the existing Webflow asset workflow."
+        eyebrow="Asset library"
+        width={760}
+      >
         <UploadLens workspaceFolder={workspaceFolder} queue={queue} queueLoading={queueQuery.isLoading} />
-      )}
+      </Drawer>
 
       <AssetDrawer
         asset={selectedAsset}

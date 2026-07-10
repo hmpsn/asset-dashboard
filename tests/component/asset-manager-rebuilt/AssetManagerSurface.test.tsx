@@ -225,30 +225,31 @@ describe('AssetManagerSurface', () => {
 
     expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument();
     expect(screen.queryByTestId('legacy-media')).not.toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: /Browse/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByLabelText('Browse asset filters')).toBeInTheDocument();
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
   });
 
-  it('writes prototype tab state and clears the default Browse URL', async () => {
-    renderSurface('/ws/ws-1/media?tab=browse');
+  it('keeps the bare route in the Browse workshop without peer lenses or overlays', async () => {
+    renderSurface('/ws/ws-1/media');
 
     expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: /Browse/i })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByTestId('location-search')).toHaveTextContent('?tab=browse');
-
-    fireEvent.click(screen.getByRole('radio', { name: /Audit/i }));
-    expect(screen.getByTestId('location-search')).toHaveTextContent('?tab=audit&sort=issues');
-
-    fireEvent.click(screen.getByRole('radio', { name: /Browse/i }));
-    expect(screen.getByTestId('location-search')).toBeEmptyDOMElement();
+    expect(screen.getByLabelText('Browse asset filters')).toBeInTheDocument();
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    expect(screen.queryAllByRole('dialog')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /Run Asset Audit/i })).not.toBeInTheDocument();
   });
 
-  it('receives ?filter=oversized on the browse lens', async () => {
-    renderSurface('/ws/ws-1/media?filter=oversized');
+  it.each([
+    ['oversized', /^Oversized\s*1$/i],
+    ['missing-alt', /^Missing alt\s*1$/i],
+  ])('keeps ?filter=%s as a Browse source-repair state', async (filter, filterButtonName) => {
+    renderSurface(`/ws/ws-1/media?filter=${filter}`);
 
     expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument();
     expect(screen.getByText('hero.jpg')).toBeInTheDocument();
     expect(screen.queryByText('logo.svg')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Oversized\s*1/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(screen.getByLabelText('Browse asset filters')).getByRole('button', { name: filterButtonName })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: /Run Asset Audit/i })).not.toBeInTheDocument();
   });
 
   it('frames Browse as the prototype source-fix workshop with readable proof copy', async () => {
@@ -261,7 +262,29 @@ describe('AssetManagerSurface', () => {
     expect(screen.getByText(/compression pass that improves Core Web Vitals/i)).toHaveClass('t-body');
   });
 
-  it('receives ?tab=audit&filter=oversized for the audit drill-in', async () => {
+  it('opens one in-flow repair-results workflow from the toolbar', async () => {
+    renderSurface('/ws/ws-1/media');
+
+    expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Repair results' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-search')).toHaveTextContent('tab=audit');
+    });
+
+    const repairResults = screen.getByRole('region', { name: 'Repair results' });
+    expect(within(repairResults).getByRole('button', { name: /Run Asset Audit/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Run Asset Audit/i })).toHaveLength(1);
+
+    fireEvent.click(within(repairResults).getByRole('button', { name: 'Close repair results' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('location-search')).toBeEmptyDOMElement();
+    });
+    expect(screen.queryByRole('region', { name: 'Repair results' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Browse asset filters')).toBeInTheDocument();
+  });
+
+  it('keeps Browse visible and mounts the requested audit repair exactly once for ?tab=audit&filter=oversized', async () => {
     getMock.mockResolvedValue({
       totalAssets: 2,
       issueCount: 1,
@@ -285,14 +308,49 @@ describe('AssetManagerSurface', () => {
     });
 
     renderSurface('/ws/ws-1/media?tab=audit&filter=oversized');
-    expect(await screen.findByText('Oversized image repair')).toBeInTheDocument();
-    expect(screen.getByText(/source-fix step for PageSpeed or Site Audit findings/i)).toBeInTheDocument();
-    expect(screen.getByText(/Use Compress all or row-level Compress/i)).toBeInTheDocument();
-
-    fireEvent.click(await screen.findByRole('button', { name: /Run Asset Audit/i }));
-
-    expect(await screen.findByText('hero.jpg')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument();
+    expect(screen.getByText('hero.jpg')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Oversized\s*1/i })).toHaveAttribute('aria-pressed', 'true');
+
+    const repairResults = screen.getByRole('region', { name: 'Repair results' });
+    expect(within(repairResults).getByText('Oversized image repair')).toBeInTheDocument();
+    expect(within(repairResults).getByText(/source-fix step for PageSpeed or Site Audit findings/i)).toBeInTheDocument();
+    expect(within(repairResults).getByText(/Use Compress all or row-level Compress/i)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Run Asset Audit/i })).toHaveLength(1);
+
+    fireEvent.click(within(repairResults).getByRole('button', { name: /Run Asset Audit/i }));
+
+    expect(await within(repairResults).findByText('hero.jpg')).toBeInTheDocument();
+    expect(within(repairResults).getByRole('button', { name: /Oversized\s*1/i })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('opens Upload in one drawer and returns to bare Browse when closed', async () => {
+    renderSurface('/ws/ws-1/media');
+
+    expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-search')).toHaveTextContent('?tab=upload');
+    });
+    const dialog = await screen.findByRole('dialog', { name: 'Upload assets' });
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(within(dialog).getByText('Clipboard upload')).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Upload assets' })).not.toBeInTheDocument();
+      expect(screen.getByTestId('location-search')).toBeEmptyDOMElement();
+    });
+    expect(screen.getByLabelText('Browse asset filters')).toBeInTheDocument();
+  });
+
+  it('opens one Upload drawer for the compatibility deep link', async () => {
+    renderSurface('/ws/ws-1/media?tab=upload');
+
+    expect(await screen.findByRole('dialog', { name: 'Upload assets' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Browse asset filters')).toBeInTheDocument();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
   });
 
   it('keeps internal implementation language out of the audit score fallback', async () => {
@@ -318,9 +376,10 @@ describe('AssetManagerSurface', () => {
     });
 
     renderSurface('/ws/ws-1/media?tab=audit&filter=oversized');
-    fireEvent.click(await screen.findByRole('button', { name: /Run Asset Audit/i }));
+    const repairResults = await screen.findByRole('region', { name: 'Repair results' });
+    fireEvent.click(within(repairResults).getByRole('button', { name: /Run Asset Audit/i }));
 
-    expect(await screen.findByText('hero.jpg')).toBeInTheDocument();
+    expect(await within(repairResults).findByText('hero.jpg')).toBeInTheDocument();
     expect(screen.queryByText(/This rebuild|in the browser/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Audit health score appears when the audit returns an authoritative score/i)).toBeInTheDocument();
   });
