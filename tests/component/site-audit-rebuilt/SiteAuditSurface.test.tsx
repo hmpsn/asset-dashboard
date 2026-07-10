@@ -230,7 +230,12 @@ function renderSurface(initialEntry = '/ws/ws-1/seo-audit') {
 
 function LocationProbe() {
   const location = useLocation();
-  return <span data-testid="location-search">{location.search}</span>;
+  return (
+    <>
+      <span data-testid="location-pathname">{location.pathname}</span>
+      <span data-testid="location-search">{location.search}</span>
+    </>
+  );
 }
 
 function expectTextWithClass(text: string | RegExp, className: string) {
@@ -370,6 +375,21 @@ describe('SiteAuditSurface rebuilt', () => {
     expectTextWithClass('Showing 2 of 2 issue groups', 't-ui');
     expectTextWithClass('From fix to proof', 't-ui');
     expectTextWithClass(/Technical fixes stay in Site Audit and Cockpit until traffic, crawlability, or Core Web Vitals recovery is measurable./i, 't-body');
+  });
+
+  it('hands source image repair to Asset Manager with canonical filter URLs', async () => {
+    renderSurface('/ws/ws-1/seo-audit');
+
+    expect(await screen.findByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();
+    expect(screen.getByText('Site Audit detects site issues. Asset Manager repairs source images.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review oversized images' }));
+    expect(screen.getByTestId('location-pathname')).toHaveTextContent('/ws/ws-1/media');
+    expect(screen.getByTestId('location-search')).toHaveTextContent('?filter=oversized');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review missing alt text' }));
+    expect(screen.getByTestId('location-pathname')).toHaveTextContent('/ws/ws-1/media');
+    expect(screen.getByTestId('location-search')).toHaveTextContent('?filter=missing-alt');
   });
 
   it('keeps internal rebuild and migration language out of the visible audit shell', async () => {

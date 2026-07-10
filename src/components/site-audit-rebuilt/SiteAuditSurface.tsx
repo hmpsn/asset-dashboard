@@ -1,7 +1,9 @@
 // @ds-rebuilt
 import { Suspense, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
+import { adminPath } from '../../routes';
 import {
   useSiteAuditRebuilt,
   type AuditIssueGroup,
@@ -526,6 +528,34 @@ function AuditEvidence({
   );
 }
 
+function AssetRepairHandoff({ workspaceId }: { workspaceId: string }) {
+  const navigate = useNavigate();
+
+  const openAssetFilter = (filter: 'oversized' | 'missing-alt') => {
+    navigate(`${adminPath(workspaceId, 'media')}?filter=${filter}`);
+  };
+
+  return (
+    <GroupBlock title="Image source repair" meta="Asset Manager owns image repair">
+      <div className="flex flex-col gap-3 px-2 py-1 sm:flex-row sm:items-center sm:justify-between">
+        <p className="t-body text-[var(--brand-text-muted)]">
+          Site Audit detects site issues. Asset Manager repairs source images.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="secondary" onClick={() => openAssetFilter('oversized')}>
+            <Icon name="image" size="sm" />
+            Review oversized images
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => openAssetFilter('missing-alt')}>
+            <Icon name="pencil" size="sm" />
+            Review missing alt text
+          </Button>
+        </div>
+      </div>
+    </GroupBlock>
+  );
+}
+
 function AuditLens({
   audit,
   activeEvidence,
@@ -831,6 +861,8 @@ function AuditLens({
       <CwvStrip data={data} />
 
       <AuditEvidence workspaceId={audit.workspace?.id ?? ''} activeEvidence={activeEvidence} />
+
+      <AssetRepairHandoff workspaceId={audit.workspace?.id ?? ''} />
 
       {data.deadLinkDetails && data.deadLinkDetails.length > 0 && (
         <DeadLinksPanel links={data.deadLinkDetails} onOpenLinks={audit.openDeadLinks} />
