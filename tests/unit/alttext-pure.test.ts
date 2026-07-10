@@ -170,6 +170,31 @@ describe('generateAltText', () => {
     expect(result).toBe('Photo of mountains at sunset.');
   });
 
+  it('detects SVG by content even when the tmp file has a non-svg extension (hashed CDN URL case)', async () => {
+    // Repro: the alt-text routes name the tmp file from the asset URL. A hashed/
+    // extensionless Webflow CDN URL yields `.jpg`, so an SVG's bytes land in a
+    // `.jpg`-named tmp file. Extension-only routing sent those bytes to sharp →
+    // null alt text ("can't see the image"). generateAltText must sniff content.
+    process.env.OPENAI_API_KEY = 'test-key-abc';
+    const svg = '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"><title>Company logo</title></svg>';
+    const { readFileSync } = await import('fs');
+    vi.mocked(readFileSync).mockImplementation((_path: unknown, encoding?: unknown) => {
+      if (encoding === 'utf-8' || encoding === 'utf8') return svg;
+      return Buffer.from(svg, 'utf-8');
+    });
+    mockCreate.mockResolvedValue({
+      choices: [{ message: { content: 'Company logo' } }],
+    });
+
+    const result = await generateAltText('/tmp/alt_gen_1720000000000.jpg');
+
+    expect(mockCreate).toHaveBeenCalledOnce();
+    const arg = mockCreate.mock.calls[0][0] as { messages: Array<{ content: unknown }> };
+    // Must take the SVG text branch (string content), NOT the raster image_url branch.
+    expect(typeof arg.messages[0].content).toBe('string');
+    expect(result).toBe('Company logo');
+  });
+
   it('truncates overlong SVG content before sending to API', async () => {
     process.env.OPENAI_API_KEY = 'test-key-abc';
 

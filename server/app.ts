@@ -225,11 +225,15 @@ export function createApp(): express.Express {
   // top-level path check (not `app.use('/mcp', mcpLimiter, ...)`) so req.path stays
   // the full '/mcp' and the limiter keys a dedicated `${ip}:/mcp` bucket — a mount
   // would strip the prefix and risk a bucket collision. Mirrors publicWriteLimiter.
+  // POST-only: only JSON-RPC tool calls do real (often paid) work and warrant the
+  // per-IP cap. GET/DELETE are answered by the router with a cheap 405 (this server
+  // offers no server→client SSE stream); counting them here would let a client's
+  // GET reconnect loop exhaust the shared bucket and 429 legitimate POST tool calls.
   // Skipped under NODE_ENV=test: high-volume MCP integration tests hit one server from
   // one IP and legitimately exceed the cap (the limiter itself is unit-tested directly).
   if (process.env.NODE_ENV !== 'test') {
     app.use((req, res, next) => {
-      if (req.path === '/mcp' || req.path.startsWith('/mcp/')) {
+      if (req.method === 'POST' && (req.path === '/mcp' || req.path.startsWith('/mcp/'))) {
         return mcpLimiter(req, res, next);
       }
       next();
