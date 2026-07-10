@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Page } from '../../routes';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import type { Workspace } from '../WorkspaceSelector';
@@ -23,7 +23,24 @@ export interface RebuiltAppChromeProps {
   onUnlinkSite: (workspaceId: string) => void;
   toggleTheme: () => void;
   onLogout?: () => void;
+  focusMode?: boolean;
+  onFocusModeChange?: (focusMode: boolean) => void;
   children: ReactNode;
+}
+
+export interface RebuiltFocusModeContextValue {
+  focusMode: boolean;
+  setFocusMode: (focusMode: boolean) => void;
+}
+
+const ignoreFocusModeChange = () => undefined;
+const RebuiltFocusModeContext = createContext<RebuiltFocusModeContextValue>({
+  focusMode: false,
+  setFocusMode: ignoreFocusModeChange,
+});
+
+export function useRebuiltFocusMode(): RebuiltFocusModeContextValue {
+  return useContext(RebuiltFocusModeContext);
 }
 
 export function useRebuildShellEnabled(): boolean {
@@ -74,12 +91,15 @@ export function RebuiltAppChrome({
   onUnlinkSite,
   toggleTheme,
   onLogout,
+  focusMode = false,
+  onFocusModeChange,
   children,
 }: RebuiltAppChromeProps) {
   const [rail, setRail] = useState(readRail);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const narrowViewportRail = useNarrowViewportRail();
   const effectiveRail = rail || narrowViewportRail;
+  const shellRail = effectiveRail || focusMode;
   useEffect(() => {
     try {
       localStorage.setItem(SIDEBAR_RAIL_KEY, rail ? '1' : '0');
@@ -95,11 +115,24 @@ export function RebuiltAppChrome({
     }
     setRail((prev) => !prev);
   }, [narrowViewportRail]);
+  const handleShellRailToggle = useCallback(() => {
+    if (focusMode) {
+      onFocusModeChange?.(false);
+      return;
+    }
+    toggleRail();
+  }, [focusMode, onFocusModeChange, toggleRail]);
+  const focusModeContextValue = useMemo<RebuiltFocusModeContextValue>(() => ({
+    focusMode,
+    setFocusMode: onFocusModeChange ?? ignoreFocusModeChange,
+  }), [focusMode, onFocusModeChange]);
 
   return (
-    <>
+    <RebuiltFocusModeContext.Provider value={focusModeContextValue}>
       <AppShell
-        rail={effectiveRail}
+        rail={shellRail}
+        focusMode={focusMode}
+        onFocusModeChange={onFocusModeChange}
         sidebar={
           <RebuiltSidebar
             workspaces={workspaces}
@@ -113,8 +146,8 @@ export function RebuiltAppChrome({
             onUnlinkSite={onUnlinkSite}
             toggleTheme={toggleTheme}
             onLogout={onLogout}
-            rail={effectiveRail}
-            onToggleRail={toggleRail}
+            rail={shellRail}
+            onToggleRail={handleShellRailToggle}
           />
         }
         topbar={
@@ -156,6 +189,6 @@ export function RebuiltAppChrome({
           onNavigate={closeMobileNav}
         />
       </Drawer>
-    </>
+    </RebuiltFocusModeContext.Provider>
   );
 }

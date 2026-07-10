@@ -1,8 +1,10 @@
 // @ds-rebuilt
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { adminPath } from '../../routes';
+import { useRebuiltFocusMode } from '../layout/RebuiltAppChrome';
 import { useToast } from '../Toast';
-import { Button, Icon, InlineBanner, PageHeader } from '../ui';
+import { Button, Icon, IconButton, InlineBanner, PageHeader } from '../ui';
 import { PageRewriterChatPane } from './PageRewriterChatPane';
 import { PageRewriterDocumentPane } from './PageRewriterDocumentPane';
 import { PageRewriterPagePicker } from './PageRewriterPagePicker';
@@ -18,6 +20,7 @@ const WORKSPACE_GRID_CLASS = 'grid gap-4 xl:grid-cols-[minmax(360px,44%)_minmax(
 export function PageRewriterSurface({ workspaceId }: PageRewriterSurfaceProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { focusMode, setFocusMode } = useRebuiltFocusMode();
   const state = usePageRewriterSurfaceState({ workspaceId, toast });
 
   return (
@@ -27,14 +30,25 @@ export function PageRewriterSurface({ workspaceId }: PageRewriterSurfaceProps) {
         subtitle="Load a live page, rewrite sections with page intelligence, and export the edited draft."
         className={HEADER_WRAP_CLASS}
         actions={(
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))}
-          >
-            <Icon name="arrowLeft" size="sm" />
-            Back to audit
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))}
+            >
+              <Icon name="arrowLeft" size="sm" />
+              Back to audit
+            </Button>
+            <IconButton
+              icon={focusMode ? Minimize2 : Maximize2}
+              label={focusMode ? 'Exit focus mode' : 'Enter focus mode'}
+              title={focusMode ? 'Exit focus mode (Esc)' : 'Enter focus mode'}
+              size="md"
+              variant="solid"
+              aria-pressed={focusMode}
+              onClick={() => setFocusMode(!focusMode)}
+            />
+          </div>
         )}
       />
 

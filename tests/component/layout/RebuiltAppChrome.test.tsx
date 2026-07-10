@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { RebuiltAppChrome, useRebuildShellEnabled } from '../../../src/components/layout/RebuiltAppChrome';
+import { RebuiltAppChrome, useRebuildShellEnabled, useRebuiltFocusMode } from '../../../src/components/layout/RebuiltAppChrome';
 import type { Workspace } from '../../../src/components/WorkspaceSelector';
 import { FEATURE_FLAGS } from '../../../shared/types/feature-flags';
 import { expectNoA11yViolations } from '../a11y';
@@ -65,12 +66,51 @@ function FlaggedShellProbe() {
   );
 }
 
+function FocusModeProbe() {
+  const { focusMode, setFocusMode } = useRebuiltFocusMode();
+  const [draft, setDraft] = useState('');
+  return (
+    <div>
+      <span data-testid="rebuilt-focus-state">{focusMode ? 'focused' : 'standard'}</span>
+      <input aria-label="Unsaved focus draft" value={draft} onChange={(event) => setDraft(event.target.value)} />
+      <button type="button" onClick={() => setFocusMode(!focusMode)}>
+        {focusMode ? 'Exit focus probe' : 'Enter focus probe'}
+      </button>
+    </div>
+  );
+}
+
+function ControlledFocusShell() {
+  const [focusMode, setFocusMode] = useState(false);
+  return (
+    <RebuiltAppChrome
+      {...chromeProps}
+      tab="rewrite"
+      focusMode={focusMode}
+      onFocusModeChange={setFocusMode}
+    >
+      <FocusModeProbe />
+    </RebuiltAppChrome>
+  );
+}
+
 function renderProbe() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/ws/ws-1/seo-keywords']}>
         <FlaggedShellProbe />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+function renderControlledFocusShell() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={['/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2F']}>
+        <ControlledFocusShell />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -121,6 +161,25 @@ describe('RebuiltAppChrome', () => {
     expect(screen.getByRole('dialog', { name: 'Navigation' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toBeInTheDocument();
     expect(localStorage.getItem('admin-sidebar-rail')).toBe('0');
+  });
+
+  it('provides controlled focus state to rebuilt surfaces without remounting their work', () => {
+    renderControlledFocusShell();
+
+    const draft = screen.getByRole('textbox', { name: 'Unsaved focus draft' });
+    fireEvent.change(draft, { target: { value: 'keep this edit' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enter focus probe' }));
+
+    expect(screen.getByTestId('rebuilt-focus-state')).toHaveTextContent('focused');
+    expect(screen.getByRole('textbox', { name: 'Unsaved focus draft' })).toHaveValue('keep this edit');
+    expect(screen.getByText('Skip to content').parentElement).toHaveStyle({
+      gridTemplateColumns: 'var(--shell-sidebar-rail) 1fr',
+    });
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.getByTestId('rebuilt-focus-state')).toHaveTextContent('standard');
+    expect(screen.getByRole('textbox', { name: 'Unsaved focus draft' })).toHaveValue('keep this edit');
   });
 
   it('has no accessibility violations once the rebuilt shell is mounted', async () => {

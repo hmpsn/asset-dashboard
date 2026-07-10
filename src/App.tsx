@@ -205,6 +205,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
   const [focusMode, setFocusMode] = useState(false);
   // Derived synchronously — prevents layout flash when navigating away (useEffect runs after paint)
   const effectiveFocusMode = focusMode && tab === 'rewrite';
+  const rebuiltSurfaceActive = rebuildShellEnabled && REBUILT_SURFACES[tab] !== undefined;
 
   // Reset backing state when navigating away so returning to rewrite starts fresh
   useEffect(() => {
@@ -213,7 +214,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
 
   // Escape key exits focus mode (in addition to the sidebar strip click)
   useEffect(() => {
-    if (!effectiveFocusMode) return;
+    if (!effectiveFocusMode || rebuiltSurfaceActive) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       // Don't exit if the user is actively typing in any editable element
@@ -223,7 +224,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [effectiveFocusMode]);
+  }, [effectiveFocusMode, rebuiltSurfaceActive]);
 
   // Read fixContext from router state (set by SeoAudit / KeywordStrategy navigate calls)
   useEffect(() => {
@@ -478,6 +479,8 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
           onUnlinkSite={handleUnlinkSite}
           toggleTheme={toggleTheme}
           onLogout={onLogout}
+          focusMode={effectiveFocusMode}
+          onFocusModeChange={setFocusMode}
         >
           <ErrorBoundary label={tab}>
             <Suspense fallback={<ChunkFallback />}>

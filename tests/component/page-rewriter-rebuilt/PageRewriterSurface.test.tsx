@@ -15,6 +15,17 @@ const apiGetMock = vi.fn();
 const apiPostMock = vi.fn();
 const navigateMock = vi.fn();
 const featureFlagsListMock = vi.fn();
+const focusModeMock = vi.hoisted(() => ({
+  enabled: false,
+  setFocusMode: vi.fn(),
+}));
+
+vi.mock('../../../src/components/layout/RebuiltAppChrome', () => ({
+  useRebuiltFocusMode: () => ({
+    focusMode: focusModeMock.enabled,
+    setFocusMode: focusModeMock.setFocusMode,
+  }),
+}));
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -130,6 +141,7 @@ describe('PageRewriterSurface rebuilt', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    focusModeMock.enabled = false;
     featureFlagsListMock.mockReturnValue(new Promise(() => {}));
     setupApi();
   });
@@ -190,6 +202,27 @@ describe('PageRewriterSurface rebuilt', () => {
     expect(screen.queryByRole('button', { name: /Publish rewrite/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
     expect(screen.queryByText('Split')).not.toBeInTheDocument();
+  });
+
+  it('enters rebuilt shell focus mode without remounting the loaded editor', async () => {
+    renderSurface('/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants');
+
+    const editor = await screen.findByRole('textbox', { name: 'Page rewrite document editor' });
+    fireEvent.click(screen.getByRole('button', { name: 'Enter focus mode' }));
+
+    expect(focusModeMock.setFocusMode).toHaveBeenCalledWith(true);
+    expect(editor).toHaveTextContent('Dental Implants');
+    expect(apiPostMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: /Save draft|Publish rewrite/i })).not.toBeInTheDocument();
+  });
+
+  it('offers the same control for exiting an active rebuilt focus mode', () => {
+    focusModeMock.enabled = true;
+    renderSurface();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Exit focus mode' }));
+
+    expect(focusModeMock.setFocusMode).toHaveBeenCalledWith(false);
   });
 
   it('lets long playbook prompt chips wrap inside narrow assistant panes', () => {

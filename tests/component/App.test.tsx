@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -221,8 +221,21 @@ vi.mock('../../src/components/layout/Breadcrumbs', () => ({
 
 vi.mock('../../src/components/layout/RebuiltAppChrome', () => ({
   useRebuildShellEnabled: () => rebuildShellMock.enabled,
-  RebuiltAppChrome: ({ children, selected }: { children: React.ReactNode; selected: { id: string } }) => (
-    <div data-testid="rebuilt-app-chrome" data-selected-workspace={selected.id}>{children}</div>
+  RebuiltAppChrome: ({
+    children,
+    selected,
+    focusMode = false,
+    onFocusModeChange,
+  }: {
+    children: React.ReactNode;
+    selected: { id: string };
+    focusMode?: boolean;
+    onFocusModeChange?: (focusMode: boolean) => void;
+  }) => (
+    <div data-testid="rebuilt-app-chrome" data-selected-workspace={selected.id} data-focus-mode={String(focusMode)}>
+      <button type="button" onClick={() => onFocusModeChange?.(!focusMode)}>Toggle rebuilt focus</button>
+      {children}
+    </div>
   ),
 }));
 
@@ -609,6 +622,15 @@ describe('Dashboard content rendering', () => {
     await waitFor(() => expect(screen.getByTestId('page-rewriter-rebuilt')).toBeInTheDocument());
     expect(screen.getByTestId('page-rewriter-rebuilt')).toHaveAttribute('data-workspace-id', 'ws-1');
     expect(screen.queryByTestId('page-rewrite-chat')).not.toBeInTheDocument();
+
+    const chrome = screen.getByTestId('rebuilt-app-chrome');
+    expect(chrome).toHaveAttribute('data-focus-mode', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle rebuilt focus' }));
+    await waitFor(() => expect(chrome).toHaveAttribute('data-focus-mode', 'true'));
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(chrome).toHaveAttribute('data-focus-mode', 'true');
+    expect(screen.getByTestId('page-rewriter-rebuilt')).toBeInTheDocument();
   });
 
   it('renders Roadmap at /roadmap', async () => {
