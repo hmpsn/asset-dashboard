@@ -2,7 +2,7 @@
 
 Surface: `brand` / Brand & AI  
 Owner: `brand-engine`  
-Status: `behavior-safe / visual-unverified`; modal-first behavior checkpoint implemented in `codex/ui-prototype-alignment`, with generator, bespoke-flow, remaining workflow modal interiors, and overview typography roles preserved
+Status: `owner-approved`; Joshua approved the rendered desktop comparison on 2026-07-10 and deferred finer feedback to the registry-wide review
 Primary route: `/ws/:workspaceId/brand`
 
 ## Prototype References
@@ -28,7 +28,7 @@ The overview should include a compact context-completeness cockpit, group sectio
 
 The overview should not show the legacy top tab strip. The grouped context inventory is the navigation surface: cockpit cards and section rows open the corresponding modal workflow while `?tab=` remains the deep-link/state contract.
 
-Voice & Messaging owns the Brand identity generators disclosure for voice-adjacent identity outputs: Tagline, Voice Guidelines, Brand Archetypes, Personality Traits, Messaging Pillars, Differentiators, and Tone Examples. The other context groups should not duplicate that disclosure in this production slice.
+Each context group owns one non-overlapping Brand identity generators disclosure: seven Voice deliverables, two Knowledge deliverables, five Audience deliverables, and three Business Facts deliverables. Together they expose all 17 production `BrandDeliverableType` values exactly once while the Identity workflow remains the single editor/capability home.
 
 Prototype-critical overlay behavior:
 
@@ -51,11 +51,28 @@ The modal can reuse existing legacy components as the content body, but the shel
 
 Current implementation note:
 
-- The Brand identity modal now adds a DS-framed `Generator workflow` panel before the carried identity editor, showing the prototype lifecycle: Generate, Refine, Edit, Approve, Export.
-- The Discovery, Brandscript, Trust evidence, and Business facts modals now add DS-framed workflow context before their carried panels, matching the prototype's bespoke `brand-flows.js` modal framing: source intake, seven-part narrative, E-E-A-T proof signals, and locations/service-area facts.
-- The Context editors, Voice calibration, and Strategy intelligence modals now add DS-framed workflow context before their carried panels: reusable AI context, voice DNA calibration, and strategy inputs.
-- The overview, rail, and modal workflow frames now use desktop-first typography roles: operator labels use `.t-ui`, explanatory copy uses `.t-body`, and caption roles stay reserved for metadata, counts, badges, timestamps, and compact controls.
-- The carried panels still mount exactly once and remain the editor bodies. This is modal-shell parity polish, not a rewrite of the legacy panel internals.
+- The loaded page opens with the prototype's purple mono eyebrow instead of a duplicate standard PageHeader. The existing Refresh context capability is hosted exactly once in the rebuilt topbar.
+- The Brand canvas now measures 1140px at both required desktop viewports: x=266–1406 at 1440×900 and x=346–1486 at 1600×1000. The opening lede, cockpit, two-column body, and first Knowledge rows follow the prototype's first-viewport rhythm.
+- Long live Brand Voice, Knowledge Base, and persona fields are visually clamped to two lines in the overview while their full content remains available in the real editors. Browser-computed clamp evidence is about 37px / two lines for the 4,648-character Brand Voice fixture. Markdown-backed preview prose is normalized for display without changing stored editor values.
+- Modal shells use the owner-approved DS `workflow` size (680px) and no longer prepend synthetic workflow cards. Every carried production editor still mounts exactly once.
+- Brandscript list selection and deletion are sibling controls; the invalid nested-button composition found during browser comparison is removed.
+- All 17 prototype generators are mapped to their real production deliverable types. `?tab=identity&focus=<BrandDeliverableType>` opens the existing selected editor; bare or invalid focus opens the full library. The overview Brandscript row focuses the first real record while bare `?tab=brandscript` retains the library.
+- The carried panel interiors remain truthful production editors, not copies of the prototype's curated fixtures. Joshua approved that data-dependent difference under V5; founder Q&A, E-E-A-T rollups, and confirmed-geo rollups remain documented backend exceptions rather than simulated data. Collapsed Brandscript previews hide Markdown syntax, and Context separators render as rules while round-tripping to the stored `---` form.
+
+## Source-Led Desktop Discrepancy Matrix — 2026-07-10
+
+| Area | Prototype | Rebuilt baseline | Final resolution |
+|---|---|---|---|
+| Opening hierarchy | Purple mono eyebrow; no page-title block | Duplicate PageHeader plus teal badge | Corrected; purple eyebrow and right-aligned read indicator now lead the page. |
+| Desktop canvas | 1140px inner canvas at 1440 and 1600 | Expanded to 1300px at 1600 | Corrected with existing `--page-max`; measured canvas matches at both viewports. |
+| First viewport | Compact Voice group; Knowledge starts onscreen | Raw 4,648-character Voice field consumed the viewport | Corrected with a computed two-line clamp; collapsed surface height is about 1946px versus about 1893px in the prototype. Cockpit and Voice landmarks are within about 2px of the reference. |
+| Cockpit | Compact four-group overview with emerald ≥80, amber ≥40, red below 40 | Extra readiness/count emphasis and a locally inferred 45% score | V1 implemented: inferred score/readiness removed; truthful `5/11 inputs configured` leads the live fixture while group evidence remains. |
+| Group spine | Four ordered color-coded groups; 17 generators distributed by group | Correct group order; only seven Voice generators exposed | V2 implemented exactly once as 7 / 2 / 5 / 3, in prototype order. |
+| Generator modal | 640px and focused on the clicked deliverable | 768px and the full 17-card library | V3/V4 implemented: selected real editor for validated focus, full-library compatibility receiver, and one 680px workflow shell. |
+| Bespoke flows | 680px Discovery, Brandscript, E-E-A-T, and Locations compositions | Truthful production editors and real empty states | V5 implemented: real interiors/data preserved; overview Brandscript launch focuses the real record. Prototype-only data rollups are approved exceptions. |
+| Topbar actions | Visual-only Preview context and Generate from site controls | Truthful Refresh context; Generate from website remains in the rail | V6 implemented as an approved production exception; no simulated actions added. |
+| Rail title role | 12.5px / 700 compact headers | Shared `SectionCard` title is 15.5px / 600 | V7 implemented as an approved exception using the closest existing DS role, 13.5px / 700. |
+| Accessibility | Separate row and destructive actions | Brandscript nested one button inside another | Corrected and browser-verified with zero nested buttons. |
 
 ## URL and Deep Links
 
@@ -65,11 +82,13 @@ Required receiver behavior:
 
 - `/ws/:workspaceId/brand` opens the overview with no modal.
 - `?tab=overview` opens the overview with no modal.
-- `?tab=identity` opens the generator modal.
+- `?tab=identity` opens the full generator library.
+- `?tab=identity&focus=<BrandDeliverableType>` opens exactly one real focused editor; an invalid focus value safely falls back to the full library.
 - `?tab=brandscript` opens the brandscript modal.
+- `?tab=brandscript&focus=existing-brandscript` opens the first real existing Brandscript; clearing focus retains the library modal.
 - `?tab=discovery` opens the discovery modal.
-- `?tab=voice` opens the voice calibration modal or drawer, depending on prototype confirmation.
-- `?tab=context` opens the context quality modal or drawer, depending on prototype confirmation.
+- `?tab=voice` opens the voice calibration modal.
+- `?tab=context` opens the context quality modal.
 - `?tab=eeat-assets` opens the E-E-A-T trust proof modal.
 - `?tab=business-footprint` opens the Business Footprint modal.
 - Legacy aliases `?tab=business-profile` and `?tab=locations` open the Business Footprint modal and preserve focus handling.
@@ -90,11 +109,9 @@ Keep these child panels mounted exactly once, but move their visible home into m
 - Intelligence Profile panel.
 - Page Strategy and Copy Pipeline carry-over, while C-6 keeps them on Brand & AI.
 
-The current inline active-panel area is a known mismatch. The corrective pass should replace inline panel switching with modal-open state while preserving the same child panel instances.
-
 ## Moved, Excluded, or Deferred
 
-- Do not add backend APIs, migrations, shared types, or new feature flags for the parity correction.
+- Do not add backend APIs, migrations, shared domain types, or new feature flags for the parity correction. The sole owner-approved DS addition is the 680px `workflow` Modal size.
 - Do not move Page Strategy or Copy Pipeline out of Brand & AI in this slice.
 - Do not invent a numeric brand-context score unless the server-backed score exists.
 - Do not surface internal rebuild language such as route tabs, carry-over contracts, mounted below, migration terms, or legacy aliases in the UI.
@@ -106,47 +123,26 @@ Required before calling Brand & AI aligned:
 - Desktop overview with no modal.
 - Desktop overview has no top tab strip.
 - Mobile overview with no text overlap.
-- Voice & Messaging exposes exactly one Brand identity generators disclosure.
-- `?tab=identity` opens the generator modal.
+- The four context groups expose exactly four non-overlapping Brand identity disclosures totaling 17 unique generators (7 / 2 / 5 / 3).
+- `?tab=identity` opens the full generator library; validated focus opens one editor and invalid focus falls back safely.
 - `?tab=brandscript` opens the brandscript modal.
 - `?tab=business-profile&focus=business-profile-section` opens the Business Footprint modal and focuses the expected section.
 - `?tab=eeat-assets` opens the trust proof modal.
 - Closing a modal restores overview state.
 - No blank modal body, duplicate panel mount, or internal migration labels.
 
-Current generator-modal polish smoke:
+Final V1–V7 evidence root: `/tmp/asset-dashboard-codex-visual-parity/brand-ai/final-v1-v7/`.
 
-- Desktop identity modal with workflow frame: `/tmp/asset-dashboard-codex-parity-captures/brand-ai-identity-generator-modal-desktop.png`.
-- Mobile identity modal with workflow frame: `/tmp/asset-dashboard-codex-parity-captures/brand-ai-identity-generator-modal-mobile.png`.
-- Smoke state: `/tmp/asset-dashboard-codex-parity-captures/brand-ai-identity-generator-modal-smoke-state.json`.
+- Paired desktop overviews: `paired-overview-1440.png` and `paired-overview-1600.png`.
+- Expanded generator states: `expanded-voice-1440.png`, `expanded-audience-1440.png`, and `expanded-facts-1440.png`.
+- Focused Identity states: `identity-focused-tagline-1440.png`, `identity-focused-missing-brand-story-1440.png`, `identity-library-1440.png`, and `identity-invalid-focus-1440.png`.
+- Brandscript compatibility states: `brandscript-focused-existing-1440.png` and `brandscript-library-1440.png`.
+- Production-interior comparison: `modal-comparison-sheet.png`.
+- Mobile floor: `rebuilt-overview-mobile-390.png` and `identity-focused-mobile-390.png`.
 
-Result: passed. Both desktop and mobile show exactly one `Brand identity` dialog, the `Generator workflow` frame, all five lifecycle steps, no visible internal labels, no page-level horizontal overflow, no console errors, and no local failed responses.
+Browser result: all tested desktop/mobile states have one real receiver, one Refresh action, zero nested buttons, zero page-level horizontal overflow, zero console errors, and zero page errors. Every Brand workflow dialog computes to 680px on desktop; the focused mobile dialog fits at 358px inside the 390px viewport.
 
-Current bespoke-flow modal polish smoke:
-
-- Desktop Discovery modal with workflow frame: `/tmp/asset-dashboard-codex-parity-captures/brand-ai-discovery-workflow-modal-desktop.png`.
-- Mobile Discovery modal with workflow frame: `/tmp/asset-dashboard-codex-parity-captures/brand-ai-discovery-workflow-modal-mobile.png`.
-- Desktop Business facts alias modal with workflow frame: `/tmp/asset-dashboard-codex-parity-captures/brand-ai-business-facts-workflow-modal-desktop.png`.
-- Smoke state: `/tmp/asset-dashboard-codex-parity-captures/brand-ai-bespoke-flow-modal-smoke-state.json`.
-
-Result: passed. Discovery desktop/mobile and Business facts alias deep-link states show exactly one dialog, the expected workflow frame, no visible internal labels, no page-level horizontal overflow, and no console errors.
-
-Current context/voice/intelligence modal polish smoke:
-
-- Desktop Context editors modal with workflow frame: `/tmp/asset-dashboard-codex-parity-captures/brand-ai-context-workflow-modal-desktop.png`.
-- Desktop Voice calibration modal with workflow frame: `/tmp/asset-dashboard-codex-parity-captures/brand-ai-voice-workflow-modal-desktop.png`.
-- Mobile Strategy intelligence modal with workflow frame: `/tmp/asset-dashboard-codex-parity-captures/brand-ai-strategy-intelligence-workflow-modal-mobile.png`.
-- Smoke state: `/tmp/asset-dashboard-codex-parity-captures/brand-ai-context-voice-intelligence-modal-smoke-state.json`.
-
-Result: passed. Context editors, Voice calibration, and Strategy intelligence modal states show exactly one dialog, the expected workflow frame, no visible internal labels, no page-level horizontal overflow, and no console errors.
-
-Current typography-role smoke:
-
-- Desktop overview after role alignment: `/tmp/asset-dashboard-codex-parity-captures/brand-ai-typography-role-overview-desktop.png`.
-- Desktop Brand identity modal after role alignment: `/tmp/asset-dashboard-codex-parity-captures/brand-ai-typography-role-identity-modal-desktop.png`.
-- Smoke state: `/tmp/asset-dashboard-codex-parity-captures/brand-ai-typography-role-smoke-state.json`.
-
-Result: layout passed. The overview has no dialog, the identity deep link opens exactly one dialog, sampled operator labels compute at `.t-ui`/13.5px, sampled explanatory copy computes at `.t-body`/15.5px, no internal labels are visible, and no horizontal overflow is present. The local preview emitted existing websocket/notification fetch noise with the backend stack not attached; no Brand & AI render or modal errors were observed.
+Fresh Sol review, 2026-07-10: `PASS`. V1–V7 are implemented exactly as approved; Voice begins within about 2px of the prototype landmark; Markdown-backed previews are readable while raw editor values round-trip unchanged; no safe-local defects remain. Joshua then reviewed the live surface and said, “It looks great,” establishing `owner-approved` status. His finer feedback is explicitly deferred to the registry-wide pass.
 
 ## Automated Test Floor
 
@@ -154,15 +150,15 @@ Result: layout passed. The overview has no dialog, the identity deep link opens 
 
 - Real feature flag hook survives loading-to-loaded transition.
 - Overview renders the four prototype context groups and usage rail for a loaded workspace with no dialog, no top tab radiogroup, and no legacy child panel.
-- Overview labels/snippets, right-rail copy, and modal workflow framing use the intended styleguide type roles instead of putting primary operator copy in caption-sized roles.
-- Voice & Messaging renders exactly one Brand identity generators disclosure and its rows open Brand identity.
+- Overview labels/snippets, right-rail copy, and modal context use the intended styleguide roles, including the owner-approved 13.5px/700 rail-title exception.
+- The four context groups render all 17 generators exactly once in the source-exact 7 / 2 / 5 / 3 mapping.
+- Generator rows write a validated atomic `tab + focus` state and mount one selected real Identity editor; bare/invalid focus preserves the full library.
 - `?tab=brandscript` opens a dialog/modal and mounts Brandscript exactly once.
+- The overview Brandscript row focuses a real record; clearing focus or using the bare deep link retains the library.
 - `?tab=eeat-assets` and `?tab=identity` open the expected dialog/modal and mount their legacy panels exactly once.
-- The Brand identity modal renders the generator workflow lifecycle before the carried editor panel.
-- Discovery, Brandscript, Trust evidence, and Business facts modal states render the prototype workflow context before the carried panel.
-- Context editors, Voice calibration, and Strategy intelligence modal states render workflow context before the carried panel.
+- All Brand workflows use the approved 680px `workflow` Modal shell without synthetic framing.
 - `?tab=business-profile` and `?tab=locations` open Business Footprint exactly once.
-- Lens switching updates the validated URL state and opens the expected modal.
+- Group/item switching updates validated URL state and opens the expected modal.
 - Modal close returns to overview.
 - Internal migration terms are absent from visible UI.
 - Rebuilt a11y floor passes.

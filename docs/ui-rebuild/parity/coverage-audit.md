@@ -91,7 +91,7 @@ Interior state has been checked in contracts, component tests, and smoke for the
 | Contract | Route ids covered | Interior states accounted for | Visual status / constraint |
 |---|---|---|---|
 | Cockpit | `home` | Stream selector, work queue, activity drawer, work-order modal, `stream=` deep link | `behavior-safe / visual-unverified` |
-| Brand & AI | `brand` | Overview sections, modal workflows, `?tab=` aliases, Voice-only generators | `behavior-safe / visual-unverified`; legacy modal interiors remain |
+| Brand & AI | `brand` | Grouped overview, modal workflows, `?tab=`/focused receivers, all 17 generators across four groups | `owner-approved`; truthful production interiors/actions and V5–V7 remain explicit exceptions |
 | Schema | `seo-schema` | Generator, Workflow Guide, page detail Drawer, publish/send/history | `behavior-safe / visual-unverified` |
 | Links | `links` | Redirects, Internal Links, Dead Links, Architecture, detail Drawer, legacy alias | `behavior-safe / visual-unverified` |
 | Performance | `performance` | Page Weight, Page Speed, weight Drawer, speed handoff | `behavior-safe / visual-unverified` |
@@ -113,7 +113,7 @@ The behavior checkpoint accounted for layout and route state across every mounte
 
 Current layout buckets:
 
-- `owner-approved`: Insights Engine, including the explicit V4–V6 production/backend exceptions.
+- `owner-approved`: Insights Engine and Brand & AI, including their explicit production/backend/design-system exceptions.
 - `behavior-safe / visual-unverified`: every other mounted surface; the table retains each known capability constraint.
 - Receiving-home proof pending: Page Intelligence stays standalone; Content Pipeline Published is the proposed Content Performance receiver. Both standalone route ids remain intact.
 - Redirect/folded only: SEO Briefs, Content, and Calendar.

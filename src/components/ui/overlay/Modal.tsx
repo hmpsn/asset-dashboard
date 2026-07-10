@@ -26,11 +26,13 @@ import { getFocusable, acquireScrollLock, releaseScrollLock } from './overlayUti
  * prefers reduced motion.
  * ────────────────────────────────────────────────────────────────────────── */
 
-type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
+type ModalSize = 'sm' | 'md' | 'workflow' | 'lg' | 'xl';
 
 const SIZE_MAX_WIDTH: Record<ModalSize, string> = {
   sm: 'max-w-[24rem]',
   md: 'max-w-[32rem]',
+  /** Compact editor/workflow shell approved for prototype-led Brand flows. */
+  workflow: 'max-w-[42.5rem]',
   lg: 'max-w-[48rem]',
   xl: 'max-w-[64rem]',
 };

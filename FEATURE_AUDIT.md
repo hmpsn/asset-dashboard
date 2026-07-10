@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **590 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **591 features** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 668. Owner-approved Brand & AI desktop composition 2026-07-10
+
+**Status:** `owner-approved`. Joshua approved `ODP-BRAND-V1` through `V7` as recommended, reviewed the final live surface, said “It looks great,” and explicitly deferred finer feedback to the registry-wide parity review. A fresh Sol rendered review returned `PASS`; automated evidence supports but does not replace that approval.
+
+**What it does:** Rebuilds the Brand & AI surface around the prototype's grouped context cockpit and modal-first workflow without changing route or production capability contracts. The overview now reports the truthful configured-input count instead of a client-inferred readiness score; distributes all 17 real Brand deliverables exactly once across Voice, Knowledge, Audience, and Business Facts in the source-exact 7 / 2 / 5 / 3 grouping; opens validated Identity focus links into one real editor while preserving bare/invalid full-library receivers; focuses the first real Brandscript only from its overview launch; and uses one owner-approved 42.5rem/680px `workflow` Modal shell. Production editors, actions, empty states, Refresh, and Discovery remain truthful. Founder interview Q&A, prototype E-E-A-T rollups, confirmed-geo rollups, unsupported Preview, and the 13.5px rail-title role remain explicit V5–V7 exceptions rather than simulated data or new typography tokens. Markdown-backed collapsed previews render as readable prose, Context rules round-trip to stored `---`, and Brandscript controls no longer nest buttons.
+
+**Why it matters:** Operators get the prototype's visual hierarchy, density, section order, and focused workflow composition while every existing Brand capability, alias, and exact-once editor home stays intact. The surface no longer implies a readiness judgment the server cannot substantiate or fabricates prototype-only actions/data.
+
+**Tests and verification:** Ten focused suites pass 218 tests. Hooks lint, typecheck, Vite build, all PR checks, and diff hygiene pass. Matched 1440×900 and 1600×1000 overviews, expanded groups, focused/full/invalid Identity receivers, focused/library Brandscript states, all workflow dialogs, and the 390×844 usability floor are recorded in `/tmp/asset-dashboard-codex-visual-parity/brand-ai/final-v1-v7/`. Browser inspection found zero nested buttons, page overflow, console errors, or page errors; every desktop workflow dialog computes to 680px.
+
+**Files:** `src/components/BrandHub.tsx`; `src/components/brand-ai-rebuilt/{BrandAiSurface,useBrandAiSurfaceState}.ts*`; `src/components/brand/{BrandscriptTab,IdentityTab}.tsx`; `src/components/ui/overlay/Modal.tsx`; `src/utils/markdownPreview.ts`; matching component tests; Brand parity contracts, decision records, design-system docs, and roadmap acceptance record.
 
 ---
 

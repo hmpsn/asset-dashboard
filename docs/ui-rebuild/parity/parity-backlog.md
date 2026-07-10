@@ -54,9 +54,9 @@ Accepted owner directions, circle-back triggers, and remaining risks are tracked
    - Deliverable: keep the current v1 and manual refresh controls; track geo-grid and GBP Performance as explicit backend capability work rather than frontend parity polish.
 
 10. Brand & AI modal-first correction
-   - Status: `behavior-safe / visual-unverified`; the modal-first behavior checkpoint is implemented, with legacy modal-interior visual work still pending.
-   - Reason: Prototype opens Brand pieces as modal workflows; current rebuilt slice uses inline active panels.
-   - Deliverable: modal state, grouped context overview, no top tab strip, Voice-only Brand identity generators, `?tab=` alias preservation, generator workflow framing in the Brand identity modal, bespoke Discovery/Brandscript/Trust evidence/Business facts workflow framing, remaining Context/Voice/Strategy Intelligence workflow framing, and exact-once child panel mounting are covered by `tests/component/brand-ai-rebuilt/BrandAiSurface.test.tsx`.
+   - Status: `owner-approved` on 2026-07-10; V1–V7 are the accepted decisions and exceptions, with finer feedback deferred to the registry-wide pass.
+   - Reason: The source-led pass restores the prototype's modal-first grouped cockpit while retaining truthful production editors, actions, URLs, and exact-once capability homes.
+   - Deliverable: all 17 generators render exactly once in the source-exact 7 / 2 / 5 / 3 group mapping; Identity and Brandscript have focused receivers; every Brand workflow uses the approved 680px modal; truthful production interiors and V5–V7 exceptions remain explicit. The 218-test floor, final browser evidence in `/tmp/asset-dashboard-codex-visual-parity/brand-ai/final-v1-v7/`, and a fresh Sol `PASS` support Joshua's visual approval.
 
 11. Cockpit overlay smoke completion
    - Status: `behavior-safe / visual-unverified`; the current fixture set and Risk receiver behavior are browser-smoked.

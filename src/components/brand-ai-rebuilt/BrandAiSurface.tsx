@@ -5,7 +5,9 @@ import { workspaces } from '../../api';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { queryKeys } from '../../lib/queryKeys';
 import { formatDate } from '../../utils/formatDates';
+import { markdownToPlainTextPreview } from '../../utils/markdownPreview';
 import type { AudiencePersona, TargetGeo } from '../../../shared/types/workspace';
+import type { BrandDeliverableType } from '../../../shared/types/brand-engine';
 import { useToast } from '../Toast';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { BrandHub } from '../BrandHub';
@@ -16,6 +18,7 @@ import { IdentityTab } from '../brand/IdentityTab';
 import { BusinessFootprintTab } from '../settings/BusinessFootprintTab';
 import { EeatAssetsTab } from '../settings/EeatAssetsTab';
 import { IntelligenceProfileTab } from '../settings/IntelligenceProfileTab';
+import { RebuiltTopbarActions } from '../layout/RebuiltAppChrome';
 import {
   Badge,
   type BadgeTone,
@@ -28,6 +31,7 @@ import {
   Modal,
   Meter,
   PageHeader,
+  scoreColor,
   SectionCard,
   Skeleton,
 } from '../ui';
@@ -85,12 +89,14 @@ interface ContextItem {
   snippet: string;
   status: ContextStatus;
   tab: BrandAiTab;
+  focus?: string;
   actionLabel: string;
 }
 
 interface IdentityGenerator {
+  deliverableType: BrandDeliverableType;
   name: string;
-  tier: 'ess' | 'pro';
+  tier: 'ess' | 'pro' | 'prem';
 }
 
 interface BrandContextGroup {
@@ -106,15 +112,38 @@ interface BrandContextGroup {
   personas?: AudiencePersona[];
 }
 
-const VOICE_IDENTITY_GENERATORS: IdentityGenerator[] = [
-  { name: 'Tagline', tier: 'ess' },
-  { name: 'Voice Guidelines', tier: 'ess' },
-  { name: 'Brand Archetypes', tier: 'pro' },
-  { name: 'Personality Traits', tier: 'pro' },
-  { name: 'Messaging Pillars', tier: 'pro' },
-  { name: 'Differentiators', tier: 'pro' },
-  { name: 'Tone Examples', tier: 'pro' },
-];
+const IDENTITY_GENERATORS_BY_GROUP = {
+  voice: [
+    { deliverableType: 'tagline', name: 'Tagline', tier: 'ess' },
+    { deliverableType: 'voice_guidelines', name: 'Voice Guidelines', tier: 'ess' },
+    { deliverableType: 'archetypes', name: 'Brand Archetypes', tier: 'pro' },
+    { deliverableType: 'personality_traits', name: 'Personality Traits', tier: 'pro' },
+    { deliverableType: 'messaging_pillars', name: 'Messaging Pillars', tier: 'pro' },
+    { deliverableType: 'differentiators', name: 'Differentiators', tier: 'pro' },
+    { deliverableType: 'tone_examples', name: 'Tone Examples', tier: 'pro' },
+  ],
+  knowledge: [
+    { deliverableType: 'elevator_pitch', name: 'Elevator Pitch', tier: 'pro' },
+    { deliverableType: 'brand_story', name: 'Brand Story', tier: 'prem' },
+  ],
+  audience: [
+    { deliverableType: 'positioning_matrix', name: 'Positioning Matrix', tier: 'prem' },
+    { deliverableType: 'personas', name: 'Customer Personas', tier: 'prem' },
+    { deliverableType: 'customer_journey', name: 'Customer Journey', tier: 'prem' },
+    { deliverableType: 'objection_handling', name: 'Objection Handling', tier: 'prem' },
+    { deliverableType: 'emotional_triggers', name: 'Emotional Triggers', tier: 'prem' },
+  ],
+  facts: [
+    { deliverableType: 'mission', name: 'Mission Statement', tier: 'ess' },
+    { deliverableType: 'vision', name: 'Vision Statement', tier: 'ess' },
+    { deliverableType: 'values', name: 'Core Values', tier: 'ess' },
+  ],
+} as const satisfies Record<ContextGroupId, readonly IdentityGenerator[]>;
+
+const IDENTITY_GENERATOR_TYPES = new Set<BrandDeliverableType>(
+  Object.values(IDENTITY_GENERATORS_BY_GROUP).flat().map((generator) => generator.deliverableType),
+);
+const BRANDSCRIPT_OVERVIEW_FOCUS = 'existing-brandscript';
 
 const GROUP_BORDER_CLASS: Record<ContextGroupId, string> = {
   voice: 'border-l-[3px] border-l-[var(--teal)]',
@@ -124,32 +153,9 @@ const GROUP_BORDER_CLASS: Record<ContextGroupId, string> = {
 };
 
 interface BrandContextSummary {
-  score: number;
   configured: number;
   total: number;
   groups: BrandContextGroup[];
-}
-
-interface ReadinessStatus {
-  label: string;
-  description: string;
-  tone: BadgeTone;
-}
-
-interface WorkflowContextFrame {
-  ariaLabel: string;
-  title: string;
-  badge: string;
-  badgeTone: BadgeTone;
-  description: string;
-  icon: IconName;
-  accent: string;
-  items: readonly {
-    label: string;
-    description: string;
-    icon: IconName;
-  }[];
-  note: string;
 }
 
 const TAB_ACCENTS: Record<BrandAiTab, string> = {
@@ -211,126 +217,12 @@ const WORKFLOW_MODAL_COPY: Record<WorkflowTab, { title: string; subtitle: string
   },
 };
 
-const GENERATOR_WORKFLOW_STEPS = ['Generate', 'Refine', 'Edit', 'Approve', 'Export'] as const;
-
-const WORKFLOW_CONTEXT_FRAMES: Partial<Record<WorkflowTab, WorkflowContextFrame>> = {
-  context: {
-    ariaLabel: 'Context editors workflow',
-    title: 'Reusable AI context',
-    badge: 'Context library',
-    badgeTone: 'teal',
-    description: 'Review the shared context library that Brand & AI passes into writing, strategy, schema, and client-facing recommendations.',
-    icon: 'clipboard',
-    accent: 'var(--teal)',
-    items: [
-      { label: 'Voice & style', description: 'House tone, phrase choices, and copy guardrails.', icon: 'message' },
-      { label: 'Knowledge base', description: 'Services, proof, process details, FAQs, and offer facts.', icon: 'doc' },
-      { label: 'Personas', description: 'Audience segments, anxieties, objections, and buying stage.', icon: 'user' },
-      { label: 'Page guidance', description: 'Page-level context that keeps generated recommendations specific.', icon: 'file' },
-    ],
-    note: 'These editors are the carried context workspace; keep changes reviewed before they feed high-volume AI output.',
-  },
-  discovery: {
-    ariaLabel: 'Discovery intake workflow',
-    title: 'Source of truth',
-    badge: 'Knowledge Base',
-    badgeTone: 'blue',
-    description: 'Collect the raw material that becomes the Knowledge Base: uploaded documents, founder answers, and reviewed AI drafts.',
-    icon: 'file',
-    accent: 'var(--blue)',
-    items: [
-      { label: 'Uploaded documents', description: 'Interviews, decks, policies, pricing, and proof sources.', icon: 'doc' },
-      { label: 'Founder interview', description: "Key questions answered in the client's own language.", icon: 'message' },
-      { label: 'Regenerate Knowledge Base', description: 'Re-read every source and draft an updated knowledge profile.', icon: 'sparkle' },
-      { label: 'Review before save', description: 'Operators approve context before it feeds AI output.', icon: 'check' },
-    ],
-    note: 'The prototype treats regeneration as a reviewed draft, not an automatic overwrite.',
-  },
-  voice: {
-    ariaLabel: 'Voice calibration workflow',
-    title: 'Voice DNA calibration',
-    badge: 'Tone guardrails',
-    badgeTone: 'teal',
-    description: 'Calibrate how the client sounds before AI writes pages, briefs, posts, and recommendations in their voice.',
-    icon: 'message',
-    accent: 'var(--teal)',
-    items: [
-      { label: 'Samples', description: 'Compare generated copy against approved source pages and examples.', icon: 'doc' },
-      { label: 'Guardrails', description: 'Lock in words to prefer, words to avoid, and tone boundaries.', icon: 'key' },
-      { label: 'Similarity review', description: 'Check whether new copy still feels like the client.', icon: 'target' },
-      { label: 'Approve for generation', description: 'Only reviewed voice DNA should feed high-stakes outputs.', icon: 'check' },
-    ],
-    note: 'Voice calibration is a trust step, not a decoration; weak samples should stay visible until reviewed.',
-  },
-  brandscript: {
-    ariaLabel: 'Brandscript workflow',
-    title: 'Seven-part narrative',
-    badge: 'StoryBrand',
-    badgeTone: 'teal',
-    description: 'Shape the customer-as-hero narrative that feeds briefs, pages, campaigns, and calls to action.',
-    icon: 'message',
-    accent: 'var(--teal)',
-    items: [
-      { label: 'Hero', description: 'Who the story is about.', icon: 'target' },
-      { label: 'Problem', description: 'External, internal, and philosophical stakes.', icon: 'info' },
-      { label: 'Guide', description: "The brand's empathy and authority.", icon: 'key' },
-      { label: 'Plan', description: 'The clear steps to buy or engage.', icon: 'clipboard' },
-      { label: 'Failure', description: 'What inaction costs the customer.', icon: 'target' },
-    ],
-    note: 'Approved sections become reusable copy context; incomplete sections stay visible instead of disappearing.',
-  },
-  'eeat-assets': {
-    ariaLabel: 'Trust evidence workflow',
-    title: 'E-E-A-T signals',
-    badge: 'Proof ledger',
-    badgeTone: 'amber',
-    description: 'Track the proof search engines and buyers can verify, then use it across schema and trust-building content.',
-    icon: 'trophy',
-    accent: 'var(--amber)',
-    items: [
-      { label: 'Experience', description: 'First-hand work, case history, and lived expertise.', icon: 'file' },
-      { label: 'Expertise', description: 'Credentials, process depth, and educational proof.', icon: 'target' },
-      { label: 'Authority', description: 'Awards, mentions, memberships, and outside validation.', icon: 'trophy' },
-      { label: 'Trust', description: 'Reviews, warranties, policies, and verifiable assurances.', icon: 'key' },
-    ],
-    note: 'Missing proof can be drafted from sources, but it still needs review before it becomes reusable trust context.',
-  },
-  'intelligence-profile': {
-    ariaLabel: 'Strategy intelligence workflow',
-    title: 'Strategy inputs',
-    badge: 'Strategy profile',
-    badgeTone: 'blue',
-    description: 'Set the strategic facts the platform uses before it prioritizes recommendations, briefs, and search opportunities.',
-    icon: 'chart',
-    accent: 'var(--blue)',
-    items: [
-      { label: 'Industry', description: 'The competitive category and search landscape to reason inside.', icon: 'home' },
-      { label: 'Goals', description: 'Business outcomes that should shape strategy recommendations.', icon: 'target' },
-      { label: 'Audience', description: 'Who the strategy should serve and persuade.', icon: 'user' },
-      { label: 'Business priorities', description: 'Near-term focus areas that keep AI suggestions useful.', icon: 'clipboard' },
-    ],
-    note: 'If a strategy input is missing, keep it explicit rather than letting AI infer the business direction.',
-  },
-  'business-footprint': {
-    ariaLabel: 'Business facts workflow',
-    title: 'Locations & service areas',
-    badge: 'Local SEO + schema',
-    badgeTone: 'blue',
-    description: 'Confirm the business facts and target geographies that local visibility, schema, and AI context can safely reuse.',
-    icon: 'pin',
-    accent: 'var(--blue)',
-    items: [
-      { label: 'Primary location', description: 'The canonical business address and identity anchor.', icon: 'home' },
-      { label: 'Service areas', description: 'Markets and geographies eligible for local matching.', icon: 'pin' },
-      { label: 'Review detected geos', description: 'Confirm inferred areas before using them for ranking.', icon: 'check' },
-      { label: 'Publishable facts', description: 'Keep website, schema, and AI context in agreement.', icon: 'clipboard' },
-    ],
-    note: 'Unconfirmed locations should stay visible as work-in-progress instead of quietly feeding ranking or schema decisions.',
-  },
-};
-
 function hasText(value: string | null | undefined): boolean {
   return Boolean(value?.trim());
+}
+
+function isIdentityGeneratorFocus(value: string | null | undefined): value is BrandDeliverableType {
+  return typeof value === 'string' && IDENTITY_GENERATOR_TYPES.has(value as BrandDeliverableType);
 }
 
 function countComplete(values: boolean[]): number {
@@ -400,7 +292,7 @@ function buildBrandContextSummary(ws: WorkspaceData | undefined): BrandContextSu
           name: 'Brand voice & style',
           source: 'brand voice',
           snippet: hasText(ws?.brandVoice)
-            ? ws?.brandVoice?.trim() ?? ''
+            ? markdownToPlainTextPreview(ws?.brandVoice)
             : 'No reviewed voice guidance yet. Generate from the site or add the house style before asking AI to write.',
           status: hasText(ws?.brandVoice) ? 'set' : 'empty',
           tab: 'context',
@@ -424,6 +316,7 @@ function buildBrandContextSummary(ws: WorkspaceData | undefined): BrandContextSu
           snippet: 'StoryBrand framework, section editing, imports, and AI-assisted fill live here.',
           status: hasText(ws?.brandVoice) ? 'part' : 'empty',
           tab: 'brandscript',
+          focus: BRANDSCRIPT_OVERVIEW_FOCUS,
           actionLabel: 'Open',
         },
       ],
@@ -443,7 +336,7 @@ function buildBrandContextSummary(ws: WorkspaceData | undefined): BrandContextSu
           name: 'Knowledge base',
           source: 'knowledge base',
           snippet: hasText(ws?.knowledgeBase)
-            ? ws?.knowledgeBase?.trim() ?? ''
+            ? markdownToPlainTextPreview(ws?.knowledgeBase)
             : 'No source knowledge is saved yet. Add services, process, proof, FAQs, and offer details.',
           status: hasText(ws?.knowledgeBase) ? 'set' : 'empty',
           tab: 'context',
@@ -541,30 +434,7 @@ function buildBrandContextSummary(ws: WorkspaceData | undefined): BrandContextSu
   ];
   const configured = groups.reduce((sum, group) => sum + group.configured, 0);
   const total = groups.reduce((sum, group) => sum + group.total, 0);
-  const score = total > 0 ? Math.round((configured / total) * 100) : 0;
-  return { score, configured, total, groups };
-}
-
-function readinessStatus(score: number): ReadinessStatus {
-  if (score >= 80) {
-    return {
-      label: 'Ready for guided generation',
-      description: 'The AI has enough context to draft with business-specific details.',
-      tone: 'emerald',
-    };
-  }
-  if (score >= 50) {
-    return {
-      label: 'Needs a little more context',
-      description: 'Generation can start, but a few missing inputs will make it safer.',
-      tone: 'amber',
-    };
-  }
-  return {
-    label: 'Needs setup before generation',
-    description: 'Add the core brand and business facts before using AI outputs.',
-    tone: 'red',
-  };
+  return { configured, total, groups };
 }
 
 function TabIcon({ tab }: { tab: BrandAiTab }) {
@@ -579,82 +449,6 @@ function TabIcon({ tab }: { tab: BrandAiTab }) {
   );
 }
 
-function BrandIdentityWorkflowFrame() {
-  return (
-    <SectionCard
-      title="Generator workflow"
-      titleIcon={<Icon name="sparkle" size="sm" className="text-[var(--teal)]" />}
-      titleExtra={<Badge label={`${GENERATOR_WORKFLOW_STEPS.length} steps`} tone="zinc" variant="soft" size="sm" />}
-      iconChip
-      variant="subtle"
-      noPadding
-    >
-      <div className="flex flex-col gap-3 p-4">
-        <p className="t-body leading-relaxed text-[var(--brand-text-muted)]">
-          Review and approve deliverables before they become reusable AI context.
-        </p>
-        <ol className="grid gap-2 sm:grid-cols-5" aria-label="Brand identity generator steps">
-          {GENERATOR_WORKFLOW_STEPS.map((step, index) => (
-            <li key={step} className="flex items-center gap-2 t-ui font-semibold text-[var(--brand-text-bright)]">
-              <span className="t-micro tabular-nums text-[var(--teal)]">{index + 1}</span>
-              <span>{step}</span>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </SectionCard>
-  );
-}
-
-function BrandWorkflowContextFrame({ tab }: { tab: WorkflowTab }) {
-  const frame = WORKFLOW_CONTEXT_FRAMES[tab];
-  if (!frame) return null;
-
-  return (
-    <section aria-label={frame.ariaLabel}>
-      <SectionCard
-        title={frame.title}
-        subtitle={frame.description}
-        titleIcon={<Icon name={frame.icon} size="sm" style={{ color: frame.accent }} />}
-        titleExtra={<Badge label={frame.badge} tone={frame.badgeTone} variant="soft" size="sm" />}
-        iconChip
-        variant="subtle"
-        noPadding
-      >
-        <div className="flex flex-col gap-3 p-4">
-          <ol className="grid gap-2 md:grid-cols-2">
-            {frame.items.map((item, index) => (
-              <li
-                key={item.label}
-                className="flex min-w-0 items-start gap-3 rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-3 py-2.5"
-              >
-                <span
-                  className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface-3)]"
-                  style={{ color: frame.accent }}
-                  aria-hidden="true"
-                >
-                  <Icon name={item.icon} size="xs" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <span className="t-micro tabular-nums text-[var(--brand-text-dim)]">{index + 1}</span>
-                    <span className="t-ui font-semibold text-[var(--brand-text-bright)]">{item.label}</span>
-                  </span>
-                  <span className="mt-1 block t-body leading-relaxed text-[var(--brand-text-muted)]">{item.description}</span>
-                </span>
-              </li>
-            ))}
-          </ol>
-          <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-3 py-2.5">
-            <Icon name="info" size="sm" className="mt-0.5 shrink-0 text-[var(--teal)]" aria-hidden="true" />
-            <p className="t-body leading-relaxed text-[var(--brand-text-muted)]">{frame.note}</p>
-          </div>
-        </div>
-      </SectionCard>
-    </section>
-  );
-}
-
 function BrandAiLoadingState() {
   return (
     <div className="flex flex-col gap-4" aria-label="Loading Brand AI surface">
@@ -666,7 +460,7 @@ function BrandAiLoadingState() {
 }
 
 function statusLabel(status: ContextStatus): string {
-  if (status === 'set') return 'Set';
+  if (status === 'set') return 'Ready';
   if (status === 'part') return 'Partial';
   return 'Needs setup';
 }
@@ -688,6 +482,17 @@ function ContextStatusIcon({ status }: { status: ContextStatus }) {
       <Icon name={icon} size="xs" />
     </span>
   );
+}
+
+function contextGroupStatus(percent: number): ContextStatus {
+  if (percent >= 80) return 'set';
+  if (percent >= 40) return 'part';
+  return 'empty';
+}
+
+function contextGroupMeterColor(percent: number): string {
+  const canonicalScoreBand = percent >= 80 ? 80 : percent >= 40 ? 60 : 0;
+  return scoreColor(canonicalScoreBand);
 }
 
 function GroupIcon({ group }: { group: BrandContextGroup }) {
@@ -712,41 +517,35 @@ function BrandContextCockpit({
 }: {
   summary: BrandContextSummary;
   activeTab: BrandAiTab;
-  onOpenTab: (tab: BrandAiTab) => void;
+  onOpenTab: (tab: BrandAiTab, focus?: string | null) => void;
 }) {
-  const status = readinessStatus(summary.score);
   return (
     <SectionCard
       variant="subtle"
       noPadding
     >
-      <div className="flex flex-col gap-4 p-4 sm:p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div data-testid="brand-context-cockpit-content" className="flex flex-col gap-5 px-4 py-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="flex items-center gap-3">
-            <div className="flex items-baseline gap-1">
-              <span className="t-h1 tabular-nums text-[var(--brand-text-bright)]">{summary.score}</span>
-              <span className="t-body font-semibold text-[var(--brand-text-muted)]">%</span>
+            <div data-testid="brand-ai-configured-count" className="flex items-baseline gap-1">
+              <span className="t-h1 tabular-nums text-[var(--brand-text-bright)]">{summary.configured}</span>
+              <span className="t-body font-semibold tabular-nums text-[var(--brand-text-muted)]">/{summary.total}</span>
             </div>
-            <span className="t-caption-sm font-medium leading-tight text-[var(--brand-text-muted)]">
-              context<br className="hidden sm:block" /> complete
-            </span>
+            <span className="t-caption-sm font-medium text-[var(--brand-text-muted)]">inputs configured</span>
           </div>
-          <div className="flex min-w-0 flex-col gap-2 sm:ml-auto sm:items-end">
+          <div className="flex min-w-0 sm:ml-auto sm:items-end">
             <span className="flex min-w-0 items-center gap-2 t-caption-sm text-[var(--brand-text-muted)]">
-              <Icon name="info" size="sm" className="shrink-0 text-[var(--teal)]" aria-hidden="true" />
+              <Icon name="info" size="sm" className="shrink-0 text-[var(--purple)]" aria-hidden="true" />
               <span className="min-w-0">
                 <span className="font-semibold text-[var(--brand-text-bright)]">Overview</span> · what the AI knows about this client
               </span>
-            </span>
-            <span className="flex flex-wrap items-center gap-2 sm:justify-end">
-              <Badge label={status.label} tone={status.tone} variant="soft" size="sm" />
-              <span className="t-caption-sm text-[var(--brand-text-muted)]">{summary.configured}/{summary.total} inputs configured</span>
             </span>
           </div>
         </div>
         <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
           {summary.groups.map((group) => {
             const groupPercent = percentage(group.configured, group.total);
+            const groupStatus = contextGroupStatus(groupPercent);
             const primaryTab = group.id === 'knowledge'
               ? 'discovery'
               : group.id === 'audience'
@@ -761,19 +560,16 @@ function BrandContextCockpit({
                 onClick={() => onOpenTab(primaryTab)}
                 className="h-full rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-3 py-3 hover:border-[var(--brand-border-hover)]"
               >
-                <span className="flex h-full flex-col gap-3">
-                  <span className="flex items-start gap-3">
-                    <GroupIcon group={group} />
-                    <span className="min-w-0 flex-1">
-                    <span className="block t-ui font-semibold text-[var(--brand-text-bright)]">{group.label}</span>
-                    <span className="mt-1 block t-body leading-snug text-[var(--brand-text-muted)]">{group.question}</span>
+                <span className="flex h-full flex-col gap-2">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Icon name={group.icon} size="xs" style={{ color: group.accent }} aria-hidden="true" />
+                    <span className="truncate t-ui font-semibold text-[var(--brand-text-bright)]">{group.label}</span>
                   </span>
-                </span>
-                  <span className="mt-auto flex flex-col gap-2">
-                    <Meter value={groupPercent} max={100} color={group.accent} height={5} ariaLabel={`${group.label} completeness`} />
+                  <span className="mt-auto flex flex-col gap-1.5">
+                    <Meter value={groupPercent} max={100} color={contextGroupMeterColor(groupPercent)} height={5} ariaLabel={`${group.label} completeness`} />
                     <span className="flex items-center justify-between gap-2">
-                      <span className="t-caption-sm text-[var(--brand-text-muted)]">{group.configured}/{group.total} set</span>
-                      <Badge label={statusLabel(statusFromCount(group.configured, group.total))} tone={statusTone(statusFromCount(group.configured, group.total))} variant="soft" size="sm" />
+                      <span className="t-ui font-semibold tabular-nums text-[var(--brand-text-bright)]">{groupPercent}%</span>
+                      <Badge label={statusLabel(groupStatus)} tone={statusTone(groupStatus)} variant="soft" size="sm" />
                     </span>
                   </span>
                 </span>
@@ -793,12 +589,12 @@ function BrandContextItemRow({
 }: {
   item: ContextItem;
   active: boolean;
-  onOpenTab: (tab: BrandAiTab) => void;
+  onOpenTab: (tab: BrandAiTab, focus?: string | null) => void;
 }) {
   return (
     <ClickableRow
       active={active}
-      onClick={() => onOpenTab(item.tab)}
+      onClick={() => onOpenTab(item.tab, item.focus)}
       className="border-b border-[var(--brand-border)] px-4 py-3 last:border-b-0 hover:bg-[var(--surface-1)]"
     >
       <span className="flex flex-col gap-3 sm:flex-row sm:items-start">
@@ -809,10 +605,10 @@ function BrandContextItemRow({
               <span className="t-ui font-semibold text-[var(--brand-text-bright)]">{item.name}</span>
               <Badge label={item.source} tone="zinc" variant="soft" size="sm" />
             </span>
-            <span className="mt-1 block t-body leading-relaxed text-[var(--brand-text-muted)]">{item.snippet}</span>
+            <span className="mt-1 line-clamp-2 t-caption-sm leading-snug text-[var(--brand-text-muted)]">{item.snippet}</span>
           </span>
         </span>
-        <span className="inline-flex shrink-0 items-center gap-1 self-start rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-3)] px-2.5 py-1 t-caption-sm font-semibold text-[var(--brand-text-bright)] sm:ml-auto">
+        <span className="inline-flex shrink-0 items-center gap-1 self-start rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-3)] px-2.5 py-1 t-label font-semibold normal-case tracking-normal text-[var(--brand-text-bright)] sm:ml-auto">
           {item.status === 'empty' && <Icon name="sparkle" size="xs" aria-hidden="true" />}
           {item.actionLabel}
           <Icon name="arrowRight" size="xs" aria-hidden="true" />
@@ -829,7 +625,7 @@ function AudienceGroupBody({
 }: {
   group: BrandContextGroup;
   activeTab: BrandAiTab;
-  onOpenTab: (tab: BrandAiTab) => void;
+  onOpenTab: (tab: BrandAiTab, focus?: string | null) => void;
 }) {
   const personas = group.personas ?? [];
   if (personas.length === 0) {
@@ -843,7 +639,7 @@ function AudienceGroupBody({
           <span className="flex flex-col items-center gap-2">
             <Icon name="user" size="md" className="text-[var(--brand-text-dim)]" aria-hidden="true" />
             <span className="t-ui font-semibold text-[var(--brand-text-bright)]">No personas defined</span>
-            <span className="max-w-md t-body text-[var(--brand-text-muted)]">
+            <span className="max-w-md t-caption-sm leading-relaxed text-[var(--brand-text-muted)]">
               AI writes to a generic audience until personas are reviewed.
             </span>
             <span className="mt-1 inline-flex items-center gap-1 rounded-[var(--radius-md)] bg-[var(--surface-3)] px-3 py-1 t-ui font-semibold text-[var(--teal)]">
@@ -874,7 +670,7 @@ function AudienceGroupBody({
                 <span className="t-ui font-semibold text-[var(--brand-text-bright)]">{persona.name}</span>
                 {persona.buyingStage && <Badge label={persona.buyingStage} tone="blue" variant="soft" size="sm" />}
               </span>
-              <span className="mt-1 block t-body text-[var(--brand-text-muted)]">{persona.description || 'Persona details ready for AI writing prompts.'}</span>
+              <span className="mt-1 line-clamp-2 t-caption-sm leading-snug text-[var(--brand-text-muted)]">{persona.description || 'Persona details ready for AI writing prompts.'}</span>
             </span>
           </span>
         </ClickableRow>
@@ -893,24 +689,32 @@ function AudienceGroupBody({
   );
 }
 
-function BrandIdentityGeneratorDisclosure({ onOpenTab }: { onOpenTab: (tab: BrandAiTab) => void }) {
+function BrandIdentityGeneratorDisclosure({
+  group,
+  onOpenGenerator,
+}: {
+  group: BrandContextGroup;
+  onOpenGenerator: (deliverableType: BrandDeliverableType) => void;
+}) {
+  const generators = IDENTITY_GENERATORS_BY_GROUP[group.id];
   return (
     <details className="border-t border-[var(--brand-border)]">
       <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 t-ui font-semibold text-[var(--brand-text-muted)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--brand-text-bright)]">
-        <span className="inline-flex text-[var(--teal)]" aria-hidden="true">
+        <span className="inline-flex" style={{ color: group.accent }} aria-hidden="true">
           <Icon name="sparkle" size="sm" />
         </span>
         <span>Brand identity generators</span>
-        <Badge label={`${VOICE_IDENTITY_GENERATORS.length} generators`} tone="zinc" variant="soft" size="sm" />
+        <Badge label={`${generators.length} generators`} tone="zinc" variant="soft" size="sm" />
         <span className="ml-auto inline-flex text-[var(--brand-text-muted)]" aria-hidden="true">
           <Icon name="chevronDown" size="sm" />
         </span>
       </summary>
       <div className="grid gap-2 px-3 pb-3 sm:grid-cols-2">
-        {VOICE_IDENTITY_GENERATORS.map((generator) => (
+        {generators.map((generator) => (
           <ClickableRow
-            key={generator.name}
-            onClick={() => onOpenTab('identity')}
+            key={generator.deliverableType}
+            data-brand-generator={generator.deliverableType}
+            onClick={() => onOpenGenerator(generator.deliverableType)}
             className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-3 py-2 hover:border-[var(--brand-border-hover)]"
           >
             <span className="flex items-center gap-2">
@@ -919,7 +723,7 @@ function BrandIdentityGeneratorDisclosure({ onOpenTab }: { onOpenTab: (tab: Bran
                 {generator.name}
               </span>
               <span className="t-micro uppercase text-[var(--brand-text-muted)]">{generator.tier}</span>
-              <Icon name="sparkle" size="xs" className="text-[var(--teal)]" aria-hidden="true" />
+              <Icon name="sparkle" size="xs" style={{ color: group.accent }} aria-hidden="true" />
             </span>
           </ClickableRow>
         ))}
@@ -932,28 +736,27 @@ function BrandContextGroupSection({
   group,
   activeTab,
   onOpenTab,
+  onOpenGenerator,
 }: {
   group: BrandContextGroup;
   activeTab: BrandAiTab;
-  onOpenTab: (tab: BrandAiTab) => void;
+  onOpenTab: (tab: BrandAiTab, focus?: string | null) => void;
+  onOpenGenerator: (deliverableType: BrandDeliverableType) => void;
 }) {
   const groupPercent = percentage(group.configured, group.total);
   return (
     <SectionCard
       id={`brand-context-${group.id}`}
       title={group.label}
-      subtitle={(
-        <>
-          <span>{group.question}</span>
-          <span className="mx-1 text-[var(--brand-text-dim)]">·</span>
-          <span>{group.feeds}</span>
-        </>
-      )}
-      titleIcon={<Icon name={group.icon} size="sm" style={{ color: group.accent }} />}
-      iconChip
+      titleExtra={<span className="t-micro font-medium normal-case tracking-normal text-[var(--brand-text-dim)]">{group.question}</span>}
+      subtitle={<span className="t-label normal-case tracking-normal text-[var(--brand-text-muted)]">{group.feeds}</span>}
+      titleIcon={<GroupIcon group={group} />}
       action={(
-        <div className="hidden min-w-[104px] flex-col gap-1 sm:flex">
-          <span className="text-right t-label tabular-nums text-[var(--brand-text-bright)]">{groupPercent}%</span>
+        <div className="hidden min-w-[88px] flex-col gap-1 sm:flex">
+          {/* stat-primitive-ok: compact prototype group-completeness readout paired with its Meter, not a labeled metric-card grid */}
+          <span className="text-right t-stat-sm font-extrabold tabular-nums text-[var(--brand-text-bright)]">
+            {groupPercent}<span className="t-label text-[var(--brand-text-muted)]">%</span>
+          </span>
           <Meter value={groupPercent} max={100} color={group.accent} height={5} ariaLabel={`${group.label} completeness`} />
         </div>
       )}
@@ -964,32 +767,30 @@ function BrandContextGroupSection({
       {group.id === 'audience' ? (
         <AudienceGroupBody group={group} activeTab={activeTab} onOpenTab={onOpenTab} />
       ) : (
-        <>
-          <div>
-            {group.items?.map((item) => (
-              <BrandContextItemRow
-                key={item.id}
-                item={item}
-                active={activeTab === item.tab}
-                onOpenTab={onOpenTab}
-              />
-            ))}
-          </div>
-          {group.id === 'voice' && <BrandIdentityGeneratorDisclosure onOpenTab={onOpenTab} />}
-        </>
+        <div>
+          {group.items?.map((item) => (
+            <BrandContextItemRow
+              key={item.id}
+              item={item}
+              active={activeTab === item.tab}
+              onOpenTab={onOpenTab}
+            />
+          ))}
+        </div>
       )}
+      <BrandIdentityGeneratorDisclosure group={group} onOpenGenerator={onOpenGenerator} />
     </SectionCard>
   );
 }
 
-function BrandContextRail({ workspaceName, onOpenTab }: { workspaceName: string; onOpenTab: (tab: BrandAiTab) => void }) {
+function BrandContextRail({ workspaceName, onOpenTab }: { workspaceName: string; onOpenTab: (tab: BrandAiTab, focus?: string | null) => void }) {
   return (
-    <aside className="flex flex-col gap-4 lg:sticky lg:top-4">
+    <aside className="flex flex-col gap-3 lg:sticky lg:top-4">
       <SectionCard
         title="How this context is used"
-        titleIcon={<Icon name="zap" size="sm" className="text-[var(--teal)]" />}
-        iconChip
+        titleIcon={<Icon name="zap" size="sm" className="text-[var(--purple)]" />}
         variant="subtle"
+        className="[&>div:first-child>div>span:last-child]:![font-family:var(--font-sans)] [&>div:first-child>div>span:last-child]:![font-size:var(--type-ui-size)] [&>div:first-child>div>span:last-child]:![line-height:var(--type-ui-line)] [&>div:first-child>div>span:last-child]:!font-bold"
       >
         <div className="flex flex-col">
           {[
@@ -998,33 +799,39 @@ function BrandContextRail({ workspaceName, onOpenTab }: { workspaceName: string;
             ['message', 'Insights chatbots', 'answer from the Knowledge base.'],
             ['pin', 'Schema & Local Presence', 'are built from Business Facts & Trust.'],
           ].map(([icon, title, copy]) => (
-            <div key={title} className="flex items-start gap-3 border-b border-[var(--brand-border)] py-3 first:pt-0 last:border-b-0 last:pb-0">
-              <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">
-                <Icon name={icon as IconName} size="sm" aria-hidden="true" />
+            <div key={title} className="flex items-start gap-2.5 border-b border-[var(--brand-border)] py-2.5 first:pt-0 last:border-b-0 last:pb-0">
+              <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]">
+                <Icon name={icon as IconName} size="xs" aria-hidden="true" />
               </span>
-              <p className="t-body text-[var(--brand-text-muted)]">
+              <p className="t-caption-sm leading-snug text-[var(--brand-text-muted)]">
                 <span className="font-semibold text-[var(--brand-text-bright)]">{title}</span> {copy}
               </p>
             </div>
           ))}
         </div>
+        <ClickableRow
+          onClick={() => onOpenTab('discovery')}
+          aria-label="Generate from website"
+          className="-mx-4 -mb-4 mt-3 w-[calc(100%+2rem)] border-t border-[var(--brand-border)] px-4 py-3"
+          style={{ backgroundColor: 'color-mix(in srgb, var(--purple) 5%, transparent)' }}
+        >
+          <span className="flex items-start gap-2.5">
+            <Icon name="sparkle" size="xs" className="mt-0.5 shrink-0 text-[var(--purple)]" aria-hidden="true" />
+            <span className="t-caption-sm leading-snug text-[var(--brand-text-muted)]">
+              <span className="font-semibold text-[var(--brand-text-bright)]">Generate from website</span> opens Discovery for {workspaceName} — review sources before they become reusable context.
+            </span>
+          </span>
+        </ClickableRow>
       </SectionCard>
 
       <SectionCard
         title="Also on this client"
-        titleIcon={<Icon name="layers" size="sm" className="text-[var(--blue)]" />}
-        iconChip
+        titleIcon={<Icon name="layers" size="sm" className="text-[var(--purple)]" />}
         variant="subtle"
+        className="[&>div:first-child>div>span:last-child]:![font-family:var(--font-sans)] [&>div:first-child>div>span:last-child]:![font-size:var(--type-ui-size)] [&>div:first-child>div>span:last-child]:![line-height:var(--type-ui-line)] [&>div:first-child>div>span:last-child]:!font-bold"
       >
-        <p className="t-body leading-relaxed text-[var(--brand-text-muted)]">
+        <p className="t-caption-sm leading-snug text-[var(--brand-text-muted)]">
           AI visibility lives with Search & Site Health. Page strategy and content planning stay with the strategy and content pipeline surfaces.
-        </p>
-        <Button size="sm" variant="secondary" className="mt-3" onClick={() => onOpenTab('discovery')}>
-          <Icon name="sparkle" size="sm" />
-          Generate from website
-        </Button>
-        <p className="mt-3 t-body text-[var(--brand-text-muted)]">
-          Generation drafts empty fields for {workspaceName}; operators review before anything becomes source context.
         </p>
       </SectionCard>
     </aside>
@@ -1035,10 +842,12 @@ function BrandContextOverview({
   ws,
   activeTab,
   onOpenTab,
+  onOpenGenerator,
 }: {
   ws: WorkspaceData | undefined;
   activeTab: BrandAiTab;
-  onOpenTab: (tab: BrandAiTab) => void;
+  onOpenTab: (tab: BrandAiTab, focus?: string | null) => void;
+  onOpenGenerator: (deliverableType: BrandDeliverableType) => void;
 }) {
   const summary = buildBrandContextSummary(ws);
   const workspaceName = ws?.name || 'this client';
@@ -1046,23 +855,35 @@ function BrandContextOverview({
 
   return (
     <div className="flex flex-col gap-5">
-      <section aria-labelledby="brand-context-title" className="flex flex-col gap-3">
+      <section aria-labelledby="brand-context-title" className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex h-2 w-2 rounded-[var(--radius-pill)] bg-[var(--teal)]" aria-hidden="true" />
-          <span className="t-label text-[var(--brand-text-dim)]">Brand & AI · {workspaceName}</span>
-          <Badge label="Read by every AI action" tone="teal" variant="soft" size="sm" />
+          <h1 id="brand-context-title" className="sr-only">Brand & AI</h1>
+          <span className="inline-flex h-2 w-2 rounded-[var(--radius-pill)] bg-[var(--purple)]" aria-hidden="true" />
+          <span data-testid="brand-ai-opening-eyebrow" className="eyebrow font-semibold text-[var(--purple)]">
+            Brand & AI · {workspaceName}
+          </span>
+          <span className="ml-auto inline-flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]">
+            <Icon name="sparkle" size="xs" className="text-[var(--purple)]" aria-hidden="true" />
+            Read by every AI action
+          </span>
         </div>
-        <p id="brand-context-title" className="max-w-4xl t-body leading-relaxed text-[var(--brand-text-muted)]">
-          The context the platform reads before it writes: how {firstName} sounds, what the business is, who it serves, and the verifiable facts behind it. Keep these four groups full and every AI output gets sharper and more on-brand.
+        <p className="max-w-2xl t-caption-sm leading-relaxed text-[var(--brand-text-muted)]">
+          The context the platform reads <span className="font-semibold text-[var(--brand-text-bright)]">before it writes</span>: how {firstName} sounds, what the business is, who it serves, and the verifiable facts behind it. Keep these four groups full and every AI output gets sharper and more on-brand.
         </p>
       </section>
 
       <BrandContextCockpit summary={summary} activeTab={activeTab} onOpenTab={onOpenTab} />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-3">
           {summary.groups.map((group) => (
-            <BrandContextGroupSection key={group.id} group={group} activeTab={activeTab} onOpenTab={onOpenTab} />
+            <BrandContextGroupSection
+              key={group.id}
+              group={group}
+              activeTab={activeTab}
+              onOpenTab={onOpenTab}
+              onOpenGenerator={onOpenGenerator}
+            />
           ))}
         </div>
         <BrandContextRail workspaceName={workspaceName} onOpenTab={onOpenTab} />
@@ -1073,12 +894,16 @@ function BrandContextOverview({
 
 function BrandAiPanel({
   tab,
+  focus,
+  onClearFocus,
   workspaceId,
   ws,
   legacyBusinessFootprintSection,
   refetchWorkspace,
 }: {
   tab: WorkflowTab;
+  focus: string | null;
+  onClearFocus: () => void;
   workspaceId: string;
   ws: WorkspaceData | undefined;
   legacyBusinessFootprintSection: LegacyBusinessFootprintSection;
@@ -1092,10 +917,26 @@ function BrandAiPanel({
     );
   }
 
-  if (tab === 'brandscript') return <BrandscriptTab workspaceId={workspaceId} />;
+  if (tab === 'brandscript') {
+    return (
+      <BrandscriptTab
+        workspaceId={workspaceId}
+        focusFirstExisting={focus === BRANDSCRIPT_OVERVIEW_FOCUS}
+        onClearFocus={onClearFocus}
+      />
+    );
+  }
   if (tab === 'discovery') return <DiscoveryTab workspaceId={workspaceId} />;
   if (tab === 'voice') return <VoiceTab workspaceId={workspaceId} />;
-  if (tab === 'identity') return <IdentityTab workspaceId={workspaceId} />;
+  if (tab === 'identity') {
+    return (
+      <IdentityTab
+        workspaceId={workspaceId}
+        focusType={isIdentityGeneratorFocus(focus) ? focus : null}
+        onClearFocus={onClearFocus}
+      />
+    );
+  }
   if (tab === 'business-footprint') {
     return (
       <BusinessFootprintTab
@@ -1130,16 +971,20 @@ function BrandAiPanel({
 
 function BrandAiWorkflowModal({
   tab,
+  focus,
   open,
   onClose,
+  onClearFocus,
   workspaceId,
   ws,
   legacyBusinessFootprintSection,
   refetchWorkspace,
 }: {
   tab: BrandAiTab;
+  focus: string | null;
   open: boolean;
   onClose: () => void;
+  onClearFocus: () => void;
   workspaceId: string;
   ws: WorkspaceData | undefined;
   legacyBusinessFootprintSection: LegacyBusinessFootprintSection;
@@ -1150,20 +995,20 @@ function BrandAiWorkflowModal({
   const copy = WORKFLOW_MODAL_COPY[tab];
 
   return (
-    <Modal open={open} onClose={onClose} size="xl">
+    <Modal open={open} onClose={onClose} size="workflow">
       <Modal.Header title={copy.title} onClose={onClose} />
       <Modal.Body className="max-h-[calc(100vh-11rem)] overflow-y-auto">
         <div className="flex flex-col gap-4">
-          <div className="flex items-start gap-3">
+          <div data-testid="brand-ai-modal-context" className="flex items-start gap-3">
             <TabIcon tab={tab} />
             <p className="min-w-0 flex-1 t-body text-[var(--brand-text-muted)]">
               {copy.subtitle}
             </p>
           </div>
-          <BrandWorkflowContextFrame tab={tab} />
-          {tab === 'identity' && <BrandIdentityWorkflowFrame />}
           <BrandAiPanel
             tab={tab}
+            focus={focus}
+            onClearFocus={onClearFocus}
             workspaceId={workspaceId}
             ws={ws}
             legacyBusinessFootprintSection={legacyBusinessFootprintSection}
@@ -1204,6 +1049,22 @@ export function BrandAiSurface({ workspaceId }: BrandAiSurfaceProps) {
     }
   }, [toast, workspaceQuery]);
 
+  const topbarActions = (
+    <div className="flex max-w-full items-center justify-end gap-2 overflow-x-auto">
+      {lastUpdated && <span className="hidden t-caption-sm text-[var(--brand-text-muted)] sm:inline">Data as of {lastUpdated}</span>}
+      <Button
+        size="sm"
+        variant="secondary"
+        onClick={() => void handleRefresh()}
+        disabled={workspaceQuery.isFetching}
+        aria-label="Refresh context"
+      >
+        <Icon name="refresh" size="sm" />
+        <span className="hidden sm:inline">Refresh context</span>
+      </Button>
+    </div>
+  );
+
   if (workspaceQuery.isError && !ws) {
     return (
       <ErrorBoundary label="Brand AI rebuilt surface">
@@ -1223,26 +1084,16 @@ export function BrandAiSurface({ workspaceId }: BrandAiSurfaceProps) {
 
   return (
     <ErrorBoundary label="Brand AI rebuilt surface">
-      <div className="flex min-h-full flex-col gap-5" data-rebuild-flag={shellFlagEnabled ? 'on' : 'default'}>
-        <PageHeader
-          title="Brand & AI"
-          subtitle="Brand context, discovery, voice, identity, and trust inputs for AI generation."
-          actions={(
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {lastUpdated && <span className="hidden t-caption-sm text-[var(--brand-text-muted)] sm:inline">Data as of {lastUpdated}</span>}
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => void handleRefresh()}
-                disabled={workspaceQuery.isFetching}
-                aria-label="Refresh context"
-              >
-                <Icon name="refresh" size="sm" />
-                <span className="hidden sm:inline">Refresh context</span>
-              </Button>
-            </div>
-          )}
-        />
+      <div
+        className="mx-auto flex min-h-full w-full max-w-[var(--page-max)] flex-col gap-5 lg:px-2 2xl:px-5"
+        data-rebuild-flag={shellFlagEnabled ? 'on' : 'default'}
+        data-testid="brand-ai-rebuilt-surface"
+      >
+        <RebuiltTopbarActions
+          fallback={<div data-testid="brand-ai-topbar-actions-fallback">{topbarActions}</div>}
+        >
+          {topbarActions}
+        </RebuiltTopbarActions>
 
         {workspaceQuery.isLoading && !ws ? (
           <BrandAiLoadingState />
@@ -1254,12 +1105,19 @@ export function BrandAiSurface({ workspaceId }: BrandAiSurfaceProps) {
               </InlineBanner>
             )}
 
-            <BrandContextOverview ws={ws} activeTab={state.tab} onOpenTab={state.setTab} />
+            <BrandContextOverview
+              ws={ws}
+              activeTab={state.tab}
+              onOpenTab={state.setTab}
+              onOpenGenerator={(deliverableType) => state.setTab('identity', deliverableType)}
+            />
 
             <BrandAiWorkflowModal
               tab={state.tab}
+              focus={state.focus}
               open={state.tab !== 'overview'}
               onClose={() => state.setTab('overview')}
+              onClearFocus={() => state.setFocus(null)}
               workspaceId={workspaceId}
               ws={ws}
               legacyBusinessFootprintSection={state.legacyBusinessFootprintSection}

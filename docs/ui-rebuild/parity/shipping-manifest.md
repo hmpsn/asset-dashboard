@@ -28,7 +28,7 @@ This commit is the immutable fork point for the earlier behavior checkpoint. It 
    - Includes prototype nav zones, global-route chrome context, mobile rail regression floor, and restored global chrome.
 
 4. **Brand & AI modal-first correction**
-   - `src/components/brand-ai-rebuilt/**` and its component test.
+   - `src/components/BrandHub.tsx`, `src/components/brand-ai-rebuilt/**`, the touched focused Brand editors under `src/components/brand/**`, `src/components/ui/overlay/Modal.tsx`, `src/utils/markdownPreview.ts`, matching tests, and accepted parity/design-system records.
    - Depends on cohorts 1-3.
 
 5. **Calibrated aligned surfaces**
@@ -56,6 +56,7 @@ The integration sandbox has advanced beyond the baseline through reviewed, surfa
 | Cohort | Integration reference | Shipping boundary |
 |---|---|---|
 | Insights Engine | `588eada03` plus the owner-approved `codex/ui-visual-parity` surface commit | V1–V3 visual composition plus the Engine-owned tests/docs only; retain V4–V6 as explicit approved exceptions. Shipping remains dormant during this goal. |
+| Brand & AI | Owner-approved `codex/ui-visual-parity` Brand surface commit | Grouped cockpit, 17-generator 7 / 2 / 5 / 3 mapping, focused Identity/Brandscript receivers, 680px workflow modal, truthful editor interiors, shared Markdown preview utility, tests, and accepted records only; retain V5–V7 as explicit exceptions. Shipping remains dormant during this goal. |
 | SEO Editor | `cb536234b` | Source-grouped worksheet and matching tests only. |
 | Site Audit | `3e4cec39e`, `4d1fd9592` | Diagnostic demotion first; canonical Asset repair sender only after Asset receiver work is available. |
 | Content Pipeline | `15eec15f3`, `4024ff87e` | Board-first slice and review fixes; keep later item workspaces deferred. |

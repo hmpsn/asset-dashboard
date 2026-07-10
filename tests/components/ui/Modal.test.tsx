@@ -16,7 +16,7 @@ function Harness({
 }: {
   open: boolean;
   onClose: () => void;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'workflow' | 'lg' | 'xl';
 }) {
   return (
     <Modal open={open} onClose={onClose} size={size}>
@@ -118,6 +118,8 @@ describe('Modal', () => {
   it('applies size max-width classes', () => {
     const { rerender } = render(<Harness open={true} onClose={() => {}} size="sm" />);
     expect(screen.getByRole('dialog').className).toMatch(/max-w-\[24rem\]/);
+    rerender(<Harness open={true} onClose={() => {}} size="workflow" />);
+    expect(screen.getByRole('dialog').className).toMatch(/max-w-\[42\.5rem\]/);
     rerender(<Harness open={true} onClose={() => {}} size="xl" />);
     expect(screen.getByRole('dialog').className).toMatch(/max-w-\[64rem\]/);
   });

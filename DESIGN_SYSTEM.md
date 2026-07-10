@@ -600,7 +600,7 @@ All three overlay primitives portal into `document.body` so `position: fixed` re
 |------|------|-------|
 | `open` | `boolean` | Controls visibility |
 | `onClose` | `() => void` | Called on Escape, backdrop click, or header × button |
-| `size` | `'sm' \| 'md' \| 'lg' \| 'xl'` | Max-width: 24rem / 32rem / 48rem / 64rem. Default `md` |
+| `size` | `'sm' \| 'md' \| 'workflow' \| 'lg' \| 'xl'` | Max-width: 24rem / 32rem / 42.5rem / 48rem / 64rem. Default `md`; `workflow` is the owner-approved compact Brand editor/workflow shell at 680px. |
 | `labelledById` | `string?` | Override for `aria-labelledby`; auto-generated otherwise |
 
 Compound sub-components: `<Modal.Header title onClose?>`, `<Modal.Body>`, `<Modal.Footer>`. Focus trap (Tab / Shift+Tab wraps), Escape to close, backdrop-click closes (drag-out safe), body-scroll lock, focus restores to trigger on close. Respects `prefers-reduced-motion`. Backdrop sits at `var(--z-modal-backdrop)` (40); panel at `var(--z-modal)` (50).

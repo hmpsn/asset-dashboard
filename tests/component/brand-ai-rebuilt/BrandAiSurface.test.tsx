@@ -1,8 +1,9 @@
 // @ds-rebuilt
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { BrandDeliverableType } from '../../../shared/types/brand-engine';
 import { BrandAiSurface } from '../../../src/components/brand-ai-rebuilt/BrandAiSurface';
 import { ToastProvider } from '../../../src/components/Toast';
 import { queryKeys } from '../../../src/lib/queryKeys';
@@ -67,8 +68,19 @@ vi.mock('../../../src/components/brand/BrandOverviewTab', () => ({
 }));
 
 vi.mock('../../../src/components/brand/BrandscriptTab', () => ({
-  BrandscriptTab: ({ workspaceId }: { workspaceId: string }) => (
-    <div data-testid="legacy-brandscript-panel">Legacy brandscript panel {workspaceId}</div>
+  BrandscriptTab: ({
+    workspaceId,
+    focusFirstExisting,
+    onClearFocus,
+  }: {
+    workspaceId: string;
+    focusFirstExisting?: boolean;
+    onClearFocus?: () => void;
+  }) => (
+    <div data-testid="legacy-brandscript-panel" data-focus={focusFirstExisting ? 'existing' : 'library'}>
+      Legacy brandscript panel {workspaceId}
+      {focusFirstExisting && <button type="button" onClick={onClearFocus}>View all brandscripts</button>}
+    </div>
   ),
 }));
 
@@ -85,8 +97,19 @@ vi.mock('../../../src/components/brand/VoiceTab', () => ({
 }));
 
 vi.mock('../../../src/components/brand/IdentityTab', () => ({
-  IdentityTab: ({ workspaceId }: { workspaceId: string }) => (
-    <div data-testid="legacy-identity-panel">Legacy identity panel {workspaceId}</div>
+  IdentityTab: ({
+    workspaceId,
+    focusType,
+    onClearFocus,
+  }: {
+    workspaceId: string;
+    focusType?: BrandDeliverableType | null;
+    onClearFocus?: () => void;
+  }) => (
+    <div data-testid="legacy-identity-panel" data-focus={focusType ?? 'library'}>
+      Legacy identity panel {workspaceId}
+      {focusType && <button type="button" onClick={onClearFocus}>View all brand identity</button>}
+    </div>
   ),
 }));
 
@@ -173,11 +196,21 @@ function renderSurface(path: string, client = createQueryClient()) {
         <ToastProvider>
           <main>
             <BrandAiSurface workspaceId="ws-brand-ai" />
+            <LocationProbe />
           </main>
         </ToastProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="brand-ai-location-search">{location.search}</output>;
+}
+
+function currentSearchParams(): URLSearchParams {
+  return new URLSearchParams(screen.getByTestId('brand-ai-location-search').textContent ?? '');
 }
 
 describe('BrandAiSurface rebuilt cockpit', () => {
@@ -202,7 +235,7 @@ describe('BrandAiSurface rebuilt cockpit', () => {
     await waitFor(() => {
       expect(container.querySelector('[data-rebuild-flag="on"]')).toBeInTheDocument();
     });
-    expect(screen.getByRole('heading', { name: 'Brand & AI' })).toBeInTheDocument();
+    expect(screen.getByText('Brand & AI · Acme Dental')).toBeInTheDocument();
   });
 
   it('renders the prototype grouped context layout with no modal or legacy child panel on overview', async () => {
@@ -210,6 +243,12 @@ describe('BrandAiSurface rebuilt cockpit', () => {
 
     await screen.findByText('Read by every AI action');
 
+    expect(screen.getByRole('heading', { name: 'Brand & AI' })).toHaveClass('sr-only');
+    expect(screen.getByTestId('brand-ai-opening-eyebrow')).toHaveClass('eyebrow', 'text-[var(--purple)]');
+    expect(screen.getByTestId('brand-ai-rebuilt-surface')).toHaveClass('max-w-[var(--page-max)]', 'lg:px-2', '2xl:px-5');
+    expect(screen.getByText(/The context the platform reads/).closest('p')).toHaveClass('max-w-2xl');
+    expect(screen.getByTestId('brand-ai-topbar-actions-fallback')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Refresh context' })).toHaveLength(1);
     expect(screen.getAllByText('Voice & Messaging').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Knowledge').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Audience').length).toBeGreaterThan(0);
@@ -219,11 +258,35 @@ describe('BrandAiSurface rebuilt cockpit', () => {
     expect(screen.getByText('Knowledge base')).toBeInTheDocument();
     expect(screen.getByText('Business footprint')).toBeInTheDocument();
     expect(screen.getByText('Brand voice & style')).toHaveClass('t-ui');
-    expect(screen.getByText('Warm and precise.')).toHaveClass('t-body');
-    expect(screen.getByText('Content briefs & posts').closest('p')).toHaveClass('t-body');
-    expect(screen.getByText('Generation drafts empty fields for Acme Dental; operators review before anything becomes source context.')).toHaveClass('t-body');
-    expect(screen.getAllByText('Brand identity generators')).toHaveLength(1);
+    expect(screen.getByText('Warm and precise.')).toHaveClass('t-caption-sm', 'line-clamp-2', 'leading-snug');
+    expect(screen.getByText('Warm and precise.')).not.toHaveClass('block');
+    expect(screen.getByText('Content briefs & posts').closest('p')).toHaveClass('t-caption-sm');
+    expect(screen.getByText('How this context is used')).toHaveClass('t-body');
+    expect(screen.getByText('How this context is used').closest('[class*="rounded"]')).toHaveClass('[&>div:first-child>div>span:last-child]:![font-size:var(--type-ui-size)]', '[&>div:first-child>div>span:last-child]:!font-bold');
+    expect(document.querySelector('#brand-context-voice .t-stat-sm')).toHaveClass('t-stat-sm', 'font-extrabold');
+    const usageCard = screen.getByText('How this context is used').closest('[class*="rounded"]');
+    const movedCard = screen.getByText('Also on this client').closest('[class*="rounded"]');
+    expect(usageCard).not.toBeNull();
+    expect(movedCard).not.toBeNull();
+    const generateLauncher = within(usageCard as HTMLElement).getByRole('button', { name: 'Generate from website' });
+    expect(generateLauncher).toBeInTheDocument();
+    expect(generateLauncher.querySelector('.t-caption-sm')).toHaveClass('leading-snug');
+    expect(generateLauncher).toHaveTextContent('Generate from website opens Discovery for Acme Dental — review sources before they become reusable context.');
+    expect(within(movedCard as HTMLElement).queryByRole('button', { name: 'Generate from website' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Generate from website' })).toHaveLength(1);
+    expect(screen.getAllByRole('meter', { name: 'Voice & Messaging completeness' })[0].firstElementChild).toHaveStyle({ background: '#f87171' });
+    expect(screen.getAllByText('Needs setup').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Ready').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('brand-ai-configured-count')).toHaveTextContent('7/11');
+    expect(screen.getByText('inputs configured')).toBeInTheDocument();
+    expect(screen.getByTestId('brand-context-cockpit-content')).toHaveClass('gap-5', 'px-4', 'py-5');
+    expect(screen.queryByText('context complete')).not.toBeInTheDocument();
+    expect(screen.queryByText('Needs a little more context')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Brand identity generators')).toHaveLength(4);
     expect(screen.getByText('7 generators')).toBeInTheDocument();
+    expect(screen.getByText('2 generators')).toBeInTheDocument();
+    expect(screen.getByText('5 generators')).toBeInTheDocument();
+    expect(screen.getByText('3 generators')).toBeInTheDocument();
     expect(screen.queryByRole('radiogroup', { name: 'Brand AI view controls' })).not.toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Brandscript' })).not.toBeInTheDocument();
     expect(screen.queryByText('Work areas')).not.toBeInTheDocument();
@@ -247,11 +310,24 @@ describe('BrandAiSurface rebuilt cockpit', () => {
     }
   });
 
+  it('derives readable overview prose from Markdown-backed source context', async () => {
+    workspaceGetByIdMock.mockResolvedValue({
+      ...workspace,
+      brandVoice: '**Warm and precise.** --- ### Tone & Personality - **Friendly**',
+    });
+
+    renderSurface('/ws/ws-brand-ai/brand');
+
+    const excerpt = await screen.findByText(/Warm and precise.*Tone & Personality.*Friendly/);
+    expect(excerpt).toHaveTextContent('Warm and precise. · Tone & Personality Friendly');
+    expect(excerpt).not.toHaveTextContent(/\*\*|###|---/);
+  });
+
   it('opens Brandscript in a modal from a runtime ?tab= param', async () => {
     renderSurface('/ws/ws-brand-ai/brand?tab=brandscript');
 
     expect(await screen.findByRole('dialog', { name: 'Brandscript' })).toBeInTheDocument();
-    await screen.findByTestId('legacy-brandscript-panel');
+    expect(await screen.findByTestId('legacy-brandscript-panel')).toHaveAttribute('data-focus', 'library');
     expect(screen.getByText('StoryBrand framework and section editing stay available here.')).toBeInTheDocument();
     expect(screen.getAllByTestId('legacy-brandscript-panel')).toHaveLength(1);
   });
@@ -267,16 +343,14 @@ describe('BrandAiSurface rebuilt cockpit', () => {
 
     renderSurface('/ws/ws-brand-ai/brand?tab=identity');
 
-    expect(await screen.findByRole('dialog', { name: 'Brand identity' })).toBeInTheDocument();
-    expect(screen.getByText('Generator workflow')).toBeInTheDocument();
-    expect(screen.getByText('Review and approve deliverables before they become reusable AI context.')).toBeInTheDocument();
+    const identityDialog = await screen.findByRole('dialog', { name: 'Brand identity' });
+    expect(identityDialog).toHaveClass('max-w-[42.5rem]');
+    expect(identityDialog).not.toHaveClass('max-w-[48rem]');
+    expect(identityDialog).not.toHaveClass('max-w-[64rem]');
     expect(screen.getByText('Generate, refine, approve, edit, and export brand deliverables.')).toHaveClass('t-body');
-    expect(screen.getByText('Review and approve deliverables before they become reusable AI context.')).toHaveClass('t-body');
-    const generatorSteps = screen.getByLabelText('Brand identity generator steps');
-    for (const step of ['Generate', 'Refine', 'Edit', 'Approve', 'Export']) {
-      expect(within(generatorSteps).getByText(step)).toBeInTheDocument();
-    }
-    expect(await screen.findByTestId('legacy-identity-panel')).toBeInTheDocument();
+    expect(screen.queryByText('Generator workflow')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Brand identity generator steps')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('legacy-identity-panel')).toHaveAttribute('data-focus', 'library');
     expect(screen.getAllByTestId('legacy-identity-panel')).toHaveLength(1);
   });
 
@@ -315,34 +389,30 @@ describe('BrandAiSurface rebuilt cockpit', () => {
     expect(screen.queryByRole('radiogroup', { name: 'Brand AI view controls' })).not.toBeInTheDocument();
   });
 
-  it('renders prototype workflow context for bespoke modal flows before carried panels', async () => {
+  it('uses compact modal context without synthetic workflow cards for bespoke flows', async () => {
     const cases = [
       {
         path: '/ws/ws-brand-ai/brand?tab=discovery',
         dialog: 'Discovery intake',
         frame: 'Discovery intake workflow',
-        copy: ['Source of truth', 'Uploaded documents', 'Founder interview', 'Regenerate Knowledge Base'],
         panel: 'legacy-discovery-panel',
       },
       {
         path: '/ws/ws-brand-ai/brand?tab=brandscript',
         dialog: 'Brandscript',
         frame: 'Brandscript workflow',
-        copy: ['Seven-part narrative', 'Hero', 'Problem', 'Guide', 'Failure'],
         panel: 'legacy-brandscript-panel',
       },
       {
         path: '/ws/ws-brand-ai/brand?tab=eeat-assets',
         dialog: 'Trust evidence',
         frame: 'Trust evidence workflow',
-        copy: ['E-E-A-T signals', 'Experience', 'Expertise', 'Authority', 'Trust'],
         panel: 'legacy-eeat-assets-panel',
       },
       {
         path: '/ws/ws-brand-ai/brand?tab=business-profile&focus=locations-section',
         dialog: 'Business facts',
         frame: 'Business facts workflow',
-        copy: ['Locations & service areas', 'Primary location', 'Service areas', 'Review detected geos'],
         panel: 'legacy-business-footprint-panel',
       },
     ] as const;
@@ -350,11 +420,9 @@ describe('BrandAiSurface rebuilt cockpit', () => {
     for (const testCase of cases) {
       const { unmount } = renderSurface(testCase.path);
 
-      expect(await screen.findByRole('dialog', { name: testCase.dialog })).toBeInTheDocument();
-      const frame = await screen.findByLabelText(testCase.frame);
-      for (const text of testCase.copy) {
-        expect(within(frame).getByText(text)).toBeInTheDocument();
-      }
+      const dialog = await screen.findByRole('dialog', { name: testCase.dialog });
+      expect(dialog).toHaveClass('max-w-[42.5rem]');
+      expect(screen.queryByLabelText(testCase.frame)).not.toBeInTheDocument();
       expect(await screen.findByTestId(testCase.panel)).toBeInTheDocument();
       expect(screen.getAllByTestId(testCase.panel)).toHaveLength(1);
 
@@ -362,27 +430,24 @@ describe('BrandAiSurface rebuilt cockpit', () => {
     }
   });
 
-  it('renders prototype workflow context for context, voice, and strategy intelligence modals', async () => {
+  it('uses compact modal context without synthetic workflow cards for carried editors', async () => {
     const cases = [
       {
         path: '/ws/ws-brand-ai/brand?tab=context',
         dialog: 'Context editors',
         frame: 'Context editors workflow',
-        copy: ['Reusable AI context', 'Voice & style', 'Knowledge base', 'Personas', 'Page guidance'],
         panel: 'legacy-context-panel',
       },
       {
         path: '/ws/ws-brand-ai/brand?tab=voice',
         dialog: 'Voice calibration',
         frame: 'Voice calibration workflow',
-        copy: ['Voice DNA calibration', 'Samples', 'Guardrails', 'Similarity review', 'Approve for generation'],
         panel: 'legacy-voice-panel',
       },
       {
         path: '/ws/ws-brand-ai/brand?tab=intelligence-profile',
         dialog: 'Strategy intelligence',
         frame: 'Strategy intelligence workflow',
-        copy: ['Strategy inputs', 'Industry', 'Goals', 'Audience', 'Business priorities'],
         panel: 'legacy-intelligence-profile-panel',
       },
     ] as const;
@@ -390,11 +455,9 @@ describe('BrandAiSurface rebuilt cockpit', () => {
     for (const testCase of cases) {
       const { unmount } = renderSurface(testCase.path);
 
-      expect(await screen.findByRole('dialog', { name: testCase.dialog })).toBeInTheDocument();
-      const frame = await screen.findByLabelText(testCase.frame);
-      for (const text of testCase.copy) {
-        expect(within(frame).getByText(text)).toBeInTheDocument();
-      }
+      const dialog = await screen.findByRole('dialog', { name: testCase.dialog });
+      expect(dialog).toHaveClass('max-w-[42.5rem]');
+      expect(screen.queryByLabelText(testCase.frame)).not.toBeInTheDocument();
       expect(await screen.findByTestId(testCase.panel)).toBeInTheDocument();
       expect(screen.getAllByTestId(testCase.panel)).toHaveLength(1);
 
@@ -402,19 +465,106 @@ describe('BrandAiSurface rebuilt cockpit', () => {
     }
   });
 
-  it('opens Brand identity from the Voice & Messaging generator disclosure', async () => {
+  it('maps all 17 unique prototype generators to focused real Identity receivers', async () => {
+    const generators: Array<{ label: string; type: BrandDeliverableType }> = [
+      { label: 'Tagline', type: 'tagline' },
+      { label: 'Voice Guidelines', type: 'voice_guidelines' },
+      { label: 'Brand Archetypes', type: 'archetypes' },
+      { label: 'Personality Traits', type: 'personality_traits' },
+      { label: 'Messaging Pillars', type: 'messaging_pillars' },
+      { label: 'Differentiators', type: 'differentiators' },
+      { label: 'Tone Examples', type: 'tone_examples' },
+      { label: 'Elevator Pitch', type: 'elevator_pitch' },
+      { label: 'Brand Story', type: 'brand_story' },
+      { label: 'Positioning Matrix', type: 'positioning_matrix' },
+      { label: 'Customer Personas', type: 'personas' },
+      { label: 'Customer Journey', type: 'customer_journey' },
+      { label: 'Objection Handling', type: 'objection_handling' },
+      { label: 'Emotional Triggers', type: 'emotional_triggers' },
+      { label: 'Mission Statement', type: 'mission' },
+      { label: 'Vision Statement', type: 'vision' },
+      { label: 'Core Values', type: 'values' },
+    ];
     renderSurface('/ws/ws-brand-ai/brand');
 
     await screen.findByText('Read by every AI action');
-    fireEvent.click(screen.getByText('Brand identity generators'));
-    fireEvent.click(screen.getByRole('button', { name: /Tagline/i }));
+    for (const disclosure of screen.getAllByText('Brand identity generators')) fireEvent.click(disclosure);
+
+    const expectedByGroup: Record<string, BrandDeliverableType[]> = {
+      voice: ['tagline', 'voice_guidelines', 'archetypes', 'personality_traits', 'messaging_pillars', 'differentiators', 'tone_examples'],
+      knowledge: ['elevator_pitch', 'brand_story'],
+      audience: ['positioning_matrix', 'personas', 'customer_journey', 'objection_handling', 'emotional_triggers'],
+      facts: ['mission', 'vision', 'values'],
+    };
+    for (const [group, types] of Object.entries(expectedByGroup)) {
+      const groupSection = document.querySelector(`#brand-context-${group}`);
+      expect(groupSection).not.toBeNull();
+      expect(Array.from(groupSection!.querySelectorAll('[data-brand-generator]')).map((row) => row.getAttribute('data-brand-generator'))).toEqual(types);
+    }
+
+    const generatorButtons = generators.map(({ label }) => screen.getByRole('button', { name: new RegExp(label, 'i') }));
+    expect(generatorButtons).toHaveLength(17);
+    expect(new Set(generatorButtons).size).toBe(17);
+
+    for (const [index, generator] of generators.entries()) {
+      fireEvent.click(generatorButtons[index]);
+      await waitFor(() => {
+        expect(screen.getByTestId('legacy-identity-panel')).toHaveAttribute('data-focus', generator.type);
+      });
+      expect(currentSearchParams().get('tab')).toBe('identity');
+      expect(currentSearchParams().get('focus')).toBe(generator.type);
+    }
 
     expect(await screen.findByRole('dialog', { name: 'Brand identity' })).toBeInTheDocument();
-    expect(screen.getByText('Generator workflow')).toBeInTheDocument();
-    const generatorSteps = screen.getByLabelText('Brand identity generator steps');
-    expect(within(generatorSteps).getByText('Generate')).toBeInTheDocument();
-    expect(within(generatorSteps).getByText('Export')).toBeInTheDocument();
-    expect(await screen.findByTestId('legacy-identity-panel')).toBeInTheDocument();
+    expect(screen.queryByText('Generator workflow')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('legacy-identity-panel')).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'View all brand identity' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('legacy-identity-panel')).toHaveAttribute('data-focus', 'library');
+    });
+    expect(currentSearchParams().get('tab')).toBe('identity');
+    expect(currentSearchParams().get('focus')).toBeNull();
+  });
+
+  it('falls back to the full Identity library for an invalid focus value', async () => {
+    renderSurface('/ws/ws-brand-ai/brand?tab=identity&focus=not-a-deliverable');
+
+    expect(await screen.findByRole('dialog', { name: 'Brand identity' })).toBeInTheDocument();
+    expect(await screen.findByTestId('legacy-identity-panel')).toHaveAttribute('data-focus', 'library');
+    expect(screen.getAllByTestId('legacy-identity-panel')).toHaveLength(1);
+  });
+
+  it('focuses the current real Brandscript only from its overview row', async () => {
+    renderSurface('/ws/ws-brand-ai/brand');
+
+    await screen.findByText('Read by every AI action');
+    const brandscriptRow = screen.getByText('Brandscript').closest('button');
+    expect(brandscriptRow).not.toBeNull();
+    fireEvent.click(brandscriptRow!);
+
+    expect(await screen.findByRole('dialog', { name: 'Brandscript' })).toBeInTheDocument();
+    expect(await screen.findByTestId('legacy-brandscript-panel')).toHaveAttribute('data-focus', 'existing');
+    expect(currentSearchParams().get('tab')).toBe('brandscript');
+    expect(currentSearchParams().get('focus')).toBe('existing-brandscript');
+
+    fireEvent.click(screen.getByRole('button', { name: 'View all brandscripts' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('legacy-brandscript-panel')).toHaveAttribute('data-focus', 'library');
+    });
+    expect(currentSearchParams().get('tab')).toBe('brandscript');
+    expect(currentSearchParams().get('focus')).toBeNull();
+  });
+
+  it('keeps the real Generate from website launcher in the rail and opens Discovery', async () => {
+    renderSurface('/ws/ws-brand-ai/brand');
+
+    const launcher = await screen.findByRole('button', { name: 'Generate from website' });
+    fireEvent.click(launcher);
+
+    expect(await screen.findByRole('dialog', { name: 'Discovery intake' })).toBeInTheDocument();
+    expect(await screen.findByTestId('legacy-discovery-panel')).toBeInTheDocument();
+    expect(currentSearchParams().get('tab')).toBe('discovery');
   });
 
   it('closes a workflow modal back to the overview state', async () => {
@@ -437,7 +587,7 @@ describe('BrandAiSurface rebuilt cockpit', () => {
     await screen.findByTestId('legacy-context-panel');
 
     expect(screen.getByTestId('legacy-brandhub-active-tab')).toHaveTextContent('context');
-    expect(screen.getAllByRole('heading', { name: 'Brand & AI' })).toHaveLength(1);
+    expect(screen.getByRole('heading', { name: 'Brand & AI' })).toHaveClass('sr-only');
     expect(screen.queryByRole('heading', { name: 'Brand & AI Context' })).not.toBeInTheDocument();
     expect(screen.queryByRole('tablist', { name: 'Legacy BrandHub tabs' })).not.toBeInTheDocument();
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();

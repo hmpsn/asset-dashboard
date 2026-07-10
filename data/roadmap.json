@@ -38,6 +38,18 @@
           "createdAt": "2026-07-09",
           "owner": "workspace-command-center",
           "notes": "Completed 2026-07-10 in codex/ui-visual-parity. Joshua explicitly approved Insights Engine with ODP-001-V1 through V6 as recommended. V1 now keeps the compact narrated POV in the spine and the complete editor in a Drawer; V2 moves Engine actions exact-once into the rebuilt topbar; V3 keeps Details and Stage inline while disclosing Edit/Fix/Park and placing compact curation/attention state beside the queue. V4-V6 are documented owner-approved exceptions for truthful live preview content, provider evidence plus collapsed Operations, and the separate Lost visibility backend read contract. Final matched 1440x900 and 1600x1000 evidence, overlays, Operations, staged-send, and the 390x844 overflow floor are in /tmp/asset-dashboard-codex-visual-parity/insights/final-approved-pass/. A fresh Sol review returned PASS with no safe-local defects; 143 focused/integration tests, hooks lint, typecheck, Vite build, pr-check, and diff hygiene pass. Status: owner-approved."
+        },
+        {
+          "id": "ui-rebuild-brand-ai-owner-visual-recheck",
+          "title": "Brand & AI owner visual re-review against the prototype",
+          "source": "ODP-BRAND-V1 through V7 circle-backs",
+          "est": "S",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-10",
+          "completedAt": "2026-07-10",
+          "owner": "brand-engine",
+          "notes": "Completed 2026-07-10 in codex/ui-visual-parity. V1-V7 restore the source-led grouped cockpit, truthful configured-input evidence, all 17 generators exactly once in the 7/2/5/3 group mapping, focused Identity and Brandscript receivers, the owner-approved 680px workflow Modal, truthful production interiors/actions, and explicit data/typography exceptions. Final 1440x900, 1600x1000, workflow, focus, library, error-fallback, and 390x844 evidence is in /tmp/asset-dashboard-codex-visual-parity/brand-ai/final-v1-v7/. Ten focused suites pass 218 tests; hooks lint, typecheck, Vite build, pr-check, diff hygiene, and a fresh Sol rendered review pass. Joshua reviewed the live surface and said, ‘It looks great. I'd like you to continue rolling through our parity pass, and I'll provide the finer feedback once we've wrapped everything.’ Status: owner-approved; finer feedback is deferred to the registry-wide review."
         }
       ]
     },

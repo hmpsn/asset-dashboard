@@ -120,6 +120,11 @@ function textToEditorHtml(value: string): string {
       flushList();
       continue;
     }
+    if (/^-{3,}$/.test(line)) {
+      flushList();
+      blocks.push('<hr>');
+      continue;
+    }
     const h3 = line.match(/^###\s+(.+)$/);
     if (h3) {
       flushList();
@@ -195,6 +200,10 @@ function editorHtmlToText(value: string): string {
     }
     if (tag === 'h3') {
       pushBlock(`### ${renderInline(el).trim()}`);
+      return;
+    }
+    if (tag === 'hr') {
+      pushBlock('---');
       return;
     }
     if (tag === 'ul') {

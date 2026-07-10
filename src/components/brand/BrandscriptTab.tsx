@@ -10,9 +10,14 @@ import type { Brandscript, BrandscriptSection, BrandscriptTemplate } from '../..
 import { SectionCard, EmptyState, Skeleton, Icon, Button, ClickableRow, IconButton, cn, ConfirmDialog, FormInput, FormSelect, FormTextarea } from '../ui';
 import { useToast } from '../Toast';
 import { queryKeys } from '../../lib/queryKeys';
+import { markdownToPlainTextPreview } from '../../utils/markdownPreview';
 
 interface Props {
   workspaceId: string;
+  /** Select the newest real Brandscript when launched from the Brand overview row. */
+  focusFirstExisting?: boolean;
+  /** Clears only the overview focus parameter while retaining the Brandscript workflow. */
+  onClearFocus?: () => void;
 }
 
 // ─── Create form ───────────────────────────────────────────────────────────
@@ -252,7 +257,9 @@ function SectionEditorCard({ section, onSave }: SectionEditorCardProps) {
         <div className="flex-1 min-w-0">
           <span className="text-sm font-semibold text-[var(--brand-text-bright)]">{section.title}</span>
           {!expanded && section.content && (
-            <p className="t-caption text-[var(--brand-text-muted)] truncate mt-0.5">{section.content}</p>
+            <p className="t-caption text-[var(--brand-text-muted)] truncate mt-0.5">
+              {markdownToPlainTextPreview(section.content)}
+            </p>
           )}
           {!expanded && !section.content && (
             <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">Empty — click to edit</p>
@@ -545,39 +552,46 @@ function ListView({ workspaceId, items, templates, onSelect, onDeleted, onCreate
       {/* List */}
       <div className="space-y-3">
         {items.map(bs => (
-          // pr-check-disable-next-line -- list item button row, not a section card
-          <ClickableRow
+          <SectionCard
             key={bs.id}
-            onClick={() => onSelect(bs)}
-            className="text-left bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] px-4 py-3 hover:border-[var(--brand-border-hover)] group"
+            variant="subtle"
+            noPadding
+            className="group hover:border-[var(--brand-border-hover)]"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-8 h-8 rounded-[var(--radius-md)] bg-teal-500/10 flex items-center justify-center shrink-0">
-                  <Icon as={BookOpen} size="md" className="text-teal-400" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[var(--brand-text-bright)] truncate">{bs.name}</p>
-                  <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
-                    {bs.frameworkType || 'Custom'} · {bs.sections.length} section{bs.sections.length !== 1 ? 's' : ''}
-                  </p>
-                </div>
-              </div>
+            <div className="flex items-stretch">
+              <ClickableRow
+                onClick={() => onSelect(bs)}
+                className="min-w-0 flex-1 px-4 py-3 text-left"
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-teal-500/10">
+                    <Icon as={BookOpen} size="md" className="text-teal-400" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-[var(--brand-text-bright)]">{bs.name}</span>
+                    <span className="mt-0.5 block t-caption text-[var(--brand-text-muted)]">
+                      {bs.frameworkType || 'Custom'} · {bs.sections.length} section{bs.sections.length !== 1 ? 's' : ''}
+                    </span>
+                  </span>
+                </span>
+              </ClickableRow>
 
-              <IconButton
-                onClick={e => { e.stopPropagation(); setConfirmDeleteId(bs.id); }}
-                disabled={deletingId === bs.id}
-                icon={deletingId === bs.id ? Loader2 : Trash2}
-                label="Delete brandscript"
-                size="sm"
-                variant="ghost"
-                className={cn(
-                  'shrink-0 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors',
-                  deletingId === bs.id && '[&_svg]:animate-spin',
-                )}
-              />
+              <span className="flex shrink-0 items-center pr-3">
+                <IconButton
+                  onClick={() => setConfirmDeleteId(bs.id)}
+                  disabled={deletingId === bs.id}
+                  icon={deletingId === bs.id ? Loader2 : Trash2}
+                  label="Delete brandscript"
+                  size="sm"
+                  variant="ghost"
+                  className={cn(
+                    'shrink-0 text-[var(--brand-text-muted)] hover:text-red-400 transition-colors',
+                    deletingId === bs.id && '[&_svg]:animate-spin',
+                  )}
+                />
+              </span>
             </div>
-          </ClickableRow>
+          </SectionCard>
         ))}
       </div>
     </div>
@@ -600,9 +614,10 @@ function ListView({ workspaceId, items, templates, onSelect, onDeleted, onCreate
 
 // ─── Root component ──────────────────────────────────────────────────────────
 
-export function BrandscriptTab({ workspaceId }: Props) {
+export function BrandscriptTab({ workspaceId, focusFirstExisting = false, onClearFocus }: Props) {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [initialFocusDismissed, setInitialFocusDismissed] = useState(false);
 
   const { data: items = [], isLoading: loadingList } = useQuery({
     queryKey: queryKeys.admin.brandscripts(workspaceId),
@@ -620,6 +635,7 @@ export function BrandscriptTab({ workspaceId }: Props) {
       queryKeys.admin.brandscripts(workspaceId),
       (old) => [bs, ...(old ?? [])],
     );
+    setInitialFocusDismissed(false);
     setSelectedId(bs.id);
   };
 
@@ -638,7 +654,8 @@ export function BrandscriptTab({ workspaceId }: Props) {
     );
   };
 
-  const selectedBrandscript = items.find(b => b.id === selectedId) ?? null;
+  const selectedBrandscript = items.find(b => b.id === selectedId)
+    ?? (focusFirstExisting && !initialFocusDismissed ? items[0] ?? null : null);
 
   const isLoading = loadingList || loadingTemplates;
 
@@ -666,7 +683,11 @@ export function BrandscriptTab({ workspaceId }: Props) {
         <BrandscriptDetail
           workspaceId={workspaceId}
           brandscript={selectedBrandscript}
-          onBack={() => setSelectedId(null)}
+          onBack={() => {
+            setSelectedId(null);
+            setInitialFocusDismissed(true);
+            onClearFocus?.();
+          }}
           onUpdated={handleUpdated}
         />
       ) : (

@@ -335,7 +335,15 @@ function TierSection({ tier, workspaceId, deliverableMap, onChanged }: TierSecti
 
 // ─── IdentityTab ──────────────────────────────────────────────────────────────
 
-export function IdentityTab({ workspaceId }: { workspaceId: string }) {
+interface IdentityTabProps {
+  workspaceId: string;
+  /** Selected-only presentation used by Brand overview generator deep links. */
+  focusType?: BrandDeliverableType | null;
+  /** Clears focus while leaving the Identity workflow/library open. */
+  onClearFocus?: () => void;
+}
+
+export function IdentityTab({ workspaceId, focusType = null, onClearFocus }: IdentityTabProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [exporting, setExporting] = useState(false);
@@ -398,6 +406,9 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
   };
 
   if (isLoading) {
+    if (focusType) {
+      return <Skeleton className="h-40 rounded-[var(--radius-xl)]" />;
+    }
     return (
       <div className="space-y-8">
         {TIER_ORDER.map(tier => (
@@ -427,6 +438,26 @@ export function IdentityTab({ workspaceId }: { workspaceId: string }) {
         >
           Retry
         </Button>
+      </div>
+    );
+  }
+
+  if (focusType) {
+    return (
+      <div className="space-y-4">
+        {onClearFocus && (
+          <Button type="button" onClick={onClearFocus} variant="ghost" size="sm">
+            View all brand identity
+          </Button>
+        )}
+        <div data-testid="focused-brand-deliverable" data-deliverable-type={focusType}>
+          <DeliverableCard
+            workspaceId={workspaceId}
+            deliverableType={focusType}
+            deliverable={deliverableMap.get(focusType)}
+            onChanged={invalidate}
+          />
+        </div>
       </div>
     );
   }

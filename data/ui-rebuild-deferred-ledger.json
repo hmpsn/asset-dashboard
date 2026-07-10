@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-07",
+  "updatedAt": "2026-07-10",
   "entries": [
     {
       "id": "DEF-foundation-001",
@@ -865,7 +865,7 @@
       "id": "DEF-brand-ai-001",
       "surface": "brand-ai",
       "item": "Numeric brand-context completeness score for the Brand AI overview cockpit",
-      "decision": "Ship qualitative Ready/Partial/Needs setup from field presence; defer a trusted numeric percent until SB-033 extends ai-context-check.",
+      "decision": "ODP-BRAND-V1: omit inferred overall scoring and readiness; use truthful configured-count and per-group evidence until SB-033 exposes a trusted server-backed score.",
       "class": "data",
       "upgradeTrigger": "SB-033 adds brand-scoped sources to server/ai-context-check.ts and exposes tested per-group scores.",
       "owner": "josh",
@@ -874,7 +874,7 @@
       "createdAt": "2026-07-07",
       "reviewBy": "2026-08-18",
       "links": {
-        "decision": "docs/ui-rebuild/phase-a/owner-decisions.json:280-288",
+        "decision": "docs/ui-rebuild/parity/owner-decision-packet.md#brand--ai-visual-circle-backs",
         "backlog": "docs/ui-rebuild/phase-a/server-backlog.json:454-465",
         "surface": "docs/ui-rebuild/phase-a/surfaces/brand-ai.json:280-284"
       }
@@ -892,7 +892,7 @@
       "createdAt": "2026-07-07",
       "reviewBy": "2026-08-18",
       "links": {
-        "decision": "docs/ui-rebuild/phase-a/owner-decisions.json:280-288",
+        "decision": "docs/ui-rebuild/parity/owner-decision-packet.md#brand--ai-visual-circle-backs",
         "backlog": "docs/ui-rebuild/phase-a/server-backlog.json:467-477",
         "surface": "docs/ui-rebuild/phase-a/surfaces/brand-ai.json:262-266"
       }

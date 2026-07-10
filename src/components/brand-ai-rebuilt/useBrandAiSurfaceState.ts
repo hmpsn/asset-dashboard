@@ -48,7 +48,7 @@ export interface UseBrandAiSurfaceStateReturn {
   rawTab: string | null;
   focus: string | null;
   legacyBusinessFootprintSection: BusinessFootprintFocus;
-  setTab: (tab: BrandAiTab) => void;
+  setTab: (tab: BrandAiTab, focus?: string | null) => void;
   setFocus: (focus: string | null) => void;
 }
 
@@ -72,10 +72,10 @@ export function useBrandAiSurfaceState(): UseBrandAiSurfaceStateReturn {
     }, { replace });
   }, [setSearchParams]);
 
-  const setTab = useCallback((nextTab: BrandAiTab) => {
+  const setTab = useCallback((nextTab: BrandAiTab, nextFocus: string | null = null) => {
     updateParams({
       [TAB_PARAM]: nextTab === DEFAULT_TAB ? null : nextTab,
-      [FOCUS_PARAM]: null,
+      [FOCUS_PARAM]: nextFocus,
     });
   }, [updateParams]);
 

@@ -112,6 +112,32 @@ Visual-parity log, 2026-07-10 — status: `owner-approved`. A source-led desktop
 
 Owner resolution, 2026-07-10: **“Approve Insights Engine with V1–V6 as recommended.”** V1–V3 are implemented exactly as recorded; V4–V6 remain explicit exceptions. Final status: `owner-approved`.
 
+### Brand & AI Visual Circle-Backs
+
+Surface: `brand` / Brand & AI
+
+Contract: `docs/ui-rebuild/parity/brand-ai-contract.md`
+
+Current status: `owner-approved`
+
+The prototype-led overview correction is rendered at both required desktop viewports. It matches the prototype's 1140px canvas, opening hierarchy, three-line lede, cockpit/body landmarks, compact group density, and first-viewport section order. Synthetic modal frames are removed, the real panels remain exact-once, and the Brandscript nested-button defect is fixed. The seven formerly owner-gated choices below are retained as the decision record.
+
+| ID | Owner decision | Recommended direction | Why it is owner-gated |
+|---|---|---|---|
+| `ODP-BRAND-V1` | Keep the locally inferred `45% context complete` / readiness judgment or remove it until a server-backed score exists. | Remove the overall percentage and readiness badge; make `5/11 inputs configured` the primary truthful readout while retaining group-level configured evidence. | The current denominator and readiness thresholds are defined in React, despite the Brand contract forbidding an invented numeric score. Exact prototype geometry and data authority conflict. |
+| `ODP-BRAND-V2` | Keep seven generators under Voice only or restore the prototype's 17 unique generators across all four context groups. | Restore all 17 once, assigned to their prototype groups, with one shared Identity capability home and no duplication. | This changes capability visibility and reverses the earlier Voice-only behavior checkpoint. |
+| `ODP-BRAND-V3` | Open the full Identity library from every generator row or focus the clicked deliverable. | Keep plain `?tab=identity` as the full-library compatibility receiver; overview rows add a validated focus value and open one real deliverable editor. | Additive focus state changes the launch workflow and must preserve direct deep-link meaning. |
+| `ODP-BRAND-V4` | Keep existing DS `lg` modal width (768px) or add a Brand-specific width matching the 640/680px prototype shells. | Approve one 680px Brand workflow size for this surface; use it for all Brand modals rather than adding two near-duplicate shared sizes. | A new shared Modal size or local width exception requires owner approval. |
+| `ODP-BRAND-V5` | Recreate the prototype's curated modal interiors exactly or preserve truthful production editors and empty states. | Preserve real editors/data; match shell, section order, density, and focus where the contracts support it. Document founder Q&A, E-E-A-T pillar rollups, and confirmed-geo rollups as backend exceptions instead of inventing data. Auto-focus the real existing Brandscript when launched from its overview row, while the direct deep link retains the library. | Exact prototype content requires data the production contracts do not expose; simulating it would be misleading, while rehoming editors changes workflow. |
+| `ODP-BRAND-V6` | Copy the prototype's visual-only Preview context / Generate from site topbar controls or retain truthful production actions. | Keep Refresh context exactly once in the topbar, keep the real Discovery launcher in the rail, and omit unsupported Preview context. Record the topbar composition as a production exception. | The prototype controls have no handlers; adding them would simulate unsupported actions, and moving Discovery would change its capability home. |
+| `ODP-BRAND-V7` | Add a new 12.5px / 700 typography role for the two Brand rail titles or retain the closest existing DS role at 13.5px / 700. | Retain the existing `t-ui` token values and record the 1px title-size difference as an approved exception. | Exact computed parity would require a new shared type token, class, or local rule exception; the owner rules require an explicit decision before any of those are added. |
+
+Owner resolution, 2026-07-10: **“Go for it.”** V1–V7 are approved exactly as recommended. This resolves the implementation choices only; it does not approve the final visual comparison.
+
+Implementation/review log, 2026-07-10: V1–V7 are implemented. The 218-test Brand/receiver floor, hooks lint, typecheck, production build, and all automated PR rules pass. Browser captures at 1440×900, 1600×1000, and 390×844 are free of page overflow, nested buttons, console errors, and page errors. After correcting Markdown preview rendering and a 13px cockpit/body landmark drift, a fresh Sol reviewer returned `PASS`.
+
+Owner visual resolution, 2026-07-10: Joshua reviewed the live surface and said, **“It looks great. I'd like you to continue rolling through our parity pass, and I'll provide the finer feedback once we've wrapped everything.”** Brand & AI is therefore `owner-approved`. V1–V7 remain the accepted decision and exception record; the later fine-feedback pass is a registry-wide circle-back, not a revocation.
+
 ### ODP-002 Content Pipeline Lifecycle Board
 
 Surface: `content-pipeline` / Content Pipeline
@@ -352,4 +378,4 @@ These behavior-safe defaults were accepted on 2026-07-09. They remain `behavior-
 
 ## Next Implementation Slice
 
-Begin Brand & AI source inventory and paired desktop comparison. Preserve the owner-approved Insights Engine commit as an atomic calibration surface; do not push, open a PR, or start staging extraction during this goal.
+Begin Content Pipeline source inventory, paired desktop comparison, and its first corrective pass. Preserve Insights Engine and Brand & AI as separate owner-approved commits; do not push, open a PR, or start staging extraction during this goal.
