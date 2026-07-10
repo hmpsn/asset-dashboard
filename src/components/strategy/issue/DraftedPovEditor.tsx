@@ -21,6 +21,7 @@ import { Pencil, RefreshCw } from 'lucide-react';
 import { SectionCard } from '../../ui/SectionCard';
 import { EmptyState } from '../../ui/EmptyState';
 import { Button } from '../../ui/Button';
+import { Icon } from '../../ui/Icon';
 import { FormTextarea } from '../../ui/forms/FormTextarea';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import type { StrategyPov } from '../../../../shared/types/strategy-pov';
@@ -39,6 +40,8 @@ interface DraftedPovEditorProps {
   onRegenerate?: () => void;
   isGenerating?: boolean;
   className?: string;
+  title?: string;
+  subtitle?: string;
 }
 
 const DEBOUNCE_MS = 700;
@@ -147,6 +150,8 @@ export function DraftedPovEditor({
   onRegenerate,
   isGenerating = false,
   className,
+  title = 'The point of view',
+  subtitle,
 }: DraftedPovEditorProps) {
   // Local draft mirrors the POV; edits flow through here and are emitted on a debounce.
   const [draft, setDraft] = useState<StrategyPovEdit>({});
@@ -189,7 +194,13 @@ export function DraftedPovEditor({
 
   if (!pov) {
     return (
-      <SectionCard title="The point of view" className={className}>
+      <SectionCard
+        title={title}
+        subtitle={subtitle}
+        titleIcon={subtitle ? <Icon as={Pencil} size="md" className="text-[var(--teal)]" /> : undefined}
+        iconChip={!!subtitle}
+        className={className}
+      >
         <EmptyState
           icon={Pencil}
           title="No point of view drafted yet"
@@ -215,7 +226,10 @@ export function DraftedPovEditor({
 
   return (
     <SectionCard
-      title="The point of view"
+      title={title}
+      subtitle={subtitle}
+      titleIcon={subtitle ? <Icon as={Pencil} size="md" className="text-[var(--teal)]" /> : undefined}
+      iconChip={!!subtitle}
       className={className}
       action={
         onRegenerate ? (

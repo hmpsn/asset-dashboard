@@ -69,6 +69,8 @@ export interface BackingMovesQueueProps {
    * per-row primary button + the bulk bar STAGE instead of sending.
    */
   stagedRecIds?: Set<string>;
+  /** Recommendation ids eligible for the local staged/sendable set. */
+  stageableRecIds?: ReadonlySet<string>;
   onStage?: (recId: string) => void;
   onStageMany?: (recIds: string[]) => void;
   /**
@@ -77,6 +79,10 @@ export interface BackingMovesQueueProps {
    * Absent on consumers that don't support manual rec creation.
    */
   onAddRec?: () => void;
+  /** Opens the owning surface's recommendation detail workflow from the canonical move row. */
+  onOpenDetails?: (recId: string) => void;
+  /** Optional prototype-style context line beneath the queue title. */
+  subtitle?: string;
 }
 
 /**
@@ -93,7 +99,9 @@ function ArchetypeGroup({
   onEditWording,
   sendLabel,
   stagedRecIds,
+  stageableRecIds,
   onStage,
+  onOpenDetails,
 }: {
   archetype: Archetype;
   recs: Recommendation[];
@@ -109,7 +117,9 @@ function ArchetypeGroup({
   sendLabel: string;
   /** Blocker 5 staging — the staged set + the toggle, threaded to each CockpitRow. */
   stagedRecIds?: Set<string>;
+  stageableRecIds?: ReadonlySet<string>;
   onStage?: (recId: string) => void;
+  onOpenDetails?: (recId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -143,19 +153,24 @@ function ArchetypeGroup({
       </div>
 
       {/* Rec rows */}
-      {visible.map((r) => (
-        <CockpitRow
-          key={r.id}
-          rec={r}
-          actions={wrappedActions}
-          selected={selectionState.isSelected(r.id)}
-          onToggleSelect={selectionState.toggle}
-          onEditWording={onEditWording}
-          sendLabel={sendLabel}
-          onStage={onStage}
-          staged={stagedRecIds?.has(r.id) ?? false}
-        />
-      ))}
+      {visible.map((r) => {
+        const canStage = !stageableRecIds || stageableRecIds.has(r.id);
+        return (
+          <CockpitRow
+            key={r.id}
+            rec={r}
+            actions={wrappedActions}
+            selected={selectionState.isSelected(r.id)}
+            onToggleSelect={selectionState.toggle}
+            onEditWording={onEditWording}
+            sendLabel={sendLabel}
+            onStage={canStage ? onStage : undefined}
+            staged={stagedRecIds?.has(r.id) ?? false}
+            stageUnavailable={!!onStage && !canStage}
+            onOpenDetails={onOpenDetails}
+          />
+        );
+      })}
 
       {/* "Show the rest" affordance */}
       {capped && (
@@ -193,9 +208,12 @@ export function BackingMovesQueue({
   stagedCount,
   curatedCount,
   stagedRecIds,
+  stageableRecIds,
   onStage,
   onStageMany,
   onAddRec,
+  onOpenDetails,
+  subtitle,
 }: BackingMovesQueueProps) {
   // Group recs by archetype, preserving ARCHETYPE_ORDER
   const groups = useMemo(() => {
@@ -233,8 +251,8 @@ export function BackingMovesQueue({
   // provided so the queue stays usable by future consumers that don't support manual rec creation.
   const counterEl =
     stagedCount !== undefined && curatedCount !== undefined ? (
-      <span className="flex items-center gap-3">
-        <span className="t-caption-sm text-[var(--brand-text-muted)] tabular-nums" data-testid="backing-moves-counter">
+      <span className="flex flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+        <span className="t-caption-sm text-right text-[var(--brand-text-muted)] tabular-nums" data-testid="backing-moves-counter">
           {stagedCount} staged · {curatedCount} already with client
         </span>
         {onAddRec && (
@@ -263,7 +281,7 @@ export function BackingMovesQueue({
 
   if (groups.length === 0) {
     return (
-      <SectionCard title="Backing moves" titleIcon={titleIcon} action={counterEl}>
+      <SectionCard title="Backing moves" titleIcon={titleIcon} subtitle={subtitle} iconChip={!!subtitle} action={counterEl}>
         <p className="t-caption-sm text-[var(--brand-text-muted)] py-6 text-center">
           No recommendations to back the issue yet.
         </p>
@@ -273,7 +291,7 @@ export function BackingMovesQueue({
 
   return (
     <>
-      <SectionCard title="Backing moves" titleIcon={titleIcon} action={counterEl}>
+      <SectionCard title="Backing moves" titleIcon={titleIcon} subtitle={subtitle} iconChip={!!subtitle} action={counterEl}>
         <div className="space-y-6">
           {groups.map(({ archetype, recs: groupRecs }) => (
             <ArchetypeGroup
@@ -287,7 +305,9 @@ export function BackingMovesQueue({
               onEditWording={onEditWording}
               sendLabel={STAGE_ROW_LABEL}
               stagedRecIds={stagedRecIds}
+              stageableRecIds={stageableRecIds}
               onStage={onStage}
+              onOpenDetails={onOpenDetails}
             />
           ))}
         </div>
@@ -299,6 +319,9 @@ export function BackingMovesQueue({
           strike remain real bulk mutations (they are not client sends). */}
       <CurationBulkActionBar
         selectedCount={sel.selectedCount}
+        sendCount={stageableRecIds
+          ? sel.resolveSelectedIds().filter((id) => stageableRecIds.has(id)).length
+          : undefined}
         isAllInFilter={sel.isAllInFilter}
         isPending={bulk.isPending}
         onClear={sel.clear}
@@ -306,7 +329,10 @@ export function BackingMovesQueue({
         onAction={(action, throttleDays) => {
           if (action === 'send') {
             // Stage the selected recs (local set) — NOT a client send.
-            onStageMany?.(sel.resolveSelectedIds());
+            const selectedIds = sel.resolveSelectedIds();
+            onStageMany?.(stageableRecIds
+              ? selectedIds.filter((id) => stageableRecIds.has(id))
+              : selectedIds);
             sel.clear();
             return;
           }

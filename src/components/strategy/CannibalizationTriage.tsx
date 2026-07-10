@@ -36,7 +36,7 @@ const ACTION_LABEL: Record<NonNullable<CannibalizationItem['action']>, string> =
  * the best-ranking page. Ranking tiebreak mirrors the server's canonical derivation
  * (server/keyword-strategy-enrichment.ts): lowest position, then most clicks, then most impressions.
  */
-function keeperPathOf(item: CannibalizationItem): string | undefined {
+export function cannibalizationKeeperPath(item: CannibalizationItem): string | undefined {
   if (item.canonicalPath && item.pages.some(p => matchPageIdentity(p.path, item.canonicalPath!))) {
     return item.canonicalPath;
   }
@@ -62,7 +62,7 @@ export function CannibalizationTriage({ entries, workspaceId }: CannibalizationT
   const [sendingKey, setSendingKey] = useState<string | null>(null);
   const sendMutation = useMutation({
     mutationFn: (item: CannibalizationItem) => {
-      const canonicalPath = keeperPathOf(item);
+      const canonicalPath = cannibalizationKeeperPath(item);
       return clientActions.create(workspaceId, { // strategy-send-must-route-through-lifecycle-ok: cannibalization deliverable spine — bespoke client card requires dedicated renderer
         sourceType: 'cannibalization',
         sourceId: cannibalizationSourceId(item.keyword),
@@ -129,7 +129,7 @@ export function CannibalizationTriage({ entries, workspaceId }: CannibalizationT
       </p>
       <div className="space-y-2">
         {visible.map((item, i) => {
-          const keeperPath = keeperPathOf(item);
+          const keeperPath = cannibalizationKeeperPath(item);
           const sourceId = cannibalizationSourceId(item.keyword);
           const sent = sentKeys.has(sourceId);
           const sending = sendingKey === sourceId;

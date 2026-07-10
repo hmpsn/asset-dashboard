@@ -27,7 +27,9 @@ export function LostQueryRecoveryCard({ workspaceId }: LostQueryRecoveryCardProp
   return (
     <SectionCard
       title="Lost visibility"
+      subtitle="Queries that recently stopped showing in search - win them back"
       titleIcon={<Icon as={Search} size="md" className="text-blue-400" />}
+      iconChip
       action={
         <Button
           onClick={recover}
@@ -39,11 +41,11 @@ export function LostQueryRecoveryCard({ workspaceId }: LostQueryRecoveryCardProp
         </Button>
       }
     >
-      <p className="t-caption-sm text-[var(--brand-text-muted)] mb-3">Queries that recently stopped showing in search — win them back with refreshed or new content.</p>
+      <p className="t-body text-[var(--brand-text-muted)] mb-3">Refresh or rebuild the page that used to rank, then re-enter the results.</p>
       <div className="space-y-1.5">
         {queries.slice(0, 5).map(q => (
           <div key={q.query} className="flex items-center justify-between gap-3 px-3 py-2 bg-[var(--surface-3)]/50 rounded-[var(--radius-lg)]">
-            <span className="t-caption-sm text-[var(--brand-text-bright)] truncate">{q.query}</span>
+            <span className="t-ui text-[var(--brand-text-bright)] truncate">{q.query}</span>
             <div className="flex items-center gap-3 flex-shrink-0">
               <span className="t-caption-sm text-[var(--brand-text-muted)]">{q.lastPosition != null ? `was #${q.lastPosition}` : 'unranked'}</span>
               <span className="t-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded">{q.totalImpressions.toLocaleString()} imp at risk</span>

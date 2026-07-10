@@ -26,11 +26,20 @@ const diff = {
   ],
 };
 
-function renderDiff() {
+function renderDiff(defaultExpanded = false) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <MemoryRouter><QueryClientProvider client={queryClient}><StrategyDiff workspaceId="ws-1" /></QueryClientProvider></MemoryRouter>,
+  const view = (expanded: boolean) => (
+    <MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <StrategyDiff workspaceId="ws-1" defaultExpanded={expanded} />
+      </QueryClientProvider>
+    </MemoryRouter>
   );
+  const result = render(view(defaultExpanded));
+  return {
+    ...result,
+    rerenderDiff: (expanded: boolean) => result.rerender(view(expanded)),
+  };
 }
 
 describe('StrategyDiff', () => {
@@ -57,5 +66,46 @@ describe('StrategyDiff', () => {
 
     // watch badge is informational — not a button, no navigation.
     expect(screen.getByText('Keep watching').closest('button')).toBeNull();
+  });
+
+  it('opens its body immediately for a changes deep-link receiver', async () => {
+    renderDiff(true);
+
+    expect(await screen.findByRole('button', { name: /What Changed/i })).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByText('Optimize page')).toBeInTheDocument();
+  });
+
+  it('opens when an already-mounted receiver changes to the changes lens', async () => {
+    const { rerenderDiff } = renderDiff(false);
+
+    expect(await screen.findByRole('button', { name: /What Changed/i })).toHaveAttribute('aria-expanded', 'false');
+    rerenderDiff(true);
+
+    expect(screen.getByRole('button', { name: /What Changed/i })).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByText('Optimize page')).toBeInTheDocument();
+  });
+
+  it('renders an honest empty receiver when a changes deep link has no comparison history', async () => {
+    strategyDiffMock.mockResolvedValue(null);
+
+    renderDiff(true);
+
+    expect(await screen.findByTestId('strategy-diff-empty')).toBeInTheDocument();
+    expect(screen.getByText('No previous strategy comparison')).toBeInTheDocument();
+    expect(screen.getByText(/first comparison will appear after the next strategy refresh/i)).toBeInTheDocument();
+  });
+
+  it('renders a retryable error instead of misreporting a failed comparison as empty history', async () => {
+    strategyDiffMock.mockRejectedValue(new Error('comparison unavailable'));
+
+    renderDiff(true);
+
+    expect(await screen.findByTestId('strategy-diff-error')).toBeInTheDocument();
+    expect(screen.getByText('Strategy comparison did not load')).toBeInTheDocument();
+    expect(screen.queryByText('No previous strategy comparison')).not.toBeInTheDocument();
+
+    strategyDiffMock.mockResolvedValue(null);
+    fireEvent.click(screen.getByRole('button', { name: 'Retry comparison' }));
+    await waitFor(() => expect(strategyDiffMock).toHaveBeenCalledTimes(2));
   });
 });

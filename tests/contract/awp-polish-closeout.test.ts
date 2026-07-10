@@ -30,9 +30,13 @@ describe('AWP polish closeout contracts', () => {
     const howItWorks = readRepoFile('src/components/strategy/StrategyHowItWorks.tsx');
 
     expect(stanceBar).not.toContain('sky-');
+    expect(stanceBar).not.toContain('purple');
     expect(archetypeMap).not.toContain('sky-');
     expect(howItWorks).not.toContain('text-accent-orange');
-    expect(stanceBar).toContain("technical: 'bg-blue-300/70'");
+    expect(stanceBar).toContain("{ id: 'demand', label: 'Win demand', background: 'var(--teal)' }");
+    expect(stanceBar).toContain("{ id: 'protect', label: 'Protect', background: 'var(--emerald)' }");
+    expect(stanceBar).toContain("{ id: 'technical', label: 'Technical', background: 'var(--blue)' }");
+    expect(stanceBar).toContain("{ id: 'local', label: 'Local', background: 'var(--orange)' }");
     expect(archetypeMap).toContain("technical: 'bg-blue-300'");
   });
 

@@ -18,6 +18,8 @@ interface CurationBulkActionBarProps {
    * commit is the header "Send issue" button; Blocker 5).
    */
   sendVerb?: string;
+  /** Optional sendable subset count when non-send bulk actions may target a wider selection. */
+  sendCount?: number;
 }
 
 export function CurationBulkActionBar({
@@ -27,6 +29,7 @@ export function CurationBulkActionBar({
   onAction,
   onClear,
   sendVerb = 'Send',
+  sendCount = selectedCount,
 }: CurationBulkActionBarProps) {
   const [throttleOpen, setThrottleOpen] = useState(false);
   const [strikeArmed, setStrikeArmed] = useState(false);
@@ -54,10 +57,10 @@ export function CurationBulkActionBar({
             size="sm"
             variant="primary"
             icon={Send}
-            disabled={isPending}
+            disabled={isPending || sendCount === 0}
             onClick={() => onAction('send')}
           >
-            {sendVerb} {selectedCount}
+            {sendVerb} {sendCount}
           </Button>
 
           {throttleOpen ? (

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { NeedsAttentionStrip } from '../../../src/components/strategy/NeedsAttentionStrip';
 
 describe('NeedsAttentionStrip', () => {
@@ -25,5 +25,23 @@ describe('NeedsAttentionStrip', () => {
     expect(screen.getByText('Old sent rec')).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', { name: /review/i })[0]);
     expect(onAct).toHaveBeenCalledWith('r1', 'stale_sent');
+  });
+
+  it('reviews a discussing move without claiming to open a reply thread', () => {
+    const onAct = vi.fn();
+    render(
+      <NeedsAttentionStrip
+        items={[
+          { recId: 'r3', title: 'Client discussion', kind: 'new_reply', detail: 'Client discussion is active' },
+        ]}
+        onAct={onAct}
+      />,
+    );
+
+    const row = screen.getByText('Client discussion').closest('li');
+    expect(row).not.toBeNull();
+    expect(within(row!).queryByRole('button', { name: 'Open reply' })).not.toBeInTheDocument();
+    fireEvent.click(within(row!).getByRole('button', { name: 'Review move' }));
+    expect(onAct).toHaveBeenCalledWith('r3', 'new_reply');
   });
 });

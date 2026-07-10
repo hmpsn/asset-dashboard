@@ -156,10 +156,14 @@ export function useEngineRebuilt(workspaceId: string) {
     () => [...stagedRecIds].filter((id) => sendableSet.has(id)),
     [sendableSet, stagedRecIds],
   );
+  const stagedSendableSet = useMemo(() => new Set(stagedSendableIds), [stagedSendableIds]);
   const curatedCount = useMemo(() => cockpitRecs.filter(isCuratedForClient).length, [cockpitRecs]);
   const stageMany = useCallback((recIds: string[]) => {
-    setStagedRecIds((prev) => new Set([...prev, ...recIds]));
-  }, [setStagedRecIds]);
+    setStagedRecIds((prev) => new Set([...prev, ...recIds.filter((id) => sendableSet.has(id))]));
+  }, [sendableSet, setStagedRecIds]);
+  const toggleSendableStage = useCallback((recId: string) => {
+    if (sendableSet.has(recId)) toggleStage(recId);
+  }, [sendableSet, toggleStage]);
   const sendIssue = useCallback(() => {
     if (stagedSendableIds.length === 0) return;
     issueBulkSend.mutate(
@@ -256,9 +260,11 @@ export function useEngineRebuilt(workspaceId: string) {
     moveQueueSourceCounts,
     stagedRecIds,
     stagedSendableIds,
+    stagedSendableSet,
+    sendableSet,
     stagedCount: stagedSendableIds.length,
     curatedCount,
-    toggleStage,
+    toggleStage: toggleSendableStage,
     stageMany,
     sendIssue,
     struckRecIds,

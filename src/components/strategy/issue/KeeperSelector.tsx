@@ -3,7 +3,7 @@
  *
  * Displays all competing pages for a cannibalization issue with their position and
  * impressions, allowing the operator to explicitly choose which page to keep as the
- * canonical winner. Seeds from the existing keeperPathOf() default in
+ * canonical winner. Seeds from the existing cannibalizationKeeperPath() default in
  * CannibalizationTriage.tsx; persists the choice via useKeeperOverride.
  *
  * Used inside the Issue cockpit (strategy-the-issue flag ON). New component — no
@@ -24,7 +24,7 @@ export interface KeeperSelectorProps {
   workspaceId: string;
   /** The URL-set key for this issue (order-independent; used as the override store key). */
   urlSetKey: string;
-  /** The currently inferred keeper path (from keeperPathOf() or stored override). */
+  /** The currently inferred keeper path (from cannibalizationKeeperPath() or stored override). */
   currentKeeperPath: string | undefined;
   /** Called after a keeper is successfully saved so the parent can update its state. */
   onKeeperChanged?: (keeperPath: string) => void;

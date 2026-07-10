@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useIntelligenceSignals } from '../../hooks/admin/useIntelligenceSignals.js';
 import { useRecomputeSignals } from '../../hooks/admin/useRecomputeSignals.js';
 import { SectionCard } from '../ui/SectionCard.js';
@@ -9,6 +10,9 @@ import type { StrategySignal } from '../../../shared/types/insights.js';
 
 interface Props {
   workspaceId: string;
+  title?: string;
+  subtitle?: string;
+  initialLimit?: number;
 }
 
 const iconMap = {
@@ -35,10 +39,17 @@ const badgeLabelMap: Record<StrategySignal['type'], string> = {
   content_gap: 'Gap',
 };
 
-export function IntelligenceSignals({ workspaceId }: Props) {
+export function IntelligenceSignals({
+  workspaceId,
+  title = 'Intelligence Signals',
+  subtitle,
+  initialLimit = 10,
+}: Props) {
+  const [expanded, setExpanded] = useState(false);
   const { data, isLoading } = useIntelligenceSignals(workspaceId);
   const recompute = useRecomputeSignals(workspaceId);
   const signals = data?.signals ?? [];
+  const visibleSignals = expanded ? signals : signals.slice(0, initialLimit);
 
   // Right-aligned freshness caption + manual recompute (teal action). Lives in the SectionCard `action`
   // slot. The caption only renders once a computedAt is known.
@@ -58,8 +69,10 @@ export function IntelligenceSignals({ workspaceId }: Props) {
   if (isLoading) {
     return (
       <SectionCard
-        title="Intelligence Signals"
-        titleIcon={<Icon as={TrendingUp} size="md" className="text-teal-400" />}
+        title={title}
+        subtitle={subtitle}
+        iconChip={!!subtitle}
+        titleIcon={<Icon as={TrendingUp} size="md" className="text-[var(--blue)]" />}
       >
         <div className="animate-pulse space-y-3">
           {[1, 2, 3].map(i => (
@@ -73,8 +86,10 @@ export function IntelligenceSignals({ workspaceId }: Props) {
   if (!signals.length) {
     return (
       <SectionCard
-        title="Intelligence Signals"
-        titleIcon={<Icon as={TrendingUp} size="md" className="text-teal-400" />}
+        title={title}
+        subtitle={subtitle}
+        iconChip={!!subtitle}
+        titleIcon={<Icon as={TrendingUp} size="md" className="text-[var(--blue)]" />}
         action={headerAction}
       >
         <EmptyState
@@ -88,13 +103,15 @@ export function IntelligenceSignals({ workspaceId }: Props) {
 
   return (
     <SectionCard
-      title="Intelligence Signals"
-      titleIcon={<Icon as={TrendingUp} size="md" className="text-teal-400" />}
-      titleExtra={<Badge label={`${signals.length}`} tone="teal" />}
+      title={title}
+      subtitle={subtitle}
+      iconChip={!!subtitle}
+      titleIcon={<Icon as={TrendingUp} size="md" className="text-[var(--blue)]" />}
+      titleExtra={<Badge label={`${signals.length}`} tone="blue" />}
       action={headerAction}
     >
       <div className="space-y-2">
-        {signals.slice(0, 10).map(signal => {
+        {visibleSignals.map(signal => {
           const SignalIcon = iconMap[signal.type];
           const color = colorMap[signal.type];
           return (
@@ -118,6 +135,13 @@ export function IntelligenceSignals({ workspaceId }: Props) {
             </div>
           );
         })}
+        {signals.length > initialLimit && (
+          <div className="flex justify-center pt-1">
+            <Button variant="ghost" size="sm" onClick={() => setExpanded((open) => !open)}>
+              {expanded ? 'Show fewer signals' : `Show all ${signals.length} signals`}
+            </Button>
+          </div>
+        )}
       </div>
     </SectionCard>
   );

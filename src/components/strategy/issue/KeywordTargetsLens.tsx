@@ -26,6 +26,10 @@ export interface KeywordTargetsLensProps {
    *  calls even if this panel is ever mounted outside the issueOverviewEl gate. Defaults to FALSE
    *  (opt-in) so an omitted prop never fires a flag-OFF fetch — the byte-identical-OFF safe default. */
   theIssueEnabled?: boolean;
+  /** Render only the lens body when a parent owns the shared section shell. */
+  embedded?: boolean;
+  /** Optional local curation set. When present, project only rows whose recommendation is staged. */
+  includedRecIds?: ReadonlySet<string>;
 }
 
 /** A single keyword/topic target row: label + sent/proposed badge + Keyword Hub deep-link. */
@@ -77,9 +81,17 @@ function TargetRow({
  * Renders one row per curated keyword_gap / topic_cluster rec. `theIssueEnabled` is threaded into the
  * hook's `enabled` arg, so flag-OFF makes zero network calls even if mounted outside the overview gate.
  */
-export function KeywordTargetsLens({ workspaceId, theIssueEnabled = false }: KeywordTargetsLensProps) {
+export function KeywordTargetsLens({
+  workspaceId,
+  theIssueEnabled = false,
+  embedded = false,
+  includedRecIds,
+}: KeywordTargetsLensProps) {
   const navigate = useNavigate();
   const { keywordTargets, isLoading, isError } = useIssueLenses(workspaceId, theIssueEnabled);
+  const visibleTargets = includedRecIds
+    ? keywordTargets.filter((row) => includedRecIds.has(row.recId))
+    : keywordTargets;
 
   const openInHub = (keyword: string) => {
     navigate(adminPath(workspaceId, 'seo-keywords') + buildHubDeepLinkQuery({ keyword }));
@@ -87,10 +99,10 @@ export function KeywordTargetsLens({ workspaceId, theIssueEnabled = false }: Key
 
   const titleIcon = <Icon as={Target} size="md" className="text-accent-brand" />;
 
-  return (
-    <SectionCard title="Keyword targets" titleIcon={titleIcon}>
+  const content = (
+    <>
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">
-        Curated keyword &amp; topic targets — open each in the Keyword Hub to act.
+        Staged keyword &amp; topic targets — open each in the Keyword Hub to act.
       </p>
 
       {isLoading ? (
@@ -101,19 +113,29 @@ export function KeywordTargetsLens({ workspaceId, theIssueEnabled = false }: Key
         <p className="t-caption-sm text-red-400/80 py-4 text-center">
           Couldn't load keyword targets. It'll retry shortly.
         </p>
-      ) : keywordTargets.length === 0 ? (
+      ) : visibleTargets.length === 0 ? (
         <EmptyState
           icon={Search}
           title="No keyword targets yet"
-          description="Curate keyword-gap or topic-cluster moves in the queue above, then open each here to act in the Keyword Hub."
+          description="Stage a keyword-gap or topic-cluster move above, then open it here to act in the Keyword Hub."
         />
       ) : (
         <div className="divide-y divide-[var(--brand-border)]">
-          {keywordTargets.map((row) => (
+          {visibleTargets.map((row) => (
             <TargetRow key={row.recId} row={row} onOpen={openInHub} />
           ))}
         </div>
       )}
+    </>
+  );
+
+  if (embedded) {
+    return <div className="px-4 py-3">{content}</div>;
+  }
+
+  return (
+    <SectionCard title="Keyword targets" titleIcon={titleIcon}>
+      {content}
     </SectionCard>
   );
 }

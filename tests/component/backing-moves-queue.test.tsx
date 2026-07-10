@@ -250,6 +250,71 @@ describe('BackingMovesQueue', () => {
     expect(onCut).toHaveBeenCalledWith('r1');
   });
 
+  it('opens an optional detail workflow from the canonical backing-move row', () => {
+    const onOpenDetails = vi.fn();
+    wrap(
+      <BackingMovesQueue
+        workspaceId="ws1"
+        recs={[makeRec('r1', 'content', 'Inspect this move')]}
+        actions={makeActions()}
+        onCut={vi.fn()}
+        onOpenDetails={onOpenDetails}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'View details for Inspect this move' }));
+    expect(onOpenDetails).toHaveBeenCalledTimes(1);
+    expect(onOpenDetails).toHaveBeenCalledWith('r1');
+  });
+
+  it('does not offer staging for a move outside the orchestrator sendable set', () => {
+    const sent = {
+      ...makeRec('sent', 'content', 'Already sent move'),
+      clientStatus: 'sent' as const,
+    };
+    wrap(
+      <BackingMovesQueue
+        workspaceId="ws1"
+        recs={[sent]}
+        actions={makeActions()}
+        onCut={vi.fn()}
+        stagedRecIds={new Set()}
+        stageableRecIds={new Set()}
+        onStage={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Stage for issue' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send to client' })).not.toBeInTheDocument();
+  });
+
+  it('stages only sendable rows from a mixed bulk selection', () => {
+    const onStageMany = vi.fn();
+    const sendable = makeRec('sendable', 'content', 'Sendable move');
+    const sent = {
+      ...makeRec('sent', 'content', 'Already sent move'),
+      clientStatus: 'sent' as const,
+    };
+    wrap(
+      <BackingMovesQueue
+        workspaceId="ws1"
+        recs={[sendable, sent]}
+        actions={makeActions()}
+        onCut={vi.fn()}
+        stagedRecIds={new Set()}
+        stageableRecIds={new Set(['sendable'])}
+        onStage={vi.fn()}
+        onStageMany={onStageMany}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select: Sendable move' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select: Already sent move' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stage 1' }));
+
+    expect(onStageMany).toHaveBeenCalledWith(['sendable']);
+  });
+
   it('renders an empty state when recs array is empty', () => {
     wrap(
       <BackingMovesQueue

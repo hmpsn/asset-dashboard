@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EngineSurface } from '../../../src/components/engine-rebuilt/EngineSurface';
 import { ToastProvider } from '../../../src/components/Toast';
 import { useFeatureFlag } from '../../../src/hooks/useFeatureFlag';
@@ -44,15 +44,33 @@ vi.mock('../../../src/components/strategy', () => ({
   StrategyHeaderActions: () => <div data-testid="strategy-header-actions">Header actions</div>,
   StrategyStalenessNudges: () => <div data-testid="strategy-staleness-nudges">Staleness nudges</div>,
   StrategyEmptyState: () => <div data-testid="strategy-empty-state">Generate strategy</div>,
-  StrategyCockpit: () => <div data-testid="strategy-cockpit">Curation cockpit</div>,
 }));
 
 vi.mock('../../../src/components/strategy/StrategyDiff', () => ({
-  StrategyDiff: () => <div data-testid="strategy-diff">What changed</div>,
+  StrategyDiff: ({ defaultExpanded }: { defaultExpanded?: boolean }) => (
+    <div data-testid="strategy-diff" data-default-expanded={defaultExpanded}>What changed</div>
+  ),
 }));
 
 vi.mock('../../../src/components/strategy/IntelligenceSignals', () => ({
-  IntelligenceSignals: () => <div data-testid="intelligence-signals">Signals</div>,
+  IntelligenceSignals: ({
+    title,
+    subtitle,
+    initialLimit,
+  }: {
+    title?: string;
+    subtitle?: string;
+    initialLimit?: number;
+  }) => (
+    <div
+      data-testid="intelligence-signals"
+      data-title={title}
+      data-subtitle={subtitle}
+      data-initial-limit={initialLimit}
+    >
+      Signals
+    </div>
+  ),
 }));
 
 vi.mock('../../../src/components/strategy/LostQueryRecoveryCard', () => ({
@@ -64,14 +82,27 @@ vi.mock('../../../src/components/strategy/issue/StanceBar', () => ({
 }));
 
 vi.mock('../../../src/components/strategy/issue/DraftedPovEditor', () => ({
-  DraftedPovEditor: () => <div data-testid="drafted-pov-editor">POV editor</div>,
+  DraftedPovEditor: ({ title, subtitle }: { title?: string; subtitle?: string }) => (
+    <div data-testid="drafted-pov-editor" data-title={title} data-subtitle={subtitle}>POV editor</div>
+  ),
 }));
 
 vi.mock('../../../src/components/strategy/issue/BackingMovesQueue', () => ({
-  BackingMovesQueue: ({ onAddRec }: { onAddRec: () => void }) => (
-    <div data-testid="backing-moves-queue">
+  BackingMovesQueue: ({
+    onAddRec,
+    onOpenDetails,
+    subtitle,
+    shortlistCap,
+  }: {
+    onAddRec: () => void;
+    onOpenDetails: (recId: string) => void;
+    subtitle?: string;
+    shortlistCap?: number;
+  }) => (
+    <div data-testid="backing-moves-queue" data-subtitle={subtitle} data-shortlist-cap={shortlistCap}>
       Backing moves
       <button type="button" onClick={onAddRec}>Add a recommendation</button>
+      <button type="button" onClick={() => onOpenDetails('rec-1')}>View move details</button>
     </div>
   ),
 }));
@@ -91,7 +122,12 @@ vi.mock('../../../src/components/strategy/NeedsAttentionStrip', () => ({
 }));
 
 vi.mock('../../../src/components/strategy/StrategyConfigPanel', () => ({
-  StrategyConfigPanel: () => <div data-testid="strategy-config-panel">Strategy config</div>,
+  StrategyConfigPanel: ({ onOpenLocalSeoSetup }: { onOpenLocalSeoSetup?: () => void }) => (
+    <div data-testid="strategy-config-panel">
+      Strategy config
+      {onOpenLocalSeoSetup && <button type="button" onClick={onOpenLocalSeoSetup}>Open market setup</button>}
+    </div>
+  ),
 }));
 
 vi.mock('../../../src/components/strategy/issue/IssueSetupReadiness', () => ({
@@ -106,25 +142,74 @@ vi.mock('../../../src/components/strategy/issue/AdminLeadsReadout', () => ({
   AdminLeadsReadout: () => <div data-testid="admin-leads-readout">Leads</div>,
 }));
 
+vi.mock('../../../src/components/strategy/CannibalizationTriage', () => ({
+  cannibalizationKeeperPath: (item: { canonicalPath?: string; pages: Array<{ path: string }> }) => (
+    item.canonicalPath ?? item.pages[0]?.path
+  ),
+  CannibalizationTriage: ({ entries }: { entries: Array<{ canonicalPath?: string }> }) => (
+    <div data-testid="cannibalization-triage">
+      {entries.length} cannibalization workflow · keeper {entries[0]?.canonicalPath ?? 'unset'}
+    </div>
+  ),
+}));
+
+vi.mock('../../../src/components/strategy/issue/KeeperSelector', () => ({
+  KeeperSelector: ({ onKeeperChanged }: { onKeeperChanged?: (path: string) => void }) => (
+    <div data-testid="keeper-selector">
+      Keeper selector
+      <button type="button" onClick={() => onKeeperChanged?.('/guides/implant-cost')}>Set test keeper</button>
+    </div>
+  ),
+}));
+
 vi.mock('../../../src/components/strategy/issue/ContentWorkOrderLens', () => ({
-  ContentWorkOrderLens: () => <div data-testid="content-work-order-lens">Content work-orders</div>,
+  ContentWorkOrderLens: ({ includedRecIds }: { includedRecIds?: ReadonlySet<string> }) => (
+    <div data-testid="content-work-order-lens" data-included-rec-ids={[...(includedRecIds ?? [])].join(',')}>
+      Content work-orders
+    </div>
+  ),
 }));
 
 vi.mock('../../../src/components/strategy/issue/KeywordTargetsLens', () => ({
-  KeywordTargetsLens: () => <div data-testid="keyword-targets-lens">Keyword targets</div>,
+  KeywordTargetsLens: ({ includedRecIds }: { includedRecIds?: ReadonlySet<string> }) => (
+    <div data-testid="keyword-targets-lens" data-included-rec-ids={[...(includedRecIds ?? [])].join(',')}>
+      Keyword targets
+    </div>
+  ),
 }));
 
 vi.mock('../../../src/components/engine-rebuilt/EngineMoveDrawer', () => ({
   EngineMoveDrawer: ({ open }: { open: boolean }) => open
-    ? <div role="dialog" aria-label="Move drawer" data-testid="engine-move-drawer">Move drawer</div>
+    ? (
+      <div role="dialog" aria-label="Move drawer" data-testid="engine-move-drawer">
+        Move drawer
+      </div>
+    )
     : null,
 }));
 
 vi.mock('../../../src/components/local-seo/LocalSeoMarketSetupDrawer', () => ({
-  LocalSeoMarketSetupDrawer: ({ open }: { open: boolean }) => open ? <div role="dialog">Local SEO setup</div> : null,
+  LocalSeoMarketSetupDrawer: ({ open }: { open: boolean }) => open
+    ? <div role="dialog" aria-label="Local SEO setup" data-testid="local-seo-setup-drawer">Local SEO setup</div>
+    : null,
 }));
 
 const workspaceId = 'ws-engine';
+
+const SPINE_SECTION_TEST_IDS = [
+  'engine-section-orientation',
+  'engine-section-value-frame',
+  'engine-section-pov',
+  'engine-section-stance',
+  'engine-section-strategy-evidence',
+  'engine-section-backing-moves',
+  'engine-section-projections',
+  'engine-trust-spine-preview',
+  'engine-section-operations',
+] as const;
+
+const originalScrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+const scrollIntoViewMock = vi.fn();
 
 const baseRec: Recommendation = {
   id: 'rec-1',
@@ -263,7 +348,11 @@ function makeEngineState(overrides: Partial<EngineState> = {}): EngineState {
       refresh: { mutate: vi.fn(), isPending: false },
     },
     feedback: { rows: [] },
-    metrics: { hasVolumeValidation: true },
+    metrics: {
+      hasVolumeValidation: true,
+      avgPos: 9.2,
+      ranked: [{ pagePath: '/implant' }],
+    },
     homeQuery: {
       data: homeData,
       isLoading: false,
@@ -363,6 +452,8 @@ function makeEngineState(overrides: Partial<EngineState> = {}): EngineState {
     moveQueueSourceCounts: { content_pipeline: 1 },
     stagedRecIds: new Set<string>(),
     stagedSendableIds: [],
+    stagedSendableSet: new Set<string>(),
+    sendableSet: new Set(['rec-1']),
     stagedCount: 0,
     curatedCount: 0,
     toggleStage: vi.fn(),
@@ -384,7 +475,7 @@ function LocationProbe() {
 }
 
 function renderSurface(initialEntry = `/ws/${workspaceId}/seo-strategy`, client = createClient()) {
-  const result = render(
+  const view = () => (
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <ToastProvider>
@@ -402,9 +493,10 @@ function renderSurface(initialEntry = `/ws/${workspaceId}/seo-strategy`, client 
           </Routes>
         </ToastProvider>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
-  return { ...result, client };
+  const result = render(view());
+  return { ...result, client, rerenderSurface: () => result.rerender(view()) };
 }
 
 function FlaggedEngineHarness() {
@@ -429,11 +521,31 @@ function expectScopedTextWithClass(scope: HTMLElement, text: string | RegExp, cl
   expect(matches.some((element) => element.classList.contains(className))).toBe(true);
 }
 
+function expectSpineOrder(sectionIds: readonly string[]) {
+  const sections = sectionIds.map((testId) => screen.getByTestId(testId));
+  for (let index = 1; index < sections.length; index += 1) {
+    expect(sections[index - 1].compareDocumentPosition(sections[index]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  }
+}
+
 describe('EngineSurface rebuilt', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    scrollIntoViewMock.mockReset();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoViewMock,
+    });
     mocks.featureFlagsList.mockResolvedValue({ 'ui-rebuild-shell': true });
     mocks.engineState = makeEngineState();
+  });
+
+  afterEach(() => {
+    if (originalScrollIntoView) {
+      Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScrollIntoView);
+      return;
+    }
+    delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView;
   });
 
   it('mounts after the real feature-flag hook transitions from loading fallback to ON', async () => {
@@ -451,7 +563,7 @@ describe('EngineSurface rebuilt', () => {
     });
 
     expect(await screen.findByTestId('engine-rebuilt-surface')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Insights Engine' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Insights Engine · Acme Dental' })).toBeInTheDocument();
   });
 
   it('meets the rebuilt a11y floor after loading states settle', async () => {
@@ -462,24 +574,172 @@ describe('EngineSurface rebuilt', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('renders one ordered strategy spine without a top-level Engine lens switcher', async () => {
+    renderSurface();
+
+    await screen.findByTestId('engine-section-operations');
+    expectSpineOrder(SPINE_SECTION_TEST_IDS);
+    expect(screen.queryByRole('radio', { name: 'Spine' })).not.toBeInTheDocument();
+    expect(screen.getByText('Average position')).toBeInTheDocument();
+    expect(screen.getByText('#9.2')).toBeInTheDocument();
+  });
+
+  it('uses the prototype opening order, hierarchy, labels, and calm queue density', async () => {
+    renderSurface();
+
+    const surface = await screen.findByTestId('engine-rebuilt-surface');
+    expect(surface.parentElement).toHaveStyle({ maxWidth: 'var(--page-max)' });
+    const identity = screen.getByRole('heading', { name: 'Insights Engine · Acme Dental' });
+    const orientation = await screen.findByTestId('engine-section-orientation');
+    const changed = screen.getByTestId('strategy-diff');
+    const verdict = within(orientation).getByRole('heading', { name: 'Refresh implant content before the next issue goes out.' });
+    expect(identity.compareDocumentPosition(changed) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(changed.compareDocumentPosition(verdict) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(orientation).queryByText('Insights Engine · Acme Dental')).not.toBeInTheDocument();
+
+    const valueFrame = screen.getByTestId('engine-section-value-frame');
+    expect(within(valueFrame).getByText('$18,450')).toHaveClass('t-stat-lg');
+
+    const pov = screen.getByTestId('drafted-pov-editor');
+    expect(pov).toHaveAttribute('data-title', 'The point of view we send Acme Dental');
+    expect(pov).toHaveAttribute('data-subtitle', 'The plain-language read the client opens with');
+
+    const signals = screen.getByTestId('intelligence-signals');
+    expect(signals).toHaveAttribute('data-title', 'Signals the Engine is watching');
+    expect(signals).toHaveAttribute('data-initial-limit', '4');
+
+    const backingMoves = screen.getByTestId('backing-moves-queue');
+    expect(backingMoves).toHaveAttribute('data-subtitle', 'The recommendations staged to back this point of view');
+    expect(backingMoves).toHaveAttribute('data-shortlist-cap', '1');
+    expect(screen.queryByRole('toolbar', { name: 'Engine refresh controls' })).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('engine-header-actions')).getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+  });
+
+  it('keeps operational tools collapsed until requested, while the operations deep link opens them', async () => {
+    const first = renderSurface();
+
+    await screen.findByTestId('engine-section-operations');
+    expect(screen.getByTestId('engine-section-operations').querySelector('details')).not.toHaveAttribute('open');
+    expect(screen.getAllByTestId('engine-lens-operations')).toHaveLength(1);
+
+    first.unmount();
+    renderSurface('/ws/ws-engine/seo-strategy?lens=operations');
+
+    await screen.findByTestId('engine-section-operations');
+    expect(screen.getByTestId('engine-section-operations').querySelector('details')).toHaveAttribute('open');
+    expect(screen.getByTestId('engine-lens-operations')).toBeInTheDocument();
+  });
+
+  it('keeps setup and operator tools reachable from an operations deep link before strategy generation', async () => {
+    mocks.engineState = makeEngineState({
+      isRealStrategy: false,
+      strategy: null,
+      cockpitRecs: [],
+    });
+
+    renderSurface('/ws/ws-engine/seo-strategy?lens=operations');
+
+    expect(await screen.findByTestId('engine-empty-strategy')).toBeInTheDocument();
+    const operations = screen.getByTestId('engine-section-operations');
+    expect(operations.querySelector('details')).toHaveAttribute('open');
+    expect(within(operations).getByTestId('engine-lens-operations')).toBeInTheDocument();
+    await waitFor(() => expect(operations).toHaveFocus());
+  });
+
+  it('mounts cannibalization write controls exactly once in Operations', async () => {
+    const engineState = makeEngineState();
+    mocks.engineState = makeEngineState({
+      strategy: {
+        ...engineState.strategy!,
+        cannibalization: [{
+          keyword: 'dental implant cost',
+          severity: 'high',
+          recommendation: 'Keep the service page and consolidate the guide.',
+          canonicalPath: '/services/implants',
+          pages: [
+            { path: '/services/implants', position: 7, source: 'gsc' },
+            { path: '/guides/implant-cost', position: 11, source: 'gsc' },
+          ],
+        }],
+      },
+    });
+
+    const rendered = renderSurface('/ws/ws-engine/seo-strategy?lens=operations');
+
+    const operations = await screen.findByTestId('engine-section-operations');
+    expect(within(operations).getAllByTestId('cannibalization-triage')).toHaveLength(1);
+    expect(within(operations).getAllByTestId('keeper-selector')).toHaveLength(1);
+    expect(screen.getAllByTestId('cannibalization-triage')).toHaveLength(1);
+    expect(screen.getAllByTestId('keeper-selector')).toHaveLength(1);
+    expect(within(operations).getByTestId('cannibalization-triage')).toHaveTextContent('keeper /services/implants');
+
+    fireEvent.click(within(operations).getByRole('button', { name: 'Set test keeper' }));
+    mocks.engineState = makeEngineState({
+      strategy: {
+        ...engineState.strategy!,
+        cannibalization: [{
+          keyword: 'dental implant cost',
+          severity: 'high',
+          recommendation: 'Keep the service page and consolidate the guide.',
+          canonicalPath: '/services/implants',
+          pages: [
+            { path: '/services/implants', position: 7, source: 'gsc' },
+            { path: '/guides/implant-cost', position: 11, source: 'gsc' },
+          ],
+        }],
+      },
+    });
+    rendered.rerenderSurface();
+
+    expect(within(operations).getByTestId('cannibalization-triage')).toHaveTextContent('keeper /services/implants');
+  });
+
+  it('uses the drafted POV lead sentence when a dedicated verdict headline is absent', async () => {
+    const engineState = makeEngineState();
+    mocks.engineState = makeEngineState({
+      strategyPov: {
+        ...engineState.strategyPov,
+        pov: {
+          ...engineState.strategyPov.pov!,
+          verdictHeadline: undefined,
+          leadSentence: 'Push the "implant page," because it is already close to page one.',
+          situation: 'Demand is already close enough to convert with focused work.',
+        },
+      },
+    });
+
+    renderSurface();
+
+    const orientation = await screen.findByTestId('engine-section-orientation');
+    expect(within(orientation).getByRole('heading', { name: 'Push the "implant page."' })).toBeInTheDocument();
+    expect(within(orientation).queryByText(/because it is already close/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText('Demand is already close enough to convert with focused work.').length).toBeGreaterThanOrEqual(1);
+  });
+
   it.each([
-    ['/ws/ws-engine/seo-strategy?lens=spine', 'engine-lens-spine'],
-    ['/ws/ws-engine/seo-strategy?lens=changes', 'engine-lens-changes'],
-    ['/ws/ws-engine/seo-strategy?lens=signals', 'engine-lens-signals'],
-    ['/ws/ws-engine/seo-strategy?lens=pov', 'engine-lens-pov'],
-    ['/ws/ws-engine/seo-strategy?lens=moves', 'engine-lens-moves'],
-    ['/ws/ws-engine/seo-strategy?lens=operations', 'engine-lens-operations'],
-  ])('renders receiver lens for %s', async (entry, testId) => {
+    ['/ws/ws-engine/seo-strategy?lens=spine', 'engine-section-orientation'],
+    ['/ws/ws-engine/seo-strategy?lens=changes', 'engine-section-changes'],
+    ['/ws/ws-engine/seo-strategy?lens=signals', 'engine-section-strategy-evidence'],
+    ['/ws/ws-engine/seo-strategy?lens=pov', 'engine-section-pov'],
+    ['/ws/ws-engine/seo-strategy?lens=moves', 'engine-section-backing-moves'],
+    ['/ws/ws-engine/seo-strategy?lens=operations', 'engine-section-operations'],
+  ])('keeps the full spine visible and focuses the requested section for %s', async (entry, targetTestId) => {
     renderSurface(entry);
 
-    expect(await screen.findByTestId(testId)).toBeInTheDocument();
+    const target = await screen.findByTestId(targetTestId);
+    expectSpineOrder(SPINE_SECTION_TEST_IDS);
+    await waitFor(() => expect(target).toHaveFocus());
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    if (entry.includes('lens=changes')) {
+      expect(screen.getByTestId('strategy-diff')).toHaveAttribute('data-default-expanded', 'true');
+    }
   });
 
   it('falls back to spine for an invalid lens value', async () => {
     renderSurface('/ws/ws-engine/seo-strategy?lens=unknown');
 
     expect(await screen.findByTestId('engine-invalid-lens-fallback')).toBeInTheDocument();
-    expect(screen.getByTestId('engine-lens-spine')).toBeInTheDocument();
+    expect(screen.getByTestId('engine-section-orientation')).toBeInTheDocument();
   });
 
   it('keeps internal rebuild and migration language out of the visible Engine UI', async () => {
@@ -506,18 +766,18 @@ describe('EngineSurface rebuilt', () => {
     expect(actionGroup).toHaveClass('flex-col');
     expect(actionGroup).toHaveClass('items-stretch');
     expect(actionGroup).toHaveClass('sm:items-end');
-    expect(screen.getByRole('button', { name: 'Send issue' })).toHaveClass('w-full');
+    expect(screen.getByTestId('strategy-header-actions')).toBeInTheDocument();
+    expect(within(actionGroup).getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send issue' })).not.toBeInTheDocument();
   });
 
-  it('opens the move drawer exactly once from the moves lens', async () => {
+  it('opens the move drawer exactly once from the backing moves section', async () => {
     renderSurface('/ws/ws-engine/seo-strategy?lens=moves');
 
-    expect(await screen.findByTestId('engine-lens-moves')).toBeInTheDocument();
-    const queues = Array.from(document.querySelectorAll<HTMLElement>('[data-testid="engine-work-queue"]'));
-    const moveQueue = queues.find((queue) => queue.textContent?.includes('Move drawer index'));
-    expect(moveQueue).toBeTruthy();
-
-    fireEvent.click(within(moveQueue!).getByRole('button', { name: 'Open' }));
+    const backingMoves = await screen.findByTestId('engine-section-backing-moves');
+    expect(within(backingMoves).getAllByTestId('backing-moves-queue')).toHaveLength(1);
+    expect(within(backingMoves).queryByTestId('engine-work-queue')).not.toBeInTheDocument();
+    fireEvent.click(within(backingMoves).getByRole('button', { name: 'View move details' }));
 
     expect(await screen.findByTestId('engine-move-drawer')).toBeInTheDocument();
     expect(screen.getAllByTestId('engine-move-drawer')).toHaveLength(1);
@@ -539,9 +799,13 @@ describe('EngineSurface rebuilt', () => {
     renderSurface('/ws/ws-engine/seo-strategy?lens=spine');
 
     const preview = await screen.findByTestId('engine-trust-spine-preview');
+    const portalFrame = within(preview).getByTestId('engine-client-portal-frame');
+    const proofRow = within(preview).getByTestId('engine-client-proof-row');
+    expect(portalFrame).toHaveClass('dashboard-light');
+    expect(proofRow).toHaveClass('sm:grid-cols-3');
     expect(within(preview).getByText('What Acme Dental sees - the trust spine')).toBeInTheDocument();
     expect(within(preview).getByText('Verdict first, dollar value, then proof')).toBeInTheDocument();
-    expectScopedTextWithClass(preview, 'Where Acme Dental stands this quarter', 't-label');
+    expectScopedTextWithClass(preview, 'Where you stand this quarter', 't-label');
     expectScopedTextWithClass(preview, 'Refresh implant content before the next issue goes out.', 't-page');
     expectScopedTextWithClass(preview, 'Search demand is moving toward implant pages.', 't-body');
     expectScopedTextWithClass(preview, 'Pipeline value at stake', 't-caption');
@@ -553,12 +817,50 @@ describe('EngineSurface rebuilt', () => {
     expectScopedTextWithClass(preview, /The client sees the verdict, value frame, and proof/, 't-body');
   });
 
-  it('keeps the send action disabled until staged moves exist, then shows the docked send action', async () => {
+  it('switches the only visible lens control inside the staged-move projection section', async () => {
+    mocks.engineState = makeEngineState({
+      stagedRecIds: new Set(['rec-1']),
+      stagedSendableIds: ['rec-1'],
+      stagedSendableSet: new Set(['rec-1']),
+      stagedCount: 1,
+    });
+    renderSurface();
+
+    const projections = await screen.findByTestId('engine-section-projections');
+    expect(within(projections).getByRole('radio', { name: 'Keyword targets' })).toHaveAttribute('aria-checked', 'true');
+    expect(within(projections).getByTestId('keyword-targets-lens')).toHaveAttribute('data-included-rec-ids', 'rec-1');
+    expect(within(projections).queryByTestId('content-work-order-lens')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('keyword-targets-lens')).toHaveLength(1);
+    expect(within(projections).getAllByRole('radiogroup')).toHaveLength(1);
+
+    fireEvent.click(within(projections).getByRole('radio', { name: 'Content work orders' }));
+
+    expect(await within(projections).findByTestId('content-work-order-lens')).toHaveAttribute('data-included-rec-ids', 'rec-1');
+    expect(within(projections).queryByTestId('keyword-targets-lens')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('content-work-order-lens')).toHaveLength(1);
+  });
+
+  it('projects only the sendable subset even if stale local staging contains another move', async () => {
+    mocks.engineState = makeEngineState({
+      stagedRecIds: new Set(['rec-1']),
+      stagedSendableIds: [],
+      stagedSendableSet: new Set(),
+      sendableSet: new Set(),
+      stagedCount: 0,
+    });
+
+    renderSurface();
+
+    const projections = await screen.findByTestId('engine-section-projections');
+    expect(within(projections).getByTestId('keyword-targets-lens')).toHaveAttribute('data-included-rec-ids', '');
+  });
+
+  it('keeps the one primary send action attached to the staged backing-moves queue', async () => {
     const first = renderSurface();
 
     expect(await screen.findByTestId('engine-rebuilt-surface')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send issue' })).toBeDisabled();
-    expect(screen.queryByTestId('engine-docked-send-bar')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send issue' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('engine-backing-send-bar')).not.toBeInTheDocument();
 
     first.unmount();
     mocks.engineState = makeEngineState({
@@ -568,8 +870,20 @@ describe('EngineSurface rebuilt', () => {
     });
     renderSurface();
 
-    expect(await screen.findByTestId('engine-docked-send-bar')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send 1 staged' })).toBeEnabled();
+    const backingMoves = await screen.findByTestId('engine-section-backing-moves');
+    expect(within(backingMoves).getByTestId('engine-backing-send-bar')).toBeInTheDocument();
+    expect(within(backingMoves).getByRole('button', { name: 'Send 1 staged' })).toBeEnabled();
+    expect(screen.getAllByRole('button', { name: /Send(?: 1 staged| issue)/ })).toHaveLength(1);
+  });
+
+  it('opens the Local SEO setup drawer exactly once from operational disclosures', async () => {
+    renderSurface('/ws/ws-engine/seo-strategy?lens=operations');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open market setup' }));
+
+    expect(await screen.findByTestId('local-seo-setup-drawer')).toBeInTheDocument();
+    expect(screen.getAllByTestId('local-seo-setup-drawer')).toHaveLength(1);
+    expect(screen.getAllByRole('dialog', { name: 'Local SEO setup' })).toHaveLength(1);
   });
 
   it.each([

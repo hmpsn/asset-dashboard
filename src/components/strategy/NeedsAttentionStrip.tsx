@@ -13,14 +13,14 @@ export interface AttentionItem {
 
 interface NeedsAttentionStripProps {
   items: AttentionItem[];
-  /** Jump the operator to the rec in the cockpit list (and, for new_reply, the discuss thread). */
+  /** Jump the operator to the move review workflow. */
   onAct: (recId: string, kind: AttentionKind) => void;
 }
 
 const KIND_META: Record<AttentionKind, { icon: typeof Send; cta: string }> = {
   stale_sent: { icon: Send, cta: 'Review' },
   superseded: { icon: RefreshCw, cta: 'Review' },
-  new_reply: { icon: MessageSquare, cta: 'Open reply' },
+  new_reply: { icon: MessageSquare, cta: 'Review move' },
 };
 
 export function NeedsAttentionStrip({ items, onAct }: NeedsAttentionStripProps) {

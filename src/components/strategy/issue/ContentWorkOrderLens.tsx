@@ -13,7 +13,7 @@
  */
 import { useNavigate } from 'react-router-dom';
 import { ClipboardList } from 'lucide-react';
-import { SectionCard, Badge, Button, Icon } from '../../ui';
+import { SectionCard, Badge, Button, EmptyState, Icon } from '../../ui';
 import type { BadgeTone } from '../../ui';
 import { useIssueLenses } from '../../../hooks/admin/useIssueLenses';
 import { adminPath } from '../../../routes';
@@ -28,6 +28,10 @@ export interface ContentWorkOrderLensProps {
    *  calls even if this panel is ever mounted outside the issueOverviewEl gate. Defaults to FALSE
    *  (opt-in) so an omitted prop never fires a flag-OFF fetch — the byte-identical-OFF safe default. */
   theIssueEnabled?: boolean;
+  /** Render only the lens body when a parent owns the shared section shell. */
+  embedded?: boolean;
+  /** Optional local curation set. When present, project only rows whose recommendation is staged. */
+  includedRecIds?: ReadonlySet<string>;
 }
 
 /** Production-stage → badge tone + operator-legible label. */
@@ -81,14 +85,22 @@ function WorkOrderRow({
  * is threaded into the hook's `enabled` arg, so flag-OFF makes zero network calls even if mounted
  * outside the overview gate.
  */
-export function ContentWorkOrderLens({ workspaceId, theIssueEnabled = false }: ContentWorkOrderLensProps) {
+export function ContentWorkOrderLens({
+  workspaceId,
+  theIssueEnabled = false,
+  embedded = false,
+  includedRecIds,
+}: ContentWorkOrderLensProps) {
   const navigate = useNavigate();
   const { contentWorkOrders, isLoading, isError } = useIssueLenses(workspaceId, theIssueEnabled);
+  const visibleWorkOrders = includedRecIds
+    ? contentWorkOrders.filter((row) => includedRecIds.has(row.recId))
+    : contentWorkOrders;
 
   // Empty → null (Blocker 4): when there are no curated content work-orders, render nothing rather
   // than an empty SectionCard, so a cold workspace shows zero placeholder chrome (mirrors
   // IssueAlsoOnPlanSection). Loading/error keep their inline states (transient, not "cold").
-  if (!isLoading && !isError && contentWorkOrders.length === 0) return null;
+  if (!embedded && !isLoading && !isError && visibleWorkOrders.length === 0) return null;
 
   const openInPipeline = (row: ContentWorkOrderRow) => {
     navigate(adminPath(workspaceId, 'content-pipeline') + (row.hasPost ? '?tab=posts' : '?tab=briefs'));
@@ -96,10 +108,10 @@ export function ContentWorkOrderLens({ workspaceId, theIssueEnabled = false }: C
 
   const titleIcon = <Icon as={ClipboardList} size="md" className="text-accent-brand" />;
 
-  return (
-    <SectionCard title="Content work-orders" titleIcon={titleIcon}>
+  const content = (
+    <>
       <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">
-        Curated content moves and where each stands in production.
+        Staged content moves and where each stands in production.
       </p>
 
       {isLoading ? (
@@ -110,13 +122,29 @@ export function ContentWorkOrderLens({ workspaceId, theIssueEnabled = false }: C
         <p className="t-caption-sm text-red-400/80 py-4 text-center">
           Couldn't load content work-orders. It'll retry shortly.
         </p>
+      ) : visibleWorkOrders.length === 0 ? (
+        <EmptyState
+          icon={ClipboardList}
+          title="No content work orders yet"
+          description="Stage a content or content-refresh move above to track it here and open it in Content Pipeline."
+        />
       ) : (
         <div className="divide-y divide-[var(--brand-border)]">
-          {contentWorkOrders.map((row) => (
+          {visibleWorkOrders.map((row) => (
             <WorkOrderRow key={row.recId} row={row} onOpen={openInPipeline} />
           ))}
         </div>
       )}
+    </>
+  );
+
+  if (embedded) {
+    return <div className="px-4 py-3">{content}</div>;
+  }
+
+  return (
+    <SectionCard title="Content work-orders" titleIcon={titleIcon}>
+      {content}
     </SectionCard>
   );
 }

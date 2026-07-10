@@ -1,5 +1,6 @@
 // @ds-rebuilt
 import { useNavigate } from 'react-router-dom';
+import { cannibalizationUrlSetKey } from '../../../shared/page-address-utils';
 import { ENGINE_LEADS_MAX, ENGINE_LEADS_PAGE, type useEngineRebuilt } from '../../hooks/admin/useEngineRebuilt';
 import { adminPath } from '../../routes';
 import {
@@ -16,8 +17,8 @@ import { StrategyConfigPanel } from '../strategy/StrategyConfigPanel';
 import { IssueSetupReadiness } from '../strategy/issue/IssueSetupReadiness';
 import { TrustLadderPanel } from '../strategy/issue/TrustLadderPanel';
 import { AdminLeadsReadout } from '../strategy/issue/AdminLeadsReadout';
-import { ContentWorkOrderLens } from '../strategy/issue/ContentWorkOrderLens';
-import { KeywordTargetsLens } from '../strategy/issue/KeywordTargetsLens';
+import { cannibalizationKeeperPath, CannibalizationTriage } from '../strategy/CannibalizationTriage';
+import { KeeperSelector } from '../strategy/issue/KeeperSelector';
 
 type EngineModel = ReturnType<typeof useEngineRebuilt>;
 
@@ -51,7 +52,7 @@ function OperationLink({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block t-ui font-semibold text-[var(--brand-text-bright)]">{title}</span>
-        <span className="block truncate t-caption-sm text-[var(--brand-text-muted)]">{description}</span>
+        <span className="block t-body text-[var(--brand-text-muted)]">{description}</span>
       </span>
       <Icon name="arrowRight" size="sm" className="text-[var(--brand-text-muted)]" />
     </ClickableRow>
@@ -67,7 +68,11 @@ function initialsFor(name: string): string {
     .join('') || 'WS';
 }
 
-export function EngineOperations({ workspaceId, engine, onOpenLocalSeoSetup }: EngineOperationsProps) {
+export function EngineOperations({
+  workspaceId,
+  engine,
+  onOpenLocalSeoSetup,
+}: EngineOperationsProps) {
   const navigate = useNavigate();
   const readiness = engine.conversionStatus.status?.readiness ?? null;
   const hasMoreLeads = engine.leadsLimit < ENGINE_LEADS_MAX;
@@ -76,6 +81,7 @@ export function EngineOperations({ workspaceId, engine, onOpenLocalSeoSetup }: E
   const openWorkItems = engine.workQueue.items.length;
   const clientSignalRows = engine.leads.leads.slice(0, 3);
   const healthTone = openWorkItems > 0 ? 'risk' : 'ok';
+  const cannibalizationEntries = engine.strategy?.cannibalization ?? [];
 
   const configPanelProps = {
     workspaceId,
@@ -106,8 +112,8 @@ export function EngineOperations({ workspaceId, engine, onOpenLocalSeoSetup }: E
   return (
     <div className="space-y-4" data-testid="engine-lens-operations">
       <GroupBlock
-        title="Operations disclosure"
-        meta="Setup, capture, trust, and owning-surface handoffs"
+        title="Setup and handoffs"
+        meta="Outcome capture, trust, and the tools that own execution"
         collapsible
         defaultOpen
         stats={[
@@ -172,9 +178,46 @@ export function EngineOperations({ workspaceId, engine, onOpenLocalSeoSetup }: E
 
       <TrustLadderPanel workspaceId={workspaceId} theIssueEnabled />
 
+      {cannibalizationEntries.length > 0 && (
+        <>
+          <CannibalizationTriage entries={cannibalizationEntries} workspaceId={workspaceId} />
+
+          <GroupBlock
+            title="Cannibalization keeper overrides"
+            meta="Choose the canonical winner used by future consolidation work"
+            flag={{
+              label: `${cannibalizationEntries.length} issue${cannibalizationEntries.length === 1 ? '' : 's'}`,
+            }}
+          >
+            <div className="divide-y divide-[var(--brand-border)]">
+              {cannibalizationEntries.map((item) => {
+                const urlSetKey = cannibalizationUrlSetKey(item.pages.map((page) => page.path));
+                const currentKeeperPath = cannibalizationKeeperPath(item);
+                return (
+                  <div key={urlSetKey} className="px-4 py-4 first:pt-2 last:pb-2">
+                    <div className="mb-2 flex items-center gap-2">
+                      <Icon name="target" size="sm" className="text-[var(--teal)]" />
+                      <span className="t-ui font-semibold text-[var(--brand-text-bright)]">
+                        {item.keyword}
+                      </span>
+                    </div>
+                    <KeeperSelector
+                      item={item}
+                      workspaceId={workspaceId}
+                      urlSetKey={urlSetKey}
+                      currentKeeperPath={currentKeeperPath}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </GroupBlock>
+        </>
+      )}
+
       <GroupBlock
         title="Client signal intake"
-        meta="Read-only client-facing signals that can inform Engine curation."
+        meta="Client signals that can inform Engine curation."
         collapsible
         defaultOpen={false}
         stats={[{ label: 'queue', value: openWorkItems, color: openWorkItems > 0 ? 'var(--amber)' : 'var(--emerald)' }]}
@@ -198,7 +241,7 @@ export function EngineOperations({ workspaceId, engine, onOpenLocalSeoSetup }: E
             />
           ))
         ) : (
-          <div className="border-t border-[var(--brand-border)] px-4 py-3 t-caption-sm text-[var(--brand-text-muted)]">
+          <div className="border-t border-[var(--brand-border)] px-4 py-3 t-body text-[var(--brand-text-muted)]">
             No captured client signals are ready for Engine review.
           </div>
         )}
@@ -225,8 +268,6 @@ export function EngineOperations({ workspaceId, engine, onOpenLocalSeoSetup }: E
         />
       )}
 
-      <ContentWorkOrderLens workspaceId={workspaceId} theIssueEnabled />
-      <KeywordTargetsLens workspaceId={workspaceId} theIssueEnabled />
     </div>
   );
 }

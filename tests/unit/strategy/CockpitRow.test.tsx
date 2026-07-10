@@ -144,4 +144,24 @@ describe('CockpitRow', () => {
     fireEvent.click(checkbox);
     expect(onToggleSelect).toHaveBeenCalledWith('r1');
   });
+
+  it('wraps the details and lifecycle controls below the move copy at narrow widths', () => {
+    render(
+      <CockpitRow
+        rec={makeRec()}
+        actions={makeActions()}
+        onOpenDetails={vi.fn()}
+        onEditWording={vi.fn()}
+        onStage={vi.fn()}
+        sendLabel="Stage for issue"
+      />,
+    );
+
+    expect(screen.getByTestId('cockpit-row-primary')).toHaveClass('flex-col', 'xl:flex-row');
+    expect(screen.getByTestId('cockpit-row-primary')).not.toHaveClass('sm:flex-row');
+    expect(screen.getByTestId('cockpit-row-primary')).not.toHaveClass('lg:flex-row');
+    expect(screen.getByTestId('cockpit-row-actions')).toHaveClass('flex-wrap', 'xl:shrink-0');
+    expect(screen.getByTestId('cockpit-row-actions')).not.toHaveClass('sm:shrink-0');
+    expect(screen.getByTestId('cockpit-row-actions')).not.toHaveClass('lg:shrink-0');
+  });
 });
