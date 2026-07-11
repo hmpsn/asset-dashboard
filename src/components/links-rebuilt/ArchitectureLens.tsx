@@ -22,6 +22,7 @@ import {
   type DataColumn,
 } from '../ui';
 import { scoreColor } from '../ui/constants';
+import { useToast } from '../Toast';
 import type { ArchitectureSourceFilter } from './useLinksSurfaceState';
 import { dateTimeOrDash, numberOrDash } from './linksFormatters';
 
@@ -139,23 +140,19 @@ function TreeNodeRow({
 function UrlTree({
   tree,
   coverage,
+  filters,
+  filter,
+  onFilterChange,
   clearSearch,
 }: {
   tree: SiteNode | null;
   coverage: Record<string, SchemaCoveragePage>;
+  filters: Array<{ id: ArchitectureSourceFilter; label: string; count: number }>;
+  filter: ArchitectureSourceFilter;
+  onFilterChange: (filter: ArchitectureSourceFilter) => void;
   clearSearch: () => void;
 }) {
   const children = tree?.children ?? [];
-  if (children.length === 0) {
-    return (
-      <EmptyState
-        icon={() => <Icon name="search" size="2xl" />}
-        title="No architecture pages match this view"
-        description="Clear search or choose a broader source filter."
-        action={<Button size="sm" variant="secondary" onClick={clearSearch}>Clear search</Button>}
-      />
-    );
-  }
   return (
     <GroupBlock
       title="URL tree"
@@ -164,11 +161,33 @@ function UrlTree({
       collapsible
       defaultOpen
     >
-      <div className="flex flex-col gap-1">
-        {children.map((node) => (
-          <TreeNodeRow key={node.path} node={node} coverageByPath={coverage} />
+      <div className="mb-2 flex flex-wrap gap-1.5 border-b border-[var(--brand-border)] pb-2" aria-label="Architecture source filters">
+        {filters.map((item) => (
+          <Button
+            key={item.id}
+            size="sm"
+            variant={filter === item.id ? 'secondary' : 'ghost'}
+            onClick={() => onFilterChange(item.id)}
+            aria-pressed={filter === item.id}
+          >
+            {item.label} <span className="t-micro text-[var(--brand-text-dim)]">{item.count}</span>
+          </Button>
         ))}
       </div>
+      {children.length === 0 ? (
+        <EmptyState
+          icon={() => <Icon name="search" size="2xl" />}
+          title="No architecture pages match this view"
+          description="Clear search or choose a broader source filter."
+          action={<Button size="sm" variant="secondary" onClick={clearSearch}>Clear search</Button>}
+        />
+      ) : (
+        <div className="flex max-h-[660px] flex-col gap-1 overflow-y-auto pr-1">
+          {children.map((node) => (
+            <TreeNodeRow key={node.path} node={node} coverageByPath={coverage} />
+          ))}
+        </div>
+      )}
     </GroupBlock>
   );
 }
@@ -180,7 +199,7 @@ function DepthDistribution({ distribution }: { distribution: Record<number, numb
   const max = Math.max(...entries.map((entry) => entry.count), 1);
 
   return (
-    <GroupBlock title="Depth distribution" meta="Most pages should sit within three clicks of the homepage." collapsible defaultOpen={false}>
+    <GroupBlock title="Depth distribution" meta="Most pages should sit within three clicks of the homepage." collapsible defaultOpen>
       <div className="flex flex-col gap-2">
         {entries.map((entry) => (
           <div key={entry.depth} className="grid grid-cols-[70px_1fr_42px] items-center gap-2">
@@ -195,6 +214,46 @@ function DepthDistribution({ distribution }: { distribution: Record<number, numb
           </div>
         ))}
       </div>
+    </GroupBlock>
+  );
+}
+
+function ArchitectureGaps({
+  gaps,
+  onAddPage,
+}: {
+  gaps: SiteArchitectureResult['gaps'];
+  onAddPage: (path: string) => void;
+}) {
+  return (
+    <GroupBlock
+      title="Architecture gaps"
+      meta="Missing hub pages and broken hierarchy."
+      stats={[{ label: 'Gaps', value: gaps.length, color: gaps.length > 0 ? 'var(--amber)' : 'var(--emerald)' }]}
+      collapsible
+      defaultOpen
+    >
+      {gaps.length === 0 ? (
+        <div className="px-2 py-4 text-center t-caption text-[var(--brand-text-muted)]">No architecture gaps in the current model.</div>
+      ) : (
+        <div className="divide-y divide-[var(--brand-border)]">
+          {gaps.map((gap) => (
+            <div key={`${gap.parentPath}:${gap.suggestedPath}`} className="grid gap-2 px-2 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Badge label={gap.priority} tone={PRIORITY_TONE[gap.priority] ?? 'zinc'} variant="soft" />
+                  <p className="truncate t-caption font-semibold text-[var(--brand-text-bright)]">{gap.suggestedPath}</p>
+                </div>
+                <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">{gap.reason}</p>
+              </div>
+              <Button size="sm" variant="secondary" onClick={() => onAddPage(gap.suggestedPath)}>
+                <Icon name="plus" size="sm" />
+                Add page
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
     </GroupBlock>
   );
 }
@@ -260,14 +319,20 @@ function PriorityQueue({ coverage }: { coverage: SchemaCoverageData | undefined 
 
   if (!coverage || rows.length === 0) return null;
   return (
-    <div className="flex flex-col gap-2">
-      <h3 className="t-ui font-semibold text-[var(--brand-text-bright)]">Schema priority queue</h3>
+    <GroupBlock
+      title="Schema priority queue"
+      meta={`Schema and internal-link evidence for pages that need attention · ${coverage.withSchema}/${coverage.totalExisting} live pages have schema.`}
+      stats={[{ label: 'Pages', value: rows.length, color: 'var(--blue)' }]}
+      headingLevel="h2"
+      collapsible
+      defaultOpen={false}
+    >
       <DataTable
         columns={columns}
         rows={rows}
         getRowKey={(record) => (record as PriorityRecord).source.path}
       />
-    </div>
+    </GroupBlock>
   );
 }
 
@@ -279,6 +344,7 @@ export function ArchitectureLens({
   search,
   clearSearch,
 }: ArchitectureLensProps) {
+  const { toast } = useToast();
   const data = architecture.data ?? null;
   const coverageData = coverage.data;
   const coverageByPath = useMemo(() => coverageMap(coverageData), [coverageData]);
@@ -325,15 +391,15 @@ export function ArchitectureLens({
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-[14px]">
       {architecture.isError && (
         <InlineBanner tone="warning" title="Architecture may be stale">
           The latest architecture read did not refresh, so the last loaded tree remains on screen.
         </InlineBanner>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <MetricTile label="Total pages" value={data.totalPages} accent="var(--teal)" />
+      <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6" data-testid="architecture-metrics">
+        <MetricTile label="Total pages" value={data.totalPages} accent="var(--blue)" />
         <MetricTile label="Live pages" value={data.existingPages} accent="var(--emerald)" />
         <MetricTile label="Planned" value={data.plannedPages} accent="var(--blue)" />
         <MetricTile label="Strategy" value={data.strategyPages} accent="var(--blue)" />
@@ -341,84 +407,59 @@ export function ArchitectureLens({
         <MetricTile
           label="Schema coverage"
           value={coverageData ? `${coverageData.coveragePct}%` : '—'}
-          sub={coverageData ? `${coverageData.withSchema}/${coverageData.totalExisting} live pages` : 'Coverage unavailable'}
           accent={coverageData ? scoreColor(coverageData.coveragePct) : 'var(--brand-text-dim)'}
         />
       </div>
 
-      <div className="flex flex-wrap gap-2" aria-label="Architecture source filters">
-        {filters.map((item) => (
-          <Button
-            key={item.id}
-            size="sm"
-            variant={filter === item.id ? 'secondary' : 'ghost'}
-            onClick={() => onFilterChange(item.id)}
-            aria-pressed={filter === item.id}
-          >
-            {item.label} <span className="t-micro text-[var(--brand-text-dim)]">{item.count}</span>
-          </Button>
-        ))}
+      <div data-testid="architecture-orphans">
+        {data.orphanPaths.length > 0 ? (
+          <InlineBanner tone="warning" title={`${data.orphanPaths.length} architecture orphan${data.orphanPaths.length === 1 ? '' : 's'}`}>
+            <p className="t-body text-[var(--brand-text-muted)]">
+              These content paths have no parent hub, making them harder for crawlers to discover.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {data.orphanPaths.slice(0, 3).map((path) => (
+                <span key={path} className="max-w-full truncate rounded-[var(--radius-sm)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-2 py-1 t-caption-sm text-[var(--amber)]">
+                  {path}
+                </span>
+              ))}
+              {data.orphanPaths.length > 3 && (
+                <span className="rounded-[var(--radius-sm)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-2 py-1 t-caption-sm text-[var(--brand-text-muted)]">
+                  +{data.orphanPaths.length - 3} more in the URL tree
+                </span>
+              )}
+            </div>
+          </InlineBanner>
+        ) : (
+          <InlineBanner tone="success" title="No architecture orphans">Every modeled page has a discoverable parent path.</InlineBanner>
+        )}
       </div>
 
-      <p className="t-caption text-[var(--brand-text-muted)]">
-        Last analyzed {dateTimeOrDash(data.analyzedAt)}
-        {coverageData?.snapshotDate ? ` · Schema snapshot ${dateTimeOrDash(coverageData.snapshotDate)}` : ''}
-      </p>
-
-      {data.gaps.length > 0 && (
-        <GroupBlock
-          title="Architecture gaps"
-          meta="Suggested URL structure gaps from the existing architecture model."
-          stats={[{ label: 'Gaps', value: data.gaps.length, color: 'var(--amber)' }]}
-          collapsible
-          defaultOpen={false}
-        >
-          <div className="grid gap-2 lg:grid-cols-2">
-            {data.gaps.map((gap) => (
-              <div key={`${gap.parentPath}:${gap.suggestedPath}`} className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate t-caption font-semibold text-[var(--brand-text-bright)]">{gap.suggestedPath}</p>
-                    <p className="truncate t-caption-sm text-[var(--brand-text-muted)]">Under {gap.parentPath}</p>
-                  </div>
-                  <Badge label={gap.priority} tone={PRIORITY_TONE[gap.priority] ?? 'zinc'} variant="soft" />
-                </div>
-                <p className="mt-2 t-body text-[var(--brand-text-muted)]">{gap.reason}</p>
-              </div>
-            ))}
-          </div>
-        </GroupBlock>
-      )}
-
-      {data.orphanPaths.length > 0 && (
-        <GroupBlock
-          title="Architecture orphans"
-          meta="Content paths whose parent directory lacks a hub or landing page."
-          stats={[{ label: 'Orphans', value: data.orphanPaths.length, color: 'var(--orange)' }]}
-          collapsible
-          defaultOpen={false}
-        >
-          <div className="grid gap-2 lg:grid-cols-2">
-            {data.orphanPaths.map((path) => (
-              <div key={path} className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-3 py-2 t-caption-sm text-[var(--brand-text)]">
-                {path}
-              </div>
-            ))}
-          </div>
-        </GroupBlock>
-      )}
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <UrlTree tree={filteredTree} coverage={coverageByPath} clearSearch={clearSearch} />
-        <div className="flex flex-col gap-5">
-          <PriorityQueue coverage={coverageData} />
+      <div className="grid gap-[14px] xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,1fr)]" data-testid="architecture-primary">
+        <UrlTree
+          tree={filteredTree}
+          coverage={coverageByPath}
+          filters={filters}
+          filter={filter}
+          onFilterChange={onFilterChange}
+          clearSearch={clearSearch}
+        />
+        <div className="flex flex-col gap-[14px]">
+          <ArchitectureGaps
+            gaps={data.gaps}
+            onAddPage={(path) => toast(`Open Content Pipeline to create ${path}; Links does not publish pages directly.`, 'info')}
+          />
           <DepthDistribution distribution={data.depthDistribution} />
         </div>
       </div>
 
+      <div data-testid="architecture-schema">
+        <PriorityQueue coverage={coverageData} />
+      </div>
+
       <InlineBanner tone="info" title="Architecture next steps">
         <p className="t-body text-[var(--brand-text-muted)]">
-          Use gaps as page-planning inputs. Create approved hub pages from the content workflow, then refresh Links to confirm the URL tree.
+          Use gaps as page-planning inputs. Create approved hub pages from the content workflow, then refresh Links to confirm the URL tree. Last analyzed {dateTimeOrDash(data.analyzedAt)}{coverageData?.snapshotDate ? ` · Schema snapshot ${dateTimeOrDash(coverageData.snapshotDate)}` : ''}.
         </p>
       </InlineBanner>
     </div>

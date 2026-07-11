@@ -17,6 +17,7 @@ import {
   InlineBanner,
   Meter,
   MetricTile,
+  SectionCard,
   Segmented,
   Skeleton,
   Toolbar,
@@ -25,7 +26,7 @@ import {
 } from '../ui';
 import { scoreColor } from '../ui/constants';
 import type { InternalPriorityFilter, InternalViewMode } from './useLinksSurfaceState';
-import { dateTimeOrDash, numberOrDash } from './linksFormatters';
+import { dateTimeOrDash } from './linksFormatters';
 import { mutationErrorMessage } from './linksMutationFeedback';
 import { useToast } from '../Toast';
 
@@ -81,8 +82,7 @@ function toSuggestionRecord(suggestion: LinkSuggestion): SuggestionRecord {
 
 function averageLinkScore(pageHealth: PageLinkHealth[] | undefined): number | null {
   if (!pageHealth || pageHealth.length === 0) return null;
-  const total = pageHealth.reduce((sum, page) => sum + page.score, 0);
-  return Math.round(total / pageHealth.length);
+  return Math.round(pageHealth.reduce((sum, page) => sum + page.score, 0) / pageHealth.length);
 }
 
 function htmlForSuggestion(suggestion: LinkSuggestion): string {
@@ -149,29 +149,64 @@ function SuggestionDrawer({
 
 function OrphanPages({ pageHealth }: { pageHealth: PageLinkHealth[] | undefined }) {
   const orphans = (pageHealth ?? []).filter((page) => page.isOrphan);
-  if (orphans.length === 0) return null;
+  if (orphans.length === 0) {
+    return (
+      <div data-testid="internal-orphans">
+        <InlineBanner tone="success" title="No orphan pages detected">
+          Every analyzed page has at least one inbound internal link.
+        </InlineBanner>
+      </div>
+    );
+  }
+  return (
+    <div data-testid="internal-orphans">
+      <InlineBanner tone="warning" title={`${orphans.length} orphan page${orphans.length === 1 ? '' : 's'}`}>
+        <p className="t-body text-[var(--brand-text-muted)]">
+          These pages have no inbound internal links, so crawlers and visitors have a harder time finding them.
+        </p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {orphans.slice(0, 6).map((page) => (
+            <span key={page.path} className="max-w-full truncate rounded-[var(--radius-sm)] border border-[var(--amber)]/25 bg-[var(--surface-2)] px-2 py-1 t-caption-sm text-[var(--amber)]">
+              {page.path}
+            </span>
+          ))}
+          {orphans.length > 6 && (
+            <span className="rounded-[var(--radius-sm)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-2 py-1 t-caption-sm text-[var(--brand-text-muted)]">
+              +{orphans.length - 6} more in page health evidence
+            </span>
+          )}
+        </div>
+      </InlineBanner>
+    </div>
+  );
+}
+
+function PageHealthEvidence({ pageHealth }: { pageHealth: PageLinkHealth[] | undefined }) {
+  if (!pageHealth || pageHealth.length === 0) return null;
+  const average = averageLinkScore(pageHealth);
   return (
     <GroupBlock
-      title="Orphan pages"
-      meta="Pages with no inbound internal links."
-      stats={[{ label: 'Orphans', value: orphans.length, color: 'var(--orange)' }]}
+      title="Page health evidence"
+      meta="Inbound, outbound, and internal-link health from the latest analysis."
+      stats={[
+        { label: 'Average score', value: average ?? '—', color: average == null ? 'var(--brand-text-dim)' : scoreColor(average) },
+        { label: 'Pages', value: pageHealth.length, color: 'var(--blue)' },
+      ]}
+      headingLevel="h2"
       collapsible
-      defaultOpen
+      defaultOpen={false}
     >
-      <div className="grid gap-2 lg:grid-cols-2">
-        {orphans.map((page) => (
-          <div key={page.path} className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate t-caption font-semibold text-[var(--brand-text-bright)]">{page.title}</p>
-                <p className="truncate t-caption-sm text-[var(--brand-text-muted)]">{page.path}</p>
-              </div>
-              <Badge label="0 inbound" tone="orange" variant="soft" />
+      <div className="divide-y divide-[var(--brand-border)]">
+        {pageHealth.map((page) => (
+          <div key={page.path} className="grid gap-2 px-2 py-3 sm:grid-cols-[minmax(0,1fr)_160px_auto] sm:items-center">
+            <div className="min-w-0">
+              <p className="truncate t-caption font-semibold text-[var(--brand-text-bright)]">{page.title}</p>
+              <p className="truncate t-caption-sm text-[var(--brand-text-muted)]">{page.path}</p>
             </div>
-            <div className="mt-2 flex items-center gap-2">
-              <Meter value={page.score} showValue ariaLabel={`${page.title} link health score`} />
-              <span className="t-caption-sm text-[var(--brand-text-muted)]">{page.outboundLinks} outbound</span>
-            </div>
+            <Meter value={page.score} color={scoreColor(page.score)} showValue ariaLabel={`${page.title} link health score`} />
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">
+              {page.inboundLinks} inbound · {page.outboundLinks} outbound
+            </span>
           </div>
         ))}
       </div>
@@ -271,7 +306,6 @@ export function InternalLinksLens({
     medium: data?.suggestions.filter((suggestion) => suggestion.priority === 'medium').length ?? 0,
     low: data?.suggestions.filter((suggestion) => suggestion.priority === 'low').length ?? 0,
   };
-  const avgScore = averageLinkScore(data?.pageHealth);
   const filters = [
     { id: 'all' as const, label: 'All', count: data?.suggestions.length ?? 0 },
     { id: 'high' as const, label: 'High', count: counts.high },
@@ -407,7 +441,7 @@ export function InternalLinksLens({
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-[14px]">
       {analyze.isError && (
         <InlineBanner tone="error" title="Internal-link analysis failed">
           <div className="flex flex-wrap items-center gap-2">
@@ -419,47 +453,87 @@ export function InternalLinksLens({
         </InlineBanner>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-3" data-testid="internal-metrics">
+        <MetricTile label="Linking opportunities" value={data.suggestions.length} accent="var(--blue)" />
         <MetricTile label="High priority" value={counts.high} accent="var(--red)" />
-        <MetricTile label="Medium" value={counts.medium} accent="var(--amber)" />
-        <MetricTile label="Low" value={counts.low} accent="var(--blue)" />
-        <MetricTile label="Orphan pages" value={data.orphanCount ?? 0} accent="var(--orange)" />
-        <MetricTile
-          label="Avg link score"
-          value={avgScore ?? '—'}
-          sub={avgScore == null ? 'No page health data' : `${data.pageHealth?.length ?? 0} pages scored`}
-          accent={avgScore == null ? 'var(--brand-text-dim)' : scoreColor(avgScore)}
-        />
+        <MetricTile label="Orphan pages" value={data.orphanCount ?? 0} accent="var(--amber)" />
       </div>
 
-      <Toolbar label="Internal-link view controls" className="w-full">
-        <Segmented
-          value={viewMode}
-          onChange={(value) => onViewModeChange(value as InternalViewMode)}
-          options={[
-            { value: 'list', label: 'List' },
-            { value: 'grouped', label: 'By source' },
-          ]}
-        />
-        <ToolbarSpacer />
-        <span className="t-caption text-[var(--brand-text-muted)]">
-          Last analyzed {dateTimeOrDash(data.analyzedAt)} · {numberOrDash(filtered.length)} shown
-        </span>
-      </Toolbar>
+      <OrphanPages pageHealth={data.pageHealth} />
 
-      <div className="flex flex-wrap gap-2" aria-label="Internal-link priority filters">
-        {filters.map((item) => (
-          <Button
-            key={item.id}
-            size="sm"
-            variant={priority === item.id ? 'secondary' : 'ghost'}
-            onClick={() => onPriorityChange(item.id)}
-            aria-pressed={priority === item.id}
-          >
-            {item.label} <span className="t-micro text-[var(--brand-text-dim)]">{item.count}</span>
-          </Button>
-        ))}
+      <div data-testid="internal-primary">
+        <SectionCard
+          title="Internal linking opportunities"
+          subtitle="Pass authority to pages that need it — highest priority first."
+          titleIcon={<Icon name="link" size="sm" className="text-[var(--teal)]" />}
+          iconChip
+          titleExtra={<span className="hidden sm:inline-flex"><Badge label={`${filtered.length} shown`} tone="teal" variant="soft" /></span>}
+          action={(
+            <Segmented
+              value={viewMode}
+              onChange={(value) => onViewModeChange(value as InternalViewMode)}
+              options={[
+                { value: 'list', label: 'List' },
+                { value: 'grouped', label: 'By source' },
+              ]}
+            />
+          )}
+          noPadding
+          variant="subtle"
+        >
+          <Toolbar label="Internal-link priority controls" className="border-b border-[var(--brand-border)] px-3 py-2">
+            <div className="flex flex-wrap gap-1.5" aria-label="Internal-link priority filters">
+              {filters.map((item) => (
+                <Button
+                  key={item.id}
+                  size="sm"
+                  variant={priority === item.id ? 'secondary' : 'ghost'}
+                  onClick={() => onPriorityChange(item.id)}
+                  aria-pressed={priority === item.id}
+                >
+                  {item.label} <span className="t-micro text-[var(--brand-text-dim)]">{item.count}</span>
+                </Button>
+              ))}
+            </div>
+            <ToolbarSpacer />
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">
+              Last analyzed {dateTimeOrDash(data.analyzedAt)}
+            </span>
+          </Toolbar>
+
+          <div className="p-2">
+            {viewMode === 'grouped' ? (
+              filtered.length === 0 ? (
+                <EmptyState
+                  icon={() => <Icon name="search" size="2xl" />}
+                  title="No internal-link suggestions match this view"
+                  description="Clear search or choose a broader priority filter."
+                  action={<Button size="sm" variant="secondary" onClick={clearSearch}>Clear search</Button>}
+                />
+              ) : (
+                <GroupedSuggestions suggestions={filtered} onOpen={setSelectedSuggestion} onCopy={copyHtml} />
+              )
+            ) : (
+              <DataTable
+                columns={columns}
+                rows={rows}
+                getRowKey={(record, index) => `${(record as SuggestionRecord).source.fromPage}:${(record as SuggestionRecord).source.toPage}:${index}`}
+                onRowClick={(record) => setSelectedSuggestion((record as SuggestionRecord).source)}
+                empty={(
+                  <EmptyState
+                    icon={() => <Icon name="search" size="2xl" />}
+                    title="No internal-link suggestions match this view"
+                    description="Clear search or choose a broader priority filter."
+                    action={<Button size="sm" variant="secondary" onClick={clearSearch}>Clear search</Button>}
+                  />
+                )}
+              />
+            )}
+          </div>
+        </SectionCard>
       </div>
+
+      <PageHealthEvidence pageHealth={data.pageHealth} />
 
       {data.attemptedPageCount && data.attemptedPageCount !== data.pageCount && (
         <InlineBanner tone={data.pageCount < data.attemptedPageCount * 0.5 ? 'warning' : 'info'} title="Partial page fetch">
@@ -468,8 +542,6 @@ export function InternalLinksLens({
           </p>
         </InlineBanner>
       )}
-
-      <OrphanPages pageHealth={data.pageHealth} />
 
       {workspaceId && data.suggestions.length > 0 && (
         <GroupBlock
@@ -494,34 +566,6 @@ export function InternalLinksLens({
             </Button>
           </div>
         </GroupBlock>
-      )}
-
-      {viewMode === 'grouped' ? (
-        filtered.length === 0 ? (
-          <EmptyState
-            icon={() => <Icon name="search" size="2xl" />}
-            title="No internal-link suggestions match this view"
-            description="Clear search or choose a broader priority filter."
-            action={<Button size="sm" variant="secondary" onClick={clearSearch}>Clear search</Button>}
-          />
-        ) : (
-          <GroupedSuggestions suggestions={filtered} onOpen={setSelectedSuggestion} onCopy={copyHtml} />
-        )
-      ) : (
-        <DataTable
-          columns={columns}
-          rows={rows}
-          getRowKey={(record, index) => `${(record as SuggestionRecord).source.fromPage}:${(record as SuggestionRecord).source.toPage}:${index}`}
-          onRowClick={(record) => setSelectedSuggestion((record as SuggestionRecord).source)}
-          empty={(
-            <EmptyState
-              icon={() => <Icon name="search" size="2xl" />}
-              title="No internal-link suggestions match this view"
-              description="Clear search or choose a broader priority filter."
-              action={<Button size="sm" variant="secondary" onClick={clearSearch}>Clear search</Button>}
-            />
-          )}
-        />
       )}
 
       {data.suggestions.length === 0 && (

@@ -2,7 +2,7 @@
 
 Surface: `links` / Links  
 Owner: optimization / link-repair workflow  
-Status: `behavior-safe / visual-unverified` after safe cleanup; row-level insert is an owner choice
+Status: `owner-approved`; Joshua approved the corrected repair-workshop composition and documented exceptions on 2026-07-10
 Primary route: `/ws/:workspaceId/links`
 
 ## Prototype References
@@ -32,7 +32,15 @@ The rebuilt surface preserves all four as peer lenses, which matches the prototy
 
 ## Current Parity Grade
 
-Visual status: `behavior-safe / visual-unverified`.
+Visual status: `owner-approved`.
+
+Source-led correction result, 2026-07-10:
+
+- All four lenses now share the prototype's exact 1120px outer / 1060px content workshop, compact context strip, one-line lens/action tray, and dense first-viewport rhythm.
+- Redirects, Internal Links, and Dead Links use the prototype's three-metric spine; Architecture uses six compact metrics followed by a bounded 1.7fr / 1fr URL-tree and gaps composition.
+- Optional evidence, page-health, schema-priority, and crawl detail remain reachable as collapsed production support rather than competing with the primary repair flow.
+- Internal and Dead Links Drawers, CSV/copy/send workflows, URL state, legacy alias, and canonical handoffs remain exact-once. No unsupported direct `Insert` action is simulated.
+- Exact 1440x900, settled 1600x1000, every lens, Drawer, and mobile evidence passed a fresh Sol review with `PASS`; Joshua explicitly owner-approved the composition and copy/send exception on 2026-07-10.
 
 Why:
 
@@ -44,7 +52,7 @@ Why:
 - Architecture preserves source filters, URL tree, schema priority queue, gaps, orphans, and depth distribution.
 - Safe cleanup removed implementation/deferred language from visible drawer/banner copy and now keeps the default route clean.
 
-Owner choice:
+Explicit exception carried into owner review:
 
 - The prototype shows a row-level `Insert` action for internal links. The rebuilt surface currently provides HTML copy plus client-send instead of claiming a direct insert. Recommended default: keep copy/send until the write target is explicit; do not simulate an insert that does not actually publish or stage a real change.
 
@@ -110,6 +118,19 @@ Clean fixture target: `ws_2ceaeb6c-0820-4da5-941e-ad9eae643993`.
 Result: passed with local browser smoke. Desktop overview, Internal Links deep link, Dead Links drawer, Architecture deep link, and mobile overview had all lens labels visible, no page-level horizontal overflow, no internal implementation labels, no duplicate dialogs, no console errors, and no failed responses. The outcome-footer smoke also passed on desktop, Internal Links deep link, and mobile footer viewport: footer copy stayed visible, no row-level `Insert` claim appeared, no internal implementation terms appeared, and console warnings/errors were empty.
 
 Typography result: passed for the live Links samples available in the clean Rinse fixture. The measured-outcome footer and Dead Links repair guidance rendered as `.t-body` at 15.5px, the Dead Links drawer opened exactly once, no internal terms appeared, no failed responses were recorded, and the light mobile Internal Links viewport had no horizontal overflow. Redirect apply guidance, Internal Links implementation guidance, and Architecture gap/next-step copy are component-test evidence because the clean live fixture does not consistently expose those optional data states. Local preview console noise was limited to the existing notification fetch failure when the full backend notification stack was not attached.
+
+Source-led final evidence:
+
+- Prototype: `/tmp/asset-dashboard-codex-visual-parity/batch7/prototype/links-redirects-1440.png`, `links-redirects-1600.png`, `links-internal-1440.png`, `links-dead-1440.png`, and `links-architecture-1440.png`.
+- Corrected: `/tmp/asset-dashboard-codex-visual-parity/batch7/links/redirects-1440-final.png`, `redirects-1600-final.png`, `internal-1440-final.png`, `dead-1440-final.png`, and `architecture-1440-final.png`.
+- Important interiors: `/tmp/asset-dashboard-codex-visual-parity/batch7/links/internal-drawer-1440.png` and `dead-drawer-internal-1440.png`.
+- Mobile floor: `/tmp/asset-dashboard-codex-visual-parity/batch7/links/redirects-mobile-390.png`.
+
+Fresh Sol verdict: `PASS`. Geometry, compact controls, per-lens metric patterns, dense primary workspaces, bounded architecture tree, Drawers, handoffs, URL state, and collapsed evidence bands align without overflow or fabricated behavior.
+
+## Registry Closeout Evidence
+
+The measured registry archive adds exact 1600x1000 prototype and rebuilt evidence for Redirects, Internal Links, Dead Links, and Architecture under `/tmp/asset-dashboard-codex-visual-parity/registry-final/`; reviewed exact 1440x900 counterparts remain authoritative. Internal/dead detail Drawers remain production-only, and copy/send remains the honest alternative to an unsupported direct Insert write.
 
 ## Automated Test Floor
 

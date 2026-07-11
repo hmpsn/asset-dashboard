@@ -361,6 +361,10 @@ function expectTextToHaveClass(text: RegExp | string, className: string) {
   expect(screen.getByText(text)).toHaveClass(className);
 }
 
+function expectComesBefore(first: HTMLElement, second: HTMLElement) {
+  expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+}
+
 function FlaggedLinksHarness() {
   const enabled = useFeatureFlag('ui-rebuild-shell');
   return enabled ? <LinksSurface workspaceId="ws-1" /> : <div data-testid="legacy-links">Legacy Links</div>;
@@ -406,10 +410,17 @@ describe('LinksSurface rebuilt admin surface', () => {
     renderSurface('/ws/ws-1/links?tab=redirects');
 
     expect(await screen.findByRole('radio', { name: /Redirects/i })).toHaveAttribute('aria-checked', 'true');
-    expect(await screen.findByText('Redirect recommendations')).toBeInTheDocument();
+    expect(await screen.findByText('Suggested 301 redirects')).toBeInTheDocument();
+    const root = screen.getByTestId('links-surface-root');
+    expect(root).toHaveClass('max-w-[1120px]');
+    expectComesBefore(screen.getByTestId('links-context-row'), screen.getByTestId('links-secondary-controls'));
+    expectComesBefore(screen.getByTestId('redirects-metrics'), screen.getByTestId('redirects-how-it-works'));
+    expectComesBefore(screen.getByTestId('redirects-how-it-works'), screen.getByTestId('redirects-primary'));
     expect(screen.getAllByText('/old-service').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByText('Scan evidence'));
     expect(screen.getByText('Redirect chains')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Match' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Re-scan' })).toHaveLength(1);
     expectTextToHaveClass(/Update internal links so they point directly to the final destination/i, 't-body');
   });
 
@@ -425,7 +436,7 @@ describe('LinksSurface rebuilt admin surface', () => {
 
     fireEvent.click(screen.getByRole('radio', { name: /Redirects/i }));
     expect(screen.getByTestId('location-search')).toBeEmptyDOMElement();
-    expect(await screen.findByText('Redirect recommendations')).toBeInTheDocument();
+    expect(await screen.findByText('Suggested 301 redirects')).toBeInTheDocument();
   });
 
   it('receives ?tab=internal and keeps list/grouped views plus the client-send batch action', async () => {
@@ -434,6 +445,9 @@ describe('LinksSurface rebuilt admin surface', () => {
     expect(await screen.findByRole('radio', { name: /Internal Links/i })).toHaveAttribute('aria-checked', 'true');
     expect(await screen.findByText(/cosmetic dentistry/)).toBeInTheDocument();
     expect(screen.getAllByText('Orphan pages').length).toBeGreaterThan(0);
+    expectComesBefore(screen.getByTestId('internal-metrics'), screen.getByTestId('internal-orphans'));
+    expectComesBefore(screen.getByTestId('internal-orphans'), screen.getByTestId('internal-primary'));
+    expect(screen.getAllByRole('button', { name: 'Re-analyze' })).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('radio', { name: 'By source' }));
     expect(await screen.findByText('Services')).toBeInTheDocument();
@@ -465,6 +479,9 @@ describe('LinksSurface rebuilt admin surface', () => {
     expect(await screen.findByRole('radio', { name: /Dead Links/i })).toHaveAttribute('aria-checked', 'true');
     expect(await screen.findByLabelText('Crawl domain')).toHaveValue('https://acme.com');
     expect(await screen.findByText('https://example.com/dead')).toBeInTheDocument();
+    expectComesBefore(screen.getByTestId('dead-metrics'), screen.getByTestId('dead-note'));
+    expectComesBefore(screen.getByTestId('dead-note'), screen.getByTestId('dead-primary'));
+    expect(screen.getAllByLabelText('Crawl domain')).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Review' }));
     expect(screen.getByRole('button', { name: 'Reviewed' })).toHaveAttribute('aria-pressed', 'true');
@@ -499,10 +516,12 @@ describe('LinksSurface rebuilt admin surface', () => {
 
     expect(await screen.findByRole('radio', { name: /Architecture/i })).toHaveAttribute('aria-checked', 'true');
     expect(await screen.findByText('Schema priority queue')).toBeInTheDocument();
+    expectComesBefore(screen.getByTestId('architecture-metrics'), screen.getByTestId('architecture-orphans'));
+    expectComesBefore(screen.getByTestId('architecture-orphans'), screen.getByTestId('architecture-primary'));
+    expectComesBefore(screen.getByTestId('architecture-primary'), screen.getByTestId('architecture-schema'));
     expect(screen.getAllByRole('button', { name: /Gaps/i }).some((button) => button.getAttribute('aria-pressed') === 'true')).toBe(true);
     expect(screen.getByText('Dental Implants')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Architecture gaps'));
-    expectTextToHaveClass(/Implants are a service gap from keyword strategy/i, 't-body');
+    expectTextToHaveClass(/Implants are a service gap from keyword strategy/i, 't-caption-sm');
     expectTextToHaveClass(/Use gaps as page-planning inputs/i, 't-body');
   });
 

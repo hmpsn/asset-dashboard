@@ -10,9 +10,11 @@ import {
   Drawer,
   EmptyState,
   FormSelect,
+  GroupBlock,
   Icon,
   InlineBanner,
   MetricTile,
+  SectionCard,
   Segmented,
   Skeleton,
   Toolbar,
@@ -85,8 +87,8 @@ function toRecord(link: DeadLink): DeadLinkRecord {
 function domainOptions(domains: SiteDomainInfo | undefined) {
   if (!domains) return [];
   return [
-    { value: domains.staging, label: `${cleanUrlLabel(domains.staging)} (staging)` },
-    ...domains.customDomains.map((domain) => ({ value: domain, label: `${cleanUrlLabel(domain)} (live)` })),
+    ...(domains.staging ? [{ value: domains.staging, label: `${cleanUrlLabel(domains.staging)} (staging)` }] : []),
+    ...domains.customDomains.filter(Boolean).map((domain) => ({ value: domain, label: `${cleanUrlLabel(domain)} (live)` })),
   ];
 }
 
@@ -195,6 +197,8 @@ export function DeadLinksLens({
   const filtered = useMemo(() => filterLinks(currentList, typeFilter, search), [currentList, typeFilter, search]);
   const rows = useMemo(() => filtered.map(toRecord), [filtered]);
   const availableDomains = domainOptions(domains.data);
+  const internalDeadCount = data?.deadLinks.filter((link) => link.type === 'internal').length ?? 0;
+  const externalDeadCount = (data?.deadLinks.length ?? 0) - internalDeadCount;
 
   const markReviewed = useCallback((link: DeadLink) => {
     toggleReviewed(linkKey(link));
@@ -348,7 +352,7 @@ export function DeadLinksLens({
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-[14px]">
       {runCheck.isError && (
         <InlineBanner tone="error" title="Link check failed">
           <div className="flex flex-wrap items-center gap-2">
@@ -358,68 +362,106 @@ export function DeadLinksLens({
         </InlineBanner>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricTile label="Total links" value={data.totalLinks} accent="var(--blue)" />
-        <MetricTile label="Healthy" value={data.healthy} accent="var(--emerald)" />
-        <MetricTile label="Dead links" value={data.deadLinks.length} accent="var(--red)" />
-        <MetricTile label="Redirects" value={data.redirects.length} accent="var(--amber)" sub={`Checked ${dateTimeOrDash(data.checkedAt)}`} />
+      <div className="grid gap-3 sm:grid-cols-3" data-testid="dead-metrics">
+        <MetricTile label="Broken links" value={data.deadLinks.length} accent="var(--red)" />
+        <MetricTile label="Internal" value={internalDeadCount} accent="var(--blue)" />
+        <MetricTile label="External" value={externalDeadCount} accent="var(--amber)" />
       </div>
 
-      {data.deadLinks.length === 0 && data.redirects.length === 0 && (
-        <InlineBanner tone="success" title="All checked links are healthy">
-          <p className="t-body text-[var(--brand-text-muted)]">
-            No dead links or redirecting links were found for {cleanUrlLabel(data.crawledDomain ?? selectedDomain)}.
-          </p>
-        </InlineBanner>
-      )}
-
-      <Toolbar label="Dead-link table controls" className="w-full">
-        <Segmented
-          value={listMode}
-          onChange={(value) => onListModeChange(value as DeadLinksListMode)}
-          options={[
-            { value: 'dead', label: `Dead (${data.deadLinks.length})` },
-            { value: 'redirects', label: `Redirects (${data.redirects.length})` },
-          ]}
-        />
-        <div className="flex flex-wrap gap-2" aria-label="Link type filters">
-          {(['all', 'internal', 'external'] as const).map((item) => (
-            <Button
-              key={item}
-              size="sm"
-              variant={typeFilter === item ? 'secondary' : 'ghost'}
-              onClick={() => onTypeFilterChange(item)}
-              aria-pressed={typeFilter === item}
-            >
-              {item}
-            </Button>
-          ))}
-        </div>
-        <ToolbarSpacer />
-        <Button size="sm" variant="secondary" onClick={exportCsv}>
-          <Icon name="download" size="sm" />
-          Export CSV
-        </Button>
-      </Toolbar>
-
-      <p className="t-caption text-[var(--brand-text-muted)]">
-        Crawled domain: {cleanUrlLabel(data.crawledDomain ?? selectedDomain)} · Last checked {dateTimeOrDash(data.checkedAt)}
-      </p>
-
-      <DataTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(record) => linkKey((record as DeadLinkRecord).source)}
-        onRowClick={(record) => setSelectedLink((record as DeadLinkRecord).source)}
-        empty={(
-          <EmptyState
-            icon={() => <Icon name="search" size="2xl" />}
-            title={listMode === 'dead' ? 'No dead links match this view' : 'No redirects match this view'}
-            description="Clear search or choose a broader link type filter."
-            action={<Button size="sm" variant="secondary" onClick={clearSearch}>Clear search</Button>}
-          />
+      <div data-testid="dead-note">
+        {data.deadLinks.length === 0 ? (
+          <InlineBanner tone="success" title="No broken links in this check">
+            <p className="t-body text-[var(--brand-text-muted)]">
+              Every checked internal and external link resolved for {cleanUrlLabel(data.crawledDomain ?? selectedDomain)}.
+            </p>
+          </InlineBanner>
+        ) : (
+          <InlineBanner tone="info" title="Fix internal dead links first">
+            <p className="t-body text-[var(--brand-text-muted)]">
+              Internal dead links waste crawl budget and break journeys; review a live redirect target. External dead links need the source link updated or removed.
+            </p>
+          </InlineBanner>
         )}
-      />
+      </div>
+
+      <div data-testid="dead-primary">
+        <SectionCard
+          title="Broken links"
+          subtitle={`Last crawl found ${data.deadLinks.length} dead link${data.deadLinks.length === 1 ? '' : 's'}.`}
+          titleIcon={<Icon name="link" size="sm" className="text-[var(--red)]" />}
+          iconChip
+          action={(
+            <Button size="sm" variant="secondary" aria-label="Export link-check CSV" onClick={exportCsv}>
+              <Icon name="download" size="sm" />
+              <span className="hidden sm:inline">Export CSV</span>
+            </Button>
+          )}
+          noPadding
+          variant="subtle"
+        >
+          <Toolbar label="Dead-link table controls" className="border-b border-[var(--brand-border)] px-3 py-2">
+            <Segmented
+              value={listMode}
+              onChange={(value) => onListModeChange(value as DeadLinksListMode)}
+              options={[
+                { value: 'dead', label: `Dead (${data.deadLinks.length})` },
+                { value: 'redirects', label: `Redirects (${data.redirects.length})` },
+              ]}
+            />
+            <div className="flex flex-wrap gap-1.5" aria-label="Link type filters">
+              {(['all', 'internal', 'external'] as const).map((item) => (
+                <Button
+                  key={item}
+                  size="sm"
+                  variant={typeFilter === item ? 'secondary' : 'ghost'}
+                  onClick={() => onTypeFilterChange(item)}
+                  aria-pressed={typeFilter === item}
+                >
+                  {item}
+                </Button>
+              ))}
+            </div>
+            <ToolbarSpacer />
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">
+              {cleanUrlLabel(data.crawledDomain ?? selectedDomain)} · {dateTimeOrDash(data.checkedAt)}
+            </span>
+          </Toolbar>
+
+          <div className="p-2">
+            <DataTable
+              columns={columns}
+              rows={rows}
+              getRowKey={(record) => linkKey((record as DeadLinkRecord).source)}
+              onRowClick={(record) => setSelectedLink((record as DeadLinkRecord).source)}
+              empty={(
+                <EmptyState
+                  icon={() => <Icon name="search" size="2xl" />}
+                  title={listMode === 'dead' ? 'No dead links match this view' : 'No redirects match this view'}
+                  description="Clear search or choose a broader link type filter."
+                  action={<Button size="sm" variant="secondary" onClick={clearSearch}>Clear search</Button>}
+                />
+              )}
+            />
+          </div>
+        </SectionCard>
+      </div>
+
+      <GroupBlock
+        title="Link-check evidence"
+        meta={`Crawled ${cleanUrlLabel(data.crawledDomain ?? selectedDomain)} · Checked ${dateTimeOrDash(data.checkedAt)}`}
+        stats={[
+          { label: 'Total links', value: data.totalLinks, color: 'var(--blue)' },
+          { label: 'Healthy', value: data.healthy, color: 'var(--emerald)' },
+          { label: 'Redirects', value: data.redirects.length, color: 'var(--amber)' },
+        ]}
+        headingLevel="h2"
+        collapsible
+        defaultOpen={false}
+      >
+        <p className="p-3 t-body text-[var(--brand-text-muted)]">
+          Open this evidence after repairs to confirm the latest crawl totals without displacing the broken-link work queue.
+        </p>
+      </GroupBlock>
 
       <DeadLinkDrawer
         link={selectedLink}

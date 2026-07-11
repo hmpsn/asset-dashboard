@@ -42,6 +42,8 @@ import {
 
 const LazyDeadLinksLens = lazyWithRetry(() => import('./DeadLinksLens').then((module) => ({ default: module.DeadLinksLens })));
 
+const SURFACE_WRAP_CLASS = 'mx-auto flex min-h-full w-full max-w-[1120px] flex-col gap-[14px] px-4 pb-[90px] sm:px-[30px]';
+
 interface LinksSurfaceProps {
   workspaceId: string;
 }
@@ -102,7 +104,12 @@ export function LinksSurface({ workspaceId }: LinksSurfaceProps) {
 
   useEffect(() => {
     if (!linkDomains.data || selectedDomain) return;
-    setSelectedDomain(linkDomains.data.defaultDomain || linkDomains.data.staging);
+    setSelectedDomain(
+      linkDomains.data.defaultDomain
+      || linkDomains.data.staging
+      || linkDomains.data.customDomains[0]
+      || '',
+    );
   }, [linkDomains.data, selectedDomain]);
 
   const lensOptions = useMemo(() => LINKS_SURFACE_TABS.map((tab) => ({
@@ -175,8 +182,12 @@ export function LinksSurface({ workspaceId }: LinksSurfaceProps) {
     if (state.tab === 'dead-links') {
       const options = linkDomains.data
         ? [
-            { value: linkDomains.data.staging, label: `${linkDomains.data.staging.replace(/^https?:\/\//i, '')} (staging)` },
-            ...linkDomains.data.customDomains.map((domain) => ({ value: domain, label: `${domain.replace(/^https?:\/\//i, '')} (live)` })),
+            ...(linkDomains.data.staging
+              ? [{ value: linkDomains.data.staging, label: `${linkDomains.data.staging.replace(/^https?:\/\//i, '')} (staging)` }]
+              : []),
+            ...linkDomains.data.customDomains
+              .filter(Boolean)
+              .map((domain) => ({ value: domain, label: `${domain.replace(/^https?:\/\//i, '')} (live)` })),
           ]
         : [];
       return (
@@ -253,14 +264,19 @@ export function LinksSurface({ workspaceId }: LinksSurfaceProps) {
   }
 
   return (
-    <div className="flex min-h-full flex-col gap-5">
-      <PageHeader
-        title="Links"
-        subtitle="Redirects, internal-link opportunities, dead-link checks, and architecture."
-        className="flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible"
-      />
+    <div className={SURFACE_WRAP_CLASS} data-testid="links-surface-root">
+      <div className="flex flex-wrap items-center gap-2" data-testid="links-context-row">
+        <span className="h-[7px] w-[7px] shrink-0 rounded-[var(--radius-pill)] bg-[var(--teal)]" aria-hidden="true" />
+        <h1 aria-label="Links" className="t-label font-semibold uppercase tracking-[0.09em] text-[var(--teal)]">
+          Links · {workspace.name}
+        </h1>
+        <span className="ml-auto inline-flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]">
+          <Icon name="clock" size="sm" />
+          {activeMeta}
+        </span>
+      </div>
 
-      <Toolbar label="Links view controls" className="w-full">
+      <div className="mb-1.5 flex flex-col gap-2 lg:flex-row lg:items-center" data-testid="links-workshop-controls">
         <LensSwitcher
           id="links-rebuilt-tab-switcher"
           options={lensOptions}
@@ -269,17 +285,21 @@ export function LinksSurface({ workspaceId }: LinksSurfaceProps) {
           size="sm"
           className="w-full flex-wrap sm:w-fit sm:flex-nowrap"
         />
-        <SearchField
-          value={state.search}
-          onChange={state.setSearch}
-          placeholder="Search links and pages"
-          debounceMs={300}
-          className="min-w-[220px] flex-1"
-        />
-        <ToolbarSpacer />
-        <span className="t-caption text-[var(--brand-text-muted)]">{activeMeta}</span>
-        {activeAction}
-      </Toolbar>
+
+        <Toolbar label="Links secondary controls" className="min-w-0 flex-1">
+          <div data-testid="links-secondary-controls" className="contents">
+            <SearchField
+              value={state.search}
+              onChange={state.setSearch}
+              placeholder="Search links and pages"
+              debounceMs={300}
+              className="min-w-[220px] flex-1 lg:max-w-[300px]"
+            />
+            <ToolbarSpacer />
+            {activeAction}
+          </div>
+        </Toolbar>
+      </div>
 
       {state.tab === 'redirects' && (
         <RedirectsLens
