@@ -333,6 +333,44 @@ describe('CockpitSurface rebuilt', () => {
     expect(screen.getByText('#3')).toHaveClass('t-body');
   });
 
+  it('uses the compact prototype frame and keeps operator controls reachable through the topbar host', async () => {
+    renderSurface();
+
+    const surface = await screen.findByTestId('cockpit-rebuilt-surface');
+    const pageFrame = surface.parentElement;
+    const contextLine = screen.getByTestId('cockpit-context-line');
+
+    expect(pageFrame).toHaveStyle({ maxWidth: '1168px', padding: '0px' });
+    expect(contextLine).toHaveTextContent('Client cockpit · Acme Dental');
+    expect(contextLine).toHaveTextContent('Today, scoped to one');
+    expect(within(contextLine).queryByRole('img')).not.toBeInTheDocument();
+    expect(screen.getByTestId('cockpit-topbar-actions-fallback')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Activity/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Refresh Cockpit data/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Settings/i })).toBeInTheDocument();
+  });
+
+  it('keeps source filters functional when they are composed inside the work-queue card', async () => {
+    renderSurface();
+
+    const queue = await screen.findByTestId('cockpit-work-queue');
+    const filters = within(queue).getByLabelText('Queue filters');
+    fireEvent.click(within(filters).getByRole('button', { name: /^Decay/ }));
+
+    expect(screen.getByText('Refresh decaying service page')).toBeInTheDocument();
+    expect(screen.queryByText('Close Core Web Vitals cleanup')).not.toBeInTheDocument();
+    expect(within(filters).getByRole('button', { name: /^Decay/ })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('keeps weekly accomplishments as supporting evidence after the core queue and rail', async () => {
+    renderSurface();
+
+    const coreGrid = await screen.findByTestId('cockpit-core-grid');
+    const weekly = screen.getByTestId('weekly-accomplishments');
+
+    expect(coreGrid.compareDocumentPosition(weekly) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('opens the carried-over work-order panel from a work-order queue row', async () => {
     renderSurface();
 

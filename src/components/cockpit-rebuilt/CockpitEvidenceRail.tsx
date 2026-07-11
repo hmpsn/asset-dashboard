@@ -147,6 +147,7 @@ export function CockpitEvidenceRail({
   onOpenRoute,
   route,
 }: CockpitEvidenceRailProps) {
+  const workspaceFirstName = workspaceName.trim().split(/\s+/)[0] || workspaceName;
   const openRequests = requests.filter((r) => r.status !== 'closed' && r.status !== 'resolved').slice(0, 4);
   const rankRows = ranks.slice(0, 5);
 
@@ -196,11 +197,11 @@ export function CockpitEvidenceRail({
   const needsReview = pipeline.review > 0;
 
   return (
-    <div className="flex flex-col gap-4" data-testid="cockpit-evidence-rail">
+    <div className="flex flex-col gap-[14px]" data-testid="cockpit-evidence-rail">
       {/* 1 — From client (leads the rail) */}
       <SectionCard
-        title="From client"
-        titleIcon={<Icon name="message" size="sm" className="text-[var(--teal)]" />}
+        title={`From ${workspaceFirstName}`}
+        titleIcon={<Icon name="message" size="sm" className="text-[var(--blue)]" />}
         iconChip
         subtitle="Replies from their portal — a human is waiting"
         action={<LinkOut label="Inbox" onClick={() => onOpenRoute(route.requests)} />}
@@ -220,7 +221,9 @@ export function CockpitEvidenceRail({
             ))}
           </div>
         ) : (
-          <div className="px-4 py-3 t-caption text-[var(--brand-text-muted)]">No open client requests in this workspace.</div>
+          <div className="px-4 py-3 t-caption text-[var(--brand-text-muted)]">
+            Nothing waiting from {workspaceFirstName} right now.
+          </div>
         )}
       </SectionCard>
 
@@ -230,7 +233,11 @@ export function CockpitEvidenceRail({
         titleIcon={<Icon name="gauge" size="sm" className="text-[var(--blue)]" />}
         iconChip
         subtitle="Site health — the invisible plumbing"
-        action={<span className="rounded-[var(--radius-pill)] border border-[var(--brand-border)] px-2 py-0.5 t-caption-sm text-[var(--brand-text-muted)]">stays here</span>}
+        action={(
+          <span className="rounded-[var(--radius-pill)] border border-[color-mix(in_srgb,var(--blue)_25%,transparent)] bg-[color-mix(in_srgb,var(--blue)_10%,transparent)] px-2 py-0.5 t-caption-sm text-[var(--blue)]">
+            stays here
+          </span>
+        )}
         noPadding
       >
         {techRows.length > 0 ? (
@@ -250,6 +257,12 @@ export function CockpitEvidenceRail({
         ) : (
           <div className="px-4 py-3 t-caption text-[var(--brand-text-muted)]">No technical issues flagged right now.</div>
         )}
+        <div className="flex items-start gap-2 border-t border-dashed border-[var(--brand-border)] bg-[color-mix(in_srgb,var(--amber)_3%,transparent)] px-4 py-3 t-caption-sm leading-relaxed text-[var(--brand-text-muted)]">
+          <Icon name="star" size="sm" className="mt-0.5 flex-none text-[var(--amber)]" aria-hidden="true" />
+          <span>
+            Technical fixes <strong className="font-semibold text-[var(--amber)]">stay in the Cockpit</strong> — they move into the Insights Engine only when they become a measured proof point.
+          </span>
+        </div>
       </SectionCard>
 
       {/* 3 — Keyword position */}

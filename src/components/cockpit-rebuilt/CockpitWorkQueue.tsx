@@ -131,33 +131,40 @@ export function CockpitWorkQueue({
   const grouped = groupItems(filteredItems, stream);
   const sourceTypes = SOURCE_ORDER.filter((sourceType) => (sourceTypeCounts[sourceType] ?? 0) > 0);
 
+  const filterControls = (
+    <div className="flex min-w-max items-center gap-2" aria-label="Queue filters">
+      <FilterChip label="All" active={stream === 'all'} count={workQueue.items.length} onClick={() => onStreamChange('all')} />
+      <FilterChip label="Risk" active={stream === 'unclassified'} count={workQueue.streams.unclassified} onClick={() => onStreamChange('unclassified')} />
+      {sourceTypes.map((sourceType) => (
+        <FilterChip
+          key={sourceType}
+          label={sourceTypeLabel(sourceType)}
+          count={sourceTypeCounts[sourceType]}
+          active={activeSourceTypes.has(sourceType)}
+          onClick={() => onToggleSourceType(sourceType)}
+        />
+      ))}
+      {activeSourceTypes.size > 0 && (
+        <Button variant="link" size="sm" onClick={onClearSourceTypes}>
+          Clear filters
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-3" data-testid="cockpit-work-queue">
-      <div className="flex flex-wrap items-center gap-2" aria-label="Queue filters">
-        <FilterChip label="All" active={stream === 'all'} count={workQueue.items.length} onClick={() => onStreamChange('all')} />
-        <FilterChip label="Risk" active={stream === 'unclassified'} count={workQueue.streams.unclassified} onClick={() => onStreamChange('unclassified')} />
-        {sourceTypes.map((sourceType) => (
-          <FilterChip
-            key={sourceType}
-            label={sourceTypeLabel(sourceType)}
-            count={sourceTypeCounts[sourceType]}
-            active={activeSourceTypes.has(sourceType)}
-            onClick={() => onToggleSourceType(sourceType)}
-          />
-        ))}
-        {activeSourceTypes.size > 0 && (
-          <Button variant="link" size="sm" onClick={onClearSourceTypes}>
-            Clear filters
-          </Button>
-        )}
-      </div>
-
       {grouped.some(([, rows]) => rows.length > 0) ? (
         <SectionCard
           title={`${clientName}'s work queue`}
           titleIcon={<Icon name="bell" size="sm" className="text-[var(--teal)]" />}
           iconChip
           subtitle="Everything this client needs, grouped by kind"
+          action={(
+            <div className="max-w-[52%] overflow-x-auto py-0.5">
+              {filterControls}
+            </div>
+          )}
           noPadding
         >
           <div className="flex flex-col">
@@ -181,7 +188,6 @@ export function CockpitWorkQueue({
                     <WorkQueueRow
                       key={`${item.stream}-${item.id}`}
                       item={item}
-                      clientName={clientName}
                       clientInitials={clientInitials}
                       actionLabel={item.sourceType === 'work_order' ? 'Open panel' : undefined}
                       onAction={() => onOpenItem(item)}
@@ -193,14 +199,17 @@ export function CockpitWorkQueue({
           </div>
         </SectionCard>
       ) : (
-        <EmptyState
-          icon={EmptyQueueIcon}
-          title="No queue rows match this view"
-          description="Clear filters or switch streams to review the shared work queue."
-          action={activeSourceTypes.size > 0 ? <Button variant="secondary" size="sm" onClick={onClearSourceTypes}>Clear filters</Button> : undefined}
-          // pr-check-disable-next-line -- brand signature radius on the empty-state container (owner-ratified global asymmetric-on-containers, ui-parity)
-          className="rounded-[var(--radius-signature-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]"
-        />
+        <>
+          <div className="max-w-full overflow-x-auto">{filterControls}</div>
+          <EmptyState
+            icon={EmptyQueueIcon}
+            title="No queue rows match this view"
+            description="Clear filters or switch streams to review the shared work queue."
+            action={activeSourceTypes.size > 0 ? <Button variant="secondary" size="sm" onClick={onClearSourceTypes}>Clear filters</Button> : undefined}
+            // pr-check-disable-next-line -- brand signature radius on the empty-state container (owner-ratified global asymmetric-on-containers, ui-parity)
+            className="rounded-[var(--radius-signature-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]"
+          />
+        </>
       )}
     </div>
   );

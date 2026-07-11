@@ -9,7 +9,6 @@ import { useCockpitRebuilt, countWorkQueueSourceTypes, workQueueWithVisibleItems
 import { queryKeys } from '../../lib/queryKeys';
 import { useToast } from '../Toast';
 import {
-  Avatar,
   Button,
   ErrorState,
   InlineBanner,
@@ -19,6 +18,7 @@ import {
   Skeleton,
   WorkStreamSelector,
 } from '../ui';
+import { RebuiltTopbarActions } from '../layout/RebuiltAppChrome';
 import { WeeklyAccomplishments } from '../workspace-home';
 import { CockpitActivityDrawer } from './CockpitActivityDrawer';
 import { CockpitEvidenceRail } from './CockpitEvidenceRail';
@@ -31,6 +31,17 @@ import { useCockpitSurfaceState } from './useCockpitSurfaceState';
 interface CockpitSurfaceProps {
   workspaceId: string;
 }
+
+/**
+ * RebuiltAppChrome already supplies the canonical 26px page inset. The
+ * prototype Cockpit then caps its inner content at 1168px (1220px wrapper
+ * minus its two 26px gutters), so this nested surface must not add a second
+ * PageContainer gutter.
+ */
+const COCKPIT_PAGE_STYLE = {
+  maxWidth: '1168px',
+  padding: 0,
+} as const;
 
 function initialsFor(name: string): string {
   const parts = name.split(/\s+/).filter(Boolean).slice(0, 2);
@@ -159,9 +170,46 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
     }
   };
 
+  const topbarActions = (
+    <div
+      data-testid="cockpit-topbar-actions"
+      className="flex max-w-full items-center justify-end gap-2 overflow-x-auto"
+    >
+      {/* muted-tier-ok: freshness is tertiary evidence in the shell toolbar. */}
+      <span
+        className={`hidden whitespace-nowrap t-caption-sm lg:inline ${isStale ? 'text-[var(--amber)]' : 'text-[var(--brand-text-dim)]'}`}
+        title={lastFetched ? `Data loaded at ${formatDate(lastFetched)}` : undefined}
+      >
+        {lastFetched ? `${isStale ? 'Stale · ' : ''}Data as of ${formatDate(lastFetched)}` : 'Data freshness unavailable'}
+      </span>
+      <Button
+        variant="secondary"
+        size="sm"
+        icon={Clock}
+        onClick={() => setActivityOpen(true)}
+        aria-label="Activity"
+      >
+        Activity
+      </Button>
+      <Button
+        variant="secondary"
+        size="sm"
+        icon={RefreshCw}
+        onClick={handleRefresh}
+        loading={cockpit.homeQuery.isFetching}
+        aria-label="Refresh Cockpit data"
+      >
+        Refresh
+      </Button>
+      <Button variant="secondary" size="sm" icon={Settings} onClick={() => navigate(routes.settings)}>
+        Settings
+      </Button>
+    </div>
+  );
+
   if ((cockpit.homeQuery.isLoading || cockpit.workspaceQuery.isLoading) && !cockpit.homeData) {
     return (
-      <PageContainer width="wide" className="min-h-full">
+      <PageContainer width="wide" className="min-h-full" style={COCKPIT_PAGE_STYLE}>
         <div data-testid="cockpit-rebuilt-loading" className="flex flex-col gap-5">
           <Skeleton className="h-[68px] w-full" />
           <Skeleton className="h-[128px] w-full" />
@@ -178,7 +226,7 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
 
   if ((cockpit.homeQuery.isError || cockpit.workspaceQuery.isError) && !cockpit.homeData) {
     return (
-      <PageContainer width="wide" className="min-h-full">
+      <PageContainer width="wide" className="min-h-full" style={COCKPIT_PAGE_STYLE}>
         <PageHeader title="Cockpit" subtitle="Single-client operator command center." />
         <ErrorState
           type="data"
@@ -192,8 +240,18 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
   }
 
   return (
-    <PageContainer width="wide" className="min-h-full" gap={false}>
-      <div data-testid="cockpit-rebuilt-surface" className="flex flex-col gap-[var(--section-gap)]">
+    <PageContainer width="wide" className="min-h-full" gap={false} style={COCKPIT_PAGE_STYLE}>
+      <div data-testid="cockpit-rebuilt-surface" className="flex flex-col gap-0">
+      <RebuiltTopbarActions
+        fallback={(
+          <div data-testid="cockpit-topbar-actions-fallback" className="mb-3">
+            {topbarActions}
+          </div>
+        )}
+      >
+        {topbarActions}
+      </RebuiltTopbarActions>
+
       {checklistVisible && (
         <OnboardingChecklist
           title="Complete Cockpit setup"
@@ -208,43 +266,32 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
         />
       )}
 
-      {/* co-eye — client context / freshness line */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <div className="flex min-w-0 items-start gap-2 t-caption-sm sm:items-center">
-          <Avatar initials={workspaceInitials} label={workspaceName} size="sm" tone="teal" />
-          <div className="min-w-0">
-            <div className="truncate font-[family-name:var(--font-mono)] font-semibold tracking-[0.08em] text-[var(--teal)] sm:tracking-[0.14em]">
-              Client cockpit · {workspaceName}
-            </div>
-            <div className="text-[var(--brand-text-dim)]">Today, scoped to one</div>
-          </div>
+      {/* co-eye — compact client context; freshness/actions live in the shell toolbar. */}
+      <div
+        data-testid="cockpit-context-line"
+        className="mb-3 flex min-w-0 items-center justify-between gap-4"
+      >
+        <div className="eyebrow flex min-w-0 items-center gap-[9px] font-semibold tracking-[0.14em] text-[var(--teal)]">
+          <span className="h-[7px] w-[7px] flex-none rounded-[var(--radius-pill)] bg-[var(--teal)]" aria-hidden="true" />
+          <span className="truncate">Client cockpit · {workspaceName}</span>
         </div>
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          {/* muted-tier-ok: freshness/date is tertiary metadata (matches prototype's dim eyebrow date) */}
-          <span
-            className={`t-caption-sm ${isStale ? 'text-[var(--amber)]' : 'text-[var(--brand-text-dim)]'}`}
-            title={lastFetched ? `Data loaded at ${formatDate(lastFetched)}` : undefined}
-          >
-            {lastFetched ? `${isStale ? 'Stale · ' : ''}Data as of ${formatDate(lastFetched)}` : 'Data freshness unavailable'}
-          </span>
-          <Button variant="ghost" size="sm" icon={Clock} onClick={() => setActivityOpen(true)} aria-label="Open activity log" />
-          <Button variant="ghost" size="sm" icon={RefreshCw} onClick={handleRefresh} loading={cockpit.homeQuery.isFetching} aria-label="Refresh Cockpit data" />
-          <Button variant="secondary" size="sm" icon={Settings} onClick={() => navigate(routes.settings)}>
-            Settings
-          </Button>
-        </div>
+        <span className="eyebrow hidden flex-none normal-case tracking-[0.04em] text-[var(--brand-text-dim)] sm:inline">
+          Today, scoped to one
+        </span>
       </div>
 
       {/* co-head — verdict hero card */}
       <div
         // pr-check-disable-next-line -- brand signature radius on the verdict hero container (owner-ratified global asymmetric-on-containers, ui-parity)
-        className="rounded-[var(--radius-signature-lg)] border border-[var(--brand-border)] px-6 py-[22px]"
-        style={{ background: 'linear-gradient(135deg, var(--surface-2), color-mix(in srgb, var(--teal) 5%, var(--surface-2)))' }}
+        className="mb-[14px] min-h-[144px] overflow-hidden rounded-[var(--radius-signature-lg)] border border-[var(--brand-border)] px-6 py-[22px]"
+        style={{
+          background: 'radial-gradient(circle at 94% 18%, var(--brand-mint-glow), transparent 28%), linear-gradient(135deg, var(--surface-2), color-mix(in srgb, var(--teal) 5%, var(--surface-2)))',
+        }}
       >
-        <h1 className="t-h2 max-w-[44ch] font-bold text-[var(--brand-text-bright)]">
+        <h1 className="t-h2 max-w-[52ch] font-bold text-[var(--brand-text-bright)]">
           {cockpit.verdict?.headline ?? 'Cockpit verdict unavailable'}
         </h1>
-        <p className="t-body mt-2 max-w-[72ch] text-[var(--brand-text)]">
+        <p className="t-body mt-1.5 max-w-[72ch] text-[var(--brand-text)]">
           {cockpit.verdict?.narrative ?? 'The server has not returned a Cockpit verdict for this workspace yet.'}
         </p>
       </div>
@@ -252,6 +299,7 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
       {/* co-streams — full-width work-stream selector, sibling of the grid below */}
       <WorkStreamSelector
         ariaLabel="Cockpit work streams"
+        className="mb-[18px] [&>button]:min-h-[145px] [&>button]:py-[14px] [&>button>span:first-child]:mb-2 [&>button>span:last-child>span:nth-child(2)]:mt-1 [&>button>span:last-child>span:nth-child(3)]:mt-0.5"
         value={toSelectableWorkStream(state.stream)}
         onChange={state.setStream}
         options={[
@@ -261,6 +309,7 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
         ]}
       />
 
+      <div className="mb-[18px] flex flex-col gap-3 empty:hidden">
       {state.retiredTab === 'meeting-brief' && (
         <InlineBanner
           tone="info"
@@ -296,11 +345,13 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
           message="Refresh the aggregate workspace read before making send or close-out decisions."
         />
       )}
-
-      {cockpit.homeData?.weeklySummary && <WeeklyAccomplishments summary={cockpit.homeData.weeklySummary} />}
+      </div>
 
       {/* co-grid — main work queue + right rail */}
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.62fr)_minmax(320px,1fr)]">
+      <div
+        data-testid="cockpit-core-grid"
+        className="grid gap-[14px] xl:grid-cols-[minmax(0,1.62fr)_minmax(320px,1fr)]"
+      >
         <div className="min-w-0">
           <CockpitWorkQueue
             workQueue={workQueue}
@@ -316,7 +367,7 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
           />
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-[14px]">
           <CockpitEvidenceRail
             workspaceName={workspaceName}
             workspaceInitials={workspaceInitials}
@@ -329,6 +380,12 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
           />
         </div>
       </div>
+
+      {cockpit.homeData?.weeklySummary && (
+        <div className="mt-[14px]">
+          <WeeklyAccomplishments summary={cockpit.homeData.weeklySummary} />
+        </div>
+      )}
 
       <CockpitActivityDrawer
         open={activityOpen}

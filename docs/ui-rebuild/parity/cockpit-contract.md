@@ -2,7 +2,7 @@
 
 Surface: `home` / Cockpit  
 Owner: `workspace-command-center`  
-Status: `behavior-safe / visual-unverified`; historical calibration behavior contract accepted
+Status: `owner-approved`; Joshua approved the corrected desktop composition and documented exceptions on 2026-07-10
 Primary route: `/ws/:workspaceId`
 
 ## Prototype References
@@ -88,6 +88,11 @@ Local captures from this recovery branch:
 - Desktop send-stream after typography-role cleanup: `/tmp/asset-dashboard-codex-parity-captures/cockpit-typography-role-send-stream-desktop.png`
 - Typography smoke state: `/tmp/asset-dashboard-codex-parity-captures/cockpit-typography-role-smoke-state.json`
 - Risk receiver after the final calibrated-surface audit: `/tmp/asset-dashboard-codex-parity-captures/cockpit-risk-stream-final.png`
+- Corrected desktop overview at 1440x900: `/tmp/asset-dashboard-codex-visual-parity/batch8/cockpit/cockpit-1440-final.png`
+- Corrected desktop overview at 1600x1000: `/tmp/asset-dashboard-codex-visual-parity/batch8/cockpit/cockpit-1600-final.png`
+- Corrected mobile floor: `/tmp/asset-dashboard-codex-visual-parity/batch8/cockpit/cockpit-mobile-390.png`
+- Corrected activity Drawer: `/tmp/asset-dashboard-codex-visual-parity/batch8/cockpit/activity-drawer-1440.png`
+- Corrected work-order overlay: `/tmp/asset-dashboard-codex-visual-parity/batch8/cockpit/work-order-overlay-1440.png`
 
 Resolved smoke findings:
 
@@ -99,7 +104,7 @@ Resolved smoke findings:
 - Typography smoke found no horizontal overflow, no visible internal labels, no raw pixel text classes in the rebuilt Cockpit path, and sampled `.t-h1`, `.t-body`, `.t-ui`, and `.t-stat-sm` nodes computed at the expected styleguide sizes. Follow-up shell smoke also confirmed sidebar group headers use `.t-label`, breadcrumbs use `.t-ui`, stream-card descriptions use `.t-body`, and no substantive visible text below 13px remains outside true label/mono/initial cases. The local preview emitted websocket/auth notification noise while the backend stack was not attached; no Cockpit render failure was observed.
 - Final Risk-receiver smoke confirms all three primary stream radios are unchecked, the Risk queue chip is pressed, only Risk rows remain, and the page has no horizontal overflow.
 
-No open Cockpit smoke gaps remain for the current fixture set.
+No open Cockpit smoke gaps remain for the current fixture set. The source-led correction now matches the prototype's capped spine, context line, verdict hero, stream band, 702/434 work/evidence split, and weekly evidence order at both required desktop viewports. A fresh Sol rendered review returned `PASS`; Joshua explicitly owner-approved this composition with its documented exceptions on 2026-07-10.
 
 ## Automated Test Floor
 
