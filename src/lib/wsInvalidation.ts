@@ -21,6 +21,7 @@ function readStringField(data: unknown, field: string): string | undefined {
 function contentPipelineKeys(workspaceId: string): readonly QueryInvalidationKey[] {
   return [
     queryKeys.admin.contentPipeline(workspaceId),
+    queryKeys.admin.contentPerformanceAll(workspaceId),
     queryKeys.admin.contentCalendar(workspaceId),
     queryKeys.admin.workspaceHome(workspaceId),
     queryKeys.admin.intelligenceAll(workspaceId),
@@ -311,6 +312,7 @@ function adminInvalidationKeys(
         queryKeys.admin.keywordStrategy(workspaceId),
         queryKeys.admin.keywordCommandCenter(workspaceId),
         queryKeys.admin.posts(workspaceId),
+        queryKeys.admin.contentPerformanceAll(workspaceId),
       ] as const;
     case WS_EVENTS.OUTCOME_EXTERNAL_DETECTED:
       return [

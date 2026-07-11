@@ -238,6 +238,28 @@ describe('BrandAiSurface rebuilt cockpit', () => {
     expect(screen.getByText('Brand & AI · Acme Dental')).toBeInTheDocument();
   });
 
+  it('shows refresh success when the workspace refetch result succeeds', async () => {
+    renderSurface('/ws/ws-brand-ai/brand');
+
+    await screen.findByText('Read by every AI action');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh context' }));
+
+    expect(await screen.findByText('Brand AI data refreshed')).toBeInTheDocument();
+  });
+
+  it('reports a resolved React Query error instead of false refresh success', async () => {
+    workspaceGetByIdMock
+      .mockResolvedValueOnce(workspace)
+      .mockRejectedValueOnce(new Error('brand context unavailable'));
+    renderSurface('/ws/ws-brand-ai/brand');
+
+    await screen.findByText('Read by every AI action');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh context' }));
+
+    expect(await screen.findByText('brand context unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('Brand AI data refreshed')).not.toBeInTheDocument();
+  });
+
   it('renders the prototype grouped context layout with no modal or legacy child panel on overview', async () => {
     renderSurface('/ws/ws-brand-ai/brand');
 

@@ -11,6 +11,7 @@ export interface Workspace {
   webflowSiteName?: string;
   gscPropertyUrl?: string;
   ga4PropertyId?: string;
+  liveDomain?: string;
   folder: string;
   createdAt: string;
   tier?: 'free' | 'growth' | 'premium';

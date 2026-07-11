@@ -14,8 +14,8 @@ import {
   useWorkspaceIntelligence,
 } from '../../hooks/admin';
 import { useAdminWorkOrders } from '../../hooks/admin/useWorkOrders';
-import { adminContentPerformanceKeys } from '../../hooks/admin/useAdminContentPerformance';
 import { queryKeys } from '../../lib/queryKeys';
+import { awaitSuccessfulRefetches } from '../../lib/reactQueryRefresh';
 import { WS_EVENTS } from '../../lib/wsEvents';
 import type { FixContext } from '../../types/fix-context';
 import { ContentPipelineGuide } from '../ContentPipelineGuide';
@@ -44,6 +44,7 @@ import {
   useContentPipelineSurfaceState,
 } from './useContentPipelineSurfaceState';
 import { mutationErrorMessage } from './contentPipelineMutationFeedback';
+import { resolveLiveSiteBase } from './contentPipelineFormatters';
 
 interface ContentPipelineSurfaceProps {
   workspaceId: string;
@@ -112,7 +113,7 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
     [workspaceId, workspaces.data],
   );
   const workspaceTier = (workspace?.tier ?? 'free') as Tier;
-  const siteLabel = workspace?.gscPropertyUrl ?? workspace?.webflowSiteName ?? null;
+  const siteLabel = resolveLiveSiteBase(workspace?.liveDomain, workspace?.gscPropertyUrl);
   const contentPipeline = intelligence.data?.contentPipeline;
   const pipelineData = pipelineQuery.data as ContentPipelineData | undefined;
   const mode = modeForTab(state.tab);
@@ -155,7 +156,7 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.workOrders(workspaceId) });
-    queryClient.invalidateQueries({ queryKey: adminContentPerformanceKeys.all(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.contentPerformanceAll(workspaceId) });
   }, [queryClient, workspaceId]);
 
   useWorkspaceEvents(workspaceId, {
@@ -184,15 +185,22 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
 
   const handleRefresh = async () => {
     try {
+      const contentPerformanceKey = queryKeys.admin.contentPerformanceAll(workspaceId);
+      await queryClient.invalidateQueries({ queryKey: contentPerformanceKey, refetchType: 'none' });
       await Promise.all([
-        pipelineQuery.refetch(),
-        intelligence.refetch(),
-        briefsQuery.refetch(),
-        requestsQuery.refetch(),
-        postsQuery.refetch(),
-        suggestionsQuery.refetch(),
-        workOrdersQuery.refetch(),
-        queryClient.invalidateQueries({ queryKey: adminContentPerformanceKeys.all(workspaceId) }),
+        queryClient.refetchQueries(
+          { queryKey: contentPerformanceKey, type: 'active' },
+          { throwOnError: true },
+        ),
+        awaitSuccessfulRefetches([
+          pipelineQuery.refetch(),
+          intelligence.refetch(),
+          briefsQuery.refetch(),
+          requestsQuery.refetch(),
+          postsQuery.refetch(),
+          suggestionsQuery.refetch(),
+          workOrdersQuery.refetch(),
+        ]),
       ]);
       toast('Content Pipeline data refreshed', 'success');
     } catch (error) {

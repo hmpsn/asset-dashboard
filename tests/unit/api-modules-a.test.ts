@@ -926,17 +926,24 @@ describe('activity.publicList', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('analyticsAnnotations.list', () => {
-  it('calls getSafe with annotations endpoint for no opts', async () => {
+  it('calls the throwing admin read with the annotations endpoint for no opts', async () => {
     await analyticsAnnotations.list('ws-1');
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('/api/google/annotations/ws-1');
   });
 
   it('appends query params from opts', async () => {
     await analyticsAnnotations.list('ws-1', { category: 'launch', startDate: '2025-01-01' });
-    const [url] = mockGetSafe.mock.calls[0];
+    const [url] = mockGet.mock.calls[0];
     expect(url).toContain('category=launch');
     expect(url).toContain('startDate=2025-01-01');
+  });
+
+  it('propagates read failures instead of returning an empty authoritative list', async () => {
+    const error = new Error('annotations unavailable');
+    mockGet.mockRejectedValueOnce(error);
+
+    await expect(analyticsAnnotations.list('ws-1')).rejects.toBe(error);
   });
 });
 

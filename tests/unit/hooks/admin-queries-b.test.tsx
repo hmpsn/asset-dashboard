@@ -63,7 +63,7 @@ vi.mock('../../../src/api/analytics', () => {
   };
 });
 
-// useAdminAssets → src/api/client (get, getSafe)
+// useAdminAssets → src/api/client (get)
 vi.mock('../../../src/api/client', () => ({
   get: vi.fn(),
   getSafe: vi.fn(),
@@ -298,11 +298,11 @@ describe('useWebflowAssets', () => {
       { wrapper: makeWrapper() },
     );
     expect(result.current.isLoading).toBe(false);
-    expect(mockGetSafe).not.toHaveBeenCalled();
+    expect(mockGet).not.toHaveBeenCalled();
   });
 
   it('enters loading state when enabled', () => {
-    mockGetSafe.mockReturnValue(new Promise(() => {}));
+    mockGet.mockReturnValue(new Promise(() => {}));
     const { result } = renderHook(
       () => useWebflowAssets('site-1', 'ws-1'),
       { wrapper: makeWrapper() },
@@ -312,13 +312,35 @@ describe('useWebflowAssets', () => {
 
   it('returns array of assets when API resolves', async () => {
     const assets = [{ id: 'a1', size: 1024, contentType: 'image/png' }];
-    mockGetSafe.mockResolvedValue(assets);
+    mockGet.mockResolvedValue(assets);
     const { result } = renderHook(
       () => useWebflowAssets('site-1', 'ws-1'),
       { wrapper: makeWrapper() },
     );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.data).toEqual(assets);
+  });
+
+  it('surfaces asset read failures to the consuming error UI', async () => {
+    mockGet.mockRejectedValue(new Error('assets unavailable'));
+    const { result } = renderHook(
+      () => useWebflowAssets('site-1', 'ws-1'),
+      { wrapper: makeWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toMatchObject({ message: 'assets unavailable' });
+  });
+
+  it('treats a malformed asset payload as an error instead of an empty library', async () => {
+    mockGet.mockResolvedValue({ not: 'an array' });
+    const { result } = renderHook(
+      () => useWebflowAssets('site-1', 'ws-1'),
+      { wrapper: makeWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toMatchObject({ message: 'Asset response was not an array' });
   });
 });
 
@@ -432,6 +454,17 @@ describe('useAnalyticsAnnotations', () => {
     );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.data).toEqual(annotations);
+  });
+
+  it('exposes annotation read failures to the surface', async () => {
+    mockAnnotationsList.mockRejectedValue(new Error('annotations unavailable'));
+    const { result } = renderHook(
+      () => useAnalyticsAnnotations('ws-1'),
+      { wrapper: makeWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toMatchObject({ message: 'annotations unavailable' });
   });
 });
 

@@ -78,6 +78,15 @@ describe('useWsInvalidation registry parity (pure)', () => {
     expect(keys).toContainEqual(queryKeys.client.outcomeWins(WS_ID));
     expect(keys).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
     expect(keys).toContainEqual(queryKeys.client.intelligence(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.contentPerformanceAll(WS_ID));
+  });
+
+  it('CONTENT_PUBLISHED invalidates content performance even when its surface is not mounted', () => {
+    const keys = adminKeys(WS_EVENTS.CONTENT_PUBLISHED);
+
+    expect(keys).toContainEqual(queryKeys.admin.posts(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.contentPipeline(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.contentPerformanceAll(WS_ID));
   });
 
   it('OUTCOME_LEARNINGS_UPDATED refreshes learnings and both intelligence roots', () => {

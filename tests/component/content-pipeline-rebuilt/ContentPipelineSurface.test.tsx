@@ -60,9 +60,6 @@ vi.mock('../../../src/hooks/useWorkspaceEvents', () => ({
 }));
 
 vi.mock('../../../src/hooks/admin/useAdminContentPerformance', () => ({
-  adminContentPerformanceKeys: {
-    all: (workspaceId: string) => ['admin-content-performance', workspaceId] as const,
-  },
   useAdminContentPerformance: (...args: unknown[]) => mocks.contentPerformanceHook(...args),
   useAdminContentPerformanceTrend: (...args: unknown[]) => mocks.contentPerformanceTrendHook(...args),
   useAdminContentPerformanceRefresh: () => ({
@@ -205,6 +202,7 @@ const workspace = {
   webflowSiteId: 'site-1',
   webflowSiteName: 'acme.example',
   gscPropertyUrl: 'https://acme.example',
+  liveDomain: 'https://live.acme.example',
   tier: 'growth',
   createdAt: '2026-07-01T12:00:00.000Z',
 };
@@ -545,7 +543,7 @@ beforeEach(() => {
     data: pipelineData,
     isLoading: false,
     isFetching: false,
-    refetch: vi.fn().mockResolvedValue({ data: pipelineData }),
+    refetch: vi.fn().mockResolvedValue({ data: pipelineData, error: null }),
   });
   mocks.workspacesHook.mockReturnValue({
     data: [workspace],
@@ -556,13 +554,13 @@ beforeEach(() => {
     data: { contentPipeline: contentPipelineSlice },
     isLoading: false,
     isFetching: false,
-    refetch: vi.fn().mockResolvedValue({ data: { contentPipeline: contentPipelineSlice } }),
+    refetch: vi.fn().mockResolvedValue({ data: { contentPipeline: contentPipelineSlice }, error: null }),
   });
-  mocks.briefsHook.mockReturnValue({ data: briefs, isLoading: false, isError: false });
-  mocks.requestsHook.mockReturnValue({ data: requests, isLoading: false, isError: false });
-  mocks.postsHook.mockReturnValue({ data: posts, isLoading: false, isError: false });
-  mocks.suggestionsHook.mockReturnValue({ data: suggestions, isLoading: false, isError: false });
-  mocks.workOrdersHook.mockReturnValue({ data: workOrders, isLoading: false, isError: false });
+  mocks.briefsHook.mockReturnValue({ data: briefs, isLoading: false, isError: false, refetch: vi.fn().mockResolvedValue({ data: briefs, error: null }) });
+  mocks.requestsHook.mockReturnValue({ data: requests, isLoading: false, isError: false, refetch: vi.fn().mockResolvedValue({ data: requests, error: null }) });
+  mocks.postsHook.mockReturnValue({ data: posts, isLoading: false, isError: false, refetch: vi.fn().mockResolvedValue({ data: posts, error: null }) });
+  mocks.suggestionsHook.mockReturnValue({ data: suggestions, isLoading: false, isError: false, refetch: vi.fn().mockResolvedValue({ data: suggestions, error: null }) });
+  mocks.workOrdersHook.mockReturnValue({ data: workOrders, isLoading: false, isError: false, refetch: vi.fn().mockResolvedValue({ data: workOrders, error: null }) });
   mocks.contentPerformanceHook.mockReturnValue({
     data: publishedResponse,
     isLoading: false,
@@ -674,6 +672,47 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     expect(screen.getAllByRole('button', { name: /^Export$/i })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: /^Refresh$/i })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: /^Guide$/i })).toHaveLength(1);
+  });
+
+  it('shows success only when every manual refetch result succeeds', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline`);
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Refresh$/i }));
+
+    expect(await screen.findByText('Content Pipeline data refreshed')).toBeInTheDocument();
+  });
+
+  it('reports a resolved React Query error instead of false refresh success', async () => {
+    const error = new Error('pipeline provider unavailable');
+    mocks.contentPipelineHook.mockReturnValue({
+      data: pipelineData,
+      isLoading: false,
+      isFetching: false,
+      refetch: vi.fn().mockResolvedValue({ data: pipelineData, error }),
+    });
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline`);
+    fireEvent.click(await screen.findByRole('button', { name: /^Refresh$/i }));
+
+    expect(await screen.findByText('pipeline provider unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('Content Pipeline data refreshed')).not.toBeInTheDocument();
+  });
+
+  it('reports an active Published read failure instead of false refresh success', async () => {
+    const error = new Error('published metrics unavailable');
+    const client = createQueryClient();
+    const refetchSpy = vi.spyOn(client, 'refetchQueries').mockRejectedValueOnce(error);
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=published`, client);
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Refresh$/i }));
+
+    expect(await screen.findByText('published metrics unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('Content Pipeline data refreshed')).not.toBeInTheDocument();
+    expect(refetchSpy).toHaveBeenCalledWith(
+      { queryKey: queryKeys.admin.contentPerformanceAll(workspaceId), type: 'active' },
+      { throwOnError: true },
+    );
+    refetchSpy.mockRestore();
   });
 
   it('opens one local full-screen Brief workspace and restores focus on Escape', async () => {
@@ -850,6 +889,21 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     expect(screen.getAllByText('45,000').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Clicks').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Impressions').length).toBeGreaterThan(0);
+  });
+
+  it('opens View live against the workspace liveDomain rather than an integration label', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=published`);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open published readback for Dental implant guide' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'View live' }));
+
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://live.acme.example/dental-implants',
+      '_blank',
+      'noopener,noreferrer',
+    );
+    openSpy.mockRestore();
   });
 
   it('opens and clears a valid published item deep link without auto-selecting invalid ids', async () => {

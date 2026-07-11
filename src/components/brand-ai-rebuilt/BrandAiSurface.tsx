@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { workspaces } from '../../api';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { queryKeys } from '../../lib/queryKeys';
+import { awaitSuccessfulRefetches } from '../../lib/reactQueryRefresh';
 import { formatDate } from '../../utils/formatDates';
 import { markdownToPlainTextPreview } from '../../utils/markdownPreview';
 import type { AudiencePersona, TargetGeo } from '../../../shared/types/workspace';
@@ -1042,7 +1043,7 @@ export function BrandAiSurface({ workspaceId }: BrandAiSurfaceProps) {
 
   const handleRefresh = useCallback(async () => {
     try {
-      await workspaceQuery.refetch();
+      await awaitSuccessfulRefetches([workspaceQuery.refetch()]);
       toast('Brand AI data refreshed', 'success');
     } catch (error) {
       toast(mutationErrorMessage(error, 'Brand AI refresh failed'), 'error');
