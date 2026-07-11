@@ -13,7 +13,7 @@ This audit follows the owner-approved visual baseline. It does not revoke the or
 - Real safe-local functionality, state, invalidation, overlay, cache, AI-context, and summary-cadence defects were fixed.
 - Six high-value frontend performance wins were implemented without changing route meaning, capability homes, or settled loaded composition.
 - Seven material choices remain owner-gated because they change composition, capability grouping, time authority, AI refresh semantics, or shared design-system behavior.
-- A clean current all-project suite and an explicit bundle-budget disposition are still required; this audit is not a release-readiness claim.
+- The clean current all-project suite is complete; an explicit bundle-budget disposition is still required, so this audit is not a release-readiness claim.
 
 ## Implemented Safe Repair Wave
 
@@ -89,9 +89,9 @@ Supporting evidence completed during the audit:
 - Page Intelligence closure evidence now includes empty/detail captures at both desktop viewports plus the 390px list/detail floor. Live verification proved Back focus transfer and originating-row restoration; cached partial-data refresh has a regression test; and a fresh independent review returned `PASS`. Joshua's earlier explicit approval remains the acceptance authority.
 - live Keywords row-click verification proved one Drawer, preserved `?q=`, reference-counted body-scroll release, URL cleanup, no document overflow, and focus restoration to the originating row after Close; focused Drawer/Keywords tests and a fresh review passed.
 
-Open verification truth:
+Current verification truth:
 
-- the most recent all-project attempt covered 2,049 files / 28,733 tests but included two resource startup/import timeouts; both passed in isolation. It predates the final closure/performance commits and is not a clean current all-project pass. Run a clean current all-project suite before goal completion.
+- the clean current all-project suite passed 2,061 files and 28,817 tests, with one intentional skip and three todos. The process emitted non-failing jsdom navigation and Node listener-count warnings but no failed files or tests.
 - bundle-budget verification remains red, but Keywords now passes its entry budget. Remaining failures are CSS 37.5 KiB versus 36.4 KiB, Page Rewriter 8.7 KiB versus 8.1 KiB, and aggregate 1.75 MiB versus 1.72 MiB; 71 new assets are warn-only. Resolve surgically after owner decisions; do not blindly raise the baseline.
 - the bounded live provider smoke remains unexecuted without dedicated staging credentials and separate staging authority. Deterministic local fixtures cover workflow verification; credentials are needed only for live/staging provider proof.
 

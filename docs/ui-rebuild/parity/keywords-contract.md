@@ -158,7 +158,7 @@ Fresh Sol verdict: `PASS`. Canvas, title/KPI/lens/tool hierarchy, dense tables, 
 
 The measured registry archive adds exact 1600x1000 prototype and rebuilt evidence for Rankings, Opportunities, Pages, Clusters, Lifecycle, and the keyword detail Drawer under `/tmp/asset-dashboard-codex-visual-parity/registry-final/`; reviewed exact 1440x900 counterparts remain authoritative. Unsupported trends and period deltas remain no-fabrication exceptions.
 
-The lazy-Drawer hardening in `36a6bbd2c` moves `KeywordDrawer` behind `lazyWithRetry`/`Suspense`, retains the canonical Drawer as the loading boundary, and captures/restores the origin focus across fallback-to-loaded replacement. Focused Keywords/Drawer tests, hooks lint, typecheck, build, PR checks, live browser verification, and a fresh reviewer `PASS` support the change. Keywords now passes its route-entry bundle budget; the branch-wide bundle and full all-project suite remain separate open gates. None of this is a new owner-approval event.
+The lazy-Drawer hardening in `36a6bbd2c` moves `KeywordDrawer` behind `lazyWithRetry`/`Suspense`, retains the canonical Drawer as the loading boundary, and captures/restores the origin focus across fallback-to-loaded replacement. Focused Keywords/Drawer tests, hooks lint, typecheck, build, PR checks, live browser verification, a fresh reviewer `PASS`, and the clean current all-project suite support the change. Keywords now passes its route-entry bundle budget; the branch-wide bundle remains a separate open gate. None of this is a new owner-approval event.
 
 ## Automated Test Floor
 

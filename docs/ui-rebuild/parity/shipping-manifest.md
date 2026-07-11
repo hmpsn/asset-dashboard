@@ -106,6 +106,6 @@ The independent functionality, runtime-wiring, bug, AI-intelligence, and optimiz
 
 ## Current Verification Caveats
 
-Do not describe this stack as release-ready yet. Focused suites, hooks lint, typecheck, production build, PR checks, AI quality/reliability reports, and fixed-viewport browser smoke support the hardening wave, but the most recent all-project attempt had two resource startup/import timeouts that passed only when isolated and predates the final closure/performance commits. A clean current all-project run remains required.
+Do not describe this stack as release-ready yet. Focused suites, hooks lint, typecheck, production build, PR checks, AI quality/reliability reports, and fixed-viewport browser smoke support the hardening wave. The clean current all-project run passed 2,061 files and 28,817 tests, with one intentional skip and three todos. Owner decisions and the bundle disposition below remain required.
 
 The current bundle ratchet is also red and must receive a surgical disposition rather than a blind baseline update. Keywords now passes its entry budget; the remaining failures are CSS 37.5 KiB versus 36.4 KiB, Page Rewriter 8.7 KiB versus 8.1 KiB, and aggregate 1.75 MiB versus 1.72 MiB. Seventy-one new assets are warn-only. No push, PR, staging extraction, or baseline increase is authorized by this manifest.
