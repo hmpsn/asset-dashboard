@@ -556,6 +556,26 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES });
   });
 
+  it('composes four truthful summary cells before the lens tray and separate working tools', () => {
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    const surface = screen.getByTestId('keywords-surface');
+    const summary = within(surface).getByTestId('keywords-summary');
+    const lensTray = within(surface).getByTestId('keywords-lens-tray');
+    const tools = within(surface).getByTestId('keywords-tools');
+
+    expect(surface).toHaveClass('max-w-[1128px]');
+    expect(within(summary).getAllByTestId('keywords-summary-cell')).toHaveLength(4);
+    expect(within(summary).getByText('Total keywords')).toBeInTheDocument();
+    expect(within(summary).getByText('Rank tracked')).toBeInTheDocument();
+    expect(within(summary).getByText('Needs review')).toBeInTheDocument();
+    expect(within(summary).getByText('Monthly value')).toBeInTheDocument();
+    expect(summary.compareDocumentPosition(lensTray) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(lensTray.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(tools).getByRole('searchbox')).toBeInTheDocument();
+    expect(within(tools).getByLabelText('Advanced keyword filter')).toBeInTheDocument();
+  });
+
   it('renders keyword rows, provenance, opportunity, and money empty states without fabricating dollars', () => {
     renderSurface('/ws/ws-1/seo-keywords');
 
@@ -623,7 +643,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
 
     expect(screen.getByText('Client keyword feedback')).toBeInTheDocument();
     expect(screen.getByText('dental implants')).toHaveClass('t-ui');
-    expect(screen.getByText('Client wants this service prioritized.')).toHaveClass('t-body');
+    expect(screen.getByText('Client wants this service prioritized.')).toHaveClass('t-caption-sm');
     expect(screen.getByText(/Clicks & impressions:/)).toHaveClass('t-body');
     fireEvent.click(screen.getAllByRole('button', { name: 'Add to strategy' }).at(-1)!);
     expect(rowActionMutateMock).toHaveBeenCalledWith(
@@ -675,6 +695,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     fireEvent.click(screen.getAllByText('cosmetic dentistry')[0]);
 
     const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveStyle({ width: '440px' });
     expect(within(dialog).getByRole('heading', { name: 'cosmetic dentistry' })).toBeInTheDocument();
     expect(within(dialog).getByText('#14 → #6 · Win · 30d')).toBeInTheDocument();
     expect(within(dialog).getByText('Why this score')).toBeInTheDocument();

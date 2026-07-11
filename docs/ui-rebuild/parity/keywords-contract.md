@@ -2,7 +2,7 @@
 
 Surface: `seo-keywords` / Keywords  
 Owner: keyword lifecycle / rank intelligence  
-Status: `behavior-safe / visual-unverified` after pilot contract pass; exact KPI/trend polish remains deferred
+Status: `owner-approved`; Joshua approved the corrected keyword-workbench composition and documented no-fabrication exceptions on 2026-07-10
 Primary route: `/ws/:workspaceId/seo-keywords`
 
 ## Prototype References
@@ -40,7 +40,15 @@ Prototype-critical behavior:
 
 ## Current Parity Grade
 
-Visual status: `behavior-safe / visual-unverified`.
+Visual status: `owner-approved`.
+
+Source-led correction result, 2026-07-10:
+
+- The live Rinse surface now uses the prototype's stable left-aligned 1128px canvas at both desktop viewports, 23px page title, truthful four-KPI strip, fit-content five-lens tray, separate tool band, and dense working set.
+- Rankings and Opportunities keep all production columns within the desktop canvas; Pages and Clusters use compact honest grouping; Lifecycle is bounded to a five-column internal-scroll board rather than growing the page unbounded.
+- The 440px detail Drawer preserves `?q=` initialization and production actions/evidence. Data metrics use the DS blue semantics while actions remain teal.
+- Prototype-only row sparklines, period deltas, average position, and full-universe grouping remain explicit no-fabrication exceptions until server-owned read models exist.
+- Exact 1440x900, 1600x1000, all five lenses, Drawer, and mobile evidence passed fresh Sol review with `PASS`; Joshua explicitly owner-approved the composition and no-fabrication exceptions on 2026-07-10.
 
 Why:
 
@@ -133,6 +141,19 @@ Result:
 - No console errors or failed local 400/500 responses.
 - Mobile title is visible after the header wrapping fix.
 - Browser smoke captures Rankings plus a row-click detail drawer with live measurement context at `.t-body`, no internal labels, and no horizontal overflow. Component tests cover the optional client feedback, live SERP proof, top local-result evidence, and local visibility explanation role samples because the populated browser row selected for smoke did not include those optional evidence slices.
+
+Source-led final evidence:
+
+- Prototype: `/tmp/asset-dashboard-codex-visual-parity/batch7/prototype/keywords-rankings-1440.png`, `keywords-rankings-1600.png`, `keywords-opportunities-1440.png`, `keywords-pages-1440.png`, `keywords-clusters-1440.png`, `keywords-lifecycle-1440.png`, and `keywords-drawer-1440.png`.
+- Corrected: `/tmp/asset-dashboard-codex-visual-parity/batch7/keywords-rankings-1440-final.png`, `keywords-rankings-1600-final.png`, `keywords-opportunities-1440-final.png`, `keywords-pages-1440-final.png`, `keywords-clusters-1440-final.png`, `keywords-lifecycle-1440-final.png`, and `keywords-drawer-1440-final.png`.
+- Local evidence interior: `/tmp/asset-dashboard-codex-visual-parity/batch7/keywords-local-drawer-1440.png`.
+- Mobile floor: `/tmp/asset-dashboard-codex-visual-parity/batch7/keywords-rankings-mobile-390.png`.
+
+Fresh Sol verdict: `PASS`. Canvas, title/KPI/lens/tool hierarchy, dense tables, grouped modes, bounded Lifecycle board, Drawer, URL state, protected actions, evidence, and client feedback remain truthful and reachable without overflow.
+
+## Registry Closeout Evidence
+
+The measured registry archive adds exact 1600x1000 prototype and rebuilt evidence for Rankings, Opportunities, Pages, Clusters, Lifecycle, and the keyword detail Drawer under `/tmp/asset-dashboard-codex-visual-parity/registry-final/`; reviewed exact 1440x900 counterparts remain authoritative. Unsupported trends and period deltas remain no-fabrication exceptions.
 
 ## Automated Test Floor
 

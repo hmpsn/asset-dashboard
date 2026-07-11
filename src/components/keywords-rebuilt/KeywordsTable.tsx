@@ -225,7 +225,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     {
       key: 'select',
       label: 'Select',
-      width: '52px',
+      width: '44px',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
         return (
@@ -246,7 +246,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     {
       key: 'keyword',
       label: 'Keyword',
-      width: 'minmax(220px, 1.8fr)',
+      width: 'minmax(190px, 1.6fr)',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
         return (
@@ -262,7 +262,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     {
       key: 'intent',
       label: 'Intent',
-      width: '118px',
+      width: '88px',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
         const intent = asIntent(row.metrics.intent);
@@ -272,7 +272,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     {
       key: 'rank',
       label: 'Rank',
-      width: '92px',
+      width: '52px',
       align: 'right',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
@@ -282,7 +282,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     {
       key: 'clicks',
       label: 'Clicks',
-      width: '92px',
+      width: '58px',
       align: 'right',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
@@ -292,7 +292,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     {
       key: 'volume',
       label: 'Volume',
-      width: '104px',
+      width: '68px',
       align: 'right',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
@@ -302,19 +302,19 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     {
       key: 'opportunity',
       label: 'Opp',
-      width: '148px',
+      width: '108px',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
         const score = row.opportunityScore;
         return typeof score === 'number'
-          ? <Meter value={score} showValue ariaLabel={`${row.keyword} opportunity score`} gradient />
+          ? <Meter value={score} showValue color="var(--blue)" ariaLabel={`${row.keyword} opportunity score`} />
           : <span className="t-caption-sm text-[var(--brand-text-muted)]">—</span>;
       },
     },
     {
       key: 'difficulty',
       label: 'KD',
-      width: '76px',
+      width: '44px',
       align: 'right',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
@@ -324,7 +324,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     {
       key: 'currentMonthly',
       label: '$',
-      width: '92px',
+      width: '64px',
       align: 'right',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
@@ -334,7 +334,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     {
       key: 'lifecycleStatus',
       label: 'Lifecycle',
-      width: 'minmax(220px, 1.2fr)',
+      width: 'minmax(128px, 0.9fr)',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
         return (
@@ -352,7 +352,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     {
       key: 'local',
       label: 'Local',
-      width: 'minmax(150px, 0.9fr)',
+      width: 'minmax(112px, 0.8fr)',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
         if (!row.localSeoState) {
@@ -376,7 +376,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     {
       key: 'select',
       label: 'Select',
-      width: '52px',
+      width: '44px',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
         return (
@@ -410,7 +410,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     {
       key: 'intent',
       label: 'Intent',
-      width: '118px',
+      width: '88px',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
         const intent = asIntent(row.metrics.intent);
@@ -420,24 +420,24 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     {
       key: 'opportunity',
       label: 'Opp',
-      width: 'minmax(150px, 1fr)',
+      width: 'minmax(135px, 1fr)',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
         const score = row.opportunityScore;
         return typeof score === 'number'
-          ? <Meter value={score} showValue ariaLabel={`${row.keyword} opportunity score`} gradient />
+          ? <Meter value={score} showValue color="var(--blue)" ariaLabel={`${row.keyword} opportunity score`} />
           : <span className="t-caption-sm text-[var(--brand-text-muted)]">—</span>;
       },
     },
     {
       key: 'upside',
       label: 'Est. gain',
-      width: '104px',
+      width: '90px',
       align: 'right',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
         return typeof row.upsideMonthly === 'number'
-          ? <span className="tabular-nums font-semibold text-[var(--emerald)]">{formatUpside(row.upsideMonthly)}</span>
+          ? <span className="tabular-nums font-semibold text-[var(--blue)]">{formatUpside(row.upsideMonthly)}</span>
           : <span className="t-caption-sm text-[var(--brand-text-muted)]">—</span>;
       },
     },
@@ -458,8 +458,8 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
   const activeColumns = state.lens === 'opportunities' ? opportunityColumns : columns;
 
   return (
-    <div className="flex flex-col gap-3">
-      <Toolbar label="Keyword table controls" className="w-full">
+    <div className="flex flex-col gap-2">
+      <Toolbar label="Keyword table controls" className="w-full" gap={6}>
         {/* Leading "Sort" label so this chip row is not mistaken for the status FilterChip
             row above it — same primitive, different axis (sort vs filter). The active chip
             shows its direction as an arrow rather than raw "asc"/"desc" enum text. */}
@@ -472,6 +472,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
               key={control.key}
               label={`${control.label}${arrow}`}
               active={isActive}
+              className="!px-[9px] !py-1"
               onClick={() => state.setSort(control.key)}
             />
           );
@@ -487,7 +488,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
         </span>
       </Toolbar>
 
-      <p className="t-body text-[var(--brand-text-muted)]">
+      <p className="t-body !text-[11.5px] !leading-[1.4] text-[var(--brand-text-muted)]">
         Clicks &amp; impressions: last {GSC_METRIC_WINDOW_DAYS} days. Rank: {GSC_METRIC_WINDOW_DAYS}-day average. Volume: provider estimate.
       </p>
 
@@ -565,6 +566,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
         getRowKey={(record) => (record as KeywordsTableRecord).source.normalizedKeyword}
         onRowClick={(record) => state.openKeyword((record as KeywordsTableRecord).source.keyword)}
         empty={emptyState}
+        className="[&>[role=row]]:!gap-2 [&>[role=row]]:!px-4 [&>[role=row]:first-child]:!h-[38px] [&>[role=row]:first-child]:!py-0 [&>[role=row]:not(:first-child)]:!min-h-14 [&>[role=row]:not(:first-child)]:!py-2"
       />
 
       {pageInfo && pageInfo.totalPages > 1 && (

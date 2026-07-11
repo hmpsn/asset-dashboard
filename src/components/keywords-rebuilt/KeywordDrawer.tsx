@@ -233,7 +233,7 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
         title={row?.keyword ?? keyword ?? 'Keyword details'}
         subtitle={row?.assignment?.pageTitle ?? row?.assignment?.pagePath ?? 'Keyword detail'}
         eyebrow="Keyword detail"
-        width={520}
+        width={440}
         footer={row && (
           <Toolbar label="Keyword detail actions" className="w-full">
             {row.nextActions.map((action) => (
@@ -294,16 +294,16 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
             )}
 
             <div className="grid gap-3 sm:grid-cols-3">
-              <MetricTile label="Rank" value={numberOrEmpty(row.metrics.currentPosition, '#')} accent="var(--blue)" />
-              <MetricTile label="Opportunity" value={numberOrEmpty(row.opportunityScore)} accent="var(--teal)" />
-              <MetricTile label="Difficulty" value={numberOrEmpty(row.metrics.difficulty)} accent="var(--amber)" />
+              <MetricTile label="Rank" value={numberOrEmpty(row.metrics.currentPosition, '#')} accent="var(--blue)" className="!min-w-0" />
+              <MetricTile label="Opportunity" value={numberOrEmpty(row.opportunityScore)} accent="var(--blue)" className="!min-w-0" />
+              <MetricTile label="Difficulty" value={numberOrEmpty(row.metrics.difficulty)} accent="var(--amber)" className="!min-w-0" />
             </div>
 
             {detail.data?.outcome && <OutcomeReadbackChip outcome={detail.data.outcome} />}
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <MetricTile label="Value Today" value={money(row.currentMonthly)} sub="Est. monthly value" accent="var(--emerald)" />
-              <MetricTile label="Upside" value={money(row.upsideMonthly)} sub="Est. potential gain" accent="var(--emerald)" />
+              <MetricTile label="Value Today" value={money(row.currentMonthly)} sub="Est. monthly value" accent="var(--blue)" className="!min-w-0" />
+              <MetricTile label="Upside" value={money(row.upsideMonthly)} sub="Est. potential gain" accent="var(--blue)" className="!min-w-0" />
             </div>
 
             <DefinitionList items={detailItems(row)} />
