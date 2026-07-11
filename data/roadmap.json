@@ -50,6 +50,18 @@
           "completedAt": "2026-07-10",
           "owner": "brand-engine",
           "notes": "Completed 2026-07-10 in codex/ui-visual-parity. V1-V7 restore the source-led grouped cockpit, truthful configured-input evidence, all 17 generators exactly once in the 7/2/5/3 group mapping, focused Identity and Brandscript receivers, the owner-approved 680px workflow Modal, truthful production interiors/actions, and explicit data/typography exceptions. Final 1440x900, 1600x1000, workflow, focus, library, error-fallback, and 390x844 evidence is in /tmp/asset-dashboard-codex-visual-parity/brand-ai/final-v1-v7/. Ten focused suites pass 218 tests; hooks lint, typecheck, Vite build, pr-check, diff hygiene, and a fresh Sol rendered review pass. Joshua reviewed the live surface and said, ‘It looks great. I'd like you to continue rolling through our parity pass, and I'll provide the finer feedback once we've wrapped everything.’ Status: owner-approved; finer feedback is deferred to the registry-wide review."
+        },
+        {
+          "id": "ui-rebuild-registry-owner-visual-parity",
+          "title": "Owner-approved desktop visual parity for every mounted rebuilt route home",
+          "source": "docs/ui-rebuild/parity/registry-final-owner-review.md",
+          "est": "phased",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-10",
+          "completedAt": "2026-07-10",
+          "owner": "workspace-command-center",
+          "notes": "Completed 2026-07-10 in codex/ui-visual-parity. Joshua approved the final 24-route batch with all documented production/data/backend exceptions and retained the Page Rewriter 62px Focus rail. Together with Insights Engine and Brand & AI, all 26 REBUILT_SURFACES route homes are owner-approved. The source-led pass covers Cockpit, Content Pipeline, SEO Editor, Search & Traffic, Asset Manager, Performance, Site Audit, Schema, Links, Competitors, Keyword Hub, Page Rewriter, Local Presence, and all 11 Global Ops route homes at 1440x900 and 1600x1000 while preserving ui-rebuild-shell, route/deep-link contracts, aliases, and exact-once capability homes. Final focused verification passes 291 tests across 22 files plus hooks lint, typecheck, Vite build, deferred-ledger verification, pr-check, diff hygiene, clean browser reload, and fresh final Sol PASS. Evidence: /tmp/asset-dashboard-codex-visual-parity/registry-final/. This is owner-approved visual parity in the isolated branch, not staging or production shipment; staging extraction remains separately pending and unauthorized."
         }
       ]
     },

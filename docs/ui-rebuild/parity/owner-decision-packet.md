@@ -44,7 +44,7 @@ Global Ops sub-decisions accepted 2026-07-09:
 | `GO-007` | Keep client onboarding out of Global Ops; retain admin enable/reset only until the client-portal phase. | Revisit with the client-portal contract. |
 | `GO-008` | Keep temporary LLMs.txt access in Workspace Settings until the AI Visibility receiver is verified. | Revisit after the receiving route, deep link, and capability smoke pass. |
 
-Behavior-safe defaults also accepted: keep Schema detail in the Drawer, keep Links on copy/send until an insert target exists, keep the current Performance detail workflow until the Asset Manager handoff is proven, and defer Keyword Hub trend/KPI visuals until server-owned read models exist. These defaults remain `behavior-safe / visual-unverified` until their turn in the current visual-parity sequence.
+Behavior-safe defaults also accepted: keep Schema detail in the Drawer, keep Links on copy/send until an insert target exists, keep the current Performance detail workflow until the Asset Manager handoff is proven, and defer Keyword Hub trend/KPI visuals until server-owned read models exist. Schema, Links, Performance, and Keyword Hub completed source-led correction and were owner-approved with those explicit exceptions on 2026-07-10.
 
 ## Accepted Behavior-Checkpoint Implementation Order
 
@@ -157,7 +157,24 @@ Risk if wrong: choosing A without enough workflow proof could hide or confuse br
 
 Implementation guardrail: build the board overview first. Keep legacy receivers reachable and do not imply subscription-drawer or Brief/Draft behavior that is not wired in the current slice.
 
-Implementation log, 2026-07-09: the first phase is complete. Bare/default and `briefs` now open the aggregate lifecycle Board; Intake expands in place; Calendar, Published, Content Health, and Matrix remain peer modes; existing Briefs/Posts/capacity workflows launch exact once. Browser smoke preserved aliases, post/fix-context behavior, Guide, and clean console/overflow. An independent review found that zero-count Brief/Draft columns could strand their workspaces and that some Board copy exposed implementation framing; persistent launch cards, one shared Briefs opener, and operator-facing copy corrected both findings. A fresh independent behavior-checkpoint review returned `PASS`. Full item workspaces and capacity Drawer remain deferred; visual status remains `behavior-safe / visual-unverified`.
+Behavior-checkpoint log, 2026-07-09: the first phase opened the aggregate lifecycle Board, expanded Intake in place, preserved peer modes and exact-once receivers, and passed independent behavior review. Full item workspaces and the capacity Drawer were still deferred at that checkpoint; its status was `behavior-safe / visual-unverified`.
+
+Source-led baseline, 2026-07-10 — starting status: `visual revision in progress`. Direct prototype/current measurement at 1440×900 and 1600×1000 confirmed the remaining mismatch was structural: the rebuilt 1600px canvas expanded to 1316px instead of the prototype's capped 1188px, five KPI tiles displaced item work, and the four columns showed aggregate launchers despite the real owner workspace having seven briefs and three posts.
+
+Recommended visual/production resolutions for the registry-wide owner review:
+
+| ID | Resolution used for this pass | Reason |
+|---|---|---|
+| `ODP-002-V1` | Compact the page header; host Export, Refresh, and Guide exact-once in rebuilt chrome with an isolated fallback; keep capacity and modes together. | Matches the prototype hierarchy without hiding actions. |
+| `ODP-002-V2` | Derive item stages from existing requests, briefs, and posts, deduplicating linked artifacts; do not add a persisted lifecycle field. | Existing reads are sufficient and `DEF-content-pipeline-007` already records the backend limitation. |
+| `ODP-002-V3` | Keep Brief focus local and open one real `ContentBriefs` editor in a full-screen shell; do not add `?brief=`. | Avoids a new route contract while making the Board item-backed. |
+| `ODP-002-V4` | Preserve `?post=` and open the selected real `ContentManager`/Post editor in the full-screen Draft/Review shell. | Maintains the existing deep-link and production action contract. |
+| `ODP-002-V5` | Retain Matrix as a fifth production mode and preserve the broader production Calendar controls. | The prototype source states Matrix belongs to the architecture but accidentally omits its button; removing either capability would be destructive. |
+| `ODP-002-V6` | Omit or relabel unsupported prototype actions: no simulated Queue refresh, Add to Insights, per-field AI assists, questionnaire, generation theater, reminder, or Matrix bulk generation. | These require new backend/operation contracts and must remain honest exceptions. |
+
+Joshua explicitly asked Codex to continue through the parity sequence and defer finer feedback until the registry-wide review. These are therefore implementation defaults for the current reversible frontend pass, not silent owner approval.
+
+Implementation result, 2026-07-10 — status: `owner-approved`. ODP-002-V1 through V6 are implemented as recommended. The owner fixture now renders a capped item-backed Board with separate Intake, blank/filled Brief, Draft, and Review three-rail workspaces, compact secondary modes, and a 440px capacity Drawer. Board-opened posts return to the Board; explicit legacy post links retain their receiver. Corrected 1440×900, 1600×1000, overlay, and mobile evidence under `/tmp/asset-dashboard-codex-visual-parity/content-pipeline/final-pass2/` passed fresh Sol review with no safe-local defects. Joshua approved the surface with its documented exceptions.
 
 ### ODP-003 SEO Editor Workbench And Review Queue
 
@@ -178,7 +195,19 @@ Risk if wrong: implementing the full queue/workbench too quickly could change ho
 
 Implementation guardrail: limit the first slice to source grouping and selected-row actions. Do not add mock review queue affordances or change write semantics.
 
-Implementation log, 2026-07-09: Static, CMS, and Manual targets now render in explicit groups while continuing to feed the existing single selected-action region. The 503-row fixture resolved to 21/217/265 rows, one Research Drawer, and clean console/overflow. No inline edit, Approve, Publish, AI-fix, or review-queue semantics were introduced; both independent behavior-checkpoint reviews found no SEO Editor defect, and the final reviewer returned `PASS`. Visual status remains `behavior-safe / visual-unverified`.
+Behavior-checkpoint log, 2026-07-09: Static, CMS, and Manual targets rendered in explicit groups while continuing to feed the existing selected-action region. That slice introduced no inline edit, Approve, Publish, AI-fix, or review-queue semantics and passed independent behavior review; its status was `behavior-safe / visual-unverified`.
+
+Source-led visual result, 2026-07-10 — status: `owner-approved`. The actual mounted prototype uses its full-width worktable by default; the apparent Edit/Research lens is dead source and was not treated as visible authority. The corrected Estateably fixture resolves 25 Static, 217 CMS, and 265 Manual targets into one sheet with inline Static/CMS title/meta fields, amber read-only Manual rows, compact source/collection/quick filters, mutually exclusive missing/selected bands, truthful leading source checkboxes, and a Research Drawer at 600px/860px. Existing URL state, save/send/publish authority, Keyword Hub handoff, and Page Intelligence route are preserved. H1/slug remain read-only, and the unsupported keyboard review queue is explicitly deferred. Corrected evidence under `/tmp/asset-dashboard-codex-visual-parity/seo-editor/pass1/` passed fresh Sol review with no safe-local defects. Joshua approved the surface with that workflow exception.
+
+Recommendations carried into the registry-wide owner review:
+
+| ID | Resolution used for this pass | Reason |
+|---|---|---|
+| `ODP-003-V1` | Keep all existing URL aliases but show the mounted prototype's sheet as the sole default composition. | Preserves deep links without rendering dead prototype controls. |
+| `ODP-003-V2` | Keep Save SEO and Publish Site as separate production capabilities. | They write at different scopes and cannot be visually merged without changing meaning. |
+| `ODP-003-V3` | Keep H1/slug read-only until writable fields exist. | Avoids simulating unsupported writes. |
+| `ODP-003-V4` | Keep keyword assignment in Keyword Hub and Page Intelligence standalone. | Avoids duplicate capability homes and premature route retirement. |
+| `ODP-003-V5` | Defer the keyboard review queue. | Current callbacks do not support the prototype's Approve/Request changes workflow truthfully. |
 
 ### ODP-004 Site Audit Diagnostic Lens Demotion
 
@@ -201,6 +230,8 @@ Implementation guardrail: preserve every diagnostic receiver and capability whil
 
 Implementation log, 2026-07-09: only Site Audit and History remain visible peers. AI Search Ready, Content Health, and Audit Guide are exact-once disclosures after Core Web Vitals, and their `?sub=` URLs open the intended evidence while retaining the audit body. The first independent review found that audit progress temporarily hid compatibility evidence; progress and evidence now render together, with a dedicated running-state regression test. The Rinse fixture passed overview, AEO receiver, History, and Schedule smoke without mutations, and a fresh independent behavior-checkpoint review returned `PASS`; visual status remains `behavior-safe / visual-unverified`.
 
+Source-led visual result, 2026-07-10 — status: `owner-approved`. The 1120px console now matches the prototype's compact context/two-peer tray, horizontal score hero, 3x2 category order, single CWV strip, utility row, bulk repair, Broken Links, and dense issue hierarchy. Bare Audit preserves that first-viewport spine by keeping collapsed compatibility support below issues; `?sub=aeo-review|content-decay|guide` instead opens the same exact-once support group immediately after CWV, so deep-link meaning is unchanged. Compact History replaces the oversized legacy composition. Issue, schedule, export/share, and report workflows remain richer production overlays. Exact 1440x900 and 1600x1000 evidence under `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/site-audit/` passed fresh Sol review with `PASS`. Joshua approved the composition and production-overlay exceptions.
+
 ### ODP-005 Analytics Hub Default Report
 
 Surface: `analytics-hub` / Search & Traffic
@@ -222,6 +253,8 @@ Implementation guardrail: give Demand mix and Priority insights tested receiving
 
 Final audit log, 2026-07-09: the first receiving-home implementation passed with populated GSC data but dropped the lower band in unconfigured and empty/error GSC states, and a surface-wide provider gate also hid provider-independent Annotations. The accepted correction handles availability per report, retains one truthful Demand mix / Priority insights band for degraded Search states, keeps Annotations available without analytics providers, and uses blue for branded read-only data. This resolves the `ODP-005` capability-home review without restoring Overview as a peer.
 
+Source-led visual result, 2026-07-10 — status: `owner-approved`. The corrected report uses the prototype's 1120px border-box canvas, compact three-mode tray, compact primary ranges, narrative-first heading, and source-specific section order. Search now reads KPI evidence → trend → Movement → Detail → monitoring; Traffic reads KPI evidence → trend → Acquisition → Engagement → Conversion → monitoring; Annotations reads contextual trend → editable timeline. Extra production ranges remain under More, Re-scan remains exact-once, Breakdown detail remains in the shared Drawer, and annotation CRUD stays intact. The unsupported proof-stage action and unavailable live GSC/GA4 data were not simulated; truthful unavailable states and fixture-backed populated ordering are recorded instead. Corrected evidence under `/tmp/asset-dashboard-codex-visual-parity/search-traffic/pass1/` passed fresh Sol review with `PASS`. Joshua approved the composition and truthful unavailable states.
+
 ### ODP-006 Media Single Workshop
 
 Surface: `media` / Assets
@@ -241,7 +274,9 @@ Risk if wrong: collapsing too early may obscure audit and upload workflows; keep
 
 Implementation guardrail: phase the workshop and prove Upload, Audit, delete, detail, and repair handoffs before removing their compatibility receivers.
 
-Final audit log, 2026-07-09: the `ODP-006` discoverability trigger fired because Repair results was appended after the complete asset grid. Owner judgment is now locked: Repair results stays above filters, metrics, and the grid as the first work area while Browse remains visible below. The same correction adds the prototype-visible All and Total media weight controls, uses blue for savings estimates, and gives a valid asset deep link precedence over Upload so combined params never mount two Drawers. Browser smoke proved the repair-first order and canonical close behavior; peer tabs remain removed.
+Final audit log, 2026-07-09: the `ODP-006` discoverability trigger fired because Repair results was appended after the complete asset grid. The behavior-checkpoint resolution moved Repair ahead of filters and the grid while Browse remained visible below. The later source-led visual pass refined that placement to follow the prototype summary/proof bands and precede Browse controls/grid, so repair remains discoverable without displacing first-viewport evidence. The correction also adds the prototype-visible All and Total media weight controls, uses blue for savings estimates, and gives a valid asset deep link precedence over Upload so combined params never mount two Drawers. Browser smoke proved the order and canonical close behavior; peer tabs remain removed.
+
+Source-led visual result, 2026-07-10 — status: `owner-approved`. The final 1180px workshop restores the prototype's four-metric summary, source-proof band, compact controls, fixed 132px card previews, red No alt / neutral Unused semantics, and two labeled contextual card actions. The prior repair-first decision is preserved as the first actionable workspace after the summary/proof bands and before Browse controls/grid; this visual qualification keeps repair discoverable without displacing the prototype's orientation evidence. Upload, Asset Detail, organize, confirmation, and progress remain production Drawers with exact overlay precedence. Evidence under `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/asset/` passed fresh Sol review with `PASS`. Joshua approved the composition and Drawer exceptions.
 
 ## Capability Decisions
 
@@ -264,6 +299,8 @@ Risk if wrong: adding Page Rewriter-only focus behavior forks shell UX; showing 
 
 Implementation guardrail: solve focus mode at the rebuilt shell boundary; keep the Page Rewriter export-only and do not introduce draft/publish controls.
 
+Source-led visual result, 2026-07-10 — status: `owner-approved`. The corrected capped workspace restores the prototype's compact context/picker, 44/56 chat-document split, fixed pane headers, seeded transcript, contained two-row playbooks, compact composer, `Live document` hierarchy, formatter/evidence order, independently scrolling document, and honest export-only footer. Loaded, empty, picker, export, Focus, and mobile evidence under `/tmp/asset-dashboard-codex-visual-parity/batch9/page-rewriter/` passed fresh Sol review with `PASS`; route/deep-link and exact-once homes remain intact. Joshua approved retaining the shared shell's 62px collapsed rail in Focus; Save draft / Publish remain deferred behind the separate backend write spine.
+
 ### ODP-008 Local Presence Data-Backed Parity
 
 Surface: `local-seo` / Local Presence
@@ -282,6 +319,8 @@ Recommendation: choose A unless those data sources are now in scope. The visible
 Risk if wrong: fabricating unavailable metrics would damage trust; blocking v1 on backend parity may slow the broader UI recovery.
 
 Implementation guardrail: continue rank/profile and reviews polish using real data only. Do not synthesize the prototype grid or performance numbers client-side.
+
+Implementation log, 2026-07-10: the source-led frontend pass retains `ODP-008 A` and replaces the nested legacy visibility wrapper with its full protected capability set exactly once. The corrected 1120px spine uses compact context/actions, the prototype's two-mode tray, one truthful profile hero, a 706/340 visibility/profile-health split, share-of-voice controls/table, one graduation note, and a 560px setup Drawer. Unknown posture is neutral, health icons use key-specific predicates, and the Drawer footer keeps its note above one desktop action row. No geo-grid nodes, GBP Performance metrics, profile completeness, rating, reviews, or review pipeline data are fabricated; live Reviews remains an honest unavailable-connection state while populated lifecycle coverage stays fixture-backed. Fresh Sol review returned `PASS` after both desktop viewports, setup, Reviews, computed overflow, and the mobile regression floor were inspected. Status is `owner-approved`; Joshua approved the truthful unavailable states and backend exceptions.
 
 ### ODP-009 Global Ops Route-Family Decisions
 
@@ -304,6 +343,8 @@ Implementation guardrail: keep route receiver polish, operator copy cleanup, and
 
 Implementation log, 2026-07-09: the final calibrated-surface audit enforced the accepted boundary rather than expanding it. Requests no longer advertises a future strategy handoff; Outcomes Book removed React-created portfolio totals and keeps server-owned workspace rows/coverage only; global rebuilt routes now mount even when the account has zero workspaces. `GO-004` remains open only for a future server-owned portfolio rollup.
 
+Visual completion log, 2026-07-10 — status: `owner-approved`. Fresh review returned `PASS` for Settings; Workspace Settings; Roadmap; Revenue / AI Usage / Features / Prospects; Outcomes Book and per-workspace Outcomes; Diagnostics; and Requests. Workspace Settings now restores the prototype identity header and compact rhythm around the preserved production tabs/operations. Roadmap now omits verbose nonnumeric capacity prose and restores a stable six-column Backlog scan. Final fixed-viewport evidence is under `/tmp/asset-dashboard-codex-visual-parity/batch8/global/`. Joshua approved all 11 route homes with `GO-001` through `GO-008` retained as explicit exceptions.
+
 ## Design System Decisions
 
 ### ODP-010 Rebuilt Page-Header Typography Scale
@@ -311,9 +352,9 @@ Implementation log, 2026-07-09: the final calibrated-surface audit enforced the 
 Surface family: all rebuilt admin surfaces
 Contract: `DESIGN_SYSTEM.md` PageHeader, `docs/ui-rebuild/parity/README.md` Typography Calibration
 
-Accepted decision: **C as a rebuilt-admin variant pilot**; the Performance pilot is implemented, and the side-by-side evidence gate remains required before broad migration.
+Accepted decision: **C as a rebuilt-admin variant pilot**; the side-by-side evidence gate is now complete for Performance, and no broad migration is authorized.
 
-Current finding: the compact default remains styleguide-compliant at `.t-h2` / 22px plus `.t-caption-sm` / 13.5px. The opt-in Performance pilot renders a semantic `h2` at `.t-h1` / 28px and its subtitle at `.t-body` / 15.5px with natural wrapping. In-browser computed evidence shows no horizontal overflow or fresh console errors; a visual side-by-side still decides whether other rebuilt surfaces adopt it.
+Current finding: the source-led Performance comparison showed the 28px pilot was too tall for the prototype's 23px hierarchy and first-viewport density. Performance now uses the shared compact `.t-h2` / 22px header. The opt-in variant remains available but is not adopted by another surface.
 
 Options:
 
@@ -321,11 +362,21 @@ Options:
 - B. Change the default `PageHeader` title/subtitle scale app-wide to match the prototype more closely.
 - C. Recommended if the prototype truly needs stronger hierarchy: add an approved rebuilt-admin/header variant that uses `.t-h1` for page titles and body-scale subtitle/context copy, then migrate rebuilt surfaces intentionally.
 
-Recommendation: keep the Performance pilot, review it beside the prototype, and migrate no additional surfaces until that evidence confirms the stronger hierarchy improves orientation without harming density.
+Recommendation: keep the shared compact header as the default, make no broader migration, and require a surface-specific prototype comparison before any future rebuilt-admin adoption.
 
 Risk if wrong: choosing B can make legacy admin pages unexpectedly oversized; choosing A may leave rebuilt pages technically compliant but still visually underpowered; one-off per-surface overrides would reintroduce typography drift.
 
 Implementation guardrail: pilot a rebuilt-admin variant only, keep the token parity test and computed-size checks, and require side-by-side browser evidence before migrating surfaces. Do not change the default `PageHeader` primitive.
+
+Performance visual result, 2026-07-10 — status: `owner-approved`. The exact 1080px canvas uses the compact header, metrics-first Page Weight composition, dense non-duplicated rows, paired selected-page Mobile/Desktop PageSpeed cards, isolated Single/Bulk bodies, and Top-N only in Bulk. Weight and bulk detail Drawers, the secondary Bulk workflow, full provider evidence, and the no-fabricated-row-fix boundary remain explicit production exceptions. Swish provides real Page Weight evidence but no current PageSpeed snapshots; the empty state was captured truthfully and populated order remains fixture-covered. Evidence under `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/performance/` passed fresh Sol review with `PASS`. Joshua approved the composition and truthful empty state.
+
+### Cockpit Visual Result
+
+Source-led result, 2026-07-10 — status: `owner-approved`.
+
+The corrected Cockpit uses the prototype's capped 1168px spine, compact workspace context and topbar actions, verdict-first hero, three-stream band, 702/434 work/evidence split, first-name client framing, and weekly evidence order. Activity opens as one 560px DS Drawer; seeded work orders continue to open the one production full-screen workflow. `stream=unclassified` remains the truthful Risk receiver, all outbound capability homes remain exact-once, and mobile has no page-level horizontal overflow.
+
+Intentional exceptions: the prototype-only Send update action has no receiver and is omitted; Promote to signal remains deferred under `SB-002` / `DEF-cockpit-002`; production stream/source filters and truthful funnel stages remain available; sparse owner data is not padded; and the carried-over work-order workflow remains a legacy full-screen modal. Paired 1440x900 and 1600x1000 captures plus Activity, work-order, and mobile evidence under `/tmp/asset-dashboard-codex-visual-parity/batch8/cockpit/` passed a fresh Sol rendered review with `PASS`. Joshua approved the composition and documented exceptions.
 
 ### ODP-011 Rebuilt Sidebar Prototype Zone Parity
 
@@ -342,7 +393,7 @@ Implementation choice:
 - Optimization stays on `var(--teal)`, not prototype purple, because the current design-system rule reserves purple for admin AI-only surfaces.
 - Action Results, Requests, and Content Perf are mapped into Client-facing as the current production equivalents of the prototype's client-facing zone.
 
-Residual risk: `page-intelligence` and `content-perf` remain non-rebuilt route-home questions, tracked by `ODP-012`. The rebuilt sidebar can present them in prototype-adjacent zones while their final homes are decided.
+Residual decision: `page-intelligence` remains a standalone documented exception. `content-perf` remains standalone until the accepted Pipeline Published compatibility receiver closes its named gaps and has populated proof. Both are tracked by `ODP-012`; the rebuilt sidebar continues presenting their existing route ids.
 
 ### ODP-012 Page Intelligence / Content Perf Rebuilt Coverage
 
@@ -351,7 +402,7 @@ Contract: `docs/ui-rebuild/parity/coverage-audit.md`
 
 Accepted decision: **B**, subject to the `ODP-012` receiving-home review above.
 
-Current finding: both routes remain standalone `NAV_REGISTRY` entries and real `Page` values, and neither is mounted in `REBUILT_SURFACES`. Content Pipeline Published now consumes the existing content-performance readback and gives that evidence a prototype-aligned proof-queue home, so it is the proposed receiving surface for `content-perf`; the standalone route remains intact until a shipping slice proves every report and deep link. Page Intelligence remains standalone because the current SEO Editor Research Drawer has not yet proved every analyze, edit, job, and handoff capability.
+Final proof finding: both routes remain standalone `NAV_REGISTRY` entries and real `Page` values, and neither is mounted in `REBUILT_SURFACES`. Page Intelligence is not safe to fold: the Rinse fixture exposes 12 pages there but only 11 Manual/read-only SEO Editor rows, omitting the strategy-only `/`, and the Research Drawer does not receive its broader `PAGE_ANALYSIS` job, content/readability evidence, keyword edits, rank tracking, local visibility, fix queue, SEO-copy set, Guide, or handoffs. Content Pipeline Published is the right future `content-perf` compatibility receiver because it reads the same report and improves item/outcome joinback, but it currently hides aggregate impressions/sessions and daily impressions, lacks an item URL receiver, calls an unsupported refresh POST, needs honest matrix-trend handling, and must route only when the rebuilt flag is on.
 
 Options:
 
@@ -367,15 +418,28 @@ Implementation guardrail: do not build standalone visual rewrites or add redirec
 
 Implementation log, 2026-07-09: Content Pipeline Published is accepted as the proposed Content Performance receiver because its proof queue already reads the shared content-performance data; `/content-perf` remains a standalone production route. Page Intelligence remains standalone until a later SEO Editor Research/detail slice proves its complete workflow. No route id, registry entry, or redirect changed.
 
+Receiving-home proof log, 2026-07-10: **Page Intelligence is preserved as the standalone `ODP-012 B` exception.** The receiving-home gap is material and fixture-proven, so no fold or redirect is allowed in this frontend visual goal. **Content Performance remains standalone pending a later flag-aware compatibility fold into Pipeline Published.** That slice is frontend-only if it restores impressions/sessions and impressions trend, adds item URL initialization, replaces Re-scan with the existing query refetch, renders matrix trend as unavailable, and keeps the legacy route when `ui-rebuild-shell` is off. Backend approval is required only for a durable refresh job, real matrix trend history, or prototype-only Add to Insights. A populated Content Performance fixture is still required before route retirement.
+
 ## Optional Later Decisions
 
-These behavior-safe defaults were accepted on 2026-07-09. They remain `behavior-safe / visual-unverified` until their turn in the current sequence:
+These behavior-safe defaults were accepted on 2026-07-09. Their source-led correction passes were owner-approved on 2026-07-10 and remain explicit exceptions:
 
 - Schema exact inline page cards versus the current detail Drawer.
 - Links row-level Insert versus current copy/send until write target is explicit.
 - Performance exact inline Page Weight expansion and side-by-side speed cards.
 - Keyword Hub trend/KPI polish once server-owned read models exist.
 
+## Schema, Links, Competitors, and Keyword Hub Visual Result
+
+Source-led result, 2026-07-10 — status: `owner-approved` for all four surfaces.
+
+- Schema uses the prototype's 1080/1020 Generator geometry and first-viewport order plus a calibrated five-row Workflow Guide. Real schema counts stay truthful; the production page-detail Drawer remains the explicit inline-card exception.
+- Links uses the prototype's 1120/1060 workshop, compact tray, 3/3/3/6 metric patterns, dense per-lens bodies, bounded Architecture tree, and collapsed evidence bands. Copy/send remains the honest alternative to unsupported direct Insert.
+- Competitors uses the prototype's 1120/1060 single-stack hierarchy from Alerts through Backlinks and truthful provider/setup states. The full populated composition is protected by fixture-backed tests because local DataForSEO credentials are unavailable.
+- Keyword Hub uses the prototype's left-aligned 1128px canvas, truthful four-KPI band, five-lens tray, dense tables/groups, bounded Lifecycle board, and 440px Drawer. Unsupported row trends and period deltas are not fabricated.
+
+All four passed fresh Sol review with `PASS` after exact 1440x900 and 1600x1000 comparison, important-interior checks, computed geometry/overflow inspection, focused component coverage, hooks lint, typecheck, and parity checks. Joshua explicitly approved all four with their documented exceptions.
+
 ## Next Implementation Slice
 
-Begin Content Pipeline source inventory, paired desktop comparison, and its first corrective pass. Preserve Insights Engine and Brand & AI as separate owner-approved commits; do not push, open a PR, or start staging extraction during this goal.
+The registry-wide paired-evidence archive and consolidated decision record are complete at `docs/ui-rebuild/parity/registry-final-owner-review.md`. Joshua approved the final 24-route batch with every documented exception and retained Page Rewriter's 62px Focus rail on 2026-07-10. The Page Intelligence / Content Performance receiving-home record is complete under `ODP-012 B`. Commit each owner-approved surface family separately; do not push, open a PR, or start staging extraction during this goal.

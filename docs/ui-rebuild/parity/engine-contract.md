@@ -144,9 +144,9 @@ Keep these capabilities reachable exactly once:
 
 ## Desktop Visual-Parity Pass — 2026-07-09
 
-Status: `visual revision in progress`
+Status: `owner-approved` (historical correction log)
 
-Direct source-and-browser comparison at `1600x1000` and `1440x900` supersedes the earlier automated-review wording. The production route is behavior-safe, but it is not owner-approved visual parity.
+Direct source-and-browser comparison at `1600x1000` and `1440x900` supersedes the earlier automated-review wording. Joshua subsequently owner-approved V1–V6 as recorded above.
 
 | Seam | Prototype | Rebuilt baseline | First correction decision |
 |---|---|---|---|

@@ -6,6 +6,20 @@ A comprehensive value assessment of every feature in the platform — **591 feat
 
 ---
 
+### 669. Owner-approved registry-wide admin desktop visual parity 2026-07-10
+
+**Status:** `owner-approved`. Joshua explicitly approved all remaining 24 mounted rebuilt route homes as the recommended deferred-feedback batch, with every documented production/data/backend exception retained and Page Rewriter's 62px Focus rail kept. Together with the earlier Insights Engine and Brand & AI approvals, all 26 routes in `REBUILT_SURFACES` now have explicit owner-approved desktop visual parity or an owner-approved exception.
+
+**What it does:** Completes the source-led visual correction of Cockpit; Content Pipeline; SEO Editor; Search & Traffic; Asset Manager; Performance; Site Audit; Schema; Links; Competitors; Keyword Hub; Page Rewriter; Local Presence; and the 11-route Global Ops family. Each surface now follows the prototype's desktop layout, hierarchy, section order, typography, spacing, density, control treatment, icons, wrappers, and important overlay composition at 1440×900 and 1600×1000 while preserving `ui-rebuild-shell`, route ids, URL/deep-link initialization, aliases, and exact-once production capability homes. Provider-dependent pages remain truthful rather than fabricating prototype data. Production-only Drawers, bulk workflows, compatibility receivers, workspace administration, and governed mutations remain explicit approved exceptions. Page Intelligence and Content Performance keep their standalone route meanings under `ODP-012 B`.
+
+**Why it matters:** Operators now get one coherent prototype-calibrated admin experience instead of a behavior-safe collection of differently composed panels. The approval also freezes an honest visual baseline: later fine feedback can refine a surface without reopening unsupported backend work or silently weakening route/capability contracts.
+
+**Tests and verification:** The final consolidated focused run passes 291 tests across 22 component/contract files. Hooks lint, TypeScript, Vite production build, deferred-ledger verification, PR checks, and diff hygiene pass. A fresh final Sol integration/render review returned `PASS` after the measured registry archive was re-audited; two premature loading-state captures were replaced with settled exact 1600×1000 Links Architecture and truthful GA4-unavailable Site Traffic evidence. A clean Local Presence preview reload produced no new console warnings or errors. The behavior checkpoint's full suite remains 28,525 tests across 2,033 files. Final evidence is under `/tmp/asset-dashboard-codex-visual-parity/registry-final/`, with the decision record in `docs/ui-rebuild/parity/registry-final-owner-review.md`.
+
+**Files:** rebuilt surface families under `src/components/*-rebuilt/`; focused legacy receivers used by Content Pipeline and Global Ops; corresponding component/contract tests; `data/ui-rebuild-deferred-ledger.json`; all parity contracts, coverage/inventory/backlog/decision records; `BRAND_DESIGN_LANGUAGE.md`; `FEATURE_AUDIT.md`; and `data/roadmap.json`.
+
+---
+
 ### 668. Owner-approved Brand & AI desktop composition 2026-07-10
 
 **Status:** `owner-approved`. Joshua approved `ODP-BRAND-V1` through `V7` as recommended, reviewed the final live surface, said “It looks great,” and explicitly deferred finer feedback to the registry-wide parity review. A fresh Sol rendered review returned `PASS`; automated evidence supports but does not replace that approval.

@@ -8,6 +8,20 @@
 
 ---
 
+## Registry-Wide Admin Visual Baseline — Owner-Approved 2026-07-10
+
+All 26 route homes mounted through `REBUILT_SURFACES` have explicit owner-approved desktop visual parity or an owner-approved exception. The per-surface contracts in `docs/ui-rebuild/parity/` remain the authority for exact geometry and exceptions; this section records the shared baseline that emerged from the source-led pass.
+
+- Use the real prototype implementation as composition authority at 1440×900 and 1600×1000. Preserve production routes, deep links, governed actions, and exact-once capability homes when the prototype is simpler.
+- Favor compact surface context, bounded desktop canvases, dense first-viewport evidence, clear section order, and progressive disclosure. Do not inflate a shared header simply because a page is rebuilt; the historical 28px Performance header pilot was superseded by the compact source-led header.
+- Keep the rebuilt shell's prototype-zone navigation and design-system color semantics. Prototype hue differences do not override the Four Laws of Color.
+- Truthful unavailable/empty states are part of the approved composition for provider-dependent surfaces. Never fabricate assets, PageSpeed results, GSC/GA4 reports, DataForSEO evidence, GBP reviews, revenue, or outcomes to imitate a populated prototype.
+- Production-only Drawers, dialogs, bulk modes, compatibility receivers, dense workspace settings, and governed workflows may exceed the prototype when their owning parity contract records the approved exception.
+- Page Rewriter Focus intentionally retains the shared shell's 62px icon rail. Joshua explicitly approved that difference; Save draft and Publish remain separate backend lifecycle work.
+- Later fine feedback is a refinement pass. Do not silently reinterpret this baseline as permission to remove capabilities, change route meaning, add backend contracts, or generalize a surface-specific exception.
+
+---
+
 ## 1. Brand Identity
 
 | Element | Value |
@@ -132,7 +146,7 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **ChartCard** | `ChartCard.tsx` | Same as SectionCard (`bg-[var(--surface-2)] border-[var(--brand-border)]`) | Thin SectionCard wrapper for chart-friendly defaults: tighter padding (`px-4 py-3`), `.t-ui` inline title + optional `<TrendBadge>` row, no `border-b` separator. Preserves signature card radius. |
 | **TrendBadge** | `TrendBadge.tsx` | Positive: `text-emerald-400` + `TrendingUp`; Negative: `text-red-400` + `TrendingDown`; Zero (when `hideOnZero={false}`): `text-zinc-400` + `Minus` | Canonical directional delta indicator. Props: `value`, `suffix='%'`, `invert`, `showSign`, `label`, `size='sm'\|'md'`, `hideOnZero=true`. Replaces all hand-rolled `TrendingUp/Down + emerald/red` ternaries. Use `invert` when lower=better (positions, error counts). |
 | **FreshnessStamp** | `FreshnessStamp.tsx` | `text-[var(--brand-text-muted)]` + muted clock icon | Compact metadata stamp for real data recency ("Data as of ..."). Renders nothing when the timestamp is missing or invalid so unavailable data never looks current. |
-| **PageHeader** | `PageHeader.tsx` | Default title `.t-h2`; default subtitle `.t-caption-sm`. Opt-in `rebuilt-admin`: semantic `h2` with `.t-h1`, subtitle `.t-body`. | Title + optional subtitle + action slot. Default remains compact and truncating; rebuilt-admin wraps text/actions and must be adopted surface by surface. |
+| **PageHeader** | `PageHeader.tsx` | Default title `.t-h2`; default subtitle `.t-caption-sm`. The available `rebuilt-admin` variant uses semantic `h2` with `.t-h1` and `.t-body`. | Title + optional subtitle + action slot. The owner-approved rebuilt registry uses source-led surface composition; the historical 28px Performance pilot was superseded by the compact header, and no broader `rebuilt-admin` adoption is authorized. |
 | **Badge** | `Badge.tsx` | 7 tones: `teal`, `blue`, `emerald`, `amber`, `red`, `orange`, `zinc`; variants `soft`, `outline`, `solid`; shapes `sm`, `pill` | Canonical category/metadata/counter pill. New code uses `tone`; legacy `color` remains as a compatibility alias during migration. Optional `icon`, `dot`, and `ariaLabel` replace hand-rolled dense-table pills. |
 | **StatusBadge** | `StatusBadge.tsx` | Central registry by domain: page-edit, content, approval, client-action, request, schema, matrix, integration, job, keyword-command-center, severity, priority | Canonical status/severity/priority badge. Unknown statuses hide by default; `fallback="neutral"` renders a zinc badge. |
 | **TabBar** | `TabBar.tsx` | Active: `border-teal-500 text-teal-200` | Underline style, `border-b-2`; horizontally scroll-safe on constrained widths |

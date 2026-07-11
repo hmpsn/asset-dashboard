@@ -2,7 +2,7 @@
 
 Baseline: the integration checkpoint commit that introduces this file on `codex/ui-prototype-alignment`.
 
-This commit is the immutable fork point for the earlier behavior checkpoint. It is intentionally broader than a shipping PR. It does not establish owner-approved visual parity for any surface. Never open it as one PR; extract reviewed cohorts from `staging` in the dependency order below.
+This commit is the immutable fork point for the earlier behavior checkpoint. It is intentionally broader than a shipping PR and did not itself establish visual parity. The later `codex/ui-visual-parity` surface commits now carry owner-approved parity for all 26 mounted route homes. Never open either integration stack as one PR; extraction remains dormant and must start from `staging` only after separate Joshua authorization.
 
 ## Baseline Verification
 
@@ -53,18 +53,25 @@ These rules are dormant during the active visual-parity goal. Do not start stagi
 
 The integration sandbox has advanced beyond the baseline through reviewed, surface-scoped commits. Shipping still starts from `staging`; these hashes are semantic extraction references, not a request to cherry-pick the entire stack.
 
-| Cohort | Integration reference | Shipping boundary |
+| Cohort | Owner-approved integration reference | Shipping boundary |
 |---|---|---|
-| Insights Engine | `588eada03` plus the owner-approved `codex/ui-visual-parity` surface commit | V1–V3 visual composition plus the Engine-owned tests/docs only; retain V4–V6 as explicit approved exceptions. Shipping remains dormant during this goal. |
-| Brand & AI | Owner-approved `codex/ui-visual-parity` Brand surface commit | Grouped cockpit, 17-generator 7 / 2 / 5 / 3 mapping, focused Identity/Brandscript receivers, 680px workflow modal, truthful editor interiors, shared Markdown preview utility, tests, and accepted records only; retain V5–V7 as explicit exceptions. Shipping remains dormant during this goal. |
-| SEO Editor | `cb536234b` | Source-grouped worksheet and matching tests only. |
-| Site Audit | `3e4cec39e`, `4d1fd9592` | Diagnostic demotion first; canonical Asset repair sender only after Asset receiver work is available. |
-| Content Pipeline | `15eec15f3`, `4024ff87e` | Board-first slice and review fixes; keep later item workspaces deferred. |
-| Rebuilt focus bridge | `a690f25d3` | Shared shell focus API plus Page Rewriter consumer/tests; ship before any dependent focus consumer. |
-| Search & Traffic | `e24cb21a1`, `9bf362d21` | Search-default report first; degraded-provider homes and final color correction in the closeout reference. |
-| Performance repair sender | `8cfc4ae78` | Canonical Asset filter sender; pair with the Asset receiver PR dependency. |
-| Asset Manager | `241f54a25`, `9bf362d21` | Single Browse workshop first; repair-first placement, overlay precedence, All/weight metrics, and final tests in the closeout reference. |
-| PageHeader pilot | `9bf362d21` | Shared opt-in variant plus Performance-only adoption/tests; do not bulk-migrate other surfaces. |
-| Final behavior audit | `9bf362d21` | Cockpit, Global Ops, Local Presence, Performance color, route census, docs/roadmap, browser evidence, and an independent behavior-review `PASS`; extract only the owning surface from this mixed closeout commit. This is not an owner visual-parity approval. |
+| Insights Engine | `d4323d902` | Engine-owned composition/tests/docs only; retain V4–V6 as approved exceptions. |
+| Brand & AI | `5ac077770` | Grouped cockpit, focused editors, approved 680px workflow modal, tests, and V5–V7 exceptions. |
+| Competitors | `342862e3a` | Competitive stack, provider/setup truth, detail/handoff preservation, and focused tests. |
+| Content Pipeline | `63c8d5293` | Board, Intake, item workspaces, secondary lenses, shared Brief/Draft receivers, route-contract tests, and explicit unsupported-operation exceptions. |
+| SEO Editor | `14927f2e7` | Full source-grouped worktable, inline fields, Manual rows, Research Drawer, URL/write contracts, and review-queue exception. |
+| Search & Traffic | `8f6623f37` | Three-report composition, hidden Overview receiver, truthful provider states, annotation CRUD, Drawer, and tests. |
+| Asset Manager | `a3de85db7` | Single workshop, repair placement, dense asset cards, production overlays, and tests. |
+| Performance | `eeb828553` | Compact Page Weight/Page Speed composition, paired selected-page cards, Single/Bulk isolation, Asset handoff, and provider exceptions. |
+| Site Audit | `7dd5efe77` | Audit decision spine, compact History, compatibility receivers, production overlays, and canonical repair handoffs. |
+| Schema | `f9019091a` | Generator/Guide composition, workflow strip, production detail Drawer exception, and tests. |
+| Links | `eb6ff3992` | Four-lens workshop, dense repair evidence, detail Drawers, copy/send exception, and tests. |
+| Keyword Hub | `78d2d7777` | Five-lens workbench, bounded Lifecycle, detail Drawer, matrix snapshots, and trend/delta no-fabrication exception. |
+| Cockpit | `ca620887b` | Verdict/stream/work/evidence spine, overlays, Risk receiver, and Send/Promote exceptions. |
+| Local Presence | `735d7afe5` | Two-mode real-data composition, setup Drawer, legacy receivers, and geo-grid/GBP backend exceptions. |
+| Global Ops | `e18271bf8` | All 11 route homes, shared legacy interiors, wave A/B/C composition modules, focused tests, and `GO-001` through `GO-008`. |
+| Page Rewriter | `5f48acf09` | Two-pane export-only workspace, picker/chat/document composition, approved 62px Focus rail, deferred-ledger record, and backend write-spine exception. |
+
+The historical 28px Performance `PageHeader` pilot was superseded by the source-led compact header and is not a shipping cohort. These references are extraction aids only; no push, PR, or staging work is authorized by the visual-parity approval.
 
 Route-home decision: Content Pipeline Published is the proposed Content Performance receiver because it already consumes shared readback data, but `/content-perf` remains standalone. Page Intelligence remains standalone until a later SEO Editor Research/detail slice proves every capability. No route migration belongs in the current extraction set.
