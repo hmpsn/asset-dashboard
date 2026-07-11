@@ -8,9 +8,9 @@
 
 ---
 
-## Registry-Wide Admin Visual Baseline — Owner-Approved 2026-07-10
+## Registry-Wide Admin Visual Baseline — Owner-Approved 2026-07-11
 
-The original 26 route homes mounted through `REBUILT_SURFACES` have explicit owner-approved desktop visual parity or an owner-approved exception. Page Intelligence was mounted later as a standalone receiving-home rebuild and remains awaiting explicit approval. The per-surface contracts in `docs/ui-rebuild/parity/` remain the authority for exact geometry and exceptions; this section records the shared baseline that emerged from the source-led pass.
+All 27 route homes currently mounted through `REBUILT_SURFACES` have explicit owner-approved desktop visual parity or an owner-approved exception. The original 26-route batch was approved on 2026-07-10; Page Intelligence became the 27th direct mount and Joshua explicitly approved it with the Content Performance receiving-home bundle on 2026-07-11. Content Performance is an owner-approved flag-on fold into Pipeline Published, not a 28th direct mount; its canonical route id and legacy receiver remain available flag-off. The per-surface contracts in `docs/ui-rebuild/parity/` remain the authority for exact geometry and exceptions; this section records the shared baseline that emerged from the source-led pass.
 
 - Use the real prototype implementation as composition authority at 1440×900 and 1600×1000. Preserve production routes, deep links, governed actions, and exact-once capability homes when the prototype is simpler.
 - Favor compact surface context, bounded desktop canvases, dense first-viewport evidence, clear section order, and progressive disclosure. Do not inflate a shared header simply because a page is rebuilt; the historical 28px Performance header pilot was superseded by the compact source-led header.
@@ -182,11 +182,11 @@ All shared primitives live in `src/components/ui/`. Full specs in `DESIGN_SYSTEM
 | **Column** | `ui/layout/Column.tsx` | No color — structural only | Strict `flex flex-col` — never `flex-row`. Convenience alias for vertical stacks. Props: `gap`, `align`, `className`. `forwardRef`. |
 | **Grid** | `ui/layout/Grid.tsx` | No color — structural only | Responsive CSS grid. Props: `cols` (`{ sm?, md?, lg?, xl? }` with values 1–12), `gap`. Uses static `Record<number, string>` maps per breakpoint so Tailwind's scanner can detect all class strings. `forwardRef`. |
 | **Divider** | `ui/layout/Divider.tsx` | `border-[var(--brand-border)]` | Thin rule. `orientation="horizontal"` (default, `border-b w-full`) or `"vertical"` (`border-r h-full`). Role=separator + aria-orientation. `forwardRef`. |
-| **Modal** | `ui/overlay/Modal.tsx` | Panel: `bg-zinc-900 border-zinc-800`; close ×: `text-zinc-400 hover:text-zinc-200`; focus ring: `focus-visible:ring-teal-500` | Compound: `<Modal.Header>`, `<Modal.Body>`, `<Modal.Footer>`. Portals to `document.body`. Focus trap + Escape + backdrop-click to close. Restores focus to trigger on close. Backdrop at `--z-modal-backdrop` (40), panel at `--z-modal` (50). `size="workflow"` is the owner-approved compact editor shell at 42.5rem / 680px. |
+| **Modal** | `ui/overlay/Modal.tsx` | Panel: `bg-zinc-900 border-zinc-800`; close ×: `text-zinc-400 hover:text-zinc-200`; focus ring: `focus-visible:ring-teal-500` | Compound: `<Modal.Header>`, `<Modal.Body>`, `<Modal.Footer>`. Portals to `document.body`. Focus trap + Escape + backdrop-click to close. Restores focus to trigger on close. Canonical Modal, Drawer, and Modal-composed ConfirmDialog instances share `overlayUtils`; DOM order determines the topmost open panel, and only that panel owns focus trapping, Escape/Enter, and backdrop dismissal. Scroll locking is reference-counted across the stack. Backdrop at `--z-modal-backdrop` (40), panel at `--z-modal` (50). `size="workflow"` is the owner-approved compact editor shell at 42.5rem / 680px. |
 | **SchemaReviewModal** | `client/SchemaReviewModal.tsx` | Shell: `fixed inset-0 z-[var(--z-modal-fullscreen)] bg-black/80 backdrop-blur-sm`; inner panel fills viewport | Full-screen WAI-ARIA dialog wrapping `SchemaReviewTab`. Opened from InboxTab SEO Changes schema plan card. `autoFocus` on close button, Escape key dismiss. See full-screen modal pattern below. |
 | **ClientActionDetailModal** | `client/ClientActionDetailModal.tsx` | Same full-screen shell as SchemaReviewModal | Full-screen WAI-ARIA dialog for Tier-3 client action cards. Four typed payload renderers: `internal_link`, `redirect_proposal`, `keyword_strategy`, `aeo_change`. Default raw JSON fallback. `respondToClientAction` re-throws on error (retry-safe). |
 | **Popover** | `ui/overlay/Popover.tsx` | Panel: `bg-zinc-900 border-zinc-800`; normal item: `text-zinc-200 hover:bg-zinc-800`; danger item: `text-red-400 hover:bg-red-500/10` | Compound: `<Popover.Item>`, `<Popover.Separator>`. Portals to `document.body`. Arrow key + Home/End navigation. Tab closes (focus moves naturally). Outside-click + Escape to close. |
-| **Tooltip** | `ui/overlay/Tooltip.tsx` | `bg-zinc-950 text-zinc-100 text-xs px-2 py-1 rounded shadow-lg` | Hover (500 ms delay) + focus (instant). `role="tooltip"`, `aria-describedby` on trigger. Portals to `document.body` — safe under `transform`/`filter` ancestors. |
+| **Tooltip** | `ui/overlay/Tooltip.tsx` | `bg-zinc-950 text-zinc-100 text-xs px-2 py-1 rounded shadow-lg` | Hover (500 ms delay) + focus (instant). `role="tooltip"`, `aria-describedby` on trigger. Portals to `document.body` — safe under `transform`/`filter` ancestors. **Open owner decision:** a Tooltip launched from inside a Modal/Drawer can still sit below the modal layer because `--z-tooltip` (30) is lower than `--z-modal` (50). Do not change the shared token or overlay behavior until Joshua approves the Asset Manager overlay-aware interpretation. |
 
 ### Helper Functions (`constants.ts`)
 
@@ -607,6 +607,7 @@ The UI rebuild adds six token families to `src/tokens.css` (the single token sou
 | Modal enter | `animate-[scaleIn_0.2s_ease-out]` |
 | Modal overlay | `bg-black/70 backdrop-blur-md` |
 | Modal container | `bg-zinc-900 border border-zinc-700/50 rounded-2xl shadow-2xl max-w-md` |
+| Stacked canonical overlays | Modal, Drawer, and Modal-composed ConfirmDialog use shared DOM-order topmost detection. Only the topmost panel traps focus or handles Escape/Enter/backdrop; body scroll remains locked until the last canonical overlay closes. |
 | Full-screen modal | `fixed inset-0 z-[var(--z-modal-fullscreen)] bg-black/80 backdrop-blur-sm` | Used for takeover dialogs (SchemaReviewModal, ClientActionDetailModal). `--z-modal-fullscreen: 55` sits between `--z-modal` (50) and `--z-toast` (60). |
 
 **Full-screen modal shell contract** (`SchemaReviewModal`, `ClientActionDetailModal`):
@@ -663,7 +664,7 @@ Use named z-index token classes such as `z-[var(--z-modal)]` rather than raw num
 | `src/components/ui/ProgressIndicator.tsx` | Blue progress bar, idle/error = null |
 | `src/components/ui/TierGate.tsx` | Tier lock overlay + TierBadge |
 | `src/components/ui/DataList.tsx` | Ranked data list |
-| `src/components/ui/ConfirmDialog.tsx` | Confirmation modal (teal CTA, destructive variant = red CTA, Escape/Enter keyboard, backdrop dismiss) |
+| `src/components/ui/ConfirmDialog.tsx` | Confirmation dialog composed inside canonical Modal (teal CTA, destructive variant = red CTA, topmost-only Enter, Modal-owned Escape/backdrop/focus behavior) |
 | `src/components/ui/OnboardingChecklist.tsx` | First-visit workspace setup modal (blue progress, teal checkmarks, localStorage) |
 | `src/components/ui/WorkflowStepper.tsx` | Horizontal numbered stepper (emerald=done, teal=current, zinc=future) |
 | `src/components/ui/WorkspaceHealthBar.tsx` | Multi-metric health bars + recommended next action (blue fills, teal CTA) |
@@ -822,6 +823,7 @@ When shipping UI changes that affect color or design patterns:
 | 2026-07-09 | **UI Rebuild PageHeader hierarchy pilot**: adds the opt-in `variant="rebuilt-admin"` visual pattern without changing the default primitive. The variant keeps semantic `h2`, maps page titles to `.t-h1`, maps page context to `.t-body`, and allows copy/actions to wrap. Performance is the sole pilot; broader migration remains gated on prototype comparison. No new token or hue was introduced. |
 | 2026-07-10 | **Owner-approved Insights Engine composition**: no new token, hue, or shared DS primitive. The primary spine uses one compact narrated POV card and opens the existing complete editor in the canonical `Drawer`; Engine-level actions portal exact-once into the rebuilt shell topbar while isolated mounts use an explicit inline fallback; compact move rows keep Details and Stage/Unstage inline and disclose Edit/Fix/Park through the accessible `Popover`. Curation and Needs Attention share one compact support row immediately above Backing moves. Truthful live preview height/content, production-only provider evidence plus collapsed Operations, and the Lost visibility backend read gap are explicit surface exceptions approved under `ODP-001-V4` through `V6`; they do not create reusable design-system exceptions. |
 | 2026-07-10 | **Owner-approved Brand & AI composition**: the grouped cockpit and modal-first workflow reuse the existing color and type roles; purple remains limited to admin-AI accents, read-only configured evidence stays blue/neutral, and actions stay teal. The surface reports truthful configured-input evidence instead of an inferred readiness score, distributes all 17 generators once across the source groups, and keeps production editors/actions honest. The closest existing `t-ui` role at 13.5px/700 is the approved rail-title exception. The sole shared DS extension is `Modal size="workflow"` at 42.5rem / 680px; it is a compact editor/workflow shell, not a new token or hue. |
+| 2026-07-11 | **Receiving-home approval and post-parity interaction/performance closeout**: no new token or hue. Joshua explicitly approved the Page Intelligence direct mount and folded Content Performance receiver, bringing the mounted registry to 27. Canonical Modal/Drawer/ConfirmDialog layers now coordinate topmost focus, keyboard, backdrop, and reference-counted scroll lock; contextual loading fallbacks preserve the approved composition while Admin Chat and Content Pipeline defer closed interiors, and Search & Traffic scopes provider reads by active lens. Asset Manager's Tooltip-above-Drawer behavior remains an explicit owner decision because resolving it changes shared overlay semantics. |
 
 > **Golden rule**: Teal for actions, blue for data, emerald for success, purple for admin AI, zinc for structure. When in doubt, check the decision tree above.
 
@@ -886,8 +888,12 @@ Five shared primitives added to `src/components/ui/` (use these before hand-roll
 
 ## Page Intelligence Research workbench (2026-07-10)
 
+**Status:** `owner-approved` on 2026-07-11 as part of Joshua's explicit combined Page Intelligence / Content Performance receiving-home approval. Automated and rendered PASS results are supporting evidence, not the approval source.
+
 The standalone flag-on Page Intelligence surface adopts the prototype SEO Editor Research geometry: a compact 22px header band, dense controls, a `minmax(360px, 42%)` page rail, independent rail/detail scrolling, a deliberate empty-selection state, sticky target context, and a sticky footer containing only real production handoffs. It reuses established typography roles, DS primitives, Font Awesome semantic icon keys, surface/border tokens, teal actions, blue data, and canonical score colors. This is a surface composition, not a new primitive or token rule; flag-off legacy presentation remains unchanged.
 
 ## Content Performance Published results (2026-07-10)
+
+**Status:** `owner-approved` on 2026-07-11 as part of Joshua's explicit combined Page Intelligence / Content Performance receiving-home approval. Automated and rendered PASS results are supporting evidence, not the approval source.
 
 The flag-on Content Performance receiving home uses Pipeline Published and the prototype's results hierarchy: four compact authoritative summary cells, stacked verdict-led cards with a colored left rail, keyword/page-type/publish-age context, a compact control row, and deeper production evidence in a Drawer. Teal remains action/navigation, blue remains search/traffic data, emerald marks measured wins, and red marks measured loss. Daily paired clicks/impressions trend loads only after deliberate Drawer open so visual parity does not create unbounded provider reads. No new primitive or token is introduced; the flag-off legacy page remains unchanged.

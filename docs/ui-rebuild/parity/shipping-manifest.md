@@ -2,7 +2,7 @@
 
 Baseline: the integration checkpoint commit that introduces this file on `codex/ui-prototype-alignment`.
 
-This commit is the immutable fork point for the earlier behavior checkpoint. It is intentionally broader than a shipping PR and did not itself establish visual parity. The later `codex/ui-visual-parity` surface commits now carry owner-approved parity for all 26 mounted route homes. Never open either integration stack as one PR; extraction remains dormant and must start from `staging` only after separate Joshua authorization.
+This commit is the immutable fork point for the earlier behavior checkpoint. It is intentionally broader than a shipping PR and did not itself establish visual parity. The later `codex/ui-visual-parity` surface commits now carry owner-approved parity for all 27 directly mounted route homes plus the folded Content Performance receiving home. The original 26-route approval remains the historical batch; Page Intelligence and Content Performance were approved later as one receiving-home bundle. Never open either integration stack as one PR; extraction remains dormant and must start from `staging` only after separate Joshua authorization.
 
 ## Baseline Verification
 
@@ -71,11 +71,36 @@ The integration sandbox has advanced beyond the baseline through reviewed, surfa
 | Local Presence | `735d7afe5` | Two-mode real-data composition, setup Drawer, legacy receivers, and geo-grid/GBP backend exceptions. |
 | Global Ops | `e18271bf8` | All 11 route homes, shared legacy interiors, wave A/B/C composition modules, focused tests, and `GO-001` through `GO-008`. |
 | Page Rewriter | `5f48acf09` | Two-pane export-only workspace, picker/chat/document composition, approved 62px Focus rail, deferred-ledger record, and backend write-spine exception. |
-| Page Intelligence | awaiting owner approval | Standalone Research master/detail workbench, validated tab/page deep links, existing analysis/edit/tracking/handoff capabilities, and flag-off legacy preservation. |
-| Content Performance | awaiting owner approval | Authoritative Published result cards/readback Drawer, bounded trend loading, item deep links, flag-aware compatibility redirect, and legacy OFF preservation. |
+| Page Intelligence | `3bfcffe09` — `owner-approved` | Standalone Research master/detail workbench, validated tab/page deep links, existing analysis/edit/tracking/handoff capabilities, and flag-off legacy preservation. |
+| Content Performance | `6057ca3e1` + `ae3df5488` — `owner-approved` | Shared authoritative readback contract plus Published result cards/Drawer, bounded trend loading, item deep links, flag-aware compatibility redirect, and legacy OFF preservation. |
 
 The historical 28px Performance `PageHeader` pilot was superseded by the source-led compact header and is not a shipping cohort. These references are extraction aids only; no push, PR, or staging work is authorized by the visual-parity approval.
 
-Route-home decision: Content Pipeline Published is now the flag-on Content Performance receiver; `/content-perf` remains a compatibility route and flag-off legacy home. Page Intelligence remains standalone with its mounted prototype-led Research workbench. Neither follow-on is an extraction cohort until Joshua explicitly approves its desktop comparison.
+Route-home decision: Content Pipeline Published is the owner-approved flag-on Content Performance receiver; `/content-perf` remains a compatibility route and flag-off legacy home. Page Intelligence remains standalone with its owner-approved prototype-led Research workbench. Both are eligible only for a future surface-scoped extraction after separate authorization; this approval does not start staging work.
 
 Provider-readiness follow-on: the integration branch now has deterministic provider-rich local fixtures, explicit environment profiles, truthful provider health, and a bounded read-only staging smoke. Treat that work as a separate integrations cohort; it does not authorize credentials, staging execution, provider spend beyond the smoke ceiling, or shipment with a visual surface.
+
+## Post-Approval Hardening Cohorts
+
+The independent functionality, runtime-wiring, bug, AI-intelligence, and optimization audit landed additional reviewed commits after the visual approvals. These hashes are required semantic extraction inputs for their owning surfaces; they are not owner-approval records and must not be shipped as one mixed PR.
+
+| Cohort | Integration references | Extraction boundary |
+|---|---|---|
+| Capability and safe client-review preservation | `8f6c3ce83` | Site Audit/client decision adapters and matching shared/integration contracts. |
+| Workspace-owned state and rebuilt shell wiring | `476db936a` | App, Admin Chat, and Page Intelligence state isolation with focused tests. |
+| Admin refresh and cache wiring | `8a8f42f85` | Brand, Pipeline, assets, content-performance, query keys, refresh helper, WS mapping, and tests. |
+| Provider-backed intelligence invalidation | `1757ef409` | Intelligence crons, local/LLM/rank producers, and cache-invalidation tests. |
+| AI reliability runtime evidence | `7405e802b` | AI reliability scripts/registry and harness coverage only. |
+| Canonical stacked overlays | `4e647d093` | Modal, Drawer, ConfirmDialog, shared overlay machinery, and component tests. |
+| Digest/calendar/cache freshness | `ba62f607e` | Monthly digest and intelligence/learnings invalidation; keep `AUD-D5` unresolved. |
+| Generated-context freshness | `09bc10bfa` | Workspace intelligence, briefing voice, LLMs.txt, Admin Chat context, chat summaries, and focused AI tests; keep `AUD-D6` unresolved. |
+| Final navigation and URL-state wiring | `a90971567` | Client dashboard subscriptions, Command Palette flag behavior, Pipeline editor identity, and Page Rewriter request epochs. |
+| Closed Admin Chat deferral | `f8c9fa0f9` | Lazy ChatPanel and disabled closed-state smart-placeholder intelligence. |
+| Search & Traffic provider scoping | `ffd900f20` | Active-lens provider reads, observer reuse, analytics stale times, and event-specific invalidation. |
+| Content Pipeline interior deferral | `fe8ab70a2` | Lazy inactive interiors and bounded aggregate/list reads. |
+
+## Current Verification Caveats
+
+Do not describe this stack as release-ready yet. Focused suites, hooks lint, typecheck, production build, PR checks, AI quality/reliability reports, and fixed-viewport browser smoke support the hardening wave, but the most recent all-project attempt had two resource startup/import timeouts that passed only when isolated. A clean current all-project run remains required.
+
+The current bundle ratchet is also red and must receive a surgical disposition rather than a blind baseline update: CSS 40.1 KiB versus 36.4 KiB; Keywords 11.7 KiB versus 11.6 KiB; Page Rewriter 8.7 KiB versus 8.1 KiB; aggregate 1.75 MiB versus 1.72 MiB. Sixty-eight new assets are warn-only. No push, PR, staging extraction, or baseline increase is authorized by this manifest.

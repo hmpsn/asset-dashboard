@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-10",
+  "updatedAt": "2026-07-11",
   "entries": [
     {
       "id": "DEF-foundation-001",
@@ -127,25 +127,12 @@
       }
     },
     {
-      "id": "DEF-shell-003",
-      "surface": "foundation",
-      "item": "The rebuilt shell has no way to express focus mode \u2014 legacy Sidebar takes hidden/onExitHidden and collapses to a slim exit strip (App.tsx effectiveFocusMode, fires on the rewrite surface). RebuiltSidebar/AppShell omit it.",
-      "decision": "Not a pilot regression \u2014 focus mode only fires on Page Rewriter and the pilot is Keywords-only. Ledgered so it is closed before the rebuilt shell expands to cover the Page Rewriter surface (review PR #1478).",
-      "class": "behavior",
-      "upgradeTrigger": "The rebuild reaches the Page Rewriter surface (Phase A) \u2014 add a hidden/collapsed shell state to AppShell + RebuiltSidebar before the shell replaces the legacy one there.",
-      "owner": "josh",
-      "status": "open",
-      "roadmapItemId": null,
-      "createdAt": "2026-07-05",
-      "reviewBy": "2026-10-31"
-    },
-    {
       "id": "DEF-shell-004",
       "surface": "foundation",
-      "item": "The rebuilt breadcrumb/topbar drops the visible \u2318K search IconButton and the breadcrumb workspace-switcher dropdown that legacy Breadcrumbs render. The \u2318K keyboard shortcut still works (global listener) and workspace switching is covered by the sidebar selector \u2014 this is a secondary/discoverability affordance loss, not a capability loss.",
-      "decision": "Accepted for F4 (shortcut + sidebar switcher preserve the underlying capability). Re-add the visible top-bar search affordance before the rebuilt shell replaces the legacy one platform-wide (review PR #1478).",
+      "item": "CommandPalette is mounted on every rebuilt surface and \u2318K/Ctrl+K works, but RebuiltBreadcrumb has no mouse-visible Command Palette trigger. Workspace switching is intentionally owned by RebuiltSidebar's WorkspaceSelector rather than duplicated in the topbar.",
+      "decision": "The final registry approval accepts the sidebar workspace selector and preserved keyboard shortcut as the current shell composition. Track only the visible command-discovery affordance; do not describe CommandPalette or workspace switching as absent.",
       "class": "behavior",
-      "upgradeTrigger": "Phase A shell-expansion, or the first mouse-user report of the missing search button \u2014 add a \u2318K IconButton to the rebuilt Toolbar/breadcrumb.",
+      "upgradeTrigger": "Joshua requests a visible shell search control, or usability/support evidence shows the shortcut-only entry is insufficient; add one trigger for the existing CommandPalette without adding a second palette or workspace selector.",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,
@@ -203,10 +190,10 @@
     {
       "id": "DEF-shell-005",
       "surface": "foundation",
-      "item": "RebuiltAppChrome/AppShell has no slot for the connection/health StatusBar (hasOpenAIKey/hasWebflowToken/connected/workspaceCount) the legacy shell renders \u2014 AppShell exposes sidebar/topbar/children but no footer. Review PR #1480 restored CommandPalette (\u2318K) + AdminChat to the rebuilt mount (real capability losses), but StatusBar needs a shell footer slot.",
-      "decision": "Ship the rebuilt Keywords surface without the StatusBar footer for now \u2014 the RebuiltSidebar footer's NotificationBell already surfaces connection state, and adding an AppShell footer slot is a shell-primitive enhancement, not a Keywords-pilot bug. The two capability-loss items (\u2318K, admin chat) were fixed in-PR; this display-affordance is ledgered.",
+      "item": "The rebuilt shell still omits the legacy StatusBar connection/health strip: HTTP connection, OpenAI key, Webflow token, and workspace count. NotificationBell reports notifications and background jobs only; it is not a connection-health replacement.",
+      "decision": "Keep this open until Joshua chooses whether the production-only health strip belongs in the rebuilt sidebar footer or topbar, or is an approved omission. CommandPalette and AdminChat are already restored exact-once and are not part of this deferral.",
       "class": "behavior",
-      "upgradeTrigger": "Phase A shell-expansion (the rebuilt shell covers non-Keywords surfaces) \u2014 add a `footer` slot to AppShell + thread StatusBar through RebuiltAppChrome so every rebuilt surface shows connection/health state.",
+      "upgradeTrigger": "Joshua approves a compact connection-health placement or explicitly approves omission. If retained, consume the existing useHealthCheck result in one DS-native shell location without duplicating Settings health controls.",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,
@@ -350,23 +337,6 @@
       }
     },
     {
-      "id": "DEF-search-traffic-002",
-      "surface": "search-traffic",
-      "item": "Cross-workspace GSC book roll-up (SB-013 / N1) not built; the surface is single-workspace.",
-      "decision": "Roll-up is a global-ops/cockpit concern scheduled with that wave, not a leaf-surface build.",
-      "class": "data",
-      "upgradeTrigger": "Global-ops roll-up wave (W6).",
-      "owner": "josh",
-      "status": "open",
-      "roadmapItemId": null,
-      "createdAt": "2026-07-07",
-      "reviewBy": "2026-09-15",
-      "links": {
-        "ticket": "docs/ui-rebuild/phase-a/tickets/search-traffic.md",
-        "sb": "SB-013"
-      }
-    },
-    {
       "id": "DEF-asset-manager-001",
       "surface": "asset-manager",
       "item": "Compression graduation insight (CWV-move on a compress pass) is not built; the rebuilt surface ships compression parity without writing a graduation insight.",
@@ -399,23 +369,6 @@
       "links": {
         "ticket": "docs/ui-rebuild/phase-a/tickets/asset-manager.md",
         "sb": "SB-059"
-      }
-    },
-    {
-      "id": "DEF-asset-manager-003",
-      "surface": "asset-manager",
-      "item": "Asset dimensions (w×h) are omitted from cards/table until SB-022's background-derived field is populated; the list render never fires an N+1 per-asset dimension fetch.",
-      "decision": "The Webflow list-assets payload carries no original w×h; derive lazily/batched in the background and show dimensions only once the field is backfilled (probes.md Probe 1 / SB-022 at M).",
-      "class": "data",
-      "upgradeTrigger": "SB-022 background dimension-derivation lands and backfills the width/height field.",
-      "owner": "josh",
-      "status": "open",
-      "roadmapItemId": null,
-      "createdAt": "2026-07-07",
-      "reviewBy": "2026-09-15",
-      "links": {
-        "ticket": "docs/ui-rebuild/phase-a/tickets/asset-manager.md",
-        "sb": "SB-022"
       }
     },
     {
@@ -793,10 +746,10 @@
     {
       "id": "DEF-schema-004",
       "surface": "schema",
-      "item": "Shared Site Audit category score omitted from Schema until SB-010 provides the Site Audit-owned projection.",
-      "decision": "Do not invent a Schema-local audit scorer; consume the shared category score only after the Site Audit backlog item lands.",
+      "item": "Site Audit now provides suppression-aware categoryScores including Schema, but the owner-approved Schema composition intentionally omits that cross-surface audit score and keeps its prototype-led workflow summary metrics.",
+      "decision": "Do not duplicate Site Audit scoring inside Schema without a product decision. Schema keeps the approved generator/readiness composition while Site Audit remains the exact home for category health scores; this replaces the stale claim that SB-010 is unavailable.",
       "class": "data",
-      "upgradeTrigger": "SB-010 ships per-category audit scoring with the six-category taxonomy and exposes the schema category score for consumers.",
+      "upgradeTrigger": "Joshua requests a cross-surface Schema health score and confirms its exact-once home; then consume the existing categoryScores projection without recomputing a Schema-local score.",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,
@@ -972,10 +925,10 @@
     {
       "id": "DEF-content-pipeline-001",
       "surface": "content-pipeline",
-      "item": "GeneratedPost engagement readbacks and per-post time-series cards",
-      "decision": "Defer deeper GeneratedPost metrics beyond the shared Content Performance read path.",
+      "item": "Standalone GeneratedPost records that are not linked to a delivered or published ContentRequest are not first-class Content Performance items. Request-backed posts already show GA4 engagement and on-demand paired GSC trends; matrix items remain supported with honest availability.",
+      "decision": "Retain request/matrix-backed Published readbacks and do not create duplicate post rows. Defer a direct GeneratedPost source until the read model defines published URL identity, request/post deduplication, and public serialization.",
       "class": "data",
-      "upgradeTrigger": "SB-007 lands engagement and time-series readback fields for GeneratedPost rows.",
+      "upgradeTrigger": "SB-007 adds a direct GeneratedPost source with stable URL and published-at identity, request/post deduplication, GA4 readbacks, bounded GSC trend loading, and fixture-backed tests.",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,
@@ -1055,24 +1008,6 @@
       }
     },
     {
-      "id": "DEF-content-pipeline-006",
-      "surface": "content-pipeline",
-      "item": "CMS draft and publish writeback from the rebuilt draft workspace",
-      "decision": "Preserve current export and publish controls until write-target rules are owner-approved.",
-      "class": "behavior",
-      "upgradeTrigger": "SB-032 lands Webflow writeback with route tests and write-target documentation.",
-      "owner": "josh",
-      "status": "open",
-      "roadmapItemId": null,
-      "createdAt": "2026-07-07",
-      "reviewBy": "2026-08-18",
-      "links": {
-        "ref1": "docs/ui-rebuild/phase-a/server-backlog.json:440-451",
-        "ref2": "src/components/PostEditor.tsx:340-363",
-        "ref3": "src/components/PostEditor.tsx:963-1004"
-      }
-    },
-    {
       "id": "DEF-content-pipeline-007",
       "surface": "content-pipeline",
       "item": "Persisted lifecycleStage model for content pipeline items",
@@ -1144,10 +1079,10 @@
     {
       "id": "DEF-content-pipeline-011",
       "surface": "content-pipeline",
-      "item": "Page content-perf is not yet retired to content-pipeline?tab=published; the legacy content-perf route still mounts alongside the rebuilt Published tab.",
-      "decision": "Ship the rebuilt content-pipeline surface (with the Published tab) additively behind ui-rebuild-shell first; defer the content-perf route-removal (routes.ts / App.tsx / navRegistry / D8 / contract tests) to a focused follow-up so the multi-site retirement is verified on its own. Flag-OFF, content-perf remains the sole live home, so there is no user-facing double-home. HELD (owner, 2026-07-07): the ?tab=published redirect target only resolves flag-ON — the LEGACY ContentPipeline (rendered while ui-rebuild-shell is OFF, its prod default) has tabs planner/calendar/briefs/posts/publish and NO 'published' tab, so a content-pipeline?tab=published redirect falls back to Briefs flag-OFF and silently drops the ContentPerformance surface. Removing Page content-perf now would therefore regress the current production (flag-OFF) experience.",
+      "item": "With ui-rebuild-shell ON, /content-perf?item=X redirects to Content Pipeline Published and preserves item identity while the duplicate nav entry is hidden. With the flag OFF, the legacy Content Performance route and nav remain the shipping receiver; the Page id and registry entry are intentionally retained.",
+      "decision": "Joshua approved Pipeline Published as the flag-on Content Performance receiving home and approved the flag-aware compatibility split. Preserve both flag states and the compatibility route; the remaining debt is retirement of the legacy OFF branch, not an unbuilt receiving home or a current double-home.",
       "class": "behavior",
-      "upgradeTrigger": "Execute the route-removal checklist (routes.ts / App.tsx redirect / navRegistry / D8 / nav+deep-link contract tests) for Page content-perf → content-pipeline?tab=published only once the redirect target resolves in the SHIPPING flag state — i.e. do it as the last step right before ui-rebuild-shell flips on for content, OR fold the existing ContentPerformance component into the legacy ContentPipeline as a 'Published' tab in the same PR so both flag states honor ?tab=published with zero regression.",
+      "upgradeTrigger": "When ui-rebuild-shell is retired after flag-ON staging verification, remove the legacy ContentPerformance renderer and nav OFF branch while retaining /content-perf as an item-preserving compatibility redirect; update feature-flag lifecycle, nav, and deep-link contracts in the same PR.",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,
@@ -1300,26 +1235,6 @@
         "surface": "docs/ui-rebuild/phase-a/surfaces/site-audit.json:709",
         "currentSubtool": "src/components/SeoAudit.tsx:364-371",
         "backlog": "SB-009"
-      }
-    },
-    {
-      "id": "DEF-site-audit-002",
-      "surface": "site-audit",
-      "item": "sitehealth.js cross-client roll-up and batch-fix",
-      "decision": "Defer the book-level site-health matrix and all cross-client batch-fix behavior to W6 Global Ops; W5 does not ship even the read-only matrix.",
-      "class": "data",
-      "upgradeTrigger": "W6 Global Ops signs the cross-client read/write safety review and implements SB-013/SB-060 with performance and activity-log coverage.",
-      "owner": "Joshua",
-      "status": "open",
-      "roadmapItemId": null,
-      "createdAt": "2026-07-07",
-      "reviewBy": "2026-08-18",
-      "links": {
-        "delta": "DELTA 2",
-        "surface": "docs/ui-rebuild/phase-a/surfaces/site-audit.json:626-630",
-        "readBacklog": "SB-013",
-        "jobBacklog": "SB-060",
-        "existingScaffold": "server/routes/workspaces.ts:107-124"
       }
     },
     {

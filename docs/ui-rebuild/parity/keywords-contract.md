@@ -64,7 +64,7 @@ Intentional divergence from prototype:
 - The prototype omits multi-select, bulk lifecycle operations, protected keywords, hard delete eligibility, pinning, live SERP evidence, local market evidence, and full mutation feedback. These remain visible because they are production safety/capability contracts, not visual embellishments.
 - The prototype shows inline row sparklines and 7-day deltas; the rebuilt surface keeps trend evidence in the drawer until a batched history read model exists.
 - The prototype's average-position and period-over-period summary KPIs are deferred until server-owned rollups/deltas exist. Do not compute or imply those numbers in the UI.
-- The prototype banner says Keywords replaces Page Intelligence. The locked pilot decision says Page Intelligence authoring/scoring belongs in SEO Editor Research mode; in Keywords, `Pages` is lightweight grouping only.
+- The prototype banner says Keywords replaces Page Intelligence, but final `ODP-012 B` capability proof rejected that route fold. Page Intelligence remains an owner-approved standalone page-first Research workbench; in Keywords, `Pages` stays lightweight keyword grouping only, and SEO Editor Research retains metadata-detail rather than becoming a duplicate Page Intelligence home.
 
 ## URL and Deep Links
 

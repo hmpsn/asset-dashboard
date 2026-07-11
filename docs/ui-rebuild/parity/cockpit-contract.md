@@ -106,6 +106,10 @@ Resolved smoke findings:
 
 No open Cockpit smoke gaps remain for the current fixture set. The source-led correction now matches the prototype's capped spine, context line, verdict hero, stream band, 702/434 work/evidence split, and weekly evidence order at both required desktop viewports. A fresh Sol rendered review returned `PASS`; Joshua explicitly owner-approved this composition with its documented exceptions on 2026-07-10.
 
+## Post-Approval KPI Circle-Back — 2026-07-11
+
+The independent capability audit confirmed that Search/GA4 reporting already has an exact home in Search & Traffic, but the legacy workspace home also carried three distinct operator decisions not reproduced in the rebuilt Cockpit: organic traffic value, content velocity, and overall health. `AUD-D2` is `awaiting owner approval`. Recommended: do not duplicate Search/GA4 metrics; add one compact secondary band for those three unique decisions, or explicitly approve their omission. The existing Cockpit visual approval remains intact until Joshua resolves the new circle-back.
+
 ## Automated Test Floor
 
 Required component coverage:

@@ -36,7 +36,7 @@ The prototype is a master-detail SEO workbench for clearing page metadata work a
    - Queue shows one pending target at a time, progress segments, and footer actions for Request changes, Approve, Send to client, and Publish.
    - Keyboard shortcuts: arrows to move, `A` approve, `S` send, `P` publish, `R` request changes, Escape exits.
 
-The parity ledger also says the former Page Intelligence surface is merged here through an Edit / Research model. Edit is the fast-wide worksheet; Research is the deep per-page intelligence with keyword mapping, content gaps, recommendations, fix-priority read, and Create Brief / Add Schema / View Traffic hand-offs.
+The prototype ledger initially suggested merging Page Intelligence here through an Edit / Research model. Final `ODP-012 B` capability proof rejected that interpretation: SEO Editor Research remains the metadata/detail workflow described below, while Page Intelligence is an owner-approved standalone page-first workbench with its broader analysis jobs, keyword editing/tracking, local/rank evidence, Guide, SEO-copy, and handoff contracts.
 
 ## Source-Led Baseline Before Visual Correction
 

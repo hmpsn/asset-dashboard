@@ -180,6 +180,16 @@ Later low-risk polish:
 - Browser smoke of the current state for desktop, mobile, deep link, and guide drawer.
 - Better prototype-like summaries using existing data, as long as they do not imply board/workspace behavior that is not implemented.
 
+## Owner-Approved Content Performance Receiving Home — 2026-07-11
+
+Final `ODP-012 B` makes Pipeline Published the Content Performance receiving home only while `ui-rebuild-shell` is on. `/content-perf?item=...` replace-navigates to `content-pipeline?tab=published&item=...`; the rebuilt sidebar and flag-aware command palette suppress the duplicate destination. With the flag off, legacy Content Performance and its nav entry remain intact. The `Page` and `NAV_REGISTRY` identities are intentionally retained.
+
+Published now uses the authoritative shared content-performance read model: four compact summary cells, verdict-led result cards, keyword/page-type/publish-age context, filters/sort, stable item identity, and one production Drawer for paired clicks/impressions trend, GA4 evidence, brief execution, coverage, and outcome joinback. Daily trend loads only after deliberate Drawer open; Re-scan is a read refetch; missing matrix/request/provider evidence returns typed availability; public projections omit admin outcome internals. The owner workspace remains truthfully empty while populated composition is fixture-protected.
+
+Joshua explicitly approved the Page Intelligence / Content Performance receiving-home bundle on 2026-07-11. Automated review and fixed-viewport evidence under `/tmp/asset-dashboard-codex-visual-parity/content-performance/` support but do not replace that approval.
+
+Post-approval `AUD-D4` remains `awaiting owner approval`: add a compact impressions/sessions secondary summary row, or explicitly approve those metrics remaining on result cards and in the Drawer. This new circle-back does not silently modify the settled receiving-home approval.
+
 ## Browser Smoke Checklist
 
 Final source-led browser result against the owner workspace at both fixed desktop viewports:

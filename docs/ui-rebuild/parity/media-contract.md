@@ -154,6 +154,10 @@ Measured canvas geometry is `x=243, w=1180` at 1440x900 and `x=323, w=1180` at 1
 
 The measured registry archive adds exact prototype repair-selection evidence at 1440x900 and 1600x1000 plus matching rebuilt 1600x1000 evidence under `/tmp/asset-dashboard-codex-visual-parity/registry-final/`; reviewed exact 1440x900 rebuilt evidence remains authoritative. The populated prototype versus zero truthful owner-workspace assets is an explicit data-state mismatch, while Upload, Asset Detail, Organize, confirmation, and progress Drawers remain production-only states.
 
+## Post-Approval Overlay Circle-Back — 2026-07-11
+
+The runtime audit confirmed canonical stacked Modal/Drawer behavior after `4e647d093`, but Tooltip still uses the global tooltip z-layer and can render beneath an open Asset Manager Drawer. `AUD-D7` is `awaiting owner approval`. Recommended: make the shared Tooltip overlay-aware so help opened from the topmost canonical overlay remains above that overlay. This is a shared design-system behavior change, not a local media z-index patch, and must not be implemented as an unapproved exception.
+
 ## Automated Test Floor
 
 Existing/current branch coverage proves:

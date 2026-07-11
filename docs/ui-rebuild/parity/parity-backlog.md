@@ -73,10 +73,10 @@ Accepted owner directions, circle-back triggers, and remaining risks are tracked
    - Reason: The prototype nav groups pages as Cockpit/Insights, Strategy & Content, Search & Site Health, Optimization, and Client-facing. The rebuilt sidebar now mirrors those zones locally while preserving route ids and global registry semantics.
    - Deliverable: `RebuiltSidebar` uses prototype zones, local sidebar labels, a rebuilt-sidebar-only Competitors item, DS-safe Optimization teal instead of prototype purple, and token-backed group/item accents. Component coverage asserts zone order, labels, keyboard navigation, disabled-route skipping, collapsed-group persistence, content-pipeline badge survival, and a11y.
 
-14. Non-rebuilt route receiving-home mapping
-   - Checkpoint: complete under accepted `ODP-012 B`; source, live-fixture, API, job, route, and deep-link proof now defines both exceptions.
-   - Reason: `page-intelligence` and `content-perf` are real standalone nav entries but are not in `REBUILT_SURFACES`, so they are not covered by the rebuilt parity contracts or smoke evidence. `seo-briefs`, `content`, and `calendar` are folded/redirect-only; `/subscriptions` is a preserved standalone legacy receiver while `content-pipeline?tab=subscriptions` is the folded query alias.
-   - Deliverable: preserve both standalone route ids. Page Intelligence remains standalone because SEO Editor omits a strategy-only page in the Rinse fixture and does not receive its analysis job, research, keyword edit, rank tracking, local evidence, fix queue, Guide, or handoffs. Content Pipeline Published remains the future Content Performance receiver only after restoring impressions/sessions and impressions trend, adding item URL initialization, replacing the unsupported refresh POST, handling matrix trend honestly, making routing flag-aware, and proving a populated fixture.
+14. Formerly non-rebuilt route receiving-home mapping
+   - Status: `owner-approved`; final `ODP-012 B` is implemented and Joshua approved the receiving-home bundle on 2026-07-11.
+   - Reason: capability proof rejected an unsafe Page Intelligence fold but supported a flag-aware Content Performance fold. `seo-briefs`, `content`, and `calendar` remain folded/redirect-only; `/subscriptions` is a preserved standalone legacy receiver while `content-pipeline?tab=subscriptions` is the folded query alias.
+   - Deliverable: complete. Page Intelligence is the 27th direct rebuilt mount and preserves its analysis job, research, keyword edit/tracking, local/rank evidence, fix queue, Guide, SEO copy, and handoffs. Pipeline Published is the flag-on Content Performance receiver with authoritative summaries, paired trend loading, stable `?item=`, typed unavailable states, read refetch, public scrubbing, and duplicate-nav removal. Flag-off preserves legacy Content Performance; both Page/nav identities remain.
 
 ## P2
 
@@ -116,9 +116,19 @@ Accepted owner directions, circle-back triggers, and remaining risks are tracked
    - Deliverable: keep the real setup state in live evidence and protect the complete populated composition with realistic component fixtures; do not invent provider results for a screenshot.
 
 22. Visual-only polish queue
-   - Checkpoint: complete for the mounted registry; later fine feedback is a separate refinement pass.
+   - Checkpoint: complete for the owner-approved settled visual baseline; later fine feedback is a separate refinement pass. Post-parity audit closure remains active and is not implied complete by this row.
    - Reason: overlays, route state, and capability homes remain protected behavior floors while each surface receives direct visual comparison.
    - Deliverable: one discrepancy matrix, corrected evidence set, fresh review, and explicit Joshua decision per surface.
+
+23. Post-parity functionality, wiring, and AI-intelligence audit
+   - Audit status: no P0 loss found; safe repairs implemented; seven owner circle-backs remain `awaiting owner approval`.
+   - Deliverable completed: safe client review targets, workspace-owned state isolation, admin refresh wiring, provider-backed intelligence invalidation, AI reliability evidence matching, stacked overlay coordination, digest/cache freshness, generated-context freshness, and final navigation/deep-link wiring landed in `8f6c3ce83` through `a90971567` as enumerated in `post-parity-functionality-wiring-ai-audit.md`.
+   - Remaining decision gate: `AUD-D1` through `AUD-D7` cover Engine legacy workflow homes, unique Cockpit KPIs, shell connection health, Published impressions/sessions placement, monthly-digest time authority, POV refresh semantics, and shared Tooltip overlay behavior. None is an approved exception yet.
+
+24. First safe optimization wave
+   - Implementation status: complete and independently reviewed; this is performance evidence, not a new visual approval.
+   - Deliverable: Admin Chat defers its closed intelligence/chart path (`f8c9fa0f9`); Search & Traffic scopes provider reads, observers, stale times, and invalidation by active lens (`ffd900f20`); Content Pipeline defers inactive heavy interiors and duplicate aggregate reads (`fe8ab70a2`). Settled fixed-viewport smoke preserves the approved composition.
+   - Remaining optimization backlog: generic Admin Chat backend fanout, Global Ops catch-all chunking, SEO Editor projection duplication, the app-wide queue observer, invalidate-plus-immediate-refetch churn, and Cockpit whole-surface freshness rerenders. These are not parity blockers unless later evidence shows user-visible regression.
 
 ## Visual Parity Acceptance For A Surface
 

@@ -1,7 +1,7 @@
 # Admin Rebuilt Route Coverage Audit
 
-Audit state: route, nav, interior-state, and layout accounting complete; 26 route homes owner-approved on 2026-07-10, with newly mounted Page Intelligence awaiting approval
-Last updated: 2026-07-10
+Audit state: route, nav, interior-state, and layout accounting complete; 27 direct rebuilt mounts plus the folded Content Performance receiving home are owner-approved; post-parity audit circle-backs remain open
+Last updated: 2026-07-11
 Source of truth files: `src/routes.ts`, `src/lib/navRegistry.tsx`, `src/components/layout/rebuiltSurfaces.ts`, and `hmpsn studio Design System/mockup/nav.js`
 
 This audit answers four questions that the per-surface contracts do not answer by themselves:
@@ -18,8 +18,8 @@ This audit answers four questions that the per-surface contracts do not answer b
 | Admin `Page` union values | 32 | Every admin route id in `src/routes.ts`. |
 | `NAV_REGISTRY` entries | 26 | Standalone nav/palette/breadcrumb destinations. |
 | `NON_REGISTRY_PAGES` | 6 | Redirect-only, folded, or non-global-nav route ids. |
-| `REBUILT_SURFACES` entries | 26 | Routes that mount inside `RebuiltAppChrome` when `ui-rebuild-shell` is on. |
-| Parity contract files | 16 | One contract per surface family; Global Ops covers multiple route ids. |
+| `REBUILT_SURFACES` entries | 27 | Routes that mount directly inside `RebuiltAppChrome` when `ui-rebuild-shell` is on. |
+| Parity contract files | 17 | One contract per directly mounted surface family; Global Ops covers multiple route ids. |
 
 Current census result:
 
@@ -32,8 +32,8 @@ Current census result:
 
 | Route id | Nav status | Rebuilt status | Current parity status |
 |---|---|---|---|
-| `page-intelligence` | Main nav entry | Not in `REBUILT_SURFACES` | `ODP-012 B` proof complete: preserve as a standalone documented exception. SEO Editor omits strategy-only pages and does not receive Page Intelligence's research, job, keyword-edit, rank, local, queue, guide, or handoff contracts. No redirect is approved. |
-| `content-perf` | Main nav entry | Not in `REBUILT_SURFACES` | `ODP-012 B` proof complete: Pipeline Published is the intended future compatibility receiver, but the standalone route remains until aggregate impressions/sessions, impressions trend, item URL initialization, honest matrix trend handling, refresh behavior, flag-aware routing, and populated evidence are proved. |
+| `page-intelligence` | Main nav entry | Rebuilt | `owner-approved` under final `ODP-012 B`: a standalone master/detail Research workbench preserves the broader analysis, job, keyword-edit, rank, local, queue, guide, and handoff contracts while flag-off keeps the legacy receiver. |
+| `content-perf` | Main nav compatibility entry | Flag-on folded receiver; flag-off legacy | `owner-approved` under final `ODP-012 B`: Pipeline Published owns the rebuilt four-stat/result-card/readback composition, stable `?item=` initialization, typed trend availability, and bounded refetch. `/content-perf` and its nav identity remain for flag-off compatibility. |
 | `competitors` | `NON_REGISTRY_PAGES` | Rebuilt | Still intentionally absent from the global registry, but now surfaced in the rebuilt sidebar's prototype `Strategy & Content` presentation because the rebuilt shell is flag-gated. Contract exists. |
 | `workspace-settings` | `NON_REGISTRY_PAGES` | Rebuilt | Intentional per-workspace settings receiver reached from workspace gear/settings paths, not the main sidebar list. Covered by Global Ops contract. |
 | `seo-briefs` | `NON_REGISTRY_PAGES` | Not rebuilt | Folded into `content-pipeline?tab=briefs`. |
@@ -41,7 +41,7 @@ Current census result:
 | `calendar` | `NON_REGISTRY_PAGES` | Not rebuilt | Redirects to `content-pipeline?tab=calendar`. |
 | `subscriptions` | `NON_REGISTRY_PAGES` | Not rebuilt | Preserved standalone legacy `ContentSubscriptions` receiver. Separately, `content-pipeline?tab=subscriptions` aliases to the rebuilt pipeline's publish/capacity state. |
 
-Practical answer: the current contracts cover the rebuilt build, not the entire admin route universe. `page-intelligence` and `content-perf` are the two true nav routes still outside the rebuilt registry.
+Practical answer: 27 routes mount directly through the rebuilt registry. Page Intelligence is one of them. Content Performance is the only main-nav route without a direct entry, by deliberate compatibility design: it folds into the already-mounted Pipeline Published receiver only while the rebuilt flag is on. SEO Briefs, Content, and Calendar remain redirect/fold aliases, and Subscriptions remains a flag-off legacy receiver with a Pipeline query alias.
 
 ## Nav Bar Audit
 
@@ -70,7 +70,7 @@ Accepted nav parity correction:
 
 - `ODP-011` is accepted for the rebuilt shell: use prototype zones while preserving route ids and global registry semantics.
 - The prototype's `Optimization` uses `var(--purple)`, but the rebuilt implementation keeps Optimization on `var(--teal)` per the current design-system rule that purple is reserved for admin AI-only surfaces.
-- The prototype has explicit `Client-facing` destinations. The current rebuilt admin nav maps production equivalents into that zone: Action Results, Requests, and Content Perf.
+- The prototype has explicit `Client-facing` destinations. The current rebuilt admin nav maps Action Results and Requests into that zone. Content Performance no longer appears as a duplicate flag-on destination because Pipeline Published is its receiving home.
 - Current sizing is styleguide-compliant by test and smoke. The `ODP-010 C` Performance comparison concluded that the 28px pilot was too tall for the prototype; Performance returned to the compact shared header and no broader variant migration is authorized.
 
 New test coverage:
@@ -105,21 +105,21 @@ Interior state has been checked in contracts, component tests, and smoke for the
 | Assets | `media` | Dense Browse workshop, compact Repair results, Upload/asset/organize overlays, bulk and repair handoffs | `owner-approved`; production Drawers and DS color semantics remain explicit exceptions |
 | Page Rewriter | `rewrite` | Two-pane workspace, shell focus mode, page picker, export menu, `?pageUrl=` | `owner-approved`; export-only v1 and retained 62px Focus rail approved, while draft/publish remains separate backend scope |
 | Local Presence | `local-seo` | Rank/profile, Reviews/replies, setup Drawer, legacy visibility receiver | `owner-approved`; geo-grid/GBP Performance remain explicit backend exceptions |
-| Page Intelligence | `page-intelligence` | Pages master/detail Research workbench, Architecture, Guide, single/bulk analysis, keyword edit/tracking, local/rank context, SEO copy, `?tab=`/`?page=` | `awaiting owner approval`; standalone receiving-home decision implemented without changing the flag-off route |
-| Content Performance | `content-perf` / `content-pipeline?tab=published` | Four-stat summary, result cards, filters/sort, paired trend Drawer, coverage/joinback, `?item=`, flag-aware redirect | `awaiting owner approval`; flag-on folds into Published while flag-off preserves legacy route/nav |
+| Page Intelligence | `page-intelligence` | Pages master/detail Research workbench, Architecture, Guide, single/bulk analysis, keyword edit/tracking, local/rank context, SEO copy, `?tab=`/`?page=` | `owner-approved`; standalone receiving-home decision preserves the flag-off legacy route and every established capability |
+| Content Performance | `content-perf` / `content-pipeline?tab=published` | Four-stat summary, result cards, filters/sort, paired trend Drawer, coverage/joinback, `?item=`, flag-aware redirect | `owner-approved`; flag-on folds into Published while flag-off preserves the legacy route/nav |
 | Global Ops | `settings`, `workspace-settings`, `roadmap`, `revenue`, `ai-usage`, `features`, `prospect`, `outcomes-overview`, `outcomes`, `diagnostics`, `requests` | Global settings, workspace settings tabs, roadmap views, business tabs, outcomes, diagnostics, requests tabs | `owner-approved`; all 11 route homes approved with explicit `GO-*` exceptions retained |
 
 ## Layout Coverage
 
-The behavior checkpoint accounted for layout and route state across every mounted rebuilt route family. It did not complete side-by-side owner-approved visual parity, and it did not rebuild or visually audit the two non-rebuilt main-nav routes (`page-intelligence`, `content-perf`).
+The behavior checkpoint accounted for layout and route state across the original rebuilt families but did not itself establish visual parity. The later visual pass owner-approved the original 26 routes, then added and owner-approved the standalone Page Intelligence mount plus the folded Content Performance receiving home.
 
 Current layout buckets:
 
-- `owner-approved`: the original 26 mounted rebuilt route homes, including every documented production/backend/design-system exception. Joshua approved the final 24-route batch and retained Page Rewriter Focus rail on 2026-07-10.
-- `awaiting owner approval`: Page Intelligence and the Content Performance receiving-home consolidation.
-- `behavior-safe / visual-unverified`: none among the currently mounted or folded receiving homes; the two follow-ons above remain awaiting owner approval rather than owner-approved.
+- `owner-approved`: all 27 directly mounted rebuilt route homes, including Page Intelligence, plus the folded Content Performance receiving home. The original 26-route approval remains the historical batch; Joshua separately approved the later receiving-home bundle.
+- `awaiting owner approval`: no mounted or folded receiving-home visual comparison. Seven new post-parity audit circle-backs remain awaiting approval as decisions, not as silent exceptions; see `post-parity-functionality-wiring-ai-audit.md`.
+- `behavior-safe / visual-unverified`: none among the currently mounted or folded receiving homes.
 - Consolidated owner-review packet and measured registry-closeout evidence: `docs/ui-rebuild/parity/registry-final-owner-review.md` and `/tmp/asset-dashboard-codex-visual-parity/registry-final/`.
-- Receiving-home proof complete: Page Intelligence stays standalone under `ODP-012 B`; Content Pipeline Published is the flag-on Content Performance receiver. Both route ids remain intact, and both follow-ons await explicit owner visual approval.
+- Receiving-home proof and owner review complete: Page Intelligence stays standalone under `ODP-012 B`; Content Pipeline Published is the flag-on Content Performance receiver. Both route ids remain intact, and both follow-ons are owner-approved.
 - Redirect/folded only: SEO Briefs, Content, and Calendar.
 - Preserved legacy standalone receiver: Subscriptions; its Content Pipeline query alias is accounted for separately.
 
@@ -130,5 +130,5 @@ Provider evidence follow-on: `ws_demo_provider_rich` now supplies deterministic 
 Accepted on 2026-07-09:
 
 - Keep the accepted rebuilt sidebar prototype-zone grouping. Continue small token/type/accessibility fixes without changing route ids or global registry semantics.
-- Keep `page-intelligence` standalone until SEO Editor Research/detail proves complete capability parity. Treat Content Pipeline Published as the proposed `content-perf` receiving home while preserving the standalone route until a surface-scoped shipping PR proves every report and deep link on staging.
+- Keep the owner-approved standalone Page Intelligence workbench. Keep Pipeline Published as the flag-on Content Performance receiver while preserving `/content-perf` and its nav identity for flag-off compatibility. Any later route retirement still requires a surface-scoped staging PR and the route-removal checklist; no staging work is authorized by this decision.
 - Continue resolving P1 behavior mismatches first; do not spend broad visual polish time on pages whose IA is still known to disagree with the prototype.
