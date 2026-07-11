@@ -60,9 +60,12 @@ The rebuilt capture set currently contains:
 
 - `rebuilt-1440-empty.png`;
 - `rebuilt-1440-detail.png`;
-- `rebuilt-1600-detail.png`.
+- `rebuilt-1600-empty.png`;
+- `rebuilt-1600-detail.png`;
+- `rebuilt-390-empty.png`;
+- `rebuilt-390-detail.png`.
 
-The directory also retains the actual prototype references captured for Research at 1440×900 and 1600×1000 and the 1600×1000 Page Intelligence reference cards. A rebuilt 1600×1000 empty-state capture and the light mobile usability-floor capture remain pending. The captured workbench uses the approved design-system roles, Font Awesome semantic icons, teal actions, blue read-only data, and canonical score colors.
+The directory also retains the actual prototype references captured for Research at 1440×900 and 1600×1000 and the 1600×1000 Page Intelligence reference cards. The completed light mobile usability floor uses a list-to-detail flow: selecting a page replaces the rail at 390px, `Back to pages` restores it, the desktop master/detail composition remains unchanged at `md` and above, sort controls stay contained, and footer actions wrap without document or workbench overflow. The captured workbench uses the approved design-system roles, Font Awesome semantic icons, teal actions, blue read-only data, and canonical score colors.
 
 Joshua's explicit 2026-07-11 approval establishes `owner-approved` status. The independent rendered review and automated gates support that decision but do not replace it.
 
@@ -72,17 +75,12 @@ Currently proved:
 
 - registry presence for `REBUILT_SURFACES['page-intelligence']`;
 - pure valid/invalid tab resolution and page matching by id, slug, and normalized path;
-- URL precedence, fix-context retention after router-state clearing, and deliberate no-selection behavior;
-- rebuilt accessibility semantics.
-
-Required before verification closure:
-
-- a real feature-flag loading-to-ON render transition;
-- flag-off legacy rendering;
-- exact-once analysis/edit/tracking/SEO-copy capabilities and Brief/Schema/SEO Editor handoffs;
-- document and workbench overflow floors at the required viewports;
+- URL precedence, cold-load and cached-background-refresh selection after page data resolves, fix-context retention after router-state clearing, and deliberate no-selection behavior;
+- a real `ui-rebuild-shell` loading-to-ON transition and the flag-off legacy receiver;
+- exact-once analysis, keyword edit/tracking, SEO-copy, Brief, Schema, SEO Editor, and traffic handoffs;
+- desktop and 390px list-to-detail/back behavior, Back focus transfer and originating-row restoration, contained sort/footer controls, document/workbench overflow floors, and rebuilt accessibility semantics;
 - absence of internal rebuild or migration labels in rendered copy.
 
 ## Post-Approval Audit Boundary
 
-The 2026-07-11 functionality/wiring audit hardened workspace-owned state and Page Intelligence route-state isolation in `476db936a`. That safe repair does not alter this visual approval. None of `AUD-D1` through `AUD-D7` changes the Page Intelligence receiving-home decision.
+The 2026-07-11 functionality/wiring audit hardened workspace-owned state and Page Intelligence route-state isolation in `476db936a`. The post-approval closure pass in `3b7f4343f` then pinned the real flag transition/OFF receiver, exact-once capability homes, cold `?page=` initialization, and the light mobile list-to-detail floor. Fresh independent review found and resolved two final edges in `e4b12beb7`: cached partial inventories now wait for their background refresh before consuming a requested identity, and the mobile flow transfers/restores focus across the hidden list. Those safe repairs do not alter this visual approval. None of `AUD-D1` through `AUD-D7` changes the Page Intelligence receiving-home decision.

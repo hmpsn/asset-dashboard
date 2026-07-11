@@ -11,7 +11,7 @@ This audit follows the owner-approved visual baseline. It does not revoke the or
 
 - No P0 functionality loss was found.
 - Real safe-local functionality, state, invalidation, overlay, cache, AI-context, and summary-cadence defects were fixed.
-- The first three high-value frontend performance wins were implemented without changing route meaning, capability homes, or settled loaded composition.
+- Six high-value frontend performance wins were implemented without changing route meaning, capability homes, or settled loaded composition.
 - Seven material choices remain owner-gated because they change composition, capability grouping, time authority, AI refresh semantics, or shared design-system behavior.
 - A clean current all-project suite and an explicit bundle-budget disposition are still required; this audit is not a release-readiness claim.
 
@@ -28,6 +28,8 @@ This audit follows the owner-approved visual baseline. It does not revoke the or
 | `ba62f607e` | Digest/calendar/cache freshness | Aligns digest calendar selection and invalidates digest, workspace intelligence, and learnings caches from their real producers. |
 | `09bc10bfa` | Generated intelligence context | Repairs in-flight cache invalidation races, briefing voice authority, evidence-hashed LLMs.txt summaries, Admin Chat intent/provider context, prompt deduplication, and resilient conversation-summary cadence. |
 | `a90971567` | Navigation and state wiring | Restores client WS subscriptions, flag-aware palette identity/folding, Pipeline raw-route editor remounts, and Page Rewriter URL/request epoch safety. |
+| `3b7f4343f` | Page Intelligence verification closure | Pins real flag loading-to-ON and flag-off receivers, exact-once analysis/edit/tracking/copy/handoff actions, cold `?page=` initialization after data resolution, and the contained 390px list-to-detail/back floor. |
+| `e4b12beb7` | Page Intelligence focus and refresh-link closure | Transfers/restores focus across the mobile hidden-list flow and waits through cached background page refreshes before consuming a requested page identity. |
 
 These repairs are implemented and reviewed. They are not new visual-approval events.
 
@@ -45,17 +47,20 @@ The safe wave closes the directly fixable integration gaps:
 
 Two semantic choices remain owner-gated: monthly-digest time authority (`AUD-D5`) and POV evidence/voice refresh policy (`AUD-D6`).
 
-## First Safe Optimization Wave
+## Safe Optimization Waves
 
 | Commit | Quick win | Preserved contract |
 |---|---|---|
 | `f8c9fa0f9` | Lazy-load Admin Chat's heavy ChatPanel only after open and disable the invisible smart-placeholder intelligence read while closed. | Chat history, sessions, workspace isolation, focus, and open-state behavior remain. |
 | `ffd900f20` | Scope Search & Traffic provider queries by active lens, reuse parent projections, use analytics stale-time authority, and narrow event-specific invalidation while retaining the generic workspace-update fallback. | Search/Traffic/Annotations/hidden Overview routes, explicit Re-scan, provider truth, broad workspace-mutation refresh, and annotation behavior remain. |
 | `fe8ab70a2` | Defer inactive Content Pipeline workspaces/lenses and avoid duplicate full-list reads used only for counts. | Board, Intake, Brief/Draft/Review, Calendar, Published, Content Health, Matrix, capacity, and deep links remain. |
+| `faf5bd9cb` | Scope Tailwind's production utility scan to `index.html` and `src/**/*.{ts,tsx}` with an executable source-coverage contract. | Every production HTML/TS/TSX utility source remains scanned; tests, docs, and public prose no longer inflate the shipped stylesheet. |
+| `b69246f59` | Split `RenderMarkdown` from the chart-heavy client helper closure so chat/editor consumers no longer pull Recharts through a text renderer. | Markdown, tables, lists, code, rich blocks, invalid-JSON fallback, and all six direct consumers remain behavior-identical. |
+| `36a6bbd2c` | Lazy-load the 440px Keywords detail Drawer only when `?q=` or a row selection requests it, with an immediate canonical loading Drawer. | Drawer URL state, Close/Escape behavior, body scroll, row origin focus, nested controls, and settled loaded composition remain. |
 
 Independent review and settled 1440×900 / 1600×1000 smoke support these changes. That evidence confirms implementation quality, not a new owner decision.
 
-Remaining behavior-preserving optimization opportunities are lower priority: generic Admin Chat backend fanout/concurrency, Global Ops catch-all chunking, SEO Editor duplicated projections, the app-wide queue observer, invalidate-plus-immediate-refetch churn, and Cockpit whole-surface rerenders for freshness copy.
+Remaining behavior-preserving optimization opportunities are lower priority: generic Admin Chat backend fanout/concurrency, Global Ops catch-all chunking, SEO Editor duplicated projections, the app-wide queue observer, invalidate-plus-immediate-refetch churn, Cockpit whole-surface rerenders for freshness copy, and a separately reviewed dynamic DOCX-export boundary for Page Rewriter. CSS and aggregate disposition may require approved-surface consolidation or feature-flag retirement authority rather than another local micro-split.
 
 ## Owner Circle-Backs
 
@@ -81,11 +86,13 @@ Supporting evidence completed during the audit:
 - AI pipeline wiring report with zero gaps;
 - quick platform verification passed its 13 checks;
 - final fixed-viewport browser smoke at 1600×1000 and 1440×900 found no new console error or page overflow.
+- Page Intelligence closure evidence now includes empty/detail captures at both desktop viewports plus the 390px list/detail floor. Live verification proved Back focus transfer and originating-row restoration; cached partial-data refresh has a regression test; and a fresh independent review returned `PASS`. Joshua's earlier explicit approval remains the acceptance authority.
+- live Keywords row-click verification proved one Drawer, preserved `?q=`, reference-counted body-scroll release, URL cleanup, no document overflow, and focus restoration to the originating row after Close; focused Drawer/Keywords tests and a fresh review passed.
 
 Open verification truth:
 
-- the most recent all-project attempt covered 2,049 files / 28,733 tests but included two resource startup/import timeouts; both passed in isolation. Do not call that a clean all-project pass. Run a clean current all-project suite before goal completion.
-- bundle-budget verification is red: CSS 40.1 KiB versus 36.4 KiB; Keywords 11.7 KiB versus 11.6 KiB; Page Rewriter 8.7 KiB versus 8.1 KiB; aggregate 1.75 MiB versus 1.72 MiB. Sixty-eight new assets are warn-only. Resolve surgically after owner decisions; do not blindly raise the baseline.
+- the most recent all-project attempt covered 2,049 files / 28,733 tests but included two resource startup/import timeouts; both passed in isolation. It predates the final closure/performance commits and is not a clean current all-project pass. Run a clean current all-project suite before goal completion.
+- bundle-budget verification remains red, but Keywords now passes its entry budget. Remaining failures are CSS 37.5 KiB versus 36.4 KiB, Page Rewriter 8.7 KiB versus 8.1 KiB, and aggregate 1.75 MiB versus 1.72 MiB; 71 new assets are warn-only. Resolve surgically after owner decisions; do not blindly raise the baseline.
 - the bounded live provider smoke remains unexecuted without dedicated staging credentials and separate staging authority. Deterministic local fixtures cover workflow verification; credentials are needed only for live/staging provider proof.
 
 ## Shipping Boundary

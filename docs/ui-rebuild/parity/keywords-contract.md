@@ -49,6 +49,7 @@ Source-led correction result, 2026-07-10:
 - The 440px detail Drawer preserves `?q=` initialization and production actions/evidence. Data metrics use the DS blue semantics while actions remain teal.
 - Prototype-only row sparklines, period deltas, average position, and full-universe grouping remain explicit no-fabrication exceptions until server-owned read models exist.
 - Exact 1440x900, 1600x1000, all five lenses, Drawer, and mobile evidence passed fresh Sol review with `PASS`; Joshua explicitly owner-approved the composition and no-fabrication exceptions on 2026-07-10.
+- Post-approval performance hardening in `36a6bbd2c` defers the Drawer implementation until a row/card or `?q=` requests it. The immediate fallback is the same canonical 440px Drawer shell, so loaded composition and owner approval are unchanged.
 
 Why:
 
@@ -75,6 +76,7 @@ Current route/state behavior:
 - `?tab=` remains the cross-surface Hub segment/filter receiver. Legacy segment values are treated as filters, not lenses.
 - Switching `?lens=` preserves an inbound `?tab=` filter.
 - `?q=<keyword>` opens the keyword detail drawer on mount.
+- Closing the Drawer removes only `?q=`, preserves the other validated query state, releases body scroll, and restores focus to the originating row when that row still exists.
 - `filter`, `search`, `page`, `pageSize`, `sort`, and `direction` remain validated URL-backed row-query state.
 
 Compatibility requirements:
@@ -141,6 +143,7 @@ Result:
 - No console errors or failed local 400/500 responses.
 - Mobile title is visible after the header wrapping fix.
 - Browser smoke captures Rankings plus a row-click detail drawer with live measurement context at `.t-body`, no internal labels, and no horizontal overflow. Component tests cover the optional client feedback, live SERP proof, top local-result evidence, and local visibility explanation role samples because the populated browser row selected for smoke did not include those optional evidence slices.
+- The post-approval live row-click check opened exactly one Drawer, set and cleared `?q=`, restored `document.body` scrolling, kept the document at the 1600px viewport width, and returned focus to the actual originating `role="row"` after Close. Nested checkbox/button interactions remain excluded from row-focus capture.
 
 Source-led final evidence:
 
@@ -155,6 +158,8 @@ Fresh Sol verdict: `PASS`. Canvas, title/KPI/lens/tool hierarchy, dense tables, 
 
 The measured registry archive adds exact 1600x1000 prototype and rebuilt evidence for Rankings, Opportunities, Pages, Clusters, Lifecycle, and the keyword detail Drawer under `/tmp/asset-dashboard-codex-visual-parity/registry-final/`; reviewed exact 1440x900 counterparts remain authoritative. Unsupported trends and period deltas remain no-fabrication exceptions.
 
+The lazy-Drawer hardening in `36a6bbd2c` moves `KeywordDrawer` behind `lazyWithRetry`/`Suspense`, retains the canonical Drawer as the loading boundary, and captures/restores the origin focus across fallback-to-loaded replacement. Focused Keywords/Drawer tests, hooks lint, typecheck, build, PR checks, live browser verification, and a fresh reviewer `PASS` support the change. Keywords now passes its route-entry bundle budget; the branch-wide bundle and full all-project suite remain separate open gates. None of this is a new owner-approval event.
+
 ## Automated Test Floor
 
 Current branch coverage proves:
@@ -167,6 +172,7 @@ Current branch coverage proves:
 - Sort, pagination, add keyword, advanced filters, select-visible, and client feedback actions work.
 - All five lenses render and keep the rebuilt a11y floor.
 - Detail drawer opens from row click and `?q=`, carries value/provenance/outcome/local/SERP context, and avoids old internal empty labels.
+- Pointer-opened Close, Escape, and successful-delete paths preserve the remaining query state and return focus to the originating row; nested checkbox/button controls do not trigger the row-focus capture.
 - Client feedback, metric-window disclosure, SERP proof, and local evidence carry styleguide typography-role assertions.
 - Workspace events invalidate the keyword command-center query prefix.
 - Loading shimmers avoid zero-value metrics; empty, filtered-empty, stale-error, and locked states are action-oriented.
