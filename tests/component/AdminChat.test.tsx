@@ -86,6 +86,7 @@ function renderChat(
 async function openChat() {
   fireEvent.click(screen.getByRole('button', { name: /admin insights/i }));
   await screen.findByText('Admin Insights', { selector: 'span' });
+  await screen.findByPlaceholderText('Ask anything...');
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -93,6 +94,7 @@ async function openChat() {
 describe('AdminChat', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
     mockChatApi.adminAsk.mockResolvedValue({ answer: 'AI response here', mode: 'analyst' });
     mockChatApi.sessions.mockResolvedValue([]);
     mockChatApi.session.mockResolvedValue({ messages: [] });

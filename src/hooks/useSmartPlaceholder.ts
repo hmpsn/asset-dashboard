@@ -20,6 +20,8 @@ export interface SmartPlaceholderResult {
 interface UseSmartPlaceholderOptions {
   workspaceId: string;
   isAdminContext: boolean;
+  /** Allows closed or otherwise hidden consumers to defer the intelligence read. */
+  enabled?: boolean;
 }
 
 /** Generic fallback when seoContext is unavailable */
@@ -73,14 +75,14 @@ function buildAdminSuggestions(
 }
 
 export function useSmartPlaceholder(
-  { workspaceId, isAdminContext }: UseSmartPlaceholderOptions,
+  { workspaceId, isAdminContext, enabled = true }: UseSmartPlaceholderOptions,
 ): SmartPlaceholderResult {
   // Fetch seoContext slice — reads from 5-min TTL cache on server
   // Only fetch when we have a workspaceId
   const { data: intel } = useQuery({
     queryKey: queryKeys.admin.intelligence(workspaceId, ['seoContext']),
     queryFn: ({ signal }) => intelligenceApi.getIntelligence(workspaceId, ['seoContext'], undefined, undefined, signal),
-    enabled: !!workspaceId && isAdminContext,
+    enabled: enabled && !!workspaceId && isAdminContext,
     staleTime: 5 * 60 * 1000, // match server cache TTL
   });
 

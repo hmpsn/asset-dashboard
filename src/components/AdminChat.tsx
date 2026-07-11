@@ -1,11 +1,13 @@
-import { useState, useLayoutEffect, useRef, useCallback } from 'react';
+import { Suspense, useState, useLayoutEffect, useRef, useCallback } from 'react';
 import { X, MessageSquare, Bot, Plus, PanelRightClose, PanelRightOpen } from 'lucide-react';
-import { ChatPanel } from './ChatPanel';
 import type { ChatMessage } from './ChatPanel';
 import { chat } from '../api/misc';
 import { useSmartPlaceholder } from '../hooks/useSmartPlaceholder';
 import { Icon, Button, IconButton, ClickableRow, cn } from './ui';
 import { formatDate } from '../utils/formatDates';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
+
+const ChatPanel = lazyWithRetry(() => import('./ChatPanel').then(module => ({ default: module.ChatPanel })));
 
 const ADMIN_QUICK_QUESTIONS = [
   'Give me a full status report on this site',
@@ -172,6 +174,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
   const { placeholder: smartPlaceholder, suggestions } = useSmartPlaceholder({
     workspaceId,
     isAdminContext: true,
+    enabled: open,
   });
 
   const placeholder = chatMode === 'content_reviewer'
@@ -299,26 +302,39 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
               ))}
             </div>
           ) : (
-            <ChatPanel
-              messages={messages}
-              loading={loading}
-              input={input}
-              onInputChange={setInput}
-              onSend={askAi}
-              quickQuestions={ADMIN_QUICK_QUESTIONS}
-              placeholder={placeholder}
-              accent="teal"
-              suggestionChips={chatMode === 'analyst' ? suggestions : undefined}
-              onChipClick={(chip) => {
-                setInput(chip);
-                askAi(chip);
-              }}
-              emptyExtra={
-                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">
-                  Internal analyst for <strong className="text-[var(--brand-text)]">{workspaceName}</strong>. Full data access — paste a URL to analyze a page, or paste content for a review.
-                </p>
-              }
-            />
+            <Suspense
+              fallback={(
+                <div
+                  role="status"
+                  aria-live="polite"
+                  aria-label="Loading Admin Insights conversation"
+                  className="flex flex-1 items-center justify-center p-6 t-caption text-[var(--brand-text-muted)]"
+                >
+                  Preparing your conversation…
+                </div>
+              )}
+            >
+              <ChatPanel
+                messages={messages}
+                loading={loading}
+                input={input}
+                onInputChange={setInput}
+                onSend={askAi}
+                quickQuestions={ADMIN_QUICK_QUESTIONS}
+                placeholder={placeholder}
+                accent="teal"
+                suggestionChips={chatMode === 'analyst' ? suggestions : undefined}
+                onChipClick={(chip) => {
+                  setInput(chip);
+                  askAi(chip);
+                }}
+                emptyExtra={
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">
+                    Internal analyst for <strong className="text-[var(--brand-text)]">{workspaceName}</strong>. Full data access — paste a URL to analyze a page, or paste content for a review.
+                  </p>
+                }
+              />
+            </Suspense>
           )}
         </div>
       )}
