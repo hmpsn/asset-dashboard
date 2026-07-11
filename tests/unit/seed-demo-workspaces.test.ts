@@ -2,7 +2,12 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { assertDemoSeedEnvironmentSafe, DEMO_WORKSPACES } from '../../scripts/seed-demo-workspaces.ts';
+import {
+  assertDemoSeedEnvironmentSafe,
+  DEMO_WORKSPACES,
+  PROVIDER_RICH_DEMO_WORKSPACE,
+} from '../../scripts/seed-demo-workspaces.ts';
+import { LOCAL_PROVIDER_FIXTURE } from '../../server/providers/local-provider-fixtures.ts';
 import type { ClientActionSourceType } from '../../shared/types/client-actions.ts';
 
 const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
@@ -108,5 +113,18 @@ describe('seed demo workspaces safety', () => {
     expect(broken?.gscPropertyUrl).toBeNull();
     expect(broken?.ga4PropertyId).toBeNull();
     expect(broken?.seoDataProvider).toBe('dataforseo');
+  });
+
+  it('defines a separate provider-rich fixture without changing canonical scenario parity', () => {
+    expect(PROVIDER_RICH_DEMO_WORKSPACE).toMatchObject({
+      id: LOCAL_PROVIDER_FIXTURE.workspaceId,
+      domain: LOCAL_PROVIDER_FIXTURE.domain,
+      webflowSiteId: LOCAL_PROVIDER_FIXTURE.siteId,
+      gscPropertyUrl: LOCAL_PROVIDER_FIXTURE.gscPropertyUrl,
+      ga4PropertyId: LOCAL_PROVIDER_FIXTURE.ga4PropertyId,
+      scenario: 'provider-rich',
+      tier: 'premium',
+    });
+    expect(DEMO_WORKSPACES.some((workspace) => workspace.id === LOCAL_PROVIDER_FIXTURE.workspaceId)).toBe(false);
   });
 });

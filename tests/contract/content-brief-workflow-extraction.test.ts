@@ -10,7 +10,7 @@ describe('ContentBriefs workflow extraction boundary', () => {
   const hook = read('src/hooks/admin/useAdminBriefWorkflow.ts');
 
   it('keeps ContentBriefs as the render shell over useAdminBriefWorkflow', () => {
-    expect(component).toContain('useAdminBriefWorkflow({ workspaceId, fixContext, clearFixContext })');
+    expect(component).toContain('useAdminBriefWorkflow({ workspaceId, fixContext, clearFixContext, initialBriefId })');
     expect(component).toContain('<BriefGenerator');
     expect(component).toContain('<RequestList');
     expect(component).toContain('<BriefList');

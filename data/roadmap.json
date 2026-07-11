@@ -62,6 +62,18 @@
           "completedAt": "2026-07-10",
           "owner": "workspace-command-center",
           "notes": "Completed 2026-07-10 in codex/ui-visual-parity. Joshua approved the final 24-route batch with all documented production/data/backend exceptions and retained the Page Rewriter 62px Focus rail. Together with Insights Engine and Brand & AI, all 26 REBUILT_SURFACES route homes are owner-approved. The source-led pass covers Cockpit, Content Pipeline, SEO Editor, Search & Traffic, Asset Manager, Performance, Site Audit, Schema, Links, Competitors, Keyword Hub, Page Rewriter, Local Presence, and all 11 Global Ops route homes at 1440x900 and 1600x1000 while preserving ui-rebuild-shell, route/deep-link contracts, aliases, and exact-once capability homes. Final focused verification passes 291 tests across 22 files plus hooks lint, typecheck, Vite build, deferred-ledger verification, pr-check, diff hygiene, clean browser reload, and fresh final Sol PASS. Evidence: /tmp/asset-dashboard-codex-visual-parity/registry-final/. This is owner-approved visual parity in the isolated branch, not staging or production shipment; staging extraction remains separately pending and unauthorized."
+        },
+        {
+          "id": "ui-rebuild-provider-readiness",
+          "title": "Provider-ready local fixtures, health truth, and bounded staging smoke",
+          "source": "Visual-parity provider readiness follow-on 2026-07-10",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-10",
+          "completedAt": "2026-07-10",
+          "owner": "integrations",
+          "notes": "Completed locally on codex/ui-visual-parity. Added explicit local-fake/local-live/staging environment profiles, deterministic provider-rich demo fixtures scoped to ws_demo_provider_rich, truthful DataForSEO/GSC/GA4/PageSpeed/GBP health and verification states, and a read-only staging smoke with an HTTPS/non-production guard, redacted output, and a default one-call paid-provider ceiling. No OAuth identities, API keys, reviews, or unsupported actions are fabricated. Focused provider/health/env coverage passes; staging live-provider verification remains intentionally unrun until dedicated staging credentials and Joshua-authorized staging access are available."
         }
       ]
     },

@@ -76,6 +76,10 @@ These are not visual omissions and must not be “fixed” by inventing data:
 
 Component fixtures protect populated ordering and interaction composition where live provider data is unavailable. Owner approval covers the composition plus each truthful unavailable state; no fabricated browser content is authorized.
 
+### Provider-readiness follow-on
+
+The isolated branch now includes an explicit provider-rich development fixture (`ws_demo_provider_rich`) and truthful health states for DataForSEO, GSC, GA4, PageSpeed, and GBP. This improves repeatable local review without changing the owner-approved exception policy: OAuth identity, authenticated GBP reviews, and live provider verification are never simulated. A bounded read-only staging smoke is ready, but remains unexecuted until dedicated staging credentials and separate staging authority are supplied.
+
 ## Production-Only State Policy
 
 The following remain explicit exceptions because no prototype counterpart exists: activity/work-order overlays, provider and evidence Drawers, upload/detail/organize/progress flows, hidden compatibility receivers, bulk workflows, workspace-settings dense tabs, cleanup/archive dialogs, per-workspace outcomes, diagnostics history/list, and the Requests segmented hybrid.

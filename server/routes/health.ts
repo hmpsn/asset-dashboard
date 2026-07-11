@@ -15,7 +15,7 @@ import { getStorageReport, pruneChatSessions, pruneBackups, pruneReportSnapshots
 import { DEFAULT_BACKUP_RETENTION_DAYS } from '../backup.js';
 import { getDataForSeoUsage } from '../providers/dataforseo-provider.js';
 import { evaluateCreditBudget } from '../credit-budget-gate.js';
-import { listProviders } from '../seo-data-provider.js';
+import { getConfiguredProvider, getProviderForCapability, listProviders } from '../seo-data-provider.js';
 import { getTokenUsage } from '../openai-helpers.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import db from '../db/index.js';
@@ -24,6 +24,10 @@ import { createLogger } from '../logger.js';
 import type { IntegrationHealthItem, IntegrationHealthState, WorkspaceIntegrationHealth } from '../../shared/types/integration-health.js';
 import { buildWorkspaceObservabilityReport } from '../platform-observability-report.js';
 import { parsePositiveIntQuery } from '../query-param-parsers.js';
+import { getPageSpeedSummary } from '../performance-store.js';
+import { getGbpConnectionSafe, getWorkspaceGbpMappingRead } from '../google-business-profile-store.js';
+import { getWorkspaceGbpAuthenticatedReviews } from '../google-business-profile-reviews-store.js';
+import { isLocalFakeProviderModeEnabled } from '../local-provider-mode.js';
 
 
 const log = createLogger('health');
@@ -170,6 +174,8 @@ router.get('/api/integrations/health/:workspaceId', requireWorkspaceAccess('work
 
   const providerStatus = listProviders();
   const dataforseoProvider = providerStatus.find(provider => provider.name === 'dataforseo');
+  const configuredSeoProvider = getConfiguredProvider(workspace.seoDataProvider);
+  const providerMode = isLocalFakeProviderModeEnabled() ? 'local-fixture' : 'live';
 
   const dataforseoUsage = getDataForSeoUsage(workspaceId);
   // P5 — month-to-date credit budget for the DataForSEO health card quota status.
@@ -178,6 +184,15 @@ router.get('/api/integrations/health/:workspaceId', requireWorkspaceAccess('work
   const openAiUsageEntries = aiUsage.entries.filter(entry => !entry.model.includes('claude'));
   const anthropicUsageEntries = aiUsage.entries.filter(entry => entry.model.includes('claude'));
   const stripeConfig = getStripeConfigSafe();
+  const pageSpeedMobile = hasWebflowSite ? getPageSpeedSummary(workspace.webflowSiteId!, 'mobile') : null;
+  const pageSpeedDesktop = hasWebflowSite ? getPageSpeedSummary(workspace.webflowSiteId!, 'desktop') : null;
+  const latestPageSpeedAt = [pageSpeedMobile?.createdAt, pageSpeedDesktop?.createdAt]
+    .filter((value): value is string => !!value)
+    .sort()
+    .at(-1) ?? null;
+  const gbpConnection = getGbpConnectionSafe();
+  const gbpMapping = getWorkspaceGbpMappingRead(workspaceId);
+  const gbpReviews = getWorkspaceGbpAuthenticatedReviews(workspaceId);
 
   const integrations: IntegrationHealthItem[] = [
     createIntegration({
@@ -200,6 +215,7 @@ router.get('/api/integrations/health/:workspaceId', requireWorkspaceAccess('work
       label: 'Google Auth',
       configured: googleConfigured,
       connected: googleOperational,
+      verificationStatus: googleOperational ? 'verified' : 'not_checked',
       state: googleConfigured && !googleOperational ? 'degraded' : undefined,
       lastSuccessAt: null,
       lastErrorAt: null,
@@ -217,9 +233,10 @@ router.get('/api/integrations/health/:workspaceId', requireWorkspaceAccess('work
     createIntegration({
       key: 'gsc',
       label: 'Google Search Console Property',
-      configured: googleOperational && hasGscProperty,
-      connected: googleOperational && hasGscProperty,
-      state: googleOperational && !hasGscProperty ? 'degraded' : undefined,
+      configured: googleConfigured && hasGscProperty,
+      connected: googleConfigured && googleOperational && hasGscProperty,
+      state: googleConfigured && (!googleOperational || !hasGscProperty) ? 'degraded' : undefined,
+      verificationStatus: 'not_checked',
       lastSuccessAt: null,
       lastErrorAt: null,
       lastError: googleOperational
@@ -236,9 +253,10 @@ router.get('/api/integrations/health/:workspaceId', requireWorkspaceAccess('work
     createIntegration({
       key: 'ga4',
       label: 'GA4 Property',
-      configured: googleOperational && hasGa4Property,
-      connected: googleOperational && hasGa4Property,
-      state: googleOperational && !hasGa4Property ? 'degraded' : undefined,
+      configured: googleConfigured && hasGa4Property,
+      connected: googleConfigured && googleOperational && hasGa4Property,
+      state: googleConfigured && (!googleOperational || !hasGa4Property) ? 'degraded' : undefined,
+      verificationStatus: 'not_checked',
       lastSuccessAt: null,
       lastErrorAt: null,
       lastError: googleOperational
@@ -257,6 +275,19 @@ router.get('/api/integrations/health/:workspaceId', requireWorkspaceAccess('work
       label: 'DataForSEO',
       configured: !!dataforseoProvider?.configured,
       connected: !!dataforseoProvider?.configured,
+      verificationStatus: providerMode === 'local-fixture' && dataforseoProvider?.configured
+        ? 'verified'
+        : latestTimestamp(dataforseoUsage.entries)
+          ? 'verified'
+          : 'not_checked',
+      providerMode,
+      capabilities: [
+        { key: 'keyword_metrics', label: 'Keyword metrics', available: !!configuredSeoProvider, detail: null },
+        { key: 'backlinks', label: 'Backlinks', available: !!getProviderForCapability('backlinks', workspace.seoDataProvider), detail: null },
+        { key: 'national_serp', label: 'National SERP', available: !!configuredSeoProvider?.getNationalSerp, detail: null },
+        { key: 'business_listings', label: 'Business listings', available: !!configuredSeoProvider?.getBusinessListings, detail: null },
+        { key: 'llm_mentions', label: 'LLM mentions', available: !!configuredSeoProvider?.getLlmMentions, detail: null },
+      ],
       lastSuccessAt: latestTimestamp(dataforseoUsage.entries),
       lastErrorAt: null,
       lastError: dataforseoProvider?.configured ? null : 'DataForSEO credentials are not configured',
@@ -278,6 +309,52 @@ router.get('/api/integrations/health/:workspaceId', requireWorkspaceAccess('work
       tokenExpiresAt: null,
       affectedFeatures: ['Keyword strategy', 'SERP research', 'Backlink and domain analysis'],
       notes: dataforseoProvider?.configured ? null : 'Set DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD.',
+    }),
+    createIntegration({
+      key: 'pagespeed',
+      label: 'Google PageSpeed Insights',
+      configured: hasWebflowSite,
+      connected: !!latestPageSpeedAt,
+      state: hasWebflowSite && !latestPageSpeedAt ? 'degraded' : undefined,
+      verificationStatus: latestPageSpeedAt ? 'verified' : 'not_checked',
+      lastSuccessAt: latestPageSpeedAt,
+      lastErrorAt: null,
+      lastError: hasWebflowSite ? null : 'No Webflow site is linked for PageSpeed targets',
+      quotaStatus: 'unknown',
+      quotaDetail: process.env.GOOGLE_PSI_KEY || process.env.GOOGLE_API_KEY
+        ? 'PageSpeed API key is configured.'
+        : 'Keyless PageSpeed quota is available at a lower daily limit.',
+      tokenExpiresAt: null,
+      affectedFeatures: ['Performance', 'Core Web Vitals', 'SEO audits'],
+      capabilities: [
+        { key: 'mobile', label: 'Mobile snapshot', available: !!pageSpeedMobile, detail: pageSpeedMobile ? `${pageSpeedMobile.pageCount} page(s)` : null },
+        { key: 'desktop', label: 'Desktop snapshot', available: !!pageSpeedDesktop, detail: pageSpeedDesktop ? `${pageSpeedDesktop.pageCount} page(s)` : null },
+      ],
+      notes: hasWebflowSite ? 'Run a PageSpeed report to verify the connected target.' : 'Link a Webflow site before running PageSpeed.',
+    }),
+    createIntegration({
+      key: 'gbp',
+      label: 'Google Business Profile',
+      configured: gbpConnection.configured,
+      connected: gbpConnection.connected,
+      state: gbpConnection.configured && !gbpConnection.connected ? 'degraded' : undefined,
+      verificationStatus: gbpConnection.connected && gbpConnection.lastSyncedAt
+        ? 'verified'
+        : gbpConnection.configured && !gbpConnection.connected
+          ? 'failed'
+          : 'not_checked',
+      lastSuccessAt: gbpConnection.lastSyncedAt ?? null,
+      lastErrorAt: null,
+      lastError: gbpConnection.configured && !gbpConnection.connected ? 'Google Business Profile reconnect is required' : null,
+      quotaStatus: 'unknown',
+      quotaDetail: 'GBP API quota status is not currently exposed.',
+      tokenExpiresAt: gbpConnection.expiresAt ?? null,
+      affectedFeatures: ['Local Presence', 'Authenticated reviews', 'Review responses'],
+      capabilities: [
+        { key: 'location_mapping', label: 'Location mapping', available: gbpMapping.mappings.length > 0, detail: `${gbpMapping.mappings.length} mapped` },
+        { key: 'authenticated_reviews', label: 'Authenticated reviews', available: gbpReviews.locations.length > 0, detail: `${gbpReviews.aggregate.totalReviewCount} review(s)` },
+      ],
+      notes: gbpConnection.configured ? null : 'Connect Google Business Profile from workspace settings.',
     }),
     createIntegration({
       key: 'stripe',

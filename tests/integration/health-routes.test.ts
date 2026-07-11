@@ -160,8 +160,16 @@ describe('Integration health center endpoint', () => {
     const keys = new Set((body.integrations as Array<{ key: string }>).map(item => item.key));
     expect(keys.has('webflow')).toBe(true);
     expect(keys.has('google')).toBe(true);
+    expect(keys.has('pagespeed')).toBe(true);
+    expect(keys.has('gbp')).toBe(true);
     expect(keys.has('openai')).toBe(true);
     expect(keys.has('email')).toBe(true);
+
+    const integrations = body.integrations as Array<{ verificationStatus?: string }>;
+    expect(integrations.length).toBeGreaterThan(0);
+    for (const item of integrations) {
+      expect(typeof item.verificationStatus).toBe('string');
+    }
   });
 
   it('GET /api/integrations/health/:workspaceId with unknown workspace returns 404', async () => {

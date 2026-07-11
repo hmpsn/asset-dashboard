@@ -121,6 +121,8 @@ Current layout buckets:
 - Redirect/folded only: SEO Briefs, Content, and Calendar.
 - Preserved legacy standalone receiver: Subscriptions; its Content Pipeline query alias is accounted for separately.
 
+Provider evidence follow-on: `ws_demo_provider_rich` now supplies deterministic development-only GSC, GA4, PageSpeed, SEO-provider, and local-search evidence when `LOCAL_FAKE_PROVIDERS=true`. Integration health distinguishes configured, connected, verified, provider mode, and supported capabilities. This closes local evidence repeatability, not the authenticated-provider exceptions: GBP OAuth/reviews and live staging verification still require dedicated credentials, and the bounded read-only staging smoke has not been run.
+
 ## Accepted Scope Direction
 
 Accepted on 2026-07-09:

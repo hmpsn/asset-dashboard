@@ -9,6 +9,10 @@ import { googleJson, isGoogleProviderError } from './google-provider-client.js';
 import { createLogger } from './logger.js';
 import { normalizePageUrl } from './utils/page-address.js';
 import type { AnalyticsDateRange } from '../shared/types/analytics-contract.js';
+import {
+  buildLocalGa4FixtureReport,
+  isLocalProviderFixtureProperty,
+} from './providers/local-provider-fixtures.js';
 const log = createLogger('ga4');
 
 const GA4_API = 'https://analyticsdata.googleapis.com/v1beta';
@@ -115,6 +119,9 @@ export async function listGA4Properties(): Promise<GA4Property[]> {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function runReport(propertyId: string, body: Record<string, unknown>): Promise<any> {
+  if (isLocalProviderFixtureProperty(propertyId)) {
+    return buildLocalGa4FixtureReport(body);
+  }
   const token = await getGlobalToken();
   if (!token) throw new Error('Google not connected');
 

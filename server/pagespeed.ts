@@ -4,6 +4,10 @@ import { createLogger } from './logger.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { getWorkspace, getWorkspaceBySiteId } from './workspaces.js';
 import { getSiteSubdomain } from './webflow-pages.js';
+import {
+  buildLocalPageSpeedFixture,
+  buildLocalSiteSpeedFixture,
+} from './providers/local-provider-fixtures.js';
 
 const log = createLogger('pagespeed');
 const PSI_API = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
@@ -310,6 +314,8 @@ export async function runSinglePageSpeed(
   strategy: 'mobile' | 'desktop' = 'mobile',
   pageTitle: string = '',
 ): Promise<PageSpeedResult | null> {
+  const localFixture = buildLocalPageSpeedFixture(url, strategy, pageTitle);
+  if (localFixture) return localFixture;
   log.info(`PageSpeed: testing single page ${url} (${strategy})`);
   const data = await runPageSpeed(url, strategy);
   if (!data) return null;
@@ -336,6 +342,8 @@ export async function runSiteSpeed(
   maxPages: number = 5,
   workspaceId?: string,
 ): Promise<SiteSpeedResult> {
+  const localFixture = buildLocalSiteSpeedFixture(siteId, strategy, maxPages, workspaceId);
+  if (localFixture) return localFixture;
   const wsId = workspaceId || getWorkspaceBySiteId(siteId)?.id;
   const ws = wsId ? getWorkspace(wsId) : undefined;
   const token = ws?.webflowToken || process.env.WEBFLOW_API_TOKEN || '';
