@@ -353,7 +353,42 @@ export interface ContentPerformanceGa4Metrics {
 }
 
 export type ContentPerformanceSource = 'request' | 'matrix';
+export type ContentPerformanceTrendAvailability =
+  | 'available'
+  | 'insufficient_data'
+  | 'gsc_not_configured'
+  | 'page_unmapped'
+  | 'source_unsupported';
 export type ContentTermCoverageStatus = 'strong' | 'partial' | 'weak' | 'unavailable';
+
+export interface ContentPerformanceTrendPoint {
+  date: string;
+  clicks: number;
+  impressions: number;
+  /** Already a percentage. */
+  ctr: number;
+  position: number;
+}
+
+export interface ContentPerformanceTrendResponse {
+  availability: ContentPerformanceTrendAvailability;
+  reason?: string;
+  trend: ContentPerformanceTrendPoint[];
+}
+
+export interface ContentPerformanceSummary {
+  piecesTracked: number;
+  piecesPublished: number;
+  piecesDelivered: number;
+  totalClicks: number;
+  totalImpressions: number;
+  totalSessions: number;
+  averagePosition: number | null;
+  measuredOutcomes: number;
+  wins: number;
+  /** Positive means ranking positions improved; null means no position-based readback exists. */
+  averagePositionGain: number | null;
+}
 
 export interface ContentTermCoverageGrade {
   status: ContentTermCoverageStatus;
@@ -382,6 +417,8 @@ export interface ContentPerformanceJoinback {
 }
 
 export interface ContentPerformanceItem {
+  /** Stable identity across request-backed and matrix-backed published work. */
+  itemId: string;
   requestId: string;
   topic: string;
   targetKeyword: string;
@@ -392,7 +429,7 @@ export interface ContentPerformanceItem {
   daysSincePublish: number;
   gsc: ContentPerformanceGscMetrics | null;
   ga4: ContentPerformanceGa4Metrics | null;
-  source?: ContentPerformanceSource;
+  source: ContentPerformanceSource;
   coverage: ContentTermCoverageGrade;
   joinback?: ContentPerformanceJoinback;
   /**
@@ -407,6 +444,7 @@ export interface ContentPerformanceItem {
 }
 
 export interface ContentPerformanceResponse {
+  summary: ContentPerformanceSummary;
   items: ContentPerformanceItem[];
 }
 

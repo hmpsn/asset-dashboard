@@ -3,6 +3,7 @@ import { ApiError, get, post, put, patch, del, getSafe, getOptional } from './cl
 import type { LatestRank, RankHistoryEntry, TrackedKeyword } from '../../shared/types/rank-tracking';
 import type { KeywordStrategyDiff as StrategyDiff } from '../../shared/types/keyword-strategy-ux';
 import type { AdminKeywordFeedbackListRow } from '../../shared/types/keyword-feedback';
+import type { ContentPerformanceResponse, ContentPerformanceTrendResponse } from '../../shared/types/content';
 import { readNdjsonStream } from './streamUtils';
 export {
   schema,
@@ -359,17 +360,14 @@ export const seoSuggestions = {
 
 // ── Content performance ─────────────────────────────────────────
 export const contentPerformance = {
-  get: (wsId: string, days?: number) =>
-    get<unknown>(`/api/content-performance/${wsId}${days ? `?days=${days}` : ''}`),
+  get: (wsId: string) =>
+    get<ContentPerformanceResponse>(`/api/content-performance/${wsId}`),
 
   publicGet: (wsId: string) =>
-    getOptional<unknown>(`/api/public/content-performance/${wsId}`),
+    getOptional<ContentPerformanceResponse>(`/api/public/content-performance/${wsId}`),
 
-  refresh: (wsId: string) =>
-    post<unknown>(`/api/content-performance/${wsId}/refresh`),
-
-  trend: (wsId: string, requestId: string) =>
-    get<unknown>(`/api/content-performance/${wsId}/${requestId}/trend`),
+  trend: (wsId: string, itemId: string) =>
+    get<ContentPerformanceTrendResponse>(`/api/content-performance/${wsId}/${itemId}/trend`),
 };
 
 // ── AEO Review ──────────────────────────────────────────────────

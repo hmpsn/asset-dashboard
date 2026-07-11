@@ -18,11 +18,10 @@ import {
   updateContentRequest,
   deleteContentRequest,
 } from '../content-requests.js';
-import { handleContentPerformance } from '../domains/content/content-performance.js';
+import { getContentPerformanceTrend, handleContentPerformance } from '../domains/content/content-performance.js';
 import { sendPostToClientForReview, PostNotFoundError } from '../domains/content/send-post-to-client.js';
 import { listPosts } from '../content-posts.js';
 import { notifyClientBriefReady, notifyClientContentPublished, notifyClientPostReady } from '../email.js';
-import { getPageTrend } from '../search-console.js';
 import { CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
 import {
   getSiteSubdomain,
@@ -304,29 +303,9 @@ router.get('/api/content-performance/:workspaceId', requireWorkspaceAccess('work
 // Per-post GSC trend (daily clicks/impressions since publish)
 router.get('/api/content-performance/:workspaceId/:requestId/trend', requireWorkspaceAccess('workspaceId'), async (req, res) => {
   try {
-    const ws = getWorkspace(req.params.workspaceId);
-    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-    const request = getContentRequest(req.params.workspaceId, req.params.requestId);
-    if (!request) return res.status(404).json({ error: 'Request not found' });
-    if (!request.targetPageSlug || !ws.gscPropertyUrl || !ws.webflowSiteId) {
-      return res.json({ trend: [] });
-    }
-
-    // Build full URL for the page
-    let siteBase = ws.gscPropertyUrl.replace(/\/$/, '');
-    if (siteBase.startsWith('sc-domain:')) {
-      siteBase = `https://${siteBase.replace('sc-domain:', '')}`;
-    }
-    const pagePath = normalizePageUrl(request.targetPageSlug);
-    const pageUrl = `${siteBase}${pagePath}`;
-
-    // Use publish date as start, or default to 90 days
-    const publishDate = request.updatedAt || request.requestedAt;
-    const startDate = publishDate.split('T')[0];
-    const endDate = new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0]; // 3-day GSC delay
-
-    const trend = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, pageUrl, 90, { startDate, endDate });
-    res.json({ trend });
+    const result = await getContentPerformanceTrend(req.params.workspaceId, req.params.requestId);
+    if (!result) return res.status(404).json({ error: 'Published item not found' });
+    res.json(result);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({ error: msg });
