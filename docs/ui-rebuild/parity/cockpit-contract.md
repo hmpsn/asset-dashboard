@@ -108,7 +108,7 @@ No open Cockpit smoke gaps remain for the current fixture set. The source-led co
 
 ## Post-Approval KPI Circle-Back — 2026-07-11
 
-The independent capability audit confirmed that Search/GA4 reporting already has an exact home in Search & Traffic, but the legacy workspace home also carried three distinct operator decisions not reproduced in the rebuilt Cockpit: organic traffic value, content velocity, and overall health. `AUD-D2` is `awaiting owner approval`. Recommended: do not duplicate Search/GA4 metrics; add one compact secondary band for those three unique decisions, or explicitly approve their omission. The existing Cockpit visual approval remains intact until Joshua resolves the new circle-back.
+The independent capability audit confirmed that Search/GA4 reporting already has an exact home in Search & Traffic, but the legacy workspace home also carried three distinct operator decisions not reproduced in the rebuilt Cockpit: organic traffic value, content velocity, and overall health. Joshua approved `AUD-D2` on 2026-07-11: add one compact secondary band for those decisions without duplicating Search/GA4 metrics. Implementation evidence remains pending under the closure plan.
 
 ## Automated Test Floor
 

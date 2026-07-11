@@ -13,8 +13,12 @@ export interface ClientInsight {
   impactScore: number;
 }
 
-/** Monthly performance digest for client dashboard */
+/** Whether the current UTC operational month has evidence worth summarizing. */
+export type MonthlyDigestAvailability = 'ready' | 'no_data';
+
+/** Monthly performance digest for client dashboard. Always the current UTC operational month. */
 export interface MonthlyDigestData {
+  availability: MonthlyDigestAvailability;
   month: string;             // "March 2026"
   period: { start: string; end: string };
   summary: string;           // AI-generated 2-3 sentence overview
@@ -48,4 +52,3 @@ export interface ROIHighlight {
   /** Dollar value attributed to this outcome (clicks_delta × CPC). Null when CPC unavailable. */
   attributedValue: number | null;
 }
-

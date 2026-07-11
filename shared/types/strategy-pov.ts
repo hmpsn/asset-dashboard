@@ -45,3 +45,17 @@ export interface StrategyPovAIOutput {
 }
 
 export type StrategyPovVariant = 'admin' | 'client';
+
+/**
+ * Canonical API envelope for every Strategy POV read/write path.
+ * `refreshAvailable` is computed from the current effective prompt inputs; it is
+ * never inferred by the client from timestamps or recommendation ids.
+ */
+export interface StrategyPovResponse {
+  pov: StrategyPov | null;
+  refreshAvailable: boolean;
+  /** True when a normal generate found the canonical fingerprint unchanged. */
+  unchanged?: boolean;
+  /** True when automatic generation preserved an operator edit instead of replacing it. */
+  editPreserved?: boolean;
+}

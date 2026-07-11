@@ -121,7 +121,7 @@ Accepted owner directions, circle-back triggers, and remaining risks are tracked
    - Deliverable: one discrepancy matrix, corrected evidence set, fresh review, and explicit Joshua decision per surface.
 
 23. Post-parity functionality, wiring, and AI-intelligence audit
-   - Audit status: no P0 loss found; safe repairs implemented; seven owner circle-backs remain `awaiting owner approval`.
+   - Audit status: no P0 loss found; safe repairs implemented; Joshua approved all seven owner circle-backs and the targeted bundle disposition on 2026-07-11; implementation follows the closure plan.
    - Deliverable completed: safe client review targets, workspace-owned state isolation, admin refresh wiring, provider-backed intelligence invalidation, AI reliability evidence matching, stacked overlay coordination, digest/cache freshness, generated-context freshness, and final navigation/deep-link wiring landed in `8f6c3ce83` through `a90971567` as enumerated in `post-parity-functionality-wiring-ai-audit.md`.
    - Remaining decision gate: `AUD-D1` through `AUD-D7` cover Engine legacy workflow homes, unique Cockpit KPIs, shell connection health, Published impressions/sessions placement, monthly-digest time authority, POV refresh semantics, and shared Tooltip overlay behavior. None is an approved exception yet.
 

@@ -237,7 +237,7 @@ Verification: 143 tests pass across 13 focused/integration files; `npm run lint:
 
 The independent legacy-versus-rebuilt audit found that the current Engine Backing Moves composition receives every recommendation row even though only the staged/sendable set excludes `completed` and `dismissed`. It also found no rebuilt receiving home for Weekly Briefing review, the complete terminal recommendation history/un-dismiss/full OV-EMV workflow, or SEO Change Impact. The earlier V5 approval covered provider evidence and collapsed Operations as a production-capability exception; it did not explicitly approve losing these named legacy workflows.
 
-`AUD-D1` is therefore `awaiting owner approval`. Recommended: keep the primary Backing Moves queue active-only and add compact collapsed Operations groups for Weekly Briefing, terminal recommendation history, and SEO Change Impact. Do not implement the regrouping or silently extend V5 until Joshua decides.
+Joshua approved `AUD-D1` on 2026-07-11 with **“Let’s do it.”** The owner-approved implementation keeps the primary Backing Moves queue active-only and adds compact default-collapsed Operations groups for Weekly Briefing, the full non-active recommendation complement, and SEO Change Impact. Implementation evidence remains pending under the closure plan.
 
 ## Browser Smoke Checklist
 

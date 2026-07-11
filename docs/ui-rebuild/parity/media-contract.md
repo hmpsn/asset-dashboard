@@ -156,7 +156,7 @@ The measured registry archive adds exact prototype repair-selection evidence at 
 
 ## Post-Approval Overlay Circle-Back — 2026-07-11
 
-The runtime audit confirmed canonical stacked Modal/Drawer behavior after `4e647d093`, but Tooltip still uses the global tooltip z-layer and can render beneath an open Asset Manager Drawer. `AUD-D7` is `awaiting owner approval`. Recommended: make the shared Tooltip overlay-aware so help opened from the topmost canonical overlay remains above that overlay. This is a shared design-system behavior change, not a local media z-index patch, and must not be implemented as an unapproved exception.
+The runtime audit confirmed canonical stacked Modal/Drawer behavior after `4e647d093`, but Tooltip still uses the global tooltip z-layer and can render beneath an open Asset Manager Drawer. Joshua approved `AUD-D7` on 2026-07-11: make shared Tooltip overlay-aware so help opened from the topmost canonical overlay remains above it. Implementation evidence remains pending; the fix belongs to shared overlay machinery, not a local media z-index patch.
 
 ## Automated Test Floor
 

@@ -116,7 +116,7 @@ The behavior checkpoint accounted for layout and route state across the original
 Current layout buckets:
 
 - `owner-approved`: all 27 directly mounted rebuilt route homes, including Page Intelligence, plus the folded Content Performance receiving home. The original 26-route approval remains the historical batch; Joshua separately approved the later receiving-home bundle.
-- `awaiting owner approval`: no mounted or folded receiving-home visual comparison. Seven new post-parity audit circle-backs remain awaiting approval as decisions, not as silent exceptions; see `post-parity-functionality-wiring-ai-audit.md`.
+- `awaiting owner approval`: no mounted or folded receiving-home visual comparison. The seven post-parity audit circle-backs are now owner-approved decisions in implementation; they are not silently accepted exceptions. See `post-parity-functionality-wiring-ai-audit.md`.
 - `behavior-safe / visual-unverified`: none among the currently mounted or folded receiving homes.
 - Consolidated owner-review packet and measured registry-closeout evidence: `docs/ui-rebuild/parity/registry-final-owner-review.md` and `/tmp/asset-dashboard-codex-visual-parity/registry-final/`.
 - Receiving-home proof and owner review complete: Page Intelligence stays standalone under `ODP-012 B`; Content Pipeline Published is the flag-on Content Performance receiver. Both route ids remain intact, and both follow-ons are owner-approved.

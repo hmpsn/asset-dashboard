@@ -188,7 +188,7 @@ Published now uses the authoritative shared content-performance read model: four
 
 Joshua explicitly approved the Page Intelligence / Content Performance receiving-home bundle on 2026-07-11. Automated review and fixed-viewport evidence under `/tmp/asset-dashboard-codex-visual-parity/content-performance/` support but do not replace that approval.
 
-Post-approval `AUD-D4` remains `awaiting owner approval`: add a compact impressions/sessions secondary summary row, or explicitly approve those metrics remaining on result cards and in the Drawer. This new circle-back does not silently modify the settled receiving-home approval.
+Joshua approved post-approval `AUD-D4` on 2026-07-11: add a compact impressions/sessions secondary summary row using the authoritative Published read model. Implementation evidence remains pending and does not alter the settled receiving-home approval.
 
 ## Browser Smoke Checklist
 

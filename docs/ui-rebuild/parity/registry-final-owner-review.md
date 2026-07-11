@@ -3,7 +3,7 @@
 Review dates: 2026-07-10 through 2026-07-11
 Scope: the original 26-route owner-approved registry, the later owner-approved Page Intelligence direct mount, and the owner-approved folded Content Performance receiving home
 Desktop viewports: 1440×900 and 1600×1000
-Status: all 27 direct rebuilt mounts and the folded Content Performance receiving home are `owner-approved`; seven post-parity audit decisions are `awaiting owner approval`
+Status: all 27 direct rebuilt mounts and the folded Content Performance receiving home are `owner-approved`; seven post-parity audit decisions are also `owner-approved` and in implementation
 
 This packet preserves the consolidated owner-decision record for the original 26-route visual-parity closeout and tracks the later receiving-home additions separately. Joshua explicitly approved those original 26 route homes, then explicitly approved the Page Intelligence / Content Performance receiving-home bundle after its rendered TL;DR. Automated review remains supporting evidence only. The later audit decisions at the end of this packet are not approved exceptions.
 
@@ -107,7 +107,7 @@ With `ui-rebuild-shell` on, Content Performance bookmarks now replace-navigate i
 
 The multi-agent legacy-capability, runtime-wiring, bug, AI-summary/intelligence, and optimization sweep found no P0 functionality loss. Safe repairs landed in `8f6c3ce83`, `476db936a`, `8a8f42f85`, `1757ef409`, `7405e802b`, `4e647d093`, `ba62f607e`, `09bc10bfa`, and `a90971567`; the first three safe performance wins landed in `f8c9fa0f9`, `ffd900f20`, and `fe8ab70a2`. These commits preserve the approved settled composition and do not constitute new owner approval.
 
-Seven findings require an explicit owner decision rather than silent exception conversion: Engine Operations/history, unique Cockpit KPIs, rebuilt-shell connection health, Published impressions/sessions summary placement, monthly-digest time authority, POV evidence/voice refresh semantics, and overlay-aware shared Tooltips. They are recorded as `AUD-D1` through `AUD-D7` in `owner-decision-packet.md` and remain `awaiting owner approval`.
+Seven findings required an explicit owner decision rather than silent exception conversion: Engine Operations/history, unique Cockpit KPIs, rebuilt-shell connection health, Published impressions/sessions summary placement, monthly-digest time authority, POV evidence/voice refresh semantics, and overlay-aware shared Tooltips. Joshua approved `AUD-D1` through `AUD-D7` on 2026-07-11; implementation and fresh evidence follow the closure plan.
 
 Current verification is intentionally not described as a clean release gate. Focused suites, hooks lint, typecheck, production build, PR checks, AI quality/reliability reports, and live fixed-viewport smoke support the repair wave. The clean current all-project suite passed 2,065 files and 28,834 tests, with one intentional skip and three todos. Keywords and aggregate bundle gzip now pass; aggregate is 1,793,622 B against a 1,806,000 B ceiling. Bundle verification remains red only for CSS 37,307 B against a 37,274 B ceiling and the behavior-safe Page Rewriter route at 8,819 B against 8,326 B; 71 new assets are warning-only. The seven workflow decisions and these two measured per-file ratchet dispositions remain required.
 

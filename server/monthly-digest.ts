@@ -231,6 +231,7 @@ async function computeDigest(
   );
 
   const result: MonthlyDigestData = {
+    availability: 'ready',
     month: monthLabel,
     period: {
       start: monthWindow.startIso,

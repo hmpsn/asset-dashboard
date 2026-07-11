@@ -3,7 +3,7 @@
 Audit date: 2026-07-11
 Branch: `codex/ui-visual-parity`
 Scope: legacy-versus-rebuilt capability preservation, runtime wiring, general bugs, AI summaries/workspace-intelligence integration, and behavior-preserving performance opportunities
-Status: safe repair and optimization waves implemented; the final all-project suite passes; seven workflow decisions and two measured bundle-ratchet entries are `awaiting owner approval`
+Status: safe repair and optimization waves implemented; the final all-project suite passes; all seven workflow decisions and the two measured bundle-ratchet entries are `owner-approved` and in implementation
 
 This audit follows the owner-approved visual baseline. It does not revoke the original 26-route approval or the later Page Intelligence / Content Performance receiving-home approval. It also does not convert an automated reviewer `PASS` into approval of a newly discovered exception.
 
@@ -12,7 +12,7 @@ This audit follows the owner-approved visual baseline. It does not revoke the or
 - No P0 functionality loss was found.
 - Real safe-local functionality, state, invalidation, overlay, cache, AI-context, and summary-cadence defects were fixed.
 - Ten high-value frontend performance wins were implemented without changing route meaning, capability homes, or settled loaded composition.
-- Seven material choices remain owner-gated because they change composition, capability grouping, time authority, AI refresh semantics, or shared design-system behavior.
+- Seven material choices required owner approval because they change composition, capability grouping, time authority, AI refresh semantics, or shared design-system behavior; all seven are now approved and in implementation.
 - The clean current all-project suite is complete; an explicit bundle-budget disposition is still required, so this audit is not a release-readiness claim.
 
 ## Implemented Safe Repair Wave
@@ -45,7 +45,7 @@ The safe wave closes the directly fixable integration gaps:
 - chat auto-summaries trigger on crossed 6/20/40-message thresholds, recover from odd counts and failures, preserve manual summaries, protect last-good state, and prevent old session incarnations or slower calls from overwriting newer summaries;
 - deterministic AI reliability reports match named runtime operations.
 
-Two semantic choices remain owner-gated: monthly-digest time authority (`AUD-D5`) and POV evidence/voice refresh policy (`AUD-D6`).
+The two semantic choices—monthly-digest time authority (`AUD-D5`) and POV evidence/voice refresh policy (`AUD-D6`)—are owner-approved and execute under explicit truthfulness/edit-preservation contracts.
 
 ## Safe Optimization Waves
 
@@ -63,11 +63,11 @@ Two semantic choices remain owner-gated: monthly-digest time authority (`AUD-D5`
 
 Independent review and settled 1440×900 / 1600×1000 smoke support these changes. That evidence confirms implementation quality, not a new owner decision.
 
-Remaining behavior-preserving optimization opportunities are lower priority: generic Admin Chat backend fanout/concurrency, Global Ops catch-all chunking, SEO Editor duplicated projections, the app-wide queue observer, invalidate-plus-immediate-refetch churn, and Cockpit whole-surface rerenders for freshness copy. The aggregate bundle is now below its ceiling; only two measured per-file ratchet entries require explicit disposition.
+Remaining behavior-preserving optimization opportunities are lower priority: generic Admin Chat backend fanout/concurrency, Global Ops catch-all chunking, SEO Editor duplicated projections, the app-wide queue observer, invalidate-plus-immediate-refetch churn, and Cockpit whole-surface rerenders for freshness copy. The aggregate bundle is below its ceiling; the two owner-approved measured per-file ratchets are applied without increasing the aggregate baseline.
 
 ## Owner Circle-Backs
 
-The following recommendations are recorded in `owner-decision-packet.md` and remain `awaiting owner approval`:
+The following recommendations are recorded in `owner-decision-packet.md`. Joshua approved all eight directions on 2026-07-11 with **“Let’s do it.”** Implementation follows the contract-first closure plan; approval of the direction is not evidence that the implementation has passed:
 
 1. `AUD-D1` — active-only Engine Backing Moves plus collapsed Operations homes for Weekly Briefing review, terminal recommendation history/un-dismiss/full OV-EMV, and SEO Change Impact.
 2. `AUD-D2` — unique Cockpit KPI band for organic traffic value, content velocity, and overall health without duplicating Search/GA4 metrics.
@@ -78,7 +78,7 @@ The following recommendations are recorded in `owner-decision-packet.md` and rem
 7. `AUD-D7` — shared overlay-aware Tooltip behavior for Asset Manager Drawer help.
 8. `AUD-B1` — measured CSS/Page Rewriter ratchets at 37,307 B / 8,819 B while the aggregate baseline remains 1,720,000 B.
 
-Until Joshua resolves these, none may be described as an owner-approved exception or implemented by silently expanding shared/backend scope.
+The approved scope includes the bounded backend work required for `AUD-D6`. It does not authorize durable historical digest snapshots, live-provider spend, staging extraction, a push, or a PR.
 
 ## Verification Evidence And Open Gates
 
@@ -96,7 +96,7 @@ Supporting evidence completed during the audit:
 Current verification truth:
 
 - the clean current all-project suite passed 2,065 files and 28,834 tests, with one intentional skip and three todos. The process emitted non-failing jsdom navigation and Node listener-count warnings but no failed files or tests.
-- aggregate bundle gzip is green at 1,793,622 B against the 1,806,000 B ceiling (12,378 B headroom). Font Awesome base CSS fell from 36,118 B to 1,203 B, and the Page Rewriter action/DOCX allocation fell from 100,018 B to 99,512 B. Two per-file entries remain owner-gated: CSS is 37,307 B against a 37,274 B tolerance ceiling (33 B over), and the behavior-safe Page Rewriter route is 8,819 B against an 8,326 B ceiling (493 B over). Independent bundle review recommends measured baselines of 37,307 B and 8,819 B while leaving the aggregate baseline unchanged; do not apply them without Joshua's explicit disposition.
+- aggregate bundle gzip is green at 1,793,622 B against the 1,806,000 B ceiling (12,378 B headroom). Font Awesome base CSS fell from 36,118 B to 1,203 B, and the Page Rewriter action/DOCX allocation fell from 100,018 B to 99,512 B. Joshua approved measured CSS and Page Rewriter baselines of 37,307 B and 8,819 B; they are applied while the aggregate baseline remains 1,720,000 B.
 - the bounded live provider smoke remains unexecuted without dedicated staging credentials and separate staging authority. Deterministic local fixtures cover workflow verification; credentials are needed only for live/staging provider proof.
 
 ## Shipping Boundary
