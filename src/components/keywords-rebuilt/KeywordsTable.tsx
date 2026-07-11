@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
@@ -81,6 +81,28 @@ const SORT_CONTROLS = [
   { key: 'volume', label: 'Volume' },
   { key: 'difficulty', label: 'Difficulty' },
 ] as const;
+
+const ROW_NESTED_INTERACTIVE_SELECTOR = [
+  'a[href]',
+  'button',
+  'input',
+  'label',
+  'select',
+  'textarea',
+  '[contenteditable="true"]',
+  '[role="button"]',
+  '[role="checkbox"]',
+  '[role="link"]',
+].join(',');
+
+function focusPointerRow(event: ReactPointerEvent<HTMLDivElement>): void {
+  if (event.button !== 0 || !(event.target instanceof Element)) return;
+  if (event.target.closest(ROW_NESTED_INTERACTIVE_SELECTOR)) return;
+
+  const row = event.target.closest<HTMLElement>('[role="row"][tabindex]');
+  if (!row || !event.currentTarget.contains(row)) return;
+  row.focus({ preventScroll: true });
+}
 
 function TargetEmptyIcon({ className }: { className?: string }) {
   return <Icon name="target" className={className} />;
@@ -559,15 +581,17 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
         </InlineBanner>
       )}
 
-      <DataTable
-        columns={activeColumns}
-        rows={tableRows}
-        loading={rowsResult.isLoading && tableRows.length === 0}
-        getRowKey={(record) => (record as KeywordsTableRecord).source.normalizedKeyword}
-        onRowClick={(record) => state.openKeyword((record as KeywordsTableRecord).source.keyword)}
-        empty={emptyState}
-        className="[&>[role=row]]:!gap-2 [&>[role=row]]:!px-4 [&>[role=row]:first-child]:!h-[38px] [&>[role=row]:first-child]:!py-0 [&>[role=row]:not(:first-child)]:!min-h-14 [&>[role=row]:not(:first-child)]:!py-2"
-      />
+      <div onPointerDownCapture={focusPointerRow}>
+        <DataTable
+          columns={activeColumns}
+          rows={tableRows}
+          loading={rowsResult.isLoading && tableRows.length === 0}
+          getRowKey={(record) => (record as KeywordsTableRecord).source.normalizedKeyword}
+          onRowClick={(record) => state.openKeyword((record as KeywordsTableRecord).source.keyword)}
+          empty={emptyState}
+          className="[&>[role=row]]:!gap-2 [&>[role=row]]:!px-4 [&>[role=row]:first-child]:!h-[38px] [&>[role=row]:first-child]:!py-0 [&>[role=row]:not(:first-child)]:!min-h-14 [&>[role=row]:not(:first-child)]:!py-2"
+        />
+      </div>
 
       {pageInfo && pageInfo.totalPages > 1 && (
         <Toolbar label="Keyword pagination" className="justify-end">

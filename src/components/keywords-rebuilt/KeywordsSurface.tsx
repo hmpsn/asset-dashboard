@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { useCallback, useMemo, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import { BarChart3, Clock, FileText, Network, Target, type LucideIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
@@ -11,6 +11,7 @@ import {
 } from '../../hooks/admin/useKeywordCommandCenter';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { queryKeys } from '../../lib/queryKeys';
+import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import { WS_EVENTS } from '../../lib/wsEvents';
 import { KEYWORD_COMMAND_CENTER_ACTIONS, KEYWORD_COMMAND_CENTER_FILTERS } from '../../../shared/types/keyword-command-center';
 import type { KeywordCommandCenterSummaryResponse } from '../../../shared/types/keyword-command-center';
@@ -18,8 +19,7 @@ import type { AdminKeywordFeedbackListRow } from '../../../shared/types/keyword-
 import { useKeywordFeedback } from '../strategy/hooks/useKeywordFeedback';
 import { useToast } from '../Toast';
 import { mutationErrorMessage } from './keywordMutationFeedback';
-import { Badge, Button, ErrorState, PageHeader, LensSwitcher, SearchField, Toolbar, ToolbarSpacer, FilterChip, InlineBanner, MetricTile, Skeleton, FormInput, FormSelect, GroupBlock } from '../ui';
-import { KeywordDrawer } from './KeywordDrawer';
+import { Badge, Button, Drawer, ErrorState, PageHeader, LensSwitcher, LoadingState, SearchField, Toolbar, ToolbarSpacer, FilterChip, InlineBanner, MetricTile, Skeleton, FormInput, FormSelect, GroupBlock } from '../ui';
 import { KeywordsLenses } from './KeywordsLenses';
 import type { KeywordRowsQueryResult } from './KeywordsTable';
 import {
@@ -32,6 +32,10 @@ import {
 interface KeywordsSurfaceProps {
   workspaceId: string;
 }
+
+const LazyKeywordDrawer = lazyWithRetry(() => import('./KeywordDrawer').then((module) => ({
+  default: module.KeywordDrawer,
+})));
 
 const MONEY_FORMAT = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -428,11 +432,28 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
         </GroupBlock>
       </div>
 
-      <KeywordDrawer
-        workspaceId={workspaceId}
-        keyword={state.selectedKeyword}
-        onClose={state.closeKeyword}
-      />
+      {state.selectedKeyword && (
+        <Suspense
+          fallback={(
+            <Drawer
+              open
+              onClose={state.closeKeyword}
+              title={state.selectedKeyword}
+              subtitle="Keyword detail"
+              eyebrow="Keyword detail"
+              width={440}
+            >
+              <LoadingState message="Loading keyword details…" />
+            </Drawer>
+          )}
+        >
+          <LazyKeywordDrawer
+            workspaceId={workspaceId}
+            keyword={state.selectedKeyword}
+            onClose={state.closeKeyword}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
