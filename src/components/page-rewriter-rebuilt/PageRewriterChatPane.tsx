@@ -1,7 +1,7 @@
 // @ds-rebuilt
 import { extractRewriteOnly } from '../../lib/rewriteResponse';
 import { QUICK_PROMPTS } from '../page-rewrite-chat/pageRewriteChatModel';
-import { RenderMarkdown } from '../client/helpers';
+import { RenderMarkdown } from '../client/RenderMarkdown';
 import { Button, FormTextarea, Icon, InlineBanner, Tooltip } from '../ui';
 import { decodePageText } from './pageRewriterFormatters';
 import type { usePageRewriterSurfaceState } from './usePageRewriterSurfaceState';

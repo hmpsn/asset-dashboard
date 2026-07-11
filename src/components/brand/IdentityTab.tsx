@@ -6,7 +6,7 @@ import type { BrandDeliverable, BrandDeliverableType, DeliverableTier } from '..
 import { SectionCard, EmptyState, Skeleton, Button, cn, FormInput, FormTextarea } from '../ui';
 import { useToast } from '../Toast';
 import { queryKeys } from '../../lib/queryKeys';
-import { RenderMarkdown } from '../client/helpers';
+import { RenderMarkdown } from '../client/RenderMarkdown';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 

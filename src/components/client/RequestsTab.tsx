@@ -7,7 +7,7 @@ import type { ClientRequest } from './types';
 import { toClientRequestStatus } from '../../../shared/types/requests';
 import { Button, ClickableRow, Icon, IconButton, PageHeader, SectionCard, StatusBadge, FormInput } from '../ui';
 import { STUDIO_NAME } from '../../constants';
-import { RenderMarkdown } from './helpers';
+import { RenderMarkdown } from './RenderMarkdown';
 import { SubmitRequestForm } from './SubmitRequestForm';
 import { post, postForm } from '../../api/client';
 
