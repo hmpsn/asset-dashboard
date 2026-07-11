@@ -1,4 +1,5 @@
 // @ds-rebuilt
+import type { Ref } from 'react';
 import type { UnifiedPage } from '../../../shared/types/page-join';
 import type { LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo';
 import { Button, Icon } from '../ui';
@@ -26,6 +27,7 @@ interface PageIntelligenceDetailPaneProps {
   onAddSchema: (page: UnifiedPage) => void;
   onViewTraffic: () => void;
   onBackToPages: () => void;
+  backButtonRef: Ref<HTMLButtonElement>;
 }
 
 export function PageIntelligenceDetailPane({
@@ -43,6 +45,7 @@ export function PageIntelligenceDetailPane({
   onAddSchema,
   onViewTraffic,
   onBackToPages,
+  backButtonRef,
 }: PageIntelligenceDetailPaneProps) {
   if (!page) {
     return (
@@ -62,7 +65,7 @@ export function PageIntelligenceDetailPane({
   return (
     <article className="flex min-h-0 min-w-0 w-full flex-col bg-[var(--surface-2)]">
       <header className="flex-none border-b border-[var(--brand-border)] px-5 py-3">
-        <Button variant="ghost" size="sm" onClick={onBackToPages} className="-ml-2 mb-2 md:hidden">
+        <Button ref={backButtonRef} variant="ghost" size="sm" onClick={onBackToPages} className="-ml-2 mb-2 md:hidden">
           <Icon name="arrowLeft" size="sm" />
           Back to pages
         </Button>

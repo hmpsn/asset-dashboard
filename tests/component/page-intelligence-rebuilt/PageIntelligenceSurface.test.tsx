@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
     strategyPages: [] as UnifiedPage[],
     webflowPages: [] as UnifiedPage[],
     isLoading: false,
+    isFetching: false,
     error: null as Error | null,
     refetch: vi.fn(),
   },
@@ -133,6 +134,7 @@ describe('PageIntelligenceSurface module contract', () => {
     mocks.pageJoin.strategyPages = [];
     mocks.pageJoin.webflowPages = [PAGE];
     mocks.pageJoin.isLoading = false;
+    mocks.pageJoin.isFetching = false;
     mocks.pageJoin.error = null;
   });
 
@@ -176,6 +178,31 @@ describe('PageIntelligenceSurface module contract', () => {
     mocks.pageJoin.pages = [PAGE];
     mocks.pageJoin.webflowPages = [PAGE];
     mocks.pageJoin.isLoading = false;
+    view.rerender(surfaceTree(false, initialEntry));
+
+    await waitFor(() => expect(screen.getByTestId('page-intelligence-detail')).toHaveAttribute('data-page-id', 'page-1'));
+  });
+
+  it('retries an explicit page identity when cached partial data refreshes in the background', async () => {
+    mocks.pageJoin.pages = [{
+      id: 'cached-page',
+      title: 'Cached page',
+      path: '/cached',
+      slug: 'cached',
+      source: 'static',
+      analyzed: false,
+    }];
+    mocks.pageJoin.webflowPages = [...mocks.pageJoin.pages];
+    mocks.pageJoin.isLoading = false;
+    mocks.pageJoin.isFetching = true;
+    const initialEntry = '/ws/ws-1/page-intelligence?page=page-1';
+    const view = render(surfaceTree(false, initialEntry));
+
+    expect(screen.getByTestId('page-intelligence-detail')).toHaveAttribute('data-page-id', '');
+
+    mocks.pageJoin.pages = [PAGE];
+    mocks.pageJoin.webflowPages = [PAGE];
+    mocks.pageJoin.isFetching = false;
     view.rerender(surfaceTree(false, initialEntry));
 
     await waitFor(() => expect(screen.getByTestId('page-intelligence-detail')).toHaveAttribute('data-page-id', 'page-1'));

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LocalSeoReadResponse } from '../../../shared/types/local-seo';
 import type { UnifiedPage } from '../../../shared/types/page-join';
 
@@ -185,26 +185,42 @@ describe('Page Intelligence responsive flow contracts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.localSeoData = makeLocalSeoData();
+    vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(max-width: 767px)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })));
   });
 
-  it('keeps the list → detail → back transition URL-backed with one detail action home', async () => {
-    // jsdom exercises selection and route state only; breakpoint visibility remains browser-verified.
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps the list → detail → back transition URL-backed and focus-safe with one detail action home', async () => {
     renderSurface();
 
     expect(screen.queryByRole('button', { name: 'Back to pages' })).not.toBeInTheDocument();
     const inventory = screen.getByLabelText('Page inventory');
-    fireEvent.click(within(inventory).getByRole('button', { name: /Services/ }));
+    const pageRow = within(inventory).getByRole('button', { name: /Services/ });
+    fireEvent.click(pageRow);
 
     expect(await screen.findByRole('heading', { name: 'Services', level: 2 })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('location-search')).toHaveTextContent('?page=page-services'));
     expect(screen.getAllByRole('button', { name: 'Back to pages' })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'Fix in SEO Editor' })).toHaveLength(1);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Back to pages' })).toHaveFocus());
 
     fireEvent.click(screen.getByRole('button', { name: 'Back to pages' }));
 
     await waitFor(() => expect(screen.getByTestId('location-search')).toHaveTextContent(/^$/));
     expect(screen.queryByRole('button', { name: 'Back to pages' })).not.toBeInTheDocument();
-    expect(within(inventory).getByRole('button', { name: /Services/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(pageRow).toHaveAttribute('aria-pressed', 'false');
+    await waitFor(() => expect(pageRow).toHaveFocus());
   });
 
   it('keeps the page annotation Open Keywords capability in one actionable location', () => {

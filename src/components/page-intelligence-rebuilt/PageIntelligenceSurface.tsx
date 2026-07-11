@@ -71,6 +71,10 @@ export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurface
   const [sortBy, setSortBy] = useState<SortBy>('priority');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const initialSelectionResolved = useRef<string | null>(null);
+  const backButtonRef = useRef<HTMLButtonElement>(null);
+  const pageRowRefs = useRef(new Map<string, HTMLButtonElement>());
+  const selectionOriginRef = useRef<HTMLElement | null>(null);
+  const pendingReturnFocusRef = useRef<{ pageId: string; origin: HTMLElement | null } | null>(null);
 
   const keywordQuery = useKeywordStrategy(workspaceId);
   const strategy = keywordQuery.data?.strategy ?? null;
@@ -126,10 +130,30 @@ export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurface
     const pageParam = searchParams.get('page');
     const selectionKey = `${workspaceId}:${pageParam ?? ''}`;
     if (initialSelectionResolved.current === selectionKey) return;
+    const resolvedPage = resolveInitialPage(pageJoin.pages, pageParam, fixContext);
+    const hasRequestedPage = pageParam !== null || fixContext !== null;
+    if (hasRequestedPage && !resolvedPage && pageJoin.isFetching) return;
     initialSelectionResolved.current = selectionKey;
-    setSelectedId(resolveInitialPage(pageJoin.pages, pageParam, fixContext)?.id ?? null);
+    setSelectedId(resolvedPage?.id ?? null);
     retainedFixContext.current = null;
-  }, [fixContext, pageJoin.isLoading, pageJoin.pages, searchParams, workspaceId]);
+  }, [fixContext, pageJoin.isFetching, pageJoin.isLoading, pageJoin.pages, searchParams, workspaceId]);
+
+  useEffect(() => {
+    if (selectedId) {
+      const isMobileWorkbench = typeof window !== 'undefined'
+        && typeof window.matchMedia === 'function'
+        && window.matchMedia('(max-width: 767px)').matches;
+      if (isMobileWorkbench) backButtonRef.current?.focus();
+      return;
+    }
+
+    const pending = pendingReturnFocusRef.current;
+    if (!pending) return;
+    pendingReturnFocusRef.current = null;
+    const origin = pending.origin?.isConnected ? pending.origin : pageRowRefs.current.get(pending.pageId);
+    origin?.focus();
+    selectionOriginRef.current = null;
+  }, [selectedId]);
 
   const updateTab = (tab: IntelligenceTab) => {
     const next = new URLSearchParams(searchParams);
@@ -138,12 +162,23 @@ export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurface
     setSearchParams(next, { replace: true });
   };
 
-  const selectPage = (page: UnifiedPage | null) => {
+  const selectPage = (page: UnifiedPage | null, origin?: HTMLElement) => {
+    if (page && origin) selectionOriginRef.current = origin;
     setSelectedId(page?.id ?? null);
     const next = new URLSearchParams(searchParams);
     if (page) next.set('page', page.id);
     else next.delete('page');
     setSearchParams(next, { replace: true });
+  };
+
+  const returnToPageList = () => {
+    if (selectedId) {
+      pendingReturnFocusRef.current = {
+        pageId: selectedId,
+        origin: selectionOriginRef.current,
+      };
+    }
+    selectPage(null);
   };
 
   const changeSort = (next: string) => {
@@ -245,7 +280,7 @@ export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurface
                     <span className="self-end t-micro font-mono uppercase tracking-[0.06em] text-[var(--brand-text-dim)] sm:self-auto">{sortDir === 'desc' ? 'High → low' : 'Low → high'}</span>
                   </div>
                   {fixQueue.length > 0 && (
-                    <ClickableRow onClick={() => selectPage(fixQueue[0]?.page ?? null)} className="flex w-full items-center gap-2 rounded-[var(--radius-md)] border border-[var(--amber)] bg-[var(--brand-yellow-dim)] px-2.5 py-2 text-left hover:border-[var(--brand-yellow)]">
+                    <ClickableRow onClick={event => selectPage(fixQueue[0]?.page ?? null, event.currentTarget)} className="flex w-full items-center gap-2 rounded-[var(--radius-md)] border border-[var(--amber)] bg-[var(--brand-yellow-dim)] px-2.5 py-2 text-left hover:border-[var(--brand-yellow)]">
                       <Icon name="zap" size="sm" className="text-accent-warning" />
                       <span className="min-w-0 flex-1 t-caption-sm text-[var(--brand-text)]"><strong className="font-semibold text-accent-warning">Fix first:</strong> {fixQueue[0]?.page.title}</span>
                       <span className="t-micro font-mono text-[var(--brand-text-muted)]">+{fixQueue[0]?.impact}</span>
@@ -258,7 +293,17 @@ export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurface
                     const score = result?.optimizationScore ?? page.strategy?.optimizationScore;
                     const isSelected = page.id === selectedId;
                     return (
-                      <ClickableRow key={page.id} onClick={() => selectPage(page)} active={isSelected} className={`group flex w-full items-center gap-3 border-b border-[var(--brand-border)]/60 px-3 py-2.5 text-left ${isSelected ? 'bg-[var(--surface-3)]' : 'hover:bg-[var(--surface-3)]/55'}`} aria-pressed={isSelected}>
+                      <ClickableRow
+                        key={page.id}
+                        ref={node => {
+                          if (node) pageRowRefs.current.set(page.id, node);
+                          else pageRowRefs.current.delete(page.id);
+                        }}
+                        onClick={event => selectPage(page, event.currentTarget)}
+                        active={isSelected}
+                        className={`group flex w-full items-center gap-3 border-b border-[var(--brand-border)]/60 px-3 py-2.5 text-left ${isSelected ? 'bg-[var(--surface-3)]' : 'hover:bg-[var(--surface-3)]/55'}`}
+                        aria-pressed={isSelected}
+                      >
                         <span className={`flex h-7 w-7 flex-none items-center justify-center rounded-[var(--radius-md)] border ${page.source === 'cms' ? 'border-[var(--blue)] bg-[var(--blue-ghost)] text-accent-info' : 'border-[var(--brand-border)] bg-[var(--surface-2)] text-[var(--brand-text-muted)]'}`}><Icon name={page.source === 'cms' ? 'layers' : 'file'} size="sm" /></span>
                         <span className="min-w-0 flex-1">
                           <span className={`block truncate t-caption font-medium ${isSelected ? 'text-[var(--teal)]' : 'text-[var(--brand-text-bright)]'}`}>{page.title}</span>
@@ -292,7 +337,8 @@ export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurface
                 onCreateBrief={createBrief}
                 onAddSchema={openSchema}
                 onViewTraffic={openTraffic}
-                onBackToPages={() => selectPage(null)}
+                onBackToPages={returnToPageList}
+                backButtonRef={backButtonRef}
               />
             </div>
           </div>
