@@ -15,11 +15,30 @@ import { queryKeys } from '../../src/lib/queryKeys.js';
 
 const WS = 'ws_test';
 
-function keysFor(event: string) {
-  return getWorkspaceInvalidationKeys(event as never, WS, undefined, 'client-dashboard');
+function keysFor(event: string, data?: unknown) {
+  return getWorkspaceInvalidationKeys(event as never, WS, data, 'client-dashboard');
 }
 
 describe('clientDashboardInvalidationKeys leak coverage', () => {
+  it('refreshes the monthly digest for every mutation that changes its inputs', () => {
+    for (const event of [
+      WS_EVENTS.INSIGHT_RESOLVED,
+      WS_EVENTS.APPROVAL_UPDATE,
+      WS_EVENTS.APPROVAL_APPLIED,
+      WS_EVENTS.WORK_ORDER_UPDATE,
+      WS_EVENTS.OUTCOME_SCORED,
+      WS_EVENTS.OUTCOME_LEARNINGS_UPDATED,
+      WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED,
+      WS_EVENTS.OUTCOME_EXTERNAL_DETECTED,
+      WS_EVENTS.CLIENT_ACTION_UPDATE,
+      WS_EVENTS.RECOMMENDATIONS_UPDATED,
+      WS_EVENTS.WORKSPACE_UPDATED,
+      WS_EVENTS.VOICE_PROFILE_UPDATED,
+    ]) {
+      expect(keysFor(event)).toContainEqual(queryKeys.client.monthlyDigest(WS));
+    }
+  });
+
   it('INSIGHT_RESOLVED invalidates the client insight keys', () => {
     const keys = keysFor(WS_EVENTS.INSIGHT_RESOLVED);
     expect(keys.length).toBeGreaterThan(0);
@@ -52,9 +71,35 @@ describe('clientDashboardInvalidationKeys leak coverage', () => {
     ]);
   });
 
-  it('OUTCOME_PLAYBOOK_DISCOVERED invalidates only client intelligence', () => {
+  it('CLIENT_ACTION_UPDATE refreshes its action, intelligence, and digest consumers', () => {
+    expect(keysFor(WS_EVENTS.CLIENT_ACTION_UPDATE)).toEqual([
+      queryKeys.client.clientActions(WS),
+      queryKeys.client.intelligence(WS),
+      queryKeys.client.monthlyDigest(WS),
+    ]);
+  });
+
+  it('OUTCOME_PLAYBOOK_DISCOVERED invalidates intelligence and its digest consumer', () => {
     const keys = keysFor(WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED);
-    expect(keys).toEqual([queryKeys.client.intelligence(WS)]);
+    expect(keys).toEqual([
+      queryKeys.client.intelligence(WS),
+      queryKeys.client.monthlyDigest(WS),
+    ]);
+  });
+
+  it('refreshes client intelligence after Google connection and voice-profile changes', () => {
+    const googleConnectionKeys = keysFor(WS_EVENTS.WORKSPACE_UPDATED, {
+      googleConnectionChanged: true,
+    });
+    expect(googleConnectionKeys).toContainEqual(queryKeys.client.intelligence(WS));
+    expect(keysFor(WS_EVENTS.WORKSPACE_UPDATED)).not.toContainEqual(
+      queryKeys.client.intelligence(WS),
+    );
+
+    expect(keysFor(WS_EVENTS.VOICE_PROFILE_UPDATED)).toEqual([
+      queryKeys.client.intelligence(WS),
+      queryKeys.client.monthlyDigest(WS),
+    ]);
   });
 
   it('WORK_ORDER_COMMENT invalidates the dashboard-level inbox and thread comment keys', () => {

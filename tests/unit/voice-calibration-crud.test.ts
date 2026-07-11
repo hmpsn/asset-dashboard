@@ -11,9 +11,20 @@
  *   - listCalibrationSessions: returns [] when no profile or no sessions
  *   - VoiceProfileStateTransitionError: instanceof Error, .name, .from, .to, message
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
+
+const mockInvalidateMonthlyDigestCache = vi.hoisted(() => vi.fn());
+const mockClearIntelligenceCache = vi.hoisted(() => vi.fn());
+
+vi.mock('../../server/monthly-digest-cache.js', () => ({
+  invalidateMonthlyDigestCache: mockInvalidateMonthlyDigestCache,
+}));
+
+vi.mock('../../server/intelligence/cache-clear.js', () => ({
+  clearIntelligenceCache: mockClearIntelligenceCache,
+}));
 import {
   createVoiceProfile,
   getVoiceProfile,
@@ -284,9 +295,13 @@ describe('updateVoiceProfile — field updates', () => {
   afterAll(() => { ws?.cleanup(); });
 
   it('stores voiceDNA and reads it back via getVoiceProfile', () => {
+    mockInvalidateMonthlyDigestCache.mockClear();
+    mockClearIntelligenceCache.mockClear();
     updateVoiceProfile(ws.workspaceId, { voiceDNA: SAMPLE_DNA });
     const profile = getVoiceProfile(ws.workspaceId);
     expect(profile!.voiceDNA).toEqual(SAMPLE_DNA);
+    expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledWith(ws.workspaceId);
+    expect(mockClearIntelligenceCache).toHaveBeenCalledWith(ws.workspaceId);
   });
 
   it('stores guardrails and reads them back', () => {

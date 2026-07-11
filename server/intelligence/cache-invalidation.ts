@@ -1,18 +1,13 @@
 import { broadcastToWorkspace } from '../broadcast.js';
-import { invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { createLogger } from '../logger.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { intelligenceCache } from './cache-state.js';
+import { clearIntelligenceCache } from './cache-clear.js';
 
 const log = createLogger('workspace-intelligence');
 
-/** Invalidate all cached intelligence for a workspace */
+/** Invalidate all cached intelligence for a workspace and notify subscribers. */
 export function invalidateIntelligenceCache(workspaceId: string): void {
-  const deleted = intelligenceCache.deleteByPrefix(`intelligence:${workspaceId}:`);
-  try {
-    invalidateSubCachePrefix(workspaceId, '');
-  } catch { // catch-ok — sub-cache table may not exist on older DBs; non-critical
-  }
+  const deleted = clearIntelligenceCache(workspaceId);
 
   try {
     broadcastToWorkspace(workspaceId, WS_EVENTS.INTELLIGENCE_CACHE_UPDATED, {

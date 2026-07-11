@@ -5,6 +5,7 @@ import type { AnalyticsInsight, InsightType, InsightSeverity, InsightDomain, Ins
 import { parseJsonFallback, parseJsonSafe } from './db/json-validation.js';
 import { INSIGHT_DATA_SCHEMA_MAP } from './schemas/insight-schemas.js';
 import { INSIGHT_RESOLUTION_TRANSITIONS, validateTransition } from './state-machines.js';
+import { invalidateMonthlyDigestCache } from './monthly-digest-cache.js';
 
 // ── SQLite row shape ──
 
@@ -200,6 +201,7 @@ export function upsertInsight<T extends InsightType>(params: UpsertInsightParams
 
   // Fetch back to get the actual row (id may differ on conflict-replace)
   const row = stmts().selectOne.get(params.workspaceId, params.pageId, params.insightType) as InsightRow;
+  invalidateMonthlyDigestCache(params.workspaceId);
   // Cast is sound: selectOne filters by insight_type = params.insightType, so T is correct.
   return rowToInsight(row) as AnalyticsInsight<T>;
 }
@@ -224,6 +226,7 @@ export function getInsight<T extends InsightType>(
 
 export function deleteInsightsForWorkspace(workspaceId: string): number {
   const info = stmts().deleteByWorkspace.run(workspaceId);
+  if (info.changes > 0) invalidateMonthlyDigestCache(workspaceId);
   return info.changes;
 }
 
@@ -238,6 +241,7 @@ export function deleteStaleInsightsByType(
   olderThan: string,
 ): number {
   const info = stmts().deleteStaleByType.run(workspaceId, insightType, olderThan);
+  if (info.changes > 0) invalidateMonthlyDigestCache(workspaceId);
   return info.changes;
 }
 
@@ -318,6 +322,7 @@ export function resolveInsight(
   const changes = stmts().updateResolution.run(status, note ?? null, resolutionSource ?? null, resolvedAt, insightId, workspaceId);
   // If workspace_id didn't match, UPDATE affects 0 rows — return undefined so the route sends 404
   if (changes.changes === 0) return undefined;
+  invalidateMonthlyDigestCache(workspaceId);
   return getInsightById(insightId, workspaceId);
 }
 
@@ -341,7 +346,9 @@ export function suppressInsights(workspaceId: string, ids: string[]): number {
     }
     return deleted;
   });
-  return run();
+  const deleted = run();
+  if (deleted > 0) invalidateMonthlyDigestCache(workspaceId);
+  return deleted;
 }
 
 /**

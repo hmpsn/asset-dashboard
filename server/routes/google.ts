@@ -49,7 +49,7 @@ import {
 import { extractBrandTokens } from '../competitor-brand-filter.js';
 import { RICH_BLOCKS_PROMPT } from '../prompt-rich-blocks.js';
 import { buildSeoPromptContext } from '../intelligence/generation-context-builders.js';
-import { getWorkspace, getWorkspaceBySiteId } from '../workspaces.js';
+import { getWorkspace, getWorkspaceBySiteId, listWorkspaces } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { createAnnotation, getAnnotations, updateAnnotation, deleteAnnotation } from '../analytics-annotations.js';
 import { validate, z } from '../middleware/validate.js';
@@ -60,8 +60,26 @@ import { WS_EVENTS } from '../ws-events.js';
 import { parsePositiveIntQuery } from '../query-param-parsers.js';
 import { sanitizeProviderError, sendSanitizedProviderError } from '../provider-error-sanitizer.js';
 import { parseDateRangeStrict } from '../utils/request-validation.js';
+import { invalidateMonthlyDigestCache } from '../monthly-digest-cache.js';
+import { clearIntelligenceCache } from '../intelligence/cache-clear.js';
 
 const log = createLogger('google-auth');
+
+function invalidateGoogleDependentWorkspaces(siteId?: string, explicitWorkspaceId?: string): void {
+  const candidates = explicitWorkspaceId
+    ? [getWorkspace(explicitWorkspaceId)].filter((ws): ws is NonNullable<typeof ws> => Boolean(ws))
+    : siteId && siteId !== GLOBAL_KEY
+      ? [getWorkspaceBySiteId(siteId)].filter((ws): ws is NonNullable<typeof ws> => Boolean(ws))
+      : listWorkspaces().filter(ws => Boolean(ws.gscPropertyUrl || ws.ga4PropertyId));
+
+  for (const ws of candidates) {
+    invalidateMonthlyDigestCache(ws.id);
+    clearIntelligenceCache(ws.id);
+    broadcastToWorkspace(ws.id, WS_EVENTS.WORKSPACE_UPDATED, {
+      googleConnectionChanged: true,
+    });
+  }
+}
 
 type AdminAnalyticsWindow = {
   days: number;
@@ -178,6 +196,7 @@ router.get('/api/google/status', requireAdminAuth, (_req, res) => {
 
 router.post('/api/google/disconnect', requireAdminAuth, (_req, res) => {
   disconnectGlobal();
+  invalidateGoogleDependentWorkspaces(GLOBAL_KEY);
   res.json({ success: true });
 });
 
@@ -212,6 +231,7 @@ router.get('/api/google/callback', async (req, res) => {
   if (!code || !siteId) return res.status(400).send('Missing code or state');
   const result = await exchangeCode(code, siteId);
   if (result.success) {
+    invalidateGoogleDependentWorkspaces(siteId);
     // Redirect back to the app
     const redirectUrl = IS_PROD ? '/' : 'http://localhost:5173/';
     res.redirect(`${redirectUrl}?google=connected&siteId=${siteId}`);
@@ -229,6 +249,7 @@ router.post('/api/google/disconnect/:siteId', requireWorkspaceSiteAccess({
   site: { source: 'params', name: 'siteId' },
 }), (req, res) => {
   disconnect(req.params.siteId);
+  invalidateGoogleDependentWorkspaces(req.params.siteId, req.body.workspaceId);
   res.json({ success: true });
 });
 

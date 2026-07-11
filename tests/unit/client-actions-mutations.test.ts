@@ -15,7 +15,7 @@ const mockEnqueuePlaybook = vi.fn();
 const mockGetClientPortalUrl = vi.fn();
 const mockGetWorkspace = vi.fn();
 const mockBroadcastToWorkspace = vi.fn();
-const mockInvalidateIntelligenceCache = vi.fn();
+const mockClearIntelligenceCache = vi.fn();
 const mockApplyFeedbackLoop = vi.fn();
 
 vi.mock('../../server/activity-log.js', () => ({
@@ -47,8 +47,8 @@ vi.mock('../../server/broadcast.js', () => ({
   broadcastToWorkspace: mockBroadcastToWorkspace,
 }));
 
-vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
-  invalidateIntelligenceCache: mockInvalidateIntelligenceCache,
+vi.mock('../../server/intelligence/cache-clear.js', () => ({
+  clearIntelligenceCache: mockClearIntelligenceCache,
 }));
 
 vi.mock('../../server/domains/inbox/client-action-feedback-loop.js', () => ({
@@ -100,7 +100,7 @@ describe('client-actions-mutations', () => {
     expect(mockAddActivity).not.toHaveBeenCalled();
     expect(mockNotifyApprovalReady).not.toHaveBeenCalled();
     expect(mockBroadcastToWorkspace).not.toHaveBeenCalled();
-    expect(mockInvalidateIntelligenceCache).not.toHaveBeenCalled();
+    expect(mockClearIntelligenceCache).not.toHaveBeenCalled();
   });
 
   it('createAdminClientAction creates and broadcasts new action, including approval email', async () => {
@@ -145,7 +145,7 @@ describe('client-actions-mutations', () => {
       actionId: 'ca_created',
       action: 'created',
     });
-    expect(mockInvalidateIntelligenceCache).toHaveBeenCalledWith('ws_1');
+    expect(mockClearIntelligenceCache).toHaveBeenCalledWith('ws_1');
   });
 
   it('createAdminClientAction skips approval email when workspace has no client email', async () => {
@@ -201,6 +201,12 @@ describe('client-actions-mutations', () => {
 
     expect(action).toBe(completed);
     expect(mockApplyFeedbackLoop).toHaveBeenCalledWith('ws_1', completed, 'completed');
+    expect(mockApplyFeedbackLoop.mock.invocationCallOrder[0]).toBeLessThan(
+      mockBroadcastToWorkspace.mock.invocationCallOrder[0],
+    );
+    expect(mockClearIntelligenceCache.mock.invocationCallOrder[0]).toBeLessThan(
+      mockBroadcastToWorkspace.mock.invocationCallOrder[0],
+    );
     expect(mockAddActivity).toHaveBeenCalledWith(
       'ws_1',
       'client_action_completed',
@@ -286,6 +292,9 @@ describe('client-actions-mutations', () => {
       actionId: 'ca_1',
       action: 'responded',
     });
+    expect(mockApplyFeedbackLoop.mock.invocationCallOrder[0]).toBeLessThan(
+      mockBroadcastToWorkspace.mock.invocationCallOrder[0],
+    );
   });
 
   it('respondToPublicClientAction changes_requested path does not trigger feedback loop or team notify', async () => {

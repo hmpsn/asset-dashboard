@@ -36,6 +36,9 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { applyScoreAdjustment } from './insight-score-adjustments.js';
 import { toInsightPageId, normalizePageUrl } from './utils/page-address.js';
+import { invalidateMonthlyDigestCache } from './monthly-digest-cache.js';
+import { invalidateWorkspaceLearningsCache } from './workspace-learnings-cache.js';
+import { clearIntelligenceCache } from './intelligence/cache-clear.js';
 
 const log = createLogger('outcome-tracking');
 
@@ -538,6 +541,11 @@ export function getNotActedOnActions(): TrackedAction[] {
 
 export function updateAttribution(actionId: string, workspaceId: string, attribution: Attribution): boolean {
   const result = stmts().updateAttribution.run(attribution, actionId, workspaceId);
+  if (result.changes > 0) {
+    invalidateWorkspaceLearningsCache(workspaceId);
+    invalidateMonthlyDigestCache(workspaceId);
+    clearIntelligenceCache(workspaceId);
+  }
   return result.changes > 0;
 }
 
@@ -628,6 +636,12 @@ export function recordOutcome(params: {
   const outcome = rows.find(r => r.checkpoint_days === params.checkpointDays);
   if (!outcome) throw new Error(`Failed to read back outcome for action ${params.actionId}`);
   const actionRowForBroadcast = stmts().getById.get(params.actionId) as TrackedActionRow | undefined;
+  if (actionRowForBroadcast) {
+    const workspaceId = actionRowForBroadcast.workspace_id;
+    invalidateWorkspaceLearningsCache(workspaceId);
+    invalidateMonthlyDigestCache(workspaceId);
+    clearIntelligenceCache(workspaceId);
+  }
   if (
     actionRowForBroadcast &&
     params.score != null &&

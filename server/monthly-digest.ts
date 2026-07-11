@@ -3,6 +3,7 @@ import { getROIHighlightsFromOutcomes } from './outcome-tracking.js';
 import { callAI } from './ai.js';
 import { getSearchPeriodComparison } from './search-console.js';
 import { getGA4PeriodComparison } from './google-analytics.js';
+import type { CustomDateRange } from './google-analytics.js';
 import type { MonthlyDigestData, DigestItem, ROIHighlight } from '../shared/types/narrative.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import type { Workspace } from './workspaces.js';
@@ -12,14 +13,9 @@ import { buildSystemPrompt } from './prompt-assembly.js';
 import { isProgrammingError } from './errors.js';
 import { listBatches } from './approvals.js';
 import { listWorkOrders } from './work-orders.js';
+import { getOrComputeMonthlyDigest } from './monthly-digest-cache.js';
 
 const log = createLogger('monthly-digest');
-
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const MAX_CACHE_ENTRIES = 200; // bound memory: ~1 entry per workspace per active month
-const digestCache = new Map<string, { result: MonthlyDigestData; ts: number }>();
-// In-flight dedup: concurrent requests for the same key share one computation
-const inflightDigests = new Map<string, Promise<MonthlyDigestData>>();
 
 /**
  * Generate a monthly performance digest for a workspace.
@@ -30,38 +26,37 @@ export async function generateMonthlyDigest(
   month?: string, // "March 2026" — defaults to current month
 ): Promise<MonthlyDigestData> {
   const now = new Date();
-  const monthLabel = month ?? now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const monthLabel = month ?? now.toLocaleString('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
 
   // Parse the month label into actual dates so period/comparisons reflect the correct month
   const targetDate = parseMonthLabel(monthLabel, now);
-
-  const cacheKey = `${ws.id}:${monthLabel}`;
-  const cached = digestCache.get(cacheKey);
-  if (cached) {
-    if (now.getTime() - cached.ts < CACHE_TTL_MS) return cached.result;
-    digestCache.delete(cacheKey); // evict expired entry
+  const currentMonthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+  if (targetDate.getTime() > currentMonthStart) {
+    throw new RangeError(`Monthly digest cannot be generated for a future month: ${monthLabel}`);
   }
+  const monthWindow = getUtcMonthWindow(targetDate, now);
+  // The current-month reporting cutoff advances each UTC day. Include the
+  // effective provider window in the identity so a cache created just before
+  // midnight cannot serve yesterday's period for another 24 hours.
+  const cacheIdentity = `${monthLabel}:${monthWindow.dateRange.startDate}:${monthWindow.dateRange.endDate}`;
 
-  // Coalesce concurrent requests — only one AI call per cache key
-  const inflight = inflightDigests.get(cacheKey);
-  if (inflight) return inflight;
-
-  const promise = computeDigest(ws, monthLabel, targetDate, now);
-  inflightDigests.set(cacheKey, promise);
-  try {
-    return await promise;
-  } finally {
-    inflightDigests.delete(cacheKey);
-  }
+  return getOrComputeMonthlyDigest(
+    ws.id,
+    cacheIdentity,
+    now.getTime(),
+    () => computeDigest(ws, monthLabel, monthWindow),
+  );
 }
 
 async function computeDigest(
   ws: Workspace,
   monthLabel: string,
-  targetDate: Date,
-  now: Date,
+  monthWindow: ReturnType<typeof getUtcMonthWindow>,
 ): Promise<MonthlyDigestData> {
-  const cacheKey = `${ws.id}:${monthLabel}`;
   // Deterministic digest rollups (wins, resolved "issues addressed", pagesOptimized)
   // need FULL insight coverage — resolved/positive items are typically low-impact and
   // fall outside the slice's prompt-facing bounds (`all` top-100, `byType` top-25/type
@@ -100,7 +95,9 @@ async function computeDigest(
     }));
 
   const appliedBatchItems = listBatches(ws.id)
-    .filter(b => b.status === 'applied')
+    // A partially applied batch can remain `approved` (applied + approved
+    // siblings) or `partial`, yet still contain real completed work. Count item
+    // state directly instead of requiring every sibling to apply successfully.
     .flatMap(b =>
       b.items
         .filter(item => item.status === 'applied')
@@ -118,7 +115,9 @@ async function computeDigest(
     );
 
   const completedWorkOrderItems = listWorkOrders(ws.id)
-    .filter(o => o.status === 'completed')
+    // `closed` is the terminal close-out of completed work, not an undo. Keep
+    // it in the completed-work narrative after the operator closes the thread.
+    .filter(o => o.status === 'completed' || o.status === 'closed')
     .map(o => ({
       title: `${o.productType.replace(/_/g, ' ')} completed`,
       detail: `${o.pageIds.length} page${o.pageIds.length !== 1 ? 's' : ''} fixed`,
@@ -154,13 +153,19 @@ async function computeDigest(
   let clicksChange = 0;
   let impressionsChange = 0;
   let avgPositionChange = 0;
+  let sessionsChange: number | undefined;
 
   const [gscResult, ga4Result] = await Promise.allSettled([
     ws.webflowSiteId && ws.gscPropertyUrl
-      ? getSearchPeriodComparison(ws.webflowSiteId, ws.gscPropertyUrl, COMPARISON_DAYS)
+      ? getSearchPeriodComparison(
+          ws.webflowSiteId,
+          ws.gscPropertyUrl,
+          COMPARISON_DAYS,
+          monthWindow.dateRange,
+        )
       : Promise.reject(new Error('GSC not configured')),
     ws.ga4PropertyId
-      ? getGA4PeriodComparison(ws.ga4PropertyId, COMPARISON_DAYS)
+      ? getGA4PeriodComparison(ws.ga4PropertyId, COMPARISON_DAYS, monthWindow.dateRange)
       : Promise.reject(new Error('GA4 not configured')),
   ]);
 
@@ -175,8 +180,8 @@ async function computeDigest(
   }
 
   if (ga4Result.status === 'fulfilled') {
-    // GA4 sessions available for future metrics expansion — currently GSC covers clicks/impressions
-    void ga4Result.value;
+    const change = ga4Result.value.changePercent?.sessions;
+    if (typeof change === 'number' && Number.isFinite(change)) sessionsChange = change;
   }
 
   const metrics = {
@@ -213,13 +218,23 @@ async function computeDigest(
     }
   } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'monthly-digest: programming error'); /* insights not available — skip */ }
 
-  const summary = await generateDigestSummary(monthLabel, wins, issuesAddressed, roiHighlights, metrics, learningsSummary, recentOutcomesCount, topWinsBlock, ws.id);
+  const summary = await generateDigestSummary(
+    monthLabel,
+    wins,
+    issuesAddressed,
+    roiHighlights,
+    { ...metrics, sessionsChange },
+    learningsSummary,
+    recentOutcomesCount,
+    topWinsBlock,
+    ws.id,
+  );
 
   const result: MonthlyDigestData = {
     month: monthLabel,
     period: {
-      start: new Date(targetDate.getFullYear(), targetDate.getMonth(), 1).toISOString(),
-      end: new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0).toISOString(),
+      start: monthWindow.startIso,
+      end: monthWindow.endIso,
     },
     summary,
     wins,
@@ -228,14 +243,6 @@ async function computeDigest(
     roiHighlights,
   };
 
-  // Evict oldest entries if cache exceeds size cap
-  if (digestCache.size >= MAX_CACHE_ENTRIES) {
-    const oldest = [...digestCache.entries()].sort((a, b) => a[1].ts - b[1].ts);
-    for (let i = 0; i < Math.ceil(MAX_CACHE_ENTRIES / 4); i++) {
-      digestCache.delete(oldest[i][0]);
-    }
-  }
-  digestCache.set(cacheKey, { result, ts: now.getTime() });
   return result;
 }
 
@@ -279,7 +286,13 @@ async function generateDigestSummary(
   wins: DigestItem[],
   issues: DigestItem[],
   roi: ROIHighlight[],
-  metrics: { clicksChange: number; impressionsChange: number; avgPositionChange: number; pagesOptimized: number },
+  metrics: {
+    clicksChange: number;
+    impressionsChange: number;
+    avgPositionChange: number;
+    pagesOptimized: number;
+    sessionsChange?: number;
+  },
   learningsSummary?: string,
   recentOutcomesCount?: number,
   topWinsBlock?: string,
@@ -288,10 +301,14 @@ async function generateDigestSummary(
   const clicksTrend = metrics.clicksChange > 0 ? `+${metrics.clicksChange.toFixed(1)}%` : metrics.clicksChange < 0 ? `${metrics.clicksChange.toFixed(1)}%` : null;
   const impressionsTrend = metrics.impressionsChange > 0 ? `+${metrics.impressionsChange.toFixed(1)}%` : metrics.impressionsChange < 0 ? `${metrics.impressionsChange.toFixed(1)}%` : null;
   const positionTrend = metrics.avgPositionChange > 0 ? `improved ${metrics.avgPositionChange} spot${metrics.avgPositionChange !== 1 ? 's' : ''}` : null;
+  const sessionsTrend = metrics.sessionsChange && metrics.sessionsChange !== 0
+    ? `${metrics.sessionsChange > 0 ? '+' : ''}${metrics.sessionsChange.toFixed(1)}%`
+    : null;
 
   const metricLines = [
     clicksTrend ? `Search clicks: ${clicksTrend}` : null,
     impressionsTrend ? `Impressions: ${impressionsTrend}` : null,
+    sessionsTrend ? `Site sessions: ${sessionsTrend}` : null,
     positionTrend ? `Average ranking position: ${positionTrend}` : null,
   ].filter(Boolean).join('\n');
 
@@ -362,6 +379,46 @@ function fallbackSummary(_month: string, wins: number, issues: number): string {
  * Falls back to `fallback` if parsing fails.
  */
 function parseMonthLabel(label: string, fallback: Date): Date {
-  const parsed = new Date(`${label} 1`);
-  return isNaN(parsed.getTime()) ? fallback : parsed;
+  const monthNames = [
+    'january', 'february', 'march', 'april', 'may', 'june',
+    'july', 'august', 'september', 'october', 'november', 'december',
+  ] as const;
+  const match = /^([A-Za-z]+)\s+(\d{4})$/.exec(label.trim());
+  const month = match ? monthNames.indexOf(match[1].toLowerCase() as typeof monthNames[number]) : -1;
+  const year = match ? Number(match[2]) : Number.NaN;
+  if (month < 0 || !Number.isInteger(year)) {
+    return new Date(Date.UTC(fallback.getUTCFullYear(), fallback.getUTCMonth(), 1));
+  }
+  return new Date(Date.UTC(year, month, 1));
+}
+
+function getUtcMonthWindow(targetDate: Date, now: Date): {
+  dateRange: CustomDateRange;
+  startIso: string;
+  endIso: string;
+} {
+  const year = targetDate.getUTCFullYear();
+  const month = targetDate.getUTCMonth();
+  const start = new Date(Date.UTC(year, month, 1));
+  const endExclusive = new Date(Date.UTC(year, month + 1, 1));
+  const isCurrentUtcMonth = year === now.getUTCFullYear() && month === now.getUTCMonth();
+  const conservativeReportingCutoff = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() - 3,
+  ));
+  const queriedEndDay = isCurrentUtcMonth && conservativeReportingCutoff < endExclusive
+    ? new Date(Math.max(start.getTime(), conservativeReportingCutoff.getTime()))
+    : new Date(endExclusive.getTime() - 24 * 60 * 60 * 1000);
+  const end = new Date(queriedEndDay.getTime() + (24 * 60 * 60 * 1000) - 1);
+  const dateOnly = (date: Date) => date.toISOString().slice(0, 10);
+
+  return {
+    dateRange: {
+      startDate: dateOnly(start),
+      endDate: dateOnly(end),
+    },
+    startIso: start.toISOString(),
+    endIso: end.toISOString(),
+  };
 }

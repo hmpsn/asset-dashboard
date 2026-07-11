@@ -9,6 +9,7 @@ import { getPageState } from './page-edit-states.js';
 import { mirrorWorkOrderToDeliverable } from './domains/inbox/work-order-dual-write.js';
 import { createLogger } from './logger.js';
 import { z } from 'zod';
+import { invalidateMonthlyDigestCache } from './monthly-digest-cache.js';
 
 const log = createLogger('work-orders');
 
@@ -152,6 +153,7 @@ export function updateWorkOrder(
 ): WorkOrder | null {
   const order = getWorkOrder(workspaceId, orderId);
   if (!order) return null;
+  const previousStatus = order.status;
 
   // Validate status transition if status is being changed
   if (updates.status !== undefined && updates.status !== order.status) {
@@ -176,6 +178,11 @@ export function updateWorkOrder(
     updated_at: order.updatedAt,
   });
   invalidateWorkOrderCaches(workspaceId);
+  const wasDigestCompleted = previousStatus === 'completed' || previousStatus === 'closed';
+  const isDigestCompleted = order.status === 'completed' || order.status === 'closed';
+  if (wasDigestCompleted !== isDigestCompleted) {
+    invalidateMonthlyDigestCache(workspaceId);
+  }
 
   // Re-mirror the order on a status change so the order deliverable reflects lifecycle progress
   // (pending→ordered, in_progress, completed, cancelled). Gated on a status change to skip pure

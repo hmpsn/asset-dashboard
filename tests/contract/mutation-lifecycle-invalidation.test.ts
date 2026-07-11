@@ -40,7 +40,11 @@ describe('mutation lifecycle invalidation contracts', () => {
     expect(adminKeys).toContainEqual(queryKeys.admin.intelligence('ws-1'));
     expect(adminKeys).toContainEqual(queryKeys.admin.intelligenceAll('ws-1'));
     expect(clientDashboardSource).toContain('[WS_EVENTS.CLIENT_ACTION_UPDATE]: () => invalidateClientEvent(WS_EVENTS.CLIENT_ACTION_UPDATE)');
-    expect(clientKeys).toEqual([queryKeys.client.clientActions('ws-1')]);
+    expect(clientKeys).toEqual([
+      queryKeys.client.clientActions('ws-1'),
+      queryKeys.client.intelligence('ws-1'),
+      queryKeys.client.monthlyDigest('ws-1'),
+    ]);
   });
 
   it('content updates refresh content read paths and client-facing intelligence', () => {

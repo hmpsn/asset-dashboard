@@ -10,6 +10,8 @@ import { variationFeedbackItemSchema } from './schemas/voice-calibration.js';
 import { VOICE_PROFILE_TRANSITIONS, validateTransition, InvalidTransitionError } from './state-machines.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
+import { invalidateMonthlyDigestCache } from './monthly-digest-cache.js';
+import { clearIntelligenceCache } from './intelligence/cache-clear.js';
 import type {
   VoiceProfile, VoiceSample, CalibrationSession, CalibrationVariation,
   VoiceDNA, VoiceGuardrails, ContextModifier, VoiceProfileStatus,
@@ -166,6 +168,11 @@ export function updateVoiceProfile(
     context_modifiers_json: updates.contextModifiers !== undefined ? JSON.stringify(updates.contextModifiers) : (profile.contextModifiers ? JSON.stringify(profile.contextModifiers) : null),
     updated_at: now,
   });
+  const digestVoiceInputChanged = (
+    ['status', 'voiceDNA', 'guardrails'] as const
+  ).some(key => key in updates);
+  if (digestVoiceInputChanged) invalidateMonthlyDigestCache(workspaceId);
+  clearIntelligenceCache(workspaceId);
   return { ...profile, ...updates, updatedAt: now };
 }
 

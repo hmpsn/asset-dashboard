@@ -9,6 +9,7 @@ import { approvalItemSchema } from './schemas/approval-schemas.js';
 import { createLogger } from './logger.js';
 import { validateTransition, APPROVAL_ITEM_TRANSITIONS } from './state-machines.js';
 import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
+import { invalidateMonthlyDigestCache } from './monthly-digest-cache.js';
 
 const log = createLogger('approvals');
 
@@ -212,6 +213,7 @@ export function markBatchApplied(workspaceId: string, batchId: string, itemIds: 
   const batch = getBatch(workspaceId, batchId);
   if (!batch) return null;
 
+  let applied = 0;
   for (const item of batch.items) {
     if (itemIds.includes(item.id)) {
       // Only approved items may transition to applied
@@ -221,16 +223,21 @@ export function markBatchApplied(workspaceId: string, batchId: string, itemIds: 
       }
       item.status = 'applied';
       item.updatedAt = new Date().toISOString();
+      applied += 1;
     }
   }
 
   recalcBatchStatus(batch);
   invalidateIntelligenceCache(workspaceId);
+  if (applied > 0) invalidateMonthlyDigestCache(workspaceId);
   return batch;
 }
 
 export function deleteBatch(workspaceId: string, batchId: string): boolean {
   const info = stmts().deleteById.run(batchId, workspaceId);
-  if (info.changes > 0) invalidateIntelligenceCache(workspaceId);
+  if (info.changes > 0) {
+    invalidateIntelligenceCache(workspaceId);
+    invalidateMonthlyDigestCache(workspaceId);
+  }
   return info.changes > 0;
 }

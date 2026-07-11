@@ -18,6 +18,10 @@ import type {
   ActionContext,
 } from '../../shared/types/outcome-tracking.js';
 
+const mockInvalidateMonthlyDigestCache = vi.hoisted(() => vi.fn());
+const mockInvalidateWorkspaceLearningsCache = vi.hoisted(() => vi.fn());
+const mockClearIntelligenceCache = vi.hoisted(() => vi.fn());
+
 // ── Dependency mocks ──────────────────────────────────────────────────────────
 // Bridge infrastructure fires async side-effects we don't want in unit tests.
 vi.mock('../../server/bridge-infrastructure.js', () => ({
@@ -56,6 +60,18 @@ vi.mock('../../server/insight-score-adjustments.js', () => ({
     data,
     adjustedScore: score + delta,
   })),
+}));
+
+vi.mock('../../server/monthly-digest-cache.js', () => ({
+  invalidateMonthlyDigestCache: mockInvalidateMonthlyDigestCache,
+}));
+
+vi.mock('../../server/workspace-learnings-cache.js', () => ({
+  invalidateWorkspaceLearningsCache: mockInvalidateWorkspaceLearningsCache,
+}));
+
+vi.mock('../../server/intelligence/cache-clear.js', () => ({
+  clearIntelligenceCache: mockClearIntelligenceCache,
 }));
 
 // ── Import the module under test AFTER mocks ──────────────────────────────────
@@ -129,6 +145,9 @@ describe('outcome-tracking write paths', () => {
 
   afterEach(() => {
     vi.mocked(broadcastToWorkspace).mockClear();
+    mockInvalidateMonthlyDigestCache.mockClear();
+    mockInvalidateWorkspaceLearningsCache.mockClear();
+    mockClearIntelligenceCache.mockClear();
     // Clean up tracked_actions and action_outcomes for test isolation
     db.prepare(
       `DELETE FROM action_outcomes WHERE action_id IN (
@@ -369,6 +388,10 @@ describe('outcome-tracking write paths', () => {
       const updated = getAction(action.id);
       expect(updated).not.toBeNull();
       expect(updated!.attribution).toBe('externally_executed');
+      expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledOnce();
+      expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledWith(ws.workspaceId);
+      expect(mockInvalidateWorkspaceLearningsCache).toHaveBeenCalledWith(ws.workspaceId);
+      expect(mockClearIntelligenceCache).toHaveBeenCalledWith(ws.workspaceId);
     });
 
     it('updating attribution on an unknown ID does not throw and silently no-ops', () => {
@@ -651,6 +674,9 @@ describe('outcome-tracking write paths', () => {
       expect(outcome.score).toBe('win');
       expect(outcome.deltaSummary.delta_percent).toBe(50);
       expect(outcome.measuredAt).toBeTruthy();
+      expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledWith(ws.workspaceId);
+      expect(mockInvalidateWorkspaceLearningsCache).toHaveBeenCalledWith(ws.workspaceId);
+      expect(mockClearIntelligenceCache).toHaveBeenCalledWith(ws.workspaceId);
       expect(broadcastToWorkspace).toHaveBeenCalledWith(
         ws.workspaceId,
         'outcome_learnings_updated',

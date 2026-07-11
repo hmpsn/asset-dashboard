@@ -1,8 +1,13 @@
 /**
  * Unit tests for server/analytics-insights-store.ts — CRUD on analytics_insights table.
  */
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import db from '../../server/db/index.js';
+
+const mockInvalidateMonthlyDigestCache = vi.hoisted(() => vi.fn());
+vi.mock('../../server/monthly-digest-cache.js', () => ({
+  invalidateMonthlyDigestCache: mockInvalidateMonthlyDigestCache,
+}));
 import {
   cloneInsightParams,
   deleteStaleInsightsByType,
@@ -50,6 +55,10 @@ function makeAnomalyData(overrides: Partial<AnomalyDigestData> = {}): AnomalyDig
   };
 }
 
+beforeEach(() => {
+  mockInvalidateMonthlyDigestCache.mockClear();
+});
+
 describe('upsertInsight', () => {
   it('creates a new insight and returns it', () => {
     const wsId = makeWorkspaceId('ws_ins');
@@ -69,6 +78,7 @@ describe('upsertInsight', () => {
     expect((insight.data as typeof pageHealthData).trend).toBe('improving');
     expect(insight.severity).toBe('opportunity');
     expect(insight.computedAt).toBeDefined();
+    expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledWith(wsId);
   });
 
   it('replaces existing insight with same workspace+page+type key', () => {
@@ -159,9 +169,12 @@ describe('deleteInsightsForWorkspace', () => {
     upsertInsight({ workspaceId: wsId, pageId: '/a', insightType: 'page_health', data: {}, severity: 'positive' });
     upsertInsight({ workspaceId: wsId, pageId: '/b', insightType: 'content_decay', data: {}, severity: 'warning' });
 
+    mockInvalidateMonthlyDigestCache.mockClear();
     const deleted = deleteInsightsForWorkspace(wsId);
     expect(deleted).toBe(2);
     expect(getInsights(wsId)).toEqual([]);
+    expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledOnce();
+    expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledWith(wsId);
   });
 });
 
@@ -266,15 +279,20 @@ describe('analytics insight secondary operations', () => {
 
     expect(resolveInsight(insight.id, 'wrong-workspace', 'resolved')).toBeUndefined();
 
+    mockInvalidateMonthlyDigestCache.mockClear();
     const inProgress = resolveInsight(insight.id, wsId, 'in_progress', 'Working it', 'admin');
     expect(inProgress?.resolutionStatus).toBe('in_progress');
     expect(inProgress?.resolutionNote).toBe('Working it');
     expect(inProgress?.resolvedAt).toBeNull();
+    expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledWith(wsId);
 
+    mockInvalidateMonthlyDigestCache.mockClear();
     const resolved = resolveInsight(insight.id, wsId, 'resolved', 'Fixed', 'bridge');
     expect(resolved?.resolutionStatus).toBe('resolved');
     expect(resolved?.resolutionSource).toBe('bridge');
     expect(resolved?.resolvedAt).toEqual(expect.any(String));
+    expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledOnce();
+    expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledWith(wsId);
 
     const unresolved = getUnresolvedInsights(wsId);
     expect(unresolved.map(item => item.id)).toEqual([warning.id]);

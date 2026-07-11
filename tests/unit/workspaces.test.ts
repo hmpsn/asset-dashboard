@@ -9,6 +9,11 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
+const mockInvalidateMonthlyDigestCache = vi.hoisted(() => vi.fn());
+vi.mock('../../server/monthly-digest-cache.js', () => ({
+  invalidateMonthlyDigestCache: mockInvalidateMonthlyDigestCache,
+}));
+
 // We need to set up a temp directory BEFORE importing the module
 // because workspaces.ts reads UPLOAD_ROOT at module load time.
 // Instead, we'll test the exported functions that don't depend on
@@ -112,6 +117,20 @@ describe('workspace CRUD', () => {
     expect(updated).not.toBeNull();
     expect(updated!.name).toBe('Updated Name');
     expect(updated!.tier).toBe('growth');
+
+    deleteWorkspace(ws.id);
+  });
+
+  it('invalidates the monthly digest only when a digest input changes', () => {
+    const ws = createWorkspace('Digest Input Test');
+    mockInvalidateMonthlyDigestCache.mockClear();
+
+    updateWorkspace(ws.id, { name: 'Presentation-only update' });
+    expect(mockInvalidateMonthlyDigestCache).not.toHaveBeenCalled();
+
+    updateWorkspace(ws.id, { customPromptNotes: 'Use concise client language.' });
+    expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledOnce();
+    expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledWith(ws.id);
 
     deleteWorkspace(ws.id);
   });

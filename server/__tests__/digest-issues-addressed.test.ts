@@ -225,6 +225,34 @@ describe('digest issuesAddressed counting', () => {
     expect(result.issuesAddressed.length).toBeGreaterThanOrEqual(1);
   });
 
+  it('counts applied items even when sibling items leave the batch not fully applied', async () => {
+    const ws = makeWorkspace({ id: 'ws_partial_application' });
+    mocks.listBatches.mockReturnValue([
+      makeAppliedBatch({
+        workspaceId: ws.id,
+        status: 'approved',
+        items: [
+          {
+            id: 'item_applied', pageId: 'page_abc', pageTitle: 'Services Page', pageSlug: '/services',
+            field: 'seoTitle', currentValue: 'old', proposedValue: 'new', status: 'applied',
+            createdAt: '2026-05-01T00:00:00.000Z', updatedAt: '2026-05-15T00:00:00.000Z',
+          },
+          {
+            id: 'item_waiting', pageId: 'page_def', pageTitle: 'About Page', pageSlug: '/about',
+            field: 'seoDescription', currentValue: 'old', proposedValue: 'new', status: 'approved',
+            createdAt: '2026-05-01T00:00:00.000Z', updatedAt: '2026-05-15T00:00:00.000Z',
+          },
+        ],
+      }),
+    ]);
+
+    const result = await generateMonthlyDigest(ws, 'May 2026');
+
+    expect(result.issuesAddressed).toEqual([
+      expect.objectContaining({ insightId: 'batch:batch_1:item_applied' }),
+    ]);
+  });
+
   it('reports issuesAddressed >= 1 for a workspace with a completed work order', async () => {
     // No resolved insights at all
     mocks.getInsights.mockReturnValue([]);
@@ -235,6 +263,23 @@ describe('digest issuesAddressed counting', () => {
     const result = await generateMonthlyDigest(ws, 'May 2026');
 
     expect(result.issuesAddressed.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('keeps terminally closed completed work in issuesAddressed', async () => {
+    const ws = makeWorkspace({ id: 'ws_closed_wo' });
+    mocks.listWorkOrders.mockReturnValue([
+      makeCompletedWorkOrder({
+        workspaceId: ws.id,
+        status: 'closed',
+        closedAt: '2026-05-21T00:00:00.000Z',
+      }),
+    ]);
+
+    const result = await generateMonthlyDigest(ws, 'May 2026');
+
+    expect(result.issuesAddressed).toEqual([
+      expect.objectContaining({ insightId: 'work-order:wo_1' }),
+    ]);
   });
 
   it('counts distinct fields on the same page as separate fixes (title AND meta description)', async () => {

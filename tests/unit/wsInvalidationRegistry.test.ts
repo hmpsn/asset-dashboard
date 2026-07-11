@@ -98,7 +98,10 @@ describe('wsInvalidation registry', () => {
 
     expect(
       getWorkspaceInvalidationKeys(WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED, WS_ID, undefined, 'client-dashboard'),
-    ).toEqual([queryKeys.client.intelligence(WS_ID)]);
+    ).toEqual([
+      queryKeys.client.intelligence(WS_ID),
+      queryKeys.client.monthlyDigest(WS_ID),
+    ]);
   });
 
   it('maps DELIVERABLE_UPDATED for the admin deliverables pane', () => {

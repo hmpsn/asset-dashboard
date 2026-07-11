@@ -214,7 +214,10 @@ router.get('/api/public/insights/:workspaceId', async (req, res) => {
     const isAdmin = !!(payload?.role === 'admin' || payload?.role === 'owner') ||
       !!(adminToken && (adminToken === APP_PASSWORD || verifyAdminToken(adminToken)));
     const force = req.query.force === 'true' && isAdmin;
-    const insights = await getOrComputeInsights(ws.id, type, { force });
+    const insights = await getOrComputeInsights(ws.id, type, {
+      force,
+      broadcastOnCompute: true,
+    });
     res.json(insights);
   } catch (err) {
     log.error({ err }, 'Failed to compute insights');

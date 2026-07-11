@@ -42,10 +42,10 @@ router.put(
     }
     if (!updated) return res.status(404).json({ error: 'Insight not found' });
     addActivity(workspaceId, 'insight_resolved', `Insight ${status}${note ? ': ' + note : ''}`);
-    broadcastToWorkspace(workspaceId, WS_EVENTS.INSIGHT_RESOLVED, { insightId: req.params.insightId, status });
     // Outcome-tracking baseline snapshot (resolved only) — shared with the MCP
     // resolve_insight tool so operator + agent resolutions feed learning identically.
     if (status === 'resolved') recordInsightResolutionOutcome(workspaceId, updated);
+    broadcastToWorkspace(workspaceId, WS_EVENTS.INSIGHT_RESOLVED, { insightId: req.params.insightId, status });
     res.json(updated);
   },
 );
