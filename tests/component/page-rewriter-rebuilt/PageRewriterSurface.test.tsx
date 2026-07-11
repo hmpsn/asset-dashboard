@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentProps } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useSearchParams } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../src/api/client';
 import { ToastProvider } from '../../../src/components/Toast';
@@ -97,9 +97,20 @@ function setupApi() {
   });
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 function renderSurface(
   path = '/ws/ws-1/rewrite',
   props: Partial<ComponentProps<typeof PageRewriterSurface>> = {},
+  showUrlControls = false,
 ) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   queryClient.setQueryData(queryKeys.shared.featureFlags(), featureFlagResponse);
@@ -108,9 +119,36 @@ function renderSurface(
       <MemoryRouter initialEntries={[path]}>
         <ToastProvider>
           <PageRewriterSurface workspaceId="ws-1" {...props} />
+          {showUrlControls && <PageRewriterUrlControls />}
         </ToastProvider>
       </MemoryRouter>
     </QueryClientProvider>,
+  );
+}
+
+function PageRewriterUrlControls() {
+  const [, setSearchParams] = useSearchParams();
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setSearchParams({ pageUrl: 'https://acme.com/services' })}
+      >
+        Select services URL
+      </button>
+      <button
+        type="button"
+        onClick={() => setSearchParams({ pageUrl: 'https://acme.com/services/implants' })}
+      >
+        Select implants URL
+      </button>
+      <button
+        type="button"
+        onClick={() => setSearchParams({})}
+      >
+        Clear page URL
+      </button>
+    </>
   );
 }
 
@@ -188,6 +226,268 @@ describe('PageRewriterSurface rebuilt', () => {
     });
     expect(screen.queryByText('Page link ignored')).not.toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Page rewrite document editor' })).toHaveTextContent('Dental Implants');
+  });
+
+  it('synchronizes same-route pageUrl changes and resets the selected document and transcript when the param clears', async () => {
+    apiPostMock.mockImplementation((url: string, body: { url?: string; question?: string }) => {
+      if (url.endsWith('/load-page')) {
+        if (body.url === 'https://acme.com/services') {
+          return Promise.resolve({
+            ...pagePayload,
+            title: 'Dental Services',
+            slug: 'services',
+            url: body.url,
+            bodyText: 'Dental services for the whole family.',
+            html: '<main><h1>Dental Services</h1><p>Care for the whole family.</p></main>',
+            primaryKeyword: 'dental services',
+            sections: [{ level: 1, heading: 'Dental Services', body: 'Care for the whole family.' }],
+          });
+        }
+        return Promise.resolve({ ...pagePayload, url: body.url });
+      }
+      return Promise.resolve({ answer: 'Transcript response for the selected page.' });
+    });
+
+    renderSurface(
+      '/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants',
+      {},
+      true,
+    );
+
+    expect(await screen.findByRole('textbox', { name: 'Page rewrite document editor' })).toHaveTextContent('Dental Implants');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select services URL' }));
+
+    await waitFor(() => {
+      expect(apiPostMock).toHaveBeenCalledWith(
+        '/api/rewrite-chat/ws-1/load-page',
+        { url: 'https://acme.com/services' },
+      );
+    });
+    expect(await screen.findByRole('textbox', { name: 'Page rewrite document editor' })).toHaveTextContent('Dental Services');
+    expect(screen.getByRole('link', { name: /Open live page/i })).toHaveAttribute('href', 'https://acme.com/services');
+
+    fireEvent.change(screen.getByPlaceholderText(/Ask for a rewrite/i), {
+      target: { value: 'Keep this only while a page is selected' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send rewrite prompt' }));
+    expect(await screen.findByText('Transcript response for the selected page.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear page URL' }));
+
+    expect(await screen.findByText('No page loaded')).toBeInTheDocument();
+    expect(screen.getByText('Load a page to begin')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Page rewrite document editor' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Keep this only while a page is selected')).not.toBeInTheDocument();
+    expect(screen.queryByText('Transcript response for the selected page.')).not.toBeInTheDocument();
+  });
+
+  it('ignores an older same-URL page-load success after an A-to-B-to-A request sequence', async () => {
+    const staleServicesLoad = createDeferred<typeof pagePayload>();
+    const currentServicesLoad = createDeferred<typeof pagePayload>();
+    let servicesLoadCount = 0;
+    apiPostMock.mockImplementation((url: string, body: { url?: string }) => {
+      if (!url.endsWith('/load-page')) return Promise.resolve({ answer: 'Unused response' });
+      if (body.url === 'https://acme.com/services') {
+        servicesLoadCount += 1;
+        return servicesLoadCount === 1 ? staleServicesLoad.promise : currentServicesLoad.promise;
+      }
+      return Promise.resolve({ ...pagePayload, url: body.url });
+    });
+
+    renderSurface('/ws/ws-1/rewrite', {}, true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select services URL' }));
+    await waitFor(() => expect(servicesLoadCount).toBe(1));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select implants URL' }));
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: 'Page rewrite document editor' })).toHaveTextContent('Dental Implants');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select services URL' }));
+    await waitFor(() => expect(servicesLoadCount).toBe(2));
+
+    await act(async () => {
+      currentServicesLoad.resolve({
+        ...pagePayload,
+        title: 'Current Dental Services',
+        slug: 'services',
+        url: 'https://acme.com/services',
+        html: '<main><h1>Current Dental Services</h1></main>',
+        sections: [{ level: 1, heading: 'Current Dental Services', body: 'Current copy.' }],
+      });
+      await currentServicesLoad.promise;
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: 'Page rewrite document editor' })).toHaveTextContent('Current Dental Services');
+    });
+
+    await act(async () => {
+      staleServicesLoad.resolve({
+        ...pagePayload,
+        title: 'Stale Dental Services',
+        slug: 'services',
+        url: 'https://acme.com/services',
+        html: '<main><h1>Stale Dental Services</h1></main>',
+        sections: [{ level: 1, heading: 'Stale Dental Services', body: 'Stale copy.' }],
+      });
+      await staleServicesLoad.promise;
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('textbox', { name: 'Page rewrite document editor' })).toHaveTextContent('Current Dental Services');
+    expect(screen.queryByText('Stale Dental Services')).not.toBeInTheDocument();
+  });
+
+  it('ignores an older same-URL page-load error after a newer request succeeds', async () => {
+    const staleServicesLoad = createDeferred<typeof pagePayload>();
+    const currentServicesLoad = createDeferred<typeof pagePayload>();
+    let servicesLoadCount = 0;
+    apiPostMock.mockImplementation((url: string, body: { url?: string }) => {
+      if (!url.endsWith('/load-page')) return Promise.resolve({ answer: 'Unused response' });
+      if (body.url === 'https://acme.com/services') {
+        servicesLoadCount += 1;
+        return servicesLoadCount === 1 ? staleServicesLoad.promise : currentServicesLoad.promise;
+      }
+      return Promise.resolve({ ...pagePayload, url: body.url });
+    });
+
+    renderSurface('/ws/ws-1/rewrite', {}, true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select services URL' }));
+    await waitFor(() => expect(servicesLoadCount).toBe(1));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select implants URL' }));
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: 'Page rewrite document editor' })).toHaveTextContent('Dental Implants');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select services URL' }));
+    await waitFor(() => expect(servicesLoadCount).toBe(2));
+
+    await act(async () => {
+      currentServicesLoad.resolve({
+        ...pagePayload,
+        title: 'Current Dental Services',
+        slug: 'services',
+        url: 'https://acme.com/services',
+        html: '<main><h1>Current Dental Services</h1></main>',
+        sections: [{ level: 1, heading: 'Current Dental Services', body: 'Current copy.' }],
+      });
+      await currentServicesLoad.promise;
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: 'Page rewrite document editor' })).toHaveTextContent('Current Dental Services');
+    });
+
+    await act(async () => {
+      staleServicesLoad.reject(new ApiError(500, 'Stale same-URL failure'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('textbox', { name: 'Page rewrite document editor' })).toHaveTextContent('Current Dental Services');
+    expect(screen.queryByText(/Stale same-URL failure/i)).not.toBeInTheDocument();
+  });
+
+  it('ignores a stale chat success and stale finally after the page context changes', async () => {
+    const staleChat = createDeferred<{ answer: string }>();
+    const currentChat = createDeferred<{ answer: string }>();
+    let chatRequestCount = 0;
+    apiPostMock.mockImplementation((url: string, body: { url?: string; question?: string }) => {
+      if (url.endsWith('/load-page')) {
+        return Promise.resolve(body.url === 'https://acme.com/services'
+          ? {
+              ...pagePayload,
+              title: 'Dental Services',
+              slug: 'services',
+              url: body.url,
+              bodyText: 'Dental services for the whole family.',
+              html: '<main><h1>Dental Services</h1><p>Care for the whole family.</p></main>',
+            }
+          : { ...pagePayload, url: body.url });
+      }
+      chatRequestCount += 1;
+      return chatRequestCount === 1 ? staleChat.promise : currentChat.promise;
+    });
+
+    renderSurface(
+      '/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants',
+      {},
+      true,
+    );
+    await screen.findByRole('textbox', { name: 'Page rewrite document editor' });
+
+    fireEvent.change(screen.getByPlaceholderText(/Ask for a rewrite/i), {
+      target: { value: 'Answer for the implants page' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send rewrite prompt' }));
+    expect(await screen.findByText('Analyzing page context...')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select services URL' }));
+    expect(await screen.findByRole('textbox', { name: 'Page rewrite document editor' })).toHaveTextContent('Dental Services');
+
+    fireEvent.change(screen.getByPlaceholderText(/Ask for a rewrite/i), {
+      target: { value: 'Answer for the services page' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send rewrite prompt' }));
+    expect(screen.getByText('Analyzing page context...')).toBeInTheDocument();
+
+    await act(async () => {
+      staleChat.resolve({ answer: 'Stale implants response' });
+      await staleChat.promise;
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByText('Stale implants response')).not.toBeInTheDocument();
+    expect(screen.getByText('Analyzing page context...')).toBeInTheDocument();
+
+    await act(async () => {
+      currentChat.resolve({ answer: 'Current services response' });
+      await currentChat.promise;
+      await Promise.resolve();
+    });
+
+    expect(await screen.findByText('Current services response')).toBeInTheDocument();
+    expect(screen.queryByText('Analyzing page context...')).not.toBeInTheDocument();
+  });
+
+  it('ignores a stale chat error after the selected page clears', async () => {
+    const staleChat = createDeferred<{ answer: string }>();
+    apiPostMock.mockImplementation((url: string, body: { url?: string }) => {
+      if (url.endsWith('/load-page')) return Promise.resolve({ ...pagePayload, url: body.url });
+      return staleChat.promise;
+    });
+
+    renderSurface(
+      '/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants',
+      {},
+      true,
+    );
+    await screen.findByRole('textbox', { name: 'Page rewrite document editor' });
+
+    fireEvent.change(screen.getByPlaceholderText(/Ask for a rewrite/i), {
+      target: { value: 'This request will become stale' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send rewrite prompt' }));
+    expect(await screen.findByText('Analyzing page context...')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear page URL' }));
+    expect(await screen.findByText('No page loaded')).toBeInTheDocument();
+
+    await act(async () => {
+      staleChat.reject(new ApiError(429, 'AI quota exceeded'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByText('AI quota reached')).not.toBeInTheDocument();
+    expect(screen.queryByText(/AI quota exceeded/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Analyzing page context...')).not.toBeInTheDocument();
+    expect(screen.getByText('Load a page to begin')).toBeInTheDocument();
   });
 
   it('seeds a page-specific AI greeting with message avatars', async () => {

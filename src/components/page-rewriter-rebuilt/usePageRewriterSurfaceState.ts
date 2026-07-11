@@ -68,6 +68,11 @@ interface UsePageRewriterSurfaceStateParams {
   toast: ToastFn;
 }
 
+interface PageLoadRequest {
+  url: string;
+  requestId: number;
+}
+
 export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewriterSurfaceStateParams) {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialPageUrl = pageUrlFromParams(searchParams);
@@ -96,6 +101,19 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
   const comboInputRef = useRef<HTMLInputElement>(null);
   const docBodyRef = useRef<HTMLDivElement | null>(null);
   const autoLoadedUrlRef = useRef<string | null>(null);
+  const observedUrlStateRef = useRef<{ workspaceId: string; pageUrl: string | null } | null>(null);
+  const pageLoadRequestSequenceRef = useRef(0);
+  const activePageLoadRequestRef = useRef<number | null>(null);
+  const chatContextEpochRef = useRef(0);
+  const chatRequestSequenceRef = useRef(0);
+  const activeChatRequestRef = useRef<{ requestId: number; contextEpoch: number } | null>(null);
+
+  const invalidateChatContext = useCallback(() => {
+    chatContextEpochRef.current += 1;
+    activeChatRequestRef.current = null;
+    sendingRef.current = false;
+    setSending(false);
+  }, []);
 
   const updateParams = useCallback((updates: Record<string, ParamValue>, replace = true) => {
     setSearchParams((current) => {
@@ -114,20 +132,30 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
     staleTime: 5 * 60 * 1000,
   });
 
-  const loadPageMutation = useMutation<PageRewriterPageData, Error, string>({
-    mutationFn: (url) => post<PageRewriterPageData>(`/api/rewrite-chat/${workspaceId}/load-page`, { url }),
-    onMutate: (url) => {
+  const loadPageMutation = useMutation<PageRewriterPageData, Error, PageLoadRequest>({
+    mutationFn: ({ url }) => post<PageRewriterPageData>(`/api/rewrite-chat/${workspaceId}/load-page`, { url }),
+    onMutate: ({ url, requestId }) => {
+      if (activePageLoadRequestRef.current !== requestId) return;
+      // A page load changes the chat's grounding immediately, before the URL is
+      // updated after a successful response. Retire any answer still in flight
+      // so it cannot land in the next page's transcript.
+      invalidateChatContext();
+      autoLoadedUrlRef.current = url;
       setPageError(null);
       setPageData(null);
       setLastAttemptedPageUrl(url);
       if (docBodyRef.current) docBodyRef.current.dataset.pageKey = '';
     },
-    onSuccess: (data, url) => {
+    onSuccess: (data, { url, requestId }) => {
+      if (activePageLoadRequestRef.current !== requestId || autoLoadedUrlRef.current !== url) return;
+      activePageLoadRequestRef.current = null;
       setPageData(data);
       setPageUrl(url);
       updateParams({ [PAGE_REWRITER_DEEP_LINK_PARAM]: url }, false);
     },
-    onError: (error) => {
+    onError: (error, { url, requestId }) => {
+      if (activePageLoadRequestRef.current !== requestId || autoLoadedUrlRef.current !== url) return;
+      activePageLoadRequestRef.current = null;
       setPageData(null);
       setPageError(error);
     },
@@ -154,8 +182,11 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
     // A picker selection writes pageUrl after the request succeeds. Mark the URL
     // before mutating so the receiving search-param effect does not load the same
     // selection a second time when that URL update arrives.
+    const requestId = pageLoadRequestSequenceRef.current + 1;
+    pageLoadRequestSequenceRef.current = requestId;
+    activePageLoadRequestRef.current = requestId;
     autoLoadedUrlRef.current = url;
-    loadPageMutation.mutate(url);
+    loadPageMutation.mutate({ url, requestId });
   }, [loadPageMutation]);
 
   useEffect(() => {
@@ -165,11 +196,36 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
   }, [messages]);
 
   useEffect(() => {
-    if (!initialPageUrl) return;
+    const observed = observedUrlStateRef.current;
+    if (observed?.workspaceId === workspaceId && observed.pageUrl === initialPageUrl) return;
+    observedUrlStateRef.current = { workspaceId, pageUrl: initialPageUrl };
+    invalidateChatContext();
+
+    if (!initialPageUrl) {
+      activePageLoadRequestRef.current = null;
+      autoLoadedUrlRef.current = null;
+      setPageUrl('');
+      setLastAttemptedPageUrl('');
+      setPageData(null);
+      setPageError(null);
+      setMessages([]);
+      setInput('');
+      setCopiedIdx(null);
+      setMsgEdits({});
+      if (docBodyRef.current) {
+        docBodyRef.current.dataset.pageKey = '';
+        docBodyRef.current.innerHTML = '';
+      }
+      return;
+    }
+
+    if (observed && observed.workspaceId !== workspaceId) {
+      autoLoadedUrlRef.current = null;
+    }
     if (autoLoadedUrlRef.current === initialPageUrl) return;
     autoLoadedUrlRef.current = initialPageUrl;
     loadPage(initialPageUrl);
-  }, [initialPageUrl, loadPage]);
+  }, [initialPageUrl, invalidateChatContext, loadPage, workspaceId]);
 
   const selectPage = useCallback((page: PageRewriterSitemapPage) => {
     setComboQuery('');
@@ -211,6 +267,17 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
     const question = (text ?? input).trim();
     if (!question || sendingRef.current || quotaHit) return;
 
+    const requestId = chatRequestSequenceRef.current + 1;
+    chatRequestSequenceRef.current = requestId;
+    const contextEpoch = chatContextEpochRef.current;
+    activeChatRequestRef.current = { requestId, contextEpoch };
+    const isCurrentRequest = () => {
+      const active = activeChatRequestRef.current;
+      return active?.requestId === requestId
+        && active.contextEpoch === contextEpoch
+        && chatContextEpochRef.current === contextEpoch;
+    };
+
     sendingRef.current = true;
     setInput('');
     setSending(true);
@@ -225,6 +292,7 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
         pageTitle: pageData?.title,
         pageIssues: pageData?.issues,
       });
+      if (!isCurrentRequest()) return;
       const sectionTarget = parseRewriteSectionTarget(response.answer);
       setMessages((prev) => [...prev, {
         role: 'assistant',
@@ -233,6 +301,7 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
         sectionTarget,
       }]);
     } catch (error) {
+      if (!isCurrentRequest()) return;
       if (error instanceof ApiError && error.status === 429) {
         setQuotaHit(true);
         setQuotaBannerDismissed(false);
@@ -245,9 +314,12 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
         timestamp: Date.now(),
       }]);
     } finally {
-      sendingRef.current = false;
-      setSending(false);
-      inputRef.current?.focus();
+      if (isCurrentRequest()) {
+        activeChatRequestRef.current = null;
+        sendingRef.current = false;
+        setSending(false);
+        inputRef.current?.focus();
+      }
     }
   }, [input, pageData, pageUrl, quotaHit, sessionId, workspaceId]);
 
@@ -361,7 +433,7 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
     const retryUrl = lastAttemptedPageUrl || pageUrl || initialPageUrl;
     if (retryUrl) loadPage(retryUrl);
   }, [initialPageUrl, lastAttemptedPageUrl, loadPage, pageUrl]);
-  const loadingPage = loadPageMutation.isPending && !pageData && !pageError;
+  const loadingPage = loadPageMutation.isPending && autoLoadedUrlRef.current !== null && !pageData && !pageError;
 
   return {
     pageUrl,

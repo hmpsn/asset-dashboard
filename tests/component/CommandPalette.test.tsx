@@ -250,6 +250,32 @@ describe('CommandPalette', () => {
     });
   });
 
+  describe('rebuilt-shell navigation', () => {
+    function open() {
+      render(<CommandPalette workspaces={[wsWithSite]} selectedWorkspace={wsWithSite} onSelectWorkspace={vi.fn()} />);
+      fireEvent.keyDown(window, { key: 'k', metaKey: true });
+    }
+
+    it('uses the Cockpit label and folds Content Performance when the shell flag is on', () => {
+      useFeatureFlagMock.mockReturnValue(true);
+      open();
+
+      expect(useFeatureFlagMock).toHaveBeenCalledWith('ui-rebuild-shell');
+      expect(screen.getByText('Cockpit')).toBeInTheDocument();
+      expect(screen.queryByText('Home')).not.toBeInTheDocument();
+      expect(screen.queryByText('Content Perf')).not.toBeInTheDocument();
+      expect(screen.getByText('Pipeline')).toBeInTheDocument();
+    });
+
+    it('preserves the legacy labels and Content Performance home when the shell flag is off', () => {
+      open();
+
+      expect(screen.getByText('Home')).toBeInTheDocument();
+      expect(screen.getByText('Content Perf')).toBeInTheDocument();
+      expect(screen.queryByText('Cockpit')).not.toBeInTheDocument();
+    });
+  });
+
   describe('Local Presence nav', () => {
     function open() {
       render(<CommandPalette workspaces={[wsWithSite]} selectedWorkspace={wsWithSite} onSelectWorkspace={vi.fn()} />);

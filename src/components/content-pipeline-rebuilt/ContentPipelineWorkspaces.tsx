@@ -18,6 +18,7 @@ interface ContentPipelineWorkspacesProps {
   focusedBrief: ContentBrief | null;
   blankBriefOpen: boolean;
   focusedPost: GeneratedPost | null;
+  postId: string | null;
   postWorkspaceOpen: boolean;
   capacityOpen: boolean;
   briefFixContext: FixContext | null;
@@ -271,6 +272,7 @@ export function ContentPipelineWorkspaces({
   focusedBrief,
   blankBriefOpen,
   focusedPost,
+  postId,
   postWorkspaceOpen,
   capacityOpen,
   briefFixContext,
@@ -327,7 +329,7 @@ export function ContentPipelineWorkspaces({
       >
         <WorkspaceGrid
           left={<DraftLeftRail post={focusedPost} />}
-          center={<ContentManager workspaceId={workspaceId} embedded />}
+          center={<ContentManager key={postId ?? 'post-workspace'} workspaceId={workspaceId} embedded />}
           right={<DraftRightRail post={focusedPost} />}
         />
       </Drawer>

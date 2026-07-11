@@ -14,6 +14,7 @@ import {
 } from '../lib/navRegistry';
 import type { FeatureFlagKey } from '../../shared/types/feature-flags';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useToast } from './Toast';
 import { ClickableRow, FormInput, Icon } from './ui';
 
@@ -81,6 +82,7 @@ function fuzzyMatch(text: string, query: string): boolean {
 
 export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspace }: CommandPaletteProps) {
   const navigate = useNavigate();
+  const rebuildShellEnabled = useFeatureFlag('ui-rebuild-shell');
   const { toast } = useToast();
   const { startJob } = useBackgroundTasks();
   const [open, setOpen] = useState(false);
@@ -129,10 +131,12 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
   const items: PaletteItem[] = useMemo(() => {
     const result: PaletteItem[] = [];
 
-    // Navigation items — driven by the nav registry. No nav entry currently uses
-    // flagBehavior, so the resolver always reports flags as OFF; the relabel/hide
-    // mechanism is retained in the registry for future flag-gated nav changes.
-    const flagResolver = (_flag: FeatureFlagKey) => false;
+    // Navigation items — driven by the nav registry. Resolve the shell flag from
+    // the same global source as App so the palette cannot advertise folded legacy
+    // homes or stale labels while the rebuilt shell is active.
+    const flagResolver = (flag: FeatureFlagKey) => (
+      flag === 'ui-rebuild-shell' ? rebuildShellEnabled : false
+    );
     for (const entry of NAV_REGISTRY) {
       if (isNavEntryHidden(entry, flagResolver)) continue;
       if (!isPaletteNavEntryAvailable(entry, selectedWorkspace)) continue;
@@ -250,7 +254,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
     }
 
     return result;
-  }, [workspaces, selectedWorkspace, onSelectWorkspace, navigate, startJob, toast]);
+  }, [workspaces, selectedWorkspace, onSelectWorkspace, navigate, rebuildShellEnabled, startJob, toast]);
 
   // Filter items by query
   const filtered = useMemo(() => {

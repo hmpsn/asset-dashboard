@@ -37,9 +37,9 @@ describe('billing mutation lifecycle contracts', () => {
     expect(adminKeys).toContainEqual(queryKeys.admin.workspaceDetail('ws-billing'));
     expect(adminKeys).toContainEqual(queryKeys.admin.workspaceOverview());
 
-    expect(clientDashboard).toContain('[WS_EVENTS.WORKSPACE_UPDATED]: () => {');
+    expect(clientDashboard).toContain('[WS_EVENTS.WORKSPACE_UPDATED]: (data: unknown) => {');
     expect(clientDashboard).toContain(`/api/public/workspace/\${workspaceId}`);
-    expect(clientDashboard).toContain('invalidateClientEvent(WS_EVENTS.WORKSPACE_UPDATED)');
+    expect(clientDashboard).toContain('invalidateClientEvent(WS_EVENTS.WORKSPACE_UPDATED, data)');
     // client.roi joined the WORKSPACE_UPDATED set in The Issue (Client) P0: the ROI payload now
     // carries outcomeVerdict, which depends on the workspace's outcomeValue/segmentConfig.
     expect(clientKeys).toEqual([

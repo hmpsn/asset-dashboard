@@ -1,6 +1,7 @@
 // @ds-rebuilt
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { MemoryRouter, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContentPipelineSurface } from '../../../src/components/content-pipeline-rebuilt/ContentPipelineSurface';
@@ -136,8 +137,9 @@ vi.mock('../../../src/components/ContentManager', () => ({
   ContentManager: ({ workspaceId, embedded }: { workspaceId: string; embedded?: boolean }) => {
     const [params, setParams] = useSearchParams();
     const postId = params.get('post');
+    const [initializedPostId] = useState(postId);
     return (
-      <div data-testid="legacy-posts">
+      <div data-testid="legacy-posts" data-initial-post={initializedPostId ?? 'none'}>
         {!embedded && <h2>Content Posts</h2>}
         Posts {workspaceId} post={postId ?? 'none'}
         <button type="button">Draft</button>
@@ -501,16 +503,47 @@ function createQueryClient(seedFlag = true): QueryClient {
   return client;
 }
 
-function renderSurface(path = `/ws/${workspaceId}/content-pipeline?tab=briefs`, client = createQueryClient()) {
+function renderSurface(
+  path = `/ws/${workspaceId}/content-pipeline?tab=briefs`,
+  client = createQueryClient(),
+  showUrlControls = false,
+) {
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[path]}>
         <ToastProvider>
           <ContentPipelineSurface workspaceId={workspaceId} />
           <LocationProbe />
+          {showUrlControls && <ContentPipelineUrlControls />}
         </ToastProvider>
       </MemoryRouter>
     </QueryClientProvider>,
+  );
+}
+
+function ContentPipelineUrlControls() {
+  const navigate = useNavigate();
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => navigate(`/ws/${workspaceId}/content-pipeline?tab=posts&post=post-review`)}
+      >
+        Focus review post
+      </button>
+      <button
+        type="button"
+        onClick={() => navigate(`/ws/${workspaceId}/content-pipeline?tab=posts&post=missing-post-b`)}
+      >
+        Focus missing post B
+      </button>
+      <button
+        type="button"
+        onClick={() => navigate(`/ws/${workspaceId}/content-pipeline?tab=posts`)}
+      >
+        Clear focused post
+      </button>
+    </>
   );
 }
 
@@ -752,6 +785,52 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /Linked draft title/i })).not.toBeInTheDocument());
     expect(screen.getByTestId('content-pipeline-board')).toBeInTheDocument();
     expect(screen.queryByTestId('legacy-posts')).not.toBeInTheDocument();
+  });
+
+  it('remounts the embedded editor workflow when the same-route post param changes and closes it when the param clears', async () => {
+    renderSurface(
+      `/ws/${workspaceId}/content-pipeline?tab=posts&post=post-linked`,
+      createQueryClient(),
+      true,
+    );
+
+    expect(await screen.findByRole('dialog', { name: /Linked draft title/i })).toBeInTheDocument();
+    expect(screen.getByTestId('legacy-posts')).toHaveAttribute('data-initial-post', 'post-linked');
+    expect(screen.getByTestId('draft-workspace-status-rail')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Focus review post' }));
+
+    expect(await screen.findByRole('dialog', { name: /Review-ready draft/i })).toBeInTheDocument();
+    expect(screen.getByTestId('legacy-posts')).toHaveAttribute('data-initial-post', 'post-review');
+    expect(screen.getByTestId('legacy-posts')).toHaveTextContent('post=post-review');
+    expect(screen.getByTestId('review-workspace-status-rail')).toBeInTheDocument();
+    expect(screen.queryByTestId('draft-workspace-status-rail')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear focused post' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /Review-ready draft/i })).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId('legacy-posts')).toHaveAttribute('data-initial-post', 'none');
+    expect(screen.getByTestId('legacy-posts')).toHaveTextContent('post=none');
+  });
+
+  it('keys the embedded editor from the raw route post id even when the post is unresolved', async () => {
+    renderSurface(
+      `/ws/${workspaceId}/content-pipeline?tab=posts&post=missing-post-a`,
+      createQueryClient(),
+      true,
+    );
+
+    expect(await screen.findByRole('dialog', { name: 'Draft workspace' })).toBeInTheDocument();
+    expect(screen.getByTestId('legacy-posts')).toHaveAttribute('data-initial-post', 'missing-post-a');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Focus missing post B' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('legacy-posts')).toHaveAttribute('data-initial-post', 'missing-post-b');
+    });
+    expect(screen.getByTestId('legacy-posts')).toHaveTextContent('post=missing-post-b');
   });
 
   it('uses a distinct review-status rail for persisted review drafts', async () => {

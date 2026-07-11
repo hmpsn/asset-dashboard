@@ -116,16 +116,17 @@ describe('clientDashboardInvalidationKeys leak coverage', () => {
     ]);
   });
 
-  it('ClientDashboard subscribes to the leak events it maps', () => {
+  it('ClientDashboard subscribes exactly once to every client-dashboard invalidation event', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/components/ClientDashboard.tsx'), 'utf8'); // readFile-ok: contract guard for ClientDashboard workspace-event subscription wiring
+    const subscribedEvents = Array.from(
+      source.matchAll(/\[WS_EVENTS\.([A-Z0-9_]+)\]\s*:/g),
+      match => match[1],
+    );
+    const mappedEvents = Object.entries(WS_EVENTS)
+      .filter(([, event]) => keysFor(event).length > 0)
+      .map(([eventName]) => eventName);
 
-    for (const eventName of [
-      'BRIEF_UPDATED',
-      'WORK_ORDER_COMMENT',
-      'OUTCOME_ACTION_RECORDED',
-      'OUTCOME_PLAYBOOK_DISCOVERED',
-    ]) {
-      expect(source).toContain(`[WS_EVENTS.${eventName}]`);
-    }
+    expect(subscribedEvents).toHaveLength(new Set(subscribedEvents).size);
+    expect(subscribedEvents.sort()).toEqual(mappedEvents.sort());
   });
 });

@@ -406,6 +406,7 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
           focusedBrief={focusedBrief}
           blankBriefOpen={blankBriefOpen}
           focusedPost={focusedPost}
+          postId={state.postId}
           postWorkspaceOpen={Boolean(state.postId)}
           capacityOpen={capacityOpen}
           briefFixContext={briefFixContext}

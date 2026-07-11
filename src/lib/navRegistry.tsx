@@ -55,10 +55,10 @@ export type NavGroupKey =
 
 /**
  * Flag-driven behavior for a nav entry: relabel, re-describe, or hide a surface
- * while a feature flag is ON. No entry currently uses this (the keyword-hub
- * relabel/hide retired when the Hub became the only keyword surface), but the
- * mechanism is retained so future flag-gated nav changes live in ONE place
- * instead of being re-implemented per surface.
+ * while a feature flag is ON. Home uses it to become Cockpit, and Content
+ * Performance uses it to disappear once Pipeline Published becomes its rebuilt
+ * receiving home. Keep future flag-gated nav changes here instead of duplicating
+ * them across shell and palette consumers.
  */
 export interface NavFlagBehavior {
   /** The feature flag this behavior keys off of. */
@@ -158,7 +158,8 @@ export const NAV_REGISTRY: NavEntry[] = [
   { id: 'requests', label: 'Requests', icon: MessageSquare, group: 'content',
     description: 'Client content requests and feedback' },
   { id: 'content-perf', label: 'Content Perf', icon: ChartSpline, group: 'content', needsSite: true,
-    description: 'Post-publish content performance metrics' },
+    description: 'Post-publish content performance metrics',
+    flagBehavior: { flag: 'ui-rebuild-shell', hideWhenOn: true } },
 
   // ── Admin (global) ──
   { id: 'outcomes-overview', label: 'Team Outcomes', icon: BriefcaseBusiness, group: 'admin',
