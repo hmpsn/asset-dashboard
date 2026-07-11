@@ -33,7 +33,9 @@ const LandingPage = lazyWithRetry(() => import('./components/LandingPage').then(
 const PageRewriteChat = lazyWithRetry(() => import('./components/PageRewriteChat').then(m => ({ default: m.PageRewriteChat })));
 // DEV-only design-system harness (F3.2) — mounted only under import.meta.env.DEV
 // (see the /__ds-harness route). Never shipped to production; exempt from nav/registry.
-const DsHarness = lazyWithRetry(() => import('./components/dev/DsHarness'));
+const DsHarness = import.meta.env.DEV
+  ? lazyWithRetry(() => import('./components/dev/DsHarness'))
+  : null;
 
 // ── Lazy-loaded admin tab chunks ──
 const SettingsPanel = lazyWithRetry(() => import('./components/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
@@ -150,7 +152,7 @@ function App() {
         {/* DEV-only DS harness — the F3.3 keyboard-walk target. Excluded from
             production builds; import.meta.env.DEV is statically false in prod so
             this Route (and its lazy chunk) is tree-shaken away. */}
-        {import.meta.env.DEV && (
+        {import.meta.env.DEV && DsHarness && (
           <Route
             path="/__ds-harness"
             element={

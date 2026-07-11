@@ -14,6 +14,7 @@ import {
   SectionCard,
   Skeleton,
 } from '../../../ui';
+import type { IconName } from '../../../ui';
 import { formatMoney, formatNumber, percent } from '../../globalOpsFormatters';
 
 export interface OutcomeBookEntry {
@@ -33,7 +34,7 @@ function TrophyIcon({ className }: { className?: string }) {
   return <Icon name="trophy" className={className} />;
 }
 
-function trendPresentation(trend: WorkspaceOutcomeOverview['trend'] | undefined) {
+function trendPresentation(trend: WorkspaceOutcomeOverview['trend'] | undefined): { label: string; icon: IconName; className: string } {
   if (trend === 'improving') {
     return { label: 'Improving', icon: 'arrowUp', className: 'text-[var(--emerald)]' };
   }

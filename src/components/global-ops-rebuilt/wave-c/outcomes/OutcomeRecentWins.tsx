@@ -2,6 +2,7 @@
 import type { WorkspaceOutcomeOverview } from '../../../../../shared/types/outcome-tracking';
 import { ACTION_TYPE_LABELS, formatOutcomeDate } from '../../../admin/outcomes/outcomeConstants';
 import { ClickableRow, EmptyState, Icon, SectionCard, Skeleton } from '../../../ui';
+import type { IconName } from '../../../ui';
 import { formatMoney } from '../../globalOpsFormatters';
 
 interface OutcomeRecentWinsProps {
@@ -29,7 +30,7 @@ function winTitle(win: NonNullable<WorkspaceOutcomeOverview['topWin']>): string 
   return ACTION_TYPE_LABELS[win.actionType];
 }
 
-function winIcon(actionType: NonNullable<WorkspaceOutcomeOverview['topWin']>['actionType']) {
+function winIcon(actionType: NonNullable<WorkspaceOutcomeOverview['topWin']>['actionType']): { name: IconName; className: string } {
   if (actionType === 'content_published' || actionType === 'content_refreshed' || actionType === 'brief_created') {
     return { name: 'clipboard', className: 'bg-[var(--surface-3)] text-[var(--blue)]' };
   }

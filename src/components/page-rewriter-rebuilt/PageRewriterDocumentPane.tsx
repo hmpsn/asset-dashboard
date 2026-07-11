@@ -11,7 +11,7 @@ import {
   Toolbar,
   ToolbarSpacer,
 } from '../ui';
-import type { BadgeTone } from '../ui';
+import type { BadgeTone, IconName } from '../ui';
 import type { PageRewriterExportMode, PageRewriterIssue } from './pageRewriterTypes';
 import type { usePageRewriterSurfaceState } from './usePageRewriterSurfaceState';
 
@@ -51,7 +51,7 @@ function exportLabel(mode: PageRewriterExportMode): string {
 }
 
 function ExportMenu({ onExport }: { onExport: (mode: PageRewriterExportMode) => void }) {
-  const item = (mode: PageRewriterExportMode, icon: string) => (
+  const item = (mode: PageRewriterExportMode, icon: IconName) => (
     <Popover.Item key={mode} onClick={() => onExport(mode)}>
       <span className="flex items-center gap-2">
         <Icon name={icon} size="sm" className="text-[var(--brand-text-muted)]" />

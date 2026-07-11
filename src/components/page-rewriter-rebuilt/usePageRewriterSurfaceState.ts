@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { Document, Packer } from 'docx';
 import { ApiError, get, post } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { parseRewriteSectionTarget } from '../../lib/rewriteResponse';
@@ -12,9 +11,6 @@ import {
 } from '../page-rewrite-chat/pageRewriteChatModel';
 import {
   buildDocHtml,
-  buildPrintableDocHtml,
-  serializeDocToDocx,
-  serializeDocToMarkdown,
 } from '../page-rewrite-chat/pageRewriteChatDocument';
 import {
   applyRewriteToSection,
@@ -22,6 +18,7 @@ import {
   execFormatCommand,
   wrapSelectionHeading,
 } from '../page-rewrite-chat/pageRewriteChatActions';
+import { exportPageRewriterDocument } from './pageRewriterExport';
 import { mutationErrorMessage } from './pageRewriterMutationFeedback';
 import type {
   PageRewriterExportMode,
@@ -52,10 +49,6 @@ function validatedPageUrl(value: string | null | undefined): string | null {
 
 function pageUrlFromParams(params: URLSearchParams): string | null {
   return validatedPageUrl(params.get(PAGE_REWRITER_DEEP_LINK_PARAM));
-}
-
-function slugFromPage(data: PageRewriterPageData | null): string {
-  return (data?.slug || 'page').replace(/\//g, '-').replace(/^-/, '') || 'page';
 }
 
 async function writeClipboard(text: string): Promise<void> {
@@ -344,80 +337,15 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
   }, [toast]);
 
   const handleExport = useCallback((mode: PageRewriterExportMode) => {
-    const slug = slugFromPage(pageData);
-    if (mode === 'pdf') {
-      try {
-        const printRoot = document.getElementById('page-rewrite-print-root') ?? document.createElement('div');
-        printRoot.id = 'page-rewrite-print-root';
-        printRoot.className = 'page-rewrite-print-root';
-        printRoot.innerHTML = buildPrintableDocHtml(docBodyRef.current, pageData);
-        if (!printRoot.parentElement) document.body.appendChild(printRoot);
-        const cleanup = () => {
-          document.body.classList.remove('page-rewrite-printing');
-          printRoot.innerHTML = '';
-          window.removeEventListener('afterprint', cleanup);
-        };
-        document.body.classList.add('page-rewrite-printing');
-        window.addEventListener('afterprint', cleanup, { once: true });
-        window.print();
-        window.setTimeout(cleanup, 60_000);
-      } catch {
-        toast('PDF export failed. Please try again.', 'error');
-      }
-      return;
-    }
-
-    if (mode === 'docx') {
-      const doc = new Document({
-        styles: {
-          default: {
-            document: { run: { font: 'Calibri', size: 24, color: '1a1a1a' } },
-          },
-        },
-        sections: [{
-          properties: {
-            page: {
-              size: { width: 12240, height: 15840 },
-              margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
-            },
-          },
-          children: serializeDocToDocx(docBodyRef.current, pageData),
-        }],
-      });
-      void Packer.toBlob(doc).then((blob) => {
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = `${slug}-rewrite.docx`;
-        anchor.click();
-        URL.revokeObjectURL(url);
-        toast('DOCX export ready', 'success');
-      }).catch(() => toast('DOCX export failed. Please try again.', 'error'));
-      return;
-    }
-
-    if (mode === 'copyHtml') {
-      void writeClipboard(docBodyRef.current?.innerHTML ?? '')
-        .then(() => toast('Copied HTML', 'success'))
-        .catch(() => toast('Could not copy HTML', 'error'));
-      return;
-    }
-
-    const markdown = serializeDocToMarkdown(docBodyRef.current, pageData);
-    if (mode === 'copyMarkdown') {
-      void writeClipboard(markdown)
-        .then(() => toast('Copied Markdown', 'success'))
-        .catch(() => toast('Could not copy Markdown', 'error'));
-      return;
-    }
-
-    const blob = new Blob([markdown], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${slug}-rewrite.md`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    // Clipboard and print APIs must be entered during the click's user-activation
+    // window. The exporter keeps only the heavyweight DOCX library behind an
+    // async boundary; cheap modes start synchronously from this handler.
+    void exportPageRewriterDocument({
+      mode,
+      docBody: docBodyRef.current,
+      pageData,
+      toast,
+    });
   }, [pageData, toast]);
 
   const docBodyRefCallback = useCallback((el: HTMLDivElement | null) => {

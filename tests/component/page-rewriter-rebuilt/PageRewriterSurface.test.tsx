@@ -15,9 +15,14 @@ const apiGetMock = vi.fn();
 const apiPostMock = vi.fn();
 const navigateMock = vi.fn();
 const featureFlagsListMock = vi.fn();
+const exportDocumentMock = vi.hoisted(() => vi.fn());
 const focusModeMock = vi.hoisted(() => ({
   enabled: false,
   setFocusMode: vi.fn(),
+}));
+
+vi.mock('../../../src/components/page-rewriter-rebuilt/pageRewriterExport', () => ({
+  exportPageRewriterDocument: (...args: unknown[]) => exportDocumentMock(...args),
 }));
 
 vi.mock('../../../src/components/layout/RebuiltAppChrome', () => ({
@@ -567,6 +572,27 @@ describe('PageRewriterSurface rebuilt', () => {
     expect(screen.getAllByRole('link', { name: /Open live page/i })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'Export' })).toHaveLength(1);
     expect(screen.getAllByRole('heading', { level: 1 }).every((heading) => editor.contains(heading))).toBe(true);
+  });
+
+  it('enters the export workflow on demand with the live editor and selected page context', async () => {
+    renderSurface('/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants');
+
+    const editor = await screen.findByRole('textbox', { name: 'Page rewrite document editor' });
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    fireEvent.click(await screen.findByText('Download .docx'));
+
+    // The dispatcher must run in the originating click task so clipboard and print
+    // modes retain browser user activation; only DOCX internals may load later.
+    expect(exportDocumentMock).toHaveBeenCalledOnce();
+    expect(exportDocumentMock).toHaveBeenCalledWith({
+      mode: 'docx',
+      docBody: editor,
+      pageData: expect.objectContaining({
+        slug: 'services/implants',
+        primaryKeyword: 'dental implants',
+      }),
+      toast: expect.any(Function),
+    });
   });
 
   it('renders honest no-page and failed-page states without inventing a document action', async () => {
