@@ -21,6 +21,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { Breadcrumbs } from './components/layout/Breadcrumbs';
 import { RebuiltAppChrome, useRebuildShellEnabled } from './components/layout/RebuiltAppChrome';
 import { REBUILT_SURFACES } from './components/layout/rebuiltSurfaces';
+import { Icon } from './components/ui/Icon';
 import { ScannerReveal } from './components/ui/ScannerReveal';
 import { TabBar } from './components/ui/TabBar';
 import { Clipboard, Globe } from 'lucide-react';
@@ -72,6 +73,19 @@ const DiagnosticReportPage = lazyWithRetry(() => import('./components/admin/Diag
 
 function ChunkFallback() {
   return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--surface-3)] border-t-teal-400" /></div>;
+}
+
+function RebuiltClipboardStatus({ status }: { status: string }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed right-5 top-[calc(var(--shell-topbar)+var(--space-4))] z-[var(--z-toast)] flex max-w-[min(420px,calc(100vw-2.5rem))] items-center gap-1.5 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-4 py-2 t-caption-sm font-medium text-accent-brand shadow-[var(--shadow-lg)]"
+    >
+      <Icon name="clipboard" size="sm" className="flex-none" />
+      <span>{status}</span>
+    </div>
+  );
 }
 
 // Not lazy-loaded — the redirect fires immediately so a lazy chunk would add
@@ -493,10 +507,11 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
         >
           <ErrorBoundary label={tab}>
             <Suspense fallback={<ChunkFallback />}>
-              <RebuiltSurface workspaceId={rebuiltWorkspaceId} />
+              <RebuiltSurface key={`${tab}:${rebuiltWorkspaceId}`} workspaceId={rebuiltWorkspaceId} />
             </Suspense>
           </ErrorBoundary>
         </RebuiltAppChrome>
+        {clipboardStatus && <RebuiltClipboardStatus status={clipboardStatus} />}
         {/* Global chrome the legacy shell renders as siblings — restored for EVERY
             rebuilt surface (review PR #1480: the rebuilt branch dropped these, killing
             ⌘K + admin chat). StatusBar needs an AppShell footer slot → DEF-shell-005. */}
@@ -508,6 +523,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
         {health.hasOpenAIKey && chromeWorkspace && (
           <ErrorBoundary label="Admin Chat">
             <AdminChat
+              key={chromeWorkspace.id}
               workspaceId={chromeWorkspace.id}
               workspaceName={chromeWorkspace.webflowSiteName || chromeWorkspace.name}
             />
@@ -591,6 +607,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
       {selected && health.hasOpenAIKey && (
         <ErrorBoundary label="Admin Chat">
           <AdminChat
+            key={selected.id}
             workspaceId={selected.id}
             workspaceName={selected.webflowSiteName || selected.name}
           />

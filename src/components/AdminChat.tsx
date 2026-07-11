@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useLayoutEffect, useRef, useCallback } from 'react';
 import { X, MessageSquare, Bot, Plus, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { ChatPanel } from './ChatPanel';
 import type { ChatMessage } from './ChatPanel';
@@ -30,6 +30,11 @@ interface AdminChatProps {
   workspaceName: string;
 }
 
+interface AdminChatRequestContext {
+  workspaceId: string;
+  epoch: number;
+}
+
 export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -48,15 +53,37 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
   // ── Resize state ──
   const resizing = useRef<{ edge: 'left' | 'top' | 'corner'; startX: number; startY: number; startW: number; startH: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const requestContextRef = useRef<AdminChatRequestContext>({ workspaceId, epoch: 0 });
 
-  // Reset state when workspace changes
-  // effect-layout-ok — workspace-change reset is intentional post-prop sync, not derived layout state.
-  useEffect(() => {
+  const isCurrentRequest = useCallback((context: AdminChatRequestContext) => (
+    requestContextRef.current.workspaceId === context.workspaceId
+    && requestContextRef.current.epoch === context.epoch
+  ), []);
+
+  const invalidatePendingRequests = useCallback(() => {
+    requestContextRef.current = {
+      workspaceId: requestContextRef.current.workspaceId,
+      epoch: requestContextRef.current.epoch + 1,
+    };
+  }, []);
+
+  // Invalidate pending work and clear workspace-owned state before paint. The
+  // App-level key is the primary isolation boundary; this guard also protects
+  // direct mounts and any future parent that updates the prop in place.
+  useLayoutEffect(() => { // effect-layout-ok — security boundary must settle before the next workspace paints
+    if (requestContextRef.current.workspaceId !== workspaceId) {
+      requestContextRef.current = {
+        workspaceId,
+        epoch: requestContextRef.current.epoch + 1,
+      };
+    }
     setMessages([]);
     setInput('');
     setChatMode('analyst');
     setSessionId(`as-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    setSessions([]);
     setShowHistory(false);
+    setLoading(false);
   }, [workspaceId]);
 
   // ── Resize handlers ──
@@ -85,41 +112,61 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
   // ── Chat logic ──
   const askAi = async (question: string) => {
     if (!question.trim()) return;
+    const requestContext = { ...requestContextRef.current };
     setMessages(prev => [...prev, { role: 'user', content: question.trim() }]);
     setInput('');
     setLoading(true);
     try {
       const data = await chat.adminAsk({ workspaceId, question: question.trim(), sessionId });
+      if (!isCurrentRequest(requestContext)) return;
       if (data.mode) setChatMode(data.mode);
       setMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : (data.answer ?? '') }]);
     } catch (err) {
+      if (!isCurrentRequest(requestContext)) return;
       console.error('AdminChat operation failed:', err);
       setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]);
     } finally {
-      setLoading(false);
+      if (isCurrentRequest(requestContext)) setLoading(false);
     }
   };
 
   const newSession = () => {
+    invalidatePendingRequests();
     setSessionId(`as-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
     setMessages([]);
     setChatMode('analyst');
     setShowHistory(false);
+    setLoading(false);
   };
 
   const toggleHistory = () => {
-    setShowHistory(v => {
-      if (!v) chat.sessions(workspaceId, 'admin').then(d => { if (Array.isArray(d)) setSessions(d as typeof sessions); }).catch((err) => { console.error('AdminChat operation failed:', err); });
-      return !v;
+    if (showHistory) {
+      setShowHistory(false);
+      return;
+    }
+
+    setShowHistory(true);
+    const requestContext = { ...requestContextRef.current };
+    void chat.sessions(workspaceId, 'admin').then(d => {
+      if (isCurrentRequest(requestContext) && Array.isArray(d)) setSessions(d as typeof sessions);
+    }).catch((err) => {
+      if (isCurrentRequest(requestContext)) console.error('AdminChat operation failed:', err);
     });
   };
 
   const loadSession = (id: string) => {
+    invalidatePendingRequests();
+    const requestContext = { ...requestContextRef.current };
     setSessionId(id);
     setShowHistory(false);
+    setLoading(false);
     chat.session(workspaceId, id).then(d => {
-      if (d?.messages) setMessages(d.messages.map((m: { role: string; content: string }) => ({ role: m.role as 'user' | 'assistant', content: m.content })));
-    }).catch((err) => { console.error('AdminChat operation failed:', err); });
+      if (isCurrentRequest(requestContext) && d?.messages) {
+        setMessages(d.messages.map((m: { role: string; content: string }) => ({ role: m.role as 'user' | 'assistant', content: m.content })));
+      }
+    }).catch((err) => {
+      if (isCurrentRequest(requestContext)) console.error('AdminChat operation failed:', err);
+    });
   };
 
   const { placeholder: smartPlaceholder, suggestions } = useSmartPlaceholder({

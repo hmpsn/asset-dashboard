@@ -13,10 +13,11 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const rebuildShellMock = vi.hoisted(() => ({ enabled: false }));
+const rebuiltInstanceMock = vi.hoisted(() => ({ surface: 0, adminChat: 0 }));
 
 // ─── Mock all lazy-loaded page components ────────────────────────────────────
 
@@ -44,9 +45,11 @@ vi.mock('../../src/components/PageRewriteChat', () => ({
 }));
 
 vi.mock('../../src/components/page-rewriter-rebuilt/PageRewriterSurface', () => ({
-  PageRewriterSurface: ({ workspaceId }: { workspaceId: string }) => (
-    <div data-testid="page-rewriter-rebuilt" data-workspace-id={workspaceId} />
-  ),
+  PageRewriterSurface: ({ workspaceId }: { workspaceId: string }) => {
+    const { useState } = require('react') as typeof import('react');
+    const [mountId] = useState(() => ++rebuiltInstanceMock.surface);
+    return <div data-testid="page-rewriter-rebuilt" data-workspace-id={workspaceId} data-mount-id={mountId} />;
+  },
 }));
 
 vi.mock('../../src/components/content-pipeline-rebuilt/ContentPipelineSurface', async () => {
@@ -210,7 +213,11 @@ vi.mock('../../src/hooks/useBackgroundTasks', () => ({
 }));
 
 vi.mock('../../src/components/AdminChat', () => ({
-  AdminChat: () => <div data-testid="admin-chat" />,
+  AdminChat: ({ workspaceId }: { workspaceId: string }) => {
+    const { useState } = require('react') as typeof import('react');
+    const [mountId] = useState(() => ++rebuiltInstanceMock.adminChat);
+    return <div data-testid="admin-chat" data-workspace-id={workspaceId} data-mount-id={mountId} />;
+  },
 }));
 
 vi.mock('../../src/components/ErrorBoundary', () => ({
@@ -374,6 +381,11 @@ function makeQueryClient() {
   });
 }
 
+function WorkspaceRouteSwitcher() {
+  const navigate = useNavigate();
+  return <button type="button" onClick={() => navigate('/ws/ws-2/rewrite')}>Switch to workspace B</button>;
+}
+
 /**
  * Render App with a MemoryRouter at a given initial path.
  * This imports App directly (which uses BrowserRouter internally), so we
@@ -405,6 +417,8 @@ beforeEach(() => {
   mockAuthState.required = false;
   mockAuthState.authenticated = true;
   rebuildShellMock.enabled = false;
+  rebuiltInstanceMock.surface = 0;
+  rebuiltInstanceMock.adminChat = 0;
   mockWorkspaces.splice(0, mockWorkspaces.length, { ...defaultMockWorkspace });
 });
 
@@ -662,6 +676,75 @@ describe('Dashboard content rendering', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(chrome).toHaveAttribute('data-focus-mode', 'true');
     expect(screen.getByTestId('page-rewriter-rebuilt')).toBeInTheDocument();
+  });
+
+  it('remounts rebuilt surface and Admin Chat state when the active workspace changes', async () => {
+    rebuildShellMock.enabled = true;
+    mockWorkspaces.push({
+      ...defaultMockWorkspace,
+      id: 'ws-2',
+      name: 'Bravo',
+      folder: 'bravo',
+      webflowSiteId: 'site-2',
+      webflowSiteName: 'bravo.com',
+    });
+    const { Dashboard } = await import('../../src/App');
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/ws/ws-1/rewrite']}>
+          <Routes>
+            <Route
+              path="/*"
+              element={(
+                <>
+                  <WorkspaceRouteSwitcher />
+                  <Dashboard onLogout={vi.fn()} theme="dark" toggleTheme={vi.fn()} />
+                </>
+              )}
+            />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const initialSurfaceMount = (await screen.findByTestId('page-rewriter-rebuilt')).getAttribute('data-mount-id');
+    const initialChatMount = (await screen.findByTestId('admin-chat')).getAttribute('data-mount-id');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to workspace B' }));
+
+    await waitFor(() => expect(screen.getByTestId('page-rewriter-rebuilt')).toHaveAttribute('data-workspace-id', 'ws-2'));
+    expect(screen.getByTestId('page-rewriter-rebuilt').getAttribute('data-mount-id')).not.toBe(initialSurfaceMount);
+    expect(screen.getByTestId('admin-chat')).toHaveAttribute('data-workspace-id', 'ws-2');
+    expect(screen.getByTestId('admin-chat').getAttribute('data-mount-id')).not.toBe(initialChatMount);
+  });
+
+  it('shows clipboard upload completion feedback above rebuilt chrome', async () => {
+    rebuildShellMock.enabled = true;
+    const { postForm } = await import('../../src/api/client');
+    vi.mocked(postForm).mockResolvedValueOnce({ fileName: 'clipboard-proof.png' });
+    const { Dashboard } = await import('../../src/App');
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/ws/ws-1/rewrite']}>
+          <Routes>
+            <Route path="/*" element={<Dashboard onLogout={vi.fn()} theme="dark" toggleTheme={vi.fn()} />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await screen.findByTestId('page-rewriter-rebuilt');
+
+    const image = new File([new Uint8Array([1, 2, 3])], 'paste.png', { type: 'image/png' });
+    fireEvent.paste(window, {
+      clipboardData: {
+        items: [{ type: 'image/png', getAsFile: () => image }],
+      },
+    });
+
+    await waitFor(() => expect(postForm).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole('status')).toHaveTextContent('Pasted: clipboard-proof.png');
   });
 
   it('redirects flag-on Content Performance bookmarks to Pipeline Published and preserves item identity', async () => {

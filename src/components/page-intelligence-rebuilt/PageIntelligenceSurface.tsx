@@ -50,6 +50,11 @@ interface PageIntelligenceSurfaceProps {
   workspaceId: string;
 }
 
+function readPageIntelligenceFixContext(state: unknown): FixContext | null {
+  const fixContext = (state as { fixContext?: FixContext } | null)?.fixContext;
+  return fixContext?.targetRoute === 'page-intelligence' ? fixContext : null;
+}
+
 export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurfaceProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -57,7 +62,9 @@ export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurface
   const workspaces = useWorkspaces();
   const workspace = workspaces.data?.find(item => item.id === workspaceId);
   const siteId = workspace?.webflowSiteId ?? '';
-  const fixContext = (location.state as { fixContext?: FixContext } | null)?.fixContext ?? null;
+  const routeFixContext = useMemo(() => readPageIntelligenceFixContext(location.state), [location.state]);
+  const retainedFixContext = useRef<FixContext | null>(routeFixContext);
+  const fixContext = routeFixContext ?? retainedFixContext.current;
   const activeTab = resolvePageIntelligenceTab(searchParams.get('tab'));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -73,6 +80,16 @@ export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurface
   const keywordEditing = usePageIntelligenceKeywordEditing({ workspaceId, strategy });
   const keywordTracking = usePageIntelligenceKeywordTracking(workspaceId);
   const seoCopy = usePageIntelligenceSeoCopy({ workspaceId });
+
+  // Dashboard clears router state after consuming it. Preserve this receiver's
+  // context until cold page/strategy queries settle so the intended page can
+  // still be selected after that replace-navigation has completed.
+  useEffect(() => {
+    if (routeFixContext) {
+      retainedFixContext.current = routeFixContext;
+      initialSelectionResolved.current = null;
+    }
+  }, [routeFixContext]);
 
   const effectiveAnalyses = useMemo(
     () => buildEffectiveAnalyses(pageJoin.pages, analysis.analyses),
@@ -110,6 +127,7 @@ export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurface
     if (initialSelectionResolved.current === selectionKey) return;
     initialSelectionResolved.current = selectionKey;
     setSelectedId(resolveInitialPage(pageJoin.pages, pageParam, fixContext)?.id ?? null);
+    retainedFixContext.current = null;
   }, [fixContext, pageJoin.pages, searchParams, workspaceId]);
 
   const updateTab = (tab: IntelligenceTab) => {
