@@ -26,6 +26,17 @@ const workspace = {
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 
+const secondWorkspace = {
+  ...workspace,
+  id: 'ws-2',
+  name: 'Second Workspace',
+  webflowSiteId: 'site-2',
+  webflowSiteName: 'second.example',
+  folder: 'second',
+};
+
+let workspaceList = [workspace, secondWorkspace];
+
 const pageWeightResult = {
   totalPages: 3,
   totalAssetSize: 8_388_608,
@@ -115,7 +126,7 @@ beforeAll(() => {
 
 vi.mock('../../../src/hooks/admin', () => ({
   useWorkspaces: () => ({
-    data: [workspace],
+    data: workspaceList,
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
@@ -196,6 +207,7 @@ function renderFlagged(queryClient = createQueryClient()) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  workspaceList = [workspace, secondWorkspace];
   featureFlagsListMock.mockReturnValue(new Promise(() => {}));
   pageWeightScanMock.mockResolvedValue(pageWeightResult);
   pageWeightSnapshotMock.mockResolvedValue({
@@ -231,11 +243,11 @@ describe('PerformanceSurface rebuilt admin surface', () => {
     expect(screen.getByRole('radio', { name: /Page Weight/i })).toHaveAttribute('aria-checked', 'true');
   });
 
-  it('pilots the rebuilt admin page-header hierarchy', async () => {
+  it('uses the compact prototype page-header hierarchy', async () => {
     renderSurface('/ws/ws-1/performance');
 
-    expect(await screen.findByRole('heading', { name: 'Performance', level: 2 })).toHaveClass('t-h1');
-    expect(screen.getByText('Page weight and Core Web Vitals. Heavy pages fix in Asset Manager.')).toHaveClass('t-body');
+    expect(await screen.findByRole('heading', { name: 'Performance', level: 2 })).toHaveClass('t-h2');
+    expect(screen.getByText('Page weight and Core Web Vitals — the detect side of speed. Heavy pages fix in the Asset Manager.')).toHaveClass('t-caption-sm');
   });
 
   it('receives the Page Weight deep link and supports search, source filtering, and detail inspection', async () => {
@@ -247,13 +259,21 @@ describe('PerformanceSurface rebuilt admin surface', () => {
     expect(averageWeightTile?.querySelector('.t-stat')).toHaveStyle({ color: 'var(--blue)' });
     expect(screen.getByText('page:/services')).toBeInTheDocument();
     expect(screen.getByText(/Last scanned Jul 6, 2026/)).toBeInTheDocument();
-    expect(screen.getByText('Open Asset Manager to repair oversized files at the source before re-scanning.')).toHaveClass('t-body');
+    expect(screen.getByText(/compress their images in Asset Manager to cut weight and improve LCP/i)).toBeInTheDocument();
+
+    const metricLabel = screen.getByText('Pages with Assets');
+    const searchbox = screen.getByRole('searchbox');
+    expect(metricLabel.compareDocumentPosition(searchbox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    const servicesRow = screen.getByRole('button', { name: /Inspect page:\/services/i });
+    expect(within(servicesRow).getAllByText('3.0 MB')).toHaveLength(1);
+    expect(within(servicesRow).getAllByText('3 assets')).toHaveLength(1);
 
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'implant' } });
     await waitFor(() => expect(screen.queryByText('page:/services')).not.toBeInTheDocument());
     expect(screen.getByText('cms:blog/dental-implants')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /^CSS/ }));
+    fireEvent.change(screen.getByLabelText('Page weight source'), { target: { value: 'css' } });
     expect(screen.getByText('No pages match this view')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(screen.getByText('page:/services')).toBeInTheDocument();
@@ -268,7 +288,7 @@ describe('PerformanceSurface rebuilt admin surface', () => {
   it('sends Page Weight repairs to the canonical Asset Manager filter', async () => {
     renderSurface('/ws/ws-1/performance?tab=weight');
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Open assets' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Asset Manager' }));
     expect(screen.getByTestId('location-path')).toHaveTextContent('/ws/ws-1/media');
     expect(screen.getByTestId('location-search')).toHaveTextContent(/^\?filter=oversized$/);
   });
@@ -278,12 +298,14 @@ describe('PerformanceSurface rebuilt admin surface', () => {
 
     expect(await screen.findByRole('radio', { name: /Page Speed/i })).toHaveAttribute('aria-checked', 'true');
     expect(await screen.findByLabelText('PageSpeed page')).toBeInTheDocument();
-    expect(screen.getByText('Mobile average')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'services' } });
+    fireEvent.change(screen.getByLabelText('PageSpeed page'), { target: { value: 'page-services' } });
+    expect(screen.queryByLabelText('Bulk PageSpeed page count')).not.toBeInTheDocument();
+    expect(screen.getByText('Mobile result')).toBeInTheDocument();
+    expect(screen.getByText('Desktop result')).toBeInTheDocument();
     expect(screen.getByText('Field data')).toBeInTheDocument();
     expect(screen.getAllByText('Lighthouse performance score plus the full Core Web Vitals set.')[0]).toHaveClass('t-body');
 
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'services' } });
-    fireEvent.change(screen.getByLabelText('PageSpeed page'), { target: { value: 'page-services' } });
     fireEvent.click(screen.getByRole('button', { name: 'Test Mobile' }));
 
     await waitFor(() => expect(pagespeedSingleMock).toHaveBeenCalled());
@@ -294,25 +316,81 @@ describe('PerformanceSurface rebuilt admin surface', () => {
     expect(screen.getByText('Avoid excessive DOM size')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('radio', { name: /Bulk Top Pages/i }));
+    expect(screen.getByLabelText('Bulk PageSpeed page count')).toBeInTheDocument();
+    expect(screen.queryByText('Mobile result')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Test Desktop' }));
     await waitFor(() => expect(pagespeedBulkMock).toHaveBeenCalledWith('site-1', 'desktop', 3, 'ws-1'));
     expect(await screen.findByText('Desktop average')).toBeInTheDocument();
     expect(screen.getByText('Home')).toBeInTheDocument();
   });
 
+  it('shows truthful mobile and desktop results together before their evidence sections', async () => {
+    pagespeedSnapshotMock.mockImplementation((_siteId: string, _workspaceId: string, strategy: 'mobile' | 'desktop') => Promise.resolve({
+      siteId: 'site-1',
+      createdAt: strategy === 'desktop' ? '2026-07-06T16:00:00.000Z' : '2026-07-06T15:00:00.000Z',
+      result: {
+        ...(strategy === 'desktop' ? desktopSiteSpeed : mobileSiteSpeed),
+        pages: [strategy === 'desktop'
+          ? { ...desktopPageSpeed, page: 'Home', url: 'https://acme.com/' }
+          : { ...mobilePageSpeed, page: 'Home', url: 'https://acme.com/' }],
+      },
+    }));
+
+    renderSurface('/ws/ws-1/performance?tab=speed');
+
+    expect(await screen.findByText('Mobile result')).toBeInTheDocument();
+    expect(screen.getByText('Desktop result')).toBeInTheDocument();
+    expect(screen.getByText('72')).toBeInTheDocument();
+    expect(screen.getByText('91')).toBeInTheDocument();
+    expect(screen.getByText('Field data')).toBeInTheDocument();
+    expect(screen.getByText('Lab test')).toBeInTheDocument();
+    const resultsHeading = screen.getByText('Selected page results');
+    const opportunities = screen.getByRole('button', { name: /Opportunities \(/ });
+    expect(resultsHeading.compareDocumentPosition(opportunities) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('resets lens-local workflow state when the workspace and site identity change', async () => {
+    const queryClient = createQueryClient();
+    const view = render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/ws/ws-1/performance?tab=speed']}>
+          <ToastProvider>
+            <PerformanceSurface workspaceId="ws-1" />
+          </ToastProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Bulk Top Pages/i }));
+    expect(screen.getByLabelText('Bulk PageSpeed page count')).toBeInTheDocument();
+
+    view.rerender(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/ws/ws-1/performance?tab=speed']}>
+          <ToastProvider>
+            <PerformanceSurface workspaceId="ws-2" />
+          </ToastProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole('radio', { name: /Single Page/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByLabelText('Bulk PageSpeed page count')).not.toBeInTheDocument();
+  });
+
   it('keeps the PageSpeed workflow connected to the Asset Manager repair home', async () => {
     renderSurface('/ws/ws-1/performance?tab=speed');
 
     expect(await screen.findByLabelText('PageSpeed page')).toBeInTheDocument();
-    expect(screen.getByText('Speed fixes start in Asset Manager')).toBeInTheDocument();
-    expect(screen.getByText(/Use PageSpeed to identify Core Web Vitals issues/i)).toHaveClass('t-body');
-    expect(screen.getByText(/repair oversized source files in Asset Manager before retesting/i)).toBeInTheDocument();
+    expect(screen.getByText(/Speed fixes start in Asset Manager/i)).toBeInTheDocument();
+    expect(screen.getByText(/Use PageSpeed to identify Core Web Vitals issues/i)).toBeInTheDocument();
+    expect(screen.getByText(/repair oversized source files before retesting/i)).toBeInTheDocument();
   });
 
   it('sends PageSpeed repairs to the canonical Asset Manager filter', async () => {
     renderSurface('/ws/ws-1/performance?tab=speed');
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Open assets' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Asset Manager' }));
     expect(screen.getByTestId('location-path')).toHaveTextContent('/ws/ws-1/media');
     expect(screen.getByTestId('location-search')).toHaveTextContent(/^\?filter=oversized$/);
   });
@@ -344,6 +422,7 @@ describe('PerformanceSurface rebuilt admin surface', () => {
   it('keeps internal implementation language out of PageSpeed detail copy', async () => {
     renderSurface('/ws/ws-1/performance?tab=speed');
 
+    fireEvent.click(await screen.findByRole('radio', { name: /Bulk Top Pages/i }));
     const servicesRows = await screen.findAllByText('Services');
     fireEvent.click(servicesRows[0]);
     const dialog = await screen.findByRole('dialog', { name: /services/i });
