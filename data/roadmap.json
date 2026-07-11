@@ -74,6 +74,18 @@
           "completedAt": "2026-07-10",
           "owner": "integrations",
           "notes": "Completed locally on codex/ui-visual-parity. Added explicit local-fake/local-live/staging environment profiles, deterministic provider-rich demo fixtures scoped to ws_demo_provider_rich, truthful DataForSEO/GSC/GA4/PageSpeed/GBP health and verification states, and a read-only staging smoke with an HTTPS/non-production guard, redacted output, and a default one-call paid-provider ceiling. No OAuth identities, API keys, reviews, or unsupported actions are fabricated. Focused provider/health/env coverage passes; staging live-provider verification remains intentionally unrun until dedicated staging credentials and Joshua-authorized staging access are available."
+        },
+        {
+          "id": "ui-rebuild-page-intelligence-standalone",
+          "title": "Standalone Page Intelligence prototype-led rebuild",
+          "source": "ODP-012 B receiving-home decision",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-10",
+          "completedAt": "2026-07-10",
+          "owner": "seo-health",
+          "notes": "Implemented in codex/ui-visual-parity and awaiting Joshua's explicit desktop visual approval. The flag-on route now mounts a standalone Research workbench modeled on the prototype SEO Editor master/detail composition while the flag-off legacy receiver remains intact. Pages/Architecture/Guide, single and bulk analysis, progress/cancel, keyword editing/tracking, local/rank context, SEO copy, fix queue, and production handoffs remain reachable. New ?tab= and ?page= receivers use URL page identity before Page Intelligence fixContext and never auto-select the first row. Browser evidence at 1440x900 and 1600x1000 is under /tmp/asset-dashboard-codex-visual-parity/page-intelligence/. Status: awaiting owner approval; do not convert the rendered PASS into approval."
         }
       ]
     },

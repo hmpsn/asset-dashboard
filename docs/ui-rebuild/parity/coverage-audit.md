@@ -1,6 +1,6 @@
 # Admin Rebuilt Route Coverage Audit
 
-Audit state: route, nav, interior-state, and layout accounting complete; all 26 mounted rebuilt route homes owner-approved on 2026-07-10 with documented exceptions
+Audit state: route, nav, interior-state, and layout accounting complete; 26 route homes owner-approved on 2026-07-10, with newly mounted Page Intelligence awaiting approval
 Last updated: 2026-07-10
 Source of truth files: `src/routes.ts`, `src/lib/navRegistry.tsx`, `src/components/layout/rebuiltSurfaces.ts`, and `hmpsn studio Design System/mockup/nav.js`
 
@@ -105,6 +105,7 @@ Interior state has been checked in contracts, component tests, and smoke for the
 | Assets | `media` | Dense Browse workshop, compact Repair results, Upload/asset/organize overlays, bulk and repair handoffs | `owner-approved`; production Drawers and DS color semantics remain explicit exceptions |
 | Page Rewriter | `rewrite` | Two-pane workspace, shell focus mode, page picker, export menu, `?pageUrl=` | `owner-approved`; export-only v1 and retained 62px Focus rail approved, while draft/publish remains separate backend scope |
 | Local Presence | `local-seo` | Rank/profile, Reviews/replies, setup Drawer, legacy visibility receiver | `owner-approved`; geo-grid/GBP Performance remain explicit backend exceptions |
+| Page Intelligence | `page-intelligence` | Pages master/detail Research workbench, Architecture, Guide, single/bulk analysis, keyword edit/tracking, local/rank context, SEO copy, `?tab=`/`?page=` | `awaiting owner approval`; standalone receiving-home decision implemented without changing the flag-off route |
 | Global Ops | `settings`, `workspace-settings`, `roadmap`, `revenue`, `ai-usage`, `features`, `prospect`, `outcomes-overview`, `outcomes`, `diagnostics`, `requests` | Global settings, workspace settings tabs, roadmap views, business tabs, outcomes, diagnostics, requests tabs | `owner-approved`; all 11 route homes approved with explicit `GO-*` exceptions retained |
 
 ## Layout Coverage
@@ -113,11 +114,11 @@ The behavior checkpoint accounted for layout and route state across every mounte
 
 Current layout buckets:
 
-- `owner-approved`: all 26 mounted rebuilt route homes, including every documented production/backend/design-system exception. Joshua approved the final 24-route batch and retained Page Rewriter Focus rail on 2026-07-10.
-- `awaiting owner approval`: none among mounted rebuilt route homes.
-- `behavior-safe / visual-unverified`: none among the 26 mounted rebuilt route homes. The two non-rebuilt main-nav routes remain documented receiving-home exceptions, not mounted-surface parity claims.
+- `owner-approved`: the original 26 mounted rebuilt route homes, including every documented production/backend/design-system exception. Joshua approved the final 24-route batch and retained Page Rewriter Focus rail on 2026-07-10.
+- `awaiting owner approval`: Page Intelligence, newly mounted after the 26-route registry approval.
+- `behavior-safe / visual-unverified`: Content Performance remains the sole non-rebuilt main-nav receiving-home exception while its consolidation is in progress.
 - Consolidated owner-review packet and measured registry-closeout evidence: `docs/ui-rebuild/parity/registry-final-owner-review.md` and `/tmp/asset-dashboard-codex-visual-parity/registry-final/`.
-- Receiving-home proof complete: Page Intelligence stays standalone under the owner-accepted `ODP-012 B` routing exception; this is not a mounted-surface visual approval. Content Pipeline Published is the future Content Performance compatibility receiver only after the six named frontend gaps and populated browser evidence are closed. Both route ids remain intact in this goal.
+- Receiving-home proof complete: Page Intelligence stays standalone under the owner-accepted `ODP-012 B` routing exception and now has a mounted rebuilt surface awaiting explicit visual approval. Content Pipeline Published is the future Content Performance compatibility receiver only after its six named gaps and populated browser evidence are closed. Both route ids remain intact in this goal.
 - Redirect/folded only: SEO Briefs, Content, and Calendar.
 - Preserved legacy standalone receiver: Subscriptions; its Content Pipeline query alias is accounted for separately.
 

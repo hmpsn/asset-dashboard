@@ -9488,3 +9488,15 @@ From the 2026-06-30 six-screen UX review (WorkspaceOverview / WorkspaceHome / Th
 **Tests:** Environment-profile validation, local fixture identity/gating, fake SEO provider coverage, GSC/GA4/PageSpeed fixture interception, idempotent demo seeding, health-route verification semantics, and staging-smoke safety/call-cap tests. Typecheck and `pr-check` pass.
 
 **Files:** `.env.example`; `render.yaml`; `package.json`; `shared/types/integration-health.ts`; `server/routes/health.ts`; `server/providers/local-provider-fixtures.ts`; `server/providers/fake-seo-provider.ts`; `server/search-console.ts`; `server/google-analytics.ts`; `server/pagespeed.ts`; `scripts/env-contract.ts`; `scripts/verify-env.ts`; `scripts/provider-readiness-smoke.ts`; `scripts/report-verification-governance.ts`; `scripts/seed-demo-workspaces.ts`; focused unit/integration tests; `docs/workflows/local-dev-onboarding.md`; `docs/workflows/staging-environment.md`; parity records; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 613. Page Intelligence standalone rebuilt Research workbench 2026-07-10
+
+**Status:** Implemented and independently browser-reviewed in `codex/ui-visual-parity`; awaiting explicit owner desktop visual approval.
+
+**What it does:** Adds `page-intelligence` to the flag-on rebuilt-surface registry and composes the existing production Page Intelligence hooks inside a dense prototype-led master/detail Research workbench. The route resolves its own linked Webflow site, preserves Pages/Architecture/Guide, search/sort/fix-first prioritization, single and bulk analysis with progress/cancel, keyword assignment/tracking, provider metrics, local visibility, persisted and live analysis, SEO-copy generation, and exact-once Brief/Schema/SEO Editor handoffs. The detail pane has an intentional empty-selection state, sticky target header, independently scrolling evidence interior, and sticky real-action footer.
+
+**Deep links:** `?tab=pages|architecture|guide` is validated at the receiver. `?page=<id|slug|normalized-path>` is refreshable and takes precedence over a Page Intelligence `location.state.fixContext`; absent state never silently selects the first row. Flag-off behavior remains the legacy component.
+
+**Verification:** Focused routing/surface tests, hooks lint, typecheck, `pr-check`, and diff hygiene pass. Browser captures at 1440×900 and 1600×1000 confirm 22px heading authority, bounded master/detail geometry, no document overflow, mapped/unmapped truth labels, empty state, and selected detail composition. Evidence: `/tmp/asset-dashboard-codex-visual-parity/page-intelligence/`.
+
+**Files:** `src/components/page-intelligence-rebuilt/*`; `src/components/layout/rebuiltSurfaces.ts`; `tests/component/page-intelligence-rebuilt/*`; `BRAND_DESIGN_LANGUAGE.md`; parity decision/coverage/shipping records; `data/roadmap.json`; `FEATURE_AUDIT.md`.

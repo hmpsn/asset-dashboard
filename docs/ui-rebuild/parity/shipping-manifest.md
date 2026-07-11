@@ -71,9 +71,10 @@ The integration sandbox has advanced beyond the baseline through reviewed, surfa
 | Local Presence | `735d7afe5` | Two-mode real-data composition, setup Drawer, legacy receivers, and geo-grid/GBP backend exceptions. |
 | Global Ops | `e18271bf8` | All 11 route homes, shared legacy interiors, wave A/B/C composition modules, focused tests, and `GO-001` through `GO-008`. |
 | Page Rewriter | `5f48acf09` | Two-pane export-only workspace, picker/chat/document composition, approved 62px Focus rail, deferred-ledger record, and backend write-spine exception. |
+| Page Intelligence | awaiting owner approval | Standalone Research master/detail workbench, validated tab/page deep links, existing analysis/edit/tracking/handoff capabilities, and flag-off legacy preservation. |
 
 The historical 28px Performance `PageHeader` pilot was superseded by the source-led compact header and is not a shipping cohort. These references are extraction aids only; no push, PR, or staging work is authorized by the visual-parity approval.
 
-Route-home decision: Content Pipeline Published is the proposed Content Performance receiver because it already consumes shared readback data, but `/content-perf` remains standalone. Page Intelligence remains standalone until a later SEO Editor Research/detail slice proves every capability. No route migration belongs in the current extraction set.
+Route-home decision: Content Pipeline Published is the proposed Content Performance receiver because it already consumes shared readback data, but `/content-perf` remains standalone until the compatibility phase is complete. Page Intelligence remains standalone and now has a mounted prototype-led Research workbench; it is not an extraction cohort until Joshua explicitly approves its desktop comparison.
 
 Provider-readiness follow-on: the integration branch now has deterministic provider-rich local fixtures, explicit environment profiles, truthful provider health, and a bounded read-only staging smoke. Treat that work as a separate integrations cohort; it does not authorize credentials, staging execution, provider spend beyond the smoke ceiling, or shipment with a visual surface.

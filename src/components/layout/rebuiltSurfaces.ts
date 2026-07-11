@@ -56,6 +56,9 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   'seo-audit': lazyWithRetry(() =>
     import('../site-audit-rebuilt/SiteAuditSurface').then(m => ({ default: m.SiteAuditSurface })),
   ),
+  'page-intelligence': lazyWithRetry(() =>
+    import('../page-intelligence-rebuilt/PageIntelligenceSurface').then(m => ({ default: m.PageIntelligenceSurface })),
+  ),
   'home': lazyWithRetry(() =>
     import('../cockpit-rebuilt/CockpitSurface').then(m => ({ default: m.CockpitSurface })),
   ),

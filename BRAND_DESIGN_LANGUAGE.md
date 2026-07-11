@@ -10,7 +10,7 @@
 
 ## Registry-Wide Admin Visual Baseline — Owner-Approved 2026-07-10
 
-All 26 route homes mounted through `REBUILT_SURFACES` have explicit owner-approved desktop visual parity or an owner-approved exception. The per-surface contracts in `docs/ui-rebuild/parity/` remain the authority for exact geometry and exceptions; this section records the shared baseline that emerged from the source-led pass.
+The original 26 route homes mounted through `REBUILT_SURFACES` have explicit owner-approved desktop visual parity or an owner-approved exception. Page Intelligence was mounted later as a standalone receiving-home rebuild and remains awaiting explicit approval. The per-surface contracts in `docs/ui-rebuild/parity/` remain the authority for exact geometry and exceptions; this section records the shared baseline that emerged from the source-led pass.
 
 - Use the real prototype implementation as composition authority at 1440×900 and 1600×1000. Preserve production routes, deep links, governed actions, and exact-once capability homes when the prototype is simpler.
 - Favor compact surface context, bounded desktop canvases, dense first-viewport evidence, clear section order, and progressive disclosure. Do not inflate a shared header simply because a page is rebuilt; the historical 28px Performance header pilot was superseded by the compact source-led header.
@@ -883,3 +883,7 @@ Five shared primitives added to `src/components/ui/` (use these before hand-roll
 - **`StatCard` `tone` prop** + **`cardToneClasses(tone)`** (exported from `StatCard`) — the ONE canonical tinted-gradient card definition: `bg-gradient-to-br from-<tone>-500/8 via-[var(--surface-2)] to-[var(--surface-2)] border-<tone>-500/20` for `tone ∈ teal|emerald|blue|amber` (`neutral` = today's surface, unchanged). Never hand-roll `bg-gradient-to-br from-*-500/*` on a card — use `<StatCard tone>` or `cardToneClasses()`. This normalized the verdict/outcome/ROI/loop-footer shells to one opacity.
 
 **Color-law sweep (Wave 0b):** static counts/labels no longer wear mint (`text-accent-brand`) — data → `text-accent-info` (blue), completed → `text-accent-success` (emerald); mint stays action-only. Purple removed from all data/client surfaces (Law 4). Hardcoded hex → `CHART_SERIES_COLORS` (unmapped/brand/export hexes carry `// chart-hex-ok`). Warning/danger surfaces route through `InlineBanner` / `bg-accent-warning-soft`/`bg-accent-danger-soft` (the soft tokens live in `src/index.css`; warning=amber, danger=red).
+
+## Page Intelligence Research workbench (2026-07-10)
+
+The standalone flag-on Page Intelligence surface adopts the prototype SEO Editor Research geometry: a compact 22px header band, dense controls, a `minmax(360px, 42%)` page rail, independent rail/detail scrolling, a deliberate empty-selection state, sticky target context, and a sticky footer containing only real production handoffs. It reuses established typography roles, DS primitives, Font Awesome semantic icon keys, surface/border tokens, teal actions, blue data, and canonical score colors. This is a surface composition, not a new primitive or token rule; flag-off legacy presentation remains unchanged.

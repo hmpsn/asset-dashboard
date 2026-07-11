@@ -1,11 +1,11 @@
 # Registry-Wide Desktop Visual Review
 
 Review date: 2026-07-10
-Scope: all 26 routes in `REBUILT_SURFACES`
+Scope: 26 owner-approved routes plus the newly mounted Page Intelligence receiving-home rebuild
 Desktop viewports: 1440×900 and 1600×1000
-Status: all 26 mounted rebuilt route homes are `owner-approved`
+Status: 26 route homes are `owner-approved`; Page Intelligence is `awaiting owner approval`
 
-This packet is the consolidated owner-decision record for the visual-parity goal. A fresh reviewer `PASS` remained supporting evidence only; Joshua explicitly approved the final 24-route batch with every documented exception and retained Page Rewriter Focus rail on 2026-07-10. All 26 mounted rebuilt route homes are now owner-approved.
+This packet preserves the consolidated owner-decision record for the original 26-route visual-parity closeout and tracks later receiving-home additions separately. Joshua explicitly approved those 26 route homes; the newly mounted Page Intelligence surface remains awaiting approval.
 
 ## Registry Status
 
@@ -26,6 +26,7 @@ This packet is the consolidated owner-decision record for the visual-parity goal
 | `seo-keywords` | Keyword Hub | `owner-approved` | Row sparklines and period deltas remain deferred until a server-owned batched history model exists. |
 | `rewrite` | Page Rewriter | `owner-approved` | The retained 62px rail in Focus is approved; draft/publish remains a separate backend project. |
 | `local-seo` | Local Presence | `owner-approved` | GBP reviews are unavailable locally; geo-grid, GBP Performance, profile health, View-on-Google, and reopen contracts remain backend work. |
+| `page-intelligence` | Page Intelligence | `awaiting owner approval` | Standalone prototype-led Research workbench implemented under `ODP-012 B`; explicit owner desktop approval remains required. |
 | `settings` | Settings | `owner-approved` | Storage cleanup is a production-only dialog. |
 | `workspace-settings` | Workspace Settings | `owner-approved` | Dense production tabs remain under accepted `GO-006`; Export/archive and LLMs.txt stay exact-once. |
 | `roadmap` | Roadmap | `owner-approved` | Expanded item detail remains additive production disclosure. |
@@ -91,6 +92,10 @@ These states were reviewed for containment, typography, exact-once reachability,
 - Page Rewriter Focus retains the accepted shared shell's 62px icon rail, while the prototype removes navigation entirely. Joshua explicitly approved retaining the rail on 2026-07-10.
 
 All other open items in this packet are already documented production/data/backend exceptions rather than unresolved safe-local styling defects.
+
+## Page Intelligence receiving-home follow-on
+
+Page Intelligence is now mounted through `REBUILT_SURFACES` as a standalone master/detail Research workbench while the flag-off legacy receiver remains intact. It preserves every established analysis, edit, tracking, provider, Architecture, Guide, and cross-surface capability and adds validated `?tab=` and `?page=` initialization. Corrected 1440×900 and 1600×1000 evidence is under `/tmp/asset-dashboard-codex-visual-parity/page-intelligence/`. This follow-on is `awaiting owner approval`; its rendered review and automated gates do not change that status.
 
 ## Owner Decision Record
 
