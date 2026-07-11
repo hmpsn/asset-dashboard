@@ -15,24 +15,18 @@ import { LocalSeoMarketSetupDrawer } from '../local-seo/LocalSeoMarketSetupDrawe
 import {
   Button,
   ErrorState,
-  FilterChip,
+  Icon,
   InlineBanner,
   LensSwitcher,
-  MetricTile,
   PageHeader,
   SearchField,
   Skeleton,
-  Toolbar,
-  ToolbarSpacer,
 } from '../ui';
 import { LocalPresenceOverview } from './LocalPresenceOverview';
 import { LocalPresenceReviewsPipeline } from './LocalPresenceReviewsPipeline';
 import { LocalPresenceVisibility } from './LocalPresenceVisibility';
 import { mutationErrorMessage } from './localPresenceMutationFeedback';
-import {
-  LOCAL_PRESENCE_FILTERS,
-  useLocalPresenceSurfaceState,
-} from './useLocalPresenceSurfaceState';
+import { useLocalPresenceSurfaceState } from './useLocalPresenceSurfaceState';
 
 interface LocalPresenceSurfaceProps {
   workspaceId: string;
@@ -66,10 +60,6 @@ function formatFreshness(value?: string): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return 'No scan yet';
   return `Last scanned ${DATE_FORMAT.format(parsed)}`;
-}
-
-function formatRating(value?: number): string {
-  return typeof value === 'number' ? value.toFixed(1) : '—';
 }
 
 export function LocalPresenceSurface({ workspaceId }: LocalPresenceSurfaceProps) {
@@ -212,8 +202,6 @@ export function LocalPresenceSurface({ workspaceId }: LocalPresenceSurfaceProps)
 
   if (!data?.featureEnabled || !report) return null;
 
-  const activeFilter = LOCAL_PRESENCE_FILTERS.find((filter) => filter.id === state.filter)?.label ?? 'All';
-  const owned = gbpAggregateEnabled ? gbp?.owned ?? null : null;
   const activeMode: LocalPresenceMode = state.lens === 'reviews' ? 'reviews' : 'presence';
 
   const handleSetMode = (mode: LocalPresenceMode) => {
@@ -226,65 +214,51 @@ export function LocalPresenceSurface({ workspaceId }: LocalPresenceSurfaceProps)
   };
 
   return (
-    <div className="flex min-h-full flex-col gap-5">
-      <PageHeader
-        title="Local Presence"
-        subtitle="Local markets, map-pack visibility, and Google Business Profile review operations."
-      />
+    <div className="mx-auto flex min-h-full w-full max-w-[1120px] flex-col gap-[14px] px-4 pb-[90px] pt-[26px] sm:px-[30px]">
+      <div className="flex flex-wrap items-center gap-2 t-mono text-[var(--brand-text-dim)]">
+        <span className="h-[7px] w-[7px] rounded-[var(--radius-pill)] bg-[var(--blue)]" aria-hidden="true" />
+        <h1 className="t-mono font-semibold uppercase tracking-[0.09em] text-[var(--blue)]">Local Presence</h1>
+        <span aria-hidden="true">·</span>
+        <span>{formatFreshness(report.lastCapturedAt)}</span>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setSetupOpen(true)}>
+            <Icon name="settings" size="sm" />
+            Configure market
+          </Button>
+          <Button size="sm" variant="secondary" disabled={!canLocalRefresh || localRefreshing} onClick={startLocalRescan}>
+            <Icon name="refresh" size="sm" />
+            {localRefreshing ? 'Re-scanning' : 'Re-scan'}
+          </Button>
+          {gbpAggregateEnabled && (
+            <Button size="sm" variant="ghost" disabled={gbpRefreshing} onClick={startGbpRefresh}>
+              {gbpRefreshing ? 'Refreshing GBP' : 'Refresh GBP'}
+            </Button>
+          )}
+        </div>
+      </div>
 
-      <Toolbar label="Local Presence view controls" className="w-full">
+      <div className="flex flex-wrap items-center gap-3">
         <LensSwitcher
           id="local-presence-rebuilt-lens"
           options={LOCAL_PRESENCE_MODES.map((mode) => ({
             value: mode.id,
             label: mode.label,
             icon: MODE_ICONS[mode.id],
-            count: mode.id === 'presence' ? report.checkedKeywordCount : undefined,
           }))}
           value={activeMode}
           onChange={(value) => handleSetMode(value as LocalPresenceMode)}
           size="sm"
+          className="w-full sm:w-fit [&>button]:min-w-0 [&>button]:flex-1 [&>button]:px-2 sm:[&>button]:flex-none sm:[&>button]:px-[11px] [&_svg]:hidden sm:[&_svg]:block"
         />
-        <SearchField
-          value={state.searchInput}
-          onChange={state.setSearchInput}
-          placeholder="Search reviews or competitors"
-          className="min-w-[220px] flex-1"
-        />
-        <ToolbarSpacer />
-        <span className="t-caption text-[var(--brand-text-muted)]">{formatFreshness(report.lastCapturedAt)}</span>
-        <Button size="sm" variant="secondary" disabled={!canLocalRefresh || localRefreshing} onClick={startLocalRescan}>
-          {localRefreshing ? 'Re-scanning' : 'Re-scan'}
-        </Button>
-        {gbpAggregateEnabled && (
-          <Button size="sm" variant="ghost" disabled={gbpRefreshing} onClick={startGbpRefresh}>
-            {gbpRefreshing ? 'Refreshing GBP' : 'Refresh GBP'}
-          </Button>
+        {activeMode === 'reviews' && (
+          <SearchField
+            value={state.searchInput}
+            onChange={state.setSearchInput}
+            placeholder="Search reviews"
+            className="min-w-[220px] max-w-[360px] flex-1"
+          />
         )}
-      </Toolbar>
-
-      {activeMode === 'presence' && (
-        <div className="flex flex-wrap gap-2" aria-label="Local Presence filters">
-          {LOCAL_PRESENCE_FILTERS.map((filter) => (
-            <FilterChip
-              key={filter.id}
-              label={filter.label}
-              active={state.filter === filter.id}
-              onClick={() => state.setFilter(filter.id)}
-            />
-          ))}
-        </div>
-      )}
-
-      {activeMode === 'presence' && (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <MetricTile label="Markets" value={report.activeMarketCount} sub={`${report.configuredMarketCount} configured`} accent="var(--blue)" />
-          <MetricTile label="Checked" value={report.checkedKeywordCount} sub={activeFilter} accent="var(--blue)" />
-          <MetricTile label="Visible" value={report.visibleCount} sub="local matches" accent="var(--emerald)" />
-          <MetricTile label={gbpAggregateEnabled ? 'Reviews' : 'Local packs'} value={gbpAggregateEnabled ? (owned?.reviewCount ?? '—') : report.localPackPresentCount} sub={gbpAggregateEnabled ? `${formatRating(owned?.rating)} rating` : 'packs detected'} accent="var(--blue)" />
-          <MetricTile label="Needs review" value={report.possibleMatchCount + report.notVisibleCount + report.degradedCount} sub="posture issues" accent="var(--amber)" />
-        </div>
-      )}
+      </div>
 
       {localSeo.isError && data && (
         <InlineBanner tone="warning" title="Summary may be stale">
@@ -302,15 +276,19 @@ export function LocalPresenceSurface({ workspaceId }: LocalPresenceSurfaceProps)
           <LocalPresenceOverview
             workspaceId={workspaceId}
             data={data}
-            gbp={gbp}
+            gbp={gbpAggregateEnabled ? gbp : undefined}
             onOpenSetup={() => setSetupOpen(true)}
-            showCompetitors={false}
           />
           <LocalPresenceVisibility
             workspaceId={workspaceId}
             data={data}
+            gbp={gbpAggregateEnabled ? gbp : undefined}
             search={state.search}
+            searchInput={state.searchInput}
             filter={state.filter}
+            onSearchInputChange={state.setSearchInput}
+            onFilterChange={state.setFilter}
+            onOpenReviews={() => state.setLens('reviews')}
           />
         </div>
       )}

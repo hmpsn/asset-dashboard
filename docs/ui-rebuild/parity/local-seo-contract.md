@@ -2,7 +2,7 @@
 
 Surface: `local-seo` / Local Presence  
 Owner: local SEO / GBP operations  
-Status: `behavior-safe / visual-unverified`; `ODP-008 A` behavior direction accepted 2026-07-09, current real-data v1 retained
+Status: `owner-approved`; Joshua approved the corrected real-data v1 and documented backend exceptions on 2026-07-10
 Primary route: `/ws/:workspaceId/local-seo`
 
 ## Prototype References
@@ -36,12 +36,12 @@ Production carry-over that intentionally exceeds or differs from the prototype:
 - Existing `?lens=` and legacy `?tab=` values remain accepted: `overview`, `visibility`, `reviews`, and `setup`.
 - `overview`, `visibility`, and invalid/default route state render the `Rank & profile` workspace.
 - `setup` opens the setup drawer over `Rank & profile` and clears back to the default state when closed.
-- The legacy `LocalSeoVisibilityPanel` remains mounted exactly once inside `Rank & profile` because it is the real current home for market posture, local-pack checks, and keyword-level evidence.
+- The market-posture, local-pack summary, trend, competitor share-of-voice, and Track-keyword capability set formerly owned by `LocalSeoVisibilityPanel` remains composed exactly once inside `Rank & profile`. The legacy wrapper itself is no longer nested because it duplicated the summary and setup Drawer; its capabilities, not its component identity, are the protected contract.
 - Manual `Re-scan` and `Refresh GBP` controls stay visible because production currently uses explicit background jobs rather than the prototype's implied auto-sync.
 
 ## Current Parity Grade
 
-Visual status: `behavior-safe / visual-unverified`; backend capability constraints remain.
+Visual status: `owner-approved`; the corrected frontend composition passed fresh Sol review, and backend capability constraints remain explicit approved exceptions.
 
 Why:
 
@@ -49,7 +49,8 @@ Why:
 - Existing deep links and legacy aliases are preserved without keeping the old four-tab IA visible.
 - The rebuilt page uses real current local SEO data for profile health, share of voice, trends, market posture, and reviews.
 - The current real-data rank/profile workspace now maps important setup, GBP, empty-state, and trend explanations to readable styleguide body roles instead of caption-only treatment.
-- Full prototype parity still depends on data that does not exist today: 49-point geo-grid scan nodes, GBP Performance API views/calls/directions, fuller GBP profile checklist fields, view-on-Google URLs, and approved-to-draft reopen transitions.
+- Full data-backed prototype parity still depends on data that does not exist today: 49-point geo-grid scan nodes, GBP Performance API views/calls/directions, fuller GBP profile checklist fields, view-on-Google URLs, and approved-to-draft reopen transitions.
+- Fresh read-only Sol review returned `PASS` after the corrected 1440x900, 1600x1000, setup Drawer, Reviews, and 390px regression-floor captures. This is not owner approval.
 
 Accepted direction:
 
@@ -64,7 +65,7 @@ Current route/state behavior:
 
 - `/ws/:workspaceId/local-seo` renders `Rank & profile`.
 - `?lens=overview` and `?tab=overview` render `Rank & profile`.
-- `?lens=visibility` and `?tab=visibility` render `Rank & profile` with the legacy visibility panel mounted exactly once.
+- `?lens=visibility` and `?tab=visibility` render the same exact-once `Rank & profile` visibility composition.
 - `?lens=reviews` and `?tab=reviews` render `Reviews & replies`.
 - `?lens=setup` and `?tab=setup` render `Rank & profile` and open the setup drawer.
 - Closing the setup drawer clears back to the default state.
@@ -82,7 +83,7 @@ Keep these capabilities reachable exactly once:
 
 - Local operating status, workspace posture, market chips, setup label/detail, and market setup drawer.
 - GBP aggregate card, rating/review count, completeness Meter, and real available profile signals.
-- Local visibility summary, setup-state callout, market trend sparklines, repeat competitor share of voice, Track keyword action, and legacy visibility panel.
+- Local visibility summary, setup posture, market trend sparklines, repeat competitor share of voice, and Track keyword action.
 - Manual local visibility re-scan and GBP/reviews refresh background-job triggers.
 - Authenticated GBP connection/mapping status, review sync, per-location sync health, and copy-policy guidance.
 - Review-response pipeline including draft, awaiting client, changes requested, approved, published, publish failed, declined, and cancelled states.
@@ -92,7 +93,8 @@ Keep these capabilities reachable exactly once:
 - Replaced the visible four-lens switcher with prototype modes: `Rank & profile` and `Reviews & replies`.
 - Mapped `overview`, `visibility`, and `setup` URL states into the rank/profile workspace while preserving validated URL state.
 - Kept `?tab=setup` / `?lens=setup` as drawer-open state and removed the inline setup receiver body.
-- Composed the rank/profile workspace from the current status/profile card plus the real visibility evidence panel.
+- Composed the rank/profile workspace from one truthful profile hero plus one real-data 706/340 visibility/profile-health split.
+- Replaced the nested legacy visibility wrapper with its protected capability set exactly once, removing its duplicate summary and second setup Drawer without removing market posture, trend, share-of-voice, filters, or Track.
 - Suppressed duplicate competitor tables when overview and visibility evidence appear together.
 - Removed the second Markets / Checked / Visible / Local packs KPI row from the overview body; the page-level summary is the sole owner while the lower visibility band retains its distinct match-quality metrics.
 - Replaced `Provider degraded` / setup-state implementation wording with operator-facing scan/setup copy.
@@ -120,8 +122,17 @@ Typography-role smoke:
 - Light mobile regression floor: `/tmp/asset-dashboard-codex-parity-captures/local-seo-typography-rank-profile-mobile.png`.
 - State sample: `/tmp/asset-dashboard-codex-parity-captures/local-seo-typography-smoke-state.json`.
 - Single-summary desktop follow-up: `/tmp/asset-dashboard-codex-parity-captures/local-presence-single-summary-final.png`.
+- Source-led Rank & profile at 1440x900: `/tmp/asset-dashboard-codex-visual-parity/batch8/local/rank-1440-final2.png`.
+- Source-led Rank & profile at 1600x1000: `/tmp/asset-dashboard-codex-visual-parity/batch8/local/rank-1600-final.png`.
+- Corrected 560px setup Drawer: `/tmp/asset-dashboard-codex-visual-parity/batch8/local/setup-1440-final2.png`.
+- Truthful unavailable Reviews state: `/tmp/asset-dashboard-codex-visual-parity/batch8/local/reviews-1440-pass1.png`.
+- Corrected mobile floor: `/tmp/asset-dashboard-codex-visual-parity/batch8/local/rank-mobile-390-final2.png`.
 
-Result: the sparse demo workspace confirms live GBP guidance and empty visibility copy render at `.t-body` / 15.5px, compact labels remain `.t-ui` / 13.5px, no internal rebuild/migration labels are visible, and there is no horizontal overflow. Component fixtures cover the populated `Map Pack Rival`, `Austin, TX`, and `2/4 visible on 2026-07-06` cases that the sparse demo data does not expose. The light mobile capture showed expected narrow-shell clipping in the mode control, but no blank panel or blocking layout failure; mobile remains a regression floor only per parity process.
+Result: the sparse demo workspace confirms live GBP guidance and empty visibility copy render at `.t-body` / 15.5px, compact labels remain `.t-ui` / 13.5px, no internal rebuild/migration labels are visible, and there is no horizontal overflow. Component fixtures cover the populated `Map Pack Rival`, `Austin, TX`, and `2/4 visible on 2026-07-06` cases that the sparse demo data does not expose. The corrected light-mobile capture keeps the full mode tray visible without page overflow; mobile remains a regression floor only per parity process. Fresh Sol review returned `PASS`; Joshua explicitly owner-approved the composition and documented backend exceptions on 2026-07-10.
+
+## Registry Closeout Evidence
+
+The measured registry archive adds exact 1600x1000 prototype and rebuilt evidence for Rank/profile, Reviews/replies, and market setup under `/tmp/asset-dashboard-codex-visual-parity/registry-final/`; reviewed exact 1440x900 counterparts remain authoritative. Reviews remains a populated-prototype versus unavailable authenticated GBP state, and the geo-grid/GBP Performance requirements remain backend exceptions.
 
 ## Automated Test Floor
 
@@ -129,10 +140,10 @@ Current branch coverage proves:
 
 - Default Local Presence renders the prototype `Rank & profile` and `Reviews & replies` modes, with no visible `Overview`, `Visibility`, or `Setup` peer tabs.
 - `?tab=setup` opens the setup drawer and does not mount the inline setup receiver body.
-- `?lens=visibility` initializes `Rank & profile` and mounts the legacy visibility panel exactly once.
-- Switching to `Reviews & replies` mounts the review response pipeline and unmounts the visibility panel.
+- `?lens=visibility` initializes the same exact-once `Rank & profile` visibility composition without nesting the legacy wrapper.
+- Switching to `Reviews & replies` mounts the review response pipeline and unmounts rank/profile evidence.
 - Real `useFeatureFlag('local-gbp')` loading-to-loaded transition survives.
 - Internal rebuild/migration/carry-over/provider/setup-state labels are absent from the loaded surface.
 - Rank/profile and visibility evidence copy uses the intended styleguide typography roles, and snapshots are styled as read-only blue data instead of teal action state.
-- Markets and Checked render once in the rank/profile page summary; Visible has only the page summary plus the distinct visibility-evidence metric.
+- Markets and Checked render once in the rank/profile hero; Visible has only the hero proof strip plus the distinct match-quality metric.
 - The rebuilt a11y floor passes.

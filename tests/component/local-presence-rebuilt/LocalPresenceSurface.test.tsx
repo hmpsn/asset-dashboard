@@ -78,10 +78,6 @@ vi.mock('../../../src/components/local-seo/LocalSeoMarketSetupDrawer', () => ({
     open ? <div data-testid="local-seo-market-setup-drawer">Market setup drawer</div> : null,
 }));
 
-vi.mock('../../../src/components/local-seo/LocalSeoVisibilityPanel', () => ({
-  LocalSeoVisibilityPanel: () => <div data-testid="legacy-local-seo-visibility-panel">Legacy visibility panel</div>,
-}));
-
 const workspaceId = 'ws-local-presence-rebuilt';
 const now = '2026-07-06T16:30:00.000Z';
 
@@ -403,20 +399,21 @@ describe('LocalPresenceSurface', () => {
     expect(screen.queryByRole('radio', { name: /Overview/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: /Visibility/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: /Setup/i })).not.toBeInTheDocument();
-    expect(screen.getByText('Local operating status')).toBeInTheDocument();
-    expect(screen.getAllByText('Markets', { selector: 'span.t-caption' })).toHaveLength(1);
-    expect(screen.getAllByText('Checked', { selector: 'span.t-caption' })).toHaveLength(1);
-    expect(screen.getAllByText('Visible', { selector: 'span.t-caption' })).toHaveLength(2);
-    expect(screen.getAllByTestId('legacy-local-seo-visibility-panel')).toHaveLength(1);
+    expect(screen.getByText('Austin Office')).toHaveClass('t-page');
+    expect(screen.getByText('Local visibility')).toBeInTheDocument();
+    expect(screen.getAllByText('Markets', { selector: 'span.t-label' })).toHaveLength(1);
+    expect(screen.getAllByText('Checked', { selector: 'span.t-label' })).toHaveLength(1);
+    expect(screen.getAllByText('Visible', { selector: 'span.t-label' })).toHaveLength(2);
+    expect(screen.queryByTestId('legacy-local-seo-visibility-panel')).not.toBeInTheDocument();
   });
 
   it('maps rank/profile cockpit copy to styleguide typography roles', async () => {
     renderWithProviders(<LocalPresenceSurface workspaceId={workspaceId} />);
 
     expect(await screen.findByRole('heading', { name: 'Local Presence' })).toBeInTheDocument();
-    expect(screen.getAllByText('Market-specific local-pack visibility is available from retained snapshots.').some((element) => element.classList.contains('t-body'))).toBe(true);
-    expect(screen.getByText('Local visibility reporting is active')).toHaveClass('t-ui');
-    expect(screen.getByText('Rating, reviews, and the three profile signals currently available.')).toHaveClass('t-body');
+    expect(screen.getByText('Retained keyword checks across configured markets.')).toHaveClass('t-caption-sm');
+    expect(screen.getByText('Market trend')).toHaveClass('t-ui');
+    expect(screen.getByText('Austin Office')).toHaveClass('t-page');
     expect(screen.getAllByText('Map Pack Rival').some((element) => element.classList.contains('t-ui'))).toBe(true);
     expect(screen.getAllByText('Austin, TX').some((element) => element.classList.contains('t-ui'))).toBe(true);
     expect(screen.getByText('2/4 visible on 2026-07-06')).toHaveClass('t-body');
@@ -443,7 +440,8 @@ describe('LocalPresenceSurface', () => {
     );
 
     expect(await screen.findByRole('radio', { name: /Rank & profile/i })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getAllByTestId('legacy-local-seo-visibility-panel')).toHaveLength(1);
+    expect(screen.queryByTestId('legacy-local-seo-visibility-panel')).not.toBeInTheDocument();
+    expect(screen.getByText('Local visibility')).toBeInTheDocument();
     expect(screen.getByText('confident matches')).toBeInTheDocument();
   });
 
@@ -499,7 +497,7 @@ describe('LocalPresenceSurface', () => {
     await expectNoA11yViolations(container);
 
     expect(screen.queryByText(/provider degraded|setup-state reads|backend feature lifecycle|rebuild|migration|carry-over/i)).not.toBeInTheDocument();
-    expect(await screen.findByTestId('legacy-local-seo-visibility-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-local-seo-visibility-panel')).not.toBeInTheDocument();
     expect(screen.getByText('confident matches')).toBeInTheDocument();
   });
 
