@@ -143,7 +143,6 @@ const GROUP_PRESENTATION: RebuiltNavGroupPresentation[] = [
     items: [
       { id: 'outcomes' },
       { id: 'requests' },
-      { id: 'content-perf' },
     ],
   },
   {

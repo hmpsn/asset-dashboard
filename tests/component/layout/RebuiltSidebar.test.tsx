@@ -104,6 +104,7 @@ describe('RebuiltSidebar', () => {
     for (const label of ['Keywords', 'Competitors', 'Content Pipeline', 'Local Presence', 'Asset Manager', 'Action Results']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
     }
+    expect(screen.queryByRole('button', { name: 'Content Perf' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'MONITORING' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'CONTENT' })).not.toBeInTheDocument();
     await expectNoA11yViolations(container);

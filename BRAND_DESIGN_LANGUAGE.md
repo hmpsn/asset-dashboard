@@ -887,3 +887,7 @@ Five shared primitives added to `src/components/ui/` (use these before hand-roll
 ## Page Intelligence Research workbench (2026-07-10)
 
 The standalone flag-on Page Intelligence surface adopts the prototype SEO Editor Research geometry: a compact 22px header band, dense controls, a `minmax(360px, 42%)` page rail, independent rail/detail scrolling, a deliberate empty-selection state, sticky target context, and a sticky footer containing only real production handoffs. It reuses established typography roles, DS primitives, Font Awesome semantic icon keys, surface/border tokens, teal actions, blue data, and canonical score colors. This is a surface composition, not a new primitive or token rule; flag-off legacy presentation remains unchanged.
+
+## Content Performance Published results (2026-07-10)
+
+The flag-on Content Performance receiving home uses Pipeline Published and the prototype's results hierarchy: four compact authoritative summary cells, stacked verdict-led cards with a colored left rail, keyword/page-type/publish-age context, a compact control row, and deeper production evidence in a Drawer. Teal remains action/navigation, blue remains search/traffic data, emerald marks measured wins, and red marks measured loss. Daily paired clicks/impressions trend loads only after deliberate Drawer open so visual parity does not create unbounded provider reads. No new primitive or token is introduced; the flag-off legacy page remains unchanged.

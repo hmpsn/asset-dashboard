@@ -38,6 +38,7 @@ import { ContentPipelineIntake, deriveContentIntake } from './ContentPipelineInt
 import { ContentPipelineLenses } from './ContentPipelineLenses';
 import type { ContentPipelineData } from './ContentPipelineLenses';
 import { ContentPipelineWorkspaces } from './ContentPipelineWorkspaces';
+import { PublishedContentLens } from './PublishedContentLens';
 import {
   type ContentPipelineTab,
   useContentPipelineSurfaceState,
@@ -349,7 +350,15 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
           </div>
         </div>
 
-        {(state.tab === 'briefs' || state.tab === 'intake' || state.tab === 'publish' || Boolean(state.postId)) ? (
+        {state.tab === 'published' ? (
+          <PublishedContentLens
+            workspaceId={workspaceId}
+            siteLabel={siteLabel}
+            selectedItemId={state.itemId}
+            onOpenItem={state.openPublishedItem}
+            onCloseItem={state.clearPublishedItem}
+          />
+        ) : (state.tab === 'briefs' || state.tab === 'intake' || state.tab === 'publish' || Boolean(state.postId)) ? (
           <ContentLifecycleBoard
             key={boardFocus}
             items={lifecycleItems}

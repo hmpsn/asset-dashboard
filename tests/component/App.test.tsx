@@ -49,6 +49,16 @@ vi.mock('../../src/components/page-rewriter-rebuilt/PageRewriterSurface', () => 
   ),
 }));
 
+vi.mock('../../src/components/content-pipeline-rebuilt/ContentPipelineSurface', async () => {
+  const { useLocation } = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return {
+    ContentPipelineSurface: ({ workspaceId }: { workspaceId: string }) => {
+      const location = useLocation();
+      return <div data-testid="content-pipeline-rebuilt" data-workspace-id={workspaceId} data-search={location.search} />;
+    },
+  };
+});
+
 vi.mock('../../src/components/SettingsPanel', () => ({
   SettingsPanel: () => <div data-testid="settings-panel" />,
 }));
@@ -652,6 +662,44 @@ describe('Dashboard content rendering', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(chrome).toHaveAttribute('data-focus-mode', 'true');
     expect(screen.getByTestId('page-rewriter-rebuilt')).toBeInTheDocument();
+  });
+
+  it('redirects flag-on Content Performance bookmarks to Pipeline Published and preserves item identity', async () => {
+    rebuildShellMock.enabled = true;
+    const { Dashboard } = await import('../../src/App');
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/ws/ws-1/content-perf?item=published-item-1']}>
+          <Routes>
+            <Route path="/*" element={<Dashboard onLogout={vi.fn()} theme="dark" toggleTheme={vi.fn()} />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('content-pipeline-rebuilt')).toBeInTheDocument());
+    expect(screen.getByTestId('content-pipeline-rebuilt')).toHaveAttribute('data-workspace-id', 'ws-1');
+    expect(screen.getByTestId('content-pipeline-rebuilt')).toHaveAttribute('data-search', '?tab=published&item=published-item-1');
+    expect(screen.queryByTestId('content-performance')).not.toBeInTheDocument();
+  });
+
+  it('keeps the legacy Content Performance receiver when the rebuilt shell is disabled', async () => {
+    rebuildShellMock.enabled = false;
+    const { Dashboard } = await import('../../src/App');
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/ws/ws-1/content-perf?item=legacy-item']}>
+          <Routes>
+            <Route path="/*" element={<Dashboard onLogout={vi.fn()} theme="dark" toggleTheme={vi.fn()} />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('content-performance')).toBeInTheDocument());
+    expect(screen.queryByTestId('content-pipeline-rebuilt')).not.toBeInTheDocument();
   });
 
   it('renders Roadmap at /roadmap', async () => {

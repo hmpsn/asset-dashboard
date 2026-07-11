@@ -9500,3 +9500,17 @@ From the 2026-06-30 six-screen UX review (WorkspaceOverview / WorkspaceHome / Th
 **Verification:** Focused routing/surface tests, hooks lint, typecheck, `pr-check`, and diff hygiene pass. Browser captures at 1440×900 and 1600×1000 confirm 22px heading authority, bounded master/detail geometry, no document overflow, mapped/unmapped truth labels, empty state, and selected detail composition. Evidence: `/tmp/asset-dashboard-codex-visual-parity/page-intelligence/`.
 
 **Files:** `src/components/page-intelligence-rebuilt/*`; `src/components/layout/rebuiltSurfaces.ts`; `tests/component/page-intelligence-rebuilt/*`; `BRAND_DESIGN_LANGUAGE.md`; parity decision/coverage/shipping records; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 614. Content Performance receiving-home consolidation 2026-07-10
+
+**Status:** Implemented in `codex/ui-visual-parity`; awaiting explicit owner desktop visual approval.
+
+**What it does:** Makes Content Pipeline Published the flag-on receiving home for Content Performance while preserving the flag-off legacy route and canonical route id. The Published lens now uses the prototype's four-stat/result-card hierarchy with server-authoritative pieces/clicks/position-gain/outcome summaries, strong-win-aware verdicts, keyword/page-type/publish-age context, compact filters/sort, and a production detail Drawer for paired clicks/impressions trend, analytics, brief execution, evidence coverage, and joinbacks. Re-scan is a read refetch; the former nonexistent POST mutation is removed.
+
+**Contracts and safety:** Request and matrix items expose stable `itemId`/`source`. `?tab=published&item=` opens a valid item, clears on close or invalid identity, and never auto-selects another. Matrix trends resolve their planned URL; missing configuration/mapping/data/provider connection returns typed availability instead of a guaranteed 404/opaque 500. Daily GSC trend is intentionally loaded only after opening one readback, preventing an N-item provider fanout from the result list. Public items omit full admin `OutcomeReadback` internals while retaining aggregate win counts and the existing coverage scrub.
+
+**Compatibility:** With `ui-rebuild-shell` on, `/content-perf?item=X` redirects to `/content-pipeline?tab=published&item=X`, and the rebuilt sidebar shows only Pipeline. With the flag off, legacy Content Performance and its nav entry remain byte-compatible. `Page` and `NAV_REGISTRY` are intentionally retained.
+
+**Verification:** Focused component, route, public privacy, matrix/request trend, API, and summary tests pass with hooks lint, typecheck, `pr-check`, and diff hygiene. The isolated worktree server/browser proves redirect/nav/empty-state behavior at 1440×900 and 1600×1000 without touching the existing local server. The copied owner workspace has no published items, so populated result-card order and Drawer states remain fixture-covered rather than fabricated. Evidence: `/tmp/asset-dashboard-codex-visual-parity/content-performance/`.
+
+**Files:** `shared/types/content.ts`; `server/domains/content/content-performance.ts`; `server/routes/content-requests.ts`; `server/routes/public-content.ts`; `src/api/seo.ts`; `src/hooks/admin/useAdminContentPerformance.ts`; `src/components/content-pipeline-rebuilt/{PublishedContentLens,useContentPipelineSurfaceState,ContentPipelineSurface}.tsx`; `src/App.tsx`; `src/components/layout/RebuiltSidebar.tsx`; focused unit/integration/component tests; design/parity records; `data/roadmap.json`; `FEATURE_AUDIT.md`.

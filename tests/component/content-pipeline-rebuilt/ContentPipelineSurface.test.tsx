@@ -1,7 +1,7 @@
 // @ds-rebuilt
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, useNavigate, useSearchParams } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContentPipelineSurface } from '../../../src/components/content-pipeline-rebuilt/ContentPipelineSurface';
 import { deriveLifecycleBoardItems } from '../../../src/components/content-pipeline-rebuilt/ContentLifecycleBoard';
@@ -392,8 +392,21 @@ const nonContentWorkOrders = [
 ];
 
 const publishedResponse = {
+  summary: {
+    piecesTracked: 2,
+    piecesPublished: 1,
+    piecesDelivered: 1,
+    totalClicks: 1200,
+    totalImpressions: 45000,
+    totalSessions: 640,
+    averagePosition: 5.4,
+    measuredOutcomes: 1,
+    wins: 1,
+    averagePositionGain: 3.2,
+  },
   items: [
     {
+      itemId: 'request:req-1',
       requestId: 'req-1',
       topic: 'Dental implant guide',
       targetKeyword: 'dental implants',
@@ -443,6 +456,7 @@ const publishedResponse = {
       },
     },
     {
+      itemId: 'matrix:req-2',
       requestId: 'req-2',
       topic: 'Veneers service page',
       targetKeyword: 'veneers',
@@ -495,10 +509,16 @@ function renderSurface(path = `/ws/${workspaceId}/content-pipeline?tab=briefs`, 
       <MemoryRouter initialEntries={[path]}>
         <ToastProvider>
           <ContentPipelineSurface workspaceId={workspaceId} />
+          <LocationProbe />
         </ToastProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location-search" data-search={location.search} />;
 }
 
 function FlaggedContentPipeline() {
@@ -553,6 +573,7 @@ beforeEach(() => {
   });
   mocks.contentPerformanceTrendHook.mockReturnValue({
     data: {
+      availability: 'available',
       trend: [
         { date: '2026-07-01', clicks: 10, impressions: 300, ctr: 3.3, position: 8.1 },
         { date: '2026-07-02', clicks: 18, impressions: 420, ctr: 4.2, position: 6.5 },
@@ -822,17 +843,42 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     expect(await screen.findByRole('radio', { name: /Published/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByTestId('content-pipeline-published-lens')).toBeInTheDocument();
     expect(mocks.contentPerformanceHook).toHaveBeenCalledWith(workspaceId);
-    expect(screen.getByText('Pieces Live')).toBeInTheDocument();
-    expect(screen.getByText('Wins to Graduate')).toBeInTheDocument();
+    expect(screen.getByText('Pieces live')).toBeInTheDocument();
+    expect(screen.getByText('Wins to graduate')).toBeInTheDocument();
     expect(screen.queryByText('Published proof queue')).not.toBeInTheDocument();
     expect(screen.getByText('Dental implant guide')).toBeInTheDocument();
     expect(screen.getAllByText('45,000').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('72% covered')).toBeInTheDocument();
+    expect(screen.getAllByText('Clicks').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Impressions').length).toBeGreaterThan(0);
+  });
+
+  it('opens and clears a valid published item deep link without auto-selecting invalid ids', async () => {
+    const valid = renderSurface(`/ws/${workspaceId}/content-pipeline?tab=published&item=request%3Areq-1`);
+
+    expect(await screen.findByRole('dialog', { name: 'Dental implant guide' })).toBeInTheDocument();
+    expect(screen.getByText('Brief execution & source coverage')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Dental implant guide' })).not.toBeInTheDocument());
+
+    valid.unmount();
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=published&item=does-not-exist`);
+    expect(await screen.findByText('Dental implant guide')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('location-search')).toHaveAttribute('data-search', '?tab=published'));
+  });
+
+  it('writes the stable published item id when a result card opens', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=published`);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open published readback for Dental implant guide' }));
+
+    expect(await screen.findByRole('dialog', { name: 'Dental implant guide' })).toBeInTheDocument();
+    expect(screen.getByTestId('location-search')).toHaveAttribute('data-search', '?tab=published&item=request%3Areq-1');
   });
 
   it('shows only the Published empty state and real re-scan action before content goes live', async () => {
     mocks.contentPerformanceHook.mockReturnValue({
-      data: { items: [] },
+      data: { summary: { ...publishedResponse.summary, piecesTracked: 0, piecesPublished: 0 }, items: [] },
       isLoading: false,
       isFetching: false,
       isError: false,

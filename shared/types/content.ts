@@ -358,6 +358,7 @@ export type ContentPerformanceTrendAvailability =
   | 'insufficient_data'
   | 'gsc_not_configured'
   | 'page_unmapped'
+  | 'provider_unavailable'
   | 'source_unsupported';
 export type ContentTermCoverageStatus = 'strong' | 'partial' | 'weak' | 'unavailable';
 

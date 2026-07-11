@@ -16,6 +16,7 @@ import type {
   ContentPerformanceJoinback,
   ContentPerformanceResponse,
   ContentPerformanceSummary,
+  ContentPerformanceTrendPoint,
   ContentPerformanceTrendResponse,
   ContentTermCoverageGrade,
   GeneratedPost,
@@ -185,7 +186,7 @@ function lookupOutcome(
 }
 
 function scrubForPublic(item: ContentPerformanceItem): ContentPerformanceItem {
-  const { joinback: _joinback, coverage, ...rest } = item;
+  const { joinback: _joinback, outcome: _outcome, coverage, ...rest } = item;
   return {
     ...rest,
     coverage: {
@@ -263,7 +264,14 @@ export async function getContentPerformanceTrend(
   const pageUrl = `${siteBase}${pagePath === '/' ? '' : pagePath}`;
   const startDate = (publishedAt ?? new Date(Date.now() - 90 * 86400000).toISOString()).split('T')[0];
   const endDate = new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0];
-  const trend = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, pageUrl, 90, { startDate, endDate });
+  let trend: ContentPerformanceTrendPoint[];
+  try {
+    trend = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, pageUrl, 90, { startDate, endDate });
+  } catch (err) {
+    if (isProgrammingError(err)) throw err;
+    log.debug({ err, workspaceId, itemId }, 'content performance trend provider unavailable');
+    return { availability: 'provider_unavailable', reason: 'Search Console could not provide this page trend. Reconnect Google or try again later.', trend: [] };
+  }
   return trend.length > 0
     ? { availability: 'available', trend }
     : { availability: 'insufficient_data', reason: 'Search Console has not reported daily data for this page yet.', trend: [] };
@@ -388,8 +396,9 @@ export async function getContentPerformance(
 
   items.sort((a, b) => (b.gsc?.clicks || 0) - (a.gsc?.clicks || 0) || a.daysSincePublish - b.daysSincePublish);
 
+  const summary = buildSummary(items);
   const visibleItems = options.audience === 'public' ? items.map(scrubForPublic) : items;
-  return { summary: buildSummary(visibleItems), items: visibleItems };
+  return { summary, items: visibleItems };
 }
 
 export function handleContentPerformance(workspaceId: string): Promise<ContentPerformanceResponse> {

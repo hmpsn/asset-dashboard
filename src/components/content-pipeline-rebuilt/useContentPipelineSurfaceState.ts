@@ -19,6 +19,7 @@ export type ContentPipelineLegacyTab = 'subscriptions';
 const TAB_VALUES = new Set<string>(CONTENT_PIPELINE_TABS.map((tab) => tab.id));
 const TAB_PARAM = 'tab';
 const POST_PARAM = 'post';
+const ITEM_PARAM = 'item';
 const DEFAULT_TAB: ContentPipelineTab = 'briefs';
 
 const LEGACY_TAB_ALIASES: Record<ContentPipelineLegacyTab, ContentPipelineTab> = {
@@ -45,9 +46,12 @@ export interface UseContentPipelineSurfaceStateReturn {
   tab: ContentPipelineTab;
   rawTab: string | null;
   postId: string | null;
+  itemId: string | null;
   setTab: (tab: ContentPipelineTab) => void;
   openPost: (postId: string) => void;
   clearPost: () => void;
+  openPublishedItem: (itemId: string) => void;
+  clearPublishedItem: () => void;
 }
 
 export function useContentPipelineSurfaceState(): UseContentPipelineSurfaceStateReturn {
@@ -55,6 +59,7 @@ export function useContentPipelineSurfaceState(): UseContentPipelineSurfaceState
   const rawTab = searchParams.get(TAB_PARAM);
   const tab = resolveContentPipelineTab(rawTab);
   const postId = searchParams.get(POST_PARAM);
+  const itemId = searchParams.get(ITEM_PARAM);
 
   const updateParams = useCallback((updates: Record<string, ParamValue>, replace = true) => {
     setSearchParams((current) => {
@@ -71,8 +76,9 @@ export function useContentPipelineSurfaceState(): UseContentPipelineSurfaceState
     updateParams({
       [TAB_PARAM]: nextTab,
       [POST_PARAM]: nextTab === 'posts' ? postId : null,
+      [ITEM_PARAM]: nextTab === 'published' ? itemId : null,
     });
-  }, [postId, updateParams]);
+  }, [itemId, postId, updateParams]);
 
   const clearPost = useCallback(() => {
     updateParams({ [POST_PARAM]: null });
@@ -85,12 +91,23 @@ export function useContentPipelineSurfaceState(): UseContentPipelineSurfaceState
     updateParams({ [POST_PARAM]: nextPostId });
   }, [updateParams]);
 
+  const clearPublishedItem = useCallback(() => {
+    updateParams({ [ITEM_PARAM]: null });
+  }, [updateParams]);
+
+  const openPublishedItem = useCallback((nextItemId: string) => {
+    updateParams({ [TAB_PARAM]: 'published', [ITEM_PARAM]: nextItemId });
+  }, [updateParams]);
+
   return {
     tab,
     rawTab,
     postId,
+    itemId,
     setTab,
     openPost,
     clearPost,
+    openPublishedItem,
+    clearPublishedItem,
   };
 }

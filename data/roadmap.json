@@ -86,6 +86,18 @@
           "completedAt": "2026-07-10",
           "owner": "seo-health",
           "notes": "Implemented in codex/ui-visual-parity and awaiting Joshua's explicit desktop visual approval. The flag-on route now mounts a standalone Research workbench modeled on the prototype SEO Editor master/detail composition while the flag-off legacy receiver remains intact. Pages/Architecture/Guide, single and bulk analysis, progress/cancel, keyword editing/tracking, local/rank context, SEO copy, fix queue, and production handoffs remain reachable. New ?tab= and ?page= receivers use URL page identity before Page Intelligence fixContext and never auto-select the first row. Browser evidence at 1440x900 and 1600x1000 is under /tmp/asset-dashboard-codex-visual-parity/page-intelligence/. Status: awaiting owner approval; do not convert the rendered PASS into approval."
+        },
+        {
+          "id": "ui-rebuild-content-performance-receiving-home",
+          "title": "Content Performance receiving home in Pipeline Published",
+          "source": "Owner-approved receiving-home plan 2026-07-10",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-10",
+          "completedAt": "2026-07-10",
+          "owner": "content-production",
+          "notes": "Implemented in codex/ui-visual-parity and awaiting Joshua's explicit desktop visual approval. Pipeline Published now owns the prototype-led four-stat/result-card composition and server-authoritative readback summary. The nonexistent refresh mutation was removed, matrix/request items have stable identities, trends return typed availability and load only after intentional Drawer open to avoid N live GSC calls, public items omit admin outcome internals, and ?tab=published&item= deep links initialize and clear truthfully. Flag-on /content-perf bookmarks redirect with item identity and the rebuilt sidebar removes the duplicate; flag-off keeps the legacy route/nav. Browser evidence at both fixed viewports is under /tmp/asset-dashboard-codex-visual-parity/content-performance/; the owner workspace is truthfully empty while populated composition is component-fixture protected."
         }
       ]
     },

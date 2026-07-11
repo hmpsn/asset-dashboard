@@ -437,7 +437,14 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     if (tab === 'brand') return <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />;
     if (tab === 'analytics-hub') return <AnalyticsHub key={`analytics-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
-    if (tab === 'content-perf') return <ContentPerformance key={`content-perf-${selected.id}`} workspaceId={selected.id} />;
+    if (tab === 'content-perf') {
+      if (rebuildShellEnabled) {
+        const item = new URLSearchParams(location.search).get('item');
+        const target = `${adminPath(selected.id, 'content-pipeline')}?tab=published${item ? `&item=${encodeURIComponent(item)}` : ''}`;
+        return <Navigate to={target} replace />;
+      }
+      return <ContentPerformance key={`content-perf-${selected.id}`} workspaceId={selected.id} />;
+    }
     if (tab === 'requests') return (
       <div className="flex flex-col">
         <TabBar

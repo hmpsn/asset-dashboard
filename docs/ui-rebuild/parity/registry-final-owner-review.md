@@ -27,6 +27,7 @@ This packet preserves the consolidated owner-decision record for the original 26
 | `rewrite` | Page Rewriter | `owner-approved` | The retained 62px rail in Focus is approved; draft/publish remains a separate backend project. |
 | `local-seo` | Local Presence | `owner-approved` | GBP reviews are unavailable locally; geo-grid, GBP Performance, profile health, View-on-Google, and reopen contracts remain backend work. |
 | `page-intelligence` | Page Intelligence | `awaiting owner approval` | Standalone prototype-led Research workbench implemented under `ODP-012 B`; explicit owner desktop approval remains required. |
+| `content-perf` → `content-pipeline?tab=published` | Content Performance | `awaiting owner approval` | Flag-on receiving-home consolidation is complete; flag-off legacy route/nav remains. Owner workspace is truthfully empty, with populated cards fixture-protected. |
 | `settings` | Settings | `owner-approved` | Storage cleanup is a production-only dialog. |
 | `workspace-settings` | Workspace Settings | `owner-approved` | Dense production tabs remain under accepted `GO-006`; Export/archive and LLMs.txt stay exact-once. |
 | `roadmap` | Roadmap | `owner-approved` | Expanded item detail remains additive production disclosure. |
@@ -96,6 +97,10 @@ All other open items in this packet are already documented production/data/backe
 ## Page Intelligence receiving-home follow-on
 
 Page Intelligence is now mounted through `REBUILT_SURFACES` as a standalone master/detail Research workbench while the flag-off legacy receiver remains intact. It preserves every established analysis, edit, tracking, provider, Architecture, Guide, and cross-surface capability and adds validated `?tab=` and `?page=` initialization. Corrected 1440×900 and 1600×1000 evidence is under `/tmp/asset-dashboard-codex-visual-parity/page-intelligence/`. This follow-on is `awaiting owner approval`; its rendered review and automated gates do not change that status.
+
+## Content Performance receiving-home follow-on
+
+With `ui-rebuild-shell` on, Content Performance bookmarks now replace-navigate into Pipeline Published, preserving stable item identity; the rebuilt sidebar removes the duplicate destination. With the flag off, the legacy page and nav remain. Published uses authoritative summary semantics and prototype-led result cards, while paired trends load only after deliberate readback opening to bound GSC calls. Public results omit admin outcome internals. Fixed-viewport evidence is under `/tmp/asset-dashboard-codex-visual-parity/content-performance/`; the copied owner workspace is truthfully empty, so populated composition remains component-fixture protected. Status: `awaiting owner approval`.
 
 ## Owner Decision Record
 

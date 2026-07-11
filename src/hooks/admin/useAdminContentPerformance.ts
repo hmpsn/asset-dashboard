@@ -1,11 +1,11 @@
 // @ds-rebuilt
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { contentPerformance } from '../../api/seo';
 
 export const adminContentPerformanceKeys = {
   all: (workspaceId: string) => ['admin-content-performance', workspaceId] as const,
   read: (workspaceId: string, days: number) => [...adminContentPerformanceKeys.all(workspaceId), 'read', days] as const,
-  trend: (workspaceId: string, requestId: string) => [...adminContentPerformanceKeys.all(workspaceId), 'trend', requestId] as const,
+  trend: (workspaceId: string, itemId: string) => [...adminContentPerformanceKeys.all(workspaceId), 'trend', itemId] as const,
 };
 
 export function useAdminContentPerformance(workspaceId: string, days = 90) {
@@ -19,19 +19,12 @@ export function useAdminContentPerformance(workspaceId: string, days = 90) {
 
 export function useAdminContentPerformanceTrend(
   workspaceId: string,
-  requestId: string | null | undefined,
+  itemId: string | null | undefined,
 ) {
   return useQuery({
-    queryKey: adminContentPerformanceKeys.trend(workspaceId, requestId ?? 'missing-request'),
-    queryFn: () => contentPerformance.trend(workspaceId, requestId ?? ''),
-    enabled: !!workspaceId && !!requestId,
+    queryKey: adminContentPerformanceKeys.trend(workspaceId, itemId ?? 'missing-item'),
+    queryFn: () => contentPerformance.trend(workspaceId, itemId ?? ''),
+    enabled: !!workspaceId && !!itemId,
     staleTime: 60_000,
-  });
-}
-
-export function useAdminContentPerformanceRefresh(workspaceId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: () => queryClient.refetchQueries({ queryKey: adminContentPerformanceKeys.all(workspaceId) }),
   });
 }

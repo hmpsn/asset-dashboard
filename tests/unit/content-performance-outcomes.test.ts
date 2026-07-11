@@ -238,4 +238,37 @@ describe('getContentPerformance outcome readbacks', () => {
       expect.objectContaining({ startDate: '2026-06-15' }),
     );
   });
+
+  it('removes admin outcome internals from public items while retaining aggregate win counts', async () => {
+    const outcome = makeOutcome({ actionId: 'private-action', score: 'strong_win' });
+    mocks.listContentRequests.mockReturnValue([makeRequest({ id: 'req-public', targetKeyword: 'Emergency Dentist Cost' })]);
+    mocks.getScoredOutcomeReadbacks.mockReturnValue(makeReadbacks({
+      byKeyword: new Map([['emergency dentist cost', outcome]]),
+    }));
+
+    const response = await getContentPerformance('ws-content-performance', { audience: 'public' });
+
+    expect(response.summary.wins).toBe(1);
+    expect(response.summary.measuredOutcomes).toBe(1);
+    expect(response.items[0].outcome).toBeUndefined();
+    expect(JSON.stringify(response.items[0])).not.toContain('private-action');
+  });
+
+  it('returns a typed unavailable reason when Search Console cannot provide a trend', async () => {
+    mocks.getWorkspace.mockReturnValue({
+      ...makeWorkspace(),
+      webflowSiteId: 'site-1',
+      gscPropertyUrl: 'sc-domain:example.com',
+    });
+    mocks.listContentRequests.mockReturnValue([makeRequest({ id: 'req-provider', targetPageSlug: '/guide' })]);
+    mocks.getPageTrend.mockRejectedValue(new Error('Not connected to Google'));
+
+    const result = await getContentPerformanceTrend('ws-content-performance', 'req-provider');
+
+    expect(result).toEqual({
+      availability: 'provider_unavailable',
+      reason: 'Search Console could not provide this page trend. Reconnect Google or try again later.',
+      trend: [],
+    });
+  });
 });

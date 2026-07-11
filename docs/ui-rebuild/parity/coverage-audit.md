@@ -106,6 +106,7 @@ Interior state has been checked in contracts, component tests, and smoke for the
 | Page Rewriter | `rewrite` | Two-pane workspace, shell focus mode, page picker, export menu, `?pageUrl=` | `owner-approved`; export-only v1 and retained 62px Focus rail approved, while draft/publish remains separate backend scope |
 | Local Presence | `local-seo` | Rank/profile, Reviews/replies, setup Drawer, legacy visibility receiver | `owner-approved`; geo-grid/GBP Performance remain explicit backend exceptions |
 | Page Intelligence | `page-intelligence` | Pages master/detail Research workbench, Architecture, Guide, single/bulk analysis, keyword edit/tracking, local/rank context, SEO copy, `?tab=`/`?page=` | `awaiting owner approval`; standalone receiving-home decision implemented without changing the flag-off route |
+| Content Performance | `content-perf` / `content-pipeline?tab=published` | Four-stat summary, result cards, filters/sort, paired trend Drawer, coverage/joinback, `?item=`, flag-aware redirect | `awaiting owner approval`; flag-on folds into Published while flag-off preserves legacy route/nav |
 | Global Ops | `settings`, `workspace-settings`, `roadmap`, `revenue`, `ai-usage`, `features`, `prospect`, `outcomes-overview`, `outcomes`, `diagnostics`, `requests` | Global settings, workspace settings tabs, roadmap views, business tabs, outcomes, diagnostics, requests tabs | `owner-approved`; all 11 route homes approved with explicit `GO-*` exceptions retained |
 
 ## Layout Coverage
@@ -115,10 +116,10 @@ The behavior checkpoint accounted for layout and route state across every mounte
 Current layout buckets:
 
 - `owner-approved`: the original 26 mounted rebuilt route homes, including every documented production/backend/design-system exception. Joshua approved the final 24-route batch and retained Page Rewriter Focus rail on 2026-07-10.
-- `awaiting owner approval`: Page Intelligence, newly mounted after the 26-route registry approval.
-- `behavior-safe / visual-unverified`: Content Performance remains the sole non-rebuilt main-nav receiving-home exception while its consolidation is in progress.
+- `awaiting owner approval`: Page Intelligence and the Content Performance receiving-home consolidation.
+- `behavior-safe / visual-unverified`: none among the currently mounted or folded receiving homes; the two follow-ons above remain awaiting owner approval rather than owner-approved.
 - Consolidated owner-review packet and measured registry-closeout evidence: `docs/ui-rebuild/parity/registry-final-owner-review.md` and `/tmp/asset-dashboard-codex-visual-parity/registry-final/`.
-- Receiving-home proof complete: Page Intelligence stays standalone under the owner-accepted `ODP-012 B` routing exception and now has a mounted rebuilt surface awaiting explicit visual approval. Content Pipeline Published is the future Content Performance compatibility receiver only after its six named gaps and populated browser evidence are closed. Both route ids remain intact in this goal.
+- Receiving-home proof complete: Page Intelligence stays standalone under `ODP-012 B`; Content Pipeline Published is the flag-on Content Performance receiver. Both route ids remain intact, and both follow-ons await explicit owner visual approval.
 - Redirect/folded only: SEO Briefs, Content, and Calendar.
 - Preserved legacy standalone receiver: Subscriptions; its Content Pipeline query alias is accounted for separately.
 
