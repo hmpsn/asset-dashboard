@@ -3,7 +3,7 @@
 Audit date: 2026-07-11
 Branch: `codex/ui-visual-parity`
 Scope: legacy-versus-rebuilt capability preservation, runtime wiring, general bugs, AI summaries/workspace-intelligence integration, and behavior-preserving performance opportunities
-Status: safe repair and first optimization waves implemented; seven owner decisions are `awaiting owner approval`; final all-project and bundle gates remain open
+Status: safe repair and optimization waves implemented; the final all-project suite passes; seven workflow decisions and two measured bundle-ratchet entries are `awaiting owner approval`
 
 This audit follows the owner-approved visual baseline. It does not revoke the original 26-route approval or the later Page Intelligence / Content Performance receiving-home approval. It also does not convert an automated reviewer `PASS` into approval of a newly discovered exception.
 
@@ -11,7 +11,7 @@ This audit follows the owner-approved visual baseline. It does not revoke the or
 
 - No P0 functionality loss was found.
 - Real safe-local functionality, state, invalidation, overlay, cache, AI-context, and summary-cadence defects were fixed.
-- Six high-value frontend performance wins were implemented without changing route meaning, capability homes, or settled loaded composition.
+- Ten high-value frontend performance wins were implemented without changing route meaning, capability homes, or settled loaded composition.
 - Seven material choices remain owner-gated because they change composition, capability grouping, time authority, AI refresh semantics, or shared design-system behavior.
 - The clean current all-project suite is complete; an explicit bundle-budget disposition is still required, so this audit is not a release-readiness claim.
 
@@ -57,10 +57,13 @@ Two semantic choices remain owner-gated: monthly-digest time authority (`AUD-D5`
 | `faf5bd9cb` | Scope Tailwind's production utility scan to `index.html` and `src/**/*.{ts,tsx}` with an executable source-coverage contract. | Every production HTML/TS/TSX utility source remains scanned; tests, docs, and public prose no longer inflate the shipped stylesheet. |
 | `b69246f59` | Split `RenderMarkdown` from the chart-heavy client helper closure so chat/editor consumers no longer pull Recharts through a text renderer. | Markdown, tables, lists, code, rich blocks, invalid-JSON fallback, and all six direct consumers remain behavior-identical. |
 | `36a6bbd2c` | Lazy-load the 440px Keywords detail Drawer only when `?q=` or a row selection requests it, with an immediate canonical loading Drawer. | Drawer URL state, Close/Escape behavior, body scroll, row origin focus, nested controls, and settled loaded composition remain. |
+| `71a7ddc19` | Link production Font Awesome base CSS to a deterministic 52-glyph `ICON_NAMES` subset while retaining the full licensed source as the generator input; narrow `Icon.name` to the registry contract. | Every registered glyph, Sharp Regular family behavior, accessibility, Lucide migration bridge, licensed source, and icon semantics remain. |
+| `71a7ddc19` | Remove scanner-proven dead legacy/light compatibility selectors and keep the production-only design-system harness out of the production graph. | Live production utility candidates, documented compatibility utilities, light/dark tokens, and the development harness route remain. |
+| `71a7ddc19` | Move Page Rewriter's heavy DOCX dependency behind an on-demand boundary while keeping clipboard/print entry synchronous and snapshotting the editor at click time. | Markdown/HTML clipboard, Markdown download, PDF print, legacy/rebuilt DOCX filenames/styles, error feedback, and click-time document identity remain. |
 
 Independent review and settled 1440×900 / 1600×1000 smoke support these changes. That evidence confirms implementation quality, not a new owner decision.
 
-Remaining behavior-preserving optimization opportunities are lower priority: generic Admin Chat backend fanout/concurrency, Global Ops catch-all chunking, SEO Editor duplicated projections, the app-wide queue observer, invalidate-plus-immediate-refetch churn, Cockpit whole-surface rerenders for freshness copy, and a separately reviewed dynamic DOCX-export boundary for Page Rewriter. CSS and aggregate disposition may require approved-surface consolidation or feature-flag retirement authority rather than another local micro-split.
+Remaining behavior-preserving optimization opportunities are lower priority: generic Admin Chat backend fanout/concurrency, Global Ops catch-all chunking, SEO Editor duplicated projections, the app-wide queue observer, invalidate-plus-immediate-refetch churn, and Cockpit whole-surface rerenders for freshness copy. The aggregate bundle is now below its ceiling; only two measured per-file ratchet entries require explicit disposition.
 
 ## Owner Circle-Backs
 
@@ -73,6 +76,7 @@ The following recommendations are recorded in `owner-decision-packet.md` and rem
 5. `AUD-D5` — current-month operational digest authority with durable historical snapshots deferred to a later backend project.
 6. `AUD-D6` — POV hash over used evidence/effective voice, `refresh available`, no automatic overwrite of operator edits, and removal of unused slices.
 7. `AUD-D7` — shared overlay-aware Tooltip behavior for Asset Manager Drawer help.
+8. `AUD-B1` — measured CSS/Page Rewriter ratchets at 37,307 B / 8,819 B while the aggregate baseline remains 1,720,000 B.
 
 Until Joshua resolves these, none may be described as an owner-approved exception or implemented by silently expanding shared/backend scope.
 
@@ -91,8 +95,8 @@ Supporting evidence completed during the audit:
 
 Current verification truth:
 
-- the clean current all-project suite passed 2,061 files and 28,817 tests, with one intentional skip and three todos. The process emitted non-failing jsdom navigation and Node listener-count warnings but no failed files or tests.
-- bundle-budget verification remains red, but Keywords now passes its entry budget. Remaining failures are CSS 37.5 KiB versus 36.4 KiB, Page Rewriter 8.7 KiB versus 8.1 KiB, and aggregate 1.75 MiB versus 1.72 MiB; 71 new assets are warn-only. Resolve surgically after owner decisions; do not blindly raise the baseline.
+- the clean current all-project suite passed 2,065 files and 28,834 tests, with one intentional skip and three todos. The process emitted non-failing jsdom navigation and Node listener-count warnings but no failed files or tests.
+- aggregate bundle gzip is green at 1,793,622 B against the 1,806,000 B ceiling (12,378 B headroom). Font Awesome base CSS fell from 36,118 B to 1,203 B, and the Page Rewriter action/DOCX allocation fell from 100,018 B to 99,512 B. Two per-file entries remain owner-gated: CSS is 37,307 B against a 37,274 B tolerance ceiling (33 B over), and the behavior-safe Page Rewriter route is 8,819 B against an 8,326 B ceiling (493 B over). Independent bundle review recommends measured baselines of 37,307 B and 8,819 B while leaving the aggregate baseline unchanged; do not apply them without Joshua's explicit disposition.
 - the bounded live provider smoke remains unexecuted without dedicated staging credentials and separate staging authority. Deterministic local fixtures cover workflow verification; credentials are needed only for live/staging provider proof.
 
 ## Shipping Boundary
