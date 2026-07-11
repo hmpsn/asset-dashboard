@@ -1,7 +1,6 @@
 // @ds-rebuilt
 import { useMemo, useState } from 'react';
 import {
-  AlertTriangle,
   CheckCircle2,
   Download,
   Image,
@@ -59,10 +58,6 @@ interface AuditLensProps {
   quotaLocked: boolean;
   quotaReason: string;
   onQuotaHit: (partial?: { done: number; total: number }) => void;
-}
-
-function AuditEmptyIcon({ className }: { className?: string }) {
-  return <Icon as={AlertTriangle} className={className} />;
 }
 
 function issueLabel(issue: string): string {
@@ -472,19 +467,19 @@ export function AuditLens({
 
   if (!hasRun && !loading) {
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <AuditRepairContext activeFilter={activeFilter} />
-        <EmptyState
-          icon={AuditEmptyIcon}
-          title="Run an asset audit"
-          description="Scan published pages, CMS fields, CSS, and the Webflow asset library for missing alt text, oversized files, duplicates, legacy formats, and unused assets."
-          action={(
-            <Button size="md" variant="primary" onClick={() => void runAudit()}>
+        <InlineBanner tone="info" title="Run an asset audit">
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="min-w-[240px] flex-1 t-caption text-[var(--brand-text-muted)]">
+              Scan published pages, CMS fields, CSS, and the Webflow library for source-level media issues.
+            </p>
+            <Button size="sm" variant="primary" onClick={() => void runAudit()}>
               <Icon as={RefreshCw} size="sm" />
               Run Asset Audit
             </Button>
-          )}
-        />
+          </div>
+        </InlineBanner>
       </div>
     );
   }

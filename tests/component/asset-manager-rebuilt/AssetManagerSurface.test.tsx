@@ -170,6 +170,11 @@ function metricTile(label: string): HTMLElement {
   return tile;
 }
 
+function expectBefore(first: Element, second: Element): void {
+  expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING)
+    .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+}
+
 function FlaggedAssetManager() {
   const enabled = useFeatureFlag('ui-rebuild-shell');
   return enabled ? <AssetManagerSurface workspaceId="ws-1" /> : <div data-testid="legacy-media">Legacy Media</div>;
@@ -283,10 +288,62 @@ describe('AssetManagerSurface', () => {
 
     const totalWeight = metricTile('Total media weight');
     expect(within(totalWeight).getByText(formatBytes(912_000))).toHaveStyle({ color: 'var(--blue)' });
-    expect(within(metricTile('Assets')).getByText('2')).toBeInTheDocument();
+    expect(within(totalWeight).getByText('2 assets on the site')).toBeInTheDocument();
 
     const potentialSavings = metricTile('Potential savings');
     expect(within(potentialSavings).getByText(formatBytes(495_000))).toHaveStyle({ color: 'var(--blue)' });
+  });
+
+  it('keeps the prototype summary, proof, consolidated controls, and dense grid in order', async () => {
+    renderSurface('/ws/ws-1/media');
+
+    const canvas = await screen.findByTestId('asset-manager-canvas');
+    const summary = screen.getByRole('region', { name: 'Asset summary' });
+    const proof = screen.getByText('Fixes the source, not the symptom.').closest('[role="status"]')
+      ?? screen.getByText('Fixes the source, not the symptom.').parentElement;
+    const controls = screen.getByRole('toolbar', { name: 'Browse asset controls' });
+    const grid = screen.getByLabelText('Asset grid');
+
+    expect(canvas).toHaveClass('w-[calc(100%+30px)]', 'max-w-[1180px]', 'self-center', 'sm:px-[30px]');
+    expect(within(summary).getAllByText(/Total media weight|Oversized images|Potential savings|Missing alt text/)).toHaveLength(4);
+    expect(within(summary).queryByText('Assets', { selector: 'span.t-caption' })).not.toBeInTheDocument();
+    const filters = within(controls).getByRole('group', { name: 'Browse asset filters' });
+    const allFilter = within(filters).getByRole('button', { name: /^All\s*2$/i });
+    const oversizedFilter = within(filters).getByRole('button', { name: /^Oversized\s*1$/i });
+    const missingAltFilter = within(filters).getByRole('button', { name: /^Missing alt\s*1$/i });
+    const unusedFilter = within(filters).getByRole('button', { name: /^Unused\s*0$/i });
+    expectBefore(allFilter, oversizedFilter);
+    expectBefore(oversizedFilter, missingAltFilter);
+    expectBefore(missingAltFilter, unusedFilter);
+    fireEvent.click(within(controls).getByRole('button', { name: 'More browse controls' }));
+    expect(within(controls).getByPlaceholderText('Search filename or alt text...')).toBeInTheDocument();
+    expect(within(controls).getByRole('button', { name: 'Select all shown' })).toBeInTheDocument();
+
+    if (!proof) throw new Error('Source proof band not found');
+    expectBefore(summary, proof);
+    expectBefore(proof, controls);
+    expectBefore(controls, grid);
+
+    const preview = within(screen.getAllByRole('article')[0]).getByTestId('asset-preview');
+    expect(preview).toHaveClass('h-[132px]');
+  });
+
+  it('clears only the shown selection when Select all shown is toggled off', async () => {
+    renderSurface('/ws/ws-1/media');
+
+    expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Select hero.jpg'));
+    fireEvent.click(screen.getByLabelText('Select logo.svg'));
+    fireEvent.click(within(screen.getByLabelText('Browse asset filters')).getByRole('button', { name: /^Oversized\s*1$/i }));
+
+    const controls = screen.getByRole('toolbar', { name: 'Browse asset controls' });
+    fireEvent.click(within(controls).getByRole('button', { name: 'Clear shown' }));
+
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+    fireEvent.click(within(screen.getByLabelText('Browse asset filters')).getByRole('button', { name: /^All\s*2$/i }));
+
+    expect(screen.getByLabelText('Select hero.jpg')).not.toBeChecked();
+    expect(screen.getByLabelText('Select logo.svg')).toBeChecked();
   });
 
   it('frames Browse as the prototype source-fix workshop with readable proof copy', async () => {
@@ -303,6 +360,7 @@ describe('AssetManagerSurface', () => {
     renderSurface('/ws/ws-1/media');
 
     expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'More browse controls' }));
     fireEvent.click(screen.getByRole('button', { name: 'Repair results' }));
 
     await waitFor(() => {
@@ -312,6 +370,7 @@ describe('AssetManagerSurface', () => {
     const repairResults = screen.getByRole('region', { name: 'Repair results' });
     expect(within(repairResults).getByRole('button', { name: /Run Asset Audit/i })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Run Asset Audit/i })).toHaveLength(1);
+    expectBefore(repairResults, screen.getByRole('toolbar', { name: 'Browse asset controls' }));
     expect(repairResults.compareDocumentPosition(screen.getByLabelText('Asset grid')) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 

@@ -2,7 +2,7 @@
 
 Surface: `media` / Assets  
 Owner: media optimization / Webflow asset workflow  
-Status: `behavior-safe / visual-unverified`; `ODP-006 C` behavior checkpoint implemented 2026-07-09, repair-first circle-back resolved and browser-verified
+Status: `owner-approved`; Joshua approved the corrected workshop composition and documented exceptions on 2026-07-10
 Primary route: `/ws/:workspaceId/media`
 
 ## Prototype References
@@ -32,7 +32,7 @@ Prototype-critical capabilities:
 
 ## Current Parity Grade
 
-Visual status: `behavior-safe / visual-unverified`.
+Visual status: `owner-approved`.
 
 Why:
 
@@ -40,7 +40,7 @@ Why:
 - `?filter=oversized` and `?filter=missing-alt` are canonical source-repair states inside Browse; Performance and Site Audit now emit those filter-only URLs.
 - `?tab=audit` opens the existing audit workflow exactly once as an in-flow Repair results section while Browse remains visible.
 - `?tab=upload` opens the existing upload workflow exactly once in the shared Drawer while Browse remains visible; closing returns to bare Browse.
-- Repair results is the first work area above Browse filters, metrics, and the asset grid, so a deep link cannot strand the requested repair workflow below the full library.
+- Repair results is the first actionable work area after the prototype summary/proof bands and remains above Browse controls and the asset grid, so a deep link cannot strand the requested repair workflow below the full library.
 - The visible All filter maps to canonical no-filter URL state; total media weight and potential savings are present as blue read-only metrics.
 - Asset detail, CMS filters, search, sort, view, selection, bulk actions, organize, audit, upload queue, mutation feedback, and quota behavior remain reachable.
 
@@ -49,7 +49,18 @@ Accepted direction:
 - Implemented: Browse is the workshop, Upload is a toolbar-opened Drawer, and Audit is an in-flow Repair results area.
 - Preserve `?tab=audit`, `?tab=upload`, `filter`, `search`, `view`, `sort`, and `asset` as compatibility state.
 - The discoverability circle-back triggered during the final Sol audit. Accepted resolution: keep Repair results above Browse as the first work area while leaving the workshop visible below; do not restore peer tabs.
-- Circle back again only if operator review shows Upload or the repair-first composition still obscures a required workflow.
+- No safe-local visual defects remain from fresh Sol review. Joshua explicitly owner-approved the surface with its documented exceptions on 2026-07-10.
+
+## Source-Led Visual Result, 2026-07-10
+
+| Prototype seam | Corrected rebuilt composition | Retained production exception |
+|---|---|---|
+| 1180px workshop and four summary metrics | Exact 1180px border-box canvas at both desktop viewports; Total weight, Oversized, Potential savings, and Missing alt lead | DS blue/amber/red semantics replace prototype orange where required |
+| Source-proof note then compact controls | Proof band precedes All/Oversized/Missing alt/Unused, truthful Select all shown, and Upload | Search, sort, view, refresh, organize, and Repair remain reachable under More |
+| Dense 132px asset cards | Four-column auto-fill cards use fixed 132px previews, red No alt, zinc Unused, and two labeled contextual actions | Full alt/name/compress/open/copy/delete operations remain in Asset Detail |
+| Single repair workshop | `?tab=audit` opens one compact Repair results area above controls/grid while Browse stays visible | Upload, Asset Detail, organize, confirmation, and progress remain production Drawers |
+
+Fresh Sol review returned `PASS`. Joshua explicitly owner-approved this visual pass on 2026-07-10.
 
 ## URL and Deep Links
 
@@ -93,7 +104,7 @@ Keep these capabilities reachable exactly once:
 - Removed the visible Browse / Audit / Upload LensSwitcher. Browse now remains mounted for every route state.
 - Added `Repair results` and `Upload` toolbar commands. Repair results mounts the existing Audit workflow once in-flow; Upload mounts the existing workflow once in the shared Drawer.
 - Preserved `?tab=audit` and `?tab=upload` as compatibility open state while making filter-only repair URLs canonical for new cross-surface senders.
-- Moved Repair results above the asset filters, metrics, and grid after the documented discoverability circle-back fired.
+- Placed Repair results after the prototype summary/proof bands and before Browse controls and the asset grid, preserving discoverability without displacing the prototype's first-viewport evidence hierarchy.
 - Added the prototype-visible All filter as the canonical no-filter control, plus Total media weight; Potential savings now uses the blue data token instead of success color.
 - Defined deterministic overlay precedence for combined Upload and asset-detail deep links so exactly one Drawer is visible and close returns to canonical Browse.
 - Component tests assert default URL behavior, Browse source-fix/proof framing, audit drill-in source-fix context, exact-once asset drawer deep link, real feature-flag loading transition, absence of internal implementation language in the audit fallback, no-site state, CMS filter behavior, AI quota lock behavior, and rebuilt a11y.
@@ -129,6 +140,19 @@ Final repair-first audit evidence, 2026-07-09:
 - Final Search / Asset audit state: `/tmp/asset-dashboard-codex-parity-captures/final-search-asset-audit-state.json`.
 
 The live Swish workspace placed Repair results at 206px and the asset grid at 900px, showed All, Total media weight, and blue Potential savings, and had no horizontal overflow. `?tab=upload&asset=6a105b9ad308bd9a3c7642c2` mounted one Asset detail Drawer, did not expose Upload, and closed to bare `/media`.
+
+Final source-led evidence, 2026-07-10:
+
+- Prototype references: `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/prototype/asset-manager-1440.png`, `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/prototype/asset-manager-1600.png`.
+- Corrected Browse: `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/asset/browse-1440-final.png`, `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/asset/browse-1600.png`.
+- Repair, bulk, and overlays: `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/asset/repair-1440-stable.png`, `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/asset/bulk-selection-1440.png`, `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/asset/upload-drawer-1440.png`, `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/asset/detail-drawer-1440.png`.
+- Mobile floor: `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/asset/browse-mobile-390.png`.
+
+Measured canvas geometry is `x=243, w=1180` at 1440x900 and `x=323, w=1180` at 1600x1000, with no document overflow. The settled focused suite passes 20/20.
+
+## Registry Closeout Evidence
+
+The measured registry archive adds exact prototype repair-selection evidence at 1440x900 and 1600x1000 plus matching rebuilt 1600x1000 evidence under `/tmp/asset-dashboard-codex-visual-parity/registry-final/`; reviewed exact 1440x900 rebuilt evidence remains authoritative. The populated prototype versus zero truthful owner-workspace assets is an explicit data-state mismatch, while Upload, Asset Detail, Organize, confirmation, and progress Drawers remain production-only states.
 
 ## Automated Test Floor
 
