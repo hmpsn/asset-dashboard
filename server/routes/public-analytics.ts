@@ -15,6 +15,7 @@ import {
   buildConversationContext,
   getSession as getChatSession,
   generateSessionSummary,
+  shouldAttemptSessionSummary,
   formatChatLimitError,
   refundReservedChatUsage,
   reserveChatUsageIfNeeded,
@@ -648,8 +649,8 @@ ${hasGrounding ? seoContextBlock : '(No additional workspace intelligence is ava
       if (session && session.messages.length === 2) {
         addActivity(ws.id, 'chat_session', 'Client chat: ' + question.trim().slice(0, 80), `Client started a new Insights Engine conversation`); // client-visibility-ok: admin activity signal; intentionally not shown in client-visible activity feed
       }
-      // Auto-summarize after 6+ messages
-      if (session && session.messages.length >= 6 && !session.summary) {
+      // Refresh cross-session context at bounded milestones.
+      if (session && shouldAttemptSessionSummary(session.messages.length)) {
         generateSessionSummary(ws.id, sessionId).catch(() => {});
       }
     }

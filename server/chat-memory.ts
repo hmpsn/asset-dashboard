@@ -14,6 +14,23 @@ import type { ChatLimitErrorResponse, ChatUsageResponse, UsageTier } from '../sh
 
 
 const log = createLogger('chat-memory');
+const SESSION_SUMMARY_STORAGE_PREFIX = 'hmpsn:chat-summary:v1:';
+
+/**
+ * Conversation summaries are intentionally refreshed only at these bounded
+ * milestones. This keeps cross-session context current without adding an AI
+ * call to every turn after the first summary.
+ */
+export const SESSION_SUMMARY_MESSAGE_MILESTONES = [6, 20, 40] as const;
+
+interface StoredSessionSummary {
+  text?: string;
+  summarizedMessageCount: number;
+  isLegacy: boolean;
+}
+
+const summaryRefreshesInFlight = new Map<string, Promise<string | null>>();
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -52,6 +69,16 @@ const stmts = createStmtCache(() => ({
   getSession: db.prepare<[sessionId: string, workspaceId: string]>(
     `SELECT * FROM chat_sessions WHERE id = ? AND workspace_id = ?`,
   ),
+  updateSummaryIfCurrent: db.prepare<[
+    summary: string,
+    sessionId: string,
+    workspaceId: string,
+    expectedSummary: string | null,
+  ]>(
+    `UPDATE chat_sessions
+     SET summary = ?
+     WHERE id = ? AND workspace_id = ? AND summary IS ?`,
+  ),
   deleteSession: db.prepare<[sessionId: string, workspaceId: string]>(
     `DELETE FROM chat_sessions WHERE id = ? AND workspace_id = ?`,
   ),
@@ -77,14 +104,56 @@ interface ChatRow {
   updated_at: string;
 }
 
+function parseStoredSessionSummary(raw: string | null): StoredSessionSummary {
+  if (!raw) return { summarizedMessageCount: 0, isLegacy: false };
+  if (!raw.startsWith(SESSION_SUMMARY_STORAGE_PREFIX)) {
+    // Summaries written before cadence metadata existed were generated at the
+    // original six-message threshold. Treating them as such lets them refresh
+    // at 20 and 40 without a migration or exposing new API fields.
+    return {
+      text: raw,
+      summarizedMessageCount: SESSION_SUMMARY_MESSAGE_MILESTONES[0],
+      isLegacy: true,
+    };
+  }
+
+  const countStart = SESSION_SUMMARY_STORAGE_PREFIX.length;
+  const countEnd = raw.indexOf(':', countStart);
+  if (countEnd < 0) {
+    return {
+      summarizedMessageCount: 0,
+      isLegacy: true,
+    };
+  }
+  const summarizedMessageCount = Number(raw.slice(countStart, countEnd));
+  if (!Number.isSafeInteger(summarizedMessageCount) || summarizedMessageCount < 1) {
+    return {
+      text: raw.slice(countEnd + 1).trim() || undefined,
+      summarizedMessageCount: 0,
+      isLegacy: true,
+    };
+  }
+
+  return {
+    text: raw.slice(countEnd + 1),
+    summarizedMessageCount,
+    isLegacy: false,
+  };
+}
+
+function serializeStoredSessionSummary(text: string, summarizedMessageCount: number): string {
+  return `${SESSION_SUMMARY_STORAGE_PREFIX}${summarizedMessageCount}:${text}`;
+}
+
 function rowToSession(row: ChatRow): ChatSession {
+  const storedSummary = parseStoredSessionSummary(row.summary);
   return {
     id: row.id,
     workspaceId: row.workspace_id,
     channel: row.channel,
     title: row.title,
     messages: parseJsonFallback<ChatMessage[]>(row.messages, []),
-    summary: row.summary ?? undefined,
+    summary: storedSummary.text,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -127,12 +196,13 @@ export function listSessions(workspaceId: string, channel?: string): SessionSumm
 
   return rows.map(row => {
     const messages: ChatMessage[] = parseJsonFallback<ChatMessage[]>(row.messages, []);
+    const storedSummary = parseStoredSessionSummary(row.summary);
     return {
       id: row.id,
       title: row.title,
       channel: row.channel,
       messageCount: messages.length,
-      summary: row.summary ?? undefined,
+      summary: storedSummary.text,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -148,7 +218,8 @@ export function addMessage(
   role: 'user' | 'assistant',
   content: string,
 ): ChatSession {
-  let session = getSession(workspaceId, sessionId);
+  const existingRow = stmts().getSession.get(sessionId, workspaceId) as ChatRow | undefined;
+  let session = existingRow ? rowToSession(existingRow) : null;
   const now = new Date().toISOString();
 
   if (!session) {
@@ -167,7 +238,19 @@ export function addMessage(
 
   session.messages.push({ role, content, timestamp: now });
   session.updatedAt = now;
-  saveSession(session);
+  // Preserve the stored summary envelope while appending messages. Public
+  // ChatSession objects deliberately expose only the summary text, so writing
+  // that parsed object through saveSession() would discard cadence metadata.
+  stmts().upsert.run({
+    id: session.id,
+    workspace_id: session.workspaceId,
+    channel: session.channel,
+    title: session.title,
+    messages: JSON.stringify(session.messages),
+    summary: existingRow?.summary ?? null,
+    created_at: session.createdAt,
+    updated_at: session.updatedAt,
+  });
   return session;
 }
 
@@ -305,41 +388,112 @@ export function buildConversationContext(
   return { historyMessages, priorContext };
 }
 
+export function isSessionSummaryMilestone(messageCount: number): boolean {
+  return SESSION_SUMMARY_MESSAGE_MILESTONES.some(milestone => milestone === messageCount);
+}
+
+export function shouldAttemptSessionSummary(messageCount: number): boolean {
+  return messageCount >= SESSION_SUMMARY_MESSAGE_MILESTONES[0];
+}
+
+function summaryMilestoneDue(messageCount: number, summarizedMessageCount: number): number | null {
+  for (let index = SESSION_SUMMARY_MESSAGE_MILESTONES.length - 1; index >= 0; index -= 1) {
+    const milestone = SESSION_SUMMARY_MESSAGE_MILESTONES[index];
+    if (messageCount >= milestone && summarizedMessageCount < milestone) return milestone;
+  }
+  return null;
+}
+
+export interface GenerateSessionSummaryOptions {
+  /** Automatic callers are bounded to 6/20/40; manual callers summarize on demand. */
+  trigger?: 'automatic' | 'manual';
+}
+
 /**
- * Generate a session summary using AI. Called when a session reaches
- * a threshold of messages or when the user starts a new session.
+ * Generate or refresh once after crossing each bounded 6/20/40 threshold.
+ * Later automatic attempts reuse the stored summary until the next threshold;
+ * a missed or failed exact-count attempt can recover on the following turn.
  */
 export async function generateSessionSummary(
   workspaceId: string,
   sessionId: string,
+  options: GenerateSessionSummaryOptions = {},
 ): Promise<string | null> {
-  const session = getSession(workspaceId, sessionId);
-  if (!session || session.messages.length < 2) return null;
+  const row = stmts().getSession.get(sessionId, workspaceId) as ChatRow | undefined;
+  if (!row) return null;
 
-  // Don't regenerate if we already have a summary and few messages
-  if (session.summary && session.messages.length < 6) return session.summary;
+  const session = rowToSession(row);
+  const storedSummary = parseStoredSessionSummary(row.summary);
+  const trigger = options.trigger ?? 'automatic';
+  const dueMilestone = trigger === 'manual'
+    ? (
+        session.messages.length >= 2 &&
+        (storedSummary.isLegacy || session.messages.length > storedSummary.summarizedMessageCount)
+          ? session.messages.length
+          : null
+      )
+    : summaryMilestoneDue(session.messages.length, storedSummary.summarizedMessageCount);
+  if (dueMilestone == null) return storedSummary.text ?? null;
 
-  try {
-    const transcript = session.messages
-      .slice(-20) // last 20 messages max
-      .map(m => `${m.role}: ${m.content.slice(0, 300)}`)
-      .join('\n');
+  const targetMessageCount = session.messages.length;
+  const refreshKey = `${workspaceId}\u0000${sessionId}\u0000${row.created_at}\u0000${trigger}\u0000${dueMilestone}`;
+  const existingRefresh = summaryRefreshesInFlight.get(refreshKey);
+  if (existingRefresh) return existingRefresh;
 
-    const result = await callAI({
-      model: 'gpt-5.4-nano',
-      system: 'Summarize this conversation in 1-2 sentences. Focus on the key topics discussed, questions asked, and any preferences or concerns the user expressed. Be concise.',
-      messages: [{ role: 'user', content: transcript }],
-      maxTokens: 150,
-      temperature: 0.3,
-      feature: 'chat-summary',
-      workspaceId,
-    });
+  const refresh = (async (): Promise<string | null> => {
+    try {
+      const transcript = session.messages
+        .slice(-20) // last 20 messages max
+        .map(m => `${m.role}: ${m.content.slice(0, 300)}`)
+        .join('\n');
 
-    session.summary = result.text;
-    saveSession(session);
-    return result.text;
-  } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'chat-memory/generateSessionSummary: programming error');
-    return null;
-  }
+      const result = await callAI({
+        model: 'gpt-5.4-nano',
+        system: 'Summarize this conversation in 1-2 sentences. Focus on the key topics discussed, questions asked, and any preferences or concerns the user expressed. Be concise.',
+        messages: [{ role: 'user', content: transcript }],
+        maxTokens: 150,
+        temperature: 0.3,
+        feature: 'chat-summary',
+        workspaceId,
+      });
+      const nextSummary = result.text.trim();
+      if (!nextSummary) return storedSummary.text ?? null;
+
+      // A newer milestone may finish first under concurrent requests. Re-read
+      // before writing so an older in-flight summary can never overwrite it.
+      const latestRow = stmts().getSession.get(sessionId, workspaceId) as ChatRow | undefined;
+      if (!latestRow) return null;
+      const latestSummary = parseStoredSessionSummary(latestRow.summary);
+      const latestMessageCount = rowToSession(latestRow).messages.length;
+      if (latestRow.created_at !== row.created_at || latestMessageCount < targetMessageCount) {
+        return latestSummary.text ?? null;
+      }
+      if (latestSummary.summarizedMessageCount >= targetMessageCount) {
+        return latestSummary.text ?? null;
+      }
+
+      const update = stmts().updateSummaryIfCurrent.run(
+        serializeStoredSessionSummary(nextSummary, targetMessageCount),
+        sessionId,
+        workspaceId,
+        latestRow.summary,
+      );
+      if (update.changes === 0) {
+        const currentRow = stmts().getSession.get(sessionId, workspaceId) as ChatRow | undefined;
+        return currentRow ? parseStoredSessionSummary(currentRow.summary).text ?? null : null;
+      }
+      return nextSummary;
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'chat-memory/generateSessionSummary: programming error');
+      return storedSummary.text ?? null;
+    }
+  })();
+
+  summaryRefreshesInFlight.set(refreshKey, refresh);
+  void refresh.finally(() => {
+    if (summaryRefreshesInFlight.get(refreshKey) === refresh) {
+      summaryRefreshesInFlight.delete(refreshKey);
+    }
+  });
+  return refresh;
 }

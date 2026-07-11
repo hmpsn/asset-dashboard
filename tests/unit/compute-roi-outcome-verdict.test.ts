@@ -9,7 +9,7 @@ import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 
 const ctx = createEphemeralTestContext(import.meta.url);
 let wsId: string;
-let cleanup: () => void;
+let cleanup: (() => void) | undefined;
 
 beforeAll(async () => {
   await ctx.startServer();
@@ -25,9 +25,9 @@ beforeAll(async () => {
   updateWorkspace(wsId, { eventConfig: [
     { eventName: 'phone_call', displayName: 'Calls', pinned: true },
   ] });
-});
+}, 25_000);
 afterAll(async () => {
-  cleanup();
+  cleanup?.();
   await ctx.stopServer();
 });
 

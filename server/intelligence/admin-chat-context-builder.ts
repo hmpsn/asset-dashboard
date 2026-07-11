@@ -6,11 +6,12 @@ const SEO_CONTEXT_SECTIONS = ['seoContext'] as const;
 const LEARNINGS_SECTIONS = ['learnings'] as const;
 
 /**
- * Slices that have dedicated top-level blocks in buildAdminChatIntelligenceContext
- * (seoContextBlock and learningsBlock). All other assembled + prompt-formattable slices
- * are routed through the additional-slices block so their data reaches the model.
+ * Slices that must not be repeated in the additional formatted block. SEO context
+ * and learnings have dedicated top-level blocks here. Insights are intentionally
+ * formatted by assembleAdminContext's richer type-aware ANALYTICS INTELLIGENCE
+ * renderer from the same assembled slice.
  */
-const DEDICATED_SECTIONS = new Set<IntelligenceSlice>(['seoContext', 'learnings']);
+const SEPARATELY_FORMATTED_SECTIONS = new Set<IntelligenceSlice>(['seoContext', 'learnings', 'insights']);
 
 /**
  * Token budget for the additional slices block (operational, siteHealth, clientSignals,
@@ -18,6 +19,14 @@ const DEDICATED_SECTIONS = new Set<IntelligenceSlice>(['seoContext', 'learnings'
  * combined prompt stays within the ~6400-token workspace context envelope.
  */
 const ADDITIONAL_SLICES_TOKEN_BUDGET = 1500;
+
+/**
+ * Paid backlink enrichment is question-scoped. Keep this matcher conservative:
+ * generic "links" can mean navigation, broken links, or internal links and must
+ * not trigger a provider charge. These phrases specifically ask about off-site
+ * link authority or a backlink profile.
+ */
+const BACKLINK_INTENT_PATTERN = /\b(?:backlinks?|backlink\s+profile|referring\s+domains?|inbound\s+links?|off[-\s]?page\s+(?:seo|links?)|link\s+(?:authority|profile|building|equity)|domain\s+(?:authority|rating)|authority\s+score)\b/i;
 
 export type AdminChatContextCategory =
   | 'general'
@@ -44,8 +53,16 @@ export interface AdminChatIntelligenceContext {
   dataSources: string[];
 }
 
+export function hasBacklinkIntent(question: string): boolean {
+  return BACKLINK_INTENT_PATTERN.test(question);
+}
+
 function hasFormattedIntelligenceSection(block: string): boolean {
   return /##\s/.test(block);
+}
+
+function stripWorkspaceIntelligenceHeader(block: string): string {
+  return block.replace(/^\[Workspace Intelligence\]\s*/i, '').trim();
 }
 
 function appendSlice(slices: IntelligenceSlice[], slice: IntelligenceSlice): void {
@@ -80,7 +97,7 @@ export async function buildAdminChatIntelligenceContext(
   const intelligence = await buildWorkspaceIntelligence(workspaceId, {
     slices,
     learningsDomain: 'all',
-    enrichWithBacklinks: true,
+    enrichWithBacklinks: hasBacklinkIntent(question),
   });
 
   const seoContextBlock = formatForPrompt(intelligence, {
@@ -90,7 +107,7 @@ export async function buildAdminChatIntelligenceContext(
   });
   const keywordMapBlock = intelligence.seoContext ? formatPageMapForPrompt(intelligence.seoContext) : '';
   const workspaceParts = [
-    hasFormattedIntelligenceSection(seoContextBlock) ? seoContextBlock : '',
+    hasFormattedIntelligenceSection(seoContextBlock) ? stripWorkspaceIntelligenceHeader(seoContextBlock) : '',
     keywordMapBlock,
   ].filter(Boolean);
 
@@ -103,13 +120,14 @@ export async function buildAdminChatIntelligenceContext(
       })
     : '';
 
-  // Route the additional assembled slices (operational, siteHealth, clientSignals, insights,
-  // contentPipeline, localSeo) through formatForPrompt so their data reaches the model.
+  // Route the additional assembled slices (operational, siteHealth, clientSignals,
+  // contentPipeline, localSeo) through formatForPrompt so their unique data reaches the model.
   // B-10 fix: previously these slices were assembled but their formatted output was never
-  // included in the context block, making them invisible to the advisor.
+  // included in the context block, making them invisible to the advisor. Insights are the
+  // one exception because the caller already renders the same slice in greater detail.
   const additionalSections = slices.filter(
     (s): s is typeof PROMPT_FORMATTABLE_INTELLIGENCE_SLICES[number] =>
-      !DEDICATED_SECTIONS.has(s) &&
+      !SEPARATELY_FORMATTED_SECTIONS.has(s) &&
       (PROMPT_FORMATTABLE_INTELLIGENCE_SLICES as readonly string[]).includes(s),
   );
 
@@ -122,7 +140,7 @@ export async function buildAdminChatIntelligenceContext(
       tokenBudget: ADDITIONAL_SLICES_TOKEN_BUDGET,
     });
     if (hasFormattedIntelligenceSection(formatted)) {
-      additionalBlock = formatted;
+      additionalBlock = stripWorkspaceIntelligenceHeader(formatted);
       // Build a readable data-source label from the section names
       const label = additionalSections.map(s => s.replace(/([A-Z])/g, ' $1').trim()).join(', ');
       additionalDataSources.push(`Workspace Intelligence: ${label}`);
@@ -141,12 +159,20 @@ export async function buildAdminChatIntelligenceContext(
   if (hasSeoContextContent) dataSources.push('Workspace Intelligence: SEO Context');
   dataSources.push(...additionalDataSources);
 
+  const workspaceContextBlock = workspaceParts.length > 0
+    ? `WORKSPACE INTELLIGENCE CONTEXT:\n[Workspace Intelligence]\n\n${workspaceParts.join('\n\n')}`
+    : '';
+  const hasLearningsContent = hasFormattedIntelligenceSection(learningsBlock);
+
   return {
     intelligence,
-    workspaceContextBlock: workspaceParts.length > 0
-      ? `WORKSPACE INTELLIGENCE CONTEXT:\n${workspaceParts.join('\n\n')}`
+    workspaceContextBlock,
+    // formatForPrompt adds its wrapper to every call. Keep one wrapper across the
+    // final prompt: the workspace block owns it when present; a learnings-only
+    // result retains it so the fragment still has provenance when used alone.
+    learningsBlock: hasLearningsContent
+      ? (workspaceContextBlock ? stripWorkspaceIntelligenceHeader(learningsBlock) : learningsBlock)
       : '',
-    learningsBlock: hasFormattedIntelligenceSection(learningsBlock) ? learningsBlock : '',
     dataSources,
   };
 }

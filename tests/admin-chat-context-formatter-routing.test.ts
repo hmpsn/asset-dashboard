@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceIntelligence, OperationalSlice, SiteHealthSlice, ClientSignalsSlice } from '../shared/types/intelligence.js';
 import {
   buildAdminChatIntelligenceContext,
+  hasBacklinkIntent,
   selectAdminChatSlices,
 } from '../server/intelligence/admin-chat-context-builder.js';
 import {
@@ -180,9 +181,88 @@ describe('admin-chat context builder — B-10 slice formatter routing', () => {
         Array.isArray(opts?.sections) &&
         !opts.sections.includes('seoContext') &&
         !opts.sections.includes('learnings') &&
+        !opts.sections.includes('insights') &&
         opts.sections.length > 0,
     );
     expect(otherSlicesCall).toBeDefined();
+  });
+
+  it('does not format insights twice when the caller owns the richer analytics-intelligence renderer', async () => {
+    await buildAdminChatIntelligenceContext(
+      'ws-4-3',
+      'What are the highest-impact insights?',
+      new Set(['insights']),
+    );
+
+    const formattedSections = vi.mocked(formatForPrompt).mock.calls.flatMap(([, opts]) => opts?.sections ?? []);
+    expect(formattedSections.filter(section => section === 'insights')).toHaveLength(0);
+  });
+
+  it('does not request paid backlink enrichment for ordinary or internal-link questions', async () => {
+    await buildAdminChatIntelligenceContext(
+      'ws-4-3',
+      'Which broken internal links should we fix?',
+      new Set(['audit']),
+    );
+
+    expect(buildWorkspaceIntelligence).toHaveBeenCalledWith(
+      'ws-4-3',
+      expect.objectContaining({ enrichWithBacklinks: false }),
+    );
+  });
+
+  it('retains backlink data for explicit backlink and link-authority questions', async () => {
+    const intelligenceWithBacklinks: WorkspaceIntelligence = {
+      ...mockIntelligence,
+      seoContext: {
+        ...mockIntelligence.seoContext!,
+        backlinkProfile: { totalBacklinks: 1500, referringDomains: 230 },
+      },
+    };
+    vi.mocked(buildWorkspaceIntelligence).mockResolvedValue(intelligenceWithBacklinks);
+    vi.mocked(formatForPrompt).mockImplementation((intel, opts) => {
+      const sections = opts?.sections ?? [];
+      if (sections.includes('seoContext')) {
+        const backlinks = intel.seoContext?.backlinkProfile;
+        return `[Workspace Intelligence]\n\n## SEO Context\nBacklinks: ${backlinks?.totalBacklinks} total, ${backlinks?.referringDomains} referring domains`;
+      }
+      if (sections.includes('learnings')) return '[Workspace Intelligence]\n\n## Outcome Learnings\nWin rate: n/a';
+      return '';
+    });
+
+    const result = await buildAdminChatIntelligenceContext(
+      'ws-4-3',
+      'How strong is our backlink profile and domain authority?',
+      new Set(['strategy']),
+    );
+
+    expect(buildWorkspaceIntelligence).toHaveBeenCalledWith(
+      'ws-4-3',
+      expect.objectContaining({ enrichWithBacklinks: true }),
+    );
+    expect(result.workspaceContextBlock).toContain('Backlinks: 1500 total, 230 referring domains');
+  });
+
+  it('keeps one Workspace Intelligence wrapper across separately formatted prompt fragments', async () => {
+    vi.mocked(formatForPrompt).mockImplementation((_intel, opts) => {
+      const sections = opts?.sections ?? [];
+      if (sections.includes('seoContext')) return '[Workspace Intelligence]\n\n## SEO Context\nBusiness: SEO agency';
+      if (sections.includes('learnings')) return '[Workspace Intelligence]\n\n## Outcome Learnings\nWin rate: 75%';
+      if (sections.length > 0) return '[Workspace Intelligence]\n\n## Operational\nPending: 3 approvals';
+      return '';
+    });
+
+    const result = await buildAdminChatIntelligenceContext(
+      'ws-4-3',
+      'Give me a general status overview',
+      new Set(['general']),
+    );
+    const finalFragments = `${result.workspaceContextBlock}\n${result.learningsBlock}`;
+
+    expect(finalFragments.match(/\[Workspace Intelligence\]/g)).toHaveLength(1);
+    expect(finalFragments).toContain('## SEO Context');
+    expect(finalFragments).toContain('## Operational');
+    expect(finalFragments).toContain('## Outcome Learnings');
   });
 
   // ── FIX E: dataSources must not falsely list 'SEO Context' when seoContext
@@ -229,5 +309,25 @@ describe('admin-chat context builder — B-10 slice formatter routing', () => {
       new Set(['approvals']),
     );
     expect(result.dataSources).toContain('Workspace Intelligence: SEO Context');
+  });
+});
+
+describe('admin-chat backlink intent routing', () => {
+  it.each([
+    'Show our backlinks',
+    'How many referring domains do we have?',
+    'Evaluate our domain rating and link authority',
+    'Do we need an off-page SEO campaign?',
+  ])('recognizes explicit off-site authority intent: %s', (question) => {
+    expect(hasBacklinkIntent(question)).toBe(true);
+  });
+
+  it.each([
+    'Which internal links should we add?',
+    'Find broken links on the homepage',
+    'Show navigation links',
+    'Give me a general status overview',
+  ])('does not charge for generic link or unrelated intent: %s', (question) => {
+    expect(hasBacklinkIntent(question)).toBe(false);
   });
 });
