@@ -2,6 +2,7 @@
 import { useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { useWorkspaces } from '../../hooks/admin';
 import { useKeywordStrategy } from '../../hooks/admin/useKeywordStrategy';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
@@ -10,13 +11,12 @@ import { WS_EVENTS } from '../../lib/wsEvents';
 import { adminPath } from '../../routes';
 import { useStrategySettings } from '../strategy/hooks/useStrategySettings';
 import {
-  Badge,
   Button,
   EmptyState,
   ErrorState,
   Icon,
   InlineBanner,
-  PageHeader,
+  SectionCard,
   Skeleton,
 } from '../ui';
 import { BacklinkProfileCard } from './BacklinkProfileCard';
@@ -31,7 +31,7 @@ interface CompetitorsSurfaceProps {
   workspaceId: string;
 }
 
-const HEADER_WRAP_CLASS = 'flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible [&_p]:text-clip';
+const SURFACE_WRAP_CLASS = 'mx-auto flex min-h-full w-full max-w-[1120px] flex-col gap-4 px-4 pb-[90px] sm:px-[30px]';
 
 const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -55,49 +55,77 @@ function ProviderIcon({ className }: { className?: string }) {
   return <Icon name="key" className={className} />;
 }
 
-function CompetitorSetSummary({
+function CompetitorsHeader({
   competitorList,
-  ownDomain,
+  workspaceName,
   lastScanned,
   onEditSet,
+  onRescan,
+  rescanDisabled,
 }: {
   competitorList: string[];
-  ownDomain: string | null;
+  workspaceName: string;
   lastScanned: string | null;
   onEditSet: () => void;
+  onRescan: () => void;
+  rescanDisabled: boolean;
 }) {
-  const scopeLabel = ownDomain ?? `${competitorList.length} competitor${competitorList.length === 1 ? '' : 's'}`;
   const scanLabel = lastScanned ? `Last scanned ${lastScanned}` : 'Ready for next scan';
 
   return (
-    <section
-      aria-label="Competitive intelligence summary"
-      className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]/40 px-4 py-3 sm:flex-row sm:items-center"
+    <header
+      aria-label="Competitive intelligence header"
+      className="flex flex-col gap-[14px]"
     >
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex h-1.5 w-1.5 rounded-[var(--radius-pill)] bg-[var(--orange)]" aria-hidden="true" />
-          <span className="t-label text-[var(--orange)]">Competitive intelligence</span>
-          <span className="t-caption-sm text-[var(--brand-text-muted)]">·</span>
-          <span className="truncate t-caption-sm font-semibold text-[var(--brand-text-bright)]">{scopeLabel}</span>
-          <Badge label="Weekly check" tone="zinc" variant="soft" size="sm" />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {competitorList.length > 0 ? (
-            competitorList.map((domain) => (
-              <Badge key={domain} label={domain} tone="orange" variant="outline" size="sm" dot />
-            ))
-          ) : (
-            <span className="t-caption-sm text-[var(--brand-text-muted)]">No competitor domains configured</span>
-          )}
-          <span className="t-caption-sm text-[var(--brand-text-muted)]">{scanLabel}</span>
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <span className="inline-flex h-[7px] w-[7px] flex-none rounded-[var(--radius-pill)] bg-[var(--orange)]" aria-hidden="true" />
+        <span className="eyebrow font-semibold tracking-[0.09em] text-[var(--orange)]">
+          Competitive intelligence · {workspaceName}
+        </span>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          <span className="eyebrow inline-flex items-center gap-1.5 normal-case tracking-normal text-[var(--brand-text-muted)]">
+            <Icon name="clock" size="sm" />
+            Weekly check · {scanLabel}
+          </span>
+          <Button size="sm" variant="secondary" onClick={onRescan} disabled={rescanDisabled}>
+            <Icon name="refresh" size="sm" />
+            Re-scan
+          </Button>
         </div>
       </div>
-      <Button size="sm" variant="secondary" onClick={onEditSet} className="self-start sm:self-center">
-        <Icon name="settings" size="sm" />
-        Edit set
-      </Button>
-    </section>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="inline-flex h-10 w-10 flex-none items-center justify-center rounded-[var(--radius-xl)] bg-[color-mix(in_srgb,var(--orange)_12%,transparent)] text-[var(--orange)]">
+          <Icon name="swords" size="lg" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h1 className="t-h2 font-bold text-[var(--brand-text-bright)]">
+            Competitors
+          </h1>
+          <p className="t-ui mt-1 text-[var(--brand-text)]">
+            Share of voice, keyword gaps, backlinks, and competitor movement.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 sm:max-w-[480px] sm:justify-end">
+          {competitorList.length > 0 ? (
+            competitorList.map((domain) => (
+              <span
+                key={domain}
+                className="eyebrow inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-[9px] py-[5px] leading-none normal-case tracking-normal text-[var(--brand-text)]"
+              >
+                <span className="h-1.5 w-1.5 rounded-[var(--radius-pill)] bg-[var(--orange)]" aria-hidden="true" />
+                {domain}
+              </span>
+            ))
+          ) : (
+            <span className="t-mono text-[var(--brand-text-muted)]">No competitor domains configured</span>
+          )}
+          <Button size="sm" variant="secondary" onClick={onEditSet}>
+            Edit set
+          </Button>
+        </div>
+      </div>
+    </header>
   );
 }
 
@@ -110,6 +138,7 @@ function formatScanTime(value: string | null | undefined): string | null {
 export function CompetitorsSurface({ workspaceId }: CompetitorsSurfaceProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const workspaces = useWorkspaces();
   const keywordStrategy = useKeywordStrategy(workspaceId);
   const data = keywordStrategy.data;
   const strategy = data?.strategy ?? null;
@@ -127,6 +156,9 @@ export function CompetitorsSurface({ workspaceId }: CompetitorsSurfaceProps) {
   const competitiveIntel = useCompetitiveIntel(workspaceId, competitorList, seoDataAvailable);
   const lastScanned = formatScanTime(competitiveIntel.data?.fetchedAt);
   const ownDomain = competitiveIntel.data?.domains.find((domain) => domain.isOwn)?.domain ?? null;
+  const workspaceName = workspaces.data?.find((workspace) => workspace.id === workspaceId)?.name
+    ?? ownDomain
+    ?? 'Current workspace';
 
   const invalidateCompetitors = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.keywordStrategy(workspaceId) });
@@ -151,10 +183,14 @@ export function CompetitorsSurface({ workspaceId }: CompetitorsSurfaceProps) {
 
   if (keywordStrategy.isError && !data) {
     return (
-      <div className="flex min-h-full flex-col gap-5">
-        <PageHeader
-          title="Competitors"
-          subtitle="Share of voice, keyword gaps, backlinks, and competitor movement."
+      <div data-testid="competitors-surface" className={SURFACE_WRAP_CLASS}>
+        <CompetitorsHeader
+          competitorList={competitorList}
+          workspaceName={workspaceName}
+          lastScanned={lastScanned}
+          onEditSet={() => navigate(adminPath(workspaceId, 'workspace-settings'))}
+          onRescan={handleRescan}
+          rescanDisabled
         />
         <ErrorState
           type="data"
@@ -168,62 +204,51 @@ export function CompetitorsSurface({ workspaceId }: CompetitorsSurfaceProps) {
   }
 
   return (
-    <div className="flex min-h-full flex-col gap-5">
-      <PageHeader
-        title="Competitors"
-        subtitle="Share of voice, keyword gaps, backlinks, and competitor movement."
-        className={HEADER_WRAP_CLASS}
-        actions={(
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button size="sm" variant="secondary" onClick={handleRescan} disabled={competitorList.length === 0 || !seoDataAvailable}>
-              <Icon name="refresh" size="sm" />
-              Re-scan
-            </Button>
-          </div>
-        )}
+    <div data-testid="competitors-surface" className={SURFACE_WRAP_CLASS}>
+      <CompetitorsHeader
+        competitorList={competitorList}
+        workspaceName={workspaceName}
+        lastScanned={lastScanned}
+        onEditSet={() => navigate(adminPath(workspaceId, 'workspace-settings'))}
+        onRescan={handleRescan}
+        rescanDisabled={competitorList.length === 0 || !seoDataAvailable}
       />
 
       {loadingStrategy && !data ? (
         <div className="flex flex-col gap-3" aria-label="Loading competitor intelligence">
-          <Skeleton className="h-[48px] w-full" />
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-[92px] w-full" />)}
-          </div>
-          <Skeleton className="h-[260px] w-full" />
+          <Skeleton className="h-[250px] w-full" />
+          <Skeleton className="h-[210px] w-full" />
         </div>
       ) : (
         <>
-          <CompetitorSetSummary
-            competitorList={competitorList}
-            ownDomain={ownDomain}
-            lastScanned={lastScanned}
-            onEditSet={() => navigate(adminPath(workspaceId, 'workspace-settings'))}
-          />
-
           {!seoDataAvailable ? (
-            <EmptyState
-              icon={ProviderIcon}
-              title="Connect an SEO data provider"
-              description="Connect DataForSEO in Workspace Settings to load live domain, keyword, and backlink comparisons."
-              action={(
-                <Button size="sm" variant="primary" onClick={() => navigate(adminPath(workspaceId, 'workspace-settings'))}>
-                  <Icon name="settings" size="sm" />
-                  Open Workspace Settings
-                </Button>
-              )}
-            />
+            <SectionCard variant="subtle" noPadding>
+              <EmptyState
+                icon={ProviderIcon}
+                title="Connect an SEO data provider"
+                description="Connect DataForSEO in Workspace Settings to load live domain, keyword, and backlink comparisons."
+                action={(
+                  <Button size="sm" variant="primary" onClick={() => navigate(adminPath(workspaceId, 'workspace-settings'))}>
+                    <Icon name="settings" size="sm" />
+                    Open Workspace Settings
+                  </Button>
+                )}
+              />
+            </SectionCard>
           ) : competitorList.length === 0 ? (
-            <EmptyState
-              icon={EmptyIcon}
-              title="Add competitor domains"
-              description="This page reads the saved competitor set. Add domains in Workspace Settings before scanning."
-              action={(
-                <Button size="sm" variant="primary" onClick={() => navigate(adminPath(workspaceId, 'workspace-settings'))}>
-                  <Icon name="settings" size="sm" />
-                  Edit competitor set
-                </Button>
-              )}
-            />
+            <SectionCard variant="subtle" noPadding>
+              <EmptyState
+                icon={EmptyIcon}
+                title="Add competitor domains"
+                description="This page reads the saved competitor set. Add domains in Workspace Settings before scanning."
+                action={(
+                  <Button size="sm" variant="primary" onClick={() => navigate(adminPath(workspaceId, 'workspace-settings'))}>
+                    <Icon name="settings" size="sm" />
+                    Edit competitor set
+                  </Button>
+                )}
+              />
+            </SectionCard>
           ) : (
             <>
               {keywordStrategy.isError && data && (
@@ -249,7 +274,7 @@ export function CompetitorsSurface({ workspaceId }: CompetitorsSurfaceProps) {
                 liveError={competitiveIntel.isError}
                 showSend={competitorSendEnabled}
               />
-              <BacklinkProfileCard workspaceId={workspaceId} />
+              <BacklinkProfileCard workspaceId={workspaceId} domain={ownDomain} />
             </>
           )}
         </>

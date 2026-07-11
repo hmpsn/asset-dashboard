@@ -15,6 +15,7 @@ import {
   EmptyState,
   Icon,
   InlineBanner,
+  SectionCard,
   type BadgeTone,
   type DataColumn,
 } from '../ui';
@@ -35,7 +36,7 @@ type GapRecord = Record<string, unknown> & {
   keyword: string;
   volume: number;
   difficulty: number;
-  competitor: string;
+  competitorPosition: number;
 };
 
 const NUMBER_FORMAT = new Intl.NumberFormat('en-US');
@@ -51,10 +52,10 @@ function EmptyIcon({ className }: { className?: string }) {
   return <Icon name="search" className={className} />;
 }
 
-function kdColor(value: number): string {
-  if (value < 30) return 'var(--emerald)';
-  if (value < 60) return 'var(--amber)';
-  return 'var(--red)';
+function kdTone(value: number): BadgeTone {
+  if (value < 30) return 'emerald';
+  if (value < 60) return 'amber';
+  return 'red';
 }
 
 function gapKey(gap: KeywordGap): string {
@@ -67,7 +68,7 @@ function toRecord(gap: KeywordGap): GapRecord {
     keyword: gap.keyword,
     volume: gap.volume,
     difficulty: gap.difficulty,
-    competitor: gap.competitorDomain,
+    competitorPosition: gap.competitorPosition,
   };
 }
 
@@ -111,7 +112,7 @@ function GapActions({
 
   return (
     <div
-      className="flex min-w-[220px] flex-wrap items-center justify-end gap-1.5"
+      className="flex min-w-[320px] flex-wrap items-center justify-end gap-1.5"
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
     >
@@ -126,10 +127,10 @@ function GapActions({
       <Button
         size="sm"
         variant="secondary"
-        onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), {
+        onClick={() => navigate(`${adminPath(workspaceId, 'content-pipeline')}?tab=briefs`, {
           state: {
             fixContext: {
-              targetRoute: 'seo-briefs',
+              targetRoute: 'content-pipeline',
               primaryKeyword: gap.keyword,
               pageName: gap.keyword,
             },
@@ -184,8 +185,18 @@ export function KeywordGapsCard({
     {
       key: 'keyword',
       label: 'Keyword',
-      width: 'minmax(210px, 1.4fr)',
-      render: (_value, record) => <span className="truncate font-semibold text-[var(--brand-text-bright)]">{(record as GapRecord).source.keyword}</span>,
+      width: 'minmax(250px, 1fr)',
+      render: (_value, record) => {
+        const gap = (record as GapRecord).source;
+        return (
+          <span className="min-w-0">
+            <span className="t-ui block truncate font-semibold text-[var(--brand-text-bright)]">{gap.keyword}</span>
+            <span className="t-label mt-0.5 block truncate font-normal normal-case tracking-normal text-[var(--brand-text-muted)]">
+              {gap.competitorDomain} ranks #{gap.competitorPosition} · you are not ranking
+            </span>
+          </span>
+        );
+      },
       sortable: true,
     },
     {
@@ -203,21 +214,18 @@ export function KeywordGapsCard({
       align: 'right',
       render: (_value, record) => {
         const difficulty = (record as GapRecord).source.difficulty;
-        return <span style={{ color: kdColor(difficulty) }}>{difficulty}%</span>;
+        return <Badge label={`KD ${difficulty}`} tone={kdTone(difficulty)} variant="soft" size="sm" />;
       },
       sortable: true,
     },
     {
-      key: 'competitor',
-      label: 'Competitor',
-      width: 'minmax(170px, 1fr)',
+      key: 'competitorPosition',
+      label: 'Comp rank',
+      width: '96px',
+      align: 'right',
       render: (_value, record) => {
         const gap = (record as GapRecord).source;
-        return (
-          <span className="truncate">
-            {gap.competitorDomain} <span className="t-mono text-[var(--blue)]">#{gap.competitorPosition}</span>
-          </span>
-        );
+        return <span className="font-mono text-[var(--orange)]">#{gap.competitorPosition}</span>;
       },
       sortable: true,
     },
@@ -243,41 +251,45 @@ export function KeywordGapsCard({
   ], [recSet.data?.recommendations, sentGaps, showSend, workspaceId]);
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="keyword-gaps-title">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 id="keyword-gaps-title" className="t-ui font-semibold text-[var(--brand-text-bright)]">
-              Keyword gaps
-            </h2>
+    <section aria-labelledby="keyword-gaps-title">
+      <h2 id="keyword-gaps-title" className="sr-only" aria-label="Keyword gaps" />
+      <SectionCard
+        title="Keyword gaps"
+        subtitle="High-value terms competitors rank for and you do not"
+        titleIcon={<Icon name="key" size="sm" className="text-[var(--teal)]" />}
+        iconChip
+        titleExtra={(
+          <span className="flex items-center gap-1.5">
             <Badge label="Evidence only" tone="orange" variant="soft" size="sm" />
             {usingFallback && <Badge label="from strategy" tone="amber" variant="soft" size="sm" />}
-          </div>
-          <p className="t-caption-sm text-[var(--brand-text-muted)]">
-            High-value terms competitors rank for and you do not. Use Hub or briefs to turn a gap into work.
-          </p>
-        </div>
-        <Badge label={`${rows.length} opportunities`} tone="blue" variant="soft" size="sm" />
-      </div>
-
-      {liveError && usingFallback && (
-        <InlineBanner tone="warning" title="Showing the last strategy run">
-          Keyword gaps are from the last stored strategy run.
-        </InlineBanner>
-      )}
-
-      <DataTable
-        columns={columns}
-        rows={rows}
-        getRowKey={(row) => gapKey((row as GapRecord).source)}
-        empty={(
-          <EmptyState
-            icon={EmptyIcon}
-            title="No competitor gaps returned"
-            description="The latest scan did not return gap evidence for this competitor set."
-          />
+          </span>
         )}
-      />
+        action={<span className="eyebrow normal-case tracking-normal text-[var(--brand-text-muted)]">{rows.length} opportunities</span>}
+        noPadding
+        variant="subtle"
+      >
+        {liveError && usingFallback && (
+          <div className="px-[18px] pt-4">
+            <InlineBanner tone="warning" title="Showing the last strategy run">
+              Keyword gaps are from the last stored strategy run.
+            </InlineBanner>
+          </div>
+        )}
+
+        <DataTable
+          columns={columns}
+          rows={rows}
+          getRowKey={(row) => gapKey((row as GapRecord).source)}
+          empty={(
+            <EmptyState
+              icon={EmptyIcon}
+              title="No competitor gaps returned"
+              description="The latest scan did not return gap evidence for this competitor set."
+            />
+          )}
+          className="rounded-none border-0 bg-transparent"
+        />
+      </SectionCard>
     </section>
   );
 }

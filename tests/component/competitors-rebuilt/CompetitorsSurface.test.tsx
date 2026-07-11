@@ -202,6 +202,7 @@ function createQueryClient(): QueryClient {
     },
   });
   client.setQueryData(queryKeys.shared.featureFlags(), featureFlagResponse);
+  client.setQueryData(queryKeys.admin.workspaces(), [{ id: workspaceId, name: 'Client Workspace' }]);
   client.setQueryData(queryKeys.admin.competitorAlerts(workspaceId), competitorAlertsPayload);
   return client;
 }
@@ -224,6 +225,7 @@ function FlaggedCompetitors() {
 }
 
 function renderFlagged(client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })) {
+  client.setQueryData(queryKeys.admin.workspaces(), [{ id: workspaceId, name: 'Client Workspace' }]);
   return {
     queryClient: client,
     ...render(
@@ -320,24 +322,36 @@ describe('CompetitorsSurface', () => {
   it('renders the prototype section stack without top tabs or internal implementation labels', async () => {
     const { container } = renderSurface();
 
+    const surface = screen.getByTestId('competitors-surface');
+    expect(surface).toHaveClass('max-w-[1120px]', 'sm:px-[30px]');
     expect(await screen.findByRole('heading', { name: 'Competitor alerts' })).toBeInTheDocument();
     const alertFeed = screen.getByRole('list', { name: 'Competitor alert feed' });
-    expect(within(alertFeed).getByText('rival.com')).toHaveClass('t-body');
-    expect(within(alertFeed).getByText('emergency dentist austin')).toHaveClass('t-ui');
-    expect(within(alertFeed).getByText('#7 -> #2')).toHaveClass('t-caption-sm');
+    expect(within(alertFeed).getByText('rival.com')).toHaveClass('t-ui');
+    expect(within(alertFeed).getByText('emergency dentist austin')).toHaveClass('t-label');
+    expect(within(alertFeed).getByText('#7 → #2')).toHaveClass('text-[var(--blue)]');
     expect(within(alertFeed).queryByRole('grid')).not.toBeInTheDocument();
-    const summary = screen.getByLabelText('Competitive intelligence summary');
-    expect(within(summary).getByText('Competitive intelligence')).toBeInTheDocument();
-    expect(await within(summary).findByText('client.com')).toBeInTheDocument();
-    expect(within(summary).getByText('Weekly check')).toBeInTheDocument();
-    expect(within(summary).getByText(/Last scanned/)).toBeInTheDocument();
-    expect(within(summary).getByText('rival.com')).toBeInTheDocument();
-    expect(within(summary).getByText('clinic.example')).toBeInTheDocument();
-    expect(within(summary).getByRole('button', { name: 'Edit set' })).toBeInTheDocument();
-    expect(await screen.findByRole('heading', { name: 'Share of voice' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Head-to-head' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Keyword gaps' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Backlink profile' })).toBeInTheDocument();
+    const header = screen.getByLabelText('Competitive intelligence header');
+    expect(within(header).getByText('Competitive intelligence · Client Workspace')).toBeInTheDocument();
+    expect(within(header).getByText(/Weekly check/)).toBeInTheDocument();
+    expect(await within(header).findByText(/Last scanned/)).toBeInTheDocument();
+    expect(within(header).getByText('rival.com')).toBeInTheDocument();
+    expect(within(header).getByText('clinic.example')).toBeInTheDocument();
+    expect(within(header).getByRole('button', { name: 'Edit set' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Re-scan' })).toHaveLength(1);
+
+    const sectionHeadings = [
+      await screen.findByRole('heading', { name: 'Competitor alerts' }),
+      await screen.findByRole('heading', { name: 'Share of voice' }),
+      screen.getByRole('heading', { name: 'Head-to-head' }),
+      screen.getByRole('heading', { name: 'Keyword gaps' }),
+      screen.getByRole('heading', { name: 'Backlink profile' }),
+    ];
+    for (let index = 1; index < sectionHeadings.length; index += 1) {
+      expect(sectionHeadings[index - 1].compareDocumentPosition(sectionHeadings[index]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(screen.getAllByRole('meter')).toHaveLength(2);
+    expect(screen.getByText('Total backlinks')).toBeInTheDocument();
+    expect(screen.getByText('Top referring domains')).toBeInTheDocument();
     expect(screen.queryByRole('toolbar', { name: 'Competitor set controls' })).not.toBeInTheDocument();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
@@ -375,10 +389,10 @@ describe('CompetitorsSurface', () => {
     ))).toBe(true);
 
     fireEvent.click(screen.getByRole('button', { name: /Create brief/i }));
-    expect(navigateMock).toHaveBeenCalledWith('/ws/ws-competitors-rebuilt/seo-briefs', {
+    expect(navigateMock).toHaveBeenCalledWith('/ws/ws-competitors-rebuilt/content-pipeline?tab=briefs', {
       state: {
         fixContext: {
-          targetRoute: 'seo-briefs',
+          targetRoute: 'content-pipeline',
           primaryKeyword: 'emergency dentist austin',
           pageName: 'emergency dentist austin',
         },

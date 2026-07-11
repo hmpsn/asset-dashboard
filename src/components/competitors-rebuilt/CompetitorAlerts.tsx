@@ -68,7 +68,7 @@ function isRecent(value: string): boolean {
 
 function positionMove(alert: CompetitorAlertWithInsight): string {
   if (alert.previousPosition == null || alert.currentPosition == null) return '-';
-  return `#${alert.previousPosition} -> #${alert.currentPosition}`;
+  return `#${alert.previousPosition} → #${alert.currentPosition}`;
 }
 
 function AlertSectionIcon() {
@@ -81,22 +81,22 @@ function AlertFeedRow({ alert }: { alert: CompetitorAlertWithInsight }) {
   return (
     <div
       role="listitem"
-      className="flex flex-col gap-3 border-t border-[var(--brand-border)] px-4 py-3 first:border-t-0 sm:flex-row sm:items-start"
+      className="flex flex-col gap-3 border-t border-[var(--brand-border)] px-[18px] py-[13px] first:border-t-0 sm:flex-row sm:items-start"
     >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate t-body font-semibold text-[var(--brand-text-bright)]">{alert.competitorDomain}</span>
-          <Badge label={ALERT_TYPE_LABEL[alert.alertType]} tone="zinc" variant="outline" size="sm" />
+          <span className="t-ui truncate font-bold text-[var(--brand-text-bright)]">{alert.competitorDomain}</span>
+          <span className="t-label font-normal normal-case tracking-normal text-[var(--brand-text)]">{ALERT_TYPE_LABEL[alert.alertType]}</span>
           {alert.insightId && <Badge label="Insight linked" tone="blue" variant="soft" size="sm" />}
         </div>
         {alert.keyword && (
-          <p className="mt-1 t-ui text-[var(--brand-text)]">{alert.keyword}</p>
+          <p className="t-label mt-[3px] font-normal normal-case tracking-normal text-[var(--brand-text)]">{alert.keyword}</p>
         )}
-        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 t-caption-sm">
-          <span className="t-caption-sm tabular-nums font-semibold text-[var(--blue)]">{positionMove(alert)}</span>
+        <div className="t-label mt-[5px] flex flex-wrap items-center gap-x-[14px] gap-y-1 font-normal normal-case tracking-normal">
+          <span className="tabular-nums font-semibold text-[var(--blue)]">{positionMove(alert)}</span>
           {volume && <span className="tabular-nums text-[var(--blue)]">{volume}</span>}
-          <span className="text-[var(--brand-text-dim)]">Snapshot {formatDate(alert.snapshotDate)}</span>
-          <span className="text-[var(--brand-text-dim)]">Created {formatDate(alert.createdAt)}</span>
+          <span className="eyebrow normal-case tracking-normal text-[var(--brand-text-dim)]">Snapshot {formatDate(alert.snapshotDate)}</span>
+          <span className="eyebrow normal-case tracking-normal text-[var(--brand-text-dim)]">Created {formatDate(alert.createdAt)}</span>
         </div>
       </div>
       <Badge
@@ -123,8 +123,8 @@ export function CompetitorAlerts({ workspaceId, competitorCount }: CompetitorAle
     : null;
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="competitor-alerts-title">
-      <h2 id="competitor-alerts-title" className="sr-only">Competitor alerts</h2>
+    <section aria-labelledby="competitor-alerts-title">
+      <h2 id="competitor-alerts-title" className="sr-only" aria-label="Competitor alerts" />
 
       {isError && (
         <InlineBanner tone="error" title="Could not load competitor alerts">
@@ -162,11 +162,9 @@ export function CompetitorAlerts({ workspaceId, competitorCount }: CompetitorAle
           noPadding
           variant="subtle"
           action={(
-            <div className="text-right">
-              <div className="t-stat-sm tabular-nums font-bold text-[var(--blue)]">{thisWeekCount}</div> {/* stat-primitive-ok: compact single this-week alert count in the card header, not a labeled StatCard/CompactStatBar metric grid */}
-              <div className="t-caption-sm text-[var(--brand-text-muted)]">this week</div>
-              {syncLine && <div className="t-caption-sm text-[var(--brand-text-dim)]">{syncLine}</div>} {/* muted-tier-ok: last-sync freshness note is tertiary metadata, intentionally quieter than the count label */}
-            </div>
+            <span className="eyebrow normal-case tracking-normal text-[var(--brand-text-muted)]">
+              {thisWeekCount} this week{syncLine ? ` · ${syncLine.replace('Weekly check - updated ', '')}` : ''}
+            </span>
           )}
         >
           <div role="list" aria-label="Competitor alert feed">

@@ -2,7 +2,7 @@
 
 Surface: `competitors` / Competitors  
 Owner: strategy / competitive intelligence  
-Status: `behavior-safe / visual-unverified` after operator-copy cleanup, header-summary polish, and alert-feed parity polish
+Status: `owner-approved`; Joshua approved the corrected competitive-intelligence composition and documented provider exception on 2026-07-10
 Primary route: `/ws/:workspaceId/competitors`
 
 ## Prototype References
@@ -43,7 +43,14 @@ Production carry-over that intentionally exceeds the prototype:
 
 ## Current Parity Grade
 
-Visual status: `behavior-safe / visual-unverified`.
+Visual status: `owner-approved`.
+
+Source-led correction result, 2026-07-10:
+
+- The surface now uses the prototype's 1120px outer / 1060px content stack, workspace eyebrow, client/freshness context, compact title/chip/edit hierarchy, and exact research order: Alerts, Share of Voice, Head-to-head, Keyword gaps, Backlinks.
+- The live Rinse fixture truthfully renders the provider/setup state because local DataForSEO credentials are unavailable; the complete populated composition remains fixture-backed in the focused component suite.
+- Workspace identity now comes from the real workspace read rather than a competitor-count substitute. The production detail Drawer, Hub deep link, Create brief, optional Send to client, degraded-data messaging, and setup distinctions remain reachable.
+- Exact 1440x900, 1600x1000, and mobile setup evidence plus the fixture-backed populated state passed fresh Sol review with `PASS`; Joshua explicitly owner-approved the composition and truthful provider setup state on 2026-07-10.
 
 Why:
 
@@ -123,6 +130,18 @@ Alert-feed fixture-backed smoke target: `/ws/ws_1772610244629/competitors`.
 - Smoke state: `/tmp/asset-dashboard-codex-parity-captures/competitors-alert-feed-smoke-state.json`.
 
 Result: clean. The alert feed is visible, no alert grid is rendered inside the feed, row typography uses `.t-body` / `.t-ui` / `.t-caption-sm`, internal migration/rebuild labels are absent, horizontal overflow is absent, and the existing competitor detail Drawer still opens as a single dialog. Console noise was limited to Vite websocket disconnect warnings and one route-change-aborted intelligence request.
+
+Source-led final evidence:
+
+- Prototype: `/tmp/asset-dashboard-codex-visual-parity/batch7/prototype/competitors-1440.png` and `competitors-1600.png`.
+- Corrected live setup state: `/tmp/asset-dashboard-codex-visual-parity/batch7/competitors/setup-1440-final.png` and `setup-1600-final.png`.
+- Mobile floor: `/tmp/asset-dashboard-codex-visual-parity/batch7/competitors/setup-mobile-390.png`.
+
+Fresh Sol verdict: `PASS`. The setup state uses the expected canvas, hierarchy, density, workspace identity, and no-overflow responsive behavior. Populated stack fidelity is protected by realistic component fixtures because the local provider is unavailable.
+
+## Registry Closeout Evidence
+
+The registry closeout preserves exact fixed-viewport prototype references and truthful rebuilt setup-state evidence in the measured review archive at `/tmp/asset-dashboard-codex-visual-parity/registry-final/` and the reviewed surface archive. Local DataForSEO is unavailable, so the populated composition remains fixture-protected rather than fabricated in the browser; the detail Drawer remains production-only.
 
 ## Automated Test Floor
 
