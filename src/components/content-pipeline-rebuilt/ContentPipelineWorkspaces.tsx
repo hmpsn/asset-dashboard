@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import type { ReactNode } from 'react';
+import { Suspense, type ReactNode } from 'react';
 import {
   REVIEW_CHECKLIST_KEYS,
   type ContentBrief,
@@ -7,11 +7,20 @@ import {
   type ReviewChecklistKey,
 } from '../../../shared/types/content';
 import type { FixContext } from '../../types/fix-context';
-import { ContentBriefs } from '../ContentBriefs';
-import { ContentManager } from '../ContentManager';
-import { ContentSubscriptions } from '../ContentSubscriptions';
+import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import { Badge, DefinitionList, Drawer, Icon, Meter, SectionCard } from '../ui';
+import { ContentPipelineInteriorLoading } from './ContentPipelineInteriorLoading';
 import { formatContentDate } from './contentPipelineFormatters';
+
+const LazyContentBriefs = lazyWithRetry(() => import('../ContentBriefs').then((module) => ({
+  default: module.ContentBriefs,
+})));
+const LazyContentManager = lazyWithRetry(() => import('../ContentManager').then((module) => ({
+  default: module.ContentManager,
+})));
+const LazyContentSubscriptions = lazyWithRetry(() => import('../ContentSubscriptions').then((module) => ({
+  default: module.ContentSubscriptions,
+})));
 
 interface ContentPipelineWorkspacesProps {
   workspaceId: string;
@@ -299,21 +308,23 @@ export function ContentPipelineWorkspaces({
         style={FULLSCREEN_DRAWER_STYLE}
         closeOnBackdrop={false}
       >
-        <WorkspaceGrid
-          left={<BriefLeftRail brief={focusedBrief} />}
-          center={focusedBrief ? (
-            <ContentBriefs workspaceId={workspaceId} initialBriefId={focusedBrief.id} embedded />
-          ) : (
-            <ContentBriefs
-              workspaceId={workspaceId}
-              fixContext={briefFixContext}
-              clearFixContext={onClearBriefFixContext}
-              display="generator"
-              embedded
-            />
-          )}
-          right={<BriefRightRail brief={focusedBrief} />}
-        />
+        <Suspense fallback={<ContentPipelineInteriorLoading label="the brief workspace" />}>
+          <WorkspaceGrid
+            left={<BriefLeftRail brief={focusedBrief} />}
+            center={focusedBrief ? (
+              <LazyContentBriefs workspaceId={workspaceId} initialBriefId={focusedBrief.id} embedded />
+            ) : (
+              <LazyContentBriefs
+                workspaceId={workspaceId}
+                fixContext={briefFixContext}
+                clearFixContext={onClearBriefFixContext}
+                display="generator"
+                embedded
+              />
+            )}
+            right={<BriefRightRail brief={focusedBrief} />}
+          />
+        </Suspense>
       </Drawer>
 
       <Drawer
@@ -327,11 +338,13 @@ export function ContentPipelineWorkspaces({
         style={FULLSCREEN_DRAWER_STYLE}
         closeOnBackdrop={false}
       >
-        <WorkspaceGrid
-          left={<DraftLeftRail post={focusedPost} />}
-          center={<ContentManager key={postId ?? 'post-workspace'} workspaceId={workspaceId} embedded />}
-          right={<DraftRightRail post={focusedPost} />}
-        />
+        <Suspense fallback={<ContentPipelineInteriorLoading label="the draft workspace" />}>
+          <WorkspaceGrid
+            left={<DraftLeftRail post={focusedPost} />}
+            center={<LazyContentManager key={postId ?? 'post-workspace'} workspaceId={workspaceId} embedded />}
+            right={<DraftRightRail post={focusedPost} />}
+          />
+        </Suspense>
       </Drawer>
 
       <Drawer
@@ -342,7 +355,9 @@ export function ContentPipelineWorkspaces({
         eyebrow="Content capacity"
         width={440}
       >
-        <ContentSubscriptions workspaceId={workspaceId} embedded />
+        <Suspense fallback={<ContentPipelineInteriorLoading label="content capacity" compact />}>
+          <LazyContentSubscriptions workspaceId={workspaceId} embedded />
+        </Suspense>
       </Drawer>
     </>
   );

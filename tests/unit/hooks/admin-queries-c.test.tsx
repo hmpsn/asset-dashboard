@@ -364,6 +364,32 @@ describe('useContentPipeline', () => {
     expect(result.current.data?.summary?.briefs).toBe(0);
     expect(result.current.data?.decay).toBeNull();
   });
+
+  it('skips duplicate brief and post payloads when authoritative lists are already mounted', async () => {
+    mockGet
+      .mockResolvedValueOnce([{ cells: [{ status: 'published' }, { status: 'draft' }] }])
+      .mockResolvedValueOnce({ summary: { critical: 1, warning: 0, totalDecaying: 1, avgDeclinePct: -12 } });
+
+    const { result } = renderHook(
+      () => useContentPipeline('ws-1', { includeContentLists: false }),
+      { wrapper: makeWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(mockGet).toHaveBeenCalledTimes(2);
+    expect(mockGet.mock.calls.map(([url]) => url)).toEqual([
+      '/api/content-matrices/ws-1',
+      '/api/content-decay/ws-1',
+    ]);
+    expect(result.current.data?.summary).toMatchObject({
+      briefs: 0,
+      posts: 0,
+      matrices: 1,
+      cells: 2,
+      published: 1,
+    });
+    expect(result.current.data?.decay?.totalDecaying).toBe(1);
+  });
 });
 
 // ── useCopySections ─────────────────────────────────────────────────────────

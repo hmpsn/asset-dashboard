@@ -9,10 +9,11 @@ export function useAdminBriefsList(wsId: string) {
   });
 }
 
-export function useAdminRequestsList(wsId: string) {
+export function useAdminRequestsList(wsId: string, enabled = true) {
   return useQuery({
     queryKey: queryKeys.admin.requests(wsId),
     queryFn: () => contentRequests.list(wsId),
+    enabled: !!wsId && enabled,
   });
 }
 

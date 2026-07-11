@@ -14,12 +14,12 @@ import type { SuggestedBrief } from '../../api/suggested-briefs.js';
 
 export type { SuggestedBrief };
 
-export function useAiSuggestedBriefs(workspaceId: string) {
+export function useAiSuggestedBriefs(workspaceId: string, enabled = true) {
   return useQuery({
     queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId),
     queryFn: ({ signal }) => suggestedBriefsApi.list(workspaceId, false, signal),
     staleTime: 5 * 60 * 1000,
-    enabled: !!workspaceId,
+    enabled: !!workspaceId && enabled,
   });
 }
 

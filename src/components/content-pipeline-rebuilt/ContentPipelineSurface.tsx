@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { useCallback, useMemo, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
@@ -14,11 +14,11 @@ import {
   useWorkspaceIntelligence,
 } from '../../hooks/admin';
 import { useAdminWorkOrders } from '../../hooks/admin/useWorkOrders';
+import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import { queryKeys } from '../../lib/queryKeys';
 import { awaitSuccessfulRefetches } from '../../lib/reactQueryRefresh';
 import { WS_EVENTS } from '../../lib/wsEvents';
 import type { FixContext } from '../../types/fix-context';
-import { ContentPipelineGuide } from '../ContentPipelineGuide';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { RebuiltTopbarActions } from '../layout/RebuiltAppChrome';
 import { useToast } from '../Toast';
@@ -35,16 +35,26 @@ import {
 } from '../ui';
 import { ContentLifecycleBoard, deriveLifecycleBoardItems } from './ContentLifecycleBoard';
 import { ContentPipelineIntake, deriveContentIntake } from './ContentPipelineIntake';
-import { ContentPipelineLenses } from './ContentPipelineLenses';
+import {
+  ContentPipelineLenses,
+  isContentPipelineStandaloneTab,
+} from './ContentPipelineLenses';
 import type { ContentPipelineData } from './ContentPipelineLenses';
+import { ContentPipelineInteriorLoading } from './ContentPipelineInteriorLoading';
 import { ContentPipelineWorkspaces } from './ContentPipelineWorkspaces';
-import { PublishedContentLens } from './PublishedContentLens';
 import {
   type ContentPipelineTab,
   useContentPipelineSurfaceState,
 } from './useContentPipelineSurfaceState';
 import { mutationErrorMessage } from './contentPipelineMutationFeedback';
 import { resolveLiveSiteBase } from './contentPipelineFormatters';
+
+const LazyContentPipelineGuide = lazyWithRetry(() => import('../ContentPipelineGuide').then((module) => ({
+  default: module.ContentPipelineGuide,
+})));
+const LazyPublishedContentLens = lazyWithRetry(() => import('./PublishedContentLens').then((module) => ({
+  default: module.PublishedContentLens,
+})));
 
 interface ContentPipelineSurfaceProps {
   workspaceId: string;
@@ -93,19 +103,25 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
   const shellFlagEnabled = useFeatureFlag('ui-rebuild-shell');
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const pipelineQuery = useContentPipeline(workspaceId);
+  const lifecycleBoardVisible = state.tab === 'briefs'
+    || state.tab === 'intake'
+    || state.tab === 'publish'
+    || Boolean(state.postId);
+  const pipelineQuery = useContentPipeline(workspaceId, { includeContentLists: false });
   const workspaces = useWorkspaces();
   const intelligence = useWorkspaceIntelligence(workspaceId, ['contentPipeline']);
+  // Briefs/posts stay mounted because their authoritative counts are visible in
+  // the lens switcher on every tab. React Query shares these observers with
+  // active interiors, so this does not duplicate the underlying request.
   const briefsQuery = useAdminBriefsList(workspaceId);
-  const requestsQuery = useAdminRequestsList(workspaceId);
+  const requestsQuery = useAdminRequestsList(workspaceId, lifecycleBoardVisible);
   const postsQuery = useAdminPostsList(workspaceId);
-  const suggestionsQuery = useAiSuggestedBriefs(workspaceId);
-  const workOrdersQuery = useAdminWorkOrders(workspaceId);
+  const suggestionsQuery = useAiSuggestedBriefs(workspaceId, lifecycleBoardVisible);
+  const workOrdersQuery = useAdminWorkOrders(workspaceId, lifecycleBoardVisible);
   const [guideOpen, setGuideOpen] = useState(false);
   const [capacityDrawerOpen, setCapacityDrawerOpen] = useState(false);
   const [focusedBriefId, setFocusedBriefId] = useState<string | null>(null);
   const [briefFixContext, setBriefFixContext] = useState<FixContext | null>(() => readBriefFixContext(location.state));
-  const [prefillNonce, setPrefillNonce] = useState(0);
   const [blankBriefOpen, setBlankBriefOpen] = useState(() => readBriefFixContext(location.state) !== null);
 
   const workspace = useMemo(
@@ -115,7 +131,19 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
   const workspaceTier = (workspace?.tier ?? 'free') as Tier;
   const siteLabel = resolveLiveSiteBase(workspace?.liveDomain, workspace?.gscPropertyUrl);
   const contentPipeline = intelligence.data?.contentPipeline;
-  const pipelineData = pipelineQuery.data as ContentPipelineData | undefined;
+  const pipelineData = useMemo<ContentPipelineData | undefined>(() => {
+    if (!pipelineQuery.data) return undefined;
+    return {
+      ...pipelineQuery.data,
+      summary: pipelineQuery.data.summary
+        ? {
+            ...pipelineQuery.data.summary,
+            briefs: briefsQuery.data?.length ?? 0,
+            posts: postsQuery.data?.length ?? 0,
+          }
+        : null,
+    };
+  }, [briefsQuery.data, pipelineQuery.data, postsQuery.data]);
   const mode = modeForTab(state.tab);
   const boardFocus = state.tab === 'intake' ? 'intake' : 'brief';
   const lifecycleItems = useMemo(() => deriveLifecycleBoardItems({
@@ -187,6 +215,13 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
     try {
       const contentPerformanceKey = queryKeys.admin.contentPerformanceAll(workspaceId);
       await queryClient.invalidateQueries({ queryKey: contentPerformanceKey, refetchType: 'none' });
+      const lifecycleDetailRefetches = lifecycleBoardVisible
+        ? [
+            requestsQuery.refetch(),
+            suggestionsQuery.refetch(),
+            workOrdersQuery.refetch(),
+          ]
+        : [];
       await Promise.all([
         queryClient.refetchQueries(
           { queryKey: contentPerformanceKey, type: 'active' },
@@ -196,10 +231,8 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
           pipelineQuery.refetch(),
           intelligence.refetch(),
           briefsQuery.refetch(),
-          requestsQuery.refetch(),
           postsQuery.refetch(),
-          suggestionsQuery.refetch(),
-          workOrdersQuery.refetch(),
+          ...lifecycleDetailRefetches,
         ]),
       ]);
       toast('Content Pipeline data refreshed', 'success');
@@ -209,10 +242,13 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
   };
 
   const clearBriefFixContext = () => setBriefFixContext(null);
+  const lifecycleCountsReady = briefsQuery.data !== undefined && postsQuery.data !== undefined;
   const lensOptions = MODE_OPTIONS.map((option) => ({
     value: option.value,
     label: option.label,
-    count: option.value === 'board' ? lifecycleItems.length : option.count?.(pipelineData),
+    count: option.value === 'board'
+      ? (lifecycleCountsReady ? lifecycleItems.length : undefined)
+      : option.count?.(pipelineData),
   }));
 
   const openMode = (nextMode: ContentPipelineMode) => {
@@ -274,7 +310,6 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
 
   const handleCreateBrief = (keyword: string, pageUrl?: string, _suggestedBriefId?: string) => {
     setBriefFixContext(buildSignalPrefill(keyword, pageUrl));
-    setPrefillNonce((current) => current + 1);
     openBriefs();
   };
 
@@ -359,14 +394,16 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
         </div>
 
         {state.tab === 'published' ? (
-          <PublishedContentLens
-            workspaceId={workspaceId}
-            siteLabel={siteLabel}
-            selectedItemId={state.itemId}
-            onOpenItem={state.openPublishedItem}
-            onCloseItem={state.clearPublishedItem}
-          />
-        ) : (state.tab === 'briefs' || state.tab === 'intake' || state.tab === 'publish' || Boolean(state.postId)) ? (
+          <Suspense fallback={<ContentPipelineInteriorLoading label="published content" />}>
+            <LazyPublishedContentLens
+              workspaceId={workspaceId}
+              siteLabel={siteLabel}
+              selectedItemId={state.itemId}
+              onOpenItem={state.openPublishedItem}
+              onCloseItem={state.clearPublishedItem}
+            />
+          </Suspense>
+        ) : lifecycleBoardVisible ? (
           <ContentLifecycleBoard
             key={boardFocus}
             items={lifecycleItems}
@@ -385,21 +422,16 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
             onOpenBrief={openBrief}
             onOpenPost={openPost}
           />
-        ) : (
+        ) : isContentPipelineStandaloneTab(state.tab) ? (
           <ContentPipelineLenses
             workspaceId={workspaceId}
             tab={state.tab}
             pipelineData={pipelineData}
             contentPipeline={contentPipeline}
             workspaceTier={workspaceTier}
-            siteLabel={siteLabel}
-            briefFixContext={briefFixContext}
-            prefillNonce={prefillNonce}
-            clearBriefFixContext={clearBriefFixContext}
-            onCreateBrief={handleCreateBrief}
             onOpenTab={openWorkflowTab}
           />
-        )}
+        ) : null}
 
         <ContentPipelineWorkspaces
           workspaceId={workspaceId}
@@ -424,7 +456,9 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
           eyebrow="Workflow guide"
           width={560}
         >
-          <ContentPipelineGuide />
+          <Suspense fallback={<ContentPipelineInteriorLoading label="the Content Pipeline guide" compact />}>
+            <LazyContentPipelineGuide />
+          </Suspense>
         </Drawer>
       </div>
     </ErrorBoundary>

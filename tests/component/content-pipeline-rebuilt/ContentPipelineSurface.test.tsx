@@ -689,6 +689,101 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     expect(screen.queryByTestId('legacy-briefs')).not.toBeInTheDocument();
   });
 
+  it('uses authoritative Board lists without asking the aggregate query to download them again', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=briefs`);
+
+    expect(await screen.findByTestId('content-pipeline-board')).toBeInTheDocument();
+    expect(mocks.contentPipelineHook).toHaveBeenLastCalledWith(
+      workspaceId,
+      { includeContentLists: false },
+    );
+    expect(mocks.briefsHook).toHaveBeenLastCalledWith(workspaceId);
+    expect(mocks.requestsHook).toHaveBeenLastCalledWith(workspaceId, true);
+    expect(mocks.postsHook).toHaveBeenLastCalledWith(workspaceId);
+    expect(mocks.suggestionsHook).toHaveBeenLastCalledWith(workspaceId, true);
+    expect(mocks.workOrdersHook).toHaveBeenLastCalledWith(workspaceId, true);
+  });
+
+  it('gates Board-only detail queries on inactive lenses and restores them on a Board transition', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=published`);
+
+    expect(await screen.findByTestId('content-pipeline-published-lens')).toBeInTheDocument();
+    expect(mocks.briefsHook).toHaveBeenLastCalledWith(workspaceId);
+    expect(mocks.requestsHook).toHaveBeenLastCalledWith(workspaceId, false);
+    expect(mocks.postsHook).toHaveBeenLastCalledWith(workspaceId);
+    expect(mocks.suggestionsHook).toHaveBeenLastCalledWith(workspaceId, false);
+    expect(mocks.workOrdersHook).toHaveBeenLastCalledWith(workspaceId, false);
+
+    fireEvent.click(screen.getByRole('radio', { name: /Board/i }));
+
+    expect(await screen.findByTestId('content-pipeline-board')).toBeInTheDocument();
+    expect(mocks.briefsHook).toHaveBeenLastCalledWith(workspaceId);
+    expect(mocks.requestsHook).toHaveBeenLastCalledWith(workspaceId, true);
+    expect(mocks.postsHook).toHaveBeenLastCalledWith(workspaceId);
+    expect(mocks.suggestionsHook).toHaveBeenLastCalledWith(workspaceId, true);
+    expect(mocks.workOrdersHook).toHaveBeenLastCalledWith(workspaceId, true);
+  });
+
+  it('enables Board data for a post deep link but not for the unfocused Drafts receiver', async () => {
+    const drafts = renderSurface(`/ws/${workspaceId}/content-pipeline?tab=posts`);
+
+    expect(await screen.findByTestId('legacy-posts')).toBeInTheDocument();
+    expect(mocks.briefsHook).toHaveBeenLastCalledWith(workspaceId);
+    expect(mocks.requestsHook).toHaveBeenLastCalledWith(workspaceId, false);
+    expect(mocks.postsHook).toHaveBeenLastCalledWith(workspaceId);
+    expect(mocks.suggestionsHook).toHaveBeenLastCalledWith(workspaceId, false);
+    expect(mocks.workOrdersHook).toHaveBeenLastCalledWith(workspaceId, false);
+
+    drafts.unmount();
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=posts&post=post-linked`);
+
+    expect(await screen.findByRole('dialog', { name: /Linked draft title/i })).toBeInTheDocument();
+    expect(mocks.briefsHook).toHaveBeenLastCalledWith(workspaceId);
+    expect(mocks.requestsHook).toHaveBeenLastCalledWith(workspaceId, true);
+    expect(mocks.postsHook).toHaveBeenLastCalledWith(workspaceId);
+    expect(mocks.suggestionsHook).toHaveBeenLastCalledWith(workspaceId, true);
+    expect(mocks.workOrdersHook).toHaveBeenLastCalledWith(workspaceId, true);
+  });
+
+  it('keeps the real Board count on direct non-Board deep links', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=calendar`);
+
+    expect(await screen.findByTestId('legacy-calendar')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Board/i })).toHaveTextContent('3');
+    expect(mocks.briefsHook).toHaveBeenLastCalledWith(workspaceId);
+    expect(mocks.postsHook).toHaveBeenLastCalledWith(workspaceId);
+    expect(mocks.requestsHook).toHaveBeenLastCalledWith(workspaceId, false);
+  });
+
+  it('does not present a false zero Board count while authoritative lists are loading', async () => {
+    mocks.briefsHook.mockReturnValue({ data: undefined, isLoading: true, isError: false, refetch: vi.fn() });
+    mocks.postsHook.mockReturnValue({ data: undefined, isLoading: true, isError: false, refetch: vi.fn() });
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=calendar`);
+
+    expect(await screen.findByTestId('legacy-calendar')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Board' })).not.toHaveTextContent('0');
+  });
+
+  it('mounts only the active lazy interior across lens transitions', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=calendar`);
+
+    expect(await screen.findByTestId('legacy-calendar')).toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-planner')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('content-pipeline-published-lens')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-intake')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-briefs')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-subscriptions')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('radio', { name: /Matrix/i }));
+
+    expect(await screen.findByTestId('legacy-planner')).toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-calendar')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-intake')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-briefs')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-subscriptions')).not.toBeInTheDocument();
+  });
+
   it('uses item-backed cards and removes the opening KPI strip', async () => {
     renderSurface(`/ws/${workspaceId}/content-pipeline`);
 
@@ -759,7 +854,7 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     expect(workspaceDialog).toHaveStyle({ width: '100vw' });
     expect(workspaceDialog).toHaveClass('!max-w-none');
     expect(workspaceDialog).toHaveStyle({ maxWidth: 'none' });
-    expect(screen.getAllByTestId('legacy-briefs')).toHaveLength(1);
+    expect(await screen.findAllByTestId('legacy-briefs')).toHaveLength(1);
     expect(screen.getByTestId('legacy-briefs')).toHaveAttribute('data-initial-brief', 'brief-standalone');
     expect(screen.getByTestId('brief-workspace-section-rail')).toBeInTheDocument();
     expect(screen.getByTestId('brief-workspace-readiness-rail')).toBeInTheDocument();
@@ -774,8 +869,11 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Linked draft title/i }));
 
-    expect(await screen.findByRole('dialog', { name: /Linked draft title/i })).toBeInTheDocument();
-    expect(screen.getAllByTestId('legacy-posts')).toHaveLength(1);
+    const workspaceDialog = await screen.findByRole('dialog', { name: /Linked draft title/i });
+    expect(workspaceDialog).toHaveStyle({ width: '100vw' });
+    expect(workspaceDialog).toHaveClass('!max-w-none');
+    expect(workspaceDialog).toHaveStyle({ maxWidth: 'none' });
+    expect(await screen.findAllByTestId('legacy-posts')).toHaveLength(1);
     expect(screen.getByTestId('legacy-posts')).toHaveTextContent('post=post-linked');
     expect(screen.getByTestId('draft-workspace-section-rail')).toBeInTheDocument();
     expect(screen.getByTestId('draft-workspace-status-rail')).toBeInTheDocument();
@@ -851,7 +949,7 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
 
     const drawer = await screen.findByRole('dialog', { name: 'Content subscription' });
     expect(drawer).toHaveStyle({ width: '440px' });
-    expect(screen.getAllByTestId('legacy-subscriptions')).toHaveLength(1);
+    expect(await screen.findAllByTestId('legacy-subscriptions')).toHaveLength(1);
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Content subscription' })).not.toBeInTheDocument());
   });

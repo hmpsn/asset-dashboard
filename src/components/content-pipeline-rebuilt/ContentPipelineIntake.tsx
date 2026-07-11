@@ -1,11 +1,19 @@
 // @ds-rebuilt
+import { Suspense } from 'react';
 import type { ContentBrief, ContentTopicRequest, GeneratedPost } from '../../../shared/types/content';
 import type { SuggestedBrief } from '../../../shared/types/intelligence';
 import type { WorkOrder } from '../../../shared/types/payments';
-import { ContentBriefs } from '../ContentBriefs';
-import { AiSuggested } from '../pipeline/AiSuggested';
+import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import { Badge, EmptyState, Icon, SectionCard } from '../ui';
+import { ContentPipelineInteriorLoading } from './ContentPipelineInteriorLoading';
 import { formatContentDate } from './contentPipelineFormatters';
+
+const LazyContentBriefs = lazyWithRetry(() => import('../ContentBriefs').then((module) => ({
+  default: module.ContentBriefs,
+})));
+const LazyAiSuggested = lazyWithRetry(() => import('../pipeline/AiSuggested').then((module) => ({
+  default: module.AiSuggested,
+})));
 
 interface ContentIntakeInputs {
   briefs?: readonly ContentBrief[];
@@ -102,16 +110,20 @@ export function ContentPipelineIntake({ workspaceId, snapshot, onCreateBrief }: 
   return (
     <div className="flex flex-col gap-4" data-testid="content-pipeline-intake">
       {snapshot.requests.length > 0 && (
-        <ContentBriefs
-          workspaceId={workspaceId}
-          display="requests"
-          requestIds={snapshot.requests.map((request) => request.id)}
-          embedded
-        />
+        <Suspense fallback={<ContentPipelineInteriorLoading label="content requests" compact />}>
+          <LazyContentBriefs
+            workspaceId={workspaceId}
+            display="requests"
+            requestIds={snapshot.requests.map((request) => request.id)}
+            embedded
+          />
+        </Suspense>
       )}
 
       {snapshot.suggestions.length > 0 && (
-        <AiSuggested workspaceId={workspaceId} onCreateBrief={onCreateBrief} />
+        <Suspense fallback={<ContentPipelineInteriorLoading label="suggested briefs" compact />}>
+          <LazyAiSuggested workspaceId={workspaceId} onCreateBrief={onCreateBrief} />
+        </Suspense>
       )}
 
       {snapshot.workOrders.length > 0 && (

@@ -1,13 +1,7 @@
 // @ds-rebuilt
-import type { ReactNode } from 'react';
-import { ContentBriefs } from '../ContentBriefs';
-import { ContentCalendar } from '../ContentCalendar';
-import { ContentManager } from '../ContentManager';
-import { ContentPlanner } from '../ContentPlanner';
-import { ContentSubscriptions } from '../ContentSubscriptions';
-import { AiSuggested } from '../pipeline/AiSuggested';
-import type { FixContext } from '../../types/fix-context';
+import { Suspense, type ReactNode } from 'react';
 import type { ContentPipelineSlice, CannibalizationWarning, DecayAlert } from '../../../shared/types/intelligence';
+import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import {
   Badge,
   Button,
@@ -20,9 +14,19 @@ import {
   type DataColumn,
   type Tier,
 } from '../ui';
-import { PublishedContentLens } from './PublishedContentLens';
+import { ContentPipelineInteriorLoading } from './ContentPipelineInteriorLoading';
 import type { ContentPipelineTab } from './useContentPipelineSurfaceState';
 import { formatContentDate, formatInteger, formatPercentValue } from './contentPipelineFormatters';
+
+const LazyContentCalendar = lazyWithRetry(() => import('../ContentCalendar').then((module) => ({
+  default: module.ContentCalendar,
+})));
+const LazyContentManager = lazyWithRetry(() => import('../ContentManager').then((module) => ({
+  default: module.ContentManager,
+})));
+const LazyContentPlanner = lazyWithRetry(() => import('../ContentPlanner').then((module) => ({
+  default: module.ContentPlanner,
+})));
 
 interface PipelineSummary {
   briefs: number;
@@ -46,16 +50,22 @@ export interface ContentPipelineData {
 
 interface ContentPipelineLensesProps {
   workspaceId: string;
-  tab: ContentPipelineTab;
+  tab: ContentPipelineStandaloneTab;
   pipelineData?: ContentPipelineData;
   contentPipeline?: ContentPipelineSlice;
   workspaceTier: Tier;
-  siteLabel?: string | null;
-  briefFixContext: FixContext | null;
-  prefillNonce: number;
-  clearBriefFixContext: () => void;
-  onCreateBrief: (keyword: string, pageUrl?: string, suggestedBriefId?: string) => void;
   onOpenTab: (tab: ContentPipelineTab) => void;
+}
+
+export type ContentPipelineStandaloneTab = Extract<
+  ContentPipelineTab,
+  'planner' | 'calendar' | 'posts' | 'content-health'
+>;
+
+export function isContentPipelineStandaloneTab(
+  tab: ContentPipelineTab,
+): tab is ContentPipelineStandaloneTab {
+  return tab === 'planner' || tab === 'calendar' || tab === 'posts' || tab === 'content-health';
 }
 
 type HealthRecord = Record<string, unknown> & {
@@ -72,7 +82,7 @@ function CarryOverPanel({
   tab,
   children,
 }: {
-  tab: ContentPipelineTab;
+  tab: ContentPipelineStandaloneTab;
   children: ReactNode;
 }) {
   return (
@@ -272,18 +282,15 @@ export function ContentPipelineLenses({
   pipelineData,
   contentPipeline,
   workspaceTier,
-  siteLabel,
-  briefFixContext,
-  prefillNonce,
-  clearBriefFixContext,
-  onCreateBrief,
   onOpenTab,
 }: ContentPipelineLensesProps) {
   if (tab === 'planner') {
     return (
       <CarryOverPanel tab="planner">
         <div className="[&>div]:!space-y-4" data-testid="content-pipeline-matrix-composition">
-          <ContentPlanner workspaceId={workspaceId} embedded />
+          <Suspense fallback={<ContentPipelineInteriorLoading label="the content matrix" />}>
+            <LazyContentPlanner workspaceId={workspaceId} embedded />
+          </Suspense>
         </div>
       </CarryOverPanel>
     );
@@ -293,30 +300,10 @@ export function ContentPipelineLenses({
     return (
       <CarryOverPanel tab="calendar">
         <div className="[&>div>div:nth-child(2)]:hidden [&>div]:!space-y-4" data-testid="content-pipeline-calendar-composition">
-          <ContentCalendar workspaceId={workspaceId} embedded />
+          <Suspense fallback={<ContentPipelineInteriorLoading label="the content calendar" />}>
+            <LazyContentCalendar workspaceId={workspaceId} embedded />
+          </Suspense>
         </div>
-      </CarryOverPanel>
-    );
-  }
-
-  if (tab === 'intake') {
-    return (
-      <CarryOverPanel tab="intake">
-        <AiSuggested workspaceId={workspaceId} onCreateBrief={onCreateBrief} />
-      </CarryOverPanel>
-    );
-  }
-
-  if (tab === 'briefs') {
-    return (
-      <CarryOverPanel tab="briefs">
-        <ContentBriefs
-          key={briefFixContext ? `briefs-${workspaceId}-${prefillNonce}` : `briefs-${workspaceId}`}
-          workspaceId={workspaceId}
-          fixContext={briefFixContext}
-          clearFixContext={clearBriefFixContext}
-          embedded
-        />
       </CarryOverPanel>
     );
   }
@@ -324,36 +311,21 @@ export function ContentPipelineLenses({
   if (tab === 'posts') {
     return (
       <CarryOverPanel tab="posts">
-        <ContentManager workspaceId={workspaceId} embedded />
+        <Suspense fallback={<ContentPipelineInteriorLoading label="content drafts" />}>
+          <LazyContentManager workspaceId={workspaceId} embedded />
+        </Suspense>
       </CarryOverPanel>
     );
   }
 
-  if (tab === 'publish') {
-    return (
-      <CarryOverPanel tab="publish">
-        <InlineBanner tone="info" title="Production actions stay with drafts">
-          Send-to-client, status progression, Webflow publish, exports, voice scoring, and editor actions remain in the Draft/Post workspace so action bars do not scatter across tabs.
-        </InlineBanner>
-        <ContentSubscriptions workspaceId={workspaceId} embedded />
-      </CarryOverPanel>
-    );
-  }
-
-  if (tab === 'content-health') {
-    return (
-      <ContentHealthLens
-        pipelineData={pipelineData}
-        contentPipeline={contentPipeline}
-        workspaceTier={workspaceTier}
-        onOpenTab={onOpenTab}
-      />
-    );
-  }
+  if (tab !== 'content-health') return null;
 
   return (
-    <CarryOverPanel tab="published">
-      <PublishedContentLens workspaceId={workspaceId} siteLabel={siteLabel} />
-    </CarryOverPanel>
+    <ContentHealthLens
+      pipelineData={pipelineData}
+      contentPipeline={contentPipeline}
+      workspaceTier={workspaceTier}
+      onOpenTab={onOpenTab}
+    />
   );
 }

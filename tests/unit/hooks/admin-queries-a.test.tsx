@@ -167,6 +167,12 @@ describe('useAdminRequestsList', () => {
     expect(result.current.isLoading).toBe(true);
   });
 
+  it('does not issue a request when its consumer disables the list', () => {
+    const { result } = renderHook(() => useAdminRequestsList('ws-2', false), { wrapper: makeWrapper() });
+    expect(result.current.isLoading).toBe(false);
+    expect(mockRequestsList).not.toHaveBeenCalled();
+  });
+
   it('returns requests data when API resolves', async () => {
     const requests = [{ id: 'r1', title: 'Fix nav' }];
     mockRequestsList.mockResolvedValue(requests as never);
@@ -320,6 +326,12 @@ describe('useAiSuggestedBriefs', () => {
     mockSuggestedBriefsList.mockReturnValue(new Promise(() => {}));
     const { result } = renderHook(() => useAiSuggestedBriefs('ws-1'), { wrapper: makeWrapper() });
     expect(result.current.isLoading).toBe(true);
+  });
+
+  it('does not issue a request when its consumer disables intake data', () => {
+    const { result } = renderHook(() => useAiSuggestedBriefs('ws-1', false), { wrapper: makeWrapper() });
+    expect(result.current.isLoading).toBe(false);
+    expect(mockSuggestedBriefsList).not.toHaveBeenCalled();
   });
 
   it('returns store data when API resolves', async () => {
