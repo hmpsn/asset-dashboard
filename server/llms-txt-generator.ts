@@ -197,7 +197,8 @@ export function queueLlmsTxtRegeneration(workspaceId: string, trigger: string) {
   setImmediate(async () => {
     try {
       log.info({ workspaceId, trigger }, 'Auto-regenerating LLMs.txt');
-      await generateLlmsTxt(workspaceId);
+      const result = await generateLlmsTxt(workspaceId);
+      storeResult(workspaceId, result);
       setLastGenerated(workspaceId, trigger);
       log.info({ workspaceId, trigger }, 'LLMs.txt auto-regeneration complete');
     } catch (err) {

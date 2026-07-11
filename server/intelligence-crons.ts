@@ -13,6 +13,7 @@ import {
 } from './competitor-snapshot-store.js';
 import { upsertInsight, deleteStaleInsightsByType } from './analytics-insights-store.js';
 import { computeImpactScore } from './insight-enrichment.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import type * as PageKeywords from './page-keywords.js';
 import type * as OpportunityEvents from './opportunity-events.js';
 import type * as OpportunityRegen from './scoring/opportunity-regen.js';
@@ -88,7 +89,7 @@ export function stopCompetitorMonitoringCron(): void {
   if (competitorInterval) { clearInterval(competitorInterval); competitorInterval = null; }
 }
 
-async function runCompetitorCheck(): Promise<void> {
+export async function runCompetitorCheck(): Promise<void> {
   if (isCompetitorRunning) { log.warn('Competitor check already in progress — skipping cycle'); return; }
   // Only run on Monday (day 1)
   if (new Date().getDay() !== 1) return;
@@ -139,6 +140,7 @@ async function runCompetitorCheck(): Promise<void> {
         const geo = workspaceProviderGeo(ws.id);
         let anyDomainFailed = false;
         let anyDomainProcessed = false;
+        let anySnapshotPersisted = false;
         for (const domain of ws.competitorDomains) {
           if (snapshotExistsForDate(ws.id, domain, today)) continue;
           anyDomainProcessed = true;
@@ -152,6 +154,7 @@ async function runCompetitorCheck(): Promise<void> {
               volume: k.volume,
             }));
             const current = saveCompetitorSnapshot(ws.id, domain, today, topKeywords, kwResults.length);
+            anySnapshotPersisted = true;
             if (!previous || previous.snapshotDate === today) continue;
             const alerts = detectCompetitorAlerts(ws.id, domain, current, previous);
             saveCompetitorAlerts(alerts);
@@ -226,8 +229,17 @@ async function runCompetitorCheck(): Promise<void> {
         // Also skip if no domains were processed this cycle (e.g. server restarted mid-Monday and
         // all domains were skipped via snapshotExistsForDate). Running cleanup with a fresh cycleStart
         // in that case would delete valid insights written by the pre-restart run.
-        if (anyDomainProcessed && !anyDomainFailed) {
-          deleteStaleInsightsByType(ws.id, 'competitor_alert', cycleStart);
+        try {
+          if (anyDomainProcessed && !anyDomainFailed) {
+            deleteStaleInsightsByType(ws.id, 'competitor_alert', cycleStart);
+          }
+        } finally {
+          // A workspace can write many domain rows in one provider cycle. Invalidate
+          // once after the batch (and its derived alerts) is complete, never per row,
+          // even if derived stale cleanup fails after the snapshot write.
+          if (anySnapshotPersisted) {
+            invalidateIntelligenceCache(ws.id);
+          }
         }
 
         // ── PR7 · Spine B — debounced re-rank after competitor events. ──
