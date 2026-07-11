@@ -19,6 +19,7 @@ import {
   findAiReliabilityRegistryGaps,
   getPipelineTitleMap,
 } from './ai-reliability-registry.js';
+import { aiEvidenceMatchesAssertion } from './ai-evidence-matching.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -50,11 +51,7 @@ function evaluateScenario(scenario: AiReliabilityScenario): AiScenarioResult {
   let passedAssertions = 0;
 
   for (const assertion of scenario.assertions) {
-    const allOfOk = (assertion.allOf ?? []).every(token => merged.includes(token.toLowerCase()));
-    const anyOf = assertion.anyOf ?? [];
-    const anyOfOk = anyOf.length === 0 || anyOf.some(token => merged.includes(token.toLowerCase()));
-    const noneOfOk = (assertion.noneOf ?? []).every(token => !merged.includes(token.toLowerCase()));
-    const passed = allOfOk && anyOfOk && noneOfOk;
+    const passed = aiEvidenceMatchesAssertion(merged, assertion);
     if (passed) {
       passedAssertions += 1;
       continue;
