@@ -1,6 +1,6 @@
 // @ds-rebuilt
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle, FileJson, Plus, RefreshCw, Send, ShieldCheck, Upload } from 'lucide-react';
+import { CheckCircle, FileJson, Send, ShieldCheck } from 'lucide-react';
 import type { BusinessProfileContact } from '../../../shared/types/workspace';
 import type { FixContext } from '../../types/fix-context';
 import { mutationErrorMessage } from './schemaMutationFeedback';
@@ -27,10 +27,8 @@ import {
   NextStepsCard,
   ProgressIndicator,
   SearchField,
+  SectionCard,
   Skeleton,
-  Toolbar,
-  ToolbarSpacer,
-  WorkflowStepper,
   type DataColumn,
 } from '../ui';
 import { SCHEMA_PAGE_TYPE_OPTIONS } from '../schema/schemaPageTypeOptions';
@@ -45,7 +43,6 @@ import {
   SchemaHowToFooter,
   SchemaImpactPanel,
   SchemaInventoryAbsentBanner,
-  SchemaQuickStats,
   SchemaSitePlanBridge,
   inferLocalBusinessIntent,
 } from './SchemaSupportPanels';
@@ -54,6 +51,7 @@ import {
   summarizeSchemaPages,
   validationStatusForPage,
 } from './schemaFormatters';
+import { SchemaWorkflowStrip } from './SchemaWorkflowStrip';
 
 interface GeneratorLensProps {
   siteId: string;
@@ -92,6 +90,7 @@ export function GeneratorLens({
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [pageTypeErrors, setPageTypeErrors] = useState<Record<string, string>>({});
   const [bulkSendNote, setBulkSendNote] = useState('');
+  const [bulkNoteOpen, setBulkNoteOpen] = useState(false);
   const dismissedKey = `schema-bp-callout-dismissed-${workspaceId}`;
   const [calloutDismissed, setCalloutDismissed] = useState(() => safeLocalStorageGet(dismissedKey) === '1');
   const savePageType = useSaveSchemaPageType(siteId, workspaceId);
@@ -289,17 +288,8 @@ export function GeneratorLens({
 
   if (generation.loading && pages.length === 0) {
     return (
-      <div className="flex flex-col gap-5">
-        <WorkflowStepper
-          compact
-          steps={[
-            { number: 1, label: 'Scan', completed: false, current: true },
-            { number: 2, label: 'Review', completed: false, current: false },
-            { number: 3, label: 'Edit', completed: false, current: false },
-            { number: 4, label: 'Publish', completed: false, current: false },
-            { number: 5, label: 'Validate', completed: false, current: false },
-          ]}
-        />
+      <div className="flex flex-col gap-[14px]">
+        <SchemaWorkflowStrip loading />
         <ProgressIndicator
           status="running"
           step="Scanning schema opportunities..."
@@ -311,38 +301,25 @@ export function GeneratorLens({
   }
 
   const existingPageIds = new Set(pages.map((page) => page.pageId));
+  const graphErrorCount = graphValidation?.findings.filter((finding) => finding.severity === 'error').length ?? 0;
+  const graphWarningCount = graphValidation?.findings.filter((finding) => finding.severity === 'warning').length ?? 0;
+  const readinessTitle = stats.pagesWithErrors > 0
+    ? `${formatInteger(stats.pagesWithErrors)} generated page${stats.pagesWithErrors === 1 ? ' needs' : 's need'} schema fixes.`
+    : `${formatInteger(stats.pages)} generated page${stats.pages === 1 ? '' : 's'} are ready for review.`;
+  const readinessDetail = `${formatInteger(stats.totalGraphTypes)} generated @graph types are available in this snapshot. Coverage remains pending until the next trusted crawl.`;
+  const bulkTitle = bulkPublishBlocked
+    ? 'Bulk publish is paused by graph validation.'
+    : publishing.unpublishedCount > 0
+      ? `${formatInteger(publishing.unpublishedCount)} publishable page${publishing.unpublishedCount === 1 ? '' : 's'} are ready.`
+      : 'Every generated page has a publish state.';
+  const bulkDetail = bulkPublishBlocked
+    ? `${formatInteger(graphErrorCount)} graph error${graphErrorCount === 1 ? '' : 's'} must be fixed before bulk publish.`
+    : graphValidation?.status === 'warnings'
+      ? `${formatInteger(graphWarningCount)} graph warning${graphWarningCount === 1 ? '' : 's'} found; publish and client review remain available.`
+      : 'Publish the batch directly, or send the same reviewed schema to the client first.';
 
   return (
-    <div className="flex flex-col gap-5">
-      <WorkflowStepper
-        compact
-        steps={[
-          { number: 1, label: 'Scan', completed: pages.length > 0, current: generation.loading },
-          { number: 2, label: 'Review', completed: false, current: !generation.loading && pages.length > 0 },
-          { number: 3, label: 'Edit', completed: false, current: false },
-          { number: 4, label: 'Publish', completed: false, current: false },
-          { number: 5, label: 'Validate', completed: false, current: false },
-        ]}
-      />
-
-      <SchemaSitePlanBridge siteId={siteId} workspaceId={workspaceId} />
-
-      <SchemaBusinessProfilePanel
-        businessProfile={businessProfile}
-        localBusinessIntent={localBusinessIntent}
-        dismissed={calloutDismissed}
-        workspaceId={workspaceId}
-        onDismiss={handleDismissCallout}
-      />
-
-      <SchemaCmsMappingPanel
-        collections={cmsWorkflow.schemaMappingCollections}
-        cmsMappingError={cmsWorkflow.cmsMappingError}
-        savingCmsMapping={cmsWorkflow.savingCmsMapping}
-        fieldMappingTargets={cmsWorkflow.fieldMappingTargets}
-        onSaveCmsFieldMapping={cmsWorkflow.saveCmsFieldMapping}
-        maxCollections={MAX_SCHEMA_MAPPING_COLLECTIONS}
-      />
+    <div className="flex flex-col gap-[14px]">
 
       {!generation.started && (
         <>
@@ -385,12 +362,43 @@ export function GeneratorLens({
           icon={EmptyIcon}
           title={generation.singlePageError ? 'Page generation failed' : 'No schema suggestions needed'}
           description={generation.singlePageError || 'The latest scan did not return schema pages for review.'}
-          action={<Button size="sm" variant="primary" onClick={handleRunScan}><Icon as={RefreshCw} size="sm" />Re-scan</Button>}
+          action={<Button size="sm" variant="primary" onClick={handleRunScan}><Icon name="refresh" size="sm" />Re-scan</Button>}
         />
       )}
 
       {pages.length > 0 && (
         <>
+          <div data-testid="schema-generator-hero">
+            <SectionCard noPadding className="overflow-hidden">
+              <div className="grid min-h-[188px] items-center gap-5 px-[26px] py-[22px] sm:grid-cols-[120px_minmax(0,1fr)] sm:gap-6">
+                <div className="mx-auto flex h-[120px] w-[120px] flex-col items-center justify-center rounded-[var(--radius-pill)] border-[9px] border-[var(--surface-3)] bg-[var(--surface-1)] shadow-[var(--shadow-sm)]">
+                  <Icon name="file" size="2xl" className="text-[var(--teal)]" />
+                  <span className="mt-2 t-micro text-[var(--brand-text-muted)]">Ready for review</span>
+                </div>
+                <div className="min-w-0">
+                  <h2 className="t-h2 max-w-[34ch] font-bold text-[var(--brand-text-bright)]">
+                    {readinessTitle}
+                  </h2>
+                  <p className="mt-2 max-w-[62ch] t-ui leading-[1.55] text-[var(--brand-text)]">
+                    {readinessDetail}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button size="sm" variant="primary" onClick={handleRunScan} disabled={generation.loading}>
+                      <Icon name="sparkle" size="sm" />
+                      Re-generate all
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={generation.fetchPages} disabled={generation.loading || generation.loadingPages} loading={generation.loadingPages}>
+                      {!generation.loadingPages && <Icon name="plus" size="sm" />}
+                      Add a page
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
+          </div>
+
+          <SchemaWorkflowStrip loading={generation.loading} />
+
           {generation.loading && (
             <ProgressIndicator
               status="running"
@@ -418,56 +426,67 @@ export function GeneratorLens({
             />
           )}
 
-          <Toolbar label="Schema workflow actions">
-            <SchemaQuickStats total={pages.length} unpublished={publishing.unpublishedCount} />
-            <ToolbarSpacer />
-            <Button size="sm" variant="secondary" onClick={generation.fetchPages} disabled={generation.loading || generation.loadingPages} loading={generation.loadingPages}>
-              {!generation.loadingPages && <Icon as={Plus} size="sm" />}
-              Add page
-            </Button>
-            <Button size="sm" variant="secondary" onClick={handleRunScan} disabled={generation.loading}>
-              <Icon as={RefreshCw} size="sm" />
-              Re-generate all
-            </Button>
-            {publishing.unpublishedCount > 0 && (
-              <Button size="sm" variant="primary" onClick={handlePublishAll} disabled={publishing.bulkPublishing || bulkPublishBlocked} loading={publishing.bulkPublishing}>
-                {!publishing.bulkPublishing && <Icon as={Upload} size="sm" />}
-                {publishing.bulkPublishing
-                  ? `Publishing ${publishing.bulkProgress?.done ?? 0}/${publishing.bulkProgress?.total ?? publishing.unpublishedCount}`
-                  : `Publish all (${publishing.unpublishedCount})`}
-              </Button>
-            )}
-            <Button size="sm" variant="secondary" onClick={() => handleSendBatchToClient(bulkSendNote.trim() || undefined)} disabled={publishing.sendingToClient || publishing.sentToClient} loading={publishing.sendingToClient}>
-              {!publishing.sendingToClient && <Icon as={Send} size="sm" />}
-              {publishing.sentToClient ? 'Sent to client' : 'Send to client'}
-            </Button>
-          </Toolbar>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="schema-summary-strip">
+            <div className="flex" data-testid="schema-summary-tile">
+              <MetricTile label="Generated pages" value={stats.pages} sub="Current schema snapshot" accent="var(--blue)" icon={FileJson} className="min-h-[108px]" />
+            </div>
+            <div className="flex" data-testid="schema-summary-tile">
+              <MetricTile label="@graph types" value={stats.totalGraphTypes} sub="Across generated pages" accent="var(--teal)" icon={FileJson} className="min-h-[108px]" />
+            </div>
+            <div className="flex" data-testid="schema-summary-tile">
+              <MetricTile label="Existing schema" value={stats.pagesWithExisting} sub="Pages already carrying JSON-LD" accent="var(--emerald)" icon={CheckCircle} className="min-h-[108px]" />
+            </div>
+            <div className="flex" data-testid="schema-summary-tile">
+              <MetricTile label="Pages with errors" value={stats.pagesWithErrors} sub={stats.pagesWithWarnings > 0 ? `${formatInteger(stats.pagesWithWarnings)} with warnings` : 'No additional warnings'} accent={stats.pagesWithErrors > 0 ? 'var(--amber)' : 'var(--emerald)'} icon={ShieldCheck} className="min-h-[108px]" />
+            </div>
+          </div>
 
-          {!publishing.sentToClient && (
-            <FormTextarea
-              value={bulkSendNote}
-              onChange={setBulkSendNote}
-              disabled={publishing.sendingToClient}
-              maxLength={2000}
-              rows={2}
-              placeholder="Add a note for your client (optional)"
-              className="max-w-3xl"
-            />
-          )}
-
-          {graphValidation && (
-            <InlineBanner
-              tone={graphValidation.status === 'errors' ? 'error' : graphValidation.status === 'warnings' ? 'warning' : 'success'}
-              title={`Site graph ${graphValidation.status}`}
-            >
-              {graphValidation.status === 'errors'
-                ? `${graphValidation.findings.filter((finding) => finding.severity === 'error').length} graph errors must be fixed before bulk publish.`
-                : graphValidation.status === 'warnings'
-                  ? `${graphValidation.findings.filter((finding) => finding.severity === 'warning').length} warnings found. Individual and bulk publish remain available.`
-                  : `${graphValidation.nodeCount} nodes and ${graphValidation.referenceCount} references checked.`}
-              {graphValidationQuery.isFetching ? ' Refreshing validation.' : ''}
-            </InlineBanner>
-          )}
+          <div data-testid="schema-bulk-band">
+            <SectionCard noPadding variant="subtle" className="border-[color-mix(in_srgb,var(--teal)_28%,transparent)] bg-[color-mix(in_srgb,var(--teal)_6%,var(--surface-2))]">
+              <div className="flex min-h-[66px] flex-wrap items-center gap-3 px-4 py-3">
+                <span className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-[var(--radius-md)] bg-[var(--brand-mint-dim)] text-[var(--teal)]">
+                  <Icon name="sparkle" size="md" />
+                </span>
+                <div className="min-w-[220px] flex-1">
+                  <div className="t-ui font-semibold text-[var(--brand-text-bright)]">{bulkTitle}</div>
+                  <div className="mt-0.5 t-caption text-[var(--brand-text)]">{bulkDetail}{graphValidationQuery.isFetching ? ' Validation is refreshing.' : ''}</div>
+                </div>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {!publishing.sentToClient && (
+                    <Button size="sm" variant="ghost" onClick={() => setBulkNoteOpen((open) => !open)}>
+                      <Icon name="message" size="sm" />
+                      {bulkNoteOpen ? 'Hide client note' : 'Add client note'}
+                    </Button>
+                  )}
+                  {publishing.unpublishedCount > 0 && (
+                    <Button size="sm" variant="primary" onClick={handlePublishAll} disabled={publishing.bulkPublishing || bulkPublishBlocked} loading={publishing.bulkPublishing}>
+                      {!publishing.bulkPublishing && <Icon name="check" size="sm" />}
+                      {publishing.bulkPublishing
+                        ? `Publishing ${publishing.bulkProgress?.done ?? 0}/${publishing.bulkProgress?.total ?? publishing.unpublishedCount}`
+                        : `Publish all (${publishing.unpublishedCount})`}
+                    </Button>
+                  )}
+                  <Button size="sm" variant="secondary" onClick={() => handleSendBatchToClient(bulkSendNote.trim() || undefined)} disabled={publishing.sendingToClient || publishing.sentToClient} loading={publishing.sendingToClient}>
+                    {!publishing.sendingToClient && <Icon name="send" size="sm" />}
+                    {publishing.sentToClient ? 'Sent to client' : 'Send to client'}
+                  </Button>
+                </div>
+              </div>
+              {bulkNoteOpen && !publishing.sentToClient && (
+                <div className="border-t border-[var(--brand-border)] px-4 py-3">
+                  <FormTextarea
+                    value={bulkSendNote}
+                    onChange={setBulkSendNote}
+                    disabled={publishing.sendingToClient}
+                    maxLength={2000}
+                    rows={2}
+                    placeholder="Add a note for your client (optional)"
+                    className="max-w-3xl"
+                  />
+                </div>
+              )}
+            </SectionCard>
+          </div>
 
           {publishing.sendToClientError && (
             <InlineBanner
@@ -492,44 +511,67 @@ export function GeneratorLens({
             </InlineBanner>
           )}
 
-          {workspaceId && (
-            <PendingApprovals
-              workspaceId={workspaceId}
-              refreshKey={publishing.approvalRefreshKey}
-              nameFilter="Schema"
-              onRetracted={() => publishing.setApprovalRefreshKey((key) => key + 1)}
-            />
-          )}
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <MetricTile label="Pages" value={stats.pages} sub={`${formatInteger(stats.totalGraphTypes)} generated @graph types`} accent="var(--blue)" icon={FileJson} />
-            <MetricTile label="Validated" value={`${stats.pages - stats.pagesWithErrors}/${stats.pages}`} sub={stats.pagesWithErrors > 0 ? `${stats.pagesWithErrors} with errors` : stats.pagesWithWarnings > 0 ? `${stats.pagesWithWarnings} warnings` : 'No blocking errors'} accent={stats.pagesWithErrors > 0 ? 'var(--amber)' : 'var(--emerald)'} icon={ShieldCheck} />
-            <MetricTile label="Existing schema" value={stats.pagesWithExisting} sub="Pages already carrying JSON-LD" accent="var(--emerald)" icon={CheckCircle} />
-            <MetricTile label="Rich eligible" value={stats.richEligible} sub="Eligible rich-result features" accent="var(--teal)" icon={FileJson} />
-            <MetricTile label="Coverage" value="Pending" sub="Verified after the next crawl" accent="var(--blue)" icon={ShieldCheck} />
-          </div>
-
-          <SchemaInventoryAbsentBanner />
-
           <SchemaPageTable
             pages={pages}
             pageTypes={generation.pageTypes}
             pageTypeErrors={pageTypeErrors}
-            regenerating={generation.regenerating}
             published={publishing.published}
             retractedPages={publishing.retractedPages}
             validationStatusByPageId={validationStatusByPageId}
             onOpenPage={setSelectedPageId}
-            onRegenerate={(pageId) => {
-              toast('Schema regeneration started', 'info');
-              void generation.regeneratePage(pageId);
-            }}
             onPageTypeChange={handlePageTypeChange}
           />
 
-          <SchemaCompletenessPanel pages={pages} workspaceId={workspaceId} />
-          <SchemaImpactPanel data={impactQuery.data} loading={impactQuery.isLoading} />
-          <SchemaHowToFooter />
+          <div className="flex flex-col gap-3" data-testid="schema-production-support">
+            <SchemaSitePlanBridge siteId={siteId} workspaceId={workspaceId} />
+            <SchemaBusinessProfilePanel
+              businessProfile={businessProfile}
+              localBusinessIntent={localBusinessIntent}
+              dismissed={calloutDismissed}
+              workspaceId={workspaceId}
+              onDismiss={handleDismissCallout}
+            />
+            <SchemaCmsMappingPanel
+              collections={cmsWorkflow.schemaMappingCollections}
+              cmsMappingError={cmsWorkflow.cmsMappingError}
+              savingCmsMapping={cmsWorkflow.savingCmsMapping}
+              fieldMappingTargets={cmsWorkflow.fieldMappingTargets}
+              onSaveCmsFieldMapping={cmsWorkflow.saveCmsFieldMapping}
+              maxCollections={MAX_SCHEMA_MAPPING_COLLECTIONS}
+            />
+            {workspaceId && (
+              <GroupBlock
+                icon={Send}
+                iconColor="var(--teal)"
+                title="Client approval queue"
+                meta="Pending schema reviews and retraction controls."
+                collapsible
+                defaultOpen={false}
+              >
+                <div className="p-2">
+                  <PendingApprovals
+                    workspaceId={workspaceId}
+                    refreshKey={publishing.approvalRefreshKey}
+                    nameFilter="Schema"
+                    onRetracted={() => publishing.setApprovalRefreshKey((key) => key + 1)}
+                  />
+                </div>
+              </GroupBlock>
+            )}
+            <GroupBlock
+              icon={ShieldCheck}
+              iconColor="var(--blue)"
+              title="Coverage verification"
+              meta="Coverage and missing-schema counts require the next trusted crawl."
+              collapsible
+              defaultOpen={false}
+            >
+              <div className="p-2"><SchemaInventoryAbsentBanner /></div>
+            </GroupBlock>
+            <SchemaCompletenessPanel pages={pages} workspaceId={workspaceId} />
+            <SchemaImpactPanel data={impactQuery.data} loading={impactQuery.isLoading} />
+            <SchemaHowToFooter />
+          </div>
         </>
       )}
 

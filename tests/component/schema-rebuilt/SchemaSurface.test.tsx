@@ -346,6 +346,7 @@ describe('SchemaSurface rebuilt admin surface', () => {
     expect(screen.getByText('Client review handoff')).toBeInTheDocument();
 
     renderSchema('/ws/ws-1/seo-schema?tab=unknown');
+    fireEvent.click(screen.getByRole('button', { name: /Schema site plan/ }));
     expect(screen.getByText('Schema Site Plan bridge')).toBeInTheDocument();
     expect(screen.getByText('Dental Implants')).toBeInTheDocument();
   });
@@ -357,15 +358,43 @@ describe('SchemaSurface rebuilt admin surface', () => {
     for (const phase of ['Scan', 'Review', 'Edit', 'Publish', 'Validate']) {
       expect(within(workflow).getByText(phase)).toBeInTheDocument();
     }
-    expect(within(workflow).getByText('Crawl the site, read the active schema plan, and detect which pages need structured data.')).toHaveClass('t-body');
-    expect(within(workflow).getByText('Generate the site plan first')).toHaveClass('t-ui');
-    expect(screen.getByText('The page shows these safeguards when generation, validation, publishing, and client review run.')).toHaveClass('t-body');
-    expect(screen.getByText('Architecture-aware BreadcrumbList output')).toHaveClass('t-ui');
+    expect(within(workflow).getByText('Crawl the site, read the active schema plan, and detect which pages need structured data.')).toHaveClass('t-ui');
+    expect(within(workflow).getAllByTestId('schema-guide-step')).toHaveLength(5);
+    expect(screen.getByRole('button', { name: /Production safeguards/ })).toHaveAttribute('aria-expanded', 'false');
 
     expect(within(workflow).queryByText('Plan')).not.toBeInTheDocument();
     expect(within(workflow).queryByText('Coverage')).not.toBeInTheDocument();
     expect(within(workflow).queryByText('Prioritize')).not.toBeInTheDocument();
     expect(within(workflow).queryByText('Step 6')).not.toBeInTheDocument();
+  });
+
+  it('keeps the source-led generator hierarchy dense and preserves truthful readiness data', () => {
+    renderSchema('/ws/ws-1/seo-schema?tab=generator');
+
+    const hero = screen.getByTestId('schema-generator-hero');
+    const workflow = screen.getByTestId('schema-workflow-strip');
+    const summary = screen.getByTestId('schema-summary-strip');
+    const bulk = screen.getByTestId('schema-bulk-band');
+    const pageList = screen.getByTestId('schema-page-list');
+    const support = screen.getByTestId('schema-production-support');
+
+    const sourceOrder = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(hero.compareDocumentPosition(workflow) & sourceOrder).toBeTruthy();
+    expect(workflow.compareDocumentPosition(summary) & sourceOrder).toBeTruthy();
+    expect(summary.compareDocumentPosition(bulk) & sourceOrder).toBeTruthy();
+    expect(bulk.compareDocumentPosition(pageList) & sourceOrder).toBeTruthy();
+    expect(pageList.compareDocumentPosition(support) & sourceOrder).toBeTruthy();
+
+    expect(within(summary).getAllByTestId('schema-summary-tile')).toHaveLength(4);
+    expect(within(summary).getByText('2')).toBeInTheDocument();
+    expect(within(summary).getByText('3')).toBeInTheDocument();
+    expect(within(hero).queryByText(/%/)).not.toBeInTheDocument();
+    expect(within(bulk).getByRole('button', { name: /Publish all/ })).toBeInTheDocument();
+    expect(within(bulk).getByRole('button', { name: /Send to client/ })).toBeInTheDocument();
+    expect(within(bulk).getByRole('button', { name: /Add client note/ })).toBeInTheDocument();
+
+    const headers = within(pageList).getAllByRole('columnheader').map((header) => header.textContent);
+    expect(headers).toEqual(['Page', 'Type', 'Validation', 'Publish']);
   });
 
   it('writes the validated tab state when switching lenses', () => {

@@ -2,7 +2,7 @@
 
 Surface: `seo-schema` / Schema  
 Owner: optimization / structured-data workflow  
-Status: `behavior-safe / visual-unverified` after safe cleanup and guide workflow polish; exact inline-card detail is a lower-risk owner choice
+Status: `owner-approved`; Joshua approved the corrected structured-data composition and documented Drawer exception on 2026-07-10
 Primary route: `/ws/:workspaceId/seo-schema`
 
 ## Prototype References
@@ -29,7 +29,15 @@ The prototype page body includes a coverage/readiness hero, a stepper, summary m
 
 ## Current Parity Grade
 
-Visual status: `behavior-safe / visual-unverified`.
+Visual status: `owner-approved`.
+
+Source-led correction result, 2026-07-10:
+
+- The Generator now uses the prototype's exact 1080px outer / 1020px content canvas, compact context strip, two-mode tray, 23px readiness hero, five-step workflow, four summary metrics, compact bulk band, and dense page rows in the same first-viewport order.
+- The Workflow Guide now resolves to one 1020px card with an 18px display heading, two-line 13.5px introduction, and five evenly paced workflow rows rather than a second dashboard composition.
+- Real Rinse data remains honest: 10 scanned pages, 51 detected types, 5 existing-schema pages, 1 page error, and 10 publishable rows. No unsupported coverage percentage or missing-schema count is invented.
+- Page review/edit/publish/history remains in the production Drawer as an explicit capability-preserving exception to the prototype's inline expansion.
+- Exact 1440x900, 1600x1000, guide, expanded site-plan, Drawer, and mobile evidence passed a fresh Sol review with `PASS`; Joshua explicitly owner-approved the composition and Drawer exception on 2026-07-10.
 
 Why:
 
@@ -39,9 +47,9 @@ Why:
 - Generated page detail opens in the shared `Drawer`; this differs from the prototype's inline expandable cards, but it preserves the same workflow and keeps the heavy review/edit/publish UI contained.
 - Browser smoke proves desktop overview, guide deep link, mobile overview, and one open detail drawer without console errors, failed responses, page-level overflow, or internal labels.
 
-Lower-risk owner choice:
+Explicit exception carried into owner review:
 
-- If strict visual/interaction matching is required, replace the table + drawer detail with prototype-style expandable page cards. Recommended default for now: keep the drawer, because it preserves the production publish/send/history surface and is easier to review safely.
+- Keep the Drawer because it preserves the production publish/send/history surface safely. Replacing it with prototype-style expandable cards remains an owner-only workflow decision, not a safe-local visual correction.
 
 ## URL and Deep Links
 
@@ -112,9 +120,23 @@ Typography role smoke:
 
 Result: the guide renders phase descriptions and pipeline safeguards at `.t-body` / 15.5px, action/safeguard rows at `.t-ui` / 13.5px, the page-detail Drawer opens exactly once, desktop and light mobile guide checks show no horizontal overflow, and no internal rebuild/migration labels are visible. Local preview console noise was limited to the existing notification fetch failure with the backend stack not attached; no Schema request failures or render errors were observed.
 
+Source-led final evidence:
+
+- Prototype Generator: `/tmp/asset-dashboard-codex-visual-parity/batch7/prototype/schema-1440.png` and `schema-1600.png`.
+- Corrected Generator: `/tmp/asset-dashboard-codex-visual-parity/batch7/schema/generator-1440-final.png` and `generator-1600-final.png`.
+- Prototype / corrected Guide: `/tmp/asset-dashboard-codex-visual-parity/batch7/prototype/schema-guide-1440.png` and `/tmp/asset-dashboard-codex-visual-parity/batch7/schema/guide-1440-final.png`.
+- Important interiors: `/tmp/asset-dashboard-codex-visual-parity/batch7/schema/page-drawer-1440.png` and `site-plan-expanded-1440.png`.
+- Mobile floor: `/tmp/asset-dashboard-codex-visual-parity/batch7/schema/generator-mobile-390.png`.
+
+Fresh Sol verdict: `PASS`. Desktop canvas and first-viewport hierarchy match the prototype, typography and row density are calibrated, real fixture metrics remain truthful, production support stays reachable, and no desktop/mobile surface overflow was found.
+
 Fixture caveat:
 
 - `ws_demo_premium` currently returns local 500s for schema plan / graph validation endpoints, so it is not a clean Schema smoke fixture.
+
+## Registry Closeout Evidence
+
+The measured registry archive adds exact 1600x1000 Generator and Workflow Guide prototype references plus matching rebuilt Guide evidence under `/tmp/asset-dashboard-codex-visual-parity/registry-final/`; reviewed exact 1440x900 and Generator evidence remain authoritative. Page review/edit/publish/history stays in the production Drawer as the documented inline-card exception.
 
 ## Automated Test Floor
 
