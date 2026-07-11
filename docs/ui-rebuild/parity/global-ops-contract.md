@@ -2,7 +2,7 @@
 
 Surface family: `settings`, `workspace-settings`, `roadmap`, `revenue`, `ai-usage`, `features`, `prospect`, `outcomes-overview`, `outcomes`, `diagnostics`, `requests`  
 Owner: global operations / workspace administration  
-Status: `behavior-safe / visual-unverified`; `ODP-009 A` and `GO-001` through `GO-008` behavior directions accepted 2026-07-09, additive shell retained
+Status: `owner-approved`; Joshua approved all 11 Global Ops route homes with `ODP-009 A` and `GO-001` through `GO-008` retained as documented exceptions on 2026-07-10
 Primary mounts: global routes plus workspace-scoped operator routes behind `ui-rebuild-shell`
 
 ## Prototype References
@@ -40,7 +40,7 @@ Global Ops is a route family, not a single rebuilt surface. Parity requires pres
 
 ## Current Parity Grade
 
-Visual status: `behavior-safe / visual-unverified`; capability constraints remain.
+Visual status: `owner-approved`; capability constraints remain explicit approved exceptions.
 
 Why:
 
@@ -50,6 +50,9 @@ Why:
 - The route family still includes known product decisions that should not be guessed inside this goal loop: Requests promotion to strategy signal, Diagnostics stage/export, portfolio-level Outcomes rollups, Business alias route retirement, client onboarding rehome, and final LLMs.txt relocation.
 - The current pass removes visible implementation/process language from the rebuilt Global Ops shell without changing capability homes.
 - Browser smoke found and this branch fixes a route-family mount bug: rebuilt global routes were registered but `/settings`, `/roadmap`, `/revenue`, and `/outcomes-overview` fell through to legacy because `App.tsx` only mounted rebuilt surfaces when a URL-selected workspace existed. Rebuilt global routes now use the first available workspace for shell context when one exists and still mount with null workspace context when the account has none.
+- Fresh review returned `PASS` for Settings; Workspace Settings; Roadmap; the Revenue / AI Usage / Features / Prospects Business aliases; Outcomes Book and the per-workspace Outcome Dashboard; Diagnostics; and Requests. These verdicts are supporting evidence; Joshua explicitly owner-approved the route family with its documented exceptions on 2026-07-10.
+- The final Workspace Settings correction restores the prototype's 34px client identity, 22px `Workspace settings` title, `workspace · domain` context, and compact header→tabs→content rhythm while keeping every production operation and tab reachable exactly once.
+- The final Roadmap correction omits nonnumeric capacity prose from sprint headers and restores the prototype's six-column Backlog scan (`ID`, status control, `Item`, `Priority`, `Est`, textual `Status`) while retaining disclosure and locally contained mobile scrolling.
 
 Intentional divergence from prototype:
 
@@ -123,6 +126,18 @@ Judgment calls made in this pass:
 
 ## Browser Smoke Evidence
 
+Final fixed-viewport source-led evidence, 2026-07-10:
+
+- Settings: `/tmp/asset-dashboard-codex-visual-parity/batch8/global/settings-1440-final.png`, `settings-1600-final.png`, cleanup dialog, and mobile floor.
+- Workspace Settings: `/tmp/asset-dashboard-codex-visual-parity/batch8/global/workspace-settings/workspace-settings-1440-final2.png`, `workspace-settings-1600-final3.png`, and `workspace-settings-mobile-390-final3.png`; the strict 1600 capture reports zero open dialogs and page-level overflow.
+- Roadmap: `/tmp/asset-dashboard-codex-visual-parity/batch8/global/roadmap/roadmap-sprint-1440-final2.png`, `roadmap-sprint-1600-final2.png`, `roadmap-backlog-1440-final2.png`, `roadmap-backlog-1600-final3.png`, and the locally scrolling mobile Backlog floor.
+- Business: `/tmp/asset-dashboard-codex-visual-parity/batch8/global/business-*`; Revenue, AI Usage, Features, and Prospects are represented at both desktop widths, with populated-only capabilities retained in fixture tests where the local account has no truthful rows.
+- Outcomes: `/tmp/asset-dashboard-codex-visual-parity/batch8/global/outcomes/`; Book, expanded evidence, per-workspace tabs, both desktop widths, and mobile floor.
+- Diagnostics: `/tmp/asset-dashboard-codex-visual-parity/batch8/global/diagnostics/`; empty, report, expanded evidence, both desktop widths, and mobile floor.
+- Requests: `/tmp/asset-dashboard-codex-visual-parity/batch8/global/requests/`; all four modes, populated/expanded states, both desktop widths, and mobile floor.
+
+Fresh final verdict: `PASS` for every Global Ops sub-surface. This is reviewer evidence supporting Joshua's explicit 2026-07-10 owner approval of the family and its documented exceptions.
+
 Smoke states captured:
 
 - Desktop Settings: `/tmp/asset-dashboard-codex-parity-captures/global-ops-settings-desktop.png` from `/settings`.
@@ -149,6 +164,10 @@ Result:
 - Final browser inspection found no portfolio summary tiles, showed server-owned coverage values such as `0 / 6`, kept the first workspace cell at 180px, removed `Strategy handoff planned`, and found no page-level horizontal overflow in either corrected state.
 - No console errors in the in-app browser smoke.
 
+## Registry Closeout Evidence
+
+The measured registry archive adds exact-size prototype Business views, Roadmap Backlog, Outcomes Book, completed Diagnostics, and Requests reference states, plus rebuilt 1600x1000 evidence for all four Requests modes under `/tmp/asset-dashboard-codex-visual-parity/registry-final/`. Existing exact fixed-viewport evidence remains authoritative for the other Global Ops route homes. Revenue's populated-prototype/empty-local-account comparison, the per-workspace Outcome Dashboard's lack of a direct prototype, Diagnostics list/history routing, and the Requests segmented hybrid remain explicit `GO-*` exceptions.
+
 ## Automated Test Floor
 
 Current branch coverage proves:
@@ -164,3 +183,4 @@ Current branch coverage proves:
 - Outcomes Book coverage comes from the server-owned outcome overview and no client-created portfolio total is rendered.
 - The Outcomes workspace column retains a 180px minimum before the table scrolls horizontally.
 - App-level coverage proves rebuilt global routes mount with first-workspace chrome context when available and with null context when `workspaces=[]`, instead of falling through to legacy panels.
+- Focused source-led suites now also cover Wave A Settings / Workspace Settings / Roadmap composition, Business aliases and loading states, Outcomes Book/workspace modes, Diagnostics states, and Requests modes under `tests/component/global-ops-rebuilt/`.

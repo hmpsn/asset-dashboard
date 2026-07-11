@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Layers, Eye } from 'lucide-react';
-import { Button, PageHeader, EmptyState, FormInput, Icon, cn } from './ui';
+import { Button, PageHeader, EmptyState, FormInput, Icon, Skeleton, cn } from './ui';
 import { features as featuresApi } from '../api/platform';
 import { queryKeys } from '../lib/queryKeys';
 import type { Feature, FeatureCategory, PainPoint, FeatureTier } from '../../shared/types/features';
@@ -52,7 +52,7 @@ function FeatureCard({ feature }: { feature: Feature }) {
   );
 }
 
-export default function FeatureLibrary() {
+export default function FeatureLibrary({ embedded = false }: { embedded?: boolean } = {}) {
   const [search, setSearch] = useState('');
   const [view, setView] = useState<ViewMode>('painPoint');
 
@@ -106,6 +106,19 @@ export default function FeatureLibrary() {
   }, [filtered, view]);
 
   if (isLoading) {
+    if (embedded) {
+      return (
+        <div className="space-y-4" aria-label="Loading feature library" data-testid="feature-library-loading">
+          <div className="flex flex-wrap items-center gap-3">
+            <Skeleton className="h-9 w-full max-w-[360px]" />
+            <Skeleton className="h-9 w-[220px]" />
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {[0, 1, 2, 3, 4, 5].map((index) => <Skeleton key={index} className="h-[138px] w-full" />)}
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="p-6">
         <PageHeader title="Feature Library" subtitle="Loading..." icon={<Icon as={Layers} size="lg" className="text-accent-brand" />} />

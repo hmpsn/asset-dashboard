@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getOptional } from '../api/client';
 import { Zap } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
-import { SectionCard, Icon, cn, Button } from './ui';
+import { SectionCard, Icon, cn, Button, EmptyState, Skeleton } from './ui';
 import { chartAxisColor } from './ui/constants';
 import { fmtNum } from '../utils/formatNumbers';
 
@@ -48,19 +48,49 @@ interface AIUsageData {
   dataforseoDaily?: DataForSeoDaily[];
 }
 
-export function AIUsageSection() {
+export function AIUsageSection({ compact = false }: { compact?: boolean } = {}) {
   const [data, setData] = useState<AIUsageData | null>(null);
   const [days, setDays] = useState(14);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
     getOptional<AIUsageData>(`/api/ai/usage?days=${days}`)
-      .then(d => { if (d) setData(d); })
-      .catch((err) => { console.error('WorkspaceOverview operation failed:', err); });
+      .then(d => { if (active) setData(d); })
+      .catch((err) => { console.error('WorkspaceOverview operation failed:', err); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [days]);
 
   const hasAiUsage = !!data && (data.totalTokens > 0 || data.daily.some(d => d.calls > 0));
   const hasSeoUsage = !!data?.dataforseo && data.dataforseo.totalCalls > 0;
-  if (!data || (!hasAiUsage && !hasSeoUsage)) return null;
+  const usageTitleIcon = <Icon as={Zap} size="md" className="text-amber-400" />;
+
+  if (loading) {
+    return (
+      <SectionCard title="AI Usage" titleIcon={usageTitleIcon}>
+        <div aria-label="Loading AI usage" className="space-y-[14px]">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[0, 1, 2, 3].map((index) => <Skeleton key={index} className="h-[84px] w-full" />)}
+          </div>
+          <Skeleton className="h-[150px] w-full" />
+        </div>
+      </SectionCard>
+    );
+  }
+
+  if (!data || (!hasAiUsage && !hasSeoUsage)) {
+    return (
+      <SectionCard title="AI Usage" titleIcon={usageTitleIcon}>
+        <EmptyState
+          icon={Zap}
+          title="No usage in this period"
+          description="AI and SEO provider activity will appear here after it is recorded for this date range."
+          className="min-h-[260px]"
+        />
+      </SectionCard>
+    );
+  }
 
   const totalCost = data.estimatedCost;
   const totalCalls = data.daily.reduce((s, d) => s + d.calls, 0);
@@ -74,6 +104,27 @@ export function AIUsageSection() {
   const seoCacheHitRate = seo && seo.totalCalls > 0 ? Math.round((seo.cachedCalls / seo.totalCalls) * 100) : 0;
 
   const fmtCost = (v: number) => v < 0.01 ? '<$0.01' : `$${v.toFixed(2)}`;
+  const compactMetricValueClass = compact ? 't-stat-sm text-[20px] font-extrabold leading-none' : 'text-sm'; // arbitrary-text-ok stat-primitive-ok — source Business KPI tiles are exactly 20px; the nearest DS role is 18px.
+  const rangeControl = (
+    <div className="flex gap-1" aria-label="Usage date range">
+      {[7, 14, 30].map(d => (
+        <Button
+          key={d}
+          onClick={() => { setLoading(true); setDays(d); }}
+          variant="ghost"
+          size="sm"
+          className={cn(
+            'px-2 py-0.5 rounded t-caption-sm font-medium transition-colors',
+            days === d
+              ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]'
+              : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
+          )}
+        >
+          {d}d
+        </Button>
+      ))}
+    </div>
+  );
 
   const FEATURE_LABELS: Record<string, string> = {
     'content-post-intro': 'Post: Intro',
@@ -96,27 +147,8 @@ export function AIUsageSection() {
   return (
     <SectionCard
       title="AI Usage"
-      titleIcon={<Icon as={Zap} size="md" className="text-amber-400" />}
-      action={
-        <div className="flex gap-1">
-          {[7, 14, 30].map(d => (
-            <Button
-              key={d}
-              onClick={() => setDays(d)}
-              variant="ghost"
-              size="sm"
-              className={cn(
-                'px-2 py-0.5 rounded t-caption-sm font-medium transition-colors',
-                days === d
-                  ? 'bg-[var(--brand-border-hover)] text-[var(--brand-text-bright)]'
-                  : 'text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]',
-              )}
-            >
-              {d}d
-            </Button>
-          ))}
-        </div>
-      }
+      titleIcon={usageTitleIcon}
+      action={compact ? undefined : rangeControl}
     >
       {/* AI cards + daily cost chart only when there IS AI activity — the section can
           also be shown for DataForSEO usage alone, where these would read all-zero. */}
@@ -125,30 +157,47 @@ export function AIUsageSection() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
-          <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">AI Cost</div>
-          <div className="text-sm font-semibold text-[var(--brand-text-bright)]">{fmtCost(totalCost)}</div>
+          <div className={cn('t-caption-sm text-[var(--brand-text-muted)]', compact ? 'mb-2 flex items-center gap-1.5 font-medium' : 'mb-0.5')}>
+            {compact && <Icon name="zap" size="xs" aria-hidden="true" />}
+            AI cost
+          </div>
+          <div className={cn('font-semibold text-[var(--brand-text-bright)] tabular-nums', compactMetricValueClass)}>{fmtCost(totalCost)}</div>
+          {compact && <div className="mt-1.5 t-caption-sm text-[var(--brand-text-muted)]">this cycle</div>}
         </div>
         <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
-          <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">AI Calls</div>
-          <div className="text-sm font-semibold text-[var(--brand-text-bright)]">{totalCalls.toLocaleString()}</div>
+          <div className={cn('t-caption-sm text-[var(--brand-text-muted)]', compact ? 'mb-2 flex items-center gap-1.5 font-medium' : 'mb-0.5')}>
+            {compact && <Icon name="sparkle" size="xs" aria-hidden="true" />}
+            AI calls
+          </div>
+          <div className={cn('font-semibold text-[var(--brand-text-bright)] tabular-nums', compactMetricValueClass)}>{totalCalls.toLocaleString()}</div>
+          {compact && <div className="mt-1.5 t-caption-sm text-[var(--brand-text-muted)]">generations</div>}
         </div>
         <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
-          <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">OpenAI</div>
-          <div className="text-sm font-semibold text-emerald-400">{fmtCost(openaiCost)}</div>
+          <div className={cn('t-caption-sm text-[var(--brand-text-muted)]', compact ? 'mb-2 flex items-center gap-1.5 font-medium' : 'mb-0.5')}>
+            {compact && <Icon name="chart" size="xs" aria-hidden="true" />}
+            OpenAI
+          </div>
+          <div className={cn('font-semibold text-emerald-400 tabular-nums', compactMetricValueClass)}>{fmtCost(openaiCost)}</div>
+          {compact && <div className="mt-1.5 t-caption-sm text-[var(--brand-text-muted)]">GPT models</div>}
         </div>
         <div className="rounded-[var(--radius-md)] bg-[var(--surface-3)]/50 border border-[var(--brand-border)] px-3 py-2.5">
-          <div className="t-caption-sm text-[var(--brand-text-muted)] mb-0.5">Anthropic</div>
-          <div className="text-sm font-semibold text-orange-400">{fmtCost(anthropicCost)}</div>
+          <div className={cn('t-caption-sm text-[var(--brand-text-muted)]', compact ? 'mb-2 flex items-center gap-1.5 font-medium' : 'mb-0.5')}>
+            {compact && <Icon name="chart" size="xs" aria-hidden="true" />}
+            Anthropic
+          </div>
+          <div className={cn('font-semibold text-orange-400 tabular-nums', compactMetricValueClass)}>{fmtCost(anthropicCost)}</div>
+          {compact && <div className="mt-1.5 t-caption-sm text-[var(--brand-text-muted)]">Claude models</div>}
         </div>
       </div>
 
       {/* Stacked bar chart — daily cost by provider */}
       <div className="mb-1">
         <div className="flex items-center justify-between mb-2">
-          <span className="t-caption-sm text-[var(--brand-text-muted)]">Daily Cost</span>
-          <div className="flex items-center gap-3">
+          <span className="t-caption-sm font-semibold text-[var(--brand-text-bright)]">Daily cost</span>
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]"><div className="w-2 h-2 rounded-[var(--radius-pill)] bg-emerald-500" /> OpenAI</div>
             <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]"><div className="w-2 h-2 rounded-[var(--radius-pill)] bg-orange-500" /> Anthropic</div>
+            {compact && rangeControl}
           </div>
         </div>
         <ResponsiveContainer width="100%" height={120}>

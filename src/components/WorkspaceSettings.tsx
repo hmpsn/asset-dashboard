@@ -7,7 +7,7 @@ import { FeaturesTab } from './settings/FeaturesTab';
 import { ClientDashboardTab } from './settings/ClientDashboardTab';
 import { WorkspaceFeatureFlagOverrides } from './settings/WorkspaceFeatureFlagOverrides';
 import { PublishSettings } from './PublishSettings';
-import { SectionCard, Icon, Button, IconButton, FormInput } from './ui';
+import { Avatar, SectionCard, Icon, Button, IconButton, FormInput } from './ui';
 import { get, patch, post } from '../api/client';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { resolveTabSearchParam } from '../lib/tab-search-param';
@@ -63,8 +63,11 @@ interface WorkspaceData {
 interface Props {
   workspaceId: string;
   workspaceName: string;
+  workspaceDomain?: string;
   webflowSiteId?: string;
   webflowSiteName?: string;
+  /** Uses the prototype's client-identity header and compact vertical rhythm. */
+  prototypeHeader?: boolean;
   onUpdate?: (patch: Record<string, unknown>) => void;
 }
 
@@ -80,7 +83,15 @@ const SECTION_TAB_ITEMS: readonly [SectionTab, string][] = [
   ['llms-txt', 'LLMs.txt'],
 ];
 
-export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, onUpdate }: Props) {
+export function WorkspaceSettings({
+  workspaceId,
+  workspaceName,
+  workspaceDomain,
+  webflowSiteId,
+  webflowSiteName,
+  prototypeHeader = false,
+  onUpdate,
+}: Props) {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   // Tab deep-link two-halves contract: senders append ?tab=X; receiver reads it here.
@@ -157,83 +168,113 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
+    <div className={`max-w-5xl mx-auto ${prototypeHeader ? 'space-y-[14px]' : 'space-y-8'}`}>
       {/* Header with editable name */}
-      <div>
-        {editingName ? (
-          <div className="flex items-center gap-2">
-            <FormInput
-              autoFocus
-              value={nameDraft}
-              onChange={setNameDraft}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  (async () => {
-                    if (!nameDraft.trim() || nameDraft === workspaceName) { setEditingName(false); return; }
-                    setSavingName(true);
-                    try {
-                      await patchWorkspace({ name: nameDraft.trim() });
-                      toast('Workspace name updated');
-                      setEditingName(false);
-                    } catch { toast('Failed to rename', 'error'); }
-                    setSavingName(false);
-                  })();
-                }
-                if (e.key === 'Escape') { setNameDraft(workspaceName); setEditingName(false); }
-              }}
-              className="text-lg font-semibold text-[var(--brand-text-bright)] bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded px-2 py-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500"
-            />
-            <IconButton
-              type="button"
-              icon={Check}
-              label="Save workspace name"
-              size="sm"
-              variant="ghost"
-              disabled={savingName || !nameDraft.trim()}
-              onClick={async () => {
-                if (!nameDraft.trim() || nameDraft === workspaceName) { setEditingName(false); return; }
-                setSavingName(true);
-                try {
-                  await patchWorkspace({ name: nameDraft.trim() });
-                  toast('Workspace name updated');
-                  setEditingName(false);
-                } catch { toast('Failed to rename', 'error'); }
-                setSavingName(false);
-              }}
-              className="p-1 rounded hover:bg-teal-600/20 text-accent-brand"
-            />
-            <IconButton
-              type="button"
-              icon={X}
-              label="Cancel workspace rename"
-              size="sm"
-              variant="ghost"
-              onClick={() => { setNameDraft(workspaceName); setEditingName(false); }}
-              className="p-1 rounded hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)]"
-            />
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 group">
-            <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">{workspaceName}</h2>
-            <IconButton
-              type="button"
-              icon={Pencil}
-              label="Rename workspace"
-              size="sm"
-              variant="ghost"
-              onClick={() => { setNameDraft(workspaceName); setEditingName(true); }}
-              className="p-1 rounded hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)] opacity-0 group-hover:opacity-100 transition-all"
-              title="Rename workspace"
-            />
-          </div>
+      <div className={prototypeHeader ? 'flex min-w-0 items-center gap-3 md:pr-[310px]' : ''}>
+        {prototypeHeader && (
+          <Avatar
+            label={`${workspaceName} workspace`}
+            size={34}
+            tone="blue"
+          />
         )}
-        <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
-          {webflowSiteName ? `Connected to ${webflowSiteName}` : 'No Webflow site linked'}
-        </p>
+        <div className="min-w-0">
+          {prototypeHeader && (
+            <h2 className="t-h2 text-[var(--brand-text-bright)]">Workspace settings</h2>
+          )}
+          {editingName ? (
+            <div className={`flex items-center gap-2 ${prototypeHeader ? 'mt-0.5' : ''}`}>
+              <FormInput
+                autoFocus
+                value={nameDraft}
+                onChange={setNameDraft}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    (async () => {
+                      if (!nameDraft.trim() || nameDraft === workspaceName) { setEditingName(false); return; }
+                      setSavingName(true);
+                      try {
+                        await patchWorkspace({ name: nameDraft.trim() });
+                        toast('Workspace name updated');
+                        setEditingName(false);
+                      } catch { toast('Failed to rename', 'error'); }
+                      setSavingName(false);
+                    })();
+                  }
+                  if (e.key === 'Escape') { setNameDraft(workspaceName); setEditingName(false); }
+                }}
+                className="text-lg font-semibold text-[var(--brand-text-bright)] bg-[var(--surface-3)] border border-[var(--brand-border-hover)] rounded px-2 py-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:border-teal-500"
+              />
+              <IconButton
+                type="button"
+                icon={Check}
+                label="Save workspace name"
+                size="sm"
+                variant="ghost"
+                disabled={savingName || !nameDraft.trim()}
+                onClick={async () => {
+                  if (!nameDraft.trim() || nameDraft === workspaceName) { setEditingName(false); return; }
+                  setSavingName(true);
+                  try {
+                    await patchWorkspace({ name: nameDraft.trim() });
+                    toast('Workspace name updated');
+                    setEditingName(false);
+                  } catch { toast('Failed to rename', 'error'); }
+                  setSavingName(false);
+                }}
+                className="p-1 rounded hover:bg-teal-600/20 text-accent-brand"
+              />
+              <IconButton
+                type="button"
+                icon={X}
+                label="Cancel workspace rename"
+                size="sm"
+                variant="ghost"
+                onClick={() => { setNameDraft(workspaceName); setEditingName(false); }}
+                className="p-1 rounded hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)]"
+              />
+            </div>
+          ) : prototypeHeader ? (
+            <div className="group flex min-w-0 items-center gap-1.5">
+              <p className="truncate text-[12.5px] leading-[1.4] text-[var(--brand-text-muted)]">
+                {workspaceName} · {workspaceDomain || webflowSiteName || 'No live domain'}
+              </p>
+              <IconButton
+                type="button"
+                icon={Pencil}
+                label="Rename workspace"
+                size="sm"
+                variant="ghost"
+                onClick={() => { setNameDraft(workspaceName); setEditingName(true); }}
+                className="h-6 w-6 shrink-0 rounded p-1 text-[var(--brand-text-muted)] opacity-0 transition-all hover:bg-[var(--surface-3)] group-hover:opacity-100 focus-visible:opacity-100"
+                title="Rename workspace"
+              />
+            </div>
+          ) : (
+            <>
+              <div className="group flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-[var(--brand-text-bright)]">{workspaceName}</h2>
+                <IconButton
+                  type="button"
+                  icon={Pencil}
+                  label="Rename workspace"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => { setNameDraft(workspaceName); setEditingName(true); }}
+                  className="p-1 rounded hover:bg-[var(--surface-3)] text-[var(--brand-text-muted)] opacity-0 group-hover:opacity-100 transition-all"
+                  title="Rename workspace"
+                />
+              </div>
+              <p className="t-caption text-[var(--brand-text-muted)] mt-0.5">
+                {webflowSiteName ? `Connected to ${webflowSiteName}` : 'No Webflow site linked'}
+              </p>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Tab nav */}
-      <nav className="flex items-center gap-1 border-b border-[var(--brand-border)]">
+      <nav className="flex max-w-full items-center gap-1 overflow-x-auto border-b border-[var(--brand-border)]">
         {SECTION_TAB_ITEMS.map(([id, label]) => (
           <Button
             type="button"
@@ -241,7 +282,7 @@ export function WorkspaceSettings({ workspaceId, workspaceName, webflowSiteId, w
             size="sm"
             key={id}
             onClick={() => setTab(id)}
-            className="px-4 py-2.5 t-caption font-medium border-b-2 rounded-none transition-colors -mb-px"
+            className="-mb-px shrink-0 rounded-none border-b-2 px-4 py-2.5 t-caption font-medium transition-colors"
             style={tab === id ? { borderColor: 'var(--teal)', color: 'var(--teal)' } : { borderColor: 'transparent', color: 'var(--brand-text-muted)' }}
           >
             {label}
