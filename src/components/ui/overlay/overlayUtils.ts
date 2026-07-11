@@ -30,6 +30,20 @@ export function getFocusable(root: HTMLElement): HTMLElement[] {
   );
 }
 
+// ─── Stacked-overlay coordination ────────────────────────────────────────────
+// Portal overlays share the same z-index layer, so DOM order is also their
+// visual stacking order. Keyboard and backdrop handlers must yield to the last
+// connected panel; stopPropagation alone is insufficient because Modal and
+// Drawer attach native listeners to the same `document` target.
+export const OVERLAY_PANEL_SELECTOR = '[data-overlay-panel="true"]';
+
+/** Whether `root` is the visually topmost open canonical overlay panel. */
+export function isTopmostOverlay(root: HTMLElement | null): boolean {
+  if (!root || typeof document === 'undefined' || !root.isConnected) return false;
+  const panels = document.querySelectorAll<HTMLElement>(OVERLAY_PANEL_SELECTOR);
+  return panels.length > 0 && panels[panels.length - 1] === root;
+}
+
 // ─── Body-scroll lock coordination across stacked overlays ────────────────────
 // Simple reference counter: each open overlay increments; each close
 // decrements. The lock is applied only when the counter transitions 0→1 and

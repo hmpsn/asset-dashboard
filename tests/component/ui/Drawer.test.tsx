@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { Drawer } from '../../../src/components/ui/overlay/Drawer';
+import { Modal } from '../../../src/components/ui/overlay/Modal';
 import { expectNoA11yViolations } from '../a11y';
 
 afterEach(() => {
@@ -13,6 +15,25 @@ function Harness({ open, onClose }: { open: boolean; onClose: () => void }) {
     <Drawer open={open} onClose={onClose} title="Focus Trap">
       <button data-testid="first-inside">Inside First</button>
       <button data-testid="last-inside">Inside Last</button>
+    </Drawer>
+  );
+}
+
+function DrawerWithModal({ onDrawerClose }: { onDrawerClose: () => void }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  return (
+    <Drawer open onClose={onDrawerClose} title="Outer drawer">
+      <button type="button" data-testid="open-inner-modal" onClick={() => setModalOpen(true)}>
+        Open inner modal
+      </button>
+      <button type="button" data-testid="drawer-last">Drawer action</button>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
+        <Modal.Header title="Inner modal" onClose={() => setModalOpen(false)} />
+        <Modal.Body>
+          <button type="button" data-testid="modal-first">Modal first</button>
+          <button type="button" data-testid="modal-last">Modal last</button>
+        </Modal.Body>
+      </Modal>
     </Drawer>
   );
 }
@@ -113,5 +134,27 @@ describe('Drawer', () => {
     fireEvent.mouseDown(dialog);
     fireEvent.click(dialog);
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('yields Escape and Tab to a Modal stacked over the Drawer', () => {
+    const onDrawerClose = vi.fn();
+    render(<DrawerWithModal onDrawerClose={onDrawerClose} />);
+
+    const trigger = screen.getByTestId('open-inner-modal');
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(screen.getAllByRole('dialog')).toHaveLength(2);
+
+    const modalLast = screen.getByTestId('modal-last');
+    const modalClose = screen.getAllByRole('button', { name: /close/i })[1];
+    modalLast.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(modalClose);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onDrawerClose).not.toHaveBeenCalled();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(document.activeElement).toBe(trigger);
+    expect(document.body.style.overflow).toBe('hidden');
   });
 });

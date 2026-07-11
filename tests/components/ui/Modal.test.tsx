@@ -1,6 +1,8 @@
 import '@testing-library/jest-dom/vitest';
+import { useState } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
+import { ConfirmDialog } from '../../../src/components/ui/ConfirmDialog';
 import { Modal } from '../../../src/components/ui/overlay/Modal';
 
 afterEach(() => {
@@ -28,6 +30,41 @@ function Harness({
       <Modal.Footer>
         <button data-testid="confirm-btn">Confirm</button>
       </Modal.Footer>
+    </Modal>
+  );
+}
+
+function StackedModalHarness({
+  open,
+  onOuterClose,
+  onConfirmCancel,
+}: {
+  open: boolean;
+  onOuterClose: () => void;
+  onConfirmCancel: () => void;
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  return (
+    <Modal open={open} onClose={onOuterClose}>
+      <Modal.Header title="Outer dialog" onClose={onOuterClose} />
+      <Modal.Body>
+        <button type="button" data-testid="open-confirm" onClick={() => setConfirmOpen(true)}>
+          Open confirmation
+        </button>
+      </Modal.Body>
+      <Modal.Footer>
+        <button type="button" data-testid="outer-last">Outer action</button>
+      </Modal.Footer>
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Confirm nested action?"
+        message="This confirmation is stacked over the outer dialog."
+        onConfirm={() => setConfirmOpen(false)}
+        onCancel={() => {
+          onConfirmCancel();
+          setConfirmOpen(false);
+        }}
+      />
     </Modal>
   );
 }
@@ -157,5 +194,53 @@ describe('Modal', () => {
 
     expect(document.activeElement).toBe(trigger);
     trigger.remove();
+  });
+
+  it('coordinates a nested ConfirmDialog as the only Escape and focus-trap owner', () => {
+    const onOuterClose = vi.fn();
+    const onConfirmCancel = vi.fn();
+    render(
+      <StackedModalHarness
+        open
+        onOuterClose={onOuterClose}
+        onConfirmCancel={onConfirmCancel}
+      />,
+    );
+
+    const trigger = screen.getByTestId('open-confirm');
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(screen.getAllByRole('dialog')).toHaveLength(2);
+
+    const nestedConfirm = screen.getByRole('button', { name: 'Confirm' });
+    const nestedCancel = screen.getByRole('button', { name: 'Cancel' });
+    nestedConfirm.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(nestedCancel);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onConfirmCancel).toHaveBeenCalledOnce();
+    expect(onOuterClose).not.toHaveBeenCalled();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(document.activeElement).toBe(trigger);
+    expect(document.body.style.overflow).toBe('hidden');
+  });
+
+  it('keeps scroll locked until every stacked modal closes', () => {
+    const { rerender } = render(
+      <StackedModalHarness open onOuterClose={() => {}} onConfirmCancel={() => {}} />,
+    );
+    const trigger = screen.getByTestId('open-confirm');
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(document.body.style.overflow).toBe('hidden');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(document.body.style.overflow).toBe('hidden');
+
+    rerender(
+      <StackedModalHarness open={false} onOuterClose={() => {}} onConfirmCancel={() => {}} />,
+    );
+    expect(document.body.style.overflow).toBe('');
   });
 });

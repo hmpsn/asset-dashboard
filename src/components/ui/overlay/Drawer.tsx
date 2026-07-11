@@ -11,7 +11,12 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { prefersReducedMotion } from './reducedMotion';
-import { getFocusable, acquireScrollLock, releaseScrollLock } from './overlayUtils';
+import {
+  getFocusable,
+  acquireScrollLock,
+  releaseScrollLock,
+  isTopmostOverlay,
+} from './overlayUtils';
 
 /**
  * Right-anchored (or left) slide-over panel + scrim. The canonical detail
@@ -77,14 +82,18 @@ export function Drawer({
     if (!open) return;
 
     const handleKey = (e: KeyboardEvent) => {
+      const root = containerRef.current;
+      if (!isTopmostOverlay(root)) return;
+
       if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
         e.stopPropagation();
         onClose?.();
         return;
       }
       if (e.key !== 'Tab') return;
-      const root = containerRef.current;
       if (!root) return;
+      e.stopImmediatePropagation();
       const focusables = getFocusable(root);
       if (focusables.length === 0) {
         e.preventDefault();
@@ -100,7 +109,7 @@ export function Drawer({
           last.focus();
         }
       } else {
-        if (active === last) {
+        if (active === last || !root.contains(active)) {
           e.preventDefault();
           first.focus();
         }
@@ -119,6 +128,7 @@ export function Drawer({
     const root = containerRef.current;
     if (!root) return;
     const raf = requestAnimationFrame(() => {
+      if (!isTopmostOverlay(root)) return;
       const focusables = getFocusable(root);
       if (focusables.length > 0) focusables[0].focus();
       else root.focus();
@@ -154,7 +164,12 @@ export function Drawer({
   };
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (closeOnBackdrop && e.target === e.currentTarget && backdropMouseDownRef.current) {
+    if (
+      closeOnBackdrop
+      && e.target === e.currentTarget
+      && backdropMouseDownRef.current
+      && isTopmostOverlay(containerRef.current)
+    ) {
       onClose?.();
     }
     backdropMouseDownRef.current = false;
@@ -177,6 +192,7 @@ export function Drawer({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
+        data-overlay-panel="true"
         style={{ zIndex: 'var(--z-modal)' as unknown as number, width: panelWidth, ...style }}
         className={cn(
           'fixed top-0 h-full max-w-[94vw] flex flex-col bg-[var(--surface-2)] shadow-[var(--shadow-lg)] outline-none',
