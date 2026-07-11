@@ -63,6 +63,7 @@ const ga4Overview = {
   newUserPercentage: 64,
   dateRange: { start: '2026-06-01', end: '2026-06-28' },
 };
+let currentGa4Overview: typeof ga4Overview | null = ga4Overview;
 const featureFlagResponse: Partial<Record<FeatureFlagKey, boolean>> = {
   'ui-rebuild-shell': true,
 };
@@ -112,7 +113,7 @@ vi.mock('../../../src/hooks/admin/useAdminSearch', () => ({
 
 vi.mock('../../../src/hooks/admin/useAdminGA4', () => ({
   useAdminGA4: () => ({
-    overview: ga4Overview,
+    overview: currentGa4Overview,
     trend: [
       { date: '2026-06-01', users: 30, sessions: 42, pageviews: 80 },
       { date: '2026-06-02', users: 34, sessions: 45, pageviews: 88 },
@@ -253,7 +254,11 @@ function LocationProbe() {
 }
 
 function reportModes() {
-  return within(screen.getByRole('toolbar', { name: 'Search and traffic controls' })).getAllByRole('radio');
+  return within(screen.getByRole('toolbar', { name: 'Search and traffic reports' })).getAllByRole('radio');
+}
+
+function expectBefore(first: Element, second: Element) {
+  expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 }
 
 function renderFlagged(initialEntry = '/ws/ws-1/analytics-hub') {
@@ -278,6 +283,7 @@ beforeEach(() => {
   currentWorkspace = workspace;
   currentSearchOverview = searchOverview;
   currentSearchError = null;
+  currentGa4Overview = ga4Overview;
   getMock.mockResolvedValue([
     { date: '2026-05-01', clicks: 12, impressions: 300, ctr: 4, position: 9 },
     { date: '2026-05-02', clicks: 10, impressions: 280, ctr: 3.6, position: 9.2 },
@@ -296,31 +302,75 @@ describe('SearchTrafficSurface', () => {
       queryClient.setQueryData(queryKeys.shared.featureFlags(), featureFlagResponse);
     });
 
-    expect(await screen.findByRole('heading', { name: 'Search & Traffic' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Search clicks are up 20.0% this period.' })).toBeInTheDocument();
     expect(screen.queryByTestId('legacy-search-traffic')).not.toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: /Search Performance/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /Search performance/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByText('Demand mix')).toBeInTheDocument();
   });
 
   it('uses Search Performance for bare and invalid lenses with exactly three visible report modes', async () => {
     renderSurface();
 
-    expect(await screen.findByRole('heading', { name: 'Search & Traffic' })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: /Search Performance/i })).toHaveAttribute('aria-checked', 'true');
+    expect(await screen.findByRole('heading', { name: 'Search clicks are up 20.0% this period.' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Search performance/i })).toHaveAttribute('aria-checked', 'true');
     expect(reportModes()).toHaveLength(3);
     expect(screen.queryByRole('radio', { name: /Overview/i })).not.toBeInTheDocument();
     expect(screen.getByText('Demand mix')).toBeInTheDocument();
     expect(screen.getByText('Priority insights')).toBeInTheDocument();
     expect(screen.queryByText('Search + traffic trend')).not.toBeInTheDocument();
-    expect(screen.getByText(/Data as of/)).toHaveClass('t-ui');
+    expect(screen.getByText(/Data as of/)).toHaveClass('t-caption-sm');
+    const dateRange = screen.getByRole('group', { name: 'Analytics date range' });
+    expect(within(dateRange).getByRole('button', { name: '28d' })).toBeInTheDocument();
+    expect(within(dateRange).getByRole('button', { name: '90d' })).toBeInTheDocument();
+    expect(within(dateRange).getByRole('button', { name: '12m' })).toBeInTheDocument();
+    expect(within(dateRange).getByRole('button', { name: 'More date ranges' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: '7d' })).not.toBeInTheDocument();
+    expect(screen.getByRole('toolbar', { name: 'Search and traffic reports' })).toHaveClass(
+      'max-w-full',
+      'overflow-x-auto',
+    );
     expect(screen.getByText('Share uses impressions as the denominator; missing query rows remain in the non-branded remainder.')).toHaveClass('t-body');
     expect(Object.keys(capturedWorkspaceHandlers)).toContain('annotation:bridge_created');
+
+    const trend = screen.getByText('Search performance trend');
+    const movement = screen.getByText('Movement');
+    const detail = screen.getByText('Detail');
+    const monitoring = screen.getByText('Monitoring & insights');
+    expectBefore(screen.getAllByText('Clicks')[0], trend);
+    expectBefore(trend, movement);
+    expectBefore(movement, detail);
+    expectBefore(detail, monitoring);
+  });
+
+  it('keeps secondary date ranges reachable through the compact overflow menu', async () => {
+    renderSurface();
+
+    const dateRange = screen.getByRole('group', { name: 'Analytics date range' });
+    fireEvent.click(within(dateRange).getByRole('button', { name: 'More date ranges' }));
+
+    expect(await screen.findByRole('menuitem', { name: '7d' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '14d' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '6mo' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '16mo' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('menuitem', { name: '7d' }));
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/ws/ws-1/analytics-hub?days=7'));
+    expect(within(dateRange).getByRole('button', { name: 'More date ranges' })).toHaveTextContent('7d');
+  });
+
+  it('omits provider-window fallback copy when neither provider returned a real window', async () => {
+    currentSearchOverview = null;
+    currentGa4Overview = null;
+    renderSurface();
+
+    expect(await screen.findByText('No search data')).toBeInTheDocument();
+    expect(screen.queryByText('Provider window unavailable')).not.toBeInTheDocument();
   });
 
   it('normalizes an invalid lens to the default while preserving validated report params', async () => {
     renderSurface('/ws/ws-1/analytics-hub?lens=not-a-report&days=90&view=pages');
 
-    expect(await screen.findByRole('radio', { name: /Search Performance/i })).toHaveAttribute('aria-checked', 'true');
+    expect(await screen.findByRole('radio', { name: /Search performance/i })).toHaveAttribute('aria-checked', 'true');
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/ws/ws-1/analytics-hub?days=90&view=pages'));
     expect(screen.queryByRole('radio', { name: /Overview/i })).not.toBeInTheDocument();
   });
@@ -339,9 +389,9 @@ describe('SearchTrafficSurface', () => {
   it('honors the lens deep link and table view params', async () => {
     renderSurface('/ws/ws-1/analytics-hub?lens=search&view=pages&days=90');
 
-    expect(await screen.findByRole('radio', { name: /Search Performance/i })).toHaveAttribute('aria-checked', 'true');
+    expect(await screen.findByRole('radio', { name: /Search performance/i })).toHaveAttribute('aria-checked', 'true');
     await waitFor(() => expect(getMock).toHaveBeenCalled());
-    expect(screen.getByText('1 page rows')).toHaveClass('t-ui');
+    expect(screen.getByText('1 row')).toHaveClass('t-caption-sm');
     expect(screen.getByText('Open Keyword Hub')).toHaveClass('t-ui');
     expect(screen.getByText('/cosmetic-dentistry')).toBeInTheDocument();
   });
@@ -349,18 +399,18 @@ describe('SearchTrafficSurface', () => {
   it('returns to Search with canonical URL state while preserving days and view', async () => {
     renderSurface('/ws/ws-1/analytics-hub?lens=traffic&days=90&view=pages');
 
-    expect(await screen.findByRole('radio', { name: /Site Traffic/i })).toHaveAttribute('aria-checked', 'true');
-    fireEvent.click(screen.getByRole('radio', { name: /Search Performance/i }));
+    expect(await screen.findByRole('radio', { name: /Site traffic/i })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('radio', { name: /Search performance/i }));
 
-    await waitFor(() => expect(screen.getByRole('radio', { name: /Search Performance/i })).toHaveAttribute('aria-checked', 'true'));
+    await waitFor(() => expect(screen.getByRole('radio', { name: /Search performance/i })).toHaveAttribute('aria-checked', 'true'));
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/ws/ws-1/analytics-hub?days=90&view=pages'));
   });
 
   it('keeps the reporting modes visible without implementation labels', async () => {
     const { container } = renderSurface('/ws/ws-1/analytics-hub?lens=search');
 
-    expect(await screen.findByRole('radio', { name: /Search Performance/i })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('radio', { name: /Site Traffic/i })).toBeInTheDocument();
+    expect(await screen.findByRole('radio', { name: /Search performance/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /Site traffic/i })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /Annotations/i })).toBeInTheDocument();
     expect(reportModes()).toHaveLength(3);
     expect(screen.queryByRole('radio', { name: /Overview/i })).not.toBeInTheDocument();
@@ -370,7 +420,7 @@ describe('SearchTrafficSurface', () => {
   it('opens the search breakdowns drawer exactly once and closes cleanly', async () => {
     renderSurface('/ws/ws-1/analytics-hub?lens=search');
 
-    expect(await screen.findByRole('heading', { name: 'Search & Traffic' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Search clicks are up 20.0% this period.' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Breakdowns/i }));
 
     const dialogs = await screen.findAllByRole('dialog', { name: 'Search breakdowns' });
@@ -385,10 +435,16 @@ describe('SearchTrafficSurface', () => {
   it('shows conversion evidence by default on the Site Traffic lens', async () => {
     renderSurface('/ws/ws-1/analytics-hub?lens=traffic');
 
-    expect(await screen.findByRole('radio', { name: /Site Traffic/i })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByText('2026-06-01 - 2026-06-28')).toHaveClass('t-ui');
+    expect(await screen.findByRole('radio', { name: /Site traffic/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('heading', { name: 'Site users are up 28.6% this period.' })).toBeInTheDocument();
     expect(screen.getByText('Events & conversions')).toBeInTheDocument();
     expect(screen.getByText('form submit')).toBeInTheDocument();
+    expect(screen.getAllByText('Traffic sources')).toHaveLength(1);
+    expect(screen.getByText('Devices')).toBeInTheDocument();
+    expectBefore(screen.getByText('Traffic trend'), screen.getByText('Acquisition'));
+    expectBefore(screen.getByText('Acquisition'), screen.getByText('Engagement'));
+    expectBefore(screen.getByText('Engagement'), screen.getByText('Conversion'));
+    expectBefore(screen.getByText('Conversion'), screen.getByText('Monitoring & insights'));
 
     fireEvent.click(screen.getByRole('button', { name: 'Hide' }));
     expect(screen.getByText('1 tracked conversion event available.')).toHaveClass('t-body');
@@ -404,6 +460,8 @@ describe('SearchTrafficSurface', () => {
 
     expect(await screen.findByRole('radio', { name: /Annotations/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: 'Add annotation' })).toBeInTheDocument();
+    expectBefore(screen.getByText('Trend with context'), screen.getByText('Annotation timeline'));
+    expect(screen.getByTestId('annotated-trend-chart')).toHaveTextContent('chart 2');
   });
 
   it('keeps provider-independent Annotations CRUD mounted exactly once without analytics providers', async () => {
@@ -418,7 +476,7 @@ describe('SearchTrafficSurface', () => {
     currentWorkspace = { ...workspace, gscPropertyUrl: undefined };
     renderSurface();
 
-    expect(await screen.findByRole('radio', { name: /Search Performance/i })).toHaveAttribute('aria-checked', 'true');
+    expect(await screen.findByRole('radio', { name: /Search performance/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByText('Search Console not configured')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('radio', { name: /Annotations/i }));

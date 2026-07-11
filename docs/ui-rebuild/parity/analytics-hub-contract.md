@@ -2,7 +2,7 @@
 
 Surface: `analytics-hub` / Search & Traffic  
 Owner: monitoring / analytics reporting  
-Status: `behavior-safe / visual-unverified`; `ODP-005 A + C` behavior checkpoint implemented 2026-07-09, Search-default and degraded-provider corrections verified
+Status: `owner-approved`; Joshua approved the corrected report composition and documented exceptions on 2026-07-10
 Primary route: `/ws/:workspaceId/analytics-hub`
 
 ## Prototype References
@@ -42,7 +42,7 @@ Production carry-over that intentionally exceeds the prototype:
 
 ## Current Parity Grade
 
-Visual status: `behavior-safe / visual-unverified`.
+Visual status: `owner-approved`.
 
 Why:
 
@@ -50,12 +50,22 @@ Why:
 - `Overview` is no longer a visible peer. Its cross-source trend remains available through `?lens=overview`, while Demand mix and Priority insights live in a lower Search report band and mount exactly once in either state.
 - Provider availability is handled per report instead of gating the whole surface. Annotations remains available without GSC or GA4, and Search retains truthful unavailable framing plus the Demand mix / Priority insights home when GSC is unconfigured, empty, or unavailable.
 - Production reporting capabilities, validated date/table state, drawers, annotations, anomaly actions, feature-flag transition, and workspace-event invalidation remain intact.
+- The corrected 1120px report canvas now follows the prototype's compact report tray and narrative-first hierarchy. Search orders KPI evidence, trend, Movement, Detail, then monitoring; Traffic orders KPI evidence, trend, Acquisition, Engagement, Conversion, then monitoring; Annotations places its contextual trend before the editable timeline.
+- Primary 28d / 90d / 12m ranges stay in the compact chrome, with the additional production presets reachable from More. The real Re-scan action remains exact-once.
 
 Accepted direction:
 
 - Implemented: Search performance is the default, `?lens=overview` is a hidden compatibility receiver, and Demand mix/Priority insights have a tested lower-band home.
 - Circle back only if operator evidence shows that the compatibility-only cross-source trend needs a new visible home.
-- Remaining visual work is report composition polish, not an IA or route blocker.
+- No safe-local visual defects remain from fresh Sol review. Joshua explicitly owner-approved the surface with its documented exceptions on 2026-07-10.
+
+Visual correction result, 2026-07-10:
+
+- The prototype's 1120px border-box geometry, compact three-report tray, report narrative hierarchy, section order, and first-viewport density are implemented without inventing provider data.
+- The prototype proof-graduation band is intentionally omitted because production has no truthful proof-stage action at this surface. Ranking movement renders only when the real insight feed supplies it.
+- Breakdowns remain in the shared Drawer, full annotation CRUD remains in the timeline, overflow ranges remain in More, and Re-scan remains in the report chrome as explicit production-capability exceptions.
+- Local GSC and GA4 reads were unavailable during the final live comparison. Truthful unavailable states were captured directly; populated section order and exact-once homes remain fixture-covered by the focused component suite.
+- Corrected 1440x900, 1600x1000, annotation-editor, and mobile evidence under `/tmp/asset-dashboard-codex-visual-parity/search-traffic/pass1/` passed a fresh Sol review with `PASS`; Joshua explicitly approved the composition and truthful provider-unavailable states on 2026-07-10.
 
 ## URL and Deep Links
 
@@ -129,6 +139,10 @@ Final audit evidence, 2026-07-09:
 - Final Search / Asset audit state: `/tmp/asset-dashboard-codex-parity-captures/final-search-asset-audit-state.json`.
 
 The populated default and hidden receiver had no horizontal overflow. Component fixtures separately prove no-provider, GA4-only, and empty/error GSC behavior because those provider combinations are not safely mutable in the shared browser workspace.
+
+## Registry Closeout Evidence
+
+The measured registry archive adds strict prototype Search, Site Traffic, and Annotations evidence plus matching rebuilt Site Traffic and Annotations evidence at 1600x1000 under `/tmp/asset-dashboard-codex-visual-parity/registry-final/`; the reviewed exact 1440x900 counterparts remain in the surface archive. The prototype is populated while the local owner workspace has no usable GSC/GA4 report data, so the rebuilt unavailable state is intentionally truthful and the populated report order remains fixture-protected.
 
 ## Automated Test Floor
 

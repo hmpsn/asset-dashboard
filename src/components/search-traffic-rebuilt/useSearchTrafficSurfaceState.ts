@@ -4,8 +4,8 @@ import { useSearchParams } from 'react-router-dom';
 import type { SearchTrafficLens, SearchTrafficTableMode } from './types';
 
 export const SEARCH_TRAFFIC_LENSES = [
-  { id: 'search', label: 'Search Performance' },
-  { id: 'traffic', label: 'Site Traffic' },
+  { id: 'search', label: 'Search performance' },
+  { id: 'traffic', label: 'Site traffic' },
   { id: 'annotations', label: 'Annotations' },
 ] as const;
 
