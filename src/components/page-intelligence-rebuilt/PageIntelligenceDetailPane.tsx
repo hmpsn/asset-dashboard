@@ -25,6 +25,7 @@ interface PageIntelligenceDetailPaneProps {
   onCreateBrief: (page: UnifiedPage, analysis?: KeywordData) => void;
   onAddSchema: (page: UnifiedPage) => void;
   onViewTraffic: () => void;
+  onBackToPages: () => void;
 }
 
 export function PageIntelligenceDetailPane({
@@ -41,10 +42,11 @@ export function PageIntelligenceDetailPane({
   onCreateBrief,
   onAddSchema,
   onViewTraffic,
+  onBackToPages,
 }: PageIntelligenceDetailPaneProps) {
   if (!page) {
     return (
-      <div className="flex min-h-0 items-center justify-center bg-[var(--surface-2)] px-10 text-center">
+      <div className="hidden min-h-0 items-center justify-center bg-[var(--surface-2)] px-10 text-center md:flex">
         <div className="max-w-sm">
           <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-[var(--radius-signature)] border border-[var(--brand-border)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]"><Icon name="search" size="xl" /></span>
           <h2 className="t-body font-semibold text-[var(--brand-text-bright)]">Select a page to research</h2>
@@ -58,9 +60,13 @@ export function PageIntelligenceDetailPane({
     || page.strategy?.optimizationIssues?.some(issue => /schema|structured data/i.test(issue));
 
   return (
-    <article className="flex min-h-0 flex-col bg-[var(--surface-2)]">
+    <article className="flex min-h-0 min-w-0 w-full flex-col bg-[var(--surface-2)]">
       <header className="flex-none border-b border-[var(--brand-border)] px-5 py-3">
-        <div className="flex items-start justify-between gap-4">
+        <Button variant="ghost" size="sm" onClick={onBackToPages} className="-ml-2 mb-2 md:hidden">
+          <Icon name="arrowLeft" size="sm" />
+          Back to pages
+        </Button>
+        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-3)] text-[var(--brand-text-muted)]"><Icon name={page.source === 'cms' ? 'layers' : 'file'} size="sm" /></span>
@@ -70,7 +76,7 @@ export function PageIntelligenceDetailPane({
               </div>
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-left sm:text-right">
             <span className="block t-micro font-semibold uppercase tracking-[0.06em] text-[var(--brand-text-dim)]">Target</span>
             <span className="block max-w-[240px] truncate t-caption font-medium text-[var(--brand-text)]">{page.strategy?.primaryKeyword || 'Not assigned'}</span>
           </div>
@@ -116,12 +122,12 @@ export function PageIntelligenceDetailPane({
         </div>
       </div>
 
-      <footer className="flex flex-none items-center gap-2 border-t border-[var(--brand-border)] bg-[var(--surface-2)] px-5 py-3">
-        <span className="mr-auto flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]"><Icon name="info" size="sm" />Actions open the owning production workspace.</span>
-        <Button variant="secondary" size="sm" onClick={() => onCreateBrief(page, analysis)}>Create brief</Button>
-        {hasSchemaIssue && <Button variant="secondary" size="sm" onClick={() => onAddSchema(page)}>Add schema</Button>}
-        <Button variant="secondary" size="sm" onClick={onViewTraffic}>View traffic</Button>
-        <Button variant="primary" size="sm" onClick={() => onOpenSeoEditor(page)}>Fix in SEO Editor</Button>
+      <footer className="flex flex-none flex-wrap items-center gap-2 border-t border-[var(--brand-border)] bg-[var(--surface-2)] px-5 py-3 md:flex-nowrap">
+        <span className="flex w-full items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)] md:mr-auto md:w-auto"><Icon name="info" size="sm" />Actions open the owning production workspace.</span>
+        <Button variant="secondary" size="sm" className="grow md:grow-0" onClick={() => onCreateBrief(page, analysis)}>Create brief</Button>
+        {hasSchemaIssue && <Button variant="secondary" size="sm" className="grow md:grow-0" onClick={() => onAddSchema(page)}>Add schema</Button>}
+        <Button variant="secondary" size="sm" className="grow md:grow-0" onClick={onViewTraffic}>View traffic</Button>
+        <Button variant="primary" size="sm" className="grow md:grow-0" onClick={() => onOpenSeoEditor(page)}>Fix in SEO Editor</Button>
       </footer>
     </article>
   );

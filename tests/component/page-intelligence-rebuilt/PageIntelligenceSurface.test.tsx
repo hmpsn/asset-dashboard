@@ -98,15 +98,15 @@ function ClearRouterState() {
   return <button type="button" onClick={() => navigate('/ws/ws-1/page-intelligence', { replace: true, state: {} })}>Clear router state</button>;
 }
 
-function surfaceTree(withFixContext = false) {
+function surfaceTree(withFixContext = false, initialEntry?: string) {
   return (
     <MemoryRouter
-      initialEntries={[withFixContext
+      initialEntries={[initialEntry ?? (withFixContext
         ? {
             pathname: '/ws/ws-1/page-intelligence',
             state: { fixContext: { targetRoute: 'page-intelligence', pageSlug: 'services' } },
           }
-        : '/ws/ws-1/page-intelligence']}
+        : '/ws/ws-1/page-intelligence')]}
     >
       <Routes>
         <Route
@@ -155,6 +155,28 @@ describe('PageIntelligenceSurface module contract', () => {
     mocks.pageJoin.webflowPages = [PAGE];
     mocks.pageJoin.isLoading = false;
     view.rerender(surfaceTree(true));
+
+    await waitFor(() => expect(screen.getByTestId('page-intelligence-detail')).toHaveAttribute('data-page-id', 'page-1'));
+  });
+
+  it('waits for the authoritative joined inventory before resolving an explicit page identity', async () => {
+    mocks.pageJoin.pages = [{
+      id: 'strategy-only',
+      title: 'Strategy-only page',
+      path: '/strategy-only',
+      slug: 'strategy-only',
+      source: 'static',
+      analyzed: false,
+    }];
+    mocks.pageJoin.webflowPages = [];
+    mocks.pageJoin.isLoading = true;
+    const initialEntry = '/ws/ws-1/page-intelligence?page=page-1';
+    const view = render(surfaceTree(false, initialEntry));
+
+    mocks.pageJoin.pages = [PAGE];
+    mocks.pageJoin.webflowPages = [PAGE];
+    mocks.pageJoin.isLoading = false;
+    view.rerender(surfaceTree(false, initialEntry));
 
     await waitFor(() => expect(screen.getByTestId('page-intelligence-detail')).toHaveAttribute('data-page-id', 'page-1'));
   });

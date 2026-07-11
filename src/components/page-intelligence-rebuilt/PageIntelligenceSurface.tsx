@@ -121,6 +121,7 @@ export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurface
   }, [localSeoQuery.data]);
 
   useEffect(() => {
+    if (pageJoin.isLoading) return;
     if (pageJoin.pages.length === 0) return;
     const pageParam = searchParams.get('page');
     const selectionKey = `${workspaceId}:${pageParam ?? ''}`;
@@ -128,7 +129,7 @@ export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurface
     initialSelectionResolved.current = selectionKey;
     setSelectedId(resolveInitialPage(pageJoin.pages, pageParam, fixContext)?.id ?? null);
     retainedFixContext.current = null;
-  }, [fixContext, pageJoin.pages, searchParams, workspaceId]);
+  }, [fixContext, pageJoin.isLoading, pageJoin.pages, searchParams, workspaceId]);
 
   const updateTab = (tab: IntelligenceTab) => {
     const next = new URLSearchParams(searchParams);
@@ -196,7 +197,7 @@ export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurface
       {/* pr-check-disable-next-line -- prototype Research workbench is one bounded asymmetric desktop canvas, not a content card */}
       <section className="flex min-h-0 flex-col overflow-hidden rounded-[var(--radius-signature-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]" style={{ height: 'calc(100vh - var(--shell-topbar) - var(--page-pad-y) - var(--page-pad-bottom))' }}>
         <header className="flex-none border-b border-[var(--brand-border)] bg-[var(--surface-2)] px-5 pt-4">
-          <div className="flex items-end justify-between gap-5 pb-3">
+          <div className="flex flex-col items-start gap-3 pb-3 sm:flex-row sm:items-end sm:justify-between sm:gap-5">
             <div className="min-w-0">
               <div className="mb-1 flex items-center gap-2 t-micro font-semibold uppercase tracking-[0.08em] text-accent-brand">
                 <span className="h-1.5 w-1.5 rounded-[var(--radius-pill)] bg-[var(--teal)]" />
@@ -208,7 +209,7 @@ export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurface
               </p>
             </div>
             {activeTab === 'pages' && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {analysis.bulkProgress ? (
                   <Button variant="secondary" size="sm" onClick={() => analysis.cancellableBulkJobId && analysis.cancelBulkJob(analysis.cancellableBulkJobId)} disabled={!analysis.cancellableBulkJobId}>Cancel analysis</Button>
                 ) : (
@@ -234,14 +235,14 @@ export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurface
             {analysis.bulkProgress && <div className="flex-none px-4 pt-3"><ProgressIndicator status="running" detail={`Analyzing ${analysis.bulkProgress.done}/${analysis.bulkProgress.total} pages`} percent={analysis.bulkProgress.total ? analysis.bulkProgress.done / analysis.bulkProgress.total * 100 : 0} onCancel={analysis.cancellableBulkJobId ? () => analysis.cancelBulkJob(analysis.cancellableBulkJobId!) : undefined} /></div>}
             {analysis.analysisError && <div className="flex-none px-4 pt-3"><ErrorState title="Page analysis failed" message={analysis.analysisError} type="general" actions={[{ label: 'Dismiss', onClick: analysis.dismissAnalysisError, variant: 'secondary' }]} /></div>}
             {analysis.showNextSteps && !analysis.bulkProgress && <div className="flex-none px-4 pt-3"><NextStepsCard title="Analysis complete" variant="success" onDismiss={analysis.dismissNextSteps} steps={[{ label: 'Go to SEO Editor', onClick: () => navigate(adminPath(workspaceId, 'seo-editor')) }]} /></div>}
-            <div className="flex-none px-4 pt-3"><LocalSeoVisibilityPanel workspaceId={workspaceId} mode="page" onOpenKeywords={() => navigate(adminPath(workspaceId, 'seo-keywords'))} /></div>
-            <div className="grid min-h-0 flex-1 grid-cols-[minmax(360px,42%)_minmax(0,1fr)]">
-              <aside className="flex min-h-0 flex-col border-r border-[var(--brand-border)] bg-[var(--surface-1)]/40">
+            <div className={`${selectedPage ? 'hidden md:block' : 'block'} flex-none px-4 pt-3`}><LocalSeoVisibilityPanel workspaceId={workspaceId} mode="page" onOpenKeywords={() => navigate(adminPath(workspaceId, 'seo-keywords'))} /></div>
+            <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(360px,42%)_minmax(0,1fr)]">
+              <aside className={`${selectedPage ? 'hidden md:flex' : 'flex'} min-h-0 flex-col border-r border-[var(--brand-border)] bg-[var(--surface-1)]/40`}>
                 <div className="flex-none space-y-2 border-b border-[var(--brand-border)] p-3">
                   <SearchField value={search} onChange={setSearch} placeholder="Search pages or keywords…" className="py-1.5" />
-                  <div className="flex items-center justify-between gap-2">
-                    <Segmented options={SORT_OPTIONS} value={sortBy} onChange={changeSort} className="[&_button]:px-2.5 [&_button]:py-1.5" />
-                    <span className="t-micro font-mono uppercase tracking-[0.06em] text-[var(--brand-text-dim)]">{sortDir === 'desc' ? 'High → low' : 'Low → high'}</span>
+                  <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                    <Segmented options={SORT_OPTIONS} value={sortBy} onChange={changeSort} className="w-full sm:w-auto [&_button]:min-w-0 [&_button]:flex-1 [&_button]:px-1.5 [&_button]:py-1.5 sm:[&_button]:flex-none sm:[&_button]:px-2.5" />
+                    <span className="self-end t-micro font-mono uppercase tracking-[0.06em] text-[var(--brand-text-dim)] sm:self-auto">{sortDir === 'desc' ? 'High → low' : 'Low → high'}</span>
                   </div>
                   {fixQueue.length > 0 && (
                     <ClickableRow onClick={() => selectPage(fixQueue[0]?.page ?? null)} className="flex w-full items-center gap-2 rounded-[var(--radius-md)] border border-[var(--amber)] bg-[var(--brand-yellow-dim)] px-2.5 py-2 text-left hover:border-[var(--brand-yellow)]">
@@ -291,6 +292,7 @@ export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurface
                 onCreateBrief={createBrief}
                 onAddSchema={openSchema}
                 onViewTraffic={openTraffic}
+                onBackToPages={() => selectPage(null)}
               />
             </div>
           </div>
