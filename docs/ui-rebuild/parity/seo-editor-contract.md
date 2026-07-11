@@ -2,7 +2,7 @@
 
 Surface: `seo-editor` / SEO Editor  
 Owner: optimization / Webflow write-target workflow  
-Status: `behavior-safe / visual-unverified`; `ODP-003 C` source-grouping behavior checkpoint is implemented, while inline editing/review queue remain deferred
+Status: `owner-approved`; Joshua approved the corrected workbench/interior composition and documented exceptions on 2026-07-10
 Primary route: `/ws/:workspaceId/seo-editor`
 
 ## Prototype References
@@ -38,7 +38,7 @@ The prototype is a master-detail SEO workbench for clearing page metadata work a
 
 The parity ledger also says the former Page Intelligence surface is merged here through an Edit / Research model. Edit is the fast-wide worksheet; Research is the deep per-page intelligence with keyword mapping, content gaps, recommendations, fix-priority read, and Create Brief / Add Schema / View Traffic hand-offs.
 
-## Current Rebuilt Gap
+## Source-Led Baseline Before Visual Correction
 
 The rebuilt surface has many of the right production ingredients:
 
@@ -60,13 +60,26 @@ But the primary interaction model is still different from the prototype:
 
 Initial grade: `behavior mismatch` plus `capability risk`.
 
-Wave 2 correction implemented:
+Behavior-checkpoint correction implemented before the visual pass:
 
 - Edit mode now renders explicit `Static pages`, `CMS collection items`, and `Manual URLs` workbench groups using the existing table records and source authority.
 - Each group carries truthful source framing and counts; Static stays neutral, CMS uses blue data framing, and Manual uses amber read-only framing.
 - All groups continue to feed the existing single sticky selected-row action region. Static/CMS selection callbacks and Manual disabled state are unchanged.
 - The existing Detail Drawer, Edit/Research modes, URL params, fix-context handoff, save/analyze/rewrite/send flows, and approval panel remain unchanged and exact once.
 - This slice intentionally does not add inline title/meta editing, Approve, Publish, AI-fix, `Review pending`, or keyboard triage semantics.
+
+Source-led visual correction implemented 2026-07-10:
+
+- The default surface is the prototype's full-width sheet/worktable, not an Edit/Research card lens. The historical `?tab=` values remain compatibility state without duplicating the visible hierarchy.
+- Static and CMS title/meta fields use the existing production save paths inline. Manual rows remain amber read-only snapshots with disabled selection and truthful remediation in Research.
+- Source, CMS collection, and quick filters share one compact 39px row. Quick-filter `All` is label-only; other filters show their useful counts.
+- The missing-metadata band appears only when no rows are selected. Selection replaces it with one 40px, scroll-safe action toolbar.
+- Source bands use a truthful leading `Select all …` checkbox and reflect visible selection rather than a disconnected right-side button.
+- The worktable begins at x232 and uses the full rebuilt main canvas. Its single header, source bands, inline fields, and row density match the mounted prototype sheet.
+- Research opens the real detail workflow in the existing Drawer at 600px or 860px. Static/CMS write paths, previews, analysis, generation, save, send, and Keyword Hub handoff remain reachable exactly once.
+- H1 and slug stay read-only because no writable production field exists. Keyword assignment stays in Keyword Hub. The prototype keyboard review queue is not simulated because current callbacks do not support Approve/Request changes semantics.
+- Page Intelligence remains a standalone production route; this pass does not retire or redirect it based on visual similarity.
+- Fresh Sol review returned `PASS` with no safe-local visual defects. This does not constitute Joshua's visual approval.
 
 ## URL and Deep Links
 
@@ -113,12 +126,12 @@ Keep these production capabilities reachable exactly once:
 
 ## Implemented Owner Decision
 
-Decision `ODP-003 C` is implemented for source grouping while preserving the current table, Drawer, and write workflows. Inline editing and the keyboard review queue remain blocked on a dedicated save/send/approve/publish review.
+Decision `ODP-003 C` remains the capability boundary. The source-led pass advances its safe portion to the real inline workbench because Static/CMS save paths already exist; the keyboard review queue remains deferred because Approve/Request changes callbacks do not.
 
 Options:
 
-- Recommended: keep the current URL contract, but make the default surface a prototype-style write-target workbench with source-grouped spreadsheet rows, inline title/meta editing, selected-row sticky actions, page-intelligence detail drawer, and a `Review pending` keyboard queue.
-- Conservative: keep the current table + drawer structure for now, continue safe copy/style cleanup, and defer the workbench/queue rewrite until SEO editing has a dedicated implementation slice.
+- Implemented recommendation: keep the current URL contract and use the prototype-style source-grouped inline worksheet plus selected-row toolbar and Research Drawer.
+- Deferred recommendation: add a keyboard review queue only after real Approve, Request changes, Send, and Publish contracts exist and Joshua approves that workflow.
 
 Risk if wrong:
 
@@ -142,40 +155,19 @@ Later low-risk polish:
 
 ## Browser Smoke Checklist
 
-Baseline smoke for the current shell:
+Final source-led browser result:
 
-- Desktop `/ws/ws_demo_premium/seo-editor`.
-- Mobile `/ws/ws_demo_premium/seo-editor`.
-- Deep link `/ws/ws_demo_premium/seo-editor?tab=research&page=<seeded-page-id>` when seeded rows are available.
-- Source/filter deep link such as `/ws/ws_demo_premium/seo-editor?source=cms-item`.
-- Manual row detail open.
-- Static or CMS detail drawer open.
-- No blank table, duplicate drawer, hidden write target, visible internal rebuild labels, raw enum labels, text overlap, or console errors.
+- Rinse validates the truthful Manual-only state; Estateably resolves 507 targets into 25 Static, 217 CMS, and 265 Manual after source reads settle.
+- At 1440×900, heading y108, filters y167/h39, conditional banner or selected toolbar y218/h40, and worktable y294 closely match the prototype. At 1600×1000 the worktable remains full-width without document overflow.
+- Default populated evidence: `/tmp/asset-dashboard-codex-visual-parity/seo-editor/pass1/rebuilt-estateably-1440-after-review.png` and `rebuilt-estateably-1600-final.png`.
+- Final selected evidence: `rebuilt-selected-1440-v2.png`; browser audit recorded zero alerts, one selected toolbar, label-only `All`, and one leading `Select all Static pages` checkbox.
+- Research evidence: `rebuilt-static-drawer-600.png`, `rebuilt-static-drawer-860-final.png`, and `rebuilt-manual-drawer-1440.png`. The wide Drawer audited x580/w860/h900 at 1440×900 with document width 1440.
+- Mobile evidence: `rebuilt-estateably-mobile-390.png`; the document remains 390px wide and worksheet scrolling stays internal.
+- Deep-link, source/filter/search/page, overlay, and exact-once action tests remain green. Fresh Sol review returned `PASS`.
 
-Current-state smoke evidence:
+## Registry Closeout Evidence
 
-- Empty demo-shell baseline captured at `/tmp/asset-dashboard-codex-parity-captures/seo-editor-desktop-current.png`, `/tmp/asset-dashboard-codex-parity-captures/seo-editor-cms-source-deeplink-current.png`, and `/tmp/asset-dashboard-codex-parity-captures/seo-editor-mobile-current.png`.
-- Rowful desktop/mobile smoke captured against `ws_1772641235973` at `/tmp/asset-dashboard-codex-parity-captures/seo-editor-estateably-desktop-current.png` and `/tmp/asset-dashboard-codex-parity-captures/seo-editor-estateably-mobile-current.png`.
-- Source deep-link smoke captured at `/tmp/asset-dashboard-codex-parity-captures/seo-editor-estateably-cms-source-current.png`.
-- Detail drawer smoke captured at `/tmp/asset-dashboard-codex-parity-captures/seo-editor-estateably-detail-current.png`; state file `/tmp/asset-dashboard-codex-parity-captures/seo-editor-estateably-detail-state.json` recorded one dialog, no internal labels, no page-level horizontal overflow, no console errors, and no failed responses.
-- Typography-role smoke captured against `ws_1772610244629` at `/tmp/asset-dashboard-codex-parity-captures/seo-editor-typography-role-overview-desktop.png` and `/tmp/asset-dashboard-codex-parity-captures/seo-editor-typography-role-detail-desktop.png`; state file `/tmp/asset-dashboard-codex-parity-captures/seo-editor-typography-role-smoke-state.json` recorded 145 loaded rows, one detail dialog, no page-level horizontal overflow, no internal labels, `t-ui` row status at 13.5px/500, and `t-body` copy at 15.5px/500. Local preview console noise was limited to Vite WebSocket disconnect warnings plus a route-change-aborted intelligence refresh.
-
-Later full-workbench smoke, after inline editing/review queue approval:
-
-- Desktop workbench with source-grouped spreadsheet rows.
-- Mobile workbench with controls readable and no page-level horizontal overflow outside the intended table scroll.
-- Selected-row sticky action bar.
-- Detail drawer/pane with page intelligence and handoffs.
-- `Review pending` queue with keyboard triage actions.
-- Deep links initialize edit/research/source/filter/page state.
-
-Wave 2 browser result:
-
-- `/ws/ws_1772641235973/seo-editor` resolves 503 rows into 21 Static, 217 CMS, and 265 Manual rows; selector counts and group counts agree after target resolution settles.
-- Selecting `Enterprise Pricing` produces one shared selected-action toolbar above the grouped tables.
-- `?tab=research&page=69c81206a62bec51004c55d1` opens exactly one `Enterprise Pricing` Drawer while keeping the grouped worksheet available.
-- The overview/detail states have no page/main overflow, raw URL enums, implementation labels, or new console warnings/errors. Horizontal table scroll remains contained inside each `DataTable`.
-- State evidence: `/tmp/asset-dashboard-codex-parity-captures/wave2-parity-browser-state.json`.
+The measured registry archive adds exact prototype pairs at both required viewports for the default worktable, selected toolbar, Manual rows, static/CMS Research, and both 600px and 860px Research widths under `/tmp/asset-dashboard-codex-visual-parity/registry-final/prototype/`. Matching rebuilt 1600x1000 states are under `/tmp/asset-dashboard-codex-visual-parity/registry-final/rebuilt/`; the previously reviewed exact 1440x900 evidence remains authoritative. The keyboard review queue remains a named workflow exception, not a hidden visual omission.
 
 ## Automated Test Floor
 
@@ -192,14 +184,11 @@ Existing/current branch coverage proves:
 - Implementation language is absent from the loaded worksheet and detail drawer.
 - The rebuilt a11y floor passes.
 
-Wave 2 coverage now additionally proves:
+The source-led pass additionally proves:
 
-- Default Edit renders all present source groups with truthful headings/counts.
-- Static and CMS rows preserve their existing selection callbacks; Manual rows stay disabled/read-only.
-- The single selected-row action region remains outside the source groups.
+- Default renders one full-width source-grouped worksheet with inline Static/CMS title/meta controls and read-only Manual rows.
+- Missing metadata and selected actions are mutually exclusive; selected actions remain one 40px toolbar.
+- Source bands expose truthful leading select-all checkboxes, and quick-filter `All` has no duplicated total.
+- Research renders at 600px and 860px, preserves write authority, and keeps Manual remediation read-only.
 
-Still required for later slices:
-
-- Inline writable title/meta controls, after the write paths are explicitly reviewed.
-- Any future AI-fix, approve, send, publish, and clear action changes beyond the existing action region.
-- `Review pending` opens exactly one queue state and keyboard shortcuts invoke the expected actions.
+Still owner-gated as a separate future workflow slice: a real Review queue with Approve/Request changes/keyboard semantics. Joshua explicitly owner-approved the current visual pass with that exception on 2026-07-10.

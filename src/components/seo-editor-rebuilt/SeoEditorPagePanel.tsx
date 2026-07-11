@@ -1,6 +1,5 @@
 // @ds-rebuilt
 import { useEffect, useMemo, useState } from 'react';
-import { Check, ExternalLink, Lock, RefreshCw, Save, Search, Send, Sparkles, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { SEO_EDITOR_TARGET_TYPES } from '../../../shared/types/seo-editor-write-target';
 import { adminPath } from '../../routes';
@@ -17,6 +16,7 @@ import {
   Drawer,
   FormInput,
   FormTextarea,
+  GroupBlock,
   Icon,
   InlineBanner,
   KeyValueRow,
@@ -161,11 +161,16 @@ export function SeoEditorPagePanel({
   const { toast } = useToast();
   const [pageTitleDraft, setPageTitleDraft] = useState('');
   const [cmsNote, setCmsNote] = useState('');
+  const [wide, setWide] = useState(false);
 
   useEffect(() => {
     setPageTitleDraft(row?.target.title ?? '');
-    setCmsNote('');
   }, [row?.id, row?.target.title]);
+
+  useEffect(() => {
+    setCmsNote('');
+    setWide(false);
+  }, [row?.id]);
 
   const targetType = row?.target.targetType;
   const title = row?.target.title ?? 'SEO page detail';
@@ -195,7 +200,7 @@ export function SeoEditorPagePanel({
             loading={staticWorkflow.draftSaving.has(row.staticPage.id)}
             disabled={!row.edit?.dirty}
           >
-            <Icon as={staticWorkflow.draftSaved.has(row.staticPage.id) ? Check : Save} size="sm" />
+            <Icon name={staticWorkflow.draftSaved.has(row.staticPage.id) ? 'check' : 'clock'} size="sm" />
             {staticWorkflow.draftSaved.has(row.staticPage.id) ? 'Draft saved' : 'Save draft'}
           </Button>
           <Button
@@ -205,7 +210,7 @@ export function SeoEditorPagePanel({
             loading={staticWorkflow.saving.has(row.staticPage.id)}
             disabled={!row.edit?.dirty}
           >
-            <Icon as={staticWorkflow.saved.has(row.staticPage.id) ? Check : Save} size="sm" />
+            <Icon name="check" size="sm" />
             {staticWorkflow.saved.has(row.staticPage.id) ? 'Saved' : 'Save SEO'}
           </Button>
           <Button
@@ -215,7 +220,7 @@ export function SeoEditorPagePanel({
             loading={staticWorkflow.sendingPage.has(row.staticPage.id)}
             disabled={!row.edit?.dirty}
           >
-            <Icon as={Send} size="sm" />
+            <Icon name="send" size="sm" />
             {staticWorkflow.sentPage.has(row.staticPage.id) ? 'Sent' : 'Send to client'}
           </Button>
           {row.pageState?.status && staticWorkflow.clearPageTracking && (
@@ -238,7 +243,7 @@ export function SeoEditorPagePanel({
             loading={cmsWorkflow.saving.has(cmsTarget!.itemId)}
             disabled={!cmsWorkflow.dirty.has(cmsTarget!.itemId)}
           >
-            <Icon as={cmsWorkflow.saved.has(cmsTarget!.itemId) ? Check : Save} size="sm" />
+            <Icon name={cmsWorkflow.saved.has(cmsTarget!.itemId) ? 'check' : 'clock'} size="sm" />
             {cmsWorkflow.saved.has(cmsTarget!.itemId) ? 'Draft saved' : 'Save CMS draft'}
           </Button>
           <Button
@@ -248,7 +253,7 @@ export function SeoEditorPagePanel({
             loading={cmsWorkflow.publishing.has(cmsTarget!.collectionId)}
             disabled={!cmsWorkflow.saved.has(cmsTarget!.itemId)}
           >
-            <Icon as={cmsWorkflow.published.has(cmsTarget!.collectionId) ? Check : Upload} size="sm" />
+            <Icon name="check" size="sm" />
             {cmsWorkflow.published.has(cmsTarget!.collectionId) ? 'Published' : 'Publish collection'}
           </Button>
           <Button
@@ -258,7 +263,7 @@ export function SeoEditorPagePanel({
               if (!cmsWorkflow.approvalSelected.has(cmsTarget!.itemId)) cmsWorkflow.toggleApprovalItem(cmsTarget!.itemId);
             }}
           >
-            <Icon as={Send} size="sm" />
+            <Icon name="send" size="sm" />
             {cmsWorkflow.approvalSelected.has(cmsTarget!.itemId) ? 'In approval set' : 'Add to approval set'}
           </Button>
         </>
@@ -277,9 +282,20 @@ export function SeoEditorPagePanel({
       open
       onClose={onClose}
       title={title}
-      eyebrow={`${formatTargetTypeForSentence(row.target.targetType)} detail`}
+      eyebrow={`Research · ${formatTargetTypeForSentence(row.target.targetType)} detail`}
       subtitle={subtitle}
-      width="min(980px, 94vw)"
+      width={wide ? 860 : 600}
+      headerAction={(
+        <Button
+          size="sm"
+          variant="secondary"
+          aria-pressed={wide}
+          onClick={() => setWide((current) => !current)}
+        >
+          <Icon name={wide ? 'minus' : 'plus'} size="xs" />
+          {wide ? 'Narrow' : 'Wide'}
+        </Button>
+      )}
       footer={footer}
     >
       <div className="flex flex-col gap-4">
@@ -287,29 +303,17 @@ export function SeoEditorPagePanel({
           <Badge label={formatTargetTypeForSentence(row.target.targetType)} tone={row.target.targetType === SEO_EDITOR_TARGET_TYPES.manual ? 'amber' : 'teal'} variant="outline" size="sm" />
           <StatusBadge status={row.pageState?.status} size="sm" />
           {row.dirty && <Badge label="Unsaved" tone="blue" variant="soft" size="sm" />}
-          {row.target.targetType === SEO_EDITOR_TARGET_TYPES.manual && <Badge label="Visible only" tone="amber" variant="soft" size="sm" icon={Lock} />}
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
-            <KeyValueRow label="Optimization score" value={row.metrics.optimizationScore != null ? String(row.metrics.optimizationScore) : '—'} />
-          </div>
-          <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
-            <KeyValueRow label="Rank" value={formatRank(row.metrics.rank)} />
-          </div>
-          <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
-            <KeyValueRow label="Traffic" value={formatTraffic(row.metrics.traffic)} />
-          </div>
+          {row.target.targetType === SEO_EDITOR_TARGET_TYPES.manual && <Badge label="Read-only" tone="amber" variant="soft" size="sm" />}
         </div>
 
         {row.target.targetType === SEO_EDITOR_TARGET_TYPES.manual && (
-          <InlineBanner tone="warning" title="Manual row is visible only">
-            {row.target.manualApplyReason || 'This row is not backed by a writable Webflow page or CMS item, so save, publish, bulk rewrite, and client-send actions stay disabled.'}
+          <InlineBanner tone="warning" title="Manual target is read-only">
+            {row.target.manualApplyReason || 'This URL is not backed by a writable Webflow page or CMS item. Change it at the source, map it to Webflow, or route it through the redirect workflow.'}
           </InlineBanner>
         )}
 
         {row.target.targetType === SEO_EDITOR_TARGET_TYPES.staticPage && row.staticPage && row.edit && (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className={wide ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]' : 'grid gap-4'}>
             <div className="flex flex-col gap-4">
               <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -330,7 +334,7 @@ export function SeoEditorPagePanel({
                       }
                     }}
                   >
-                    <Icon as={Save} size="sm" />
+                    <Icon name="check" size="sm" />
                     Save title
                   </Button>
                 </div>
@@ -354,11 +358,11 @@ export function SeoEditorPagePanel({
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="secondary" onClick={() => staticWorkflow.analyzePage(row.staticPage!.id)} loading={staticWorkflow.analyzing.has(row.staticPage.id)}>
-                      <Icon as={Search} size="sm" />
+                      <Icon name="search" size="sm" />
                       {staticWorkflow.analyzedPages.has(row.staticPage.id) ? 'Re-analyze' : 'Analyze'}
                     </Button>
                     <Button size="sm" variant="secondary" onClick={() => staticWorkflow.aiRewrite(row.staticPage!.id, 'both')} loading={staticWorkflow.aiLoading[row.staticPage.id] === 'both'}>
-                      <Icon as={Sparkles} size="sm" />
+                      <Icon name="sparkle" size="sm" />
                       Generate pair
                     </Button>
                   </div>
@@ -411,7 +415,7 @@ export function SeoEditorPagePanel({
                   )}
                 </div>
                 <Button size="sm" variant="link" className="mt-3" onClick={() => navigate(adminPath(workspaceId, 'seo-keywords'))}>
-                  <Icon as={ExternalLink} size="sm" />
+                  <Icon name="external" size="sm" />
                   Open Keyword Hub
                 </Button>
               </div>
@@ -428,7 +432,7 @@ export function SeoEditorPagePanel({
         )}
 
         {row.target.targetType === SEO_EDITOR_TARGET_TYPES.cmsItem && row.cmsCollection && row.cmsItem && (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className={wide ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]' : 'grid gap-4'}>
             <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
@@ -446,7 +450,7 @@ export function SeoEditorPagePanel({
                   disabled={!cmsFields.titleField || !cmsFields.descField}
                   loading={cmsWorkflow.aiLoading[`${cmsTarget!.itemId}-both`]}
                 >
-                  <Icon as={Sparkles} size="sm" />
+                  <Icon name="sparkle" size="sm" />
                   Generate pair
                 </Button>
               </div>
@@ -514,7 +518,7 @@ export function SeoEditorPagePanel({
                     placeholder="Optional note for CMS approval batch"
                   />
                   <Button size="sm" variant="secondary" className="mt-2" onClick={() => cmsWorkflow.sendForApproval(cmsNote)} loading={cmsWorkflow.sendingApproval}>
-                    <Icon as={Send} size="sm" />
+                    <Icon name="send" size="sm" />
                     Send selected CMS to client
                   </Button>
                 </div>
@@ -547,13 +551,66 @@ export function SeoEditorPagePanel({
               <KeyValueRow label="SEO title" value={formatOptionalText(row.target.seo.title)} />
               <KeyValueRow label="Meta description" value={formatOptionalText(row.target.seo.description)} />
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button size="sm" variant="secondary" disabled><Icon as={Save} size="sm" /> Save disabled</Button>
-              <Button size="sm" variant="secondary" disabled><Icon as={Upload} size="sm" /> Publish disabled</Button>
-              <Button size="sm" variant="secondary" disabled><Icon as={Send} size="sm" /> Send disabled</Button>
-              <Button size="sm" variant="secondary" disabled><Icon as={RefreshCw} size="sm" /> Rewrite disabled</Button>
+            <div className="mt-4 border-t border-[var(--brand-border)] pt-4">
+              <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Make this target writable</div>
+              <ul className="mt-2 grid gap-2 t-body text-[var(--brand-text-muted)]">
+                <li className="flex items-start gap-2"><Icon name="external" size="sm" className="mt-0.5 text-[var(--amber)]" />Edit metadata in the platform that owns this URL.</li>
+                <li className="flex items-start gap-2"><Icon name="layers" size="sm" className="mt-0.5 text-[var(--blue)]" />Map it to its Webflow page or CMS collection item.</li>
+                <li className="flex items-start gap-2"><Icon name="link" size="sm" className="mt-0.5 text-[var(--brand-text-muted)]" />Use the redirect workflow if this URL should resolve to an editable target.</li>
+              </ul>
             </div>
           </div>
+        )}
+
+        {row.target.targetType !== SEO_EDITOR_TARGET_TYPES.manual && (
+          <>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
+                <KeyValueRow label="Optimization score" value={row.metrics.optimizationScore != null ? String(row.metrics.optimizationScore) : '—'} />
+              </div>
+              <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
+                <KeyValueRow label="Rank" value={formatRank(row.metrics.rank)} />
+              </div>
+              <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
+                <KeyValueRow label="Traffic" value={formatTraffic(row.metrics.traffic)} />
+              </div>
+            </div>
+
+            <GroupBlock
+              title="Page intelligence"
+              meta="Metadata recommendations and the deeper page-research handoff."
+              collapsible
+              defaultOpen={row.recommendations.length > 0}
+            >
+              <div className="grid gap-2 p-1">
+                {row.recommendations.length > 0 ? row.recommendations.map((recommendation) => (
+                  <InlineBanner key={recommendation.id} tone="warning" size="sm" title={recommendation.title}>
+                    {recommendation.insight}
+                  </InlineBanner>
+                )) : (
+                  <p className="t-body text-[var(--brand-text-muted)]">No metadata recommendations are attached to this target.</p>
+                )}
+                <Button
+                  size="sm"
+                  variant="link"
+                  className="justify-self-start"
+                  onClick={() => navigate(adminPath(workspaceId, 'page-intelligence'), {
+                    state: {
+                      fixContext: {
+                        targetRoute: 'page-intelligence',
+                        pageId: staticTarget?.pageId ?? cmsTarget?.itemId,
+                        pageSlug: row.target.rawSlug,
+                        pageName: row.target.title,
+                      },
+                    },
+                  })}
+                >
+                  <Icon name="search" size="sm" />
+                  Open Page Intelligence
+                </Button>
+              </div>
+            </GroupBlock>
+          </>
         )}
       </div>
     </Drawer>
