@@ -66,6 +66,7 @@ function createIntegration(item: Omit<IntegrationHealthItem, 'state'> & { state?
   return {
     ...item,
     state: item.state ?? (item.configured ? 'configured' : 'missing'),
+    verificationStatus: item.verificationStatus ?? 'not_checked',
   };
 }
 
