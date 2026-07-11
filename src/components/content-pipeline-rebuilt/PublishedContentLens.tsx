@@ -162,7 +162,7 @@ function TrendPanel({
         <div>
           <p className="t-label text-[var(--brand-text)]">Daily clicks trend</p>
           <p className="t-caption-sm text-[var(--brand-text-muted)]">
-            {points.length > 1 ? `${points.length} real daily points` : 'Not enough daily points yet'}
+            {points.length > 1 ? `${points.length} daily points` : 'Not enough daily points yet'}
           </p>
         </div>
         {points.length > 0 && (
@@ -183,7 +183,7 @@ function TrendPanel({
         />
       ) : (
         <p className="t-caption-sm text-[var(--brand-text-muted)]">
-          Trend series is absent for this piece. No synthetic sparkline is shown.
+          No daily click history is available for this piece yet.
         </p>
       )}
     </div>
@@ -206,7 +206,7 @@ function PublishedDetail({
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricTile label="Clicks" value={formatInteger(item.gsc?.clicks)} sub="GSC, trailing window" accent="var(--blue)" />
         <MetricTile label="Impressions" value={formatInteger(item.gsc?.impressions)} sub="GSC, trailing window" accent="var(--blue)" />
-        <MetricTile label="Sessions" value={formatInteger(item.ga4?.sessions)} sub="GA4, trailing window" accent="var(--teal)" />
+        <MetricTile label="Sessions" value={formatInteger(item.ga4?.sessions)} sub="GA4, trailing window" accent="var(--blue)" />
         <MetricTile label="Coverage" value={coverageLabel(item)} sub="Brief execution" accent={item.coverage.status === 'strong' ? 'var(--emerald)' : 'var(--amber)'} />
       </div>
 
@@ -224,7 +224,7 @@ function PublishedDetail({
 
         <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-3">
           <div className="mb-2 flex items-center gap-2">
-            <Icon name="traffic" size="sm" className="text-[var(--teal)]" aria-hidden="true" />
+            <Icon name="traffic" size="sm" className="text-[var(--blue)]" aria-hidden="true" />
             <h3 className="t-label text-[var(--brand-text)]">Site Analytics</h3>
           </div>
           <KeyValueRow label="Sessions" value={formatInteger(item.ga4?.sessions)} divider={false} />
@@ -246,7 +246,7 @@ function PublishedDetail({
 
       <GroupBlock
         title="Brief Execution"
-        meta="Term coverage and source-evidence joinback from the shared content-performance read."
+        meta="Required-term coverage and source evidence for this published piece."
         stats={[
           { label: 'Matched', value: item.coverage.matchedCount, color: 'var(--emerald)' },
           { label: 'Required', value: item.coverage.requiredCount, color: 'var(--blue)' },
@@ -317,12 +317,9 @@ export function PublishedContentLens({ workspaceId, siteLabel }: PublishedConten
 
   const totals = useMemo(() => ({
     clicks: items.reduce((sum, item) => sum + (item.gsc?.clicks ?? 0), 0),
-    impressions: items.reduce((sum, item) => sum + (item.gsc?.impressions ?? 0), 0),
-    sessions: items.reduce((sum, item) => sum + (item.ga4?.sessions ?? 0), 0),
     outcomes: items.filter((item) => item.outcome).length,
     wins: items.filter((item) => item.outcome?.score === 'win').length,
   }), [items]);
-  const readyLabel = `${totals.wins} win${totals.wins === 1 ? '' : 's'} ready`;
 
   const handleRefresh = () => {
     toast('Content performance refresh started', 'info');
@@ -422,11 +419,41 @@ export function PublishedContentLens({ workspaceId, siteLabel }: PublishedConten
     );
   }
 
+  if (items.length === 0) {
+    return (
+      <div data-testid="content-pipeline-published-lens">
+        <EmptyState
+          icon={PublishedEmptyIcon}
+          title="No published content yet"
+          description="Pieces land here once they go live, with their measured outcome readback."
+          action={(
+            <Button size="sm" variant="secondary" onClick={handleRefresh} disabled={refresh.isPending}>
+              <Icon name="refresh" size="sm" />
+              Re-scan
+            </Button>
+          )}
+        />
+      </div>
+    );
+  }
+
   const tableRows = filteredItems.map(toRecord);
-  const defaultEmpty = items.length === 0;
 
   return (
     <div className="flex flex-col gap-5" data-testid="content-pipeline-published-lens">
+      {query.isError && query.data && (
+        <InlineBanner tone="warning" title="Published data may be stale">
+          The latest content-performance read did not refresh, so the last loaded numbers are still shown.
+        </InlineBanner>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricTile label="Pieces Live" value={counts.published} accent="var(--emerald)" />
+        <MetricTile label="Total Clicks" value={formatInteger(totals.clicks)} accent="var(--blue)" />
+        <MetricTile label="Avg Position" value={averagePosition(items)} accent="var(--blue)" />
+        <MetricTile label="Wins to Graduate" value={totals.wins} sub={`${totals.outcomes} measured readback${totals.outcomes === 1 ? '' : 's'}`} accent="var(--emerald)" />
+      </div>
+
       <Toolbar label="Published content controls" className="w-full">
         <div className="flex flex-wrap gap-2" aria-label="Published status filters">
           {STATUS_FILTERS.map((filter) => (
@@ -453,52 +480,13 @@ export function PublishedContentLens({ workspaceId, siteLabel }: PublishedConten
         </Button>
       </Toolbar>
 
-      {query.isError && query.data && (
-        <InlineBanner tone="warning" title="Published data may be stale">
-          The latest content-performance read did not refresh, so the last loaded numbers are still shown.
-        </InlineBanner>
-      )}
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricTile label="Readbacks" value={totals.outcomes} sub="Scored outcome rows" accent="var(--emerald)" />
-        <MetricTile label="Total Clicks" value={formatInteger(totals.clicks)} accent="var(--blue)" />
-        <MetricTile label="Impressions" value={formatInteger(totals.impressions)} accent="var(--blue)" />
-        <MetricTile label="Sessions" value={formatInteger(totals.sessions)} accent="var(--teal)" />
-        <MetricTile label="Avg Position" value={averagePosition(items)} accent="var(--blue)" />
-      </div>
-
-      <GroupBlock
-        title="Published proof queue"
-        meta="Outcome readback and client-story graduation"
-        stats={[
-          { label: 'wins ready', value: totals.wins, color: totals.wins > 0 ? 'var(--emerald)' : 'var(--brand-text-muted)' },
-          { label: 'readbacks', value: totals.outcomes, color: 'var(--blue)' },
-        ]}
-      >
-        <div className="flex items-start gap-3 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-4 py-3">
-          <Icon name="trophy" size="md" className="mt-0.5 text-[var(--emerald)]" />
-          <div className="min-w-0">
-            <Badge label={readyLabel} tone={totals.wins > 0 ? 'emerald' : 'zinc'} variant="soft" size="sm" />
-            <p className="mt-2 t-body text-[var(--brand-text-muted)]">
-              Wins with measured lift graduate into Insights Engine as client-facing proof once the story is ready to send.
-            </p>
-          </div>
-        </div>
-      </GroupBlock>
-
       <DataTable
         columns={columns}
         rows={tableRows}
         loading={query.isFetching && tableRows.length === 0}
         getRowKey={(record) => (record as PublishedRecord).source.requestId}
         onRowClick={(record) => setSelectedItem((record as PublishedRecord).source)}
-        empty={defaultEmpty ? (
-          <EmptyState
-            icon={PublishedEmptyIcon}
-            title="No published content yet"
-            description="Content performance starts when content requests reach delivered or published status with a target page slug."
-          />
-        ) : (
+        empty={(
           <EmptyState
             icon={SearchEmptyIcon}
             title="No pieces match this status"

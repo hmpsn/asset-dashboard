@@ -171,10 +171,10 @@ export function PageIntelligence({ workspaceId, siteId, fixContext }: Props) {
 
   const createBriefForPage = (page: UnifiedPage, kw?: KeywordData) => {
     const sp = page.strategy;
-    navigate(adminPath(workspaceId, 'seo-briefs'), {
+    navigate(`${adminPath(workspaceId, 'content-pipeline')}?tab=briefs`, {
       state: {
         fixContext: {
-          targetRoute: 'seo-briefs',
+          targetRoute: 'content-pipeline',
           pageSlug: page.slug,
           pageName: page.title,
           primaryKeyword: sp?.primaryKeyword || kw?.primaryKeyword || undefined,

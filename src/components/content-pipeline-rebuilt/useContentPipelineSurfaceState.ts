@@ -46,6 +46,7 @@ export interface UseContentPipelineSurfaceStateReturn {
   rawTab: string | null;
   postId: string | null;
   setTab: (tab: ContentPipelineTab) => void;
+  openPost: (postId: string) => void;
   clearPost: () => void;
 }
 
@@ -77,11 +78,19 @@ export function useContentPipelineSurfaceState(): UseContentPipelineSurfaceState
     updateParams({ [POST_PARAM]: null });
   }, [updateParams]);
 
+  const openPost = useCallback((nextPostId: string) => {
+    // Preserve the current lens while the item workspace is open. Board cards
+    // should return to the Board when the workspace closes; explicit legacy
+    // `?tab=posts&post=...` deep links still retain their Posts receiver.
+    updateParams({ [POST_PARAM]: nextPostId });
+  }, [updateParams]);
+
   return {
     tab,
     rawTab,
     postId,
     setTab,
+    openPost,
     clearPost,
   };
 }

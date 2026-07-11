@@ -202,7 +202,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         sub: 'Generate content brief for keyword',
         icon: FileText,
         type: 'action',
-        action: () => { navigate(adminPath(selectedWorkspace!.id, 'seo-briefs')); addRecent('action:create-brief'); },
+        action: () => { navigate(`${adminPath(selectedWorkspace!.id, 'content-pipeline')}?tab=briefs`); addRecent('action:create-brief'); },
       });
       result.push({
         id: 'action:scan-anomalies',

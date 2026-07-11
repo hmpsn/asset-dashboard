@@ -65,14 +65,16 @@ export function ContentManager({ workspaceId, embedded = false }: ContentManager
   if (activePostId) {
     return (
       <div className="space-y-8">
-        <Button
-          onClick={closePostEditor}
-          variant="link"
-          size="sm"
-          className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] no-underline"
-        >
-          ← Back to Content
-        </Button>
+        {!embedded && (
+          <Button
+            onClick={closePostEditor}
+            variant="link"
+            size="sm"
+            className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] no-underline"
+          >
+            ← Back to Content
+          </Button>
+        )}
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4" style={{ borderRadius: 'var(--radius-signature)' }}>
           <PostEditor
             key={activePostId}
@@ -80,6 +82,7 @@ export function ContentManager({ workspaceId, embedded = false }: ContentManager
             postId={activePostId}
             onClose={closePostEditor}
             onDelete={closePostEditor}
+            workspaceLayout={embedded}
           />
         </div>
       </div>

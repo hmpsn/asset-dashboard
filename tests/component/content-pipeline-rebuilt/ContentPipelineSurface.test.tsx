@@ -4,6 +4,8 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, useNavigate, useSearchParams } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContentPipelineSurface } from '../../../src/components/content-pipeline-rebuilt/ContentPipelineSurface';
+import { deriveLifecycleBoardItems } from '../../../src/components/content-pipeline-rebuilt/ContentLifecycleBoard';
+import { deriveContentIntake, isContentWorkOrder } from '../../../src/components/content-pipeline-rebuilt/ContentPipelineIntake';
 import { ToastProvider } from '../../../src/components/Toast';
 import { useFeatureFlag } from '../../../src/hooks/useFeatureFlag';
 import { queryKeys } from '../../../src/lib/queryKeys';
@@ -14,6 +16,11 @@ const mocks = vi.hoisted(() => ({
   contentPipelineHook: vi.fn(),
   workspacesHook: vi.fn(),
   intelligenceHook: vi.fn(),
+  briefsHook: vi.fn(),
+  requestsHook: vi.fn(),
+  postsHook: vi.fn(),
+  suggestionsHook: vi.fn(),
+  workOrdersHook: vi.fn(),
   workspaceHandlers: {} as Record<string, () => void>,
   contentPerformanceHook: vi.fn(),
   contentPerformanceTrendHook: vi.fn(),
@@ -35,6 +42,14 @@ vi.mock('../../../src/hooks/admin', () => ({
   useContentPipeline: (...args: unknown[]) => mocks.contentPipelineHook(...args),
   useWorkspaces: (...args: unknown[]) => mocks.workspacesHook(...args),
   useWorkspaceIntelligence: (...args: unknown[]) => mocks.intelligenceHook(...args),
+  useAdminBriefsList: (...args: unknown[]) => mocks.briefsHook(...args),
+  useAdminRequestsList: (...args: unknown[]) => mocks.requestsHook(...args),
+  useAdminPostsList: (...args: unknown[]) => mocks.postsHook(...args),
+  useAiSuggestedBriefs: (...args: unknown[]) => mocks.suggestionsHook(...args),
+}));
+
+vi.mock('../../../src/hooks/admin/useWorkOrders', () => ({
+  useAdminWorkOrders: (...args: unknown[]) => mocks.workOrdersHook(...args),
 }));
 
 vi.mock('../../../src/hooks/useWorkspaceEvents', () => ({
@@ -93,13 +108,24 @@ vi.mock('../../../src/components/ContentBriefs', () => ({
     fixContext,
     clearFixContext,
     embedded,
+    initialBriefId,
+    display,
+    requestIds,
   }: {
     workspaceId: string;
     fixContext?: { primaryKeyword?: string } | null;
     clearFixContext?: () => void;
     embedded?: boolean;
+    initialBriefId?: string | null;
+    display?: 'full' | 'generator' | 'requests';
+    requestIds?: readonly string[];
   }) => (
-    <div data-testid="legacy-briefs">
+    <div
+      data-testid="legacy-briefs"
+      data-initial-brief={initialBriefId ?? ''}
+      data-display={display ?? 'full'}
+      data-request-ids={requestIds?.join(',') ?? ''}
+    >
       {!embedded && <h2>Content Briefs</h2>}
       Briefs {workspaceId} {fixContext?.primaryKeyword ?? 'no-fix-context'}
       <input aria-label="Search briefs" placeholder="Search briefs..." />
@@ -208,6 +234,7 @@ const contentPipelineSlice = {
   coverageGaps: [],
   seoEdits: { pending: 0, applied: 1, inReview: 0 },
   suggestedBriefs: 2,
+  subscriptions: { active: 0, totalPages: 0 },
   decayAlerts: [
     {
       pageUrl: '/old-guide',
@@ -225,6 +252,144 @@ const contentPipelineSlice = {
     },
   ],
 };
+
+const briefs = [
+  {
+    id: 'brief-linked',
+    workspaceId,
+    targetKeyword: 'linked keyword',
+    secondaryKeywords: [],
+    suggestedTitle: 'Linked brief title',
+    suggestedMetaDesc: 'Linked description',
+    outline: [],
+    wordCountTarget: 1200,
+    intent: 'informational',
+    audience: 'buyers',
+    competitorInsights: '',
+    internalLinkSuggestions: [],
+    pageType: 'blog' as const,
+    createdAt: '2026-07-02T12:00:00.000Z',
+  },
+  {
+    id: 'brief-standalone',
+    workspaceId,
+    targetKeyword: 'standalone keyword',
+    secondaryKeywords: ['supporting keyword'],
+    suggestedTitle: 'Standalone brief title',
+    suggestedMetaDesc: 'Standalone description',
+    outline: [],
+    wordCountTarget: 1500,
+    intent: 'commercial',
+    audience: 'operators',
+    competitorInsights: '',
+    internalLinkSuggestions: [],
+    pageType: 'service' as const,
+    keywordSource: 'manual' as const,
+    createdAt: '2026-07-03T12:00:00.000Z',
+  },
+];
+
+const requests = [
+  {
+    id: 'request-linked',
+    workspaceId,
+    topic: 'Linked request title',
+    targetKeyword: 'linked keyword',
+    intent: 'informational',
+    priority: 'high',
+    rationale: 'Client asked for it',
+    status: 'in_progress' as const,
+    briefId: 'brief-linked',
+    source: 'strategy' as const,
+    pageType: 'blog' as const,
+    requestedAt: '2026-07-01T12:00:00.000Z',
+    updatedAt: '2026-07-04T12:00:00.000Z',
+  },
+  {
+    id: 'request-queued',
+    workspaceId,
+    topic: 'Client-requested service page',
+    targetKeyword: 'queued keyword',
+    intent: 'commercial',
+    priority: 'medium',
+    rationale: 'New service launch',
+    status: 'requested' as const,
+    source: 'client' as const,
+    pageType: 'service' as const,
+    requestedAt: '2026-07-05T12:00:00.000Z',
+    updatedAt: '2026-07-05T12:00:00.000Z',
+  },
+];
+
+const posts = [
+  {
+    id: 'post-linked',
+    workspaceId,
+    briefId: 'brief-linked',
+    targetKeyword: 'linked keyword',
+    title: 'Linked draft title',
+    metaDescription: '',
+    introduction: '',
+    sections: [],
+    conclusion: '',
+    totalWordCount: 820,
+    targetWordCount: 1200,
+    status: 'draft' as const,
+    createdAt: '2026-07-04T12:00:00.000Z',
+    updatedAt: '2026-07-05T12:00:00.000Z',
+  },
+  {
+    id: 'post-review',
+    workspaceId,
+    briefId: 'brief-review-missing',
+    targetKeyword: 'review keyword',
+    title: 'Review-ready draft',
+    metaDescription: '',
+    introduction: '',
+    sections: [],
+    conclusion: '',
+    totalWordCount: 1400,
+    targetWordCount: 1400,
+    status: 'review' as const,
+    createdAt: '2026-07-04T12:00:00.000Z',
+    updatedAt: '2026-07-06T12:00:00.000Z',
+  },
+];
+
+const suggestions = [{
+  id: 'suggestion-1',
+  workspaceId,
+  keyword: 'decay refresh keyword',
+  pageUrl: '/older-page',
+  source: 'content_decay',
+  reason: 'Traffic has declined',
+  priority: 'high' as const,
+  status: 'pending' as const,
+  createdAt: '2026-07-05T12:00:00.000Z',
+  resolvedAt: null,
+  snoozedUntil: null,
+  dismissedKeywordHash: null,
+}];
+
+const workOrders = [{
+  id: 'work-order-1',
+  workspaceId,
+  paymentId: 'payment-1',
+  productType: 'post_polished' as const,
+  status: 'in_progress' as const,
+  pageIds: [],
+  quantity: 1,
+  notes: 'Polish launch announcement',
+  createdAt: '2026-07-05T12:00:00.000Z',
+  updatedAt: '2026-07-06T12:00:00.000Z',
+}];
+
+const nonContentWorkOrders = [
+  { ...workOrders[0], id: 'work-order-schema', productType: 'schema_page' as const },
+  { ...workOrders[0], id: 'work-order-fix', productType: 'fix_meta' as const },
+  { ...workOrders[0], id: 'work-order-plan', productType: 'plan_growth' as const },
+  { ...workOrders[0], id: 'work-order-strategy', productType: 'strategy' as const },
+];
 
 const publishedResponse = {
   items: [
@@ -373,6 +538,11 @@ beforeEach(() => {
     isFetching: false,
     refetch: vi.fn().mockResolvedValue({ data: { contentPipeline: contentPipelineSlice } }),
   });
+  mocks.briefsHook.mockReturnValue({ data: briefs, isLoading: false, isError: false });
+  mocks.requestsHook.mockReturnValue({ data: requests, isLoading: false, isError: false });
+  mocks.postsHook.mockReturnValue({ data: posts, isLoading: false, isError: false });
+  mocks.suggestionsHook.mockReturnValue({ data: suggestions, isLoading: false, isError: false });
+  mocks.workOrdersHook.mockReturnValue({ data: workOrders, isLoading: false, isError: false });
   mocks.contentPerformanceHook.mockReturnValue({
     data: publishedResponse,
     isLoading: false,
@@ -398,6 +568,39 @@ beforeEach(() => {
 });
 
 describe('ContentPipelineSurface rebuilt cockpit', () => {
+  it('derives one truthful card at the most advanced persisted stage', () => {
+    const items = deriveLifecycleBoardItems({ briefs, requests, posts }, new Date('2026-07-10T12:00:00.000Z'));
+
+    expect(items.map((item) => item.title)).toContain('Linked draft title');
+    expect(items.map((item) => item.title)).not.toContain('Linked brief title');
+    expect(items.map((item) => item.title)).not.toContain('Linked request title');
+    expect(items.find((item) => item.id === 'post:post-linked')).toMatchObject({
+      stage: 'draft',
+      sourceLabel: 'Strategy',
+      keyword: 'linked keyword',
+      pageType: 'Blog',
+      statusLabel: 'Draft',
+      nextAction: 'Continue draft',
+    });
+  });
+
+  it('separates pending intake artifacts and excludes non-content work orders', () => {
+    const snapshot = deriveContentIntake({
+      briefs,
+      requests,
+      posts,
+      suggestions,
+      workOrders: [...workOrders, ...nonContentWorkOrders],
+    });
+
+    expect(snapshot.requests.map((request) => request.id)).toEqual(['request-queued']);
+    expect(snapshot.suggestions.map((suggestion) => suggestion.id)).toEqual(['suggestion-1']);
+    expect(snapshot.workOrders.map((order) => order.id)).toEqual(['work-order-1']);
+    expect(snapshot.total).toBe(3);
+    expect(isContentWorkOrder(workOrders[0])).toBe(true);
+    expect(nonContentWorkOrders.every((order) => !isContentWorkOrder(order))).toBe(true);
+  });
+
   it('uses the real feature flag hook through loading(default) to loaded(true)', async () => {
     let resolveFlags: (value: { 'ui-rebuild-shell': boolean }) => void = () => {};
     mocks.featureFlagsList.mockReturnValue(new Promise((resolve) => {
@@ -434,6 +637,96 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     expect(screen.queryByTestId('legacy-briefs')).not.toBeInTheDocument();
   });
 
+  it('uses item-backed cards and removes the opening KPI strip', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline`);
+
+    expect(await screen.findByRole('button', { name: /Standalone brief title/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Linked draft title/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Review-ready draft/i })).toBeInTheDocument();
+    expect(screen.queryByText('Linked brief title')).not.toBeInTheDocument();
+    expect(screen.queryByText('Linked request title')).not.toBeInTheDocument();
+    expect(screen.queryByText('Client-requested service page')).not.toBeInTheDocument();
+    expect(screen.queryByText('decay refresh keyword')).not.toBeInTheDocument();
+    expect(screen.queryByText('Polish launch announcement')).not.toBeInTheDocument();
+    expect(screen.queryByText('Published Cells')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^New piece$/i })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Export$/i })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Refresh$/i })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Guide$/i })).toHaveLength(1);
+  });
+
+  it('opens one local full-screen Brief workspace and restores focus on Escape', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline`);
+
+    const trigger = await screen.findByRole('button', { name: /Standalone brief title/i });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const workspaceDialog = await screen.findByRole('dialog', { name: /Standalone brief title/i });
+    expect(workspaceDialog).toHaveStyle({ width: '100vw' });
+    expect(workspaceDialog).toHaveClass('!max-w-none');
+    expect(workspaceDialog).toHaveStyle({ maxWidth: 'none' });
+    expect(screen.getAllByTestId('legacy-briefs')).toHaveLength(1);
+    expect(screen.getByTestId('legacy-briefs')).toHaveAttribute('data-initial-brief', 'brief-standalone');
+    expect(screen.getByTestId('brief-workspace-section-rail')).toBeInTheDocument();
+    expect(screen.getByTestId('brief-workspace-readiness-rail')).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /Standalone brief title/i })).not.toBeInTheDocument());
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it('opens one Draft workspace through the canonical ?post= receiver and returns a Board card to the Board', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline`);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Linked draft title/i }));
+
+    expect(await screen.findByRole('dialog', { name: /Linked draft title/i })).toBeInTheDocument();
+    expect(screen.getAllByTestId('legacy-posts')).toHaveLength(1);
+    expect(screen.getByTestId('legacy-posts')).toHaveTextContent('post=post-linked');
+    expect(screen.getByTestId('draft-workspace-section-rail')).toBeInTheDocument();
+    expect(screen.getByTestId('draft-workspace-status-rail')).toBeInTheDocument();
+    expect(screen.queryByTestId('review-workspace-status-rail')).not.toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /Linked draft title/i })).not.toBeInTheDocument());
+    expect(screen.getByTestId('content-pipeline-board')).toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-posts')).not.toBeInTheDocument();
+  });
+
+  it('uses a distinct review-status rail for persisted review drafts', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline`);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Review-ready draft/i }));
+
+    expect(await screen.findByRole('dialog', { name: /Review-ready draft/i })).toBeInTheDocument();
+    expect(screen.getByTestId('review-workspace-status-rail')).toBeInTheDocument();
+    expect(screen.queryByTestId('draft-workspace-status-rail')).not.toBeInTheDocument();
+  });
+
+  it('opens truthful capacity in the existing 440px Drawer', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline`);
+
+    const capacity = await screen.findByRole('button', { name: /No content plan/i });
+    fireEvent.click(capacity);
+
+    const drawer = await screen.findByRole('dialog', { name: 'Content subscription' });
+    expect(drawer).toHaveStyle({ width: '440px' });
+    expect(screen.getAllByTestId('legacy-subscriptions')).toHaveLength(1);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Content subscription' })).not.toBeInTheDocument());
+  });
+
+  it('does not expose prototype-only queue or generation theater controls', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline`);
+
+    expect(await screen.findByTestId('content-pipeline-board')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Queue refresh/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Add to Insights/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Generate briefs for planned/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Send reminder/i })).not.toBeInTheDocument();
+  });
+
   it('expands Intake from the default Board without opening an empty disclosure', async () => {
     renderSurface(`/ws/${workspaceId}/content-pipeline`);
 
@@ -445,6 +738,9 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     fireEvent.click(intakeSummary!);
 
     expect(await screen.findByTestId('legacy-intake')).toBeInTheDocument();
+    expect(screen.getByTestId('legacy-briefs')).toHaveAttribute('data-display', 'requests');
+    expect(screen.getByTestId('legacy-briefs')).toHaveAttribute('data-request-ids', 'request-queued');
+    expect(screen.getByText('Polish launch announcement')).toBeInTheDocument();
     expect(screen.getByTestId('content-pipeline-board')).toHaveAttribute('data-intake-state', 'expanded');
   });
 
@@ -473,6 +769,11 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
       isFetching: false,
       refetch: vi.fn().mockResolvedValue({ data: { contentPipeline: emptyContentPipeline } }),
     });
+    mocks.briefsHook.mockReturnValue({ data: [], isLoading: false, isError: false });
+    mocks.requestsHook.mockReturnValue({ data: [], isLoading: false, isError: false });
+    mocks.postsHook.mockReturnValue({ data: [], isLoading: false, isError: false });
+    mocks.suggestionsHook.mockReturnValue({ data: [], isLoading: false, isError: false });
+    mocks.workOrdersHook.mockReturnValue({ data: [], isLoading: false, isError: false });
 
     const briefsView = renderSurface(`/ws/${workspaceId}/content-pipeline`);
     fireEvent.click(await screen.findByRole('button', { name: /Open briefs/i }));
@@ -487,10 +788,32 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
   it('routes Content Health brief creation through the shared Briefs opener', async () => {
     renderSurface(`/ws/${workspaceId}/content-pipeline?tab=content-health`);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Draft brief' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Draft refresh brief' }));
 
     expect(await screen.findAllByTestId('legacy-briefs')).toHaveLength(1);
     expect(screen.getByRole('radio', { name: /Board/i })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('uses the prototype-sized Content Health empty composition without internal identifiers', async () => {
+    mocks.contentPipelineHook.mockReturnValue({
+      data: { ...pipelineData, decay: { critical: 0, warning: 0, totalDecaying: 0, avgDeclinePct: 0 } },
+      isLoading: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+    mocks.intelligenceHook.mockReturnValue({
+      data: { contentPipeline: { ...contentPipelineSlice, decayAlerts: [], cannibalizationWarnings: [] } },
+      isLoading: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=content-health`);
+
+    expect(await screen.findByText('No decaying content')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Draft refresh brief' })).toBeInTheDocument();
+    expect(screen.queryByText('Pages Decaying')).not.toBeInTheDocument();
+    expect(screen.queryByText(workspaceId)).not.toBeInTheDocument();
   });
 
   it('receives ?tab=published and renders the shared content-performance read', async () => {
@@ -499,12 +822,30 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     expect(await screen.findByRole('radio', { name: /Published/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByTestId('content-pipeline-published-lens')).toBeInTheDocument();
     expect(mocks.contentPerformanceHook).toHaveBeenCalledWith(workspaceId);
-    expect(screen.getByText('Published proof queue')).toBeInTheDocument();
-    expect(screen.getByText('1 win ready')).toBeInTheDocument();
-    expect(screen.getByText(/Wins with measured lift graduate into Insights Engine/i)).toHaveClass('t-body');
+    expect(screen.getByText('Pieces Live')).toBeInTheDocument();
+    expect(screen.getByText('Wins to Graduate')).toBeInTheDocument();
+    expect(screen.queryByText('Published proof queue')).not.toBeInTheDocument();
     expect(screen.getByText('Dental implant guide')).toBeInTheDocument();
     expect(screen.getAllByText('45,000').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('72% covered')).toBeInTheDocument();
+  });
+
+  it('shows only the Published empty state and real re-scan action before content goes live', async () => {
+    mocks.contentPerformanceHook.mockReturnValue({
+      data: { items: [] },
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=published`);
+
+    expect(await screen.findByText('No published content yet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Re-scan' })).toBeInTheDocument();
+    expect(screen.queryByText('Pieces Live')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Published content controls')).not.toBeInTheDocument();
   });
 
   it('preserves the calendar ?tab=posts&post= receiver and clears only post on close', async () => {
@@ -545,7 +886,9 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     firstRender.unmount();
     renderSurface(`/ws/${workspaceId}/content-pipeline?tab=subscriptions`);
     expect(await screen.findByTestId('legacy-subscriptions')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Content capacity' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('dialog', { name: 'Content subscription' })).toHaveStyle({ width: '440px' });
+    expect(screen.getByTestId('content-pipeline-board')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /No content plan/i })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('keeps internal rebuild and migration language out of the visible shell', async () => {
@@ -555,24 +898,70 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     expect(container).not.toHaveTextContent(/receiver|carried-over|carry-over|mounted below|shell owns|subscriptions alias|\?tab=|legacy|migration|rebuild|existing (?:brief )?workspace|current posts workspace/i);
   });
 
-  it('keeps header actions stackable on narrow viewports', async () => {
+  it('uses the topbar action portal fallback without duplicating narrow controls', async () => {
     renderSurface(`/ws/${workspaceId}/content-pipeline?tab=briefs`);
 
     const actionGroup = await screen.findByTestId('content-pipeline-header-actions');
-    expect(actionGroup).toHaveClass('flex-col');
-    expect(actionGroup).toHaveClass('sm:flex-row');
+    expect(screen.getByTestId('content-pipeline-topbar-actions-fallback')).toContainElement(actionGroup);
     expect(actionGroup).toHaveClass('max-w-full');
+    expect(actionGroup).toHaveClass('overflow-x-auto');
+    expect(screen.getAllByRole('button', { name: /^New piece$/ })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Export$/ })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Refresh$/ })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Guide$/ })).toHaveLength(1);
+  });
+
+  it('keeps new brief creation reachable from a populated Board', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline`);
+
+    fireEvent.click(await screen.findByRole('button', { name: /^New piece$/ }));
+
+    expect(await screen.findAllByTestId('legacy-briefs')).toHaveLength(1);
+    expect(screen.getByTestId('legacy-briefs')).toHaveAttribute('data-display', 'generator');
+    expect(screen.getByRole('dialog', { name: 'New content brief' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Board/i })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('consumes direct Content Pipeline brief handoff state before the router clears it', async () => {
+    const client = createQueryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[{
+          pathname: `/ws/${workspaceId}/content-pipeline`,
+          search: '?tab=briefs',
+          state: {
+            fixContext: {
+              targetRoute: 'content-pipeline',
+              primaryKeyword: 'emergency dentist austin',
+              pageSlug: '/emergency-dentist',
+              autoGenerate: true,
+            },
+          },
+        }]}
+        >
+          <ToastProvider>
+            <ContentPipelineSurface workspaceId={workspaceId} />
+          </ToastProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole('dialog', { name: 'New brief · emergency dentist austin' })).toBeInTheDocument();
+    expect(screen.getByTestId('legacy-briefs')).toHaveTextContent('emergency dentist austin');
+    expect(screen.getAllByTestId('legacy-briefs')).toHaveLength(1);
   });
 
   it('keeps legacy workspaces reachable exactly once without duplicating the page title', async () => {
     renderSurface(`/ws/${workspaceId}/content-pipeline`);
 
-    fireEvent.click(await screen.findByRole('button', { name: /Open briefs/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Standalone brief title/i }));
     expect(await screen.findByTestId('legacy-briefs')).toBeInTheDocument();
     expect(screen.getAllByTestId('legacy-briefs')).toHaveLength(1);
     expect(screen.getAllByRole('heading', { name: 'Content Pipeline' })).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole('button', { name: /Open drafts/i }));
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByTestId('legacy-briefs')).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /Linked draft title/i }));
     expect(await screen.findByTestId('legacy-posts')).toBeInTheDocument();
     expect(screen.getAllByTestId('legacy-posts')).toHaveLength(1);
     expect(screen.getAllByRole('heading', { name: 'Content Pipeline' })).toHaveLength(1);

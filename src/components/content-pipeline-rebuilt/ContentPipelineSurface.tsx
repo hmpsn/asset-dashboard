@@ -1,15 +1,26 @@
 // @ds-rebuilt
 import { useCallback, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
-import { useContentPipeline, useWorkspaces, useWorkspaceIntelligence } from '../../hooks/admin';
+import {
+  useAdminBriefsList,
+  useAdminPostsList,
+  useAdminRequestsList,
+  useAiSuggestedBriefs,
+  useContentPipeline,
+  useWorkspaces,
+  useWorkspaceIntelligence,
+} from '../../hooks/admin';
+import { useAdminWorkOrders } from '../../hooks/admin/useWorkOrders';
 import { adminContentPerformanceKeys } from '../../hooks/admin/useAdminContentPerformance';
 import { queryKeys } from '../../lib/queryKeys';
 import { WS_EVENTS } from '../../lib/wsEvents';
 import type { FixContext } from '../../types/fix-context';
 import { ContentPipelineGuide } from '../ContentPipelineGuide';
 import { ErrorBoundary } from '../ErrorBoundary';
+import { RebuiltTopbarActions } from '../layout/RebuiltAppChrome';
 import { useToast } from '../Toast';
 import {
   Button,
@@ -17,21 +28,20 @@ import {
   Icon,
   LensSwitcher,
   Menu,
-  MetricTile,
   PageHeader,
-  Skeleton,
-  Toolbar,
+  ToolbarSpacer,
   type MenuItem,
   type Tier,
 } from '../ui';
-import { ContentLifecycleBoard } from './ContentLifecycleBoard';
+import { ContentLifecycleBoard, deriveLifecycleBoardItems } from './ContentLifecycleBoard';
+import { ContentPipelineIntake, deriveContentIntake } from './ContentPipelineIntake';
 import { ContentPipelineLenses } from './ContentPipelineLenses';
 import type { ContentPipelineData } from './ContentPipelineLenses';
+import { ContentPipelineWorkspaces } from './ContentPipelineWorkspaces';
 import {
   type ContentPipelineTab,
   useContentPipelineSurfaceState,
 } from './useContentPipelineSurfaceState';
-import { formatContentDate } from './contentPipelineFormatters';
 import { mutationErrorMessage } from './contentPipelineMutationFeedback';
 
 interface ContentPipelineSurfaceProps {
@@ -54,6 +64,11 @@ function buildSignalPrefill(keyword: string, pageUrl?: string): FixContext {
   };
 }
 
+function readBriefFixContext(routerState: unknown): FixContext | null {
+  const fixContext = (routerState as { fixContext?: FixContext } | null)?.fixContext;
+  return fixContext?.targetRoute === 'content-pipeline' ? fixContext : null;
+}
+
 type ContentPipelineMode = 'board' | 'calendar' | 'published' | 'content-health' | 'planner';
 
 const MODE_OPTIONS: Array<{ value: ContentPipelineMode; label: string; count?: (data: ContentPipelineData | undefined) => number | undefined }> = [
@@ -71,6 +86,7 @@ function modeForTab(tab: ContentPipelineTab): ContentPipelineMode | undefined {
 }
 
 export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfaceProps) {
+  const location = useLocation();
   const state = useContentPipelineSurfaceState();
   const shellFlagEnabled = useFeatureFlag('ui-rebuild-shell');
   const queryClient = useQueryClient();
@@ -78,10 +94,17 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
   const pipelineQuery = useContentPipeline(workspaceId);
   const workspaces = useWorkspaces();
   const intelligence = useWorkspaceIntelligence(workspaceId, ['contentPipeline']);
+  const briefsQuery = useAdminBriefsList(workspaceId);
+  const requestsQuery = useAdminRequestsList(workspaceId);
+  const postsQuery = useAdminPostsList(workspaceId);
+  const suggestionsQuery = useAiSuggestedBriefs(workspaceId);
+  const workOrdersQuery = useAdminWorkOrders(workspaceId);
   const [guideOpen, setGuideOpen] = useState(false);
-  const [briefFixContext, setBriefFixContext] = useState<FixContext | null>(null);
+  const [capacityDrawerOpen, setCapacityDrawerOpen] = useState(false);
+  const [focusedBriefId, setFocusedBriefId] = useState<string | null>(null);
+  const [briefFixContext, setBriefFixContext] = useState<FixContext | null>(() => readBriefFixContext(location.state));
   const [prefillNonce, setPrefillNonce] = useState(0);
-  const [boardBriefsOpen, setBoardBriefsOpen] = useState(false);
+  const [blankBriefOpen, setBlankBriefOpen] = useState(() => readBriefFixContext(location.state) !== null);
 
   const workspace = useMemo(
     () => workspaces.data?.find((item) => item.id === workspaceId),
@@ -91,13 +114,46 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
   const siteLabel = workspace?.gscPropertyUrl ?? workspace?.webflowSiteName ?? null;
   const contentPipeline = intelligence.data?.contentPipeline;
   const pipelineData = pipelineQuery.data as ContentPipelineData | undefined;
-  const dataAsOf = formatContentDate(workspace?.createdAt);
   const mode = modeForTab(state.tab);
   const boardFocus = state.tab === 'intake' ? 'intake' : 'brief';
+  const lifecycleItems = useMemo(() => deriveLifecycleBoardItems({
+    briefs: briefsQuery.data,
+    requests: requestsQuery.data,
+    posts: postsQuery.data,
+  }), [briefsQuery.data, postsQuery.data, requestsQuery.data]);
+  const intakeSnapshot = useMemo(() => deriveContentIntake({
+    briefs: briefsQuery.data,
+    requests: requestsQuery.data,
+    posts: postsQuery.data,
+    suggestions: suggestionsQuery.data,
+    workOrders: workOrdersQuery.data,
+  }), [briefsQuery.data, postsQuery.data, requestsQuery.data, suggestionsQuery.data, workOrdersQuery.data]);
+  const focusedBrief = useMemo(
+    () => briefsQuery.data?.find((brief) => brief.id === focusedBriefId) ?? null,
+    [briefsQuery.data, focusedBriefId],
+  );
+  const focusedPost = useMemo(
+    () => postsQuery.data?.find((post) => post.id === state.postId) ?? null,
+    [postsQuery.data, state.postId],
+  );
+  const subscriptionSummary = contentPipeline?.subscriptions;
+  const activePlanCount = subscriptionSummary?.active ?? 0;
+  const capacityOpen = capacityDrawerOpen || state.tab === 'publish';
+  const capacityHeadline = activePlanCount > 0
+    ? `${activePlanCount} active plan${activePlanCount === 1 ? '' : 's'}`
+    : 'No content plan';
+  const capacityDetail = activePlanCount > 0
+    ? `${subscriptionSummary?.totalPages ?? 0} pages covered`
+    : 'Set up plan';
 
   const invalidateContentPipeline = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligence(workspaceId, ['contentPipeline']) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.briefs(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.workOrders(workspaceId) });
     queryClient.invalidateQueries({ queryKey: adminContentPerformanceKeys.all(workspaceId) });
   }, [queryClient, workspaceId]);
 
@@ -130,6 +186,11 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
       await Promise.all([
         pipelineQuery.refetch(),
         intelligence.refetch(),
+        briefsQuery.refetch(),
+        requestsQuery.refetch(),
+        postsQuery.refetch(),
+        suggestionsQuery.refetch(),
+        workOrdersQuery.refetch(),
         queryClient.invalidateQueries({ queryKey: adminContentPerformanceKeys.all(workspaceId) }),
       ]);
       toast('Content Pipeline data refreshed', 'success');
@@ -142,27 +203,47 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
   const lensOptions = MODE_OPTIONS.map((option) => ({
     value: option.value,
     label: option.label,
-    count: option.count?.(pipelineData),
+    count: option.value === 'board' ? lifecycleItems.length : option.count?.(pipelineData),
   }));
 
   const openMode = (nextMode: ContentPipelineMode) => {
-    setBoardBriefsOpen(false);
+    setCapacityDrawerOpen(false);
+    setFocusedBriefId(null);
+    setBlankBriefOpen(false);
+    clearBriefFixContext();
     state.setTab(nextMode === 'board' ? 'briefs' : nextMode);
   };
 
   const openBriefs = () => {
-    setBoardBriefsOpen(true);
+    setFocusedBriefId(null);
+    setBlankBriefOpen(true);
     state.setTab('briefs');
   };
 
+  const openNewPiece = () => {
+    clearBriefFixContext();
+    openBriefs();
+  };
+
   const openIntake = () => {
-    setBoardBriefsOpen(false);
+    setBlankBriefOpen(false);
     state.setTab('intake');
   };
 
   const openDrafts = () => {
-    setBoardBriefsOpen(false);
+    setBlankBriefOpen(false);
     state.setTab('posts');
+  };
+
+  const openBrief = (briefId: string) => {
+    setBlankBriefOpen(false);
+    setFocusedBriefId(briefId);
+  };
+
+  const openPost = (postId: string) => {
+    setFocusedBriefId(null);
+    setBlankBriefOpen(false);
+    state.openPost(postId);
   };
 
   const openWorkflowTab = (tab: ContentPipelineTab) => {
@@ -178,7 +259,7 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
       openDrafts();
       return;
     }
-    setBoardBriefsOpen(false);
+    setBlankBriefOpen(false);
     state.setTab(tab);
   };
 
@@ -188,90 +269,104 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
     openBriefs();
   };
 
-  return (
-    <ErrorBoundary label="Content Pipeline rebuilt surface">
-      <div className="flex min-h-full flex-col gap-5" data-rebuild-flag={shellFlagEnabled ? 'on' : 'default'}>
-        <PageHeader
-          title="Content Pipeline"
-          subtitle="Move content from opportunity to published proof without losing the next action."
-          className="flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible [&>div:last-child]:w-full sm:[&>div:last-child]:w-auto"
-          actions={(
-            <div data-testid="content-pipeline-header-actions" className="flex w-full max-w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-              {dataAsOf !== '—' && <span className="block w-full t-caption-sm text-[var(--brand-text-muted)] sm:w-auto">Workspace since {dataAsOf}</span>}
-              <Menu
-                align="end"
-                trigger={(
-                  <Button size="sm" variant="secondary" className="w-full sm:w-auto">
-                    <Icon name="download" size="sm" />
-                    Export
-                  </Button>
-                )}
-                items={exportMenuItems}
-              />
-              <Button size="sm" variant="secondary" className="w-full sm:w-auto" onClick={() => void handleRefresh()} disabled={pipelineQuery.isFetching || intelligence.isFetching}>
-                <Icon name="refresh" size="sm" />
-                Refresh
-              </Button>
-              <Button size="sm" variant="secondary" className="w-full sm:w-auto" onClick={() => setGuideOpen(true)}>
-                <Icon name="info" size="sm" />
-                Guide
-              </Button>
-              <Button size="sm" variant="secondary" className="w-full sm:w-auto" onClick={() => state.setTab('publish')} aria-pressed={state.tab === 'publish'}>
-                <Icon name="chart" size="sm" />
-                Content capacity
-              </Button>
-            </div>
-          )}
-        />
+  const closeCapacity = () => {
+    setCapacityDrawerOpen(false);
+    if (state.tab === 'publish') state.setTab('briefs');
+  };
 
-        <Toolbar label="Content Pipeline view controls" className="w-full">
-          <LensSwitcher
-            id="content-pipeline-rebuilt-lens"
-            options={lensOptions}
-            value={mode}
-            onChange={(value) => openMode(value as ContentPipelineMode)}
-            size="sm"
-          />
-        </Toolbar>
+  const closeBriefWorkspace = () => {
+    setFocusedBriefId(null);
+    setBlankBriefOpen(false);
+    clearBriefFixContext();
+  };
 
-        {pipelineQuery.isLoading && !pipelineData ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Loading Content Pipeline summary">
-            {Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-[92px] w-full" />)}
-          </div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <MetricTile label="Briefs" value={pipelineData?.summary?.briefs ?? 0} accent="var(--blue)" />
-            <MetricTile label="Posts" value={pipelineData?.summary?.posts ?? 0} accent="var(--teal)" />
-            <MetricTile label="Matrices" value={pipelineData?.summary?.matrices ?? 0} accent="var(--teal)" />
-            <MetricTile label="Published Cells" value={pipelineData?.summary?.published ?? 0} accent="var(--emerald)" />
-            <MetricTile label="Health Signals" value={pipelineData?.decay?.totalDecaying ?? 0} accent={(pipelineData?.decay?.critical ?? 0) > 0 ? 'var(--red)' : 'var(--amber)'} />
-          </div>
+  const topbarActions = (
+    <div data-testid="content-pipeline-header-actions" className="flex max-w-full items-center justify-end gap-2 overflow-x-auto">
+      <Button size="sm" onClick={openNewPiece}>
+        <Icon name="plus" size="sm" />
+        New piece
+      </Button>
+      <Menu
+        align="end"
+        trigger={(
+          <Button size="sm" variant="secondary">
+            <Icon name="download" size="sm" />
+            Export
+          </Button>
         )}
+        items={exportMenuItems}
+      />
+      <Button size="sm" variant="secondary" onClick={() => void handleRefresh()} disabled={pipelineQuery.isFetching || intelligence.isFetching}>
+        <Icon name="refresh" size="sm" />
+        Refresh
+      </Button>
+      <Button size="sm" variant="secondary" onClick={() => setGuideOpen(true)}>
+        <Icon name="info" size="sm" />
+        Guide
+      </Button>
+    </div>
+  );
 
-        {(state.tab === 'briefs' || state.tab === 'intake') ? (
+  return (
+    <ErrorBoundary label="Content Pipeline">
+      <div className="mr-auto flex min-h-full w-full max-w-[var(--page-max)] flex-col gap-4" data-rebuild-flag={shellFlagEnabled ? 'on' : 'default'}>
+        <RebuiltTopbarActions fallback={<div data-testid="content-pipeline-topbar-actions-fallback">{topbarActions}</div>}>
+          {topbarActions}
+        </RebuiltTopbarActions>
+
+        <div className="flex flex-wrap items-end gap-4" aria-label="Content Pipeline overview and view controls">
+          <PageHeader
+            title="Content Pipeline"
+            subtitle={(
+              <>
+                Active work for <strong className="font-semibold text-[var(--brand-text-bright)]">{workspace?.name ?? 'this workspace'}</strong> — idea to approved, one card at a time. Scheduled pieces live in <strong className="font-semibold text-[var(--brand-text-bright)]">Calendar</strong>; live pieces and their results in <strong className="font-semibold text-[var(--brand-text-bright)]">Published</strong>.
+              </>
+            )}
+            className="max-w-full flex-[0_1_44ch] [&_p]:mt-1 [&_p]:whitespace-normal [&_p]:overflow-visible [&_p]:text-clip [&_p]:leading-relaxed"
+          />
+          <ToolbarSpacer />
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-auto shrink-0 gap-2 px-2.5 py-1.5 text-left"
+            onClick={() => setCapacityDrawerOpen(true)}
+            aria-pressed={capacityOpen || state.tab === 'publish'}
+          >
+            <Icon name="layers" size="sm" className="text-[var(--teal)]" />
+            <span className="flex flex-col items-start leading-tight">
+              <span className="t-caption-sm font-semibold text-[var(--brand-text-bright)]">{capacityHeadline}</span>
+              <span className="t-micro text-[var(--brand-text-dim)]">{capacityDetail}</span>
+            </span>
+          </Button>
+          <div className="basis-full overflow-x-auto pb-px">
+            <LensSwitcher
+              id="content-pipeline-rebuilt-lens"
+              options={lensOptions}
+              value={mode}
+              onChange={(value) => openMode(value as ContentPipelineMode)}
+              size="sm"
+            />
+          </div>
+        </div>
+
+        {(state.tab === 'briefs' || state.tab === 'intake' || state.tab === 'publish' || Boolean(state.postId)) ? (
           <ContentLifecycleBoard
             key={boardFocus}
-            pipelineData={pipelineData}
-            contentPipeline={contentPipeline}
+            items={lifecycleItems}
             focus={boardFocus}
+            intakeCount={intakeSnapshot.total}
+            intakeSummary={intakeSnapshot.summary}
             intakeContent={(
-              <ContentPipelineLenses
+              <ContentPipelineIntake
                 workspaceId={workspaceId}
-                tab="intake"
-                pipelineData={pipelineData}
-                contentPipeline={contentPipeline}
-                workspaceTier={workspaceTier}
-                siteLabel={siteLabel}
-                briefFixContext={briefFixContext}
-                prefillNonce={prefillNonce}
-                clearBriefFixContext={clearBriefFixContext}
+                snapshot={intakeSnapshot}
                 onCreateBrief={handleCreateBrief}
-                onOpenTab={openWorkflowTab}
               />
             )}
-            onOpenIntake={openIntake}
             onOpenBriefs={openBriefs}
             onOpenDrafts={openDrafts}
+            onOpenBrief={openBrief}
+            onOpenPost={openPost}
           />
         ) : (
           <ContentPipelineLenses
@@ -289,21 +384,19 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
           />
         )}
 
-        {boardBriefsOpen && state.tab === 'briefs' && (
-          <ContentPipelineLenses
-            workspaceId={workspaceId}
-            tab="briefs"
-            pipelineData={pipelineData}
-            contentPipeline={contentPipeline}
-            workspaceTier={workspaceTier}
-            siteLabel={siteLabel}
-            briefFixContext={briefFixContext}
-            prefillNonce={prefillNonce}
-            clearBriefFixContext={clearBriefFixContext}
-            onCreateBrief={handleCreateBrief}
-            onOpenTab={openWorkflowTab}
-          />
-        )}
+        <ContentPipelineWorkspaces
+          workspaceId={workspaceId}
+          focusedBrief={focusedBrief}
+          blankBriefOpen={blankBriefOpen}
+          focusedPost={focusedPost}
+          postWorkspaceOpen={Boolean(state.postId)}
+          capacityOpen={capacityOpen}
+          briefFixContext={briefFixContext}
+          onClearBriefFixContext={clearBriefFixContext}
+          onCloseBrief={closeBriefWorkspace}
+          onClosePost={state.clearPost}
+          onCloseCapacity={closeCapacity}
+        />
 
         <Drawer
           open={guideOpen}

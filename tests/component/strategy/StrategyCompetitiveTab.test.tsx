@@ -44,12 +44,12 @@ describe('StrategyCompetitiveTab', () => {
     expect(screen.getByText('Add competitor domains')).toBeInTheDocument();
   });
 
-  it('wires the KeywordGaps Create-brief CTA to navigate into seo-briefs with a fixContext', () => {
+  it('wires the KeywordGaps Create-brief CTA directly into Content Pipeline with a fixContext', () => {
     const navigate = renderTab();
     fireEvent.click(screen.getByRole('button', { name: 'Create brief' }));
     expect(navigate).toHaveBeenCalledWith(
-      expect.stringContaining('seo-briefs'),
-      { state: { fixContext: { targetRoute: 'seo-briefs', pageName: 'best crm software' } } },
+      expect.stringContaining('content-pipeline?tab=briefs'),
+      { state: { fixContext: { targetRoute: 'content-pipeline', pageName: 'best crm software' } } },
     );
   });
 });

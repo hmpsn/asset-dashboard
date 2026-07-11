@@ -100,10 +100,12 @@ export function useAdminBriefWorkflow({
   workspaceId,
   fixContext,
   clearFixContext,
+  initialBriefId,
 }: {
   workspaceId: string;
   fixContext?: BriefWorkflowFixContext | null;
   clearFixContext?: () => void;
+  initialBriefId?: string | null;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -117,7 +119,7 @@ export function useAdminBriefWorkflow({
   const [pendingRequestBriefJob, setPendingRequestBriefJob] = useState<{ jobId: string; requestId: string } | null>(null);
   const [businessCtx, setBusinessCtx] = useState('');
   const [generationStyle, setGenerationStyle] = useState<ContentGenerationStyle>(DEFAULT_CONTENT_GENERATION_STYLE);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(() => initialBriefId ?? null);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
   const [loadingBrief, setLoadingBrief] = useState<string | null>(null);
   const [briefError, setBriefError] = useState<string | null>(null);
@@ -156,11 +158,18 @@ export function useAdminBriefWorkflow({
   const posts = (postsQ.data ?? []) as PostSummary[];
   const templateCrossref = templateCrossrefQ.data ?? null;
   const loading = briefsQ.isLoading || requestsQ.isLoading || postsQ.isLoading;
+  const initialBriefListLoaded = briefsQ.data !== undefined;
+  const initialBriefAvailable = Boolean(initialBriefId && briefsQ.data?.some((brief) => brief.id === initialBriefId));
   const hasBlockingQueryError =
     (briefsQ.isError || requestsQ.isError || postsQ.isError) &&
     briefs.length === 0 &&
     clientRequests.length === 0 &&
     posts.length === 0;
+
+  useEffect(() => {
+    if (initialBriefId === undefined || !initialBriefListLoaded) return;
+    setExpanded(initialBriefAvailable ? initialBriefId : null);
+  }, [initialBriefAvailable, initialBriefId, initialBriefListLoaded]);
 
   const fixContextRef = useRef<BriefWorkflowFixContext | null | undefined>(null);
   const fixConsumed = useRef(false);

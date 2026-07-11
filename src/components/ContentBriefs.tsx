@@ -15,9 +15,23 @@ interface ContentBriefsProps {
   fixContext?: FixContext | null;
   clearFixContext?: () => void;
   embedded?: boolean;
+  /** Opens one persisted brief in-place; omitted keeps the existing collapsed list behavior. */
+  initialBriefId?: string | null;
+  /** Narrows the established manager to one truthful composition without duplicating its hooks or mutations. */
+  display?: 'full' | 'generator' | 'requests';
+  /** Optional admitted request ids for Intake's requests-only composition. */
+  requestIds?: readonly string[];
 }
 
-export function ContentBriefs({ workspaceId, fixContext, clearFixContext, embedded = false }: ContentBriefsProps) {
+export function ContentBriefs({
+  workspaceId,
+  fixContext,
+  clearFixContext,
+  embedded = false,
+  initialBriefId,
+  display = 'full',
+  requestIds,
+}: ContentBriefsProps) {
   const {
     activePostId,
     briefError,
@@ -88,7 +102,7 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext, embedd
     toggleRequestBrief,
     undoDelete,
     updateRequestStatus,
-  } = useAdminBriefWorkflow({ workspaceId, fixContext, clearFixContext });
+  } = useAdminBriefWorkflow({ workspaceId, fixContext, clearFixContext, initialBriefId });
 
   if (loading) {
     return (
@@ -153,6 +167,16 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext, embedd
       </div>
     </div>
   );
+  const focusedBrief = initialBriefId ? briefs.find((brief) => brief.id === initialBriefId) : undefined;
+  const focusedBriefs = focusedBrief ? [focusedBrief] : briefs;
+  const visibleClientRequests = display === 'requests' && requestIds
+    ? clientRequests.filter((request) => requestIds.includes(request.id))
+    : clientRequests;
+  const showBriefControls = display === 'full' && !focusedBrief;
+  const showGenerator = display === 'generator' || (display === 'full' && !focusedBrief);
+  const showRequests = display === 'requests' || (display === 'full' && !focusedBrief);
+  const showPosts = display === 'full' && !focusedBrief;
+  const showBriefList = display === 'full' || Boolean(focusedBrief);
 
   return (
     <div className="space-y-8">
@@ -220,36 +244,38 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext, embedd
           icon={<Icon as={Clipboard} size="lg" className="text-accent-brand" />}
           actions={briefControls}
         />
-      ) : (
+      ) : showBriefControls ? (
         <div className="flex flex-wrap items-center justify-end gap-2" aria-label="Content briefs controls">
           {briefControls}
         </div>
-      )}
+      ) : null}
 
       {/* Generator */}
-      <BriefGenerator
-        workspaceId={workspaceId}
-        keyword={keyword}
-        businessCtx={businessCtx}
-        pageType={pageType}
-        generationStyle={generationStyle}
-        refUrls={refUrls}
-        showAdvanced={showAdvanced}
-        generating={generating}
-        error={error}
-        templateCrossref={templateCrossref}
-        onKeywordChange={setKeyword}
-        onBusinessCtxChange={setBusinessCtx}
-        onPageTypeChange={setPageType}
-        onGenerationStyleChange={setGenerationStyle}
-        onRefUrlsChange={setRefUrls}
-        onToggleAdvanced={() => setShowAdvanced(v => !v)}
-        onGenerate={generateBrief}
-      />
+      {showGenerator && (
+        <BriefGenerator
+          workspaceId={workspaceId}
+          keyword={keyword}
+          businessCtx={businessCtx}
+          pageType={pageType}
+          generationStyle={generationStyle}
+          refUrls={refUrls}
+          showAdvanced={showAdvanced}
+          generating={generating}
+          error={error}
+          templateCrossref={templateCrossref}
+          onKeywordChange={setKeyword}
+          onBusinessCtxChange={setBusinessCtx}
+          onPageTypeChange={setPageType}
+          onGenerationStyleChange={setGenerationStyle}
+          onRefUrlsChange={setRefUrls}
+          onToggleAdvanced={() => setShowAdvanced(v => !v)}
+          onGenerate={generateBrief}
+        />
+      )}
 
       {/* Client Requests */}
-      <RequestList
-        clientRequests={clientRequests}
+      {showRequests && <RequestList
+        clientRequests={visibleClientRequests}
         expandedRequest={expandedRequest}
         generatingBriefFor={generatingBriefFor}
         loadingBrief={loadingBrief}
@@ -283,10 +309,10 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext, embedd
         generatingPostFor={generatingPostFor}
         onGeneratePost={generatePost}
         onOpenPost={setActivePostId}
-      />
+      />}
 
       {/* Generated Posts list */}
-      {posts.length > 0 && !activePostId && (
+      {showPosts && posts.length > 0 && !activePostId && (
         // pr-check-disable-next-line -- Generated-post list is a compact non-SectionCard shell around selectable rows.
         <div className="bg-[var(--surface-2)] border border-blue-500/20 p-4 space-y-3" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <div className="flex items-center gap-2 mb-1">
@@ -320,30 +346,33 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext, embedd
       )}
 
       {/* Briefs list (standalone — not linked to a request) */}
-      <BriefList
-        briefs={briefs}
-        clientRequests={clientRequests as any}
-        expanded={expanded}
-        briefSearch={briefSearch}
-        briefSort={briefSort}
-        editingBrief={editingBrief}
-        generatingPostFor={generatingPostFor}
-        regeneratingBrief={regeneratingBrief}
-        sendingToClient={sendingToClient}
-        onSetExpanded={setExpanded}
-        onSetBriefSearch={setBriefSearch}
-        onSetBriefSort={setBriefSort}
-        onSetEditingBrief={setEditingBrief}
-        onSaveBriefField={saveBriefField}
-        onGeneratePost={generatePost}
-        onRegenerateBrief={regenerateBrief}
-        onCopyAsMarkdown={copyAsMarkdown}
-        onExportClientHTML={exportClientHTML}
-        onSendToClient={sendToClient}
-        onConfirmDeleteBrief={confirmDeleteBrief}
-        onRegenerateOutline={regenerateOutline}
-        regeneratingOutline={regeneratingOutline}
-      />
+      {showBriefList && (
+        <BriefList
+          briefs={focusedBriefs}
+          clientRequests={(focusedBrief ? [] : clientRequests) as any}
+          expanded={expanded}
+          briefSearch={briefSearch}
+          briefSort={briefSort}
+          editingBrief={editingBrief}
+          generatingPostFor={generatingPostFor}
+          regeneratingBrief={regeneratingBrief}
+          sendingToClient={sendingToClient}
+          onSetExpanded={setExpanded}
+          onSetBriefSearch={setBriefSearch}
+          onSetBriefSort={setBriefSort}
+          onSetEditingBrief={setEditingBrief}
+          onSaveBriefField={saveBriefField}
+          onGeneratePost={generatePost}
+          onRegenerateBrief={regenerateBrief}
+          onCopyAsMarkdown={copyAsMarkdown}
+          onExportClientHTML={exportClientHTML}
+          onSendToClient={sendToClient}
+          onConfirmDeleteBrief={confirmDeleteBrief}
+          onRegenerateOutline={regenerateOutline}
+          regeneratingOutline={regeneratingOutline}
+          workspaceMode={Boolean(embedded && focusedBrief)}
+        />
+      )}
     </div>
   );
 }

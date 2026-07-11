@@ -120,10 +120,10 @@ export function ContentGaps({ contentGaps, workspaceId, maxVisible }: ContentGap
                 <Icon as={FileText} size="sm" className="text-teal-300" /> Draft Brief
               </Button>
               <Button
-                onClick={() => navigate(adminPath(workspaceId, 'seo-briefs'), {
+                onClick={() => navigate(`${adminPath(workspaceId, 'content-pipeline')}?tab=briefs`, {
                   state: {
                     fixContext: {
-                      targetRoute: 'seo-briefs',
+                      targetRoute: 'content-pipeline',
                       primaryKeyword: gap.targetKeyword,
                       pageType: gap.suggestedPageType || undefined,
                       rationale: gap.rationale,
