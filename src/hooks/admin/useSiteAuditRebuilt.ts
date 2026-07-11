@@ -10,12 +10,14 @@ import { queryKeys } from '../../lib/queryKeys';
 import { applyClientSuppressions, type ClientSuppression } from '../../lib/audit-suppression-client';
 import { issueToTaskItem, issueToTaskKey } from '../../lib/audit-batch';
 import { normalizePageUrl } from '../../lib/pathUtils';
+import { buildSiteAuditApprovalPayload } from '../../components/site-audit-rebuilt/siteAuditApproval';
 import { adminPath } from '../../routes';
 import { computePageScore } from '../../../shared/scoring';
 import {
   AUDIT_CATEGORY_SCORE_VERSION,
   AUDIT_DISPLAY_CATEGORIES,
   AUDIT_DISPLAY_CATEGORY_LABELS,
+  auditWritableFieldForCheck,
   type AuditCategoryScore,
   type AuditDisplayCategory,
 } from '../../../shared/types/seo-audit.js';
@@ -328,9 +330,10 @@ export function useSiteAuditRebuilt(workspaceId: string) {
     setApplyingFix(fixKey);
     try {
       const fields: Record<string, unknown> = {};
-      if (issue.check === 'title' || issue.check === 'title_length' || issue.check === 'missing_title') {
+      const writableField = auditWritableFieldForCheck(issue.check);
+      if (writableField === 'seoTitle') {
         fields.seo = { title: text };
-      } else if (issue.check === 'meta-description' || issue.check === 'meta_length' || issue.check === 'missing_meta') {
+      } else if (writableField === 'seoDescription') {
         fields.seo = { description: text };
       } else if (issue.check === 'og-tags' && issue.message.toLowerCase().includes('title')) {
         fields.openGraph = { title: text };
@@ -429,23 +432,15 @@ export function useSiteAuditRebuilt(workspaceId: string) {
   const flagForClient = useCallback(async (page: SiteAuditPage, issue: SiteAuditIssue, note: string) => {
     const key = issueToTaskKey(page, issue);
     const fixKey = `${page.pageId}-${issue.check}`;
-    const suggestion = editedSuggestions[fixKey] || issue.suggestedFix || '';
-    const field = issue.check === 'title' ? 'seoTitle' : 'seoDescription';
     setFlagSending(true);
     try {
-      await post(`/api/approvals/${workspaceId}`, {
+      await post(`/api/approvals/${workspaceId}`, buildSiteAuditApprovalPayload({
         siteId,
-        name: `[Review] ${issue.message.slice(0, 60)}`,
-        items: [{
-          pageId: page.pageId,
-          pageTitle: page.page,
-          pageSlug: page.slug,
-          field,
-          currentValue: issue.value || '',
-          proposedValue: suggestion || `${issue.recommendation}${note ? `\n\nNote: ${note}` : ''}`,
-          reason: issue.recommendation || issue.message,
-        }],
-      });
+        page,
+        issue,
+        editedSuggestion: editedSuggestions[fixKey],
+        note,
+      }));
       setFlaggedIssues((prev) => new Set(prev).add(key));
       return true;
     } finally {

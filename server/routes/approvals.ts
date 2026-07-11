@@ -45,6 +45,7 @@ const createBatchSchema = z.object({
     field: z.string(),
     currentValue: z.string().optional(),
     proposedValue: z.string().optional(),
+    reason: z.string().optional(),
     collectionId: z.string().optional(),
   }).strict()).min(1, 'At least one item is required'),
 }).strict();

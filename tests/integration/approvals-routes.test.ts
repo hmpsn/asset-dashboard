@@ -149,6 +149,28 @@ describe('Approvals — CRUD', () => {
     itemId = body.items[0].id;
   });
 
+  it('POST preserves an audit review reason instead of rejecting the strict payload', async () => {
+    const res = await postJson(`/api/approvals/${testWsId}`, {
+      siteId: testSiteId,
+      name: '[Review] Missing page title',
+      note: 'Please confirm the positioning.',
+      items: [{
+        pageId: 'page_audit_reason',
+        pageSlug: '/services',
+        pageTitle: 'Services',
+        field: 'seoTitle',
+        currentValue: '',
+        proposedValue: 'SEO Services | Acme',
+        reason: 'Add a unique, descriptive title.',
+      }],
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.note).toBe('Please confirm the positioning.');
+    expect(body.items[0].reason).toBe('Add a unique, descriptive title.');
+  });
+
   it('GET /api/approvals/:workspaceId lists batches', async () => {
     const res = await api(`/api/approvals/${testWsId}`);
     expect(res.status).toBe(200);
