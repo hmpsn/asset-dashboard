@@ -91,7 +91,7 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
   const [quotaBannerDismissed, setQuotaBannerDismissed] = useState(false);
   const [quotaPartialMessage, setQuotaPartialMessage] = useState<string | null>(null);
 
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatTranscriptRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const comboInputRef = useRef<HTMLInputElement>(null);
   const docBodyRef = useRef<HTMLDivElement | null>(null);
@@ -151,12 +151,17 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
       setPageError(new Error('Enter a full http or https URL.'));
       return;
     }
+    // A picker selection writes pageUrl after the request succeeds. Mark the URL
+    // before mutating so the receiving search-param effect does not load the same
+    // selection a second time when that URL update arrives.
+    autoLoadedUrlRef.current = url;
     loadPageMutation.mutate(url);
   }, [loadPageMutation]);
 
   useEffect(() => {
-    if (typeof chatEndRef.current?.scrollIntoView !== 'function') return;
-    chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    const transcript = chatTranscriptRef.current;
+    if (!transcript) return;
+    transcript.scrollTop = transcript.scrollHeight;
   }, [messages]);
 
   useEffect(() => {
@@ -382,7 +387,7 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
     quotaBannerVisible: quotaHit && !quotaBannerDismissed,
     quotaPartialMessage,
     aiDisabledReason: quotaHit ? 'AI quota reached for this workspace. Try again after quota resets.' : null,
-    chatEndRef,
+    chatTranscriptRef,
     inputRef,
     comboInputRef,
     sendMessage,

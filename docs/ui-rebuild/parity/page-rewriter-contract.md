@@ -2,7 +2,7 @@
 
 Surface: `rewrite` / Page Rewriter  
 Owner: optimization / AI rewrite workspace  
-Status: `behavior-safe / visual-unverified`; `ODP-007 A` behavior checkpoint implemented 2026-07-09, shell focus bridge verified, export-only v1 retained
+Status: `owner-approved`; Joshua approved the export-only v1, documented backend exceptions, and retained 62px Focus rail on 2026-07-10
 Primary route: `/ws/:workspaceId/rewrite`
 
 ## Prototype References
@@ -35,25 +35,39 @@ Prototype-critical structure:
 - Rewrite suggestions land as editable assistant blocks with Apply / Copy affordances.
 - The document pane owns audit issue chips, page metrics, formatting, live-page link, and export.
 
+## First Visual Correction Pass — 2026-07-10
+
+| Prototype discrepancy | Correction in this pass | Protected production behavior |
+|---|---|---|
+| Generic page header and unconstrained page pushed the drafting workspace below the first viewport. | Replaced the large header with a compact purple AI context row; centered the workspace on `--page-max`; made the desktop grid viewport-contained with independent pane scroll. | Back to audit and the controlled shell Focus action remain reachable exactly once. |
+| Picker showed path before title and confined selection to a small trailing button. | Made the page title primary, domain/path monospace secondary, added the purple file-identity tile, and made the full row the accessible listbox trigger. | Sitemap search, arbitrary URL load, indentation, keyboard selection, loading/error/no-match states remain intact. |
+| Chat ordered playbooks before the transcript and opened with a generic empty panel. | Restored header → transcript → short playbook controls → compact composer; seeded a page-specific AI greeting and added AI/user avatars. | All six production prompt instructions remain available behind short labels; editable response, named-section Apply, Copy, Markdown, loading, and quota behavior remain intact. |
+| Document header was page-title-led and mixed formatting into the same row; export lived in the footer. | Restored `Live document`, kept the page H1 inside the editor, moved Export to the document header exactly once, and separated the fixed formatting toolbar. | Open live page and all five export formats remain reachable exactly once. |
+| Four large metric cards plus a separate issue row consumed most of the document pane. | Compressed keyword, rank, traffic, optimization, and every audit issue into one fixed evidence band above the independently scrolling document. | No metric or issue was removed or fabricated; unavailable optimization stays `—`. |
+| Footer was action-heavy for an export-only artifact. | Reduced it to a compact honest status line: `Export-only draft`, `Not live`, and `Not saved or published to the CMS.` | Save draft and Publish rewrite remain absent under `ODP-007 A`. |
+| Picker selection could be loaded again when its successful URL write reached the deep-link effect. | The selected validated URL is marked before mutation, so the receiver effect does not duplicate the load. | Direct `?pageUrl=` initialization, retry, and URL synchronization remain unchanged. |
+
 ## Current Parity Grade
 
-Visual status: `behavior-safe / visual-unverified` for the accepted export-only v1.
+Visual status: `owner-approved` for the accepted export-only v1.
 
 Why:
 
-- The rebuilt surface now matches the prototype's core interaction model closely enough: one route, one workspace, page picker, rewrite assistant, always-visible playbook chips, editable rewrite block, section apply, copy, document editor, formatting toolbar, export menu, and `?pageUrl=` deep-link receiver.
+- The first source-led correction pass now follows the prototype's compact one-workspace composition: context row, full-row picker, 44/56 chat-document split, fixed pane headers, independently scrolling transcript/document, short playbooks, compact composer, fixed evidence band, and compact export-only footer.
 - The previous rebuilt view-mode switcher (`Split` / `Chat` / `Document`) is removed from the default page body so the prototype two-pane workspace is the visible navigation model.
-- The document pane now carries a prototype-style footer/status bar: export lives with the document, the draft state is explicit, and the UI says `Export-only draft`, `Not live`, and `Not saved or published to the CMS.` instead of implying persistence or CMS publication.
-- The current export-only workspace now maps working copy to the styleguide type roles: assistant guidance and generated rewrite text use `.t-body`, page picker/document controls use `.t-ui`, and true metadata remains in caption roles.
+- The document pane now carries Export once in the `Live document` header and a compact honest footer/status bar. The UI says `Export-only draft`, `Not live`, and `Not saved or published to the CMS.` instead of implying persistence or CMS publication.
+- The current workspace maps compact assistant transcript and controls to `.t-ui`, page address to `.t-mono`, document prose to `.t-page`, and footer metadata to caption roles.
 - Existing production carry-over remains preserved: keyboard-operable page picker, arbitrary URL load, deep-link validation, audit issue chips, editable rewrite answers, named-section apply, live-page link, Markdown / HTML / `.md` / `.docx` / PDF export, quota handling, and a11y floor.
 - Focus mode is restored through the rebuilt shell's controlled context. Page Rewriter can enter and exit focus without remounting the editor, and Escape remains owned by `AppShell` on rebuilt routes.
 - Save draft / Publish rewrite / push-to-draft are prototype-only write-spine affordances. They are deliberately not implemented in this slice because there is no current full-page Webflow write path, draft table, migration, lifecycle, activity log, or broadcast contract.
+- Required 1440×900 and 1600×1000 paired captures are complete. Fresh Sol review returned `PASS` across loaded, empty, picker, export, Focus, and mobile states; Joshua explicitly owner-approved the surface and retained Focus rail on 2026-07-10.
 
 Accepted direction:
 
 - Implemented: one sanctioned controlled focus bridge runs from `App` through `RebuiltAppChrome` to Page Rewriter.
 - Keep export-only v1 and do not show Save draft / Publish until the backend write target and draft lifecycle exist.
 - Circle back on draft/publish only as a separately scoped backend lifecycle project.
+- The prototype hides navigation in Focus mode, while the accepted shared rebuilt shell retains its 62px collapsed rail. Joshua explicitly approved retaining the rail on 2026-07-10; removal is no longer an open circle-back.
 
 ## URL and Deep Links
 
@@ -87,18 +101,45 @@ Keep these capabilities reachable exactly once:
 ## Safe Work Completed
 
 - Removed the visible `Split` / `Chat` / `Document` view switcher from the default page body so the prototype two-pane workspace is the primary model.
-- Kept chat and document panes mounted together, preserving the prototype's side-by-side flow on desktop and stacked flow on smaller screens.
+- Kept chat and document panes mounted together, preserving the prototype's side-by-side flow on desktop and stacked flow on smaller screens; desktop panes now share a viewport-contained `min-h-0` grid and own their scroll independently.
+- Replaced the generic PageHeader with the prototype's compact AI context/action row while preserving Back and controlled Focus.
+- Reordered the full-row page picker to page title → domain/path, gave it the prototype's purple file identity, and kept the searchable listbox keyboard-operable.
+- Added a page-specific seeded AI greeting plus AI/user avatars, then placed short production-backed playbook controls between transcript and composer.
 - Replaced visible `page-keyword projection` fallback copy with operator-facing optimization-score copy.
 - Treated target keyword and primary-keyword metrics as blue read-only data instead of teal action state.
-- Wrapped the loaded header copy/actions on narrow viewports.
-- Let long rewrite playbook prompt chips wrap inside narrow assistant panes so mobile text is not clipped.
-- Moved the export menu from the top toolbar into a document footer that labels the current artifact as an export-only draft, shows `Not live`, and keeps Save draft / Publish rewrite absent until a real write spine exists.
+- Compressed all four page metrics and audit issues into one fixed evidence band; the document body now owns the remaining pane scroll.
+- Restored a distinct `Live document` header, formatting toolbar, and page H1 hierarchy. Export lives in the document header exactly once; the footer carries status only.
+- Wrapped compact playbook labels into a contained two-row control band while retaining the full production prompt as the control title.
 - Fixed the rebuilt document pane's mixed loaded/pending state so a loaded page exits skeleton mode and shows the editor/footer even if the mutation pending flag lingers during local StrictMode/browser smoke.
-- Promoted Page Rewriter's page picker path, assistant guidance, empty assistant state, generated rewrite blocks, document controls, document body, loading copy, and export-only footer explanation to the appropriate `.t-ui` / `.t-body` roles.
+- Prevented a picker selection from causing a second load when the successful selection writes its `pageUrl` search param.
+- Mapped Page Rewriter's picker path, compact transcript, generated rewrite blocks, document controls/body, and export status to `.t-mono`, `.t-ui`, `.t-page`, and caption roles according to hierarchy.
 - Added the controlled rebuilt focus context, wired it through `AppShell`, and exposed one Page Rewriter enter/exit control. The real sidebar and shell grid collapse together; Escape exits focus only through the rebuilt shell authority.
-- Component tests assert the real `useFeatureFlag('ui-rebuild-shell')` loading-to-loaded transition, `?pageUrl=` receiver, invalid URL guard, no top view switcher, no visible internal rebuild/projection terms, page picker keyboard load, editable rewrite apply, quota lock, Back to audit behavior, and rebuilt a11y.
+- Twenty component tests assert the real flag transition, `?pageUrl=` receiver, invalid URL guard, exact-once picker load, seeded greeting/avatars, HTML-entity decoding, pane-local transcript scrolling, hierarchy/order, evidence/export homes, empty/error/quota states, contained playbooks, no top view switcher, editable rewrite apply, Back, Focus, and the rebuilt a11y floor.
 
-## Browser Smoke Evidence
+## Final Source-Led Browser Evidence — 2026-07-10
+
+Final comparison root: `/tmp/asset-dashboard-codex-visual-parity/batch9/page-rewriter/`.
+
+Prototype baselines:
+
+- Loaded, 1440×900: `prototype/page-rewriter-loaded-1440.png`
+- Loaded, 1600×1000: `prototype/page-rewriter-loaded-1600.png`
+
+Corrected rebuilt states:
+
+- Loaded: `rebuilt/page-rewriter-loaded-1440-final.png`, `rebuilt/page-rewriter-loaded-1600-final.png`
+- Picker open: `rebuilt/page-rewriter-picker-open-1440-final.png`, `rebuilt/page-rewriter-picker-open-1600-final.png`
+- Export open: matching `rebuilt/page-rewriter-export-open-*-final.png` captures in the evidence root
+- Focus: matching `rebuilt/page-rewriter-focus-*-final.png` captures in the evidence root
+- Empty: matching `rebuilt/page-rewriter-empty-1440-final.png`, `rebuilt/page-rewriter-empty-1600-final.png`
+- Mobile floor: `rebuilt/page-rewriter-loaded-mobile-390-final2.png`
+- Computed geometry/typography: `rebuilt/page-rewriter-computed-1600.json`
+
+Result: fresh Sol `PASS`. At both required desktop viewports the corrected surface uses the capped design-system spine, compact context/picker, 44/56 workspace split, fixed pane headers, pane-local scrolling, seeded transcript, contained two-row playbooks, compact composer, `Live document` hierarchy, fixed evidence/formatter bands, and honest export-only footer. Picker and export overlays stay contained; the mobile state opens at the context header and stacks without page overflow. Joshua explicitly owner-approved the retained 62px Focus rail and the complete visual pass on 2026-07-10.
+
+## Historical Browser Smoke Evidence
+
+The captures below are behavior-checkpoint baselines from before the 2026-07-10 source-led composition pass. They are retained for regression history but do not verify the final visual pass above.
 
 Clean fixture target: `ws_1772610244629`, page `https://swish-dental-2023.webflow.io/`.
 
@@ -138,8 +179,13 @@ Existing/current branch coverage proves:
 
 - Real `useFeatureFlag('ui-rebuild-shell')` loading-to-loaded transition mounts Page Rewriter.
 - `?pageUrl=` validates and auto-loads the page.
+- Selecting a sitemap page performs one load even after the successful selection writes `pageUrl` back to the URL.
 - Invalid `?pageUrl=` values do not call the load-page endpoint.
 - The default page has no top view radiogroup and shows both prototype panes.
+- The context, picker, pane order, seeded page-specific greeting, and AI/user avatars are present.
+- Chat DOM order is header → independently scrolling transcript → short playbook row → compact composer.
+- The document owns one `Live document` header, one formatting toolbar, one compact evidence band, one live-page link, and one Export trigger; page H1 elements remain inside the editor.
+- No-page and 502 failure states stay honest and do not expose Export.
 - The loaded document pane shows `Export-only draft`, `Not live`, and `Not saved or published to the CMS.`, clears the loading skeleton, and keeps Save draft / Publish rewrite absent.
 - The workspace maps important assistant, page picker, generated rewrite, and export status copy to styleguide typography roles.
 - Internal rebuild/projection terms are absent from visible loaded states.

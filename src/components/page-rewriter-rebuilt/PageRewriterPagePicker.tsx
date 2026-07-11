@@ -4,6 +4,7 @@ import { getIndentLevel } from '../page-rewrite-chat/pageRewriteChatModel';
 import { normalizePageUrl } from '../../lib/pathUtils';
 import { Button, ClickableRow, FormInput, Icon, InlineBanner } from '../ui';
 import type { PageRewriterSitemapPage } from './pageRewriterTypes';
+import { decodePageText } from './pageRewriterFormatters';
 import type { usePageRewriterSurfaceState } from './usePageRewriterSurfaceState';
 
 type PageRewriterState = ReturnType<typeof usePageRewriterSurfaceState>;
@@ -35,6 +36,16 @@ function pageLabel(page: PageRewriterSitemapPage): string {
   return page.slug || page.title || page.url;
 }
 
+function formatPageAddress(value: string): string {
+  if (!value) return '';
+  try {
+    const parsed = new URL(value);
+    return `${parsed.host}${parsed.pathname}${parsed.search}`;
+  } catch {
+    return normalizePageUrl(value);
+  }
+}
+
 export function PageRewriterPagePicker({
   pageData,
   pageUrl,
@@ -56,25 +67,52 @@ export function PageRewriterPagePicker({
   onCloseCombo,
 }: PageRewriterPagePickerProps) {
   const activeOptionId = filteredPages[comboIdx] ? `page-rewriter-option-${comboIdx}` : undefined;
-  const currentLabel = pageData
-    ? (pageData.slug ? normalizePageUrl(pageData.slug) : pageUrl)
-    : 'No page selected';
+  const currentTitle = pageData?.title ? decodePageText(pageData.title) : 'Choose a page to rewrite';
+  const currentAddress = pageData
+    ? formatPageAddress(pageUrl || pageData.url || pageData.slug)
+    : 'Search the sitemap or paste a full URL';
+  const pickerLabel = pageData
+    ? `${currentTitle}. ${currentAddress}. Change page`
+    : 'Choose page';
 
   return (
-    <div className="flex min-w-[280px] flex-1 flex-col gap-2">
-      <div className="flex items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2">
-        <Icon name="doc" size="sm" className="flex-none text-[var(--brand-text-dim)]" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate t-ui font-semibold text-[var(--brand-text-bright)]">{currentLabel}</p>
-          {pageData?.title && <p className="truncate t-caption text-[var(--brand-text-muted)]">{pageData.title}</p>}
-        </div>
-        <Button size="sm" variant="secondary" onClick={onOpenCombo}>
-          {pageData ? 'Change' : 'Choose page'}
-        </Button>
-      </div>
+    <div className="relative flex w-full min-w-0 flex-col gap-2">
+      <Button
+        size="md"
+        variant="secondary"
+        aria-label={pickerLabel}
+        aria-haspopup="listbox"
+        aria-expanded={comboOpen}
+        onClick={onOpenCombo}
+        className="group w-full min-w-0 justify-start gap-3 rounded-[var(--radius-xl)] border-[var(--brand-border)] bg-[var(--surface-2)] px-4 py-2.5 text-left hover:border-[var(--brand-border-hover)] hover:bg-[var(--surface-3)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mint-glow)]"
+        style={{ transitionDuration: 'var(--dur-fast)' }}
+      >
+        <span
+          className="flex h-8 w-8 flex-none items-center justify-center rounded-[var(--radius-md)] text-[var(--purple)]"
+          style={{ background: 'color-mix(in srgb, var(--purple) 12%, transparent)' }}
+          aria-hidden="true"
+        >
+          <Icon name="doc" size="sm" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate t-ui font-semibold text-[var(--brand-text-bright)]">{currentTitle}</span>
+          <span className="block truncate t-mono text-[var(--brand-text-muted)]">{currentAddress}</span>
+        </span>
+        {loadingPage ? (
+          <Icon name="refresh" size="sm" className="flex-none animate-spin text-[var(--teal)]" />
+        ) : (
+          <span className="flex flex-none items-center gap-1.5 t-caption text-[var(--brand-text-muted)] group-hover:text-[var(--brand-text-bright)]">
+            {pageData ? 'Change page' : 'Choose'}
+            <Icon name="chevronDown" size="sm" />
+          </span>
+        )}
+      </Button>
 
       {comboOpen && (
-        <div className="rounded-[var(--radius-lg)] border border-[var(--teal)] bg-[var(--surface-2)] shadow-[var(--shadow-lg)]">
+        <div
+          className="absolute left-0 right-0 top-[calc(100%+var(--space-2))] rounded-[var(--radius-lg)] border border-[var(--teal)] bg-[var(--surface-2)] shadow-[var(--shadow-lg)]"
+          style={{ zIndex: 'var(--z-dropdown)' }}
+        >
           <div className="flex items-center gap-2 border-b border-[var(--brand-border)] px-3 py-2">
             <Icon name="search" size="sm" className="flex-none text-[var(--brand-text-dim)]" />
             <FormInput
@@ -132,7 +170,7 @@ export function PageRewriterPagePicker({
                 >
                   <Icon name="file" size="sm" className="flex-none text-[var(--brand-text-dim)]" />
                   <span className="min-w-0 flex-1 truncate">{pageLabel(page)}</span>
-                  {page.title && <span className="hidden max-w-[260px] truncate t-caption-sm text-[var(--brand-text-muted)] md:inline">{page.title}</span>}
+                  {page.title && <span className="hidden max-w-[260px] truncate t-caption-sm text-[var(--brand-text-muted)] md:inline">{decodePageText(page.title)}</span>}
                 </ClickableRow>
               ))}
             </div>

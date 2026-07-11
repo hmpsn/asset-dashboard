@@ -155,9 +155,9 @@ describe('PageRewriterSurface rebuilt', () => {
       queryClient.setQueryData(queryKeys.shared.featureFlags(), featureFlagResponse);
     });
 
-    expect(await screen.findByRole('heading', { name: 'Page Rewriter' })).toBeInTheDocument();
+    expect(await screen.findByText('Page rewriter · AI rewrite workspace')).toBeInTheDocument();
     expect(screen.queryByTestId('legacy-rewrite')).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Rewrite assistant' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Rewrite chat' })).toBeInTheDocument();
   });
 
   it('mounts with a seeded feature-flag QueryClient and passes the a11y floor', async () => {
@@ -170,7 +170,7 @@ describe('PageRewriterSurface rebuilt', () => {
       );
     });
 
-    expect(screen.getByRole('heading', { name: 'Page Rewriter' })).toBeInTheDocument();
+    expect(screen.getByText('Page rewriter · AI rewrite workspace')).toBeInTheDocument();
     expect(screen.getAllByText(/dental implants/i).length).toBeGreaterThan(0);
     expect(screen.getByText('#7')).toBeInTheDocument();
     expect(screen.getByText('320')).toBeInTheDocument();
@@ -190,10 +190,105 @@ describe('PageRewriterSurface rebuilt', () => {
     expect(screen.getByRole('textbox', { name: 'Page rewrite document editor' })).toHaveTextContent('Dental Implants');
   });
 
+  it('seeds a page-specific AI greeting with message avatars', async () => {
+    renderSurface('/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants');
+
+    await screen.findByRole('textbox', { name: 'Page rewrite document editor' });
+
+    expect(screen.getByText((_, element) => element?.hasAttribute('data-message-bubble') && element.textContent?.includes('I’ve loaded Dental Implants') === true)).toHaveTextContent(
+      'I’ve loaded Dental Implants. Its target is “dental implants”.',
+    );
+    expect(screen.getByLabelText('Rewrite AI')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText(/Ask for a rewrite/i), {
+      target: { value: 'Rewrite the benefits section' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send rewrite prompt' }));
+
+    expect(await screen.findByLabelText('You')).toBeInTheDocument();
+  });
+
+  it('decodes scraped HTML entities in visible page titles', async () => {
+    apiPostMock.mockImplementation((url: string, body: { url?: string; question?: string }) => {
+      if (url.endsWith('/load-page')) {
+        return Promise.resolve({ ...pagePayload, title: 'Dental Implants &amp; Restorations', url: body.url });
+      }
+      return Promise.resolve({ answer: 'Rewrite ready.' });
+    });
+
+    renderSurface('/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants');
+
+    await screen.findByRole('textbox', { name: 'Page rewrite document editor' });
+    expect(screen.getAllByText('Dental Implants & Restorations').length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText(/&amp;/)).not.toBeInTheDocument();
+  });
+
+  it('keeps the prototype chat and document hierarchy in viewport-bound pane order', async () => {
+    renderSurface('/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants');
+
+    const editor = await screen.findByRole('textbox', { name: 'Page rewrite document editor' });
+    const workspace = screen.getByTestId('page-rewriter-workspace');
+    const transcript = screen.getByTestId('page-rewriter-transcript');
+    const playbook = screen.getByTestId('page-rewriter-playbook');
+    const composer = screen.getByTestId('page-rewriter-composer');
+
+    expect(workspace).toHaveClass('max-w-[var(--page-max)]', 'lg:min-h-0');
+    expect(transcript.compareDocumentPosition(playbook) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(playbook.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(editor).toHaveClass('min-h-0', 'overflow-y-auto');
+  });
+
+  it('auto-scrolls only the transcript pane when messages arrive', async () => {
+    renderSurface('/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants');
+
+    const transcript = await screen.findByTestId('page-rewriter-transcript');
+    Object.defineProperty(transcript, 'scrollHeight', { configurable: true, value: 420 });
+    transcript.scrollTop = 0;
+
+    fireEvent.change(screen.getByPlaceholderText(/Ask for a rewrite/i), {
+      target: { value: 'Rewrite the benefits section' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send rewrite prompt' }));
+
+    await waitFor(() => expect(transcript.scrollTop).toBe(420));
+  });
+
+  it('keeps picker identity, evidence, formatting, live-page, and export controls in their exact-once homes', async () => {
+    renderSurface('/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants');
+
+    const editor = await screen.findByRole('textbox', { name: 'Page rewrite document editor' });
+    const picker = screen.getByRole('button', { name: /Dental Implants.*acme\.com\/services\/implants.*Change page/i });
+
+    expect(picker).toHaveAttribute('aria-haspopup', 'listbox');
+    expect(screen.getAllByTestId('page-rewriter-evidence-band')).toHaveLength(1);
+    expect(screen.getByText('Optimization')).toBeInTheDocument();
+    expect(screen.getByText('82/100')).toBeInTheDocument();
+    expect(screen.getAllByRole('toolbar', { name: 'Document formatting' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: /Open live page/i })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Export' })).toHaveLength(1);
+    expect(screen.getAllByRole('heading', { level: 1 }).every((heading) => editor.contains(heading))).toBe(true);
+  });
+
+  it('renders honest no-page and failed-page states without inventing a document action', async () => {
+    const { unmount } = renderSurface();
+
+    expect(screen.getByText('No page loaded')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
+    unmount();
+
+    apiPostMock.mockRejectedValueOnce(new ApiError(502, 'Snapshot unavailable'));
+    renderSurface('/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants');
+
+    expect(await screen.findByText('Page did not load')).toBeInTheDocument();
+    expect(screen.getByText(/Snapshot unavailable \(HTTP 502\)/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
+  });
+
   it('renders the prototype two-pane workspace without a top view switcher', async () => {
     renderSurface('/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants');
 
-    expect(await screen.findByRole('heading', { name: 'Rewrite assistant' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Rewrite chat' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Live document' })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Page rewrite document editor' })).toBeInTheDocument();
     expect(screen.getByText('Export-only draft')).toBeInTheDocument();
     expect(screen.getByText('Not saved or published to the CMS.')).toBeInTheDocument();
@@ -225,11 +320,13 @@ describe('PageRewriterSurface rebuilt', () => {
     expect(focusModeMock.setFocusMode).toHaveBeenCalledWith(false);
   });
 
-  it('lets long playbook prompt chips wrap inside narrow assistant panes', () => {
+  it('wraps compact playbooks inside the assistant pane without a horizontal strip', () => {
     renderSurface('/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants');
 
-    const prompt = screen.getByRole('button', { name: /Suggest an FAQ section with schema-ready Q&A pairs/i });
-    expect(prompt.closest('span')).toHaveClass('w-full', 'whitespace-normal');
+    const prompt = screen.getByRole('button', { name: 'Add an FAQ' });
+    expect(prompt).toHaveAttribute('title', 'Suggest an FAQ section with schema-ready Q&A pairs');
+    expect(screen.getByTestId('page-rewriter-playbook')).toHaveClass('flex-wrap');
+    expect(screen.getByTestId('page-rewriter-playbook')).not.toHaveClass('overflow-x-auto');
   });
 
   it('maps the workspace copy to styleguide typography roles', async () => {
@@ -237,11 +334,11 @@ describe('PageRewriterSurface rebuilt', () => {
 
     await screen.findByRole('textbox', { name: 'Page rewrite document editor' });
 
-    expect(screen.getByText('Rewrite sections, reshape headings, and draft answer-first copy for the loaded page.')).toHaveClass('t-body');
-    expect(screen.getByText('This page is loaded with dental implants as the primary keyword.')).toHaveClass('t-body');
-    expect(screen.getAllByText('/services/implants').some((element) => element.classList.contains('t-ui'))).toBe(true);
+    expect(screen.getByText('Instruct the AI — it drafts, you apply')).toHaveClass('t-caption');
+    expect(screen.getByText((_, element) => element?.hasAttribute('data-message-bubble') && element.textContent?.includes('I’ve loaded Dental Implants') === true)).toHaveClass('t-ui');
+    expect(screen.getByText('acme.com/services/implants')).toHaveClass('t-mono');
     expect(screen.getByText('Export-only draft')).toHaveClass('t-ui');
-    expect(screen.getByText('Not saved or published to the CMS.')).toHaveClass('t-body');
+    expect(screen.getByText('Not saved or published to the CMS.')).toHaveClass('t-caption');
 
     fireEvent.change(screen.getByPlaceholderText(/Ask for a rewrite/i), {
       target: { value: 'Rewrite the benefits section' },
@@ -251,7 +348,7 @@ describe('PageRewriterSurface rebuilt', () => {
     const applyButton = await screen.findByRole('button', { name: /Apply to Benefits/i });
     const rewriteBlock = applyButton.closest('.max-w-\\[88\\%\\]')?.querySelector('[contenteditable="true"]');
     expect(rewriteBlock).not.toBeNull();
-    expect(rewriteBlock).toHaveClass('t-body');
+    expect(rewriteBlock).toHaveClass('t-ui');
   });
 
   it('keeps internal rebuild and projection language out of visible loaded states', async () => {
@@ -262,7 +359,9 @@ describe('PageRewriterSurface rebuilt', () => {
 
     renderSurface('/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants');
 
-    expect(await screen.findByText('No optimization score is available for this page yet.')).toBeInTheDocument();
+    const evidenceBand = await screen.findByTestId('page-rewriter-evidence-band');
+    expect(evidenceBand).toHaveTextContent('Optimization');
+    expect(evidenceBand).toHaveTextContent('—');
     expect(screen.queryByText(/page-keyword projection|T1|carry-over|rebuild|migration|server-backed|endpoint/i)).not.toBeInTheDocument();
   });
 
@@ -289,6 +388,7 @@ describe('PageRewriterSurface rebuilt', () => {
         { url: 'https://acme.com/services/implants' },
       );
     });
+    expect(apiPostMock.mock.calls.filter(([url]) => String(url).endsWith('/load-page'))).toHaveLength(1);
   });
 
   it('renders editable rewrite answers and applies them to the named section', async () => {

@@ -1,10 +1,9 @@
 // @ds-rebuilt
-import { Maximize2, Minimize2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { adminPath } from '../../routes';
 import { useRebuiltFocusMode } from '../layout/RebuiltAppChrome';
 import { useToast } from '../Toast';
-import { Button, Icon, IconButton, InlineBanner, PageHeader } from '../ui';
+import { Button, Icon, InlineBanner } from '../ui';
 import { PageRewriterChatPane } from './PageRewriterChatPane';
 import { PageRewriterDocumentPane } from './PageRewriterDocumentPane';
 import { PageRewriterPagePicker } from './PageRewriterPagePicker';
@@ -14,8 +13,7 @@ interface PageRewriterSurfaceProps {
   workspaceId: string;
 }
 
-const HEADER_WRAP_CLASS = 'flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible [&_p]:text-clip';
-const WORKSPACE_GRID_CLASS = 'grid gap-4 xl:grid-cols-[minmax(360px,44%)_minmax(0,1fr)]';
+const WORKSPACE_GRID_CLASS = 'grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(330px,44%)_minmax(0,1fr)] lg:overflow-hidden';
 
 export function PageRewriterSurface({ workspaceId }: PageRewriterSurfaceProps) {
   const navigate = useNavigate();
@@ -24,33 +22,35 @@ export function PageRewriterSurface({ workspaceId }: PageRewriterSurfaceProps) {
   const state = usePageRewriterSurfaceState({ workspaceId, toast });
 
   return (
-    <div className="flex min-h-full flex-col gap-5">
-      <PageHeader
-        title="Page Rewriter"
-        subtitle="Load a live page, rewrite sections with page intelligence, and export the edited draft."
-        className={HEADER_WRAP_CLASS}
-        actions={(
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))}
-            >
-              <Icon name="arrowLeft" size="sm" />
-              Back to audit
-            </Button>
-            <IconButton
-              icon={focusMode ? Minimize2 : Maximize2}
-              label={focusMode ? 'Exit focus mode' : 'Enter focus mode'}
-              title={focusMode ? 'Exit focus mode (Esc)' : 'Enter focus mode'}
-              size="md"
-              variant="solid"
-              aria-pressed={focusMode}
-              onClick={() => setFocusMode(!focusMode)}
-            />
-          </div>
-        )}
-      />
+    <div
+      data-testid="page-rewriter-workspace"
+      className="mx-auto flex min-h-full w-full max-w-[var(--page-max)] flex-col gap-3 lg:h-[calc(100dvh_-_var(--shell-topbar)_-_var(--page-pad-y)_-_var(--page-pad-bottom))] lg:min-h-0"
+    >
+      <div data-testid="page-rewriter-context-row" className="flex flex-wrap items-center gap-2">
+        <div className="mr-auto flex min-w-0 items-center gap-2 t-micro font-semibold uppercase text-[var(--purple)]">
+          <span className="h-2 w-2 flex-none rounded-[var(--radius-pill)] bg-[var(--purple)]" aria-hidden="true" />
+          <span className="truncate">Page rewriter · AI rewrite workspace</span>
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))}
+        >
+          <Icon name="arrowLeft" size="sm" />
+          Back to audit
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          aria-label={focusMode ? 'Exit focus mode' : 'Enter focus mode'}
+          aria-pressed={focusMode}
+          title={focusMode ? 'Exit focus mode (Esc)' : 'Enter focus mode'}
+          onClick={() => setFocusMode(!focusMode)}
+        >
+          <Icon name={focusMode ? 'eyeOff' : 'eye'} size="sm" />
+          {focusMode ? 'Exit focus' : 'Focus'}
+        </Button>
+      </div>
 
       <PageRewriterPagePicker
         pageData={state.pageData}

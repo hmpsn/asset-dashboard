@@ -301,10 +301,10 @@
     {
       "id": "DEF-page-rewriter-003",
       "surface": "page-rewriter",
-      "item": "Server-persisted rewrite drafts (SB-030) deferred; v1 keeps drafts in localStorage (the existing quick-win).",
-      "decision": "localStorage draft is the v1 persistence; server-persisted drafts are a later tier.",
+      "item": "Server-persisted rewrite drafts (SB-030) deferred; the export-only v1 is in-memory and edits are lost on navigation.",
+      "decision": "No draft persistence exists in v1; export is the only durable handoff until the server draft write spine lands.",
       "class": "data",
-      "upgradeTrigger": "Cross-device draft persistence requested, or the write spine (DEF-page-rewriter-001) lands.",
+      "upgradeTrigger": "Any draft persistence is required, or the write spine (DEF-page-rewriter-001) lands.",
       "owner": "josh",
       "status": "open",
       "roadmapItemId": null,

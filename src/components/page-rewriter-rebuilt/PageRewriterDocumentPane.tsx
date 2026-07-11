@@ -1,14 +1,11 @@
 // @ds-rebuilt
-import { normalizePageUrl } from '../../lib/pathUtils';
 import {
   Badge,
   Button,
+  CompactStatBar,
   EmptyState,
   ErrorState,
   Icon,
-  InlineBanner,
-  Meter,
-  MetricTile,
   Popover,
   Skeleton,
   Toolbar,
@@ -86,15 +83,13 @@ function ExportMenu({ onExport }: { onExport: (mode: PageRewriterExportMode) => 
 function AuditChips({ issues }: { issues: PageRewriterIssue[] }) {
   if (issues.length === 0) {
     return (
-      <InlineBanner tone="success" size="sm" title="No page audit issues on this snapshot">
-        The loaded audit snapshot did not return issues for this page.
-      </InlineBanner>
+      <Badge label="No current audit issues" tone="emerald" variant="soft" shape="pill" />
     );
   }
 
   const visibleIssues = issues.slice(0, 20);
   return (
-    <div className="flex flex-wrap gap-1.5" aria-label="Page audit issues">
+    <div className="flex min-w-0 gap-1.5 overflow-x-auto" aria-label="Page audit issues">
       {visibleIssues.map((issue, index) => (
         <Badge
           key={`${issue.check}-${index}`}
@@ -116,60 +111,89 @@ function AuditChips({ issues }: { issues: PageRewriterIssue[] }) {
   );
 }
 
+function EvidenceBand({ pageData }: { pageData: NonNullable<PageRewriterState['pageData']> }) {
+  return (
+    <div
+      data-testid="page-rewriter-evidence-band"
+      className="flex-none border-b border-[var(--brand-border)] bg-[var(--surface-1)] px-3 py-2.5"
+    >
+      <CompactStatBar
+        items={[
+          { label: 'Keyword', value: pageData.primaryKeyword ?? '—', valueColor: 'text-[var(--blue)]' },
+          { label: 'Rank', value: formatRank(pageData.rank), valueColor: 'text-[var(--blue)]' },
+          { label: 'Traffic', value: formatNumber(pageData.monthlyTraffic), valueColor: 'text-[var(--blue)]' },
+          { label: 'Optimization', value: pageData.optimizationScore == null ? '—' : `${pageData.optimizationScore}/100`, valueColor: 'text-[var(--blue)]' },
+        ]}
+        className="border-0 bg-transparent px-0 py-0 [&>div]:min-w-0"
+      />
+      <div className="mt-2 flex min-w-0 items-center gap-2 border-t border-[var(--brand-border)] pt-2">
+        <span className="flex-none t-label text-[var(--brand-text-dim)]">Issues</span>
+        <AuditChips issues={pageData.issues} />
+      </div>
+    </div>
+  );
+}
+
 export function PageRewriterDocumentPane({ state, onOpenPicker }: PageRewriterDocumentPaneProps) {
   const pageData = state.pageData;
-  const pageAddress = pageData ? (pageData.slug ? normalizePageUrl(pageData.slug) : state.pageUrl) : state.pageUrl;
-  const title = pageData?.title || pageAddress || 'Draft document';
 
   return (
-    <section className="flex min-h-[620px] flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)]">
-      <div className="border-b border-[var(--brand-border)] px-4 py-3">
-        <Toolbar label="Document controls" className="w-full">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate t-body font-semibold text-[var(--brand-text-bright)]">{title}</h2>
-              {state.pageUrl && (
-                <a
-                  href={state.pageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 t-ui text-[var(--teal)] hover:opacity-90"
-                >
-                  Open live page
-                  <Icon name="external" size="sm" />
-                </a>
-              )}
-            </div>
-            <p className="mt-1 truncate t-ui text-[var(--brand-text-muted)]">{pageAddress || 'Search pages or paste a URL above.'}</p>
-          </div>
-          <ToolbarSpacer />
-          {pageData && (
-            <>
-              <Button size="sm" variant="ghost" onClick={state.handleFormatBold} aria-label="Bold selection">
-                <span className="font-bold">B</span>
-              </Button>
-              <Button size="sm" variant="ghost" onClick={state.handleFormatItalic} aria-label="Italic selection">
-                <span className="italic">I</span>
-              </Button>
-              <Button size="sm" variant="ghost" onClick={state.handleHeading2}>H2</Button>
-              <Button size="sm" variant="ghost" onClick={state.handleHeading3}>H3</Button>
-              <Button size="sm" variant="ghost" onClick={state.handleClearFormatting}>
-                <Icon name="x" size="sm" />
-                Clear
-              </Button>
-            </>
-          )}
-        </Toolbar>
+    <section className="flex min-h-[560px] flex-col overflow-hidden rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-2)] shadow-[var(--shadow-md)] lg:h-full lg:min-h-0">
+      <div className="flex flex-none flex-wrap items-center gap-2.5 border-b border-[var(--brand-border)] px-4 py-2.5">
+        <span
+          className="flex h-7 w-7 flex-none items-center justify-center rounded-[var(--radius-md)] text-[var(--blue)]"
+          style={{ background: 'color-mix(in srgb, var(--blue) 12%, transparent)' }}
+          aria-hidden="true"
+        >
+          <Icon name="pencil" size="sm" />
+        </span>
+        <div className="mr-auto min-w-0">
+          <h2 className="t-ui font-bold text-[var(--brand-text-bright)]">Live document</h2>
+          <p className="truncate t-caption text-[var(--brand-text-muted)]">Edit inline — rewrites land here</p>
+        </div>
+        {pageData && state.pageUrl && (
+          <a
+            href={state.pageUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 t-ui text-[var(--teal)] hover:opacity-90"
+          >
+            Open live page
+            <Icon name="external" size="sm" />
+          </a>
+        )}
+        {pageData && <ExportMenu onExport={state.handleExport} />}
       </div>
 
+      {pageData && (
+        <div className="flex-none border-b border-[var(--brand-border)] bg-[var(--surface-1)] px-3 py-1.5">
+          <Toolbar label="Document formatting" className="w-full" wrap={false} gap={4}>
+            <Button size="sm" variant="ghost" onClick={state.handleFormatBold} aria-label="Bold selection" className="min-w-8 px-2">
+              <span className="font-bold">B</span>
+            </Button>
+            <Button size="sm" variant="ghost" onClick={state.handleFormatItalic} aria-label="Italic selection" className="min-w-8 px-2">
+              <span className="italic">I</span>
+            </Button>
+            <span className="mx-1 h-5 w-px flex-none bg-[var(--brand-border)]" aria-hidden="true" />
+            <Button size="sm" variant="ghost" onClick={state.handleHeading2}>H2</Button>
+            <Button size="sm" variant="ghost" onClick={state.handleHeading3}>H3</Button>
+            <ToolbarSpacer />
+            <Button size="sm" variant="ghost" onClick={state.handleClearFormatting}>
+              <Icon name="x" size="sm" />
+              Clear
+            </Button>
+          </Toolbar>
+        </div>
+      )}
+
       {state.loadingPage && (
-        <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="page-rewriter-loading">
-          {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-[92px] w-full" />)}
+        <div className="grid min-h-0 flex-1 gap-3 p-4 sm:grid-cols-2" data-testid="page-rewriter-loading">
+          {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-20 w-full" />)}
         </div>
       )}
 
       {Boolean(state.pageError) && !state.loadingPage && (
-        <div className="p-4">
+        <div className="flex min-h-0 flex-1 items-center p-4">
           <ErrorState
             type={state.pageErrorStatus === 502 ? 'network' : 'data'}
             title="Page did not load"
@@ -185,47 +209,13 @@ export function PageRewriterDocumentPane({ state, onOpenPicker }: PageRewriterDo
           title="No page loaded"
           description="Choose a sitemap page or paste a full URL to load editable page content."
           action={<Button size="sm" variant="secondary" onClick={onOpenPicker}>Choose page</Button>}
-          className="min-h-[440px]"
+          className="min-h-0 flex-1"
         />
       )}
 
       {pageData && !state.loadingPage && (
         <>
-          <div className="grid gap-3 border-b border-[var(--brand-border)] p-4 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricTile
-              label="Primary Keyword"
-              value={pageData.primaryKeyword ?? '—'}
-              accent="var(--blue)"
-            />
-            <MetricTile
-              label="Rank"
-              value={formatRank(pageData.rank)}
-              sub="Current GSC position"
-              accent="var(--blue)"
-            />
-            <MetricTile
-              label="Monthly Traffic"
-              value={formatNumber(pageData.monthlyTraffic)}
-              sub="Organic sessions"
-              accent="var(--blue)"
-            />
-            <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-[15px] py-[13px]">
-              <Meter
-                value={pageData.optimizationScore ?? 0}
-                label="Optimization Score"
-                showValue={pageData.optimizationScore != null}
-                ariaLabel="Optimization score"
-                gradient
-              />
-              {pageData.optimizationScore == null && (
-                <p className="mt-2 t-body text-[var(--brand-text-muted)]">No optimization score is available for this page yet.</p>
-              )}
-            </div>
-          </div>
-
-          <div className="border-b border-[var(--brand-border)] px-4 py-3">
-            <AuditChips issues={pageData.issues} />
-          </div>
+          <EvidenceBand pageData={pageData} />
 
           <div
             ref={state.docBodyRefCallback}
@@ -235,23 +225,14 @@ export function PageRewriterDocumentPane({ state, onOpenPicker }: PageRewriterDo
             contentEditable
             suppressContentEditableWarning
             spellCheck
-            className="min-h-[440px] flex-1 overflow-y-auto px-6 py-5 t-body text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mint-glow)]"
+            className="min-h-0 flex-1 overflow-y-auto px-6 py-5 t-page text-[var(--brand-text-bright)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mint-glow)]"
           />
 
-          <div className="flex flex-col gap-3 border-t border-[var(--brand-border)] bg-[var(--surface-1)] px-4 py-3 sm:flex-row sm:items-center">
-            <div className="flex min-w-0 flex-1 items-start gap-2">
-              <Icon name="check" size="sm" className="mt-0.5 flex-none text-[var(--brand-text-muted)]" />
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="t-ui font-semibold text-[var(--brand-text-bright)]">Export-only draft</span>
-                  <Badge label="Not live" tone="zinc" variant="soft" size="sm" />
-                </div>
-                <p className="mt-0.5 t-body text-[var(--brand-text-muted)]">Not saved or published to the CMS.</p>
-              </div>
-            </div>
-            <div className="flex flex-none items-center justify-start sm:justify-end">
-              <ExportMenu onExport={state.handleExport} />
-            </div>
+          <div className="flex flex-none flex-wrap items-center gap-2 border-t border-[var(--brand-border)] bg-[var(--surface-1)] px-4 py-2">
+            <Icon name="info" size="sm" className="flex-none text-[var(--brand-text-muted)]" />
+            <span className="t-ui font-semibold text-[var(--brand-text-bright)]">Export-only draft</span>
+            <Badge label="Not live" tone="zinc" variant="soft" size="sm" />
+            <span className="t-caption text-[var(--brand-text-muted)]">Not saved or published to the CMS.</span>
           </div>
         </>
       )}
