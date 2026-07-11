@@ -32,7 +32,7 @@ describe('billing mutation lifecycle contracts', () => {
     const adminKeys = getWorkspaceInvalidationKeys(WS_EVENTS.WORKSPACE_UPDATED, 'ws-billing', undefined, 'admin');
     const clientKeys = getWorkspaceInvalidationKeys(WS_EVENTS.WORKSPACE_UPDATED, 'ws-billing', undefined, 'client-dashboard');
 
-    expect(adminInvalidation).toContain('[WS_EVENTS.WORKSPACE_UPDATED]: () => invalidateRegistry(WS_EVENTS.WORKSPACE_UPDATED)');
+    expect(adminInvalidation).toContain('[WS_EVENTS.WORKSPACE_UPDATED]: (data: unknown) => invalidateRegistry(WS_EVENTS.WORKSPACE_UPDATED, data)');
     expect(adminKeys).toContainEqual(queryKeys.admin.workspaceHome('ws-billing'));
     expect(adminKeys).toContainEqual(queryKeys.admin.workspaceDetail('ws-billing'));
     expect(adminKeys).toContainEqual(queryKeys.admin.workspaceOverview());

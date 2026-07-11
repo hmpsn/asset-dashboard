@@ -446,6 +446,8 @@ function adminInvalidationKeys(
       ] as const;
     case WS_EVENTS.STRATEGY_UPDATED:
       return strategyMutationKeys(workspaceId);
+    case WS_EVENTS.STRATEGY_KEYWORD_SET_UPDATED:
+      return [queryKeys.admin.strategyKeywordSet(workspaceId)] as const;
     case WS_EVENTS.RANK_TRACKING_UPDATED:
       return rankTrackingMutationKeys(workspaceId);
     case WS_EVENTS.SERP_SNAPSHOTS_REFRESHED:

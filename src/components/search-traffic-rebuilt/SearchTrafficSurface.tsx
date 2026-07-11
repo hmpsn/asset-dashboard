@@ -2,9 +2,7 @@
 import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaces } from '../../hooks/admin';
-import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { queryKeys } from '../../lib/queryKeys';
-import { WS_EVENTS } from '../../lib/wsEvents';
 import {
   Button,
   DateRangeSelector,
@@ -143,11 +141,11 @@ export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps)
   const siteId = workspace?.webflowSiteId;
   const gscPropertyUrl = workspace?.gscPropertyUrl;
   const ga4PropertyId = workspace?.ga4PropertyId;
-  const searchData = useSearchTrafficSearchData(workspaceId, siteId, gscPropertyUrl, state.days);
-  const ga4Data = useSearchTrafficGa4Data(workspaceId, state.days, ga4PropertyId);
+  const searchData = useSearchTrafficSearchData(workspaceId, siteId, gscPropertyUrl, state.days, state.lens);
+  const ga4Data = useSearchTrafficGa4Data(workspaceId, state.days, ga4PropertyId, state.lens);
   const annotations = useAnalyticsAnnotations(workspaceId);
 
-  const invalidateAnalytics = useCallback(() => {
+  const rescanAnalytics = useCallback(() => {
     if (siteId) queryClient.invalidateQueries({ queryKey: queryKeys.admin.gscAll(`${workspaceId}:${siteId}`) });
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.ga4All(workspaceId) });
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.analyticsAnnotations(workspaceId) });
@@ -156,20 +154,11 @@ export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps)
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.strategyKeywordSet(workspaceId) });
   }, [queryClient, siteId, workspaceId]);
 
-  useWorkspaceEvents(workspaceId, {
-    // ws-invalidation-ok — rebuilt Search & Traffic owns the admin analytics read-model refresh while mounted outside the legacy AnalyticsHub.
-    [WS_EVENTS.ANNOTATION_BRIDGE_CREATED]: invalidateAnalytics,
-    // ws-invalidation-ok — insight bridge changes affect the filtered insight windows shown on this surface.
-    [WS_EVENTS.INSIGHT_BRIDGE_UPDATED]: invalidateAnalytics,
-    // ws-invalidation-ok — resolved insights must disappear from the filtered insight windows.
-    [WS_EVENTS.INSIGHT_RESOLVED]: invalidateAnalytics,
-    // ws-invalidation-ok — anomaly scan/ack/dismiss actions update the actionable panel on this surface.
-    [WS_EVENTS.ANOMALIES_UPDATE]: invalidateAnalytics,
-    // ws-invalidation-ok — keyword strategy membership drives the strategy dot on query rows.
-    [WS_EVENTS.STRATEGY_KEYWORD_SET_UPDATED]: invalidateAnalytics,
-  });
-
-  const dataWindow = searchData.overview?.dateRange ?? ga4Data.overview?.dateRange;
+  const dataWindow = state.lens === 'search'
+    ? searchData.overview?.dateRange
+    : state.lens === 'traffic'
+      ? ga4Data.overview?.dateRange
+      : searchData.overview?.dateRange ?? ga4Data.overview?.dateRange;
   const lastUpdated = formatScanTime(dataWindow?.end ? `${dataWindow.end}T12:00:00.000Z` : null);
   const overflowDate = OVERFLOW_DATE_OPTIONS.find((option) => option.value === state.days);
   const narrative = reportNarrative(
@@ -266,7 +255,7 @@ export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps)
               }))}
             />
           </div>
-          <Button size="sm" variant="secondary" onClick={invalidateAnalytics}>
+          <Button size="sm" variant="secondary" onClick={rescanAnalytics}>
             <Icon name="refresh" size="sm" aria-hidden="true" />
             Re-scan
           </Button>
@@ -293,11 +282,11 @@ export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps)
       {state.lens === 'overview' && (
         <OverviewLens
           workspaceId={workspaceId}
-          siteId={siteId}
           gscPropertyUrl={gscPropertyUrl}
           ga4PropertyId={ga4PropertyId}
           days={state.days}
           searchData={searchData}
+          ga4Data={ga4Data}
         />
       )}
 

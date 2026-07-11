@@ -12,6 +12,8 @@ import { expectNoA11yViolations } from '../a11y';
 const getMock = vi.fn();
 const featureFlagsListMock = vi.fn();
 let capturedWorkspaceHandlers: Record<string, (data?: unknown) => void> = {};
+const adminSearchCallMock = vi.fn();
+const adminGa4CallMock = vi.fn();
 
 const workspace = {
   id: 'ws-1',
@@ -91,7 +93,9 @@ vi.mock('../../../src/hooks/admin', () => ({
 }));
 
 vi.mock('../../../src/hooks/admin/useAdminSearch', () => ({
-  useAdminSearch: () => ({
+  useAdminSearch: (...args: unknown[]) => {
+    adminSearchCallMock(...args);
+    return ({
     overview: currentSearchOverview,
     trend: [
       { date: '2026-06-01', clicks: 20, impressions: 400, ctr: 5, position: 8 },
@@ -108,11 +112,14 @@ vi.mock('../../../src/hooks/admin/useAdminSearch', () => ({
     },
     isLoading: false,
     error: currentSearchError,
-  }),
+    });
+  },
 }));
 
 vi.mock('../../../src/hooks/admin/useAdminGA4', () => ({
-  useAdminGA4: () => ({
+  useAdminGA4: (...args: unknown[]) => {
+    adminGa4CallMock(...args);
+    return ({
     overview: currentGa4Overview,
     trend: [
       { date: '2026-06-01', users: 30, sessions: 42, pageviews: 80 },
@@ -134,11 +141,12 @@ vi.mock('../../../src/hooks/admin/useAdminGA4', () => ({
     conversions: [{ eventName: 'form_submit', conversions: 24, users: 20, rate: 2.2 }],
     isLoading: false,
     error: null,
-  }),
+    });
+  },
 }));
 
 vi.mock('../../../src/hooks/admin/useAnalyticsOverview', () => ({
-  useAnalyticsOverview: () => ({
+  useAnalyticsOverviewFromData: () => ({
     gscClicks: 1200,
     gscImpressions: 24000,
     gscPosition: 8.2,
@@ -231,16 +239,19 @@ vi.mock('../../../src/components/insights', () => ({
 function renderSurface(initialEntry = '/ws/ws-1/analytics-hub') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   queryClient.setQueryData(queryKeys.shared.featureFlags(), featureFlagResponse);
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialEntry]}>
-        <LocationProbe />
-        <ToastProvider>
-          <SearchTrafficSurface workspaceId="ws-1" />
-        </ToastProvider>
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
+  return {
+    queryClient,
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <LocationProbe />
+          <ToastProvider>
+            <SearchTrafficSurface workspaceId="ws-1" />
+          </ToastProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    ),
+  };
 }
 
 function FlaggedSearchTraffic() {
@@ -284,6 +295,8 @@ beforeEach(() => {
   currentSearchOverview = searchOverview;
   currentSearchError = null;
   currentGa4Overview = ga4Overview;
+  adminSearchCallMock.mockClear();
+  adminGa4CallMock.mockClear();
   getMock.mockResolvedValue([
     { date: '2026-05-01', clicks: 12, impressions: 300, ctr: 4, position: 9 },
     { date: '2026-05-02', clicks: 10, impressions: 280, ctr: 3.6, position: 9.2 },
@@ -330,7 +343,7 @@ describe('SearchTrafficSurface', () => {
       'overflow-x-auto',
     );
     expect(screen.getByText('Share uses impressions as the denominator; missing query rows remain in the non-branded remainder.')).toHaveClass('t-body');
-    expect(Object.keys(capturedWorkspaceHandlers)).toContain('annotation:bridge_created');
+    expect(Object.keys(capturedWorkspaceHandlers)).not.toContain('annotation:bridge_created');
 
     const trend = screen.getByText('Search performance trend');
     const movement = screen.getByText('Movement');
@@ -358,6 +371,20 @@ describe('SearchTrafficSurface', () => {
     expect(within(dateRange).getByRole('button', { name: 'More date ranges' })).toHaveTextContent('7d');
   });
 
+  it('keeps explicit Re-scan wired to provider and surface read models', async () => {
+    const { queryClient } = renderSurface();
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Re-scan' }));
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.admin.gscAll('ws-1:site-1') });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.admin.ga4All('ws-1') });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.admin.analyticsAnnotations('ws-1') });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.admin.insightFeed('ws-1') });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.admin.anomalyAlerts('ws-1') });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.admin.strategyKeywordSet('ws-1') });
+  });
+
   it('omits provider-window fallback copy when neither provider returned a real window', async () => {
     currentSearchOverview = null;
     currentGa4Overview = null;
@@ -365,6 +392,17 @@ describe('SearchTrafficSurface', () => {
 
     expect(await screen.findByText('No search data')).toBeInTheDocument();
     expect(screen.queryByText('Provider window unavailable')).not.toBeInTheDocument();
+  });
+
+  it('does not leak a cached GA4 timestamp when returning from Traffic to Search', async () => {
+    currentSearchOverview = null;
+    renderSurface('/ws/ws-1/analytics-hub?lens=traffic');
+
+    expect(await screen.findByText(/Data as of/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: /Search performance/i }));
+
+    await screen.findByText('No search data');
+    expect(screen.queryByText(/Data as of/)).not.toBeInTheDocument();
   });
 
   it('normalizes an invalid lens to the default while preserving validated report params', async () => {
@@ -384,6 +422,20 @@ describe('SearchTrafficSurface', () => {
     expect(reportModes()).toHaveLength(3);
     expect(reportModes().filter((radio) => radio.getAttribute('aria-checked') === 'true')).toHaveLength(0);
     expect(screen.queryByRole('radio', { name: /Overview/i })).not.toBeInTheDocument();
+    expect(adminSearchCallMock).toHaveBeenLastCalledWith(
+      'ws-1',
+      'site-1',
+      'https://acme.com/',
+      28,
+      { enabled: true, metrics: ['overview', 'trend', 'comparison'] },
+    );
+    expect(adminGa4CallMock).toHaveBeenLastCalledWith(
+      'ws-1',
+      28,
+      true,
+      ['overview', 'trend', 'comparison'],
+    );
+    expect(getMock).not.toHaveBeenCalled();
   });
 
   it('honors the lens deep link and table view params', async () => {
@@ -441,6 +493,15 @@ describe('SearchTrafficSurface', () => {
     expect(screen.getByText('form submit')).toBeInTheDocument();
     expect(screen.getAllByText('Traffic sources')).toHaveLength(1);
     expect(screen.getByText('Devices')).toBeInTheDocument();
+    expect(adminSearchCallMock).toHaveBeenLastCalledWith(
+      'ws-1',
+      'site-1',
+      'https://acme.com/',
+      28,
+      { enabled: false, metrics: undefined },
+    );
+    expect(adminGa4CallMock).toHaveBeenLastCalledWith('ws-1', 28, true, undefined);
+    expect(getMock).not.toHaveBeenCalled();
     expectBefore(screen.getByText('Traffic trend'), screen.getByText('Acquisition'));
     expectBefore(screen.getByText('Acquisition'), screen.getByText('Engagement'));
     expectBefore(screen.getByText('Engagement'), screen.getByText('Conversion'));
@@ -462,6 +523,15 @@ describe('SearchTrafficSurface', () => {
     expect(screen.getByRole('button', { name: 'Add annotation' })).toBeInTheDocument();
     expectBefore(screen.getByText('Trend with context'), screen.getByText('Annotation timeline'));
     expect(screen.getByTestId('annotated-trend-chart')).toHaveTextContent('chart 2');
+    expect(adminSearchCallMock).toHaveBeenLastCalledWith(
+      'ws-1',
+      'site-1',
+      'https://acme.com/',
+      28,
+      { enabled: true, metrics: ['overview', 'trend'] },
+    );
+    expect(adminGa4CallMock).toHaveBeenLastCalledWith('ws-1', 28, true, ['overview', 'trend']);
+    expect(getMock).toHaveBeenCalledOnce();
   });
 
   it('keeps provider-independent Annotations CRUD mounted exactly once without analytics providers', async () => {

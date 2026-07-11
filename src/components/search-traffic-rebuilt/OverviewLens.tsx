@@ -3,12 +3,12 @@ import { BarChart3, MousePointerClick, Search, Users } from 'lucide-react';
 import { useMemo } from 'react';
 import { AnnotatedTrendChart, type TrendLine } from '../charts/AnnotatedTrendChart';
 import { Badge, ChartCard, EmptyState, Skeleton } from '../ui';
-import { useAnalyticsOverview } from '../../hooks/admin/useAnalyticsOverview';
+import { useAnalyticsOverviewFromData } from '../../hooks/admin/useAnalyticsOverview';
 import { useInsightFeed } from '../../hooks/admin/useInsightFeed';
 import { useToggleSet } from '../../hooks/useToggleSet';
 import { SearchContextBand } from './SearchContextBand';
 import { SparkMetricTile } from './SparkMetricTile';
-import type { SearchTrafficSearchData } from './types';
+import type { SearchTrafficGa4Data, SearchTrafficSearchData } from './types';
 import {
   SERIES,
   buildSparkline,
@@ -19,11 +19,11 @@ import {
 
 interface OverviewLensProps {
   workspaceId: string;
-  siteId?: string;
   gscPropertyUrl?: string;
   ga4PropertyId?: string;
   days: number;
   searchData: SearchTrafficSearchData;
+  ga4Data: SearchTrafficGa4Data;
 }
 
 type OverviewMetricKey = 'clicks' | 'impressions' | 'ctr' | 'position' | 'users' | 'sessions';
@@ -47,13 +47,16 @@ function LoadingGrid() {
 
 export function OverviewLens({
   workspaceId,
-  siteId,
   gscPropertyUrl,
   ga4PropertyId,
   days,
   searchData,
+  ga4Data,
 }: OverviewLensProps) {
-  const overview = useAnalyticsOverview(workspaceId, siteId, gscPropertyUrl, ga4PropertyId, days);
+  const overview = useAnalyticsOverviewFromData(workspaceId, searchData, ga4Data, {
+    gsc: !!gscPropertyUrl,
+    ga4: !!ga4PropertyId,
+  });
   const { feed, summary, isLoading: feedLoading } = useInsightFeed(workspaceId);
   const [activeLines, toggleLine] = useToggleSet(['clicks', 'users']);
 

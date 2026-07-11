@@ -19,7 +19,7 @@ import {
   Skeleton,
 } from '../ui';
 import type { DataColumn } from '../ui';
-import { useAnalyticsOverview } from '../../hooks/admin/useAnalyticsOverview';
+import { useAnalyticsOverviewFromData } from '../../hooks/admin/useAnalyticsOverview';
 import { useInsightFeed } from '../../hooks/admin/useInsightFeed';
 import { useToggleSet } from '../../hooks/useToggleSet';
 import { SparkMetricTile } from './SparkMetricTile';
@@ -66,7 +66,10 @@ const conversionColumns: DataColumn[] = [
 export function TrafficLens({ workspaceId, ga4PropertyId, days, data, onOpenBreakdowns }: TrafficLensProps) {
   const [activeLines, toggleLine] = useToggleSet(['users', 'sessions']);
   const [eventsOpen, setEventsOpen] = useState(true);
-  const overviewData = useAnalyticsOverview(workspaceId, undefined, undefined, ga4PropertyId, days);
+  const overviewData = useAnalyticsOverviewFromData(workspaceId, null, data, {
+    gsc: false,
+    ga4: !!ga4PropertyId,
+  });
   const { feed, isLoading: feedLoading } = useInsightFeed(workspaceId);
 
   if (!ga4PropertyId) {

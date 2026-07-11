@@ -110,15 +110,45 @@ describe('analytics stale time wiring', () => {
     expect(queryCalls.every(call => call.enabled === false)).toBe(true);
   });
 
-  it('does not give admin wrappers the client analytics stale time by default', () => {
+  it('applies the analytics stale time to admin GA4 and search queries', () => {
     renderHook(() => useAdminGA4('ws-1', 28, true));
     expect(queryCalls.length).toBeGreaterThanOrEqual(11);
-    expect(queryCalls.every(call => call.staleTime === undefined)).toBe(true);
+    expect(queryCalls.every(call => call.staleTime === STALE_TIMES.ANALYTICS)).toBe(true);
 
     resetHarness();
 
     renderHook(() => useAdminSearch('ws-1', 'site-1', 'https://example.com', 28));
     expect(queryCalls.length).toBeGreaterThanOrEqual(6);
-    expect(queryCalls.every(call => call.staleTime === undefined)).toBe(true);
+    expect(queryCalls.every(call => call.staleTime === STALE_TIMES.ANALYTICS)).toBe(true);
+  });
+
+  it('runs only the selected admin GA4 metrics', () => {
+    renderHook(() => useAdminGA4('ws-1', 28, true, ['overview', 'trend', 'comparison']));
+
+    expect(ga4Api.overview).toHaveBeenCalledOnce();
+    expect(ga4Api.trend).toHaveBeenCalledOnce();
+    expect(ga4Api.comparison).toHaveBeenCalledOnce();
+    expect(ga4Api.topPages).not.toHaveBeenCalled();
+    expect(ga4Api.sources).not.toHaveBeenCalled();
+    expect(ga4Api.devices).not.toHaveBeenCalled();
+    expect(ga4Api.landingPages).not.toHaveBeenCalled();
+    expect(ga4Api.conversions).not.toHaveBeenCalled();
+  });
+
+  it('runs only the selected admin search metrics', () => {
+    renderHook(() => useAdminSearch(
+      'ws-1',
+      'site-1',
+      'https://example.com',
+      28,
+      { metrics: ['overview', 'trend'] },
+    ));
+
+    expect(gscApi.overview).toHaveBeenCalledOnce();
+    expect(gscApi.trend).toHaveBeenCalledOnce();
+    expect(gscApi.comparison).not.toHaveBeenCalled();
+    expect(gscApi.devices).not.toHaveBeenCalled();
+    expect(gscApi.countries).not.toHaveBeenCalled();
+    expect(gscApi.searchTypes).not.toHaveBeenCalled();
   });
 });

@@ -1,9 +1,12 @@
 // src/hooks/admin/useAnalyticsOverview.ts
 import { useMemo } from 'react';
-import { useAdminSearch } from './useAdminSearch';
-import { useAdminGA4 } from './useAdminGA4';
+import { useAdminSearch, type AdminSearchData } from './useAdminSearch';
+import { useAdminGA4, type AdminGA4Data } from './useAdminGA4';
 import { useAnalyticsAnnotations, useCreateAnnotation } from './useAnalyticsAnnotations';
 import type { Annotation } from './useAnalyticsAnnotations';
+
+const OVERVIEW_GSC_METRICS = ['overview', 'trend', 'comparison'] as const;
+const OVERVIEW_GA4_METRICS = ['overview', 'trend', 'comparison'] as const;
 
 export interface AnalyticsOverviewData {
   // GSC headline
@@ -40,20 +43,22 @@ export interface AnalyticsOverviewData {
   hasGa4: boolean;
 }
 
-export function useAnalyticsOverview(
+interface AnalyticsOverviewConnections {
+  gsc: boolean;
+  ga4: boolean;
+}
+
+export function useAnalyticsOverviewFromData(
   workspaceId: string,
-  siteId: string | undefined,
-  gscPropertyUrl: string | undefined,
-  ga4PropertyId: string | undefined,
-  days: number,
+  gsc: AdminSearchData | null,
+  ga4: AdminGA4Data | null,
+  connections: AnalyticsOverviewConnections,
 ): AnalyticsOverviewData {
-  const gsc = useAdminSearch(workspaceId, siteId ?? '', gscPropertyUrl, days);
-  const ga4 = useAdminGA4(workspaceId, days, !!ga4PropertyId);
   const { data: annotations = [] } = useAnalyticsAnnotations(workspaceId);
   const createAnnotation = useCreateAnnotation(workspaceId);
 
-  const hasGsc = !!gscPropertyUrl && !!gsc.overview;
-  const hasGa4 = !!ga4PropertyId && !!ga4.overview;
+  const hasGsc = connections.gsc && !!gsc?.overview;
+  const hasGa4 = connections.ga4 && !!ga4?.overview;
 
   // Merge GSC trend + GA4 trend into unified date-keyed array
   const trendData = useMemo(() => {
@@ -68,7 +73,7 @@ export function useAnalyticsOverview(
       pageviews: number;
     }>();
 
-    for (const t of gsc.trend) {
+    for (const t of connections.gsc ? gsc?.trend ?? [] : []) {
       byDate.set(t.date, {
         date: t.date,
         clicks: t.clicks,
@@ -80,7 +85,7 @@ export function useAnalyticsOverview(
         pageviews: 0,
       });
     }
-    for (const t of ga4.trend) {
+    for (const t of connections.ga4 ? ga4?.trend ?? [] : []) {
       const existing = byDate.get(t.date);
       if (existing) {
         existing.users = t.users;
@@ -101,28 +106,45 @@ export function useAnalyticsOverview(
     }
 
     return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
-  }, [gsc.trend, ga4.trend]);
+  }, [connections.ga4, connections.gsc, ga4?.trend, gsc?.trend]);
 
   return {
-    gscClicks: gsc.overview?.totalClicks ?? 0,
-    gscImpressions: gsc.overview?.totalImpressions ?? 0,
-    gscPosition: gsc.overview?.avgPosition ?? 0,
-    gscClicksDelta: gsc.comparison?.changePercent.clicks ?? null,
-    gscImpressionsDelta: gsc.comparison?.changePercent.impressions ?? null,
-    gscPositionDelta: gsc.comparison?.change.position ?? null,
-    ga4Users: ga4.overview?.totalUsers ?? 0,
-    ga4Sessions: ga4.overview?.totalSessions ?? 0,
-    ga4BounceRate: ga4.overview?.bounceRate ?? 0,
-    ga4UsersDelta: ga4.comparison?.changePercent.users ?? null,
-    ga4SessionsDelta: ga4.comparison?.changePercent.sessions ?? null,
-    ga4BounceRateDelta: ga4.comparison
+    gscClicks: connections.gsc ? gsc?.overview?.totalClicks ?? 0 : 0,
+    gscImpressions: connections.gsc ? gsc?.overview?.totalImpressions ?? 0 : 0,
+    gscPosition: connections.gsc ? gsc?.overview?.avgPosition ?? 0 : 0,
+    gscClicksDelta: connections.gsc ? gsc?.comparison?.changePercent.clicks ?? null : null,
+    gscImpressionsDelta: connections.gsc ? gsc?.comparison?.changePercent.impressions ?? null : null,
+    gscPositionDelta: connections.gsc ? gsc?.comparison?.change.position ?? null : null,
+    ga4Users: connections.ga4 ? ga4?.overview?.totalUsers ?? 0 : 0,
+    ga4Sessions: connections.ga4 ? ga4?.overview?.totalSessions ?? 0 : 0,
+    ga4BounceRate: connections.ga4 ? ga4?.overview?.bounceRate ?? 0 : 0,
+    ga4UsersDelta: connections.ga4 ? ga4?.comparison?.changePercent.users ?? null : null,
+    ga4SessionsDelta: connections.ga4 ? ga4?.comparison?.changePercent.sessions ?? null : null,
+    ga4BounceRateDelta: connections.ga4 && ga4?.comparison
       ? Math.round((ga4.comparison.current.bounceRate - ga4.comparison.previous.bounceRate) * 10) / 10
       : null,
     trendData,
     annotations,
     createAnnotation,
-    isLoading: gsc.isLoading || ga4.isLoading,
+    isLoading: (connections.gsc && !!gsc?.isLoading) || (connections.ga4 && !!ga4?.isLoading),
     hasGsc,
     hasGa4,
   };
+}
+
+export function useAnalyticsOverview(
+  workspaceId: string,
+  siteId: string | undefined,
+  gscPropertyUrl: string | undefined,
+  ga4PropertyId: string | undefined,
+  days: number,
+): AnalyticsOverviewData {
+  const gsc = useAdminSearch(workspaceId, siteId ?? '', gscPropertyUrl, days, {
+    metrics: OVERVIEW_GSC_METRICS,
+  });
+  const ga4 = useAdminGA4(workspaceId, days, !!ga4PropertyId, OVERVIEW_GA4_METRICS);
+  return useAnalyticsOverviewFromData(workspaceId, gsc, ga4, {
+    gsc: !!gscPropertyUrl,
+    ga4: !!ga4PropertyId,
+  });
 }
