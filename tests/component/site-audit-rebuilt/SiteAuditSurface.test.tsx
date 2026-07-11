@@ -25,7 +25,7 @@ vi.mock('../../../src/hooks/admin/useSiteAuditRebuilt', async () => {
 });
 
 vi.mock('../../../src/components/audit/AuditHistory', () => ({
-  AuditHistory: () => <div data-testid="site-audit-history-view">Audit History</div>,
+  AuditHistory: () => <div data-testid="legacy-site-audit-history-view">Legacy Audit History</div>,
 }));
 vi.mock('../../../src/components/audit/SeoAuditGuide', () => ({
   SeoAuditGuide: () => <div data-testid="site-audit-guide-view">SEO Audit Guide</div>,
@@ -114,6 +114,28 @@ const sampleAudit: SiteAuditResult = {
       type: 'internal',
     },
   ],
+  cwvSummary: {
+    mobile: {
+      assessment: 'needs-improvement',
+      fieldDataAvailable: true,
+      lighthouseScore: 76,
+      metrics: {
+        LCP: { value: 2800, rating: 'needs-improvement' },
+        INP: { value: 190, rating: 'good' },
+        CLS: { value: 0.08, rating: 'good' },
+      },
+    },
+    desktop: {
+      assessment: 'good',
+      fieldDataAvailable: false,
+      lighthouseScore: 91,
+      metrics: {
+        LCP: { value: 1800, rating: 'good' },
+        INP: { value: 130, rating: 'good' },
+        CLS: { value: 0.04, rating: 'good' },
+      },
+    },
+  },
   categoryScoreVersion: 1,
   categoryScores: [],
 };
@@ -260,7 +282,7 @@ describe('SiteAuditSurface rebuilt', () => {
 
   it.each([
     ['/ws/ws-1/seo-audit?sub=audit', 'site-audit-rebuilt-audit'],
-    ['/ws/ws-1/seo-audit?sub=history', 'site-audit-history-view'],
+    ['/ws/ws-1/seo-audit?sub=history', 'site-audit-history-compact'],
   ])('renders peer mode for %s', async (entry, testId) => {
     renderSurface(entry);
     expect(await screen.findByTestId(testId)).toBeInTheDocument();
@@ -332,11 +354,53 @@ describe('SiteAuditSurface rebuilt', () => {
 
     fireEvent.click(auditModeSwitcher().getByRole('radio', { name: /History/ }));
     expect(screen.getByTestId('location-search')).toHaveTextContent('?sub=history');
-    expect(await screen.findByTestId('site-audit-history-view')).toBeInTheDocument();
+    expect(await screen.findByTestId('site-audit-history-compact')).toBeInTheDocument();
 
     fireEvent.click(auditModeSwitcher().getByRole('radio', { name: /Site Audit/ }));
     expect(screen.getByTestId('location-search')).toHaveTextContent('');
     expect(await screen.findByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();
+  });
+
+  it('follows the prototype decision order inside a centered audit canvas', async () => {
+    renderSurface('/ws/ws-1/seo-audit?sub=audit');
+
+    await screen.findByTestId('site-audit-rebuilt-audit');
+    const surface = screen.getByTestId('site-audit-rebuilt-surface');
+    expect(surface).toHaveClass('max-w-[1120px]');
+
+    const orderedSections = [
+      'site-audit-context',
+      'site-audit-lenses',
+      'site-audit-hero',
+      'site-audit-categories',
+      'site-audit-cwv',
+      'site-audit-bulk-actions',
+      'site-audit-broken-links',
+      'site-audit-issues',
+      'site-audit-support',
+    ].map((testId) => screen.getByTestId(testId));
+
+    orderedSections.slice(1).forEach((section, index) => {
+      expect(orderedSections[index].compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    expect(within(screen.getByTestId('site-audit-categories')).getAllByRole('button').map((button) => button.textContent)).toEqual([
+      expect.stringContaining('Indexability'),
+      expect.stringContaining('On-page'),
+      expect.stringContaining('Performance'),
+      expect.stringContaining('Structured data'),
+      expect.stringContaining('Links'),
+      expect.stringContaining('Mobile'),
+    ]);
+  });
+
+  it('uses the compact local history composition instead of the legacy shared view', async () => {
+    renderSurface('/ws/ws-1/seo-audit?sub=history');
+
+    const history = await screen.findByTestId('site-audit-history-compact');
+    expect(history).toHaveTextContent('Audit History');
+    expect(history).toHaveTextContent('1 snapshot');
+    expect(screen.queryByTestId('legacy-site-audit-history-view')).not.toBeInTheDocument();
   });
 
   it('opens schedule and issue detail drawers exactly once', async () => {
@@ -369,10 +433,10 @@ describe('SiteAuditSurface rebuilt', () => {
     renderSurface('/ws/ws-1/seo-audit');
 
     expect(await screen.findByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();
-    expectTextWithClass('2 pages analyzed. Noindex pages stay out of score denominators.', 't-body');
+    expectTextWithClass(/1 critical issue needs attention first\./i, 't-ui');
     expectTextWithClass('Missing title', 't-ui');
     expectTextWithClass('Add a specific page title.', 't-caption');
-    expectTextWithClass('Showing 2 of 2 issue groups', 't-ui');
+    expectTextWithClass('Showing 2 of 2 groups', 't-caption-sm');
     expectTextWithClass('From fix to proof', 't-ui');
     expectTextWithClass(/Technical fixes stay in Site Audit and Cockpit until traffic, crawlability, or Core Web Vitals recovery is measurable./i, 't-body');
   });

@@ -2,7 +2,7 @@
 
 Surface: `seo-audit` / Site Audit  
 Owner: optimization / technical-health workflow  
-Status: `behavior-safe / visual-unverified`; `ODP-004 A` diagnostic-lens behavior direction accepted, canonical Asset Manager repair handoff implemented and verified
+Status: `owner-approved`; Joshua approved the corrected audit composition and documented exceptions on 2026-07-10
 Primary route: `/ws/:workspaceId/seo-audit`
 
 ## Prototype References
@@ -28,13 +28,13 @@ The prototype has two visible sub-tabs: `Site Audit` and `History`. Performance,
 
 ## Current Parity Grade
 
-Initial grade: `behavior mismatch`.
+Visual status: `owner-approved`.
 
 Why:
 
 - The rebuilt surface already preserves the core audit workflow: health score, category meters, Core Web Vitals, issue grouping, dead-link handoff, schedule drawer, export/share, history, and issue detail drawer.
 - The default lens now matches the prototype label, `Site Audit`, and the default route is clean (`/seo-audit` rather than `?sub=audit`) while still accepting `?sub=audit`.
-- The remaining mismatch is visible IA: the rebuilt surface exposes `AI Search Ready`, `Content Health`, and `Guide` as peer lenses. The prototype absorbs those signals into the audit surface or adjacent guidance instead of giving them equal top-level weight.
+- The visible IA mismatch is resolved: only Site Audit and History remain peer modes, while compatibility evidence stays exact-once inside the audit flow.
 
 Accepted direction:
 
@@ -44,12 +44,23 @@ Accepted direction:
 Wave 2 correction implemented:
 
 - The visible mode switcher now contains only `Site Audit` and `History`.
-- `AI Search Ready`, `Content Health`, and `Audit Guide` live in one `Search readiness and guidance` evidence group after Core Web Vitals, each in the canonical `Disclosure` primitive.
+- `AI Search Ready`, `Content Health`, and `Audit Guide` live in one evidence/repair support group. Bare Audit keeps the collapsed group below the primary repair decision flow; a compatibility `?sub=` receiver mounts the same group immediately after Core Web Vitals and opens the requested disclosure.
 - `?sub=aeo-review`, `?sub=content-decay`, and `?sub=guide` keep the full audit console rendered, mark Site Audit active, and open only the requested evidence disclosure.
 - The same exact-once evidence group remains available alongside background-audit progress, so a valid compatibility URL does not disappear during a run.
 - The three diagnostic workflows remain reachable exactly once; run, schedule, history, issue detail, dead-link handoff, export/share, suppression, and action-item capabilities are unchanged.
 - The loaded audit now names Asset Manager as the source-image repair owner and offers truthful oversized and missing-alt handoffs without claiming the current audit found either issue or inventing counts.
 - Current behavior grade: aligned for the accepted diagnostic-demotion slice. Discoverability remains the circle-back trigger.
+
+## Source-Led Visual Result, 2026-07-10
+
+| Prototype seam | Corrected rebuilt composition | Retained production exception |
+|---|---|---|
+| 1120px technical console | Exact 1120px border-box / 1060px inner canvas with compact context and Site Audit / History tray | Shared rebuilt shell remains the route chrome |
+| Audit decision spine | Horizontal score/verdict hero → 3x2 prototype category order → one CWV strip → utility → bulk repair → Broken Links → dense issues | Deep-linked evidence opens after CWV; bare Audit keeps its collapsed exact-once home below issues |
+| History | One compact score trend and snapshot ledger | Persistent report and Action Items remain truthful production follow-ons |
+| Detail and operations | Dense issue list with exact-one detail, schedule, and report overlays | Issue detail remains a Drawer; schedule/export/share remain richer than prototype toasts |
+
+Fresh Sol review returned `PASS`. Joshua explicitly owner-approved this visual pass on 2026-07-10.
 
 ## URL and Deep Links
 
@@ -127,6 +138,19 @@ Typography/proof-framing evidence:
 - Smoke state: `/tmp/asset-dashboard-codex-parity-captures/site-audit-typography-role-smoke-state.json`
 
 Result: passed with local Playwright after the in-app browser connector timed out during page capture. The state file confirms no horizontal overflow, no visible internal labels, one issue dialog, and styleguide-computed sizes for the sampled audit copy: `.t-body` at `15.5px` / `23.25px` line-height and `.t-ui` at `13.5px` / `18.9px` line-height. Local preview noise was limited to Vite WebSocket disconnect warnings, a favicon/resource 404, and one route-change-aborted intelligence request.
+
+Final source-led evidence, 2026-07-10:
+
+- Prototype references: `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/prototype/site-audit-1440.png`, `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/prototype/site-audit-1600.png`.
+- Corrected default: `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/site-audit/audit-1440-final.png`, `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/site-audit/audit-1600.png`.
+- History, compatibility evidence, and overlays: `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/site-audit/history-1440.png`, `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/site-audit/support-aeo-1440.png`, `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/site-audit/issue-drawer-1440.png`, `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/site-audit/schedule-drawer-1440.png`.
+- Mobile floor: `/tmp/asset-dashboard-codex-visual-parity/repair-cluster/site-audit/audit-mobile-390.png`.
+
+Measured canvas geometry is `x=273, w=1120` at 1440x900 and `x=353, w=1120` at 1600x1000, with no document overflow. The default first viewport places bulk repair at `y=802`; the exact-1440 evidence was independently rechecked after the final state-aware support placement. The settled focused suite passes 17/17.
+
+## Registry Closeout Evidence
+
+The measured registry archive adds exact History prototype pairs at both viewports, matching rebuilt 1600x1000 History evidence, and rebuilt 1600x1000 evidence for AI Search, Content Health, and Guide compatibility support under `/tmp/asset-dashboard-codex-visual-parity/registry-final/`. The reviewed exact 1440x900 counterparts remain authoritative; issue, schedule, export/share, and report overlays remain production-only capability states.
 
 ## Automated Test Floor
 

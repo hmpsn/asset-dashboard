@@ -12,12 +12,9 @@ import {
   type SiteAuditSortMode,
 } from '../../hooks/admin/useSiteAuditRebuilt';
 import {
-  AUDIT_DISPLAY_CATEGORIES,
-  AUDIT_DISPLAY_CATEGORY_LABELS,
   type AuditDisplayCategory,
 } from '../../../shared/types/seo-audit.js';
 import type { CwvStrategyResult, DeadLinkItem, SeoAuditResult, Severity } from '../audit/types';
-import { AuditHistory } from '../audit/AuditHistory';
 import { SeoAuditGuide } from '../audit/SeoAuditGuide';
 import { ActionItemsPanel } from '../audit/ActionItemsPanel';
 import { BulkAcceptPanel } from '../audit/BulkAcceptPanel';
@@ -36,7 +33,6 @@ import {
   ErrorState,
   FilterChip,
   FormTextarea,
-  GroupBlock,
   Icon,
   LensSwitcher,
   Meter,
@@ -44,17 +40,19 @@ import {
   MetricTile,
   PageHeader,
   SearchField,
+  SectionCard,
   Segmented,
   Skeleton,
   Toggle,
   Toolbar,
   ToolbarSpacer,
   scoreColor,
-  scoreColorClass,
   cn,
+  type IconName,
 } from '../ui';
+import { CompactAuditHistory } from './CompactAuditHistory';
 import { ScheduleDrawer } from './ScheduleDrawer';
-import { formatCompactNumber, formatInteger, formatScore } from './siteAuditFormatters';
+import { dateTimeOrDash, formatCompactNumber, formatInteger, formatScore } from './siteAuditFormatters';
 import { mutationErrorMessage } from './siteAuditMutationFeedback';
 import {
   SITE_AUDIT_VISIBLE_SUBS,
@@ -96,6 +94,35 @@ const CATEGORY_ACCENT: Record<AuditDisplayCategory, string> = {
   mobile: 'var(--blue)',
 };
 
+const SURFACE_WRAP_CLASS = 'mx-auto flex min-h-full w-full max-w-[1120px] flex-col gap-[14px] px-4 pb-20 sm:px-[30px]';
+
+const PROTOTYPE_CATEGORY_ORDER: AuditDisplayCategory[] = [
+  'index',
+  'onpage',
+  'perf',
+  'schema',
+  'links',
+  'mobile',
+];
+
+const CATEGORY_ICON: Record<AuditDisplayCategory, IconName> = {
+  index: 'search',
+  onpage: 'file',
+  perf: 'gauge',
+  schema: 'layers',
+  links: 'link',
+  mobile: 'sitemap',
+};
+
+const CATEGORY_LABEL: Record<AuditDisplayCategory, string> = {
+  index: 'Indexability',
+  onpage: 'On-page',
+  perf: 'Performance',
+  schema: 'Structured data',
+  links: 'Links',
+  mobile: 'Mobile',
+};
+
 function SurfaceIcon({ className }: { className?: string }) {
   return <Icon name="gauge" className={className} />;
 }
@@ -128,45 +155,73 @@ function metricValue(metric: CwvStrategyResult['metrics']['LCP'], key: 'LCP' | '
 }
 
 function CwvStrip({ data }: { data: SiteAuditResult }) {
-  const strategies = [
-    ['Mobile', data.cwvSummary?.mobile],
-    ['Desktop', data.cwvSummary?.desktop],
-  ] as const;
-  if (!data.cwvSummary?.mobile && !data.cwvSummary?.desktop) return null;
+  const strategies: Array<{ label: 'Mobile' | 'Desktop'; strategy: CwvStrategyResult }> = [];
+  if (data.cwvSummary?.mobile) strategies.push({ label: 'Mobile', strategy: data.cwvSummary.mobile });
+  if (data.cwvSummary?.desktop) strategies.push({ label: 'Desktop', strategy: data.cwvSummary.desktop });
+  if (strategies.length === 0) {
+    return (
+      <div data-testid="site-audit-cwv">
+        <SectionCard noPadding variant="subtle">
+          <div className="flex flex-wrap items-center gap-3 px-[18px] py-4">
+            <Icon name="gauge" size="md" className="text-[var(--blue)]" />
+            <div className="min-w-0 flex-1">
+              <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Core Web Vitals</div>
+              <div className="t-caption-sm text-[var(--brand-text-muted)]">This saved audit does not include field or lab performance data.</div>
+            </div>
+            <Badge label="No data" tone="zinc" variant="outline" />
+          </div>
+        </SectionCard>
+      </div>
+    );
+  }
 
   return (
-    <GroupBlock title="Core Web Vitals" meta="Field-data strip with lab score fallback">
-      <div className="grid gap-3 md:grid-cols-2">
-        {strategies.map(([label, strategy]) => {
-          if (!strategy) return null;
+    <div data-testid="site-audit-cwv">
+      <SectionCard noPadding variant="subtle">
+        <div
+          className={cn(
+            'grid grid-cols-1 md:divide-x md:divide-[var(--brand-border)]',
+            strategies.length === 1
+              ? 'md:grid-cols-[minmax(150px,0.48fr)_minmax(0,1fr)]'
+              : 'md:grid-cols-[minmax(150px,0.48fr)_repeat(2,minmax(0,1fr))]',
+          )}
+        >
+          <div className="flex flex-col justify-center border-b border-[var(--brand-border)] px-[18px] py-4 md:border-b-0">
+            <div className="flex items-center gap-2">
+              <Icon name="gauge" size="sm" className="text-[var(--blue)]" />
+              <span className="t-ui font-semibold text-[var(--brand-text-bright)]">Core Web Vitals</span>
+            </div>
+            <span className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">Real-user field data with lab fallback</span>
+          </div>
+        {strategies.map(({ label, strategy }) => {
           const badge = cwvBadge(strategy.assessment);
           return (
-            <div key={label} className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
-              <div className="mb-3 flex items-center justify-between gap-2">
+            <div key={label} className="border-b border-[var(--brand-border)] px-[18px] py-3.5 last:border-b-0 md:border-b-0">
+              <div className="mb-2 flex items-center justify-between gap-2">
                 <span className="t-ui font-semibold text-[var(--brand-text-bright)]">{label}</span>
                 <Badge label={badge.label} tone={badge.tone} variant="soft" />
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 divide-x divide-[var(--brand-border)]">
                 {(['LCP', 'INP', 'CLS'] as const).map((key) => (
-                  <div key={key} className="rounded-[var(--radius-md)] bg-[var(--surface-2)] px-3 py-2">
-                    <div className="t-caption-sm text-[var(--brand-text-muted)]">{key}</div>
+                  <div key={key} className="px-2 first:pl-0 last:pr-0">
+                    <div className="t-mono text-[var(--brand-text-dim)]">{key}</div>
                     {/* stat-primitive-ok: compact CWV metric micro-grid (LCP/INP/CLS across 3 cols with a trailing Meter), not a labeled StatCard/CompactStatBar metric grid */}
                     <div className="t-stat-sm text-[var(--brand-text-bright)]">{metricValue(strategy.metrics[key], key)}</div>
                   </div>
                 ))}
               </div>
               <Meter
-                className="mt-3"
-                label={strategy.fieldDataAvailable ? 'Real-user field data' : 'Lab simulation only'}
+                className="mt-2"
+                label={strategy.fieldDataAvailable ? 'Field data' : 'Lab simulation'}
                 value={strategy.lighthouseScore}
-                showValue
-                gradient
+                color={scoreColor(strategy.lighthouseScore)}
               />
             </div>
           );
         })}
-      </div>
-    </GroupBlock>
+        </div>
+      </SectionCard>
+    </div>
   );
 }
 
@@ -178,61 +233,46 @@ function DeadLinksPanel({
   onOpenLinks: () => void;
 }) {
   if (links.length === 0) return null;
-  const rows = links.map((link, index) => ({
-    id: `${link.url}-${index}`,
-    url: link.url,
-    status: String(link.status),
-    type: link.type,
-    foundOn: link.foundOn || link.foundOnSlug,
-    anchorText: link.anchorText || '—',
-  })) as unknown as Record<string, unknown>[];
+  const internal = links.filter((link) => link.type === 'internal').length;
+  const external = links.length - internal;
 
   return (
-    <GroupBlock
-      title="Broken Links"
-      meta="Status, source page, and anchor text"
-      stats={[{ label: 'found', value: links.length, color: 'var(--red)' }]}
-      flag={{ label: 'Links owns fixes', color: 'var(--teal)', bg: 'var(--brand-mint-dim)', border: 'var(--brand-mint-dim)' }}
-    >
-      <div className="space-y-3">
-        <div className="flex items-center justify-between gap-3 px-2 pt-1">
-          <p className="t-body text-[var(--brand-text-muted)]">
-            Redirect creation and dead-link CSV export live in the Links workshop.
-          </p>
-          <Button size="sm" variant="secondary" onClick={onOpenLinks}>
-            <Icon name="external" size="sm" />
-            Open Links
-          </Button>
-        </div>
-        <DataTable
-          columns={[
-            { key: 'status', label: 'Status', width: '84px' },
-            {
-              key: 'url',
-              label: 'Broken URL',
-              width: 'minmax(240px, 1.4fr)',
-              render: (value) => <span className="truncate font-mono">{String(value)}</span>,
-            },
-            { key: 'type', label: 'Type', width: '90px' },
-            {
-              key: 'foundOn',
-              label: 'Found on',
-              width: 'minmax(180px, 1fr)',
-              render: (value) => <span className="truncate">{String(value)}</span>,
-            },
-            {
-              key: 'anchorText',
-              label: 'Anchor',
-              width: 'minmax(160px, 1fr)',
-              render: (value) => <span className="truncate">{String(value)}</span>,
-            },
-          ]}
-          rows={rows}
-          getRowKey={(row) => String(row.id)}
-          onRowClick={onOpenLinks}
-        />
-      </div>
-    </GroupBlock>
+    <div data-testid="site-audit-broken-links">
+      <SectionCard
+        title="Broken Links"
+        subtitle={`${links.length} dead ${links.length === 1 ? 'link' : 'links'} found during the crawl`}
+        titleIcon={<Icon name="link" size="sm" className="text-[var(--red)]" />}
+        iconChip
+        action={(
+          <div className="flex items-center gap-2">
+            <Badge label={`${internal} internal`} tone="red" variant="soft" />
+            <Badge label={`${external} external`} tone="amber" variant="soft" />
+            <Button size="sm" variant="secondary" onClick={onOpenLinks}>
+              Manage in Links
+              <Icon name="arrowRight" size="sm" />
+            </Button>
+          </div>
+        )}
+        noPadding
+        variant="subtle"
+      >
+        {links.map((link, index) => (
+          <ClickableRow
+            key={`${link.url}-${index}`}
+            onClick={onOpenLinks}
+            className="grid w-full items-center gap-3 border-t border-[var(--brand-border)] px-[18px] py-2.5 text-left first:border-t-0 hover:bg-[var(--surface-3)] sm:grid-cols-[72px_minmax(0,1.2fr)_minmax(0,1fr)_auto]"
+          >
+            <Badge label={String(link.status)} tone={link.type === 'internal' ? 'red' : 'amber'} variant="soft" />
+            <span className="t-mono truncate text-[var(--brand-text-bright)]">{link.url}</span>
+            <span className="t-caption-sm truncate text-[var(--brand-text-muted)]">
+              on <strong className="font-semibold text-[var(--brand-text-bright)]">{link.foundOn || link.foundOnSlug}</strong>
+              {link.anchorText ? ` · “${link.anchorText}”` : ''}
+            </span>
+            <Icon name="arrowRight" size="sm" className="text-[var(--blue)]" />
+          </ClickableRow>
+        ))}
+      </SectionCard>
+    </div>
   );
 }
 
@@ -245,35 +285,97 @@ function CategoryCards({
   activeCategories: ReadonlySet<string>;
   onToggleCategory: (category: AuditDisplayCategory) => void;
 }) {
+  const scoreByCategory = new Map(data.map((score) => [score.category, score]));
+
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-      {data.map((score) => {
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" data-testid="site-audit-categories">
+      {PROTOTYPE_CATEGORY_ORDER.map((category) => scoreByCategory.get(category)).filter((score) => !!score).map((score) => {
         const active = activeCategories.has(score.category);
+        const issueCount = score.errors + score.warnings + score.infos;
+        const accent = scoreColor(score.score);
+        const label = CATEGORY_LABEL[score.category];
         return (
-          <GroupBlock
+          <SectionCard
             key={score.category}
-            title={score.label}
-            meta={`${score.affectedPages} affected of ${score.denominatorPages} indexed pages`}
-            className={cn(active && 'ring-2 ring-[var(--brand-mint-glow)]')}
-            stats={[{ label: 'score', value: formatScore(score.score), color: scoreColor(score.score) }]}
+            noPadding
+            variant="subtle"
+            className={cn(active && 'ring-1 ring-[var(--teal)]')}
           >
             <ClickableRow
               active={active}
               onClick={() => onToggleCategory(score.category)}
-              className="rounded-[var(--radius-md)] px-3 py-3"
+              aria-label={`Filter issues by ${label}`}
+              className="px-4 py-[14px]"
             >
-              <div className="space-y-3">
-                <Meter value={score.score} gradient showValue ariaLabel={`${score.label} score`} />
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Badge label={`${score.errors} errors`} tone="red" variant="soft" />
-                  <Badge label={`${score.warnings} warnings`} tone="amber" variant="soft" />
-                  <Badge label={`${score.infos} info`} tone="blue" variant="soft" />
+              <div>
+                <div className="mb-3 flex items-center gap-2.5">
+                  <span
+                    className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-[var(--radius-md)]"
+                    style={{ color: accent, background: `color-mix(in srgb, ${accent} 12%, transparent)` }}
+                  >
+                    <Icon name={CATEGORY_ICON[score.category]} size="sm" />
+                  </span>
+                  <span className="t-ui font-semibold text-[var(--brand-text-bright)]">{label}</span>
+                  {/* stat-primitive-ok: compact score is the trailing value within a category filter card, not a standalone KPI */}
+                  <span className="ml-auto t-stat-sm" style={{ color: accent }}>{formatScore(score.score)}</span>
+                </div>
+                <Meter value={score.score} color={accent} ariaLabel={`${label} score`} height={5} />
+                <div className="mt-2.5 flex items-center justify-between gap-3 t-caption-sm text-[var(--brand-text-muted)]">
+                  <span className={cn(issueCount === 0 && 'text-[var(--emerald)]')}>
+                    {issueCount === 0 ? 'Clean' : `${issueCount} issue${issueCount === 1 ? '' : 's'}`}
+                  </span>
+                  <span>{score.affectedPages} affected {score.affectedPages === 1 ? 'page' : 'pages'}</span>
                 </div>
               </div>
             </ClickableRow>
-          </GroupBlock>
+          </SectionCard>
         );
       })}
+    </div>
+  );
+}
+
+function scoreVerdict(score: number): string {
+  if (score >= 90) return 'in excellent shape';
+  if (score >= 75) return 'in solid shape, with a few fixes';
+  return 'not there yet';
+}
+
+function AuditHero({ data, siteName }: { data: SiteAuditResult; siteName: string }) {
+  const indexedPages = data.pages.filter((page) => !page.noindex).length;
+  const remaining = data.warnings + data.infos;
+  const redirects = data.deadLinkSummary?.redirects;
+
+  return (
+    <div data-testid="site-audit-hero">
+      <SectionCard noPadding>
+        <div className="grid items-center gap-[26px] px-5 py-[22px] sm:grid-cols-[132px_minmax(0,1fr)] sm:px-[26px]">
+          <div className="relative mx-auto h-[132px] w-[132px]">
+            <MetricRing score={data.siteScore} size={132} strokeWidth={10} noAnimation />
+            <span className="absolute inset-x-0 top-[91px] text-center t-micro uppercase tracking-[0.08em] text-[var(--brand-text-dim)]">
+              Health
+            </span>
+          </div>
+          <div className="min-w-0">
+            <h1 className="t-h2 text-[var(--brand-text-bright)]">
+              {siteName} is {scoreVerdict(data.siteScore)}.
+            </h1>
+            <p className="mt-2 max-w-[68ch] t-ui text-[var(--brand-text-muted)]">
+              {data.errors > 0
+                ? `${data.errors} critical ${data.errors === 1 ? 'issue needs' : 'issues need'} attention first. ${remaining} more warnings and notices are ordered below by severity and demand.`
+                : `No critical issues. ${remaining} warnings and notices remain, and the site is in good technical shape.`}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Badge label={`${data.errors} critical`} tone={data.errors > 0 ? 'red' : 'emerald'} variant="outline" size="md" />
+              <Badge label={`${data.warnings} warnings`} tone="amber" variant="outline" size="md" />
+              <Badge label={`${formatInteger(indexedPages)} indexable`} tone="emerald" variant="outline" size="md" />
+              {redirects != null && (
+                <Badge label={`${formatInteger(redirects)} redirects`} tone={redirects > 10 ? 'amber' : 'emerald'} variant="outline" size="md" />
+              )}
+            </div>
+          </div>
+        </div>
+      </SectionCard>
     </div>
   );
 }
@@ -481,54 +583,6 @@ function AuditEvidence({
   workspaceId: string;
   activeEvidence: SiteAuditEvidenceSub | null;
 }) {
-  return (
-    <GroupBlock
-      title="Search readiness and guidance"
-      meta="Supporting diagnostics for the technical audit"
-    >
-      <div key={activeEvidence ?? 'audit'} className="space-y-3 p-2">
-        <Disclosure
-          summary="AI Search Ready"
-          badges={[{ label: 'Search evidence', tone: 'blue' }]}
-          defaultOpen={activeEvidence === 'aeo-review'}
-        >
-          <p className="mb-3 t-body text-[var(--brand-text-muted)]">
-            Review how the site presents its expertise and entities to AI search systems.
-          </p>
-          <Suspense fallback={<Skeleton className="h-[320px] w-full" />}>
-            <AeoReview workspaceId={workspaceId} />
-          </Suspense>
-        </Disclosure>
-
-        <Disclosure
-          summary="Content Health"
-          badges={[{ label: 'Content evidence', tone: 'blue' }]}
-          defaultOpen={activeEvidence === 'content-decay'}
-        >
-          <p className="mb-3 t-body text-[var(--brand-text-muted)]">
-            Review pages whose freshness or performance needs attention alongside technical findings.
-          </p>
-          <Suspense fallback={<Skeleton className="h-[320px] w-full" />}>
-            <ContentDecay workspaceId={workspaceId} />
-          </Suspense>
-        </Disclosure>
-
-        <Disclosure
-          summary="Audit Guide"
-          badges={[{ label: 'Guidance', tone: 'teal' }]}
-          defaultOpen={activeEvidence === 'guide'}
-        >
-          <p className="mb-3 t-body text-[var(--brand-text-muted)]">
-            Use the audit guide to interpret findings and choose the next technical action.
-          </p>
-          <SeoAuditGuide />
-        </Disclosure>
-      </div>
-    </GroupBlock>
-  );
-}
-
-function AssetRepairHandoff({ workspaceId }: { workspaceId: string }) {
   const navigate = useNavigate();
 
   const openAssetFilter = (filter: 'oversized' | 'missing-alt') => {
@@ -536,23 +590,71 @@ function AssetRepairHandoff({ workspaceId }: { workspaceId: string }) {
   };
 
   return (
-    <GroupBlock title="Image source repair" meta="Asset Manager owns image repair">
-      <div className="flex flex-col gap-3 px-2 py-1 sm:flex-row sm:items-center sm:justify-between">
-        <p className="t-body text-[var(--brand-text-muted)]">
-          Site Audit detects site issues. Asset Manager repairs source images.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="secondary" onClick={() => openAssetFilter('oversized')}>
-            <Icon name="image" size="sm" />
-            Review oversized images
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => openAssetFilter('missing-alt')}>
-            <Icon name="pencil" size="sm" />
-            Review missing alt text
-          </Button>
+    <div data-testid="site-audit-support">
+      <Disclosure
+        summary="Evidence & repair support"
+        badges={[
+          { label: '3 diagnostics', tone: 'blue' },
+          { label: 'Asset handoff', tone: 'teal' },
+        ]}
+        defaultOpen={activeEvidence !== null}
+      >
+        <div key={activeEvidence ?? 'audit'} className="space-y-2 pt-1">
+          <Disclosure
+            summary="AI Search Ready"
+            badges={[{ label: 'Search evidence', tone: 'blue' }]}
+            defaultOpen={activeEvidence === 'aeo-review'}
+          >
+            <p className="mb-3 t-body text-[var(--brand-text-muted)]">
+              Review how the site presents its expertise and entities to AI search systems.
+            </p>
+            <Suspense fallback={<Skeleton className="h-[320px] w-full" />}>
+              <AeoReview workspaceId={workspaceId} />
+            </Suspense>
+          </Disclosure>
+
+          <Disclosure
+            summary="Content Health"
+            badges={[{ label: 'Content evidence', tone: 'blue' }]}
+            defaultOpen={activeEvidence === 'content-decay'}
+          >
+            <p className="mb-3 t-body text-[var(--brand-text-muted)]">
+              Review pages whose freshness or performance needs attention alongside technical findings.
+            </p>
+            <Suspense fallback={<Skeleton className="h-[320px] w-full" />}>
+              <ContentDecay workspaceId={workspaceId} />
+            </Suspense>
+          </Disclosure>
+
+          <Disclosure
+            summary="Audit Guide"
+            badges={[{ label: 'Guidance', tone: 'teal' }]}
+            defaultOpen={activeEvidence === 'guide'}
+          >
+            <p className="mb-3 t-body text-[var(--brand-text-muted)]">
+              Use the audit guide to interpret findings and choose the next technical action.
+            </p>
+            <SeoAuditGuide />
+          </Disclosure>
+
+          <div className="flex flex-col gap-3 border-t border-[var(--brand-border)] px-1 pt-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="t-body text-[var(--brand-text-muted)]">
+              Site Audit detects site issues. Asset Manager repairs source images.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" onClick={() => openAssetFilter('oversized')}>
+                <Icon name="image" size="sm" />
+                Review oversized images
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => openAssetFilter('missing-alt')}>
+                <Icon name="pencil" size="sm" />
+                Review missing alt text
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
-    </GroupBlock>
+      </Disclosure>
+    </div>
   );
 }
 
@@ -574,7 +676,7 @@ function AuditLens({
   const [reportView, setReportView] = useState<'html' | 'csv' | null>(null);
   const [bulkApplying, setBulkApplying] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
-  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [, setBulkError] = useState<string | null>(null);
   const bulkHandlersRef = useRef<{ acceptAll: () => Promise<void>; cancel: () => void } | null>(null);
 
   const data = audit.data;
@@ -680,6 +782,19 @@ function AuditLens({
     }
   };
 
+  const handleClearSuppressions = async () => {
+    try {
+      await audit.unsuppressAll();
+      toast('Suppression rules cleared', 'success');
+    } catch (error) {
+      toast(mutationErrorMessage(error, 'Suppressions could not be cleared'), 'error');
+    }
+  };
+
+  const pendingFixes = data?.pages.reduce((count, page) => count + page.issues.filter((issue) => (
+    !!issue.suggestedFix && !audit.appliedFixes.has(`${page.pageId}-${issue.check}`)
+  )).length, 0) ?? 0;
+
   if (audit.workflow.loading) {
     const progress = audit.workflow.runningAuditJob?.total && audit.workflow.runningAuditJob.progress != null
       ? Math.round((audit.workflow.runningAuditJob.progress / audit.workflow.runningAuditJob.total) * 100)
@@ -732,125 +847,8 @@ function AuditLens({
   }
 
   return (
-    <div className="space-y-5" data-testid="site-audit-rebuilt-audit">
-      <div className="grid gap-4 xl:grid-cols-[minmax(240px,320px)_1fr]">
-        <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-5">
-          <div className="flex items-center justify-center py-3">
-            <MetricRing score={data.siteScore} size={150} noAnimation />
-          </div>
-          <div className="mt-4 text-center">
-            <h3 className={cn('t-h2', scoreColorClass(data.siteScore))}>Overall Site Score</h3>
-            <p className="t-body text-[var(--brand-text-muted)] mt-1">
-              {data.totalPages} pages analyzed. Noindex pages stay out of score denominators.
-            </p>
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <MetricTile
-              label="Errors"
-              value={data.errors}
-              accent="var(--red)"
-              onClick={() => toggleSeverity('error')}
-              className={cn(severityFilters.has('error') && 'ring-2 ring-[var(--brand-mint-glow)]')}
-            />
-            <MetricTile
-              label="Warnings"
-              value={data.warnings}
-              accent="var(--amber)"
-              onClick={() => toggleSeverity('warning')}
-              className={cn(severityFilters.has('warning') && 'ring-2 ring-[var(--brand-mint-glow)]')}
-            />
-            <MetricTile
-              label="Info"
-              value={data.infos}
-              accent="var(--blue)"
-              onClick={() => toggleSeverity('info')}
-              className={cn(severityFilters.has('info') && 'ring-2 ring-[var(--brand-mint-glow)]')}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <Toolbar label="Site Audit actions" className="w-full">
-            <Button size="sm" onClick={handleRunAudit} disabled={!audit.siteId || audit.workflow.loading}>
-              <Icon name="refresh" size="sm" />
-              Re-run
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => setScheduleOpen(true)}>
-              <Icon name="clock" size="sm" />
-              Schedule
-            </Button>
-            <Button size="sm" variant="secondary" onClick={handleSaveAndShare} loading={audit.savingReport}>
-              <Icon name="send" size="sm" />
-              Save &amp; share
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => setReportModalOpen(true)}>
-              <Icon name="download" size="sm" />
-              Export
-            </Button>
-            <ToolbarSpacer />
-            <Toggle
-              checked={!audit.workflow.skipLinkCheck}
-              onChange={(checked) => audit.workflow.setSkipLinkCheck(!checked)}
-              label="Dead-link scan"
-            />
-          </Toolbar>
-
-          <div className="grid gap-3 md:grid-cols-4">
-            <MetricTile label="Indexed pages" value={data.pages.filter((page) => !page.noindex).length} sub={`${data.pages.filter((page) => page.noindex).length} noindex excluded`} />
-            <MetricTile label="Issue groups" value={audit.issueGroups.length} sub={`${filteredGroups.length} visible`} />
-            <MetricTile label="Suppressed" value={audit.suppressions.length} sub="effective scoring" onClick={audit.suppressions.length > 0 ? audit.unsuppressAll : undefined} />
-            <MetricTile label="Traffic map" value={formatInteger(Object.keys(audit.traffic.data ?? {}).length)} sub="pages with demand" />
-          </div>
-
-          {audit.suppressions.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-3 py-2">
-              <Badge label={`${audit.suppressions.length} suppressed`} tone="zinc" variant="outline" />
-              <span className="t-body text-[var(--brand-text-muted)]">Hidden findings are excluded from effective scores.</span>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={async () => {
-                  try {
-                    await audit.unsuppressAll();
-                    toast('Suppression rules cleared', 'success');
-                  } catch (error) {
-                    toast(mutationErrorMessage(error, 'Suppressions could not be cleared'), 'error');
-                  }
-                }}
-                className="ml-auto"
-              >
-                Clear all
-              </Button>
-            </div>
-          )}
-
-          {audit.workflow.showNextSteps && (
-            <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="t-ui font-semibold text-[var(--brand-text-bright)]">Next actions</span>
-                <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('errors')} loading={audit.batchCreating}>
-                  Add error tasks
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('filtered')} loading={audit.batchCreating}>
-                  Add visible tasks
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('all')} loading={audit.batchCreating}>
-                  Add all tasks
-                </Button>
-                <Button size="sm" variant="secondary" onClick={handleAcceptAll} disabled={bulkApplying}>
-                  Accept AI suggestions
-                </Button>
-                {bulkApplying && (
-                  <span className="t-ui text-[var(--brand-text-muted)]">
-                    {bulkProgress ? `${bulkProgress.done}/${bulkProgress.total}` : 'Starting...'}
-                  </span>
-                )}
-              </div>
-              {bulkError && <p className="t-caption-sm text-[var(--red)] mt-2">{bulkError}</p>}
-            </div>
-          )}
-        </div>
-      </div>
+    <div className="space-y-[14px]" data-testid="site-audit-rebuilt-audit">
+      <AuditHero data={data} siteName={audit.siteName || 'Connected site'} />
 
       <CategoryCards
         data={audit.categoryScores}
@@ -860,85 +858,75 @@ function AuditLens({
 
       <CwvStrip data={data} />
 
-      <AuditEvidence workspaceId={audit.workspace?.id ?? ''} activeEvidence={activeEvidence} />
-
-      <AssetRepairHandoff workspaceId={audit.workspace?.id ?? ''} />
-
-      {data.deadLinkDetails && data.deadLinkDetails.length > 0 && (
-        <DeadLinksPanel links={data.deadLinkDetails} onOpenLinks={audit.openDeadLinks} />
-      )}
-
-      <div className="space-y-3">
-        <Toolbar label="Audit issue filters" className="w-full">
-          <SearchField value={search} onChange={setSearch} placeholder="Search issues, pages, or recommendations" />
-          <Segmented
-            value={sortMode}
-            onChange={(value) => setSortMode(value as SiteAuditSortMode)}
-            options={[
-              { value: 'severity', label: 'Severity' },
-              { value: 'traffic', label: 'Traffic' },
-            ]}
-          />
-          <ToolbarSpacer />
-          <Button size="sm" variant="ghost" onClick={() => { setCategoryFilters(new Set()); setSeverityFilters(new Set()); }}>
-            Clear filters
-          </Button>
-        </Toolbar>
-
-        <div className="flex flex-wrap gap-2">
-          {(['error', 'warning', 'info'] as const).map((severity) => (
-            <FilterChip
-              key={severity}
-              label={severity}
-              active={severityFilters.has(severity)}
-              count={audit.issueGroups.filter((group) => group.severity === severity).length}
-              onClick={() => toggleSeverity(severity)}
-            />
-          ))}
-          {AUDIT_DISPLAY_CATEGORIES.map((category) => (
-            <FilterChip
-              key={category}
-              label={AUDIT_DISPLAY_CATEGORY_LABELS[category]}
-              active={categoryFilters.has(category)}
-              count={audit.issueGroups.filter((group) => group.displayCategory === category).length}
-              onClick={() => toggleCategory(category)}
-            />
-          ))}
-        </div>
-
-        <div className="t-ui text-[var(--brand-text-muted)]">
-          Showing {filteredGroups.length} of {audit.issueGroups.length} issue groups
-        </div>
-
-        <DataTable
-          id="site-audit-issue-table"
-          columns={issueColumns}
-          rows={rows}
-          getRowKey={(row) => (row as unknown as IssueTableRow).id}
-          onRowClick={(row) => setSelectedGroup((row as unknown as IssueTableRow).group)}
-          empty={(
-            <EmptyState
-              icon={SurfaceIcon}
-              title="No issues match the current filters"
-              description="Clear filters or re-run the audit to refresh the issue set."
-            />
-          )}
+      <Toolbar label="Site Audit actions" className="w-full">
+        <Segmented
+          value={sortMode}
+          onChange={(value) => setSortMode(value as SiteAuditSortMode)}
+          options={[
+            { value: 'severity', label: 'Severity' },
+            { value: 'traffic', label: 'Traffic' },
+          ]}
         />
-      </div>
+        <ToolbarSpacer />
+        <Toggle
+          checked={!audit.workflow.skipLinkCheck}
+          onChange={(checked) => audit.workflow.setSkipLinkCheck(!checked)}
+          label="Dead-link scan"
+        />
+        <Button size="sm" variant="secondary" onClick={() => setScheduleOpen(true)}>
+          <Icon name="clock" size="sm" />
+          Schedule
+        </Button>
+        <Button size="sm" variant="secondary" onClick={handleSaveAndShare} loading={audit.savingReport}>
+          <Icon name="send" size="sm" />
+          Save &amp; share
+        </Button>
+        <Button size="sm" variant="secondary" onClick={() => setReportModalOpen(true)}>
+          <Icon name="download" size="sm" />
+          Export
+        </Button>
+        <Button size="sm" variant="secondary" onClick={handleRunAudit} disabled={!audit.siteId || audit.workflow.loading}>
+          <Icon name="refresh" size="sm" />
+          Re-run audit
+        </Button>
+      </Toolbar>
 
-      <div className="flex items-start gap-3 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-4 py-3">
-        <Icon name="trophy" size="md" className="mt-0.5 text-[var(--emerald)]" />
-        <div>
-          <div className="t-ui font-semibold text-[var(--brand-text-bright)]">From fix to proof</div>
-          <p className="mt-1 t-body text-[var(--brand-text-muted)]">
-            Technical fixes stay in Site Audit and Cockpit until traffic, crawlability, or Core Web Vitals recovery is measurable.
-          </p>
-        </div>
-      </div>
-
-      {(data as SiteAuditResult & { snapshotId?: string }).snapshotId && (
-        <ActionItemsPanel snapshotId={(data as SiteAuditResult & { snapshotId: string }).snapshotId} />
+      {activeEvidence !== null && (
+        <AuditEvidence workspaceId={audit.workspace?.id ?? ''} activeEvidence={activeEvidence} />
       )}
+
+      <div data-testid="site-audit-bulk-actions">
+        <SectionCard noPadding variant="subtle">
+          <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+            <span className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-[var(--radius-md)] bg-[var(--brand-mint-dim)] text-[var(--teal)]">
+              <Icon name="sparkle" size="sm" />
+            </span>
+            <div className="min-w-[210px] flex-1">
+              <div className="t-ui font-semibold text-[var(--brand-text-bright)]">
+                {pendingFixes} AI-fixable {pendingFixes === 1 ? 'suggestion' : 'suggestions'} across titles, meta &amp; page fields
+              </div>
+              <div className="t-caption-sm text-[var(--brand-text-muted)]">
+                Apply supported edits in bulk or turn the current issue set into operator tasks.
+              </div>
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('errors')} loading={audit.batchCreating}>
+              Add error tasks
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('filtered')} loading={audit.batchCreating}>
+              Add visible tasks
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('all')} loading={audit.batchCreating}>
+              Add all tasks
+            </Button>
+            <Button size="sm" onClick={handleAcceptAll} disabled={bulkApplying || pendingFixes === 0}>
+              <Icon name="sparkle" size="sm" />
+              {bulkApplying
+                ? (bulkProgress ? `${bulkProgress.done}/${bulkProgress.total}` : 'Starting…')
+                : `Accept all ${pendingFixes}`}
+            </Button>
+          </div>
+        </SectionCard>
+      </div>
 
       <BulkAcceptPanel
         workspaceId={audit.workspace?.id ?? ''}
@@ -952,6 +940,95 @@ function AuditLens({
         onBulkError={setBulkError}
         onRegisterHandlers={(handlers) => { bulkHandlersRef.current = handlers; }}
       />
+
+      {data.deadLinkDetails && data.deadLinkDetails.length > 0 && (
+        <DeadLinksPanel links={data.deadLinkDetails} onOpenLinks={audit.openDeadLinks} />
+      )}
+
+      <div data-testid="site-audit-issues">
+        <SectionCard
+          title="Issues to fix"
+          subtitle="Open an issue to review affected pages, route the repair, or send it to the client"
+          titleIcon={<Icon name="gauge" size="sm" className="text-[var(--amber)]" />}
+          iconChip
+          action={(
+            <span className="t-caption-sm text-[var(--brand-text-muted)]">
+              Showing {filteredGroups.length} of {audit.issueGroups.length} groups
+            </span>
+          )}
+          noPadding
+          variant="subtle"
+        >
+          <Toolbar
+            label="Audit issue filters"
+            className="border-b border-[var(--brand-border)] px-4 py-3"
+          >
+            <SearchField value={search} onChange={setSearch} placeholder="Search issues, pages, or recommendations" />
+            {(['error', 'warning', 'info'] as const).map((severity) => (
+              <FilterChip
+                key={severity}
+                label={severity}
+                active={severityFilters.has(severity)}
+                count={audit.issueGroups.filter((group) => group.severity === severity).length}
+                onClick={() => toggleSeverity(severity)}
+              />
+            ))}
+            <ToolbarSpacer />
+            <Button size="sm" variant="ghost" onClick={() => { setCategoryFilters(new Set()); setSeverityFilters(new Set()); }}>
+              Clear filters
+            </Button>
+          </Toolbar>
+
+          <DataTable
+            id="site-audit-issue-table"
+            columns={issueColumns}
+            rows={rows}
+            getRowKey={(row) => (row as unknown as IssueTableRow).id}
+            onRowClick={(row) => setSelectedGroup((row as unknown as IssueTableRow).group)}
+            className="rounded-none border-x-0 border-b-0"
+            empty={(
+              <EmptyState
+                icon={SurfaceIcon}
+                title="No issues match the current filters"
+                description="Clear filters or re-run the audit to refresh the issue set."
+              />
+            )}
+          />
+        </SectionCard>
+      </div>
+
+      {audit.suppressions.length > 0 && (
+        <SectionCard noPadding variant="subtle">
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2.5">
+            <Icon name="eyeOff" size="sm" className="text-[var(--brand-text-dim)]" />
+            <Badge label={`${audit.suppressions.length} suppressed`} tone="zinc" variant="outline" />
+            <span className="t-ui text-[var(--brand-text-muted)]">Hidden findings are excluded from effective scores.</span>
+            <Button size="sm" variant="ghost" onClick={handleClearSuppressions} className="ml-auto">
+              Clear all
+            </Button>
+          </div>
+        </SectionCard>
+      )}
+
+      {activeEvidence === null && (
+        <AuditEvidence workspaceId={audit.workspace?.id ?? ''} activeEvidence={activeEvidence} />
+      )}
+
+      <SectionCard noPadding variant="subtle">
+        <div className="flex items-start gap-3 px-4 py-3">
+          <Icon name="trophy" size="md" className="mt-0.5 text-[var(--emerald)]" />
+          <div>
+            <div className="t-ui font-semibold text-[var(--brand-text-bright)]">From fix to proof</div>
+            <p className="mt-1 t-body text-[var(--brand-text-muted)]">
+              Technical fixes stay in Site Audit and Cockpit until traffic, crawlability, or Core Web Vitals recovery is measurable.
+            </p>
+          </div>
+        </div>
+      </SectionCard>
+
+      {(data as SiteAuditResult & { snapshotId?: string }).snapshotId && (
+        <ActionItemsPanel snapshotId={(data as SiteAuditResult & { snapshotId: string }).snapshotId} />
+      )}
 
       <IssueDetailDrawer
         group={selectedGroup}
@@ -1044,7 +1121,7 @@ function LensBody({
 }) {
   if (visibleSub === 'history') {
     return (
-      <AuditHistory
+      <CompactAuditHistory
         siteId={audit.siteId}
         history={audit.workflow.history}
         onRefresh={audit.workflow.refreshAuditHistory}
@@ -1067,10 +1144,13 @@ export function SiteAuditSurface({ workspaceId }: SiteAuditSurfaceProps) {
         ? audit.workflow.history.length
         : undefined,
   })), [audit.issueGroups.length, audit.workflow.history.length]);
+  const latestSnapshot = audit.workflow.history[0];
+  const lastCrawl = latestSnapshot ? dateTimeOrDash(latestSnapshot.createdAt) : 'Not run yet';
+  const crawledPages = audit.data?.totalPages ?? latestSnapshot?.totalPages;
 
   if (audit.workspaces.isLoading && !audit.workspace) {
     return (
-      <div className="flex min-h-full flex-col gap-5" aria-label="Loading Site Audit">
+      <div className={SURFACE_WRAP_CLASS} aria-label="Loading Site Audit">
         <Skeleton className="h-[72px] w-full" />
         <Skeleton className="h-[54px] w-full" />
         <Skeleton className="h-[360px] w-full" />
@@ -1080,7 +1160,7 @@ export function SiteAuditSurface({ workspaceId }: SiteAuditSurfaceProps) {
 
   if (audit.workspaces.isError && !audit.workspace) {
     return (
-      <div className="flex min-h-full flex-col gap-5">
+      <div className={SURFACE_WRAP_CLASS}>
         <PageHeader title="Site Audit" subtitle="Technical health, content quality, and search readiness." />
         <ErrorState
           type="data"
@@ -1095,7 +1175,7 @@ export function SiteAuditSurface({ workspaceId }: SiteAuditSurfaceProps) {
 
   if (!audit.workspace) {
     return (
-      <div className="flex min-h-full flex-col gap-5">
+      <div className={SURFACE_WRAP_CLASS}>
         <PageHeader title="Site Audit" subtitle="Technical health, content quality, and search readiness." />
         <ErrorState type="data" title="Workspace not found" message="Choose a workspace before reviewing Site Audit." className="min-h-[420px]" />
       </div>
@@ -1104,7 +1184,7 @@ export function SiteAuditSurface({ workspaceId }: SiteAuditSurfaceProps) {
 
   if (!audit.siteId) {
     return (
-      <div className="flex min-h-full flex-col gap-5" data-testid="site-audit-rebuilt-surface">
+      <div className={SURFACE_WRAP_CLASS} data-testid="site-audit-rebuilt-surface">
         <PageHeader title="Site Audit" subtitle="Technical health, content quality, and search readiness." icon={<Icon name="gauge" size="lg" className="text-[var(--teal)]" />} />
         <EmptyState
           icon={SurfaceIcon}
@@ -1117,24 +1197,31 @@ export function SiteAuditSurface({ workspaceId }: SiteAuditSurfaceProps) {
 
   return (
     <ErrorBoundary label="Site Audit">
-      <div className="flex min-h-full flex-col gap-5" data-testid="site-audit-rebuilt-surface">
-        <PageHeader
-          title="Site Audit"
-          subtitle={`${audit.siteName || 'Connected site'} · technical health, content quality, and search readiness`}
-          icon={<Icon name="gauge" size="lg" className="text-[var(--teal)]" />}
-          className="flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible"
-        />
+      <div className={SURFACE_WRAP_CLASS} data-testid="site-audit-rebuilt-surface">
+        <div
+          className="flex min-h-7 flex-wrap items-center gap-2 t-mono uppercase tracking-[0.08em] text-[var(--amber)]"
+          data-testid="site-audit-context"
+        >
+          <span className="h-[7px] w-[7px] rounded-[var(--radius-pill)] bg-[var(--amber)]" aria-hidden="true" />
+          <span>Site audit · {audit.siteName || audit.workspace.name}</span>
+          <span className="ml-auto flex items-center gap-1.5 normal-case tracking-normal text-[var(--brand-text-muted)]">
+            <Icon name="clock" size="sm" />
+            Last crawl {lastCrawl}{crawledPages != null ? ` · ${formatInteger(crawledPages)} URLs` : ''}
+          </span>
+        </div>
 
-        <Toolbar label="Site Audit lenses" className="w-full">
-          <LensSwitcher
-            id="site-audit-sub-switcher"
-            options={lensOptions}
-            value={state.visibleSub}
-            onChange={(value) => state.setSub(value as SiteAuditVisibleSub)}
-            size="sm"
-            className="w-full flex-wrap sm:w-fit sm:flex-nowrap"
-          />
-        </Toolbar>
+        <div data-testid="site-audit-lenses">
+          <Toolbar label="Site Audit lenses">
+            <LensSwitcher
+              id="site-audit-sub-switcher"
+              options={lensOptions}
+              value={state.visibleSub}
+              onChange={(value) => state.setSub(value as SiteAuditVisibleSub)}
+              size="sm"
+              mono
+            />
+          </Toolbar>
+        </div>
 
         {audit.workflow.auditError && (
           <ErrorState
