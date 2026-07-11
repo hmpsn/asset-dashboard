@@ -58,11 +58,12 @@ Test-first acceptance:
 
 - Hash changes for every rendered evidence/effective-voice/custom-prompt change and is stable for identical inputs.
 - Only `seoContext`, `learnings`, `siteHealth`, and `clientSignals` are assembled.
-- Effective voice is injected exactly once.
+- Effective voice is injected exactly once; calibrated/no-sample profiles never receive a contradictory no-voice statement.
 - Nonce bypasses cache but persisted hash remains canonical.
 - GET exposes freshness; normal generate and scheduler preserve edited stale POVs.
 - Explicit Regenerate replaces the draft and clears freshness.
 - Version-conditional save discards an in-flight result after an operator edit.
+- Missing learnings stay unavailable, tracked wins preserve attribution without an unbounded “recent” label, generation is per-workspace single-flight, and delayed PATCH responses return the latest committed version.
 
 ## P1b — Current-Month, Honest-No-Data Digest
 
@@ -79,9 +80,10 @@ Test-first acceptance:
 Test-first acceptance:
 
 - Public query parameters cannot select a historical month.
-- GSC, GA4, insights, approvals, work orders, and measured outcomes use the current UTC month.
+- GSC, GA4, insights, approvals, work orders, and measured outcomes use one declared current-UTC-month reporting window.
 - Evidence-free output is `no_data`, makes no AI call, and never claims performance held steady.
 - Fulfilled zero-valued provider evidence remains `ready`.
+- Negative evidence remains evidence; lifetime learnings are excluded; AI-failure copy follows measured direction; ROI execution attribution reaches prompt and client UI.
 - Durable historical snapshots are not simulated.
 
 ## P1c — Cockpit Unique-Decision Band

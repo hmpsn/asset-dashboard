@@ -10,6 +10,8 @@ These are the owner-approved invariants for `AUD-D1`–`AUD-D7` and `AUD-B1`. Th
 4. Effective brand voice is injected once. Unused intelligence slices are not assembled.
 5. A normal generate or scheduler run never overwrites an operator-edited POV. Changed evidence/voice sets `refreshAvailable`; explicit Regenerate is the only replacement authority.
 6. A version-conditional save rejects an AI result when an edit landed while generation was in flight.
+7. Missing learnings stay unavailable, never a measured 0% win rate. Tracked wins retain execution attribution, never require fabricated entries, and carry no unbounded “recent” claim.
+8. Per-workspace generation is single-flight, and PATCH responses re-read the latest committed version after freshness work so a slower response cannot return an older edit.
 
 ## Client Digest
 
@@ -17,6 +19,7 @@ These are the owner-approved invariants for `AUD-D1`–`AUD-D7` and `AUD-B1`. Th
 2. Provider metrics and every operational rollup use the same current-month authority. Mutable all-time stores must not be presented as historical-month facts.
 3. No evidence returns `availability: 'no_data'`, deterministic honest copy, and no AI call. A real provider response containing zeroes is still evidence and remains `ready`.
 4. Durable historical reports require immutable snapshots and remain a separate backend project.
+5. Lifetime learnings are not injected into a current-month narrative. Negative evidence counts as evidence, AI-failure copy reflects measured direction, and ROI highlights retain execution attribution through prompt and client rendering.
 
 ## Rebuilt Surfaces and Shell
 

@@ -1,4 +1,5 @@
 import type { InsightType, InsightSeverity, InsightDomain } from './analytics.js';
+import type { Attribution } from './outcome-tracking.js';
 
 /** Client-facing insight — reframed from admin language to outcome language */
 export interface ClientInsight {
@@ -21,7 +22,7 @@ export interface MonthlyDigestData {
   availability: MonthlyDigestAvailability;
   month: string;             // "March 2026"
   period: { start: string; end: string };
-  summary: string;           // AI-generated 2-3 sentence overview
+  summary: string;           // AI-generated when evidence exists; deterministic honest copy for no_data/fallback
   wins: DigestItem[];
   issuesAddressed: DigestItem[];
   metrics: {
@@ -51,4 +52,9 @@ export interface ROIHighlight {
   clicksGained: number;
   /** Dollar value attributed to this outcome (clicks_delta × CPC). Null when CPC unavailable. */
   attributedValue: number | null;
+  /**
+   * Honest execution authority for client framing. The live outcome producer always sets this;
+   * optional only for the deprecated pre-outcome attribution reader, which must stay neutral.
+   */
+  attribution?: Exclude<Attribution, 'not_acted_on'>;
 }
