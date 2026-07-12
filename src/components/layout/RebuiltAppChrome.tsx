@@ -6,6 +6,7 @@ import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import type { Workspace } from '../WorkspaceSelector';
 import { AppShell, Drawer, PageContainer } from '../ui';
 import { RebuiltBreadcrumb } from './RebuiltBreadcrumb';
+import { RebuiltConnectionHealth, type RebuiltConnectionHealthState } from './RebuiltConnectionHealth';
 import { RebuiltSidebar } from './RebuiltSidebar';
 
 /**
@@ -18,6 +19,7 @@ export interface RebuiltAppChromeProps {
   tab: Page;
   theme: 'dark' | 'light';
   pendingContentRequests: number;
+  connectionHealth: RebuiltConnectionHealthState;
   onCreate: (name: string, siteId?: string, siteName?: string) => void;
   onDelete: (id: string) => void;
   onLinkSite: (workspaceId: string, siteId: string, siteName: string, token?: string) => void;
@@ -108,6 +110,7 @@ export function RebuiltAppChrome({
   tab,
   theme,
   pendingContentRequests,
+  connectionHealth,
   onCreate,
   onDelete,
   onLinkSite,
@@ -164,6 +167,7 @@ export function RebuiltAppChrome({
           rail={shellRail}
           focusMode={focusMode}
           onFocusModeChange={onFocusModeChange}
+          footer={<RebuiltConnectionHealth {...connectionHealth} />}
           sidebar={(
             <RebuiltSidebar
               workspaces={workspaces}

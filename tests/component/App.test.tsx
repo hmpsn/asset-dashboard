@@ -241,17 +241,31 @@ vi.mock('../../src/components/layout/RebuiltAppChrome', () => ({
   RebuiltAppChrome: ({
     children,
     selected,
+    connectionHealth,
     focusMode = false,
     onFocusModeChange,
   }: {
     children: React.ReactNode;
     selected: { id: string } | null;
+    connectionHealth: {
+      connected: boolean;
+      hasOpenAIKey: boolean;
+      hasWebflowToken: boolean;
+      workspaceCount: number;
+    };
     focusMode?: boolean;
     onFocusModeChange?: (focusMode: boolean) => void;
   }) => (
     <div data-testid="rebuilt-app-chrome" data-selected-workspace={selected?.id ?? 'none'} data-focus-mode={String(focusMode)}>
       <button type="button" onClick={() => onFocusModeChange?.(!focusMode)}>Toggle rebuilt focus</button>
       {children}
+      <footer
+        data-testid="rebuilt-connection-health-props"
+        data-connected={String(connectionHealth.connected)}
+        data-openai={String(connectionHealth.hasOpenAIKey)}
+        data-webflow={String(connectionHealth.hasWebflowToken)}
+        data-workspace-count={connectionHealth.workspaceCount}
+      />
     </div>
   ),
 }));
@@ -627,6 +641,10 @@ describe('Dashboard content rendering', () => {
     await waitFor(() => expect(screen.getByTestId('global-settings-rebuilt')).toBeInTheDocument());
     expect(screen.getByTestId('global-settings-rebuilt')).toHaveAttribute('data-workspace-id', 'ws-1');
     expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument();
+    expect(screen.getByTestId('rebuilt-connection-health-props')).toHaveAttribute('data-connected', 'true');
+    expect(screen.getByTestId('rebuilt-connection-health-props')).toHaveAttribute('data-openai', 'true');
+    expect(screen.getByTestId('rebuilt-connection-health-props')).toHaveAttribute('data-webflow', 'true');
+    expect(screen.getByTestId('rebuilt-connection-health-props')).toHaveAttribute('data-workspace-count', '1');
   });
 
   it('mounts rebuilt global Settings when no workspace exists', async () => {
@@ -647,6 +665,7 @@ describe('Dashboard content rendering', () => {
     await waitFor(() => expect(screen.getByTestId('rebuilt-app-chrome')).toHaveAttribute('data-selected-workspace', 'none'));
     expect(screen.getByTestId('global-settings-rebuilt')).toHaveAttribute('data-workspace-id', '');
     expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument();
+    expect(screen.getByTestId('rebuilt-connection-health-props')).toHaveAttribute('data-workspace-count', '0');
   });
 
   it('mounts rebuilt Page Rewriter instead of legacy rewrite chat when the rebuilt shell is enabled', async () => {
@@ -676,6 +695,10 @@ describe('Dashboard content rendering', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(chrome).toHaveAttribute('data-focus-mode', 'true');
     expect(screen.getByTestId('page-rewriter-rebuilt')).toBeInTheDocument();
+    expect(screen.getAllByTestId('rebuilt-connection-health-props')).toHaveLength(1);
+    expect(screen.getAllByTestId('command-palette')).toHaveLength(1);
+    expect(screen.getAllByTestId('admin-chat')).toHaveLength(1);
+    expect(screen.queryByTestId('status-bar')).not.toBeInTheDocument();
   });
 
   it('remounts rebuilt surface and Admin Chat state when the active workspace changes', async () => {
@@ -842,6 +865,7 @@ describe('Dashboard content rendering', () => {
       expect(screen.getByTestId('breadcrumbs')).toBeInTheDocument();
       expect(screen.getByTestId('status-bar')).toBeInTheDocument();
     });
+    expect(screen.queryByTestId('rebuilt-connection-health-props')).not.toBeInTheDocument();
   });
 });
 

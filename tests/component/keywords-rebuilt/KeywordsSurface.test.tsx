@@ -1064,9 +1064,10 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     // Global overlay chrome must SURVIVE the rebuilt mount (review PR #1480 regression:
     // the rebuilt branch dropped these). CommandPalette renders unconditionally — it
     // hosts the global ⌘K listener, so losing it kills the shortcut on every rebuilt
-    // surface. (AdminChat is gated on hasOpenAIKey — false in this fixture. StatusBar is
-    // intentionally deferred to an AppShell footer slot, DEF-shell-005.)
+    // surface. (AdminChat is gated on hasOpenAIKey — false in this fixture. The rebuilt
+    // shell owns connection health once in its persistent AppShell footer.)
     expect(screen.getByTestId('command-palette')).toBeInTheDocument();
     expect(screen.queryByTestId('legacy-status')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('region', { name: 'Connection health' })).toHaveLength(1);
   });
 });

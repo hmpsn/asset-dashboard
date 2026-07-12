@@ -43,6 +43,12 @@ const chromeProps = {
   onUnlinkSite: vi.fn(),
   toggleTheme: vi.fn(),
   onLogout: vi.fn(),
+  connectionHealth: {
+    connected: true,
+    hasOpenAIKey: true,
+    hasWebflowToken: false,
+    workspaceCount: 1,
+  },
 };
 
 function mockMatchMedia(matches: boolean) {
@@ -150,6 +156,7 @@ describe('RebuiltAppChrome', () => {
     renderProbe();
 
     expect(screen.getByTestId('legacy-shell')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Connection health' })).not.toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByText('Keyword pilot body')).toBeInTheDocument();
     });
@@ -159,6 +166,15 @@ describe('RebuiltAppChrome', () => {
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Admin' })).toHaveTextContent('Keywords');
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Keyword Hub');
+
+    const health = screen.getByRole('region', { name: 'Connection health' });
+    expect(health.closest('footer')).toBeInTheDocument();
+    expect(health).toHaveTextContent('HTTPConnected');
+    expect(health).toHaveTextContent('OpenAIActive');
+    expect(health).toHaveTextContent('WebflowNo token');
+    expect(health).toHaveTextContent('1 workspace');
+    expect(within(health).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(health).queryByRole('link')).not.toBeInTheDocument();
   });
 
   it('forces the sidebar rail on narrow viewports and opens mobile navigation without changing the saved desktop preference', async () => {
@@ -180,6 +196,7 @@ describe('RebuiltAppChrome', () => {
     expect(screen.getByRole('dialog', { name: 'Navigation' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toBeInTheDocument();
     expect(localStorage.getItem('admin-sidebar-rail')).toBe('0');
+    expect(screen.getAllByRole('region', { name: 'Connection health' })).toHaveLength(1);
   });
 
   it('provides controlled focus state to rebuilt surfaces without remounting their work', () => {
@@ -199,6 +216,7 @@ describe('RebuiltAppChrome', () => {
 
     expect(screen.getByTestId('rebuilt-focus-state')).toHaveTextContent('standard');
     expect(screen.getByRole('textbox', { name: 'Unsaved focus draft' })).toHaveValue('keep this edit');
+    expect(screen.getAllByRole('region', { name: 'Connection health' })).toHaveLength(1);
   });
 
   it('hosts surface actions in the topbar without a nested toolbar and cleans up the portal', () => {

@@ -498,6 +498,12 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
           tab={tab}
           theme={theme}
           pendingContentRequests={pendingContentRequests}
+          connectionHealth={{
+            connected,
+            hasOpenAIKey: health.hasOpenAIKey,
+            hasWebflowToken: health.hasWebflowToken,
+            workspaceCount: workspaces.length,
+          }}
           onCreate={handleCreate}
           onDelete={handleDelete}
           onLinkSite={handleLinkSite}
@@ -516,7 +522,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
         {clipboardStatus && <RebuiltClipboardStatus status={clipboardStatus} />}
         {/* Global chrome the legacy shell renders as siblings — restored for EVERY
             rebuilt surface (review PR #1480: the rebuilt branch dropped these, killing
-            ⌘K + admin chat). StatusBar needs an AppShell footer slot → DEF-shell-005. */}
+            ⌘K + admin chat). Connection health is rendered by RebuiltAppChrome. */}
         <CommandPalette
           workspaces={workspaces}
           selectedWorkspace={chromeWorkspace}

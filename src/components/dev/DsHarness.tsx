@@ -332,6 +332,12 @@ export default function DsHarness() {
               tab="seo-keywords"
               theme={shellTheme}
               pendingContentRequests={3}
+              connectionHealth={{
+                connected: true,
+                hasOpenAIKey: true,
+                hasWebflowToken: true,
+                workspaceCount: SHELL_WORKSPACES.length,
+              }}
               onCreate={(name) => toast(`Create ${name}`, 'info')}
               onDelete={(id) => toast(`Delete ${id}`, 'error')}
               onLinkSite={(workspaceId) => toast(`Link ${workspaceId}`, 'info')}

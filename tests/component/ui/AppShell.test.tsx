@@ -20,6 +20,25 @@ describe('AppShell', () => {
     expect(screen.getByText('Page content')).toBeInTheDocument();
   });
 
+  it('renders one persistent footer after, not inside, the scrollable content region', () => {
+    render(
+      <AppShell
+        sidebar={<nav>Sidebar content</nav>}
+        topbar={<div>Topbar content</div>}
+        footer={<div>Connection health</div>}
+      >
+        <div>Page content</div>
+      </AppShell>,
+    );
+
+    const main = document.getElementById('app-shell-main-content');
+    const footer = screen.getByRole('contentinfo');
+    expect(main).not.toBeNull();
+    expect(main).not.toContainElement(footer);
+    expect(main!.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getAllByText('Connection health')).toHaveLength(1);
+  });
+
   it('sizes the sidebar from --shell-sidebar when rail is false', () => {
     const { container } = render(
       <AppShell sidebar={<nav>Nav</nav>}>
