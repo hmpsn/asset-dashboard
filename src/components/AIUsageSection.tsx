@@ -104,7 +104,7 @@ export function AIUsageSection({ compact = false }: { compact?: boolean } = {}) 
   const seoCacheHitRate = seo && seo.totalCalls > 0 ? Math.round((seo.cachedCalls / seo.totalCalls) * 100) : 0;
 
   const fmtCost = (v: number) => v < 0.01 ? '<$0.01' : `$${v.toFixed(2)}`;
-  const compactMetricValueClass = compact ? 't-stat-sm text-[20px] font-extrabold leading-none' : 'text-sm'; // arbitrary-text-ok stat-primitive-ok — source Business KPI tiles are exactly 20px; the nearest DS role is 18px.
+  const compactMetricValueClass = compact ? 't-stat-sm font-extrabold leading-none' : 'text-sm'; // stat-primitive-ok — compact Business KPI tiles use the canonical small-stat role.
   const rangeControl = (
     <div className="flex gap-1" role="group" aria-label="Usage date range">
       {[7, 14, 30].map(d => (

@@ -47,7 +47,7 @@ const PRIMARY_FILTER_IDS = new Set<string>(KEYWORDS_SURFACE_FILTERS.map((filter)
 
 const KEYWORDS_HEADER_CLASS = [
   'flex-col items-start gap-3 sm:flex-row sm:items-start',
-  '[&_h2]:!text-[23px] [&_h2]:!font-bold', // arbitrary-text-ok -- the source prototype pins this surface title to 23px/700.
+  '[&_h2]:![font-size:var(--type-h2-size)] [&_h2]:!font-bold',
   '[&_p]:!max-w-[60ch] [&_p]:!whitespace-normal',
 ].join(' ');
 

@@ -1,7 +1,7 @@
 // @ds-rebuilt
 import { Fragment } from 'react';
 import type { WorkQueueClassification } from '../../../shared/types/work-queue';
-import { Button, ClientThreadRow, Icon, SectionCard } from '../ui';
+import { Button, ClickableRow, ClientThreadRow, Icon, SectionCard } from '../ui';
 import type { IconName } from '../ui/iconNames';
 import type { CockpitKpiModel, CockpitRankRow, CockpitRequestRow } from '../../hooks/admin/useCockpitRebuilt';
 import { formatPercent } from './cockpitFormatters';
@@ -80,14 +80,14 @@ function TechRow({
       >
         {sev.label}
       </span>
-      {/* // button-ok: compact prototype "Fix" chip — Button primitive has no surface-3/blue-text small variant */}
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        size="sm"
         onClick={onFix}
-        className="flex-none rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-3)] px-[11px] py-1.5 t-caption-sm font-semibold text-[var(--blue)] transition-colors hover:border-[var(--brand-border-hover)]"
+        className="flex-none rounded-[var(--radius-md)] border-[var(--brand-border)] bg-[var(--surface-3)] px-[11px] py-1.5 font-semibold text-[var(--blue)] hover:border-[var(--brand-border-hover)]"
       >
         Fix
-      </button>
+      </Button>
     </div>
   );
 }
@@ -302,9 +302,7 @@ export function CockpitEvidenceRail({
             </Fragment>
           ))}
         </div>
-        {/* // button-ok: full-width prototype "N ready for review" callout row — a bespoke clickable row, not a Button-primitive use */}
-        <button
-          type="button"
+        <ClickableRow
           onClick={() => onOpenRoute(needsReview ? route.contentBriefs : route.contentPublished)}
           className="flex w-full items-center gap-2 border-t border-[var(--brand-border)] px-4 py-3 text-left transition-colors hover:bg-[var(--surface-3)]"
         >
@@ -315,7 +313,7 @@ export function CockpitEvidenceRail({
               : `${pipeline.published}/${pipeline.total} cells published`}
           </span>
           <Icon name="arrowRight" size="sm" className="flex-none text-[var(--brand-text-dim)]" />
-        </button>
+        </ClickableRow>
       </SectionCard>
 
       <span className="sr-only" data-testid="cockpit-rail-queue-count">{workQueue.items.length}</span>
