@@ -153,14 +153,19 @@ export function RoadmapLens() {
     };
   }).filter((group) => group.rows.length > 0), [allRows, filteredRows, sprints]);
 
+  // "Shipping velocity" = items shipped per recent *completed* sprint. The roadmap API orders
+  // fully-shipped sprints newest-first below the backlog (scripts/sort-roadmap.ts), so restrict to
+  // fully-shipped sprints before slicing — otherwise slice(0, 4) picks the top-of-list in-flight
+  // sprints (partial done-counts) and can exclude the shipped history the widget advertises.
   const velocityPoints = useMemo<VelocityPoint[]>(() => sprints
+    .filter((sprintData) => sprintData.items.length > 0
+      && sprintData.items.every((item) => normalizeRuntimeStatus(item.status) === 'done'))
     .map((sprintData) => ({
       id: sprintData.id,
       label: shortSprintLabel(sprintData.name),
       fullLabel: sprintData.name,
       count: sprintData.items.filter((item) => normalizeRuntimeStatus(item.status) === 'done').length,
     }))
-    .filter((point) => point.count > 0)
     .slice(0, 4)
     .reverse(), [sprints]);
 

@@ -125,14 +125,25 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
 
   const checklistIsActive = checklistVisible && onboardingSteps.some((step) => !step.completed);
   const workQueue = workQueueWithVisibleItems(cockpit.workQueue, checklistIsActive);
-  const sourceTypeCounts = countWorkQueueSourceTypes(workQueue.items);
+  // Chip counts must reflect the active stream — visibleItems() also filters by stream, so a global
+  // count would advertise a chip whose stream-scoped click reveals zero rows.
+  const streamScopedItems = state.stream === 'all'
+    ? workQueue.items
+    : workQueue.items.filter((item) => item.stream === state.stream);
+  const sourceTypeCounts = countWorkQueueSourceTypes(streamScopedItems);
   const lastFetched = cockpit.lastFetched;
   const isStale = lastFetched ? now.getTime() - lastFetched.getTime() > 60 * 60 * 1000 : false;
 
   const openRoute = (route: string) => navigate(route);
 
   const handleRefresh = () => {
+    // Refresh every query that feeds a displayed KPI, not just workspace-home: site health (audit),
+    // organic value (ROI), and coverage gaps + overall health (intelligence) each come from their
+    // own query. Invalidating them refetches the mounted observers so no KPI stays stale.
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.roi(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.shared.auditSummary(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) });
     toast('Cockpit refresh started', 'success');
     void cockpit.homeQuery.refetch().then((result) => {
       if (result.error) {

@@ -142,6 +142,12 @@ export function RebuiltAppChrome({
       /* localStorage unavailable — rail state stays in-memory only */
     }
   }, [rail]);
+  useEffect(() => {
+    // The mobile nav drawer's open state ANDs with narrowViewportRail, so widening the viewport
+    // hides it while mobileNavOpen stays true. Clear the flag when leaving the narrow breakpoint
+    // so returning to a narrow width doesn't auto-reopen the drawer unprompted.
+    if (!narrowViewportRail) setMobileNavOpen(false);
+  }, [narrowViewportRail]);
   const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
   const toggleRail = useCallback(() => {
     if (narrowViewportRail) {

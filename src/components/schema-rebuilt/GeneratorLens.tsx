@@ -305,12 +305,12 @@ export function GeneratorLens({
   const graphWarningCount = graphValidation?.findings.filter((finding) => finding.severity === 'warning').length ?? 0;
   const readinessTitle = stats.pagesWithErrors > 0
     ? `${formatInteger(stats.pagesWithErrors)} generated page${stats.pagesWithErrors === 1 ? ' needs' : 's need'} schema fixes.`
-    : `${formatInteger(stats.pages)} generated page${stats.pages === 1 ? '' : 's'} are ready for review.`;
+    : `${formatInteger(stats.pages)} generated page${stats.pages === 1 ? ' is' : 's are'} ready for review.`;
   const readinessDetail = `${formatInteger(stats.totalGraphTypes)} generated @graph types are available in this snapshot. Coverage remains pending until the next trusted crawl.`;
   const bulkTitle = bulkPublishBlocked
     ? 'Bulk publish is paused by graph validation.'
     : publishing.unpublishedCount > 0
-      ? `${formatInteger(publishing.unpublishedCount)} publishable page${publishing.unpublishedCount === 1 ? '' : 's'} are ready.`
+      ? `${formatInteger(publishing.unpublishedCount)} publishable page${publishing.unpublishedCount === 1 ? ' is' : 's are'} ready.`
       : 'Every generated page has a publish state.';
   const bulkDetail = bulkPublishBlocked
     ? `${formatInteger(graphErrorCount)} graph error${graphErrorCount === 1 ? '' : 's'} must be fixed before bulk publish.`

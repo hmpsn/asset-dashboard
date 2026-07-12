@@ -190,10 +190,20 @@ function ResultCard({ item, onOpen }: { item: ContentPerformanceItem; onOpen: ()
 
 function SummaryStats({ summary }: { summary: ContentPerformanceSummary }) {
   // stat-primitive-ok -- prototype parity calls for one compact four-cell summary band.
+  // Position gain = baseline − current, so >0 is an improvement (search positions are
+  // lower-is-better). Sign the arrow so a decline can't render as a green ▲ "improvement".
+  const posGain = summary.averagePositionGain;
+  const posGainValue = posGain == null
+    ? '—'
+    : posGain > 0
+      ? `▲${posGain.toFixed(1)}`
+      : posGain < 0
+        ? `▼${Math.abs(posGain).toFixed(1)}`
+        : '0.0';
   const stats = [
     { label: 'Pieces live', value: summary.piecesPublished, positive: false },
     { label: 'Total clicks', value: formatInteger(summary.totalClicks), positive: true },
-    { label: 'Avg. position gain', value: summary.averagePositionGain == null ? '—' : `▲${summary.averagePositionGain.toFixed(1)}`, positive: summary.averagePositionGain != null },
+    { label: 'Avg. position gain', value: posGainValue, positive: posGain != null && posGain > 0 },
     { label: 'Wins to graduate', value: summary.wins, positive: false },
   ];
   return (

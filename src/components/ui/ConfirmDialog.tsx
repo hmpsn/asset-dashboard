@@ -32,15 +32,27 @@ export function ConfirmDialog({
       const titleElement = document.getElementById(titleId);
       const panel = titleElement?.closest<HTMLElement>('[data-overlay-panel="true"]') ?? null;
       if (!isTopmostOverlay(panel)) return;
-      // Skip Enter if a button inside the dialog has focus — its onClick fires natively, avoiding a double-call.
-      if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) {
-        e.stopImmediatePropagation();
-        onConfirm();
+      if (e.key !== 'Enter') return;
+      if (variant === 'destructive') {
+        // Destructive dialogs let the Modal auto-focus Cancel, which owns Enter (safe default).
+        // Only confirm on Enter when focus is NOT on a dialog button, so a focused button's native
+        // onClick isn't double-invoked.
+        if (!(e.target instanceof HTMLButtonElement)) {
+          e.stopImmediatePropagation();
+          onConfirm();
+        }
+        return;
       }
+      // Non-destructive: Enter confirms regardless of which control holds focus. The Modal
+      // auto-focuses Cancel (first focusable), so preventDefault stops its native activation and
+      // keeps Enter from falling through to onCancel.
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      onConfirm();
     };
     document.addEventListener('keydown', handler); // keydown-ok — topmost confirmation owns Enter regardless of focus state
     return () => document.removeEventListener('keydown', handler);
-  }, [open, onConfirm, titleId]);
+  }, [open, onConfirm, titleId, variant]);
 
   return (
     <Modal

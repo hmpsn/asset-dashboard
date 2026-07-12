@@ -420,8 +420,8 @@ export function SeoEditorSurface({ workspaceId }: SeoEditorSurfaceProps) {
         title="Production tools"
         meta="Approvals, bulk drafting, analysis, and generated suggestions stay available without crowding the workbench."
         stats={[
-          { label: 'missing titles', value: workflows.bulkWorkflow.missingTitles, color: 'var(--amber)' },
-          { label: 'missing meta', value: workflows.bulkWorkflow.missingDescs, color: 'var(--red)' },
+          { label: 'static missing titles', value: workflows.bulkWorkflow.missingTitles, color: 'var(--amber)' },
+          { label: 'static missing meta', value: workflows.bulkWorkflow.missingDescs, color: 'var(--red)' },
         ]}
         collapsible
         defaultOpen={false}

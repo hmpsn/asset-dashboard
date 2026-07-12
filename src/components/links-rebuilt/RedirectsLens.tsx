@@ -28,7 +28,7 @@ import {
   type DataColumn,
 } from '../ui';
 import type { RedirectStatusFilter } from './useLinksSurfaceState';
-import { dateTimeOrDash, downloadCsv, numberOrDash, percentOrDash, truncateMiddle } from './linksFormatters';
+import { dateTimeOrDash, downloadCsv, numberOrDash, truncateMiddle } from './linksFormatters';
 import { mutationErrorMessage } from './linksMutationFeedback';
 import { useToast } from '../Toast';
 
@@ -477,7 +477,9 @@ export function RedirectsLens({
       width: '86px',
       align: 'right',
       sortable: true,
-      render: (_value, record) => percentOrDash((record as RedirectPageRecord).matchScore),
+      // matchScore is a raw keyword-overlap score (bestScore, accept threshold ≥3), not a 0-100
+      // percentage — render it unitless so a strong 5-token match can't read as a weak "5%".
+      render: (_value, record) => numberOrDash((record as RedirectPageRecord).matchScore),
     },
     {
       key: 'target',

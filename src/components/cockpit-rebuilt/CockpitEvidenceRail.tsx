@@ -148,7 +148,9 @@ export function CockpitEvidenceRail({
   route,
 }: CockpitEvidenceRailProps) {
   const workspaceFirstName = workspaceName.trim().split(/\s+/)[0] || workspaceName;
-  const openRequests = requests.filter((r) => r.status !== 'closed' && r.status !== 'resolved').slice(0, 4);
+  // Exclude terminal admin request states. NB: the admin RequestStatus union has no 'resolved'
+  // ('resolved' is a client-projection value) — the terminal "done" state is 'completed'.
+  const openRequests = requests.filter((r) => r.status !== 'closed' && r.status !== 'completed').slice(0, 4);
   const rankRows = ranks.slice(0, 5);
 
   // Technical hand-offs synthesised from KPI slices → compact severity rows.

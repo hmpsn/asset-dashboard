@@ -47,9 +47,13 @@ export function KeeperSelector({
 }: KeeperSelectorProps) {
   const [pendingPath, setPendingPath] = useState<string | null>(null);
   const { setKeeper, isSettingKeeper } = useKeeperOverride(workspaceId);
+  // currentKeeperPath arrives raw (full URL / slash-variant) from cannibalizationKeeperPath();
+  // the rendered rows are normalized (see uniquePages below). Normalize the keeper into the same
+  // identity space so it is matched — highlighted, sorted first, and guarded against redundant writes.
+  const normalizedKeeperPath = currentKeeperPath ? normalizePageUrl(currentKeeperPath) : undefined;
 
   function handleSelect(path: string) {
-    if (path === currentKeeperPath || isSettingKeeper) return;
+    if (path === normalizedKeeperPath || isSettingKeeper) return;
     setPendingPath(path);
     setKeeper(
       { urlSetKey, keeperPath: path },
@@ -80,8 +84,8 @@ export function KeeperSelector({
 
   // Sort pages: keeper first, then by position (ascending), then by impressions (descending).
   const sortedPages = uniquePages.sort((a, b) => {
-    const aIsKeeper = a.path === currentKeeperPath;
-    const bIsKeeper = b.path === currentKeeperPath;
+    const aIsKeeper = a.path === normalizedKeeperPath;
+    const bIsKeeper = b.path === normalizedKeeperPath;
     if (aIsKeeper && !bIsKeeper) return -1;
     if (!aIsKeeper && bIsKeeper) return 1;
     const aPos = a.position ?? Infinity;
@@ -97,7 +101,7 @@ export function KeeperSelector({
       </p>
       <div className="space-y-1">
         {sortedPages.map((page) => {
-          const isKeeper = page.path === currentKeeperPath;
+          const isKeeper = page.path === normalizedKeeperPath;
           const isPending = pendingPath === page.path;
 
           return (
