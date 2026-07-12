@@ -44,6 +44,24 @@ const stmts = createStmtCache(() => ({
       generated_at = excluded.generated_at,
       edited_at    = excluded.edited_at
   `),
+  insertIfAbsent: db.prepare(`
+    INSERT INTO strategy_pov
+      (workspace_id, pov_json, prompt_hash, version, generated_at, edited_at)
+    VALUES
+      (@workspace_id, @pov_json, @prompt_hash, @version, @generated_at, @edited_at)
+    ON CONFLICT(workspace_id) DO NOTHING
+  `),
+  updateIfVersion: db.prepare(`
+    UPDATE strategy_pov
+    SET
+      pov_json = @pov_json,
+      prompt_hash = @prompt_hash,
+      version = @version,
+      generated_at = @generated_at,
+      edited_at = @edited_at
+    WHERE workspace_id = @workspace_id
+      AND version = @expected_version
+  `),
 }));
 
 function rowToPov(row: PovRow): StrategyPov {
@@ -112,12 +130,43 @@ export function saveStrategyPov(
 }
 
 /**
+ * Persist an AI draft only when the row version still matches the snapshot read
+ * before the async generation call. Operator edits always bump `version`, so a
+ * late AI result cannot replace an edit that landed while generation was in
+ * flight. `null` means the caller observed no row and therefore may only insert.
+ */
+export function saveStrategyPovIfVersion(
+  workspaceId: string,
+  pov: StrategyPov,
+  promptHash: string,
+  expectedVersion: number | null,
+): boolean {
+  const params = {
+    workspace_id: workspaceId,
+    pov_json: JSON.stringify(pov),
+    prompt_hash: promptHash,
+    version: pov.version,
+    generated_at: pov.generatedAt,
+    edited_at: pov.editedAt,
+  };
+
+  if (expectedVersion === null) {
+    return stmts().insertIfAbsent.run(params).changes === 1;
+  }
+
+  return stmts().updateIfVersion.run({
+    ...params,
+    expected_version: expectedVersion,
+  }).changes === 1;
+}
+
+/**
  * Bump the version after an operator edit. Re-reads, applies the edited fields onto the resolved
  * blob, increments version, stamps editedAt, and persists. Returns the new resolved POV.
- * The prompt_hash is left UNCHANGED here — the generator's hash keys on curated rec content +
- * variant + regenerate nonce, NOT on version, so an operator edit leaves the cache key intact: a
- * subsequent plain generate over unchanged curated content reports POV_UNCHANGED and the edit
- * survives (only a regenerate forces a redraft). Returns null if no row.
+ * The prompt_hash is left UNCHANGED here — it fingerprints the exact effective system/user prompts,
+ * not the edited prose or row version. A subsequent normal generate over unchanged inputs reports
+ * POV_UNCHANGED; changed inputs expose refreshAvailable while preserving this edit. Only explicit
+ * Regenerate has replacement authority. Returns null if no row.
  */
 export function bumpStrategyPovVersion(
   workspaceId: string,

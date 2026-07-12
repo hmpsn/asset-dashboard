@@ -12,9 +12,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const rebuildShellMock = vi.hoisted(() => ({ enabled: false }));
+const rebuiltInstanceMock = vi.hoisted(() => ({ surface: 0, adminChat: 0 }));
 
 // ─── Mock all lazy-loaded page components ────────────────────────────────────
 
@@ -40,6 +43,24 @@ vi.mock('../../src/components/LandingPage', () => ({
 vi.mock('../../src/components/PageRewriteChat', () => ({
   PageRewriteChat: () => <div data-testid="page-rewrite-chat" />,
 }));
+
+vi.mock('../../src/components/page-rewriter-rebuilt/PageRewriterSurface', () => ({
+  PageRewriterSurface: ({ workspaceId }: { workspaceId: string }) => {
+    const { useState } = require('react') as typeof import('react');
+    const [mountId] = useState(() => ++rebuiltInstanceMock.surface);
+    return <div data-testid="page-rewriter-rebuilt" data-workspace-id={workspaceId} data-mount-id={mountId} />;
+  },
+}));
+
+vi.mock('../../src/components/content-pipeline-rebuilt/ContentPipelineSurface', async () => {
+  const { useLocation } = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return {
+    ContentPipelineSurface: ({ workspaceId }: { workspaceId: string }) => {
+      const location = useLocation();
+      return <div data-testid="content-pipeline-rebuilt" data-workspace-id={workspaceId} data-search={location.search} />;
+    },
+  };
+});
 
 vi.mock('../../src/components/SettingsPanel', () => ({
   SettingsPanel: () => <div data-testid="settings-panel" />,
@@ -192,7 +213,11 @@ vi.mock('../../src/hooks/useBackgroundTasks', () => ({
 }));
 
 vi.mock('../../src/components/AdminChat', () => ({
-  AdminChat: () => <div data-testid="admin-chat" />,
+  AdminChat: ({ workspaceId }: { workspaceId: string }) => {
+    const { useState } = require('react') as typeof import('react');
+    const [mountId] = useState(() => ++rebuiltInstanceMock.adminChat);
+    return <div data-testid="admin-chat" data-workspace-id={workspaceId} data-mount-id={mountId} />;
+  },
 }));
 
 vi.mock('../../src/components/ErrorBoundary', () => ({
@@ -209,6 +234,76 @@ vi.mock('../../src/components/layout/Sidebar', () => ({
 
 vi.mock('../../src/components/layout/Breadcrumbs', () => ({
   Breadcrumbs: () => <div data-testid="breadcrumbs" />,
+}));
+
+vi.mock('../../src/components/layout/RebuiltAppChrome', () => ({
+  useRebuildShellEnabled: () => rebuildShellMock.enabled,
+  RebuiltAppChrome: ({
+    children,
+    selected,
+    connectionHealth,
+    focusMode = false,
+    onFocusModeChange,
+  }: {
+    children: React.ReactNode;
+    selected: { id: string } | null;
+    connectionHealth: {
+      connected: boolean;
+      hasOpenAIKey: boolean;
+      hasWebflowToken: boolean;
+      workspaceCount: number;
+    };
+    focusMode?: boolean;
+    onFocusModeChange?: (focusMode: boolean) => void;
+  }) => (
+    <div data-testid="rebuilt-app-chrome" data-selected-workspace={selected?.id ?? 'none'} data-focus-mode={String(focusMode)}>
+      <button type="button" onClick={() => onFocusModeChange?.(!focusMode)}>Toggle rebuilt focus</button>
+      {children}
+      <footer
+        data-testid="rebuilt-connection-health-props"
+        data-connected={String(connectionHealth.connected)}
+        data-openai={String(connectionHealth.hasOpenAIKey)}
+        data-webflow={String(connectionHealth.hasWebflowToken)}
+        data-workspace-count={connectionHealth.workspaceCount}
+      />
+    </div>
+  ),
+}));
+
+vi.mock('../../src/components/global-ops-rebuilt', () => ({
+  GlobalSettingsSurface: ({ workspaceId }: { workspaceId: string }) => (
+    <div data-testid="global-settings-rebuilt" data-workspace-id={workspaceId} />
+  ),
+  RoadmapSurface: ({ workspaceId }: { workspaceId: string }) => (
+    <div data-testid="roadmap-rebuilt" data-workspace-id={workspaceId} />
+  ),
+  RevenueBusinessSurface: ({ workspaceId }: { workspaceId: string }) => (
+    <div data-testid="business-rebuilt" data-workspace-id={workspaceId} />
+  ),
+  AiUsageBusinessSurface: ({ workspaceId }: { workspaceId: string }) => (
+    <div data-testid="business-rebuilt" data-workspace-id={workspaceId} />
+  ),
+  FeatureLibraryBusinessSurface: ({ workspaceId }: { workspaceId: string }) => (
+    <div data-testid="business-rebuilt" data-workspace-id={workspaceId} />
+  ),
+  ProspectBusinessSurface: ({ workspaceId }: { workspaceId: string }) => (
+    <div data-testid="business-rebuilt" data-workspace-id={workspaceId} />
+  ),
+  OutcomesOverviewSurface: ({ workspaceId }: { workspaceId: string }) => (
+    <div data-testid="outcomes-book-rebuilt" data-workspace-id={workspaceId} />
+  ),
+  WorkspaceSettingsSurface: ({ workspaceId }: { workspaceId: string }) => (
+    <div data-testid="workspace-settings-rebuilt" data-workspace-id={workspaceId} />
+  ),
+  OutcomeWorkspaceSurface: ({ workspaceId }: { workspaceId: string }) => (
+    <div data-testid="outcome-workspace-rebuilt" data-workspace-id={workspaceId} />
+  ),
+  DiagnosticsSurface: ({ workspaceId }: { workspaceId: string }) => (
+    <div data-testid="diagnostics-rebuilt" data-workspace-id={workspaceId} />
+  ),
+  RequestsSurface: ({ workspaceId }: { workspaceId: string }) => (
+    <div data-testid="requests-rebuilt" data-workspace-id={workspaceId} />
+  ),
 }));
 
 vi.mock('../../src/components/ui/ScannerReveal', () => ({
@@ -261,8 +356,7 @@ vi.mock('../../src/api/client', () => ({
   getOptional: vi.fn().mockResolvedValue(null),
 }));
 
-const mockWorkspaces = [
-  {
+const defaultMockWorkspace = {
     id: 'ws-1',
     name: 'Acme',
     folder: 'acme',
@@ -273,8 +367,9 @@ const mockWorkspaces = [
     ga4PropertyId: null,
     businessProfile: null,
     intelligenceProfile: null,
-  },
-];
+};
+
+const mockWorkspaces = [{ ...defaultMockWorkspace }];
 
 vi.mock('../../src/hooks/admin', () => ({
   useWorkspaces: () => ({ data: mockWorkspaces }),
@@ -286,6 +381,7 @@ vi.mock('../../src/hooks/admin', () => ({
     data: { hasOpenAIKey: true, hasWebflowToken: true },
     isSuccess: true,
   }),
+  useWorkspaceBadges: () => ({ data: { pendingRequests: 0 } }),
   useQueue: () => ({ data: [] }),
   WORKSPACES_KEY: ['admin-workspaces'],
   QUEUE_KEY: ['admin-queue'],
@@ -297,6 +393,11 @@ function makeQueryClient() {
   return new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+}
+
+function WorkspaceRouteSwitcher() {
+  const navigate = useNavigate();
+  return <button type="button" onClick={() => navigate('/ws/ws-2/rewrite')}>Switch to workspace B</button>;
 }
 
 /**
@@ -329,6 +430,10 @@ beforeEach(() => {
   mockAuthState.checking = false;
   mockAuthState.required = false;
   mockAuthState.authenticated = true;
+  rebuildShellMock.enabled = false;
+  rebuiltInstanceMock.surface = 0;
+  rebuiltInstanceMock.adminChat = 0;
+  mockWorkspaces.splice(0, mockWorkspaces.length, { ...defaultMockWorkspace });
 });
 
 // ── AdminApp auth states ──────────────────────────────────────────────────────
@@ -518,6 +623,191 @@ describe('Dashboard content rendering', () => {
     await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeInTheDocument());
   });
 
+  it('mounts rebuilt global Settings with the first workspace as chrome context', async () => {
+    rebuildShellMock.enabled = true;
+    const { Dashboard } = await import('../../src/App');
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/settings']}>
+          <Routes>
+            <Route path="/*" element={<Dashboard onLogout={vi.fn()} theme="dark" toggleTheme={vi.fn()} />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('rebuilt-app-chrome')).toHaveAttribute('data-selected-workspace', 'ws-1'));
+    await waitFor(() => expect(screen.getByTestId('global-settings-rebuilt')).toBeInTheDocument());
+    expect(screen.getByTestId('global-settings-rebuilt')).toHaveAttribute('data-workspace-id', 'ws-1');
+    expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument();
+    expect(screen.getByTestId('rebuilt-connection-health-props')).toHaveAttribute('data-connected', 'true');
+    expect(screen.getByTestId('rebuilt-connection-health-props')).toHaveAttribute('data-openai', 'true');
+    expect(screen.getByTestId('rebuilt-connection-health-props')).toHaveAttribute('data-webflow', 'true');
+    expect(screen.getByTestId('rebuilt-connection-health-props')).toHaveAttribute('data-workspace-count', '1');
+  });
+
+  it('mounts rebuilt global Settings when no workspace exists', async () => {
+    rebuildShellMock.enabled = true;
+    mockWorkspaces.splice(0, mockWorkspaces.length);
+    const { Dashboard } = await import('../../src/App');
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/settings']}>
+          <Routes>
+            <Route path="/*" element={<Dashboard onLogout={vi.fn()} theme="dark" toggleTheme={vi.fn()} />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('rebuilt-app-chrome')).toHaveAttribute('data-selected-workspace', 'none'));
+    expect(screen.getByTestId('global-settings-rebuilt')).toHaveAttribute('data-workspace-id', '');
+    expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument();
+    expect(screen.getByTestId('rebuilt-connection-health-props')).toHaveAttribute('data-workspace-count', '0');
+  });
+
+  it('mounts rebuilt Page Rewriter instead of legacy rewrite chat when the rebuilt shell is enabled', async () => {
+    rebuildShellMock.enabled = true;
+    const { Dashboard } = await import('../../src/App');
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/ws/ws-1/rewrite?pageUrl=https%3A%2F%2Facme.com%2Fservices%2Fimplants']}>
+          <Routes>
+            <Route path="/*" element={<Dashboard onLogout={vi.fn()} theme="dark" toggleTheme={vi.fn()} />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('rebuilt-app-chrome')).toHaveAttribute('data-selected-workspace', 'ws-1'));
+    await waitFor(() => expect(screen.getByTestId('page-rewriter-rebuilt')).toBeInTheDocument());
+    expect(screen.getByTestId('page-rewriter-rebuilt')).toHaveAttribute('data-workspace-id', 'ws-1');
+    expect(screen.queryByTestId('page-rewrite-chat')).not.toBeInTheDocument();
+
+    const chrome = screen.getByTestId('rebuilt-app-chrome');
+    expect(chrome).toHaveAttribute('data-focus-mode', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle rebuilt focus' }));
+    await waitFor(() => expect(chrome).toHaveAttribute('data-focus-mode', 'true'));
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(chrome).toHaveAttribute('data-focus-mode', 'true');
+    expect(screen.getByTestId('page-rewriter-rebuilt')).toBeInTheDocument();
+    expect(screen.getAllByTestId('rebuilt-connection-health-props')).toHaveLength(1);
+    expect(screen.getAllByTestId('command-palette')).toHaveLength(1);
+    expect(screen.getAllByTestId('admin-chat')).toHaveLength(1);
+    expect(screen.queryByTestId('status-bar')).not.toBeInTheDocument();
+  });
+
+  it('remounts rebuilt surface and Admin Chat state when the active workspace changes', async () => {
+    rebuildShellMock.enabled = true;
+    mockWorkspaces.push({
+      ...defaultMockWorkspace,
+      id: 'ws-2',
+      name: 'Bravo',
+      folder: 'bravo',
+      webflowSiteId: 'site-2',
+      webflowSiteName: 'bravo.com',
+    });
+    const { Dashboard } = await import('../../src/App');
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/ws/ws-1/rewrite']}>
+          <Routes>
+            <Route
+              path="/*"
+              element={(
+                <>
+                  <WorkspaceRouteSwitcher />
+                  <Dashboard onLogout={vi.fn()} theme="dark" toggleTheme={vi.fn()} />
+                </>
+              )}
+            />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const initialSurfaceMount = (await screen.findByTestId('page-rewriter-rebuilt')).getAttribute('data-mount-id');
+    const initialChatMount = (await screen.findByTestId('admin-chat')).getAttribute('data-mount-id');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to workspace B' }));
+
+    await waitFor(() => expect(screen.getByTestId('page-rewriter-rebuilt')).toHaveAttribute('data-workspace-id', 'ws-2'));
+    expect(screen.getByTestId('page-rewriter-rebuilt').getAttribute('data-mount-id')).not.toBe(initialSurfaceMount);
+    expect(screen.getByTestId('admin-chat')).toHaveAttribute('data-workspace-id', 'ws-2');
+    expect(screen.getByTestId('admin-chat').getAttribute('data-mount-id')).not.toBe(initialChatMount);
+  });
+
+  it('shows clipboard upload completion feedback above rebuilt chrome', async () => {
+    rebuildShellMock.enabled = true;
+    const { postForm } = await import('../../src/api/client');
+    vi.mocked(postForm).mockResolvedValueOnce({ fileName: 'clipboard-proof.png' });
+    const { Dashboard } = await import('../../src/App');
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/ws/ws-1/rewrite']}>
+          <Routes>
+            <Route path="/*" element={<Dashboard onLogout={vi.fn()} theme="dark" toggleTheme={vi.fn()} />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await screen.findByTestId('page-rewriter-rebuilt');
+
+    const image = new File([new Uint8Array([1, 2, 3])], 'paste.png', { type: 'image/png' });
+    fireEvent.paste(window, {
+      clipboardData: {
+        items: [{ type: 'image/png', getAsFile: () => image }],
+      },
+    });
+
+    await waitFor(() => expect(postForm).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole('status')).toHaveTextContent('Pasted: clipboard-proof.png');
+  });
+
+  it('redirects flag-on Content Performance bookmarks to Pipeline Published and preserves item identity', async () => {
+    rebuildShellMock.enabled = true;
+    const { Dashboard } = await import('../../src/App');
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/ws/ws-1/content-perf?item=published-item-1']}>
+          <Routes>
+            <Route path="/*" element={<Dashboard onLogout={vi.fn()} theme="dark" toggleTheme={vi.fn()} />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('content-pipeline-rebuilt')).toBeInTheDocument());
+    expect(screen.getByTestId('content-pipeline-rebuilt')).toHaveAttribute('data-workspace-id', 'ws-1');
+    expect(screen.getByTestId('content-pipeline-rebuilt')).toHaveAttribute('data-search', '?tab=published&item=published-item-1');
+    expect(screen.queryByTestId('content-performance')).not.toBeInTheDocument();
+  });
+
+  it('keeps the legacy Content Performance receiver when the rebuilt shell is disabled', async () => {
+    rebuildShellMock.enabled = false;
+    const { Dashboard } = await import('../../src/App');
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/ws/ws-1/content-perf?item=legacy-item']}>
+          <Routes>
+            <Route path="/*" element={<Dashboard onLogout={vi.fn()} theme="dark" toggleTheme={vi.fn()} />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('content-performance')).toBeInTheDocument());
+    expect(screen.queryByTestId('content-pipeline-rebuilt')).not.toBeInTheDocument();
+  });
+
   it('renders Roadmap at /roadmap', async () => {
     await renderDashboardAtPath('/roadmap');
     await waitFor(() => expect(screen.getByTestId('roadmap-panel')).toBeInTheDocument());
@@ -575,6 +865,7 @@ describe('Dashboard content rendering', () => {
       expect(screen.getByTestId('breadcrumbs')).toBeInTheDocument();
       expect(screen.getByTestId('status-bar')).toBeInTheDocument();
     });
+    expect(screen.queryByTestId('rebuilt-connection-health-props')).not.toBeInTheDocument();
   });
 });
 

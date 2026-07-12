@@ -7,6 +7,7 @@ import {
   EmptyState,
   Icon,
   InlineBanner,
+  SectionCard,
   Skeleton,
   type DataColumn,
 } from '../ui';
@@ -27,19 +28,11 @@ type DomainRecord = Record<string, unknown> & {
   domain: string;
   traffic: number | null;
   keywords: number | null;
-  refDomains: number | null;
-  trafficValue: number | null;
   authorityRank: number | null;
   top3Keywords: number | null;
-  leader: boolean;
 };
 
 const NUMBER_FORMAT = new Intl.NumberFormat('en-US');
-const MONEY_FORMAT = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  maximumFractionDigits: 0,
-});
 
 function EmptyIcon({ className }: { className?: string }) {
   return <Icon name="target" className={className} />;
@@ -49,10 +42,6 @@ function num(value: number | null | undefined): string {
   return typeof value === 'number' ? NUMBER_FORMAT.format(value) : '-';
 }
 
-function money(value: number | null | undefined): string {
-  return typeof value === 'number' ? MONEY_FORMAT.format(value) : '-';
-}
-
 function toRecords(domains: CompetitiveDomain[]): DomainRecord[] {
   return domains
     .map((domain) => ({
@@ -60,18 +49,14 @@ function toRecords(domains: CompetitiveDomain[]): DomainRecord[] {
       domain: domain.domain,
       traffic: domain.overview?.organicTraffic ?? null,
       keywords: domain.overview?.organicKeywords ?? null,
-      refDomains: domain.backlinks?.referringDomains ?? null,
-      trafficValue: domain.overview?.organicCost ?? null,
       authorityRank: domain.authorityRank ?? null,
       top3Keywords: domain.top3Keywords ?? null,
-      leader: false,
     }))
-    .sort((a, b) => (b.traffic ?? 0) - (a.traffic ?? 0))
-    .map((record, index) => ({ ...record, leader: index === 0 }));
+    .sort((a, b) => (b.traffic ?? 0) - (a.traffic ?? 0));
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'SEO provider data is temporarily unavailable.';
+  return error instanceof Error ? error.message : 'SEO data is temporarily unavailable.';
 }
 
 export function HeadToHeadTable({
@@ -97,36 +82,16 @@ export function HeadToHeadTable({
           const row = record as DomainRecord;
           return (
             <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <span
+                className="h-[7px] w-[7px] flex-none rounded-[var(--radius-pill)]"
+                style={{ backgroundColor: row.source.isOwn ? 'var(--blue)' : 'var(--orange)' }}
+                aria-hidden="true"
+              />
               <span className="truncate font-semibold text-[var(--brand-text-bright)]">{row.domain}</span>
               {row.source.isOwn && <Badge label="YOU" tone="blue" variant="soft" size="sm" />}
-              {row.leader && <Badge label="Leader" tone="emerald" variant="soft" size="sm" />}
             </div>
           );
         },
-        sortable: true,
-      },
-      {
-        key: 'traffic',
-        label: 'Traffic',
-        width: '104px',
-        align: 'right',
-        render: (_value, record) => num((record as DomainRecord).traffic),
-        sortable: true,
-      },
-      {
-        key: 'keywords',
-        label: 'Keywords',
-        width: '108px',
-        align: 'right',
-        render: (_value, record) => num((record as DomainRecord).keywords),
-        sortable: true,
-      },
-      {
-        key: 'refDomains',
-        label: 'Ref domains',
-        width: '118px',
-        align: 'right',
-        render: (_value, record) => num((record as DomainRecord).refDomains),
         sortable: true,
       },
     ];
@@ -145,6 +110,25 @@ export function HeadToHeadTable({
       });
     }
 
+    base.push(
+      {
+        key: 'traffic',
+        label: 'Est. traffic',
+        width: '118px',
+        align: 'right',
+        render: (_value, record) => num((record as DomainRecord).traffic),
+        sortable: true,
+      },
+      {
+        key: 'keywords',
+        label: 'Keywords',
+        width: '108px',
+        align: 'right',
+        render: (_value, record) => num((record as DomainRecord).keywords),
+        sortable: true,
+      },
+    );
+
     if (hasTop3) {
       base.push({
         key: 'top3Keywords',
@@ -156,82 +140,68 @@ export function HeadToHeadTable({
       });
     }
 
-    base.push({
-      key: 'trafficValue',
-      label: 'Value',
-      width: '116px',
-      align: 'right',
-      render: (_value, record) => money((record as DomainRecord).trafficValue),
-      sortable: true,
-    });
-
     return base;
   }, [hasAuthority, hasTop3]);
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="head-to-head-title">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 id="head-to-head-title" className="t-ui font-semibold text-[var(--brand-text-bright)]">
-            Head-to-head
-          </h2>
-          <p className="t-caption-sm text-[var(--brand-text-muted)]">
-            One sortable comparison including your domain. Select a competitor for detail.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {data?.fetchedAt && (
-            <span className="t-caption text-[var(--brand-text-muted)]">
-              Last scanned {new Date(data.fetchedAt).toLocaleString()}
-            </span>
-          )}
-          {isFetching && <Badge label="Refreshing" tone="blue" variant="soft" size="sm" />}
-        </div>
-      </div>
-
-      {data?.degraded && (
-        <InlineBanner tone="warning" title="Some live provider data is unavailable">
-          Showing the metrics that loaded. {data.providerFailures?.length ? `${data.providerFailures.length} provider read(s) degraded.` : null}
-        </InlineBanner>
-      )}
-
-      {isError && data && (
-        <InlineBanner tone="warning" title="Live fetch failed - showing cached data.">
-          <div className="flex flex-wrap items-center gap-2">
-            <span>{errorMessage(error)}</span>
-            <Button size="sm" variant="secondary" onClick={onRetry}>Retry</Button>
+    <section aria-labelledby="head-to-head-title">
+      <h2 id="head-to-head-title" className="sr-only" aria-label="Head-to-head" />
+      <SectionCard
+        title="Head-to-head"
+        subtitle="Where you stand against each competitor · select a row for detail"
+        titleIcon={<Icon name="user" size="sm" className="text-[var(--orange)]" />}
+        iconChip
+        noPadding
+        variant="subtle"
+        action={isFetching ? <Badge label="Refreshing" tone="blue" variant="soft" size="sm" /> : undefined}
+      >
+        {(data?.degraded || isError) && (
+          <div className="flex flex-col gap-2 px-[18px] pt-4">
+            {data?.degraded && (
+              <InlineBanner tone="warning" title="Some live competitor data is unavailable">
+                Showing the metrics that loaded. {data.providerFailures?.length ? `${data.providerFailures.length} competitor data read(s) degraded.` : null}
+              </InlineBanner>
+            )}
+            {isError && data && (
+              <InlineBanner tone="warning" title="Showing the last loaded competitor data">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>{errorMessage(error)}</span>
+                  <Button size="sm" variant="secondary" onClick={onRetry}>Retry</Button>
+                </div>
+              </InlineBanner>
+            )}
+            {isError && !data && (
+              <InlineBanner tone="error" title="Competitive intelligence did not load">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>{errorMessage(error)}</span>
+                  <Button size="sm" variant="secondary" onClick={onRetry}>Retry</Button>
+                </div>
+              </InlineBanner>
+            )}
           </div>
-        </InlineBanner>
-      )}
+        )}
 
-      {isError && !data && (
-        <InlineBanner tone="error" title="Competitive intelligence did not load">
-          <div className="flex flex-wrap items-center gap-2">
-            <span>{errorMessage(error)}</span>
-            <Button size="sm" variant="secondary" onClick={onRetry}>Retry</Button>
-          </div>
-        </InlineBanner>
-      )}
-
-      {isLoading && !data ? (
-        <Skeleton className="h-[260px] w-full" />
-      ) : rows.length === 0 ? (
-        <EmptyState
-          icon={EmptyIcon}
-          title="No competitive metrics returned"
-          description="The provider did not return usable domain comparison data for this set."
-        />
-      ) : (
-        <DataTable
-          columns={columns}
-          rows={rows}
-          getRowKey={(row) => (row as DomainRecord).source.domain}
-          onRowClick={(row) => {
-            const record = row as DomainRecord;
-            if (!record.source.isOwn) setSelectedDomain(record.source.domain);
-          }}
-        />
-      )}
+        {isLoading && !data ? (
+          <div className="p-[18px]"><Skeleton className="h-[180px] w-full" /></div>
+        ) : rows.length === 0 ? (
+          <EmptyState
+            icon={EmptyIcon}
+            title="No competitive metrics returned"
+            description="The latest scan did not return usable domain comparison data for this set."
+          />
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={rows}
+            getRowKey={(row) => (row as DomainRecord).source.domain}
+            onRowClick={(row) => {
+              const record = row as DomainRecord;
+              if (!record.source.isOwn) setSelectedDomain(record.source.domain);
+            }}
+            className="rounded-none border-0 bg-transparent"
+          />
+        )}
+      </SectionCard>
 
       <CompetitorDetailDrawer
         domains={data?.domains ?? []}

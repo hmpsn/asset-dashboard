@@ -14,6 +14,8 @@ export interface AppShellProps {
   /** Nav slot (F4 fills this from navRegistry.tsx). */
   sidebar?: ReactNode;
   topbar?: ReactNode;
+  /** Persistent shell content rendered outside the scrolling page canvas. */
+  footer?: ReactNode;
   /** Collapse the sidebar to --shell-sidebar-rail. */
   rail?: boolean;
   /** Controlled focus mode: collapses the sidebar rail while true. */
@@ -37,6 +39,7 @@ function hasOpenOverlay(): boolean {
 export function AppShell({
   sidebar,
   topbar,
+  footer,
   rail = false,
   focusMode,
   onFocusModeChange,
@@ -144,6 +147,7 @@ export function AppShell({
         >
           {children}
         </div>
+        {footer && <footer style={{ flexShrink: 0 }}>{footer}</footer>}
       </div>
     </div>
   );

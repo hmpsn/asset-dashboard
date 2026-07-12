@@ -6,6 +6,9 @@ const mocks = vi.hoisted(() => ({
   loggerError: vi.fn(),
 }));
 
+const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+const ORIGINAL_LOCAL_FAKE_PROVIDERS = process.env.LOCAL_FAKE_PROVIDERS;
+
 vi.mock('../../server/google-auth.js', () => ({
   getGlobalToken: mocks.getGlobalToken,
 }));
@@ -31,6 +34,45 @@ describe('google-analytics behavior', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+    process.env.LOCAL_FAKE_PROVIDERS = ORIGINAL_LOCAL_FAKE_PROVIDERS;
+  });
+
+  it('serves the explicit provider-rich property without auth or network calls in local fixture mode', async () => {
+    process.env.NODE_ENV = 'development';
+    process.env.LOCAL_FAKE_PROVIDERS = 'true';
+    mocks.getGlobalToken.mockResolvedValue(null);
+
+    const { LOCAL_PROVIDER_FIXTURE } = await import('../../server/providers/local-provider-fixtures.js');
+    const {
+      getGA4Countries,
+      getGA4DailyTrend,
+      getGA4DeviceBreakdown,
+      getGA4Overview,
+      getGA4PeriodComparison,
+      getGA4TopPages,
+      getGA4TopSources,
+    } = await import('../../server/google-analytics.js');
+
+    const [overview, trend, pages, sources, devices, countries, comparison] = await Promise.all([
+      getGA4Overview(LOCAL_PROVIDER_FIXTURE.ga4PropertyId),
+      getGA4DailyTrend(LOCAL_PROVIDER_FIXTURE.ga4PropertyNumericId),
+      getGA4TopPages(LOCAL_PROVIDER_FIXTURE.ga4PropertyId),
+      getGA4TopSources(LOCAL_PROVIDER_FIXTURE.ga4PropertyId),
+      getGA4DeviceBreakdown(LOCAL_PROVIDER_FIXTURE.ga4PropertyId),
+      getGA4Countries(LOCAL_PROVIDER_FIXTURE.ga4PropertyId),
+      getGA4PeriodComparison(LOCAL_PROVIDER_FIXTURE.ga4PropertyId),
+    ]);
+
+    expect(overview.totalUsers).toBeGreaterThan(0);
+    expect(trend.length).toBeGreaterThanOrEqual(14);
+    expect(pages[0]?.path).toBe('/');
+    expect(sources[0]).toMatchObject({ source: 'google', medium: 'organic' });
+    expect(devices.map((row) => row.device)).toEqual(['desktop', 'mobile', 'tablet']);
+    expect(countries[0]?.country).toBe('United States');
+    expect(comparison.current.totalSessions).toBeGreaterThan(comparison.previous.totalSessions);
+    expect(mocks.getGlobalToken).not.toHaveBeenCalled();
+    expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
   it('throws auth error before any fetch when global token is unavailable', async () => {

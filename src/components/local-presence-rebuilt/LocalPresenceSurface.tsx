@@ -1,6 +1,6 @@
 // @ds-rebuilt
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BarChart3, MapPin, Settings2, Star, type LucideIcon } from 'lucide-react';
+import { MapPin, Star, type LucideIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
 import { useGbpReviews, useLocalGbpRefresh, useLocalSeo, useLocalSeoRefresh } from '../../hooks/admin';
@@ -15,27 +15,18 @@ import { LocalSeoMarketSetupDrawer } from '../local-seo/LocalSeoMarketSetupDrawe
 import {
   Button,
   ErrorState,
-  FilterChip,
+  Icon,
   InlineBanner,
   LensSwitcher,
-  MetricTile,
   PageHeader,
   SearchField,
   Skeleton,
-  Toolbar,
-  ToolbarSpacer,
 } from '../ui';
 import { LocalPresenceOverview } from './LocalPresenceOverview';
 import { LocalPresenceReviewsPipeline } from './LocalPresenceReviewsPipeline';
-import { LocalPresenceSetup } from './LocalPresenceSetup';
 import { LocalPresenceVisibility } from './LocalPresenceVisibility';
 import { mutationErrorMessage } from './localPresenceMutationFeedback';
-import {
-  LOCAL_PRESENCE_FILTERS,
-  LOCAL_PRESENCE_LENSES,
-  type LocalPresenceLens,
-  useLocalPresenceSurfaceState,
-} from './useLocalPresenceSurfaceState';
+import { useLocalPresenceSurfaceState } from './useLocalPresenceSurfaceState';
 
 interface LocalPresenceSurfaceProps {
   workspaceId: string;
@@ -48,11 +39,16 @@ const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
   minute: '2-digit',
 });
 
-const LENS_ICONS: Record<LocalPresenceLens, LucideIcon> = {
-  overview: MapPin,
-  visibility: BarChart3,
+const LOCAL_PRESENCE_MODES = [
+  { id: 'presence', label: 'Rank & profile' },
+  { id: 'reviews', label: 'Reviews & replies' },
+] as const;
+
+type LocalPresenceMode = typeof LOCAL_PRESENCE_MODES[number]['id'];
+
+const MODE_ICONS: Record<LocalPresenceMode, LucideIcon> = {
+  presence: MapPin,
   reviews: Star,
-  setup: Settings2,
 };
 
 function isLockedError(error: unknown): boolean {
@@ -64,10 +60,6 @@ function formatFreshness(value?: string): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return 'No scan yet';
   return `Last scanned ${DATE_FORMAT.format(parsed)}`;
-}
-
-function formatRating(value?: number): string {
-  return typeof value === 'number' ? value.toFixed(1) : '—';
 }
 
 export function LocalPresenceSurface({ workspaceId }: LocalPresenceSurfaceProps) {
@@ -143,11 +135,6 @@ export function LocalPresenceSurface({ workspaceId }: LocalPresenceSurfaceProps)
     setSetupOpen(true);
   }, [data?.featureEnabled, state.lens]);
 
-  const handleSetLens = (lens: LocalPresenceLens) => {
-    state.setLens(lens);
-    if (lens === 'setup' && data?.featureEnabled) setSetupOpen(true);
-  };
-
   const startLocalRescan = () => {
     localRefresh.mutate({}, {
       onSuccess: () => toast('Local visibility re-scan started', 'success'),
@@ -215,70 +202,62 @@ export function LocalPresenceSurface({ workspaceId }: LocalPresenceSurfaceProps)
 
   if (!data?.featureEnabled || !report) return null;
 
-  const activeFilter = LOCAL_PRESENCE_FILTERS.find((filter) => filter.id === state.filter)?.label ?? 'All';
-  const owned = gbpAggregateEnabled ? gbp?.owned ?? null : null;
+  const activeMode: LocalPresenceMode = state.lens === 'reviews' ? 'reviews' : 'presence';
+
+  const handleSetMode = (mode: LocalPresenceMode) => {
+    state.setLens(mode === 'reviews' ? 'reviews' : 'overview');
+  };
+
+  const closeSetup = () => {
+    setSetupOpen(false);
+    if (state.lens === 'setup') state.setLens('overview');
+  };
 
   return (
-    <div className="flex min-h-full flex-col gap-5">
-      <PageHeader
-        title="Local Presence"
-        subtitle="Local markets, map-pack visibility, and Google Business Profile review operations."
-      />
-
-      <Toolbar label="Local Presence view controls" className="w-full">
-        <LensSwitcher
-          id="local-presence-rebuilt-lens"
-          options={LOCAL_PRESENCE_LENSES.map((lens) => ({
-            value: lens.id,
-            label: lens.label,
-            icon: LENS_ICONS[lens.id],
-            count: lens.id === 'reviews'
-              ? undefined
-              : lens.id === 'visibility'
-                ? report.checkedKeywordCount
-                : lens.id === 'setup'
-                  ? report.configuredMarketCount
-                  : report.activeMarketCount,
-          }))}
-          value={state.lens}
-          onChange={(value) => handleSetLens(value as LocalPresenceLens)}
-          size="sm"
-        />
-        <SearchField
-          value={state.searchInput}
-          onChange={state.setSearchInput}
-          placeholder="Search reviews or competitors"
-          className="min-w-[220px] flex-1"
-        />
-        <ToolbarSpacer />
-        <span className="t-caption text-[var(--brand-text-muted)]">{formatFreshness(report.lastCapturedAt)}</span>
-        <Button size="sm" variant="secondary" disabled={!canLocalRefresh || localRefreshing} onClick={startLocalRescan}>
-          {localRefreshing ? 'Re-scanning' : 'Re-scan'}
-        </Button>
-        {gbpAggregateEnabled && (
-          <Button size="sm" variant="ghost" disabled={gbpRefreshing} onClick={startGbpRefresh}>
-            {gbpRefreshing ? 'Refreshing GBP' : 'Refresh GBP'}
+    <div className="mx-auto flex min-h-full w-full max-w-[1120px] flex-col gap-[14px] px-4 pb-[90px] pt-[26px] sm:px-[30px]">
+      <div className="flex flex-wrap items-center gap-2 t-mono text-[var(--brand-text-dim)]">
+        <span className="h-[7px] w-[7px] rounded-[var(--radius-pill)] bg-[var(--blue)]" aria-hidden="true" />
+        <h1 className="t-mono font-semibold uppercase tracking-[0.09em] text-[var(--blue)]">Local Presence</h1>
+        <span aria-hidden="true">·</span>
+        <span>{formatFreshness(report.lastCapturedAt)}</span>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setSetupOpen(true)}>
+            <Icon name="settings" size="sm" />
+            Configure market
           </Button>
-        )}
-      </Toolbar>
-
-      <div className="flex flex-wrap gap-2" aria-label="Local Presence filters">
-        {LOCAL_PRESENCE_FILTERS.map((filter) => (
-          <FilterChip
-            key={filter.id}
-            label={filter.label}
-            active={state.filter === filter.id}
-            onClick={() => state.setFilter(filter.id)}
-          />
-        ))}
+          <Button size="sm" variant="secondary" disabled={!canLocalRefresh || localRefreshing} onClick={startLocalRescan}>
+            <Icon name="refresh" size="sm" />
+            {localRefreshing ? 'Re-scanning' : 'Re-scan'}
+          </Button>
+          {gbpAggregateEnabled && (
+            <Button size="sm" variant="ghost" disabled={gbpRefreshing} onClick={startGbpRefresh}>
+              {gbpRefreshing ? 'Refreshing GBP' : 'Refresh GBP'}
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricTile label="Markets" value={report.activeMarketCount} sub={`${report.configuredMarketCount} configured`} accent="var(--blue)" />
-        <MetricTile label="Checked" value={report.checkedKeywordCount} sub={activeFilter} accent="var(--blue)" />
-        <MetricTile label="Visible" value={report.visibleCount} sub="local matches" accent="var(--emerald)" />
-        <MetricTile label={gbpAggregateEnabled ? 'Reviews' : 'Local packs'} value={gbpAggregateEnabled ? (owned?.reviewCount ?? '—') : report.localPackPresentCount} sub={gbpAggregateEnabled ? `${formatRating(owned?.rating)} rating` : 'packs detected'} accent="var(--blue)" />
-        <MetricTile label="Needs review" value={report.possibleMatchCount + report.notVisibleCount + report.degradedCount} sub="posture issues" accent="var(--amber)" />
+      <div className="flex flex-wrap items-center gap-3">
+        <LensSwitcher
+          id="local-presence-rebuilt-lens"
+          options={LOCAL_PRESENCE_MODES.map((mode) => ({
+            value: mode.id,
+            label: mode.label,
+            icon: MODE_ICONS[mode.id],
+          }))}
+          value={activeMode}
+          onChange={(value) => handleSetMode(value as LocalPresenceMode)}
+          size="sm"
+          className="w-full sm:w-fit [&>button]:min-w-0 [&>button]:flex-1 [&>button]:px-2 sm:[&>button]:flex-none sm:[&>button]:px-[11px] [&_svg]:hidden sm:[&_svg]:block"
+        />
+        {activeMode === 'reviews' && (
+          <SearchField
+            value={state.searchInput}
+            onChange={state.setSearchInput}
+            placeholder="Search reviews"
+            className="min-w-[220px] max-w-[360px] flex-1"
+          />
+        )}
       </div>
 
       {localSeo.isError && data && (
@@ -292,23 +271,28 @@ export function LocalPresenceSurface({ workspaceId }: LocalPresenceSurfaceProps)
         </InlineBanner>
       )}
 
-      {state.lens === 'overview' && (
-        <LocalPresenceOverview
-          workspaceId={workspaceId}
-          data={data}
-          gbp={gbp}
-          onOpenSetup={() => setSetupOpen(true)}
-        />
+      {activeMode === 'presence' && (
+        <div className="flex flex-col gap-4">
+          <LocalPresenceOverview
+            workspaceId={workspaceId}
+            data={data}
+            gbp={gbpAggregateEnabled ? gbp : undefined}
+            onOpenSetup={() => setSetupOpen(true)}
+          />
+          <LocalPresenceVisibility
+            workspaceId={workspaceId}
+            data={data}
+            gbp={gbpAggregateEnabled ? gbp : undefined}
+            search={state.search}
+            searchInput={state.searchInput}
+            filter={state.filter}
+            onSearchInputChange={state.setSearchInput}
+            onFilterChange={state.setFilter}
+            onOpenReviews={() => state.setLens('reviews')}
+          />
+        </div>
       )}
-      {state.lens === 'visibility' && (
-        <LocalPresenceVisibility
-          workspaceId={workspaceId}
-          data={data}
-          search={state.search}
-          filter={state.filter}
-        />
-      )}
-      {state.lens === 'reviews' && (
+      {activeMode === 'reviews' && (
         <LocalPresenceReviewsPipeline
           workspaceId={workspaceId}
           desk={state.desk}
@@ -316,19 +300,11 @@ export function LocalPresenceSurface({ workspaceId }: LocalPresenceSurfaceProps)
           search={state.search}
         />
       )}
-      {state.lens === 'setup' && (
-        <LocalPresenceSetup
-          workspaceId={workspaceId}
-          data={data}
-          onOpenSetup={() => setSetupOpen(true)}
-        />
-      )}
-
       <LocalSeoMarketSetupDrawer
         workspaceId={workspaceId}
         data={data}
         open={setupOpen}
-        onClose={() => setSetupOpen(false)}
+        onClose={closeSetup}
       />
     </div>
   );

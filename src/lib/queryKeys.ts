@@ -18,6 +18,8 @@ import type { AnalyticsDateRange } from '../../shared/types/analytics-contract.j
 
 export type DateRange = AnalyticsDateRange;
 
+const adminContentPerformanceKey = (wsId: string) => ['admin-content-performance', wsId] as const;
+
 export const queryKeys = {
   // ── Admin ─────────────────────────────────────────────────────────
   admin: {
@@ -54,6 +56,11 @@ export const queryKeys = {
     publishTarget: (wsId: string) => ['publish-target', wsId] as const,
     contentCalendar: (wsId: string) => ['content-calendar', wsId] as const,
     contentPipeline: (wsId: string) => ['content-pipeline', wsId] as const,
+    contentPerformanceAll: adminContentPerformanceKey,
+    contentPerformance: (wsId: string, days: number) =>
+      [...adminContentPerformanceKey(wsId), 'read', days] as const,
+    contentPerformanceTrend: (wsId: string, itemId: string) =>
+      [...adminContentPerformanceKey(wsId), 'trend', itemId] as const,
     contentTemplates: (wsId: string) => ['content-templates', wsId] as const,
     contentMatrices: (wsId: string) => ['content-matrices', wsId] as const,
     roi: (wsId: string) => ['admin-roi', wsId] as const,
@@ -206,7 +213,6 @@ export const queryKeys = {
     workspaceOverview: () => ['admin-workspace-overview'] as const,
     globalOpsGoogleStatus: () => ['admin-global-ops-google-status'] as const,
     globalOpsGscSites: () => ['admin-global-ops-gsc-sites'] as const,
-    globalOpsHealth: () => ['admin-global-ops-health'] as const,
     globalOpsStorage: () => ['admin-global-ops-storage'] as const,
     globalOpsStudioConfig: () => ['admin-global-ops-studio-config'] as const,
     health: () => ['admin-health'] as const,

@@ -18,9 +18,17 @@ import {
   buildAiPipelineWiringReport,
   formatAiPipelineWiringMarkdown,
 } from '../../scripts/report-ai-pipeline-wiring.js';
+import { aiEvidenceMatchesAssertion } from '../../scripts/ai-evidence-matching.js';
 import type { AiQualityFixture } from '../../shared/types/ai-reliability.js';
 
 describe('ai reliability harness', () => {
+  it('matches deterministic evidence across harmless whitespace changes', () => {
+    expect(aiEvidenceMatchesAssertion(
+      '// A malformed AI synthesis response makes\n// generation THROW.',
+      { allOf: ['malformed AI synthesis response makes generation THROW'] },
+    )).toBe(true);
+  });
+
   it('emits stable advisory JSON for the reliability report', () => {
     const report = buildAiReliabilityReport();
     const parsed = JSON.parse(JSON.stringify(report, null, 2)) as typeof report;

@@ -3,7 +3,7 @@
  *
  * Displays all competing pages for a cannibalization issue with their position and
  * impressions, allowing the operator to explicitly choose which page to keep as the
- * canonical winner. Seeds from the existing keeperPathOf() default in
+ * canonical winner. Seeds from the existing cannibalizationKeeperPath() default in
  * CannibalizationTriage.tsx; persists the choice via useKeeperOverride.
  *
  * Used inside the Issue cockpit (strategy-the-issue flag ON). New component — no
@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { Check } from 'lucide-react';
 import { Badge, Button, Icon } from '../../ui/index.js';
 import { useKeeperOverride } from '../../../hooks/admin/useKeeperOverride.js';
+import { normalizePageUrl } from '../../../../shared/page-address-utils.js';
 import type { CannibalizationItem } from '../../../../shared/types/workspace.js';
 
 export interface KeeperSelectorProps {
@@ -24,7 +25,7 @@ export interface KeeperSelectorProps {
   workspaceId: string;
   /** The URL-set key for this issue (order-independent; used as the override store key). */
   urlSetKey: string;
-  /** The currently inferred keeper path (from keeperPathOf() or stored override). */
+  /** The currently inferred keeper path (from cannibalizationKeeperPath() or stored override). */
   currentKeeperPath: string | undefined;
   /** Called after a keeper is successfully saved so the parent can update its state. */
   onKeeperChanged?: (keeperPath: string) => void;
@@ -46,9 +47,13 @@ export function KeeperSelector({
 }: KeeperSelectorProps) {
   const [pendingPath, setPendingPath] = useState<string | null>(null);
   const { setKeeper, isSettingKeeper } = useKeeperOverride(workspaceId);
+  // currentKeeperPath arrives raw (full URL / slash-variant) from cannibalizationKeeperPath();
+  // the rendered rows are normalized (see uniquePages below). Normalize the keeper into the same
+  // identity space so it is matched — highlighted, sorted first, and guarded against redundant writes.
+  const normalizedKeeperPath = currentKeeperPath ? normalizePageUrl(currentKeeperPath) : undefined;
 
   function handleSelect(path: string) {
-    if (path === currentKeeperPath || isSettingKeeper) return;
+    if (path === normalizedKeeperPath || isSettingKeeper) return;
     setPendingPath(path);
     setKeeper(
       { urlSetKey, keeperPath: path },
@@ -64,10 +69,23 @@ export function KeeperSelector({
     );
   }
 
+  // A producer can report the same page from keyword-map and GSC evidence. The keeper workflow is
+  // page-identity based, so render one option per normalized path and retain the strongest row.
+  const uniquePages = Array.from(item.pages.reduce((byPath, page) => {
+    const normalizedPath = normalizePageUrl(page.path);
+    const normalizedPage = { ...page, path: normalizedPath };
+    const current = byPath.get(normalizedPath);
+    const hasBetterPosition = (normalizedPage.position ?? Infinity) < (current?.position ?? Infinity);
+    const hasBetterImpressions = (normalizedPage.position ?? Infinity) === (current?.position ?? Infinity)
+      && (normalizedPage.impressions ?? 0) > (current?.impressions ?? 0);
+    if (!current || hasBetterPosition || hasBetterImpressions) byPath.set(normalizedPath, normalizedPage);
+    return byPath;
+  }, new Map<string, CannibalizationItem['pages'][number]>()).values());
+
   // Sort pages: keeper first, then by position (ascending), then by impressions (descending).
-  const sortedPages = [...item.pages].sort((a, b) => {
-    const aIsKeeper = a.path === currentKeeperPath;
-    const bIsKeeper = b.path === currentKeeperPath;
+  const sortedPages = uniquePages.sort((a, b) => {
+    const aIsKeeper = a.path === normalizedKeeperPath;
+    const bIsKeeper = b.path === normalizedKeeperPath;
     if (aIsKeeper && !bIsKeeper) return -1;
     if (!aIsKeeper && bIsKeeper) return 1;
     const aPos = a.position ?? Infinity;
@@ -83,7 +101,7 @@ export function KeeperSelector({
       </p>
       <div className="space-y-1">
         {sortedPages.map((page) => {
-          const isKeeper = page.path === currentKeeperPath;
+          const isKeeper = page.path === normalizedKeeperPath;
           const isPending = pendingPath === page.path;
 
           return (

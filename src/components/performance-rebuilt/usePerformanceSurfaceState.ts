@@ -24,7 +24,11 @@ export function usePerformanceSurfaceState() {
   const setLens = useCallback((nextLens: PerformanceLens) => {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
-      next.set('tab', nextLens);
+      if (nextLens === DEFAULT_TAB) {
+        next.delete('tab');
+      } else {
+        next.set('tab', nextLens);
+      }
       return next;
     }, { replace: true });
   }, [setSearchParams]);

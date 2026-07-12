@@ -20,6 +20,7 @@ import {
   ErrorState,
   FormSelect,
   Icon,
+  InlineBanner,
   LensSwitcher,
   PageHeader,
   SearchField,
@@ -41,6 +42,8 @@ import {
 
 const LazyDeadLinksLens = lazyWithRetry(() => import('./DeadLinksLens').then((module) => ({ default: module.DeadLinksLens })));
 
+const SURFACE_WRAP_CLASS = 'mx-auto flex min-h-full w-full max-w-[1120px] flex-col gap-[14px] px-4 pb-[90px] sm:px-[30px]';
+
 interface LinksSurfaceProps {
   workspaceId: string;
 }
@@ -59,6 +62,17 @@ function lensCount(tab: LinksSurfaceTab, data: {
   if (tab === 'internal') return data.internalCount;
   if (tab === 'dead-links') return data.deadCount;
   return data.architectureCount;
+}
+
+function LinkOutcomeFooter() {
+  return (
+    <InlineBanner tone="info" title="Link fixes become outcomes after measurement">
+      <p className="t-body text-[var(--brand-text-muted)]">
+        Use Links for redirects, internal links, and dead-link repair. When analytics or Search Console proves lift,
+        graduate the measured win into Insights Engine instead of treating the workshop itself as the outcome.
+      </p>
+    </InlineBanner>
+  );
 }
 
 export function LinksSurface({ workspaceId }: LinksSurfaceProps) {
@@ -90,7 +104,12 @@ export function LinksSurface({ workspaceId }: LinksSurfaceProps) {
 
   useEffect(() => {
     if (!linkDomains.data || selectedDomain) return;
-    setSelectedDomain(linkDomains.data.defaultDomain || linkDomains.data.staging);
+    setSelectedDomain(
+      linkDomains.data.defaultDomain
+      || linkDomains.data.staging
+      || linkDomains.data.customDomains[0]
+      || '',
+    );
   }, [linkDomains.data, selectedDomain]);
 
   const lensOptions = useMemo(() => LINKS_SURFACE_TABS.map((tab) => ({
@@ -163,8 +182,12 @@ export function LinksSurface({ workspaceId }: LinksSurfaceProps) {
     if (state.tab === 'dead-links') {
       const options = linkDomains.data
         ? [
-            { value: linkDomains.data.staging, label: `${linkDomains.data.staging.replace(/^https?:\/\//i, '')} (staging)` },
-            ...linkDomains.data.customDomains.map((domain) => ({ value: domain, label: `${domain.replace(/^https?:\/\//i, '')} (live)` })),
+            ...(linkDomains.data.staging
+              ? [{ value: linkDomains.data.staging, label: `${linkDomains.data.staging.replace(/^https?:\/\//i, '')} (staging)` }]
+              : []),
+            ...linkDomains.data.customDomains
+              .filter(Boolean)
+              .map((domain) => ({ value: domain, label: `${domain.replace(/^https?:\/\//i, '')} (live)` })),
           ]
         : [];
       return (
@@ -241,31 +264,42 @@ export function LinksSurface({ workspaceId }: LinksSurfaceProps) {
   }
 
   return (
-    <div className="flex min-h-full flex-col gap-5">
-      <PageHeader
-        title="Links"
-        subtitle="Redirects, internal-link opportunities, dead-link checks, and architecture."
-      />
+    <div className={SURFACE_WRAP_CLASS} data-testid="links-surface-root">
+      <div className="flex flex-wrap items-center gap-2" data-testid="links-context-row">
+        <span className="h-[7px] w-[7px] shrink-0 rounded-[var(--radius-pill)] bg-[var(--teal)]" aria-hidden="true" />
+        <h1 aria-label="Links" className="t-label font-semibold uppercase tracking-[0.09em] text-[var(--teal)]">
+          Links · {workspace.name}
+        </h1>
+        <span className="ml-auto inline-flex items-center gap-1.5 t-caption-sm text-[var(--brand-text-muted)]">
+          <Icon name="clock" size="sm" />
+          {activeMeta}
+        </span>
+      </div>
 
-      <Toolbar label="Links view controls" className="w-full">
+      <div className="mb-1.5 flex flex-col gap-2 lg:flex-row lg:items-center" data-testid="links-workshop-controls">
         <LensSwitcher
           id="links-rebuilt-tab-switcher"
           options={lensOptions}
           value={state.tab}
           onChange={(value) => state.setTab(value as LinksSurfaceTab)}
           size="sm"
+          className="w-full flex-wrap sm:w-fit sm:flex-nowrap"
         />
-        <SearchField
-          value={state.search}
-          onChange={state.setSearch}
-          placeholder="Search links and pages"
-          debounceMs={300}
-          className="min-w-[220px] flex-1"
-        />
-        <ToolbarSpacer />
-        <span className="t-caption text-[var(--brand-text-muted)]">{activeMeta}</span>
-        {activeAction}
-      </Toolbar>
+
+        <Toolbar label="Links secondary controls" className="min-w-0 flex-1">
+          <div data-testid="links-secondary-controls" className="contents">
+            <SearchField
+              value={state.search}
+              onChange={state.setSearch}
+              placeholder="Search links and pages"
+              debounceMs={300}
+              className="min-w-[220px] flex-1 lg:max-w-[300px]"
+            />
+            <ToolbarSpacer />
+            {activeAction}
+          </div>
+        </Toolbar>
+      </div>
 
       {state.tab === 'redirects' && (
         <RedirectsLens
@@ -333,6 +367,8 @@ export function LinksSurface({ workspaceId }: LinksSurfaceProps) {
           clearSearch={state.clearSearch}
         />
       )}
+
+      <LinkOutcomeFooter />
     </div>
   );
 }

@@ -1,13 +1,11 @@
 // @ds-rebuilt
-import { Meter, Skeleton } from '../ui';
+import { Icon, Meter, SectionCard, Skeleton } from '../ui';
 import type { CompetitiveIntelResponse } from './types';
 
 interface ShareOfVoiceProps {
   data?: CompetitiveIntelResponse;
   isLoading: boolean;
 }
-
-const NUMBER_FORMAT = new Intl.NumberFormat('en-US');
 
 export function ShareOfVoice({ data, isLoading }: ShareOfVoiceProps) {
   if (isLoading && !data) return <Skeleton className="h-[180px] w-full" />;
@@ -26,50 +24,47 @@ export function ShareOfVoice({ data, isLoading }: ShareOfVoiceProps) {
   const sov = rows
     .map((row) => ({ ...row, pct: Math.round((row.traffic / total) * 100) }))
     .sort((a, b) => b.traffic - a.traffic);
+  const maxShare = sov[0]?.pct ?? 100;
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="share-of-voice-title">
-      <div>
-        <h2 id="share-of-voice-title" className="t-ui font-semibold text-[var(--brand-text-bright)]">
-          Share of voice
-        </h2>
-        <p className="t-caption-sm text-[var(--brand-text-muted)]">
-          Organic traffic share across your domain and configured competitors.
-        </p>
-      </div>
-      <div className="grid gap-3 lg:grid-cols-2">
-        {sov.map((row) => (
-          <div
-            key={row.domain}
-            className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-4 py-3"
-          >
-            <div className="mb-2 flex items-baseline justify-between gap-3">
-              <div className="min-w-0">
-                <p
-                  className="truncate t-caption font-semibold"
-                  style={{ color: row.isOwn ? 'var(--blue)' : 'var(--brand-text-bright)' }}
+    <section aria-labelledby="share-of-voice-title">
+      <h2 id="share-of-voice-title" className="sr-only" aria-label="Share of voice" />
+      <SectionCard
+        title="Share of voice"
+        subtitle="Organic traffic vs. your competitor set"
+        titleIcon={<Icon name="chart" size="sm" className="text-[var(--blue)]" />}
+        iconChip
+        noPadding
+        variant="subtle"
+      >
+        <div className="px-[18px] py-4">
+          {sov.map((row, index) => (
+            <div key={row.domain} className={index === sov.length - 1 ? '' : 'mb-[13px]'}>
+              <div className="t-label mb-[5px] flex items-baseline justify-between gap-3 font-normal normal-case tracking-normal">
+                <span
+                  className="min-w-0 truncate font-semibold"
+                  style={{ color: row.isOwn ? 'var(--blue)' : 'var(--brand-text)' }}
                 >
                   {row.isOwn ? `${row.domain} (you)` : row.domain}
-                </p>
-                <p className="t-caption-sm text-[var(--brand-text-muted)]">
-                  {NUMBER_FORMAT.format(row.traffic)} est. visits
-                </p>
+                </span>
+                <span // stat-primitive-ok: per-row share-of-voice percentage paired with a Meter, not a metric-grid stat
+                  className="font-mono tabular-nums"
+                  style={{ color: row.isOwn ? 'var(--blue)' : 'var(--brand-text-muted)' }}
+                >
+                  {row.pct}%
+                </span>
               </div>
-              <span // stat-primitive-ok: per-row share-of-voice percentage in a domain list (paired with a Meter bar), not a labeled StatCard/CompactStatBar metric grid
-                className="t-stat-sm tabular-nums font-bold"
-                style={{ color: row.isOwn ? 'var(--blue)' : 'var(--orange)' }}
-              >
-                {row.pct}%
-              </span>
+              <Meter
+                value={row.pct}
+                max={maxShare}
+                height={9}
+                color={row.isOwn ? 'var(--blue)' : 'var(--orange)'}
+                ariaLabel={`${row.domain} share of voice`}
+              />
             </div>
-            <Meter
-              value={row.pct}
-              color={row.isOwn ? 'var(--blue)' : 'var(--orange)'}
-              ariaLabel={`${row.domain} share of voice`}
-            />
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </SectionCard>
     </section>
   );
 }

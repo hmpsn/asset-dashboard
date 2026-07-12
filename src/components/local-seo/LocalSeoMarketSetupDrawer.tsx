@@ -555,7 +555,7 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
         aria-label="Configure local market"
         tabIndex={-1}
         // pr-check-disable-next-line -- Brand signature radius intentional for bottom-sheet drawer top corners on mobile, matching StrategyKeywordDrawer.
-        className="fixed inset-x-0 bottom-0 h-[82vh] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-auto sm:w-full sm:max-w-lg bg-[var(--surface-2)] border-t border-[var(--brand-border)] sm:border-t-0 sm:border-l z-[var(--z-modal-fullscreen)] flex flex-col overflow-hidden duration-200 rounded-t-[var(--radius-signature-lg)] sm:rounded-none outline-none animate-in slide-in-from-right" // fixed-inset-ok -- local SEO setup uses the established mobile sheet / desktop drawer pattern above chat widgets.
+        className="fixed inset-x-0 bottom-0 h-[82vh] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-auto sm:w-full sm:max-w-[560px] bg-[var(--surface-2)] border-t border-[var(--brand-border)] sm:border-t-0 sm:border-l z-[var(--z-modal-fullscreen)] flex flex-col overflow-hidden duration-200 rounded-t-[var(--radius-signature-lg)] sm:rounded-none outline-none animate-in slide-in-from-right" // fixed-inset-ok -- local SEO setup uses the established mobile sheet / desktop drawer pattern above chat widgets.
       >
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-[var(--brand-border)] flex-shrink-0">
           <div>
@@ -878,27 +878,25 @@ export function LocalSeoMarketSetupDrawer({ workspaceId, data, open, onClose }: 
               Fix errors above before saving.
             </p>
           )}
-          <div className="flex flex-row sm:items-center sm:justify-between gap-3">
-            <p className="t-caption-sm text-[var(--brand-text-muted)]">
-              Local visibility checks are separate from Rank Tracker and strategy generation.
-            </p>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
-              <Button variant="secondary" size="sm" loading={(update.isPending && !refresh.isPending) || lookingUp} disabled={saving || lookingUp} onClick={() => save(false)}>
-                Save market
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                icon={refresh.isPending ? undefined : RefreshCw}
-                loading={refresh.isPending}
-                disabled={saving || lookingUp || !canSaveAndRefresh}
-                title={!canSaveAndRefresh ? 'Choose at least one active local market before refreshing visibility.' : undefined}
-                onClick={() => save(true)}
-              >
-                Save and refresh visibility
-              </Button>
-            </div>
+          <p className="t-caption-sm text-[var(--brand-text-muted)]">
+            Local visibility checks are separate from Rank Tracker and strategy generation.
+          </p>
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
+            <Button variant="ghost" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
+            <Button variant="secondary" size="sm" loading={(update.isPending && !refresh.isPending) || lookingUp} disabled={saving || lookingUp} onClick={() => save(false)}>
+              Save market
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={refresh.isPending ? undefined : RefreshCw}
+              loading={refresh.isPending}
+              disabled={saving || lookingUp || !canSaveAndRefresh}
+              title={!canSaveAndRefresh ? 'Choose at least one active local market before refreshing visibility.' : undefined}
+              onClick={() => save(true)}
+            >
+              Save and refresh visibility
+            </Button>
           </div>
         </div>
       </div>

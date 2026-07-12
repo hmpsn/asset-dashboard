@@ -22,15 +22,15 @@ import {
   FormSelect,
   Icon,
   InlineBanner,
-  LensSwitcher,
+  Drawer,
   MetricTile,
   PageHeader,
   SearchField,
+  SectionCard,
   Skeleton,
   Toolbar,
   ToolbarSpacer,
   Tooltip,
-  scoreColor,
 } from '../ui';
 import { formatBytes } from '../../utils/formatNumbers';
 import { AssetDrawer } from './AssetDrawer';
@@ -41,7 +41,6 @@ import { OrganizeDrawer } from './OrganizeDrawer';
 import { UploadLens } from './UploadLens';
 import { mutationErrorMessage } from './assetManagerMutationFeedback';
 import {
-  ASSET_MANAGER_LENSES,
   BROWSE_FILTERS,
   CMS_FILTERS,
   type Asset,
@@ -59,6 +58,16 @@ import { useAssetManagerSurfaceState } from './useAssetManagerSurfaceState';
 interface AssetManagerSurfaceProps {
   workspaceId: string;
 }
+
+const HEADER_WRAP_CLASS = 'flex-col items-start gap-3 sm:flex-row sm:items-center [&_p]:whitespace-normal [&_p]:overflow-visible [&_p]:text-clip';
+const ASSETS_SUBTITLE = 'Browse, compress, rename, and add alt text to Webflow assets at the source.';
+const SURFACE_WRAP_CLASS = 'box-border flex min-h-full w-[calc(100%+30px)] max-w-[1180px] self-center flex-col gap-4 px-4 pb-[90px] sm:px-[30px]';
+const PRIMARY_BROWSE_FILTER_ORDER: BrowseFilter[] = ['oversized', 'missing-alt', 'unused'];
+const PRIMARY_BROWSE_FILTER_IDS = new Set<BrowseFilter>(PRIMARY_BROWSE_FILTER_ORDER);
+const PRIMARY_BROWSE_FILTERS = BROWSE_FILTERS
+  .filter((filter) => PRIMARY_BROWSE_FILTER_IDS.has(filter.id))
+  .sort((a, b) => PRIMARY_BROWSE_FILTER_ORDER.indexOf(a.id) - PRIMARY_BROWSE_FILTER_ORDER.indexOf(b.id));
+const SECONDARY_BROWSE_FILTERS = BROWSE_FILTERS.filter((filter) => !PRIMARY_BROWSE_FILTER_IDS.has(filter.id));
 
 interface WorkspaceData {
   id: string;
@@ -89,12 +98,6 @@ interface CompressResponse {
   savings?: number;
   cmsUpdates?: { succeeded: number; failed: number };
 }
-
-const LENS_ICONS = {
-  browse: Image,
-  audit: Sparkles,
-  upload: Upload,
-};
 
 const SORT_OPTIONS = [
   { value: 'createdOn', label: 'Newest' },
@@ -189,6 +192,7 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
   const [organizeExecuting, setOrganizeExecuting] = useState(false);
   const [organizeResult, setOrganizeResult] = useState<BulkResult | null>(null);
   const [selectedCmsFields, setSelectedCmsFields] = useState<Set<string>>(new Set());
+  const [browseControlsOpen, setBrowseControlsOpen] = useState(false);
 
   const workspaceQuery = useQuery({
     queryKey: queryKeys.admin.workspaceDetail(workspaceId),
@@ -282,6 +286,7 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
     ?? webflowAssets.find((asset) => asset.id === state.selectedAssetId)
     ?? cmsAssets.find((asset) => asset.id === state.selectedAssetId)
     ?? null;
+  const assetDetailOpen = selectedAsset !== null;
 
   useEffect(() => {
     if (!selectedAsset) return;
@@ -307,7 +312,14 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
     'cms-missing-alt': stats.cmsMissingAlt,
   } satisfies Record<BrowseFilter, number>), [stats, unusedQuery.data, webflowAssets]);
 
-  const selectedAssets = filteredAssets.filter((asset) => selectedIds.has(asset.id));
+  const selectableAssets = useMemo(() => {
+    const byId = new Map<string, BrowseAsset>();
+    for (const asset of [...webflowAssets, ...cmsAssets]) byId.set(asset.id, asset);
+    return [...byId.values()];
+  }, [cmsAssets, webflowAssets]);
+  const selectedAssets = selectableAssets.filter((asset) => selectedIds.has(asset.id));
+  const allShownSelected = filteredAssets.length > 0 && filteredAssets.every((asset) => selectedIds.has(asset.id));
+  const hasSecondaryFilter = [...state.browseFilters].some((filter) => !PRIMARY_BROWSE_FILTER_IDS.has(filter));
   const quotaReason = 'Monthly AI generation limit reached. AI alt text and smart rename actions are disabled for this session.';
 
   const markQuotaHit = useCallback((partial?: { done: number; total: number }) => {
@@ -718,11 +730,15 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
   };
 
   const selectAllShown = () => {
-    if (selectedAssets.length === filteredAssets.length && filteredAssets.length > 0) {
-      setSelectedIds(new Set<string>());
-    } else {
-      setSelectedIds(new Set(filteredAssets.map((asset) => asset.id)));
-    }
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const clearShown = filteredAssets.length > 0 && filteredAssets.every((asset) => prev.has(asset.id));
+      for (const asset of filteredAssets) {
+        if (clearShown) next.delete(asset.id);
+        else next.add(asset.id);
+      }
+      return next;
+    });
   };
 
   const actionBusy = (assetId: string, action: 'alt' | 'compress' | 'rename') => {
@@ -733,20 +749,21 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
 
   if (workspaceQuery.isLoading) {
     return (
-      <div className="flex min-h-full flex-col gap-5" aria-label="Loading asset manager">
-        <Skeleton className="h-[72px] w-full" />
-        <Skeleton className="h-[48px] w-full" />
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-[92px] w-full" />)}
+      <div className={SURFACE_WRAP_CLASS} aria-label="Loading asset manager">
+        <Skeleton className="h-[28px] w-full" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-[106px] w-full" />)}
         </div>
+        <Skeleton className="h-[60px] w-full" />
+        <Skeleton className="h-[40px] w-full" />
       </div>
     );
   }
 
   if (workspaceQuery.isError || !workspace) {
     return (
-      <div className="flex min-h-full flex-col gap-5">
-        <PageHeader title="Assets" subtitle="Browse, audit, and upload Webflow media." />
+      <div className={SURFACE_WRAP_CLASS}>
+        <PageHeader title="Assets" subtitle={ASSETS_SUBTITLE} className={HEADER_WRAP_CLASS} />
         <ErrorState
           type="data"
           title="Workspace did not load"
@@ -759,8 +776,8 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
 
   if (!siteId) {
     return (
-      <div className="flex min-h-full flex-col gap-5">
-        <PageHeader title="Assets" subtitle="Browse, audit, and upload Webflow media." />
+      <div className={SURFACE_WRAP_CLASS}>
+        <PageHeader title="Assets" subtitle={ASSETS_SUBTITLE} className={HEADER_WRAP_CLASS} />
         <EmptyState
           icon={LockedIcon}
           title="Link a Webflow site"
@@ -770,67 +787,71 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
     );
   }
 
-  const lensOptions = ASSET_MANAGER_LENSES.map((lens) => ({
-    value: lens.id,
-    label: lens.label,
-    icon: LENS_ICONS[lens.id],
-    count: lens.id === 'browse' ? assets.length : lens.id === 'audit' ? unusedQuery.data?.size : queue.length,
-  }));
-
   return (
-    <div className="flex min-h-full flex-col gap-5">
-      <PageHeader
-        title="Assets"
-        subtitle="Browse Webflow media, run asset audits, and send uploads through the existing processing pipeline."
-        actions={(
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {lastUpdated && <span className="t-caption-sm text-[var(--brand-text-muted)]">Data as of {lastUpdated}</span>}
-            <Button size="sm" variant="secondary" onClick={refreshAssets} disabled={assetsQuery.isFetching}>
-              <Icon as={RefreshCw} size="sm" className={assetsQuery.isFetching ? 'animate-spin' : undefined} />
-              Refresh
-            </Button>
-          </div>
-        )}
-      />
+    <div data-testid="asset-manager-canvas" className={SURFACE_WRAP_CLASS}>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="sr-only">Assets</h2>
+        <div className="flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-[var(--radius-pill)] bg-[var(--teal)]" aria-hidden="true" />
+          <span className="t-micro font-semibold uppercase tracking-[0.14em] text-[var(--brand-text-muted)]">
+            Asset Manager · {workspace.name}
+          </span>
+        </div>
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 t-caption-sm text-[var(--brand-text-muted)]">
+          <span className="inline-flex items-center gap-1.5">
+            <Icon as={Image} size="sm" aria-hidden="true" />
+            {stats.total} assets · {formatBytes(stats.totalWeight)} total
+          </span>
+          {lastUpdated && <span>Data as of {lastUpdated}</span>}
+        </div>
+      </header>
 
-      <Toolbar label="Asset Manager controls">
-        <LensSwitcher
-          options={lensOptions}
-          value={state.lens}
-          onChange={(value) => state.setLens(value as typeof state.lens)}
-        />
-        {(state.lens === 'browse' || state.lens === 'audit') && (
-          <SearchField
-            value={state.searchInput}
-            onChange={state.setSearchInput}
-            placeholder={state.lens === 'audit' ? 'Search issues...' : 'Search filename or alt text...'}
-            className="min-w-[260px]"
-          />
-        )}
-        <ToolbarSpacer />
-        {state.lens === 'browse' && (
+      <section aria-label="Asset summary" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {assetsQuery.isLoading ? (
+          Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-[106px] w-full" />)
+        ) : (
           <>
-            <FormSelect
-              value={state.assetSort}
-              onChange={(value) => state.setAssetSort(value as AssetSort)}
-              options={SORT_OPTIONS}
-              className="w-[140px]"
-              aria-label="Sort assets"
+            <MetricTile
+              label="Total media weight"
+              value={formatBytes(stats.totalWeight)}
+              accent="var(--blue)"
+              icon={Database}
+              sub={`${stats.total} assets on the site`}
+              className="min-h-[106px]"
             />
-            <FormSelect
-              value={state.view}
-              onChange={(value) => state.setView(value as typeof state.view)}
-              options={VIEW_OPTIONS}
-              className="w-[120px]"
-              aria-label="Asset view"
+            <MetricTile
+              label="Oversized images"
+              value={stats.oversized}
+              accent="var(--amber)"
+              icon={Minimize2}
+              sub="over 500 KB — slowing LCP"
+              className="min-h-[106px]"
             />
-            <Button size="sm" variant="secondary" onClick={() => void handleOrganizePreview()}>
-              <Icon as={FolderOpen} size="sm" />
-              Organize
-            </Button>
+            <MetricTile
+              label="Potential savings"
+              value={formatBytes(stats.estimatedSavings)}
+              accent="var(--blue)"
+              icon={Minimize2}
+              sub={stats.estimatedSavings > 0 ? 'compress to reclaim' : 'no oversized raster assets'}
+              className="min-h-[106px]"
+            />
+            <MetricTile
+              label="Missing alt text"
+              value={stats.missingAlt}
+              accent="var(--amber)"
+              icon={Sparkles}
+              sub="accessibility + SEO gap"
+              className="min-h-[106px]"
+            />
           </>
         )}
-      </Toolbar>
+      </section>
+
+      <InlineBanner tone="info" title="Fixes the source, not the symptom.">
+        <p className="t-body">
+          Compressing writes optimized assets back to Webflow and updates selected CMS references, so PageSpeed and Site Audit media findings clear from the source.
+        </p>
+      </InlineBanner>
 
       {quotaLocked && !quotaDismissed && (
         <InlineBanner tone="warning" title="AI quota reached" onDismiss={() => setQuotaDismissed(true)}>
@@ -852,10 +873,45 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
         </InlineBanner>
       )}
 
-      {state.lens === 'browse' && (
-        <>
-          <div className="flex flex-wrap gap-2" aria-label="Browse asset filters">
-            {BROWSE_FILTERS.map((filter) => (
+      {state.lens === 'audit' && (
+        <section aria-label="Repair results">
+          <SectionCard
+            title="Repair results"
+            subtitle="Review and resolve media issues without leaving the asset library."
+            action={(
+              <Button size="sm" variant="ghost" onClick={() => state.setLens('browse')}>
+                Close repair results
+              </Button>
+            )}
+          >
+            <AuditLens
+              siteId={siteId}
+              workspaceId={workspaceId}
+              search={state.search}
+              searchInput={state.searchInput}
+              onSearchChange={state.setSearchInput}
+              activeFilter={state.auditFilter}
+              onFilterChange={state.setAuditFilter}
+              sort={state.auditSort}
+              onSortChange={state.setAuditSort}
+              quotaLocked={quotaLocked}
+              quotaReason={quotaReason}
+              onQuotaHit={markQuotaHit}
+            />
+          </SectionCard>
+        </section>
+      )}
+
+      <Toolbar label="Browse asset controls" gap={8} align="flex-start" className="w-full">
+        <div className="flex w-full flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-wrap gap-1.5" role="group" aria-label="Browse asset filters">
+            <FilterChip
+              label="All"
+              active={state.browseFilters.size === 0}
+              count={stats.total}
+              onClick={state.showAllBrowseAssets}
+            />
+            {PRIMARY_BROWSE_FILTERS.map((filter) => (
               <FilterChip
                 key={filter.id}
                 label={filter.label}
@@ -864,130 +920,178 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
                 onClick={() => state.toggleBrowseFilter(filter.id)}
               />
             ))}
-            {state.browseFilters.size > 0 && (
-              <FilterChip label="Clear" active onClick={state.clearBrowseFilters} />
-            )}
+            <Button
+              size="sm"
+              variant={browseControlsOpen || hasSecondaryFilter ? 'secondary' : 'ghost'}
+              aria-label="More browse controls"
+              aria-expanded={browseControlsOpen}
+              onClick={() => setBrowseControlsOpen((open) => !open)}
+            >
+              More
+              <Icon name={browseControlsOpen ? 'chevronUp' : 'chevronDown'} size="sm" aria-hidden="true" />
+            </Button>
           </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-            {assetsQuery.isLoading ? (
-              Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-[92px] w-full" />)
-            ) : (
-              <>
-                <MetricTile label="Assets" value={stats.total} accent="var(--blue)" icon={Image} />
-                <MetricTile label="Missing alt" value={stats.missingAlt} accent="var(--amber)" icon={Sparkles} />
-                <MetricTile label="Oversized" value={stats.oversized} accent="var(--blue)" icon={Minimize2} />
-                <MetricTile label="Unused" value={stats.unused} accent="var(--red)" icon={FolderOpen} />
-                <MetricTile label="CMS images" value={stats.cmsImages} accent="var(--blue)" icon={Database} sub={`${stats.cmsMissingAlt} missing alt`} />
-                <MetricTile label="Potential savings" value={formatBytes(stats.estimatedSavings)} accent={scoreColor(82)} icon={Minimize2} sub="estimate" />
-              </>
-            )}
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <Button size="sm" variant="secondary" onClick={selectAllShown} disabled={filteredAssets.length === 0}>
+              <Icon as={state.view === 'grid' ? Grid3X3 : List} size="sm" aria-hidden="true" />
+              {allShownSelected ? 'Clear shown' : 'Select all shown'}
+            </Button>
+            <Button size="sm" variant="primary" onClick={() => state.setLens('upload')}>
+              <Icon as={Upload} size="sm" aria-hidden="true" />
+              Upload
+            </Button>
           </div>
+        </div>
 
-          {isCmsFilter && cmsQuery.data?.collections && (
-            <CmsFieldSelector
-              collections={cmsQuery.data.collections}
-              selectedFields={selectedCmsFields}
-              onChange={setSelectedCmsFields}
-            />
-          )}
-
-          {selectedIds.size > 0 && (
-            <div className="sticky top-0 z-[var(--z-dropdown)] bg-[var(--surface-1)] pb-1">
-              <InlineBanner tone="info" title={`${selectedIds.size} selected`} onDismiss={() => setSelectedIds(new Set<string>())}>
-                <Toolbar label="Bulk asset actions" className="mt-2 border-none bg-transparent p-0">
-                  <Button size="sm" variant="secondary" onClick={selectAllShown}>
-                    <Icon as={state.view === 'grid' ? Grid3X3 : List} size="sm" />
-                    {selectedAssets.length === filteredAssets.length ? 'Clear shown' : 'Select all shown'}
-                  </Button>
-                  <Tooltip content={quotaLocked ? quotaReason : 'Generate alt text for selected assets with missing alt text'} placement="top" contentClassName="max-w-sm">
-                    <span className="inline-flex" tabIndex={0}>
-                      <Button size="sm" variant="secondary" disabled={quotaLocked || !!bulkAltProgress} onClick={() => void handleBulkGenerateAlt()}>
-                        <Icon as={Sparkles} size="sm" />
-                        {bulkAltProgress ? `${bulkAltProgress.done}/${bulkAltProgress.total}` : 'Generate alt'}
-                      </Button>
-                    </span>
-                  </Tooltip>
-                  <Tooltip content={quotaLocked ? quotaReason : 'Draft and apply smart names for selected assets'} placement="top" contentClassName="max-w-sm">
-                    <span className="inline-flex" tabIndex={0}>
-                      <Button size="sm" variant="secondary" disabled={quotaLocked || !!bulkRenameProgress} onClick={() => void handleBulkRename()}>
-                        <Icon as={Wand2} size="sm" />
-                        {bulkRenameProgress ? `${bulkRenameProgress.done}/${bulkRenameProgress.total}` : 'Smart rename'}
-                      </Button>
-                    </span>
-                  </Tooltip>
-                  <Button size="sm" variant="secondary" disabled={!!bulkCompressProgress} onClick={() => void handleBulkCompress()}>
-                    <Icon as={Minimize2} size="sm" />
-                    {bulkCompressProgress ? `${bulkCompressProgress.done}/${bulkCompressProgress.total}` : 'Compress'}
-                  </Button>
-                  <ToolbarSpacer />
-                  <Button size="sm" variant="danger" disabled={deletingId === 'bulk'} onClick={() => setConfirmBulkDelete(true)}>
-                    Delete
-                  </Button>
-                </Toolbar>
-              </InlineBanner>
+        {browseControlsOpen && (
+          <div className="flex w-full flex-col gap-2 border-t border-[var(--brand-border)] pt-2">
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Additional asset filters">
+              {SECONDARY_BROWSE_FILTERS.map((filter) => (
+                <FilterChip
+                  key={filter.id}
+                  label={filter.label}
+                  active={state.browseFilters.has(filter.id)}
+                  count={filterCounts[filter.id]}
+                  onClick={() => state.toggleBrowseFilter(filter.id)}
+                />
+              ))}
+              {state.browseFilters.size > 0 && (
+                <FilterChip label="Clear" active onClick={state.clearBrowseFilters} />
+              )}
             </div>
-          )}
-
-          {assetsQuery.isLoading ? (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-[280px] w-full" />)}
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <SearchField
+                value={state.searchInput}
+                onChange={state.setSearchInput}
+                placeholder="Search filename or alt text..."
+                className="w-full min-w-0 sm:w-auto sm:min-w-[240px]"
+              />
+              <FormSelect
+                value={state.assetSort}
+                onChange={(value) => state.setAssetSort(value as AssetSort)}
+                options={SORT_OPTIONS}
+                className="w-[132px]"
+                aria-label="Sort assets"
+              />
+              <FormSelect
+                value={state.view}
+                onChange={(value) => state.setView(value as typeof state.view)}
+                options={VIEW_OPTIONS}
+                className="w-[112px]"
+                aria-label="Asset view"
+              />
+              <ToolbarSpacer />
+              <Button size="sm" variant="ghost" onClick={refreshAssets} disabled={assetsQuery.isFetching}>
+                <Icon as={RefreshCw} size="sm" className={assetsQuery.isFetching ? 'animate-spin' : undefined} aria-hidden="true" />
+                Refresh
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => void handleOrganizePreview()}>
+                <Icon as={FolderOpen} size="sm" aria-hidden="true" />
+                Organize
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => state.setLens('audit')}>
+                <Icon as={Sparkles} size="sm" aria-hidden="true" />
+                Repair results
+              </Button>
             </div>
-          ) : state.view === 'table' ? (
-            <AssetTable
-              assets={filteredAssets}
-              selected={selectedIds}
-              quotaLocked={quotaLocked}
-              quotaReason={quotaReason}
-              actionBusy={actionBusy}
-              onToggleSelect={toggleSelected}
-              onOpenAsset={state.openAsset}
-              onGenerateAlt={(asset) => { void handleGenerateAlt(asset); }}
-              onCompress={(asset) => { void handleCompress(asset); }}
-              onSmartRename={(asset) => { void handleSmartRename(asset); }}
-            />
-          ) : (
-            <AssetGrid
-              assets={filteredAssets}
-              selected={selectedIds}
-              quotaLocked={quotaLocked}
-              quotaReason={quotaReason}
-              actionBusy={actionBusy}
-              onToggleSelect={toggleSelected}
-              onOpenAsset={state.openAsset}
-              onGenerateAlt={(asset) => { void handleGenerateAlt(asset); }}
-              onCompress={(asset) => { void handleCompress(asset); }}
-              onSmartRename={(asset) => { void handleSmartRename(asset); }}
-              onClearFilters={state.clearAll}
-            />
-          )}
-        </>
-      )}
+          </div>
+        )}
+      </Toolbar>
 
-      {state.lens === 'audit' && (
-        <AuditLens
-          siteId={siteId}
-          workspaceId={workspaceId}
-          search={state.search}
-          searchInput={state.searchInput}
-          onSearchChange={state.setSearchInput}
-          activeFilter={state.auditFilter}
-          onFilterChange={state.setAuditFilter}
-          sort={state.auditSort}
-          onSortChange={state.setAuditSort}
-          quotaLocked={quotaLocked}
-          quotaReason={quotaReason}
-          onQuotaHit={markQuotaHit}
+      {isCmsFilter && cmsQuery.data?.collections && (
+        <CmsFieldSelector
+          collections={cmsQuery.data.collections}
+          selectedFields={selectedCmsFields}
+          onChange={setSelectedCmsFields}
         />
       )}
 
-      {state.lens === 'upload' && (
-        <UploadLens workspaceFolder={workspaceFolder} queue={queue} queueLoading={queueQuery.isLoading} />
+      {selectedIds.size > 0 && (
+        <div className="sticky top-0 z-[var(--z-dropdown)] bg-[var(--surface-1)] pb-1">
+          <InlineBanner tone="info" title={`${selectedIds.size} selected`} onDismiss={() => setSelectedIds(new Set<string>())}>
+            <Toolbar label="Bulk asset actions" className="mt-2 border-none bg-transparent p-0">
+              <Tooltip content={quotaLocked ? quotaReason : 'Generate alt text for selected assets with missing alt text'} placement="top" contentClassName="max-w-sm">
+                <span className="inline-flex" tabIndex={0}>
+                  <Button size="sm" variant="secondary" disabled={quotaLocked || !!bulkAltProgress} onClick={() => void handleBulkGenerateAlt()}>
+                    <Icon as={Sparkles} size="sm" />
+                    {bulkAltProgress ? `${bulkAltProgress.done}/${bulkAltProgress.total}` : 'Generate alt'}
+                  </Button>
+                </span>
+              </Tooltip>
+              <Tooltip content={quotaLocked ? quotaReason : 'Draft and apply smart names for selected assets'} placement="top" contentClassName="max-w-sm">
+                <span className="inline-flex" tabIndex={0}>
+                  <Button size="sm" variant="secondary" disabled={quotaLocked || !!bulkRenameProgress} onClick={() => void handleBulkRename()}>
+                    <Icon as={Wand2} size="sm" />
+                    {bulkRenameProgress ? `${bulkRenameProgress.done}/${bulkRenameProgress.total}` : 'Smart rename'}
+                  </Button>
+                </span>
+              </Tooltip>
+              <Button size="sm" variant="secondary" disabled={!!bulkCompressProgress} onClick={() => void handleBulkCompress()}>
+                <Icon as={Minimize2} size="sm" />
+                {bulkCompressProgress ? `${bulkCompressProgress.done}/${bulkCompressProgress.total}` : 'Compress'}
+              </Button>
+              <ToolbarSpacer />
+              <Button size="sm" variant="danger" disabled={deletingId === 'bulk'} onClick={() => setConfirmBulkDelete(true)}>
+                Delete
+              </Button>
+            </Toolbar>
+          </InlineBanner>
+        </div>
       )}
+
+      {assetsQuery.isLoading ? (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(216px,1fr))] gap-[14px]">
+          {Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-[246px] w-full" />)}
+        </div>
+      ) : state.view === 'table' ? (
+        <AssetTable
+          assets={filteredAssets}
+          selected={selectedIds}
+          quotaLocked={quotaLocked}
+          quotaReason={quotaReason}
+          actionBusy={actionBusy}
+          onToggleSelect={toggleSelected}
+          onOpenAsset={state.openAsset}
+          onGenerateAlt={(asset) => { void handleGenerateAlt(asset); }}
+          onCompress={(asset) => { void handleCompress(asset); }}
+          onSmartRename={(asset) => { void handleSmartRename(asset); }}
+        />
+      ) : (
+        <AssetGrid
+          assets={filteredAssets}
+          selected={selectedIds}
+          quotaLocked={quotaLocked}
+          quotaReason={quotaReason}
+          actionBusy={actionBusy}
+          onToggleSelect={toggleSelected}
+          onOpenAsset={state.openAsset}
+          onGenerateAlt={(asset) => { void handleGenerateAlt(asset); }}
+          onCompress={(asset) => { void handleCompress(asset); }}
+          onSmartRename={(asset) => { void handleSmartRename(asset); }}
+          onClearFilters={state.clearAll}
+        />
+      )}
+
+      <InlineBanner tone="success" title="From media fix to proof">
+        <p className="t-body">
+          A compression pass that improves Core Web Vitals or page speed can graduate into Insights Engine once the measured lift lands.
+        </p>
+      </InlineBanner>
+
+      <Drawer
+        open={state.lens === 'upload' && !assetDetailOpen}
+        onClose={() => state.setLens('browse')}
+        title="Upload assets"
+        subtitle="Add images to the existing Webflow asset workflow."
+        eyebrow="Asset library"
+        width={760}
+      >
+        <UploadLens workspaceFolder={workspaceFolder} queue={queue} queueLoading={queueQuery.isLoading} />
+      </Drawer>
 
       <AssetDrawer
         asset={selectedAsset}
-        open={!!selectedAsset}
+        open={assetDetailOpen}
         quotaLocked={quotaLocked}
         quotaReason={quotaReason}
         altDraft={altDraft}

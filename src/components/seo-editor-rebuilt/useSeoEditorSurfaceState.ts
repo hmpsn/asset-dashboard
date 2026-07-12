@@ -40,6 +40,14 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 type ParamValue = string | number | null | undefined;
 
+export function seoEditorSourceScopeLabel(source: SeoEditorSourceScope): string {
+  return SEO_EDITOR_SOURCE_OPTIONS.find((option) => option.id === source)?.label ?? 'All';
+}
+
+export function seoEditorQuickFilterLabel(filter: SeoEditorQuickFilter): string {
+  return SEO_EDITOR_QUICK_FILTERS.find((option) => option.id === filter)?.label ?? 'All';
+}
+
 function readTab(value: string | null): SeoEditorSurfaceTab {
   return resolveTabSearchParam<SeoEditorSurfaceTab>(value, {
     validValues: VALID_TABS,

@@ -36,6 +36,9 @@ import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import { applyScoreAdjustment } from './insight-score-adjustments.js';
 import { toInsightPageId, normalizePageUrl } from './utils/page-address.js';
+import { invalidateMonthlyDigestCache } from './monthly-digest-cache.js';
+import { invalidateWorkspaceLearningsCache } from './workspace-learnings-cache.js';
+import { clearIntelligenceCache } from './intelligence/cache-clear.js';
 
 const log = createLogger('outcome-tracking');
 
@@ -93,6 +96,26 @@ const stmts = createStmtCache(() => ({
         FROM action_outcomes ao2
         WHERE ao2.action_id = ao.action_id
           AND ao2.score IN ('strong_win', 'win')
+      )
+    ORDER BY ao.measured_at DESC
+    LIMIT ?
+  `),
+  getWinsWithValueByWorkspaceInWindow: db.prepare(`
+    SELECT ao.*, ta.page_url, ta.action_type, ta.attribution
+    FROM action_outcomes ao
+    JOIN tracked_actions ta ON ta.id = ao.action_id
+    WHERE ta.workspace_id = ?
+      AND ao.score IN ('strong_win', 'win')
+      AND ta.attribution != 'not_acted_on'
+      AND julianday(ao.measured_at) >= julianday(?)
+      AND julianday(ao.measured_at) < julianday(?)
+      AND ao.checkpoint_days = (
+        SELECT MAX(ao2.checkpoint_days)
+        FROM action_outcomes ao2
+        WHERE ao2.action_id = ao.action_id
+          AND ao2.score IN ('strong_win', 'win')
+          AND julianday(ao2.measured_at) >= julianday(?)
+          AND julianday(ao2.measured_at) < julianday(?)
       )
     ORDER BY ao.measured_at DESC
     LIMIT ?
@@ -538,6 +561,11 @@ export function getNotActedOnActions(): TrackedAction[] {
 
 export function updateAttribution(actionId: string, workspaceId: string, attribution: Attribution): boolean {
   const result = stmts().updateAttribution.run(attribution, actionId, workspaceId);
+  if (result.changes > 0) {
+    invalidateWorkspaceLearningsCache(workspaceId);
+    invalidateMonthlyDigestCache(workspaceId);
+    clearIntelligenceCache(workspaceId);
+  }
   return result.changes > 0;
 }
 
@@ -628,6 +656,12 @@ export function recordOutcome(params: {
   const outcome = rows.find(r => r.checkpoint_days === params.checkpointDays);
   if (!outcome) throw new Error(`Failed to read back outcome for action ${params.actionId}`);
   const actionRowForBroadcast = stmts().getById.get(params.actionId) as TrackedActionRow | undefined;
+  if (actionRowForBroadcast) {
+    const workspaceId = actionRowForBroadcast.workspace_id;
+    invalidateWorkspaceLearningsCache(workspaceId);
+    invalidateMonthlyDigestCache(workspaceId);
+    clearIntelligenceCache(workspaceId);
+  }
   if (
     actionRowForBroadcast &&
     params.score != null &&
@@ -979,12 +1013,31 @@ export function getWorkspaceOutcomeValueRollup(workspaceId: string, limit = 100)
  * clicksGained is taken from deltaSummary.delta_absolute when primary_metric is clicks;
  * falls back to 0 for non-clicks metrics so the field is always a number.
  */
-export function getROIHighlightsFromOutcomes(workspaceId: string, limit = 10): ROIHighlight[] {
+export interface ROIHighlightWindow {
+  start: string;
+  endExclusive: string;
+}
+
+export function getROIHighlightsFromOutcomes(
+  workspaceId: string,
+  limit = 10,
+  window?: ROIHighlightWindow,
+): ROIHighlight[] {
   interface WinRow extends ActionOutcomeRow {
     page_url: string | null;
     action_type: string;
+    attribution: string;
   }
-  const rows = stmts().getWinsWithValueByWorkspace.all(workspaceId, limit) as WinRow[];
+  const rows = (window
+    ? stmts().getWinsWithValueByWorkspaceInWindow.all(
+        workspaceId,
+        window.start,
+        window.endExclusive,
+        window.start,
+        window.endExclusive,
+        limit,
+      )
+    : stmts().getWinsWithValueByWorkspace.all(workspaceId, limit)) as WinRow[];
   return rows.map(row => {
     const delta = parseJsonFallback<{
       primary_metric?: string;
@@ -1025,8 +1078,19 @@ export function getROIHighlightsFromOutcomes(workspaceId: string, limit = 10): R
     const result = `${scoreText}${deltaText}`;
 
     const attributedValue = typeof row.attributed_value === 'number' ? row.attributed_value : null;
+    const attribution = row.attribution === 'platform_executed' || row.attribution === 'externally_executed'
+      ? row.attribution
+      : undefined;
 
-    return { pageTitle, pageUrl, action, result, clicksGained, attributedValue };
+    return {
+      pageTitle,
+      pageUrl,
+      action,
+      result,
+      clicksGained,
+      attributedValue,
+      ...(attribution ? { attribution } : {}),
+    };
   });
 }
 

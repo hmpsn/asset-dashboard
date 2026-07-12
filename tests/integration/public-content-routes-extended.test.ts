@@ -610,7 +610,7 @@ describe('GET /api/public/content-performance/:workspaceId/:requestId/trend', ()
     const res = await api(`/api/public/content-performance/${openWsId}/no-such-req/trend`);
     expect(res.status).toBe(404);
     const body = await res.json() as { error: string };
-    expect(body.error).toMatch(/request/i);
+    expect(body.error).toMatch(/item/i);
   });
 
   it('returns { trend: [] } when visible request has no targetPageSlug or GSC config', async () => {
@@ -618,7 +618,8 @@ describe('GET /api/public/content-performance/:workspaceId/:requestId/trend', ()
     try {
       const res = await api(`/api/public/content-performance/${openWsId}/${req!.id}/trend`);
       expect(res.status).toBe(200);
-      const body = await res.json() as { trend: unknown[] };
+      const body = await res.json() as { availability: string; trend: unknown[] };
+      expect(body.availability).toBe('gsc_not_configured');
       expect(body.trend).toEqual([]);
     } finally {
       db.prepare('DELETE FROM content_topic_requests WHERE id = ?').run(req!.id);
@@ -633,7 +634,7 @@ describe('GET /api/public/content-performance/:workspaceId/:requestId/trend', ()
         const res = await api(`/api/public/content-performance/${openWsId}/${req!.id}/trend`);
         expect(res.status).toBe(404);
         const body = await res.json() as { error: string };
-        expect(body.error).toMatch(/request/i);
+        expect(body.error).toMatch(/item/i);
       } finally {
         db.prepare('DELETE FROM content_topic_requests WHERE id = ?').run(req!.id);
       }

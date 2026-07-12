@@ -73,8 +73,8 @@ export function StrategyCompetitiveTab({ workspaceId, competitors, seoDataAvaila
         workspaceId={workspaceId}
         navigate={navigate}
         onCreateBrief={(keyword) =>
-          navigate(adminPath(workspaceId, 'seo-briefs'), {
-            state: { fixContext: { targetRoute: 'seo-briefs', pageName: keyword } },
+          navigate(`${adminPath(workspaceId, 'content-pipeline')}?tab=briefs`, {
+            state: { fixContext: { targetRoute: 'content-pipeline', pageName: keyword } },
           })
         }
       />

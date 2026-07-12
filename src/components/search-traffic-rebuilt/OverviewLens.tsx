@@ -2,13 +2,13 @@
 import { BarChart3, MousePointerClick, Search, Users } from 'lucide-react';
 import { useMemo } from 'react';
 import { AnnotatedTrendChart, type TrendLine } from '../charts/AnnotatedTrendChart';
-import { InsightFeed } from '../insights';
-import { Badge, ChartCard, EmptyState, GroupBlock, InlineBanner, KeyValueRow, Skeleton } from '../ui';
-import { useAnalyticsOverview } from '../../hooks/admin/useAnalyticsOverview';
+import { Badge, ChartCard, EmptyState, Skeleton } from '../ui';
+import { useAnalyticsOverviewFromData } from '../../hooks/admin/useAnalyticsOverview';
 import { useInsightFeed } from '../../hooks/admin/useInsightFeed';
 import { useToggleSet } from '../../hooks/useToggleSet';
+import { SearchContextBand } from './SearchContextBand';
 import { SparkMetricTile } from './SparkMetricTile';
-import type { SearchTrafficSearchData } from './types';
+import type { SearchTrafficGa4Data, SearchTrafficSearchData } from './types';
 import {
   SERIES,
   buildSparkline,
@@ -19,11 +19,11 @@ import {
 
 interface OverviewLensProps {
   workspaceId: string;
-  siteId?: string;
   gscPropertyUrl?: string;
   ga4PropertyId?: string;
   days: number;
   searchData: SearchTrafficSearchData;
+  ga4Data: SearchTrafficGa4Data;
 }
 
 type OverviewMetricKey = 'clicks' | 'impressions' | 'ctr' | 'position' | 'users' | 'sessions';
@@ -47,13 +47,16 @@ function LoadingGrid() {
 
 export function OverviewLens({
   workspaceId,
-  siteId,
   gscPropertyUrl,
   ga4PropertyId,
   days,
   searchData,
+  ga4Data,
 }: OverviewLensProps) {
-  const overview = useAnalyticsOverview(workspaceId, siteId, gscPropertyUrl, ga4PropertyId, days);
+  const overview = useAnalyticsOverviewFromData(workspaceId, searchData, ga4Data, {
+    gsc: !!gscPropertyUrl,
+    ga4: !!ga4PropertyId,
+  });
   const { feed, summary, isLoading: feedLoading } = useInsightFeed(workspaceId);
   const [activeLines, toggleLine] = useToggleSet(['clicks', 'users']);
 
@@ -180,13 +183,7 @@ export function OverviewLens({
         )}
       </div>
 
-      {brandedDemand?.status === 'error' && (
-        <InlineBanner tone="warning" title="Branded split may be stale">
-          {brandedDemand.error ?? 'Search overview loaded, but the branded/non-branded split did not refresh.'}
-        </InlineBanner>
-      )}
-
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.8fr)]">
+      <div>
         <ChartCard title="Search + traffic trend" action={<Badge label={`${days}d`} tone="zinc" variant="soft" size="sm" />}>
           {overview.trendData.length > 0 ? (
             <AnnotatedTrendChart
@@ -201,44 +198,15 @@ export function OverviewLens({
             <EmptyState icon={BarChart3} title="No trend points yet" description="The connected providers did not return daily trend rows for this window." />
           )}
         </ChartCard>
-
-        <GroupBlock
-          icon={Search}
-          iconColor={SERIES.clicks}
-          title="Demand mix"
-          meta="Server-computed from Search Console query rows."
-          stats={brandedDemand?.status === 'ready' ? [
-            { label: 'branded', value: formatPercent(brandedDemand.branded?.sharePct), color: 'var(--teal)' },
-            { label: 'non-brand', value: formatPercent(brandedDemand.nonBranded?.sharePct), color: 'var(--blue)' },
-          ] : []}
-        >
-          {brandedDemand?.status === 'ready' ? (
-            <div className="px-2 pb-2">
-              <KeyValueRow label="Branded clicks" value={formatNumber(brandedDemand.branded?.clicks)} valueColor="var(--teal)" divider={false} />
-              <KeyValueRow label="Non-branded clicks" value={formatNumber(brandedDemand.nonBranded?.clicks)} valueColor="var(--blue)" />
-              <KeyValueRow label="Rows sampled" value={formatNumber(brandedDemand.queryRowsSampled)} />
-              <p className="t-caption-sm text-[var(--brand-text-muted)]">
-                Share uses impressions as the denominator; missing query rows remain in the non-branded remainder.
-              </p>
-            </div>
-          ) : (
-            <div className="px-2 pb-2 t-caption text-[var(--brand-text-muted)]">
-              {brandedDemand?.status === 'error' ? 'Split unavailable for this refresh.' : 'Brand tokens were not available for this workspace.'}
-            </div>
-          )}
-        </GroupBlock>
       </div>
 
-      <ChartCard title="Priority insights">
-        <InsightFeed
-          feed={feed}
-          summary={summary}
-          loading={feedLoading}
-          showPills
-          workspaceId={workspaceId}
-          limit={6}
-        />
-      </ChartCard>
+      <SearchContextBand
+        workspaceId={workspaceId}
+        brandedDemand={brandedDemand}
+        feed={feed}
+        summary={summary}
+        loading={feedLoading}
+      />
     </div>
   );
 }

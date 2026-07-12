@@ -16,6 +16,19 @@
     }
     ,
     {
+      "name": "smoke-backend",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "PORT=3011 npm run dev:server"],
+      "env": { "SKIP_WATCHERS": "1" },
+      "port": 3011
+    },
+    {
+      "name": "smoke-frontend",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "PORT=3011 npm run dev -- --port 5174 --strictPort"],
+      "port": 5174
+    },
+    {
       "name": "brainstorm",
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "64038", "-d", "/Users/joshuahampson/CascadeProjects/asset-dashboard/.claude/worktrees/inspiring-agnesi/.superpowers/brainstorm/47841-1774753263/content"],

@@ -12,17 +12,15 @@ import {
   FormInput,
   Icon,
   InlineBanner,
-  PageContainer,
-  PageHeader,
-  Segmented,
   SectionCard,
 } from '../ui';
 import { mutationErrorMessage } from './globalOpsMutationFeedback';
 import {
-  BUSINESS_TABS,
   useBusinessTabState,
   type BusinessTab,
 } from './useGlobalOpsSurfaceState';
+import { BusinessPanelFrame } from './wave-b/business/BusinessPanelFrame';
+import { BusinessTabTray } from './wave-b/business/BusinessTabTray';
 
 interface BusinessLensProps {
   defaultTab?: BusinessTab;
@@ -97,58 +95,55 @@ export function BusinessLens({ defaultTab }: BusinessLensProps) {
   const activeContent = tab === 'revenue'
     ? <RevenueDashboard />
     : tab === 'ai-usage'
-      ? <AIUsageSection />
+      ? <AIUsageSection compact />
       : tab === 'features'
-        ? <FeatureLibrary />
+        ? <FeatureLibrary embedded />
         : <SalesReport />;
 
   return (
-    <PageContainer width="wide" className="min-h-full" gap={false}>
-      <div data-testid="business-rebuilt" data-active-tab={tab} className="flex flex-col gap-[var(--section-gap)]">
-        <PageHeader
-          title="Business"
-          subtitle="Revenue, AI cost, feature catalog, and prospect audit operations."
-          actions={<Badge label="Additive aliases" tone="blue" variant="soft" />}
-        />
+    <div
+      data-testid="business-rebuilt"
+      data-active-tab={tab}
+      className="mx-auto min-h-full w-full max-w-[1080px] px-4 sm:px-[30px]"
+    >
+      <header data-testid="business-header" className="mb-4 flex items-center gap-[13px]">
+        <span className="inline-flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] border border-[var(--brand-border)] bg-[var(--surface-2)] text-[var(--yellow)]">
+          <Icon name="chart" size="lg" aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h1 className="t-h2 !font-bold text-[var(--brand-text-bright)]">Business</h1>
+          <p className="mt-0.5 t-caption-sm text-[var(--brand-text)]">Revenue, AI usage, the feature library, and prospect reports</p>
+        </div>
+      </header>
 
-        {invalidTab && (
+      {invalidTab && (
+        <div className="mb-3">
           <InlineBanner
             tone="warning"
             title="Unknown Business tab"
             message={`The requested tab is not active, so Business opened ${TAB_LABELS[tab]}.`}
             data-testid="business-invalid-tab-fallback"
           />
-        )}
+        </div>
+      )}
 
-        <Segmented
-          options={BUSINESS_TABS.map((tab) => ({ value: tab, label: TAB_LABELS[tab] }))}
-          value={tab}
-          onChange={(value) => setTab(value as BusinessTab)}
-          className="max-w-full overflow-x-auto"
-        />
+      <BusinessTabTray value={tab} onChange={setTab} />
 
-        {tab === 'prospects' && prospectUrl && (
-          <SectionCard
-            title="Create workspace from prospect"
-            titleIcon={<Icon name="plus" size="md" className="text-[var(--teal)]" />}
-            titleExtra={<Badge label={domainFromUrl(prospectUrl)} tone="blue" variant="soft" />}
-          >
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <FormInput value={workspaceName} onChange={setWorkspaceName} placeholder="Workspace name" className="flex-1" />
-              <Button onClick={createFromProspect} loading={createWorkspace.isPending}>Create workspace</Button>
-            </div>
-          </SectionCard>
-        )}
-
+      {tab === 'prospects' && prospectUrl && (
         <SectionCard
-          title={TAB_LABELS[tab]}
-          titleIcon={<Icon name={tab === 'revenue' ? 'trophy' : tab === 'ai-usage' ? 'zap' : tab === 'features' ? 'layers' : 'globe'} size="md" className="text-[var(--teal)]" />}
-          titleExtra={<Badge label="Legacy parity carried over" tone="zinc" variant="soft" />}
-          noPadding
+          title="Create workspace from prospect"
+          titleIcon={<Icon name="plus" size="md" className="text-[var(--teal)]" />}
+          titleExtra={<Badge label={domainFromUrl(prospectUrl)} tone="blue" variant="soft" />}
+          className="mb-[14px]"
         >
-          <div className="p-4">{activeContent}</div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <FormInput value={workspaceName} onChange={setWorkspaceName} placeholder="Workspace name" className="flex-1" />
+            <Button onClick={createFromProspect} loading={createWorkspace.isPending}>Create workspace</Button>
+          </div>
         </SectionCard>
-      </div>
-    </PageContainer>
+      )}
+
+      <BusinessPanelFrame tab={tab}>{activeContent}</BusinessPanelFrame>
+    </div>
   );
 }

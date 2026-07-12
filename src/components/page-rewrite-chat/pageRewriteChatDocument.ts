@@ -1,4 +1,3 @@
-import { Paragraph, TextRun, HeadingLevel } from 'docx';
 import { toSectionSlug, type PageData } from './pageRewriteChatModel';
 
 const NODE_TYPE_ELEMENT = 1;
@@ -115,75 +114,7 @@ export function buildPrintableDocHtml(docBody: HTMLElement | null, pageData: Pag
   ].join('');
 }
 
-export function serializeDocToDocx(docBody: HTMLElement | null, pageData: PageData | null): Paragraph[] {
-  const paragraphs: Paragraph[] = [];
-  const severityColor: Record<string, string> = {
-    error: 'DC2626',
-    warning: 'D97706',
-    info: '2563EB',
-  };
-
-  if (pageData && pageData.issues.length > 0) {
-    paragraphs.push(new Paragraph({ text: 'SEO Issues', heading: HeadingLevel.HEADING_2 }));
-    pageData.issues.forEach(issue => {
-      const color = severityColor[issue.severity] ?? '6B7280';
-      paragraphs.push(new Paragraph({
-        bullet: { level: 0 },
-        children: [
-          new TextRun({ text: issue.severity.toUpperCase(), bold: true, color, size: 20 }),
-          new TextRun({ text: `  ${issue.message}`, size: 22 }),
-        ],
-      }));
-    });
-    paragraphs.push(new Paragraph({ text: '' }));
-  }
-
-  if (!docBody) return paragraphs;
-
-  const headingLevel = (tag: string): typeof HeadingLevel[keyof typeof HeadingLevel] | null => {
-    if (tag === 'h1') return HeadingLevel.HEADING_1;
-    if (tag === 'h2') return HeadingLevel.HEADING_2;
-    if (tag === 'h3') return HeadingLevel.HEADING_3;
-    if (tag === 'h4') return HeadingLevel.HEADING_4;
-    return null;
-  };
-
-  const walk = (node: Node) => {
-    if (node.nodeType !== NODE_TYPE_ELEMENT) return;
-    const el = node as Element;
-    const tag = el.tagName.toLowerCase();
-    const level = headingLevel(tag);
-    if (level) {
-      paragraphs.push(new Paragraph({ text: el.textContent?.trim() || '', heading: level }));
-      return;
-    }
-    if (tag === 'p') {
-      const runs: TextRun[] = [];
-      el.childNodes.forEach(child => {
-        if (child.nodeType === NODE_TYPE_TEXT) {
-          runs.push(new TextRun({ text: child.textContent || '', size: 24 }));
-        } else if (child.nodeType === NODE_TYPE_ELEMENT) {
-          const c = child as Element;
-          const ctag = c.tagName;
-          runs.push(new TextRun({
-            text: c.textContent || '',
-            size: 24,
-            bold: ctag === 'STRONG' || ctag === 'B',
-            italics: ctag === 'EM' || ctag === 'I',
-          }));
-        }
-      });
-      if (runs.length) {
-        paragraphs.push(new Paragraph({
-          children: runs,
-          spacing: { after: 160 },
-        }));
-      }
-      return;
-    }
-    el.childNodes.forEach(walk);
-  };
-
-  docBody.childNodes.forEach(walk);
-  return paragraphs;
+/** Capture the editable document before an on-demand exporter yields to the network. */
+export function snapshotPageRewriteDocBody(docBody: HTMLElement | null): HTMLElement | null {
+  return docBody ? docBody.cloneNode(true) as HTMLElement : null;
 }

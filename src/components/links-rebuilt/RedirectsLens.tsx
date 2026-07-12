@@ -21,13 +21,14 @@ import {
   Icon,
   InlineBanner,
   MetricTile,
+  SectionCard,
   Skeleton,
   Toolbar,
   ToolbarSpacer,
   type DataColumn,
 } from '../ui';
 import type { RedirectStatusFilter } from './useLinksSurfaceState';
-import { dateTimeOrDash, downloadCsv, numberOrDash, percentOrDash, truncateMiddle } from './linksFormatters';
+import { dateTimeOrDash, downloadCsv, numberOrDash, truncateMiddle } from './linksFormatters';
 import { mutationErrorMessage } from './linksMutationFeedback';
 import { useToast } from '../Toast';
 
@@ -175,7 +176,7 @@ function RedirectRecommendations({
     sendToClient.mutate({
       sourceId: `redirects:${data.scannedAt}`,
       title: `Redirect recommendations (${acceptedRules.length})`,
-      summary: `Review ${acceptedRules.length} redirect proposal${acceptedRules.length !== 1 ? 's' : ''}. These are manual or agency-executed for v1 and are not written directly to Webflow by the client.`,
+      summary: `Review ${acceptedRules.length} redirect proposal${acceptedRules.length !== 1 ? 's' : ''}. These are reviewed here, then exported or sent for approval before implementation.`,
       priority: acceptedRules.length > 3 ? 'high' : 'medium',
       clientNote: note.trim() || undefined,
       payload: {
@@ -193,62 +194,58 @@ function RedirectRecommendations({
     });
   };
 
-  if (rules.length === 0) return null;
+  if (rules.length === 0) {
+    return (
+      <div data-testid="redirects-primary">
+        <SectionCard
+          title="Suggested 301 redirects"
+          subtitle="Recover link equity and stop visitors reaching dead ends."
+          titleIcon={<Icon name="arrowRight" size="sm" className="text-[var(--teal)]" />}
+          iconChip
+          noPadding
+          variant="subtle"
+        >
+          <div className="px-4 py-7 text-center">
+            <p className="t-ui font-semibold text-[var(--brand-text-bright)]">No suggested targets in this scan</p>
+            <p className="mt-1 t-caption text-[var(--brand-text-muted)]">The saved crawl has no redirect recommendations to review or export.</p>
+          </div>
+        </SectionCard>
+      </div>
+    );
+  }
 
   return (
-    <GroupBlock
-      title="Redirect recommendations"
-      meta="Accept, edit, dismiss, export, or send the batch to the client for review."
-      stats={[
-        { label: 'Suggested', value: rules.length, color: 'var(--teal)' },
-        { label: 'Accepted', value: acceptedRules.length, color: 'var(--emerald)' },
-      ]}
-      collapsible
-      defaultOpen
-    >
-      <div className="flex flex-col gap-3">
-        {acceptedRules.length > 0 && (
-          <Toolbar label="Accepted redirect rule actions">
-            <Button size="sm" variant="secondary" onClick={copyAccepted}>
-              <Icon name="copy" size="sm" />
-              Copy accepted
-            </Button>
-            <Button size="sm" variant="secondary" onClick={exportAccepted}>
-              <Icon name="download" size="sm" />
-              Export CSV
-            </Button>
-            <ToolbarSpacer />
-            <Button size="sm" variant="primary" disabled={sendToClient.isPending} onClick={sendAccepted}>
-              <Icon name="send" size="sm" />
-              Send to client
-            </Button>
-          </Toolbar>
+    <div className="flex flex-col gap-[14px]" data-testid="redirects-primary">
+      <SectionCard
+        title="Suggested 301 redirects"
+        subtitle="Recover link equity and stop visitors reaching dead ends."
+        titleIcon={<Icon name="arrowRight" size="sm" className="text-[var(--teal)]" />}
+        iconChip
+        titleExtra={<span className="hidden sm:inline-flex"><Badge label={`${acceptedRules.length} accepted`} tone={acceptedRules.length > 0 ? 'emerald' : 'zinc'} variant="soft" /></span>}
+        action={(
+          <Button size="sm" variant="primary" aria-label={`Export CSV (${acceptedRules.length})`} disabled={acceptedRules.length === 0} onClick={exportAccepted}>
+            <Icon name="download" size="sm" />
+            <span className="hidden sm:inline">Export CSV ({acceptedRules.length})</span>
+          </Button>
         )}
-        {acceptedRules.length > 0 && (
-          <FormTextarea
-            value={note}
-            onChange={setNote}
-            rows={2}
-            maxLength={2000}
-            placeholder="Add a note for your client (optional)"
-            disabled={sendToClient.isPending}
-          />
-        )}
-        <div className="flex flex-col gap-2">
+        noPadding
+        variant="subtle"
+      >
+        <div className="divide-y divide-[var(--brand-border)]">
           {rules.map((rule) => (
-            <div
-              key={rule.from}
-              className="rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3"
-            >
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <span className="t-caption font-semibold text-[var(--brand-text-bright)]">{rule.from}</span>
-                <Icon name="arrowRight" size="sm" className="text-[var(--brand-text-dim)]" />
+            <div key={rule.from} className="grid gap-2 px-4 py-3 transition-colors hover:bg-[var(--surface-3)] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <Badge label="404" tone="red" variant="soft" size="sm" className="font-mono" />
+                  <span className="truncate t-caption font-semibold text-[var(--red)]">{rule.from}</span>
+                </div>
                 {editingRule === rule.from ? (
-                  <div className="flex min-w-[260px] flex-1 flex-wrap items-center gap-2">
+                  <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
                     <FormInput
                       value={editDraft}
                       onChange={setEditDraft}
                       aria-label={`Edit target for ${rule.from}`}
+                      className="min-w-[240px] flex-1"
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') saveTarget(rule.from);
                         if (event.key === 'Escape') {
@@ -257,21 +254,20 @@ function RedirectRecommendations({
                         }
                       }}
                     />
-                    <Button size="sm" variant="primary" onClick={() => saveTarget(rule.from)}>
-                      Save
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setEditingRule(null)}>
-                      Cancel
-                    </Button>
+                    <Button size="sm" variant="primary" onClick={() => saveTarget(rule.from)}>Save</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setEditingRule(null)}>Cancel</Button>
                   </div>
                 ) : (
-                  <span className="t-caption font-semibold text-[var(--teal)]">{rule.to}</span>
+                  <div className="mt-1 flex min-w-0 items-center gap-2">
+                    <Icon name="arrowRight" size="sm" className="shrink-0 text-[var(--brand-text-dim)]" />
+                    <span className="truncate t-caption font-semibold text-[var(--emerald)]">{rule.to}</span>
+                    {rule.accepted && <Badge label="Accepted" tone="emerald" variant="soft" size="sm" />}
+                  </div>
                 )}
-                {rule.accepted && <Badge label="Accepted" tone="emerald" variant="soft" />}
+                <p className="mt-1 truncate t-caption-sm text-[var(--brand-text-muted)]">{rule.reason}</p>
               </div>
-              <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">{rule.reason}</p>
               {editingRule !== rule.from && (
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="flex shrink-0 items-center gap-1.5 sm:justify-end">
                   {!rule.accepted && (
                     <Button size="sm" variant="secondary" onClick={() => acceptRule(rule.from)}>
                       <Icon name="check" size="sm" />
@@ -290,9 +286,8 @@ function RedirectRecommendations({
                     Edit target
                   </Button>
                   {!rule.accepted && (
-                    <Button size="sm" variant="ghost" onClick={() => dismissRule(rule.from)}>
+                    <Button size="sm" variant="ghost" aria-label={`Dismiss ${rule.from}`} onClick={() => dismissRule(rule.from)}>
                       <Icon name="x" size="sm" />
-                      Dismiss
                     </Button>
                   )}
                 </div>
@@ -300,8 +295,40 @@ function RedirectRecommendations({
             </div>
           ))}
         </div>
-      </div>
-    </GroupBlock>
+      </SectionCard>
+
+      {acceptedRules.length > 0 && (
+        <GroupBlock
+          title="Accepted redirect batch"
+          meta="Copy the rules or send the reviewed proposal to the client."
+          stats={[{ label: 'Accepted', value: acceptedRules.length, color: 'var(--emerald)' }]}
+          collapsible
+          defaultOpen={false}
+        >
+          <div className="flex flex-col gap-3">
+            <FormTextarea
+              value={note}
+              onChange={setNote}
+              rows={2}
+              maxLength={2000}
+              placeholder="Add a note for your client (optional)"
+              disabled={sendToClient.isPending}
+            />
+            <Toolbar label="Accepted redirect rule actions">
+              <Button size="sm" variant="secondary" onClick={copyAccepted}>
+                <Icon name="copy" size="sm" />
+                Copy accepted
+              </Button>
+              <ToolbarSpacer />
+              <Button size="sm" variant="primary" disabled={sendToClient.isPending} onClick={sendAccepted}>
+                <Icon name="send" size="sm" />
+                Send to client
+              </Button>
+            </Toolbar>
+          </div>
+        </GroupBlock>
+      )}
+    </div>
   );
 }
 
@@ -315,7 +342,7 @@ function RedirectChains({ chains }: { chains: RedirectChain[] }) {
       meta="Multi-hop redirects slow page loads and waste crawl budget. Aim for one hop."
       stats={[{ label: 'Chains', value: chains.length, color: 'var(--amber)' }]}
       collapsible
-      defaultOpen={chains.length > 0}
+      defaultOpen={false}
     >
       <div className="flex flex-col gap-2">
         {chains.map((chain, index) => {
@@ -383,6 +410,11 @@ export function RedirectsLens({
   const tableRows = useMemo(() => filteredPages.map(toPageRecord), [filteredPages]);
   const ruleMap = useMemo(() => new Map(rules.map((rule) => [ruleKey(rule.from), rule])), [rules]);
   const summary = data?.summary;
+  const notFoundPages = data?.pageStatuses.filter((page) => typeof page.status === 'number' && page.status >= 400 && page.status < 500) ?? [];
+  const hasClickEvidence = notFoundPages.some((page) => typeof page.clicks === 'number');
+  const atRiskClicks = hasClickEvidence
+    ? notFoundPages.reduce((sum, page) => sum + (page.clicks ?? 0), 0)
+    : '—';
   const filters = [
     { id: 'all' as const, label: 'All pages', count: data?.pageStatuses.length ?? 0 },
     { id: 'redirects' as const, label: 'Redirects', count: summary?.redirecting ?? 0 },
@@ -445,7 +477,9 @@ export function RedirectsLens({
       width: '86px',
       align: 'right',
       sortable: true,
-      render: (_value, record) => percentOrDash((record as RedirectPageRecord).matchScore),
+      // matchScore is a raw keyword-overlap score (bestScore, accept threshold ≥3), not a 0-100
+      // percentage — render it unitless so a strong 5-token match can't read as a weak "5%".
+      render: (_value, record) => numberOrDash((record as RedirectPageRecord).matchScore),
     },
     {
       key: 'target',
@@ -500,7 +534,7 @@ export function RedirectsLens({
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-[14px]">
       {scan.isError && (
         <InlineBanner tone="error" title="Redirect scan failed">
           <div className="flex flex-wrap items-center gap-2">
@@ -512,54 +546,59 @@ export function RedirectsLens({
         </InlineBanner>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricTile label="Healthy" value={summary?.healthy ?? 0} accent="var(--emerald)" />
-        <MetricTile label="Redirecting" value={summary?.redirecting ?? 0} accent="var(--amber)" />
-        <MetricTile label="404s" value={summary?.notFound ?? 0} accent="var(--red)" />
-        <MetricTile label="Chains" value={summary?.chainsDetected ?? 0} accent="var(--teal)" sub={summary && summary.longestChain > 1 ? `Longest ${summary.longestChain} hops` : undefined} />
-        <MetricTile label="Pages checked" value={summary?.totalPages ?? data.pageStatuses.length} sub={`Last scanned ${dateTimeOrDash(scanTime)}`} accent="var(--blue)" />
+      <div className="grid gap-3 sm:grid-cols-3" data-testid="redirects-metrics">
+        <MetricTile label="404 URLs" value={summary?.notFound ?? notFoundPages.length} accent="var(--red)" />
+        <MetricTile label="Search clicks at risk" value={atRiskClicks} accent="var(--blue)" />
+        <MetricTile label="Rules ready to export" value={rules.filter((rule) => rule.accepted).length} accent="var(--emerald)" />
       </div>
 
-      <div className="flex flex-wrap gap-2" aria-label="Redirect status filters">
-        {filters.map((item) => (
-          <Button
-            key={item.id}
-            size="sm"
-            variant={filter === item.id ? 'secondary' : 'ghost'}
-            onClick={() => onFilterChange(item.id)}
-            aria-pressed={filter === item.id}
-          >
-            {item.label} <span className="t-micro text-[var(--brand-text-dim)]">{item.count}</span>
-          </Button>
-        ))}
+      <div data-testid="redirects-how-it-works">
+        <InlineBanner tone="info" title="How it works">
+          <p className="t-body text-[var(--brand-text-muted)]">
+            Review the suggested 301 targets, accept the good matches, then export CSV for Webflow Settings, Hosting, 301 Redirects. Update internal links so they point directly to the final destination when a chain is present.
+          </p>
+        </InlineBanner>
       </div>
 
       <RedirectRecommendations workspaceId={workspaceId} data={data} rules={rules} setRules={setRules} />
-      <RedirectChains chains={data.chains} />
 
-      <DataTable
-        columns={columns}
-        rows={tableRows}
-        getRowKey={(record) => (record as RedirectPageRecord).source.path}
-        empty={(
-          <EmptyState
-            icon={() => <Icon name="search" size="2xl" />}
-            title="No pages match this redirect view"
-            description="Clear search or choose a broader status filter."
-            action={<Button size="sm" variant="secondary" onClick={clearSearch}>Clear search</Button>}
-          />
-        )}
-      />
-
-      {(summary?.chainsDetected ?? 0) > 0 || (summary?.notFound ?? 0) > 0 || rules.some((rule) => rule.accepted) ? (
-        <InlineBanner tone="info" title="How to apply these fixes">
-          <div className="space-y-1 t-caption-sm text-[var(--brand-text-muted)]">
-            {(summary?.chainsDetected ?? 0) > 0 && <p>Update internal links so they point directly to the final destination.</p>}
-            {(summary?.notFound ?? 0) > 0 && <p>Create 301 redirects in Webflow Settings, Hosting, 301 Redirects for broken URLs worth preserving.</p>}
-            {rules.some((rule) => rule.accepted) && <p>Export accepted rules as CSV or send the batch to the client for approval.</p>}
+      <GroupBlock
+        title="Scan evidence"
+        meta={`All pages, filters, and redirect-chain detail · Last scanned ${dateTimeOrDash(scanTime)}`}
+        stats={[{ label: 'Pages', value: summary?.totalPages ?? data.pageStatuses.length, color: 'var(--blue)' }]}
+        collapsible
+        defaultOpen={false}
+      >
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2" aria-label="Redirect status filters">
+            {filters.map((item) => (
+              <Button
+                key={item.id}
+                size="sm"
+                variant={filter === item.id ? 'secondary' : 'ghost'}
+                onClick={() => onFilterChange(item.id)}
+                aria-pressed={filter === item.id}
+              >
+                {item.label} <span className="t-micro text-[var(--brand-text-dim)]">{item.count}</span>
+              </Button>
+            ))}
           </div>
-        </InlineBanner>
-      ) : null}
+          <RedirectChains chains={data.chains} />
+          <DataTable
+            columns={columns}
+            rows={tableRows}
+            getRowKey={(record) => (record as RedirectPageRecord).source.path}
+            empty={(
+              <EmptyState
+                icon={() => <Icon name="search" size="2xl" />}
+                title="No pages match this redirect view"
+                description="Clear search or choose a broader status filter."
+                action={<Button size="sm" variant="secondary" onClick={clearSearch}>Clear search</Button>}
+              />
+            )}
+          />
+        </div>
+      </GroupBlock>
     </div>
   );
 }

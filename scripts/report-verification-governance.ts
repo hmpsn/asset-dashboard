@@ -136,6 +136,11 @@ export const VERIFICATION_GOVERNANCE_REGISTRY = {
     owner: 'platform-foundation',
     rationale: 'Feature flag catalog consistency is cheap, deterministic, and required for every PR.',
   },
+  'verify:env': {
+    classification: 'secret-backed',
+    owner: 'integrations',
+    rationale: 'Environment profile verification inspects provider configuration and is run manually in the target local or staging environment.',
+  },
   'verify:lexicon': {
     classification: 'pr-ci-blocking',
     owner: 'platform-foundation',

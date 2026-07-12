@@ -8,8 +8,9 @@
 #   4. Fill in the env var values in the Render dashboard
 #
 # Data sharing:
-#   - External APIs (Webflow, GSC, GA4, OpenAI) share the same tokens,
-#     so both environments see the same live data.
+#   - Provider smoke credentials (DataForSEO, Google OAuth, PageSpeed) are
+#     environment-specific. Staging must never reuse production credentials.
+#   - Other shared service keys remain in the shared groups below.
 #   - File-based state (workspaces, audits, approvals) lives on each
 #     service's persistent disk. To seed staging with production data,
 #     use: render ssh into prod → tar the data dir → scp to staging.
@@ -45,6 +46,12 @@ services:
         generateValue: true
       - key: GOOGLE_REDIRECT_URI
         sync: false  # differs per environment
+      - key: GOOGLE_BUSINESS_PROFILE_REDIRECT_URI
+        sync: false  # production GBP callback URL
+      - key: GOOGLE_OAUTH_ENCRYPTION_KEY
+        sync: false  # preserve the existing production encryption key; never rotate casually
+      - key: GOOGLE_OAUTH_STATE_SECRET
+        sync: false
       - key: STRIPE_SECRET_KEY
         sync: false  # live keys for prod
       - key: STRIPE_PUBLISHABLE_KEY
@@ -56,7 +63,7 @@ services:
       - key: ALLOWED_ORIGINS
         sync: false
       - fromGroup: shared-api-keys
-      - fromGroup: shared-google
+      - fromGroup: production-provider-credentials
       - fromGroup: shared-smtp
       - fromGroup: shared-sentry
       - fromGroup: shared-turnstile
@@ -79,6 +86,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PROVIDER_ENV_PROFILE
+        value: staging
+      - key: LOCAL_FAKE_PROVIDERS
+        value: "false"
       - key: NODE_VERSION
         value: 24.12.0
       - key: DATA_DIR
@@ -95,6 +106,12 @@ services:
         generateValue: true
       - key: GOOGLE_REDIRECT_URI
         sync: false  # staging callback URL
+      - key: GOOGLE_BUSINESS_PROFILE_REDIRECT_URI
+        sync: false  # staging GBP callback URL
+      - key: GOOGLE_OAUTH_ENCRYPTION_KEY
+        sync: false  # stable and unique to staging; never copy production ciphertext/tokens
+      - key: GOOGLE_OAUTH_STATE_SECRET
+        sync: false
       - key: STRIPE_SECRET_KEY
         sync: false  # test keys for staging
       - key: STRIPE_PUBLISHABLE_KEY
@@ -106,7 +123,7 @@ services:
       - key: ALLOWED_ORIGINS
         sync: false
       - fromGroup: shared-api-keys
-      - fromGroup: shared-google
+      - fromGroup: staging-provider-credentials
       - fromGroup: shared-smtp
       - fromGroup: shared-sentry
       - fromGroup: shared-turnstile
@@ -116,7 +133,7 @@ services:
       mountPath: /var/data/asset-dashboard
       sizeGB: 1
 
-# Shared env var groups — set once, used by both services
+# Environment groups — shared service keys plus isolated provider credentials
 envVarGroups:
   - name: shared-api-keys
     envVars:
@@ -126,15 +143,29 @@ envVarGroups:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
-      - key: GOOGLE_PSI_KEY
-        sync: false
-      - key: SEMRUSH_API_KEY
-        sync: false
-  - name: shared-google
+  - name: production-provider-credentials
     envVars:
+      - key: DATAFORSEO_LOGIN
+        sync: false
+      - key: DATAFORSEO_PASSWORD
+        sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_PSI_KEY
+        sync: false
+  - name: staging-provider-credentials
+    envVars:
+      - key: DATAFORSEO_LOGIN
+        sync: false
+      - key: DATAFORSEO_PASSWORD
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_PSI_KEY
         sync: false
   - name: shared-smtp
     envVars:

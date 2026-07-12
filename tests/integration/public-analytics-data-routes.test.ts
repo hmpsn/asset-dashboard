@@ -323,6 +323,7 @@ describe('GET /api/public/insights/:workspaceId/digest — digest shape', () => 
     const body = await res.json() as Record<string, unknown>;
     // Required top-level fields per MonthlyDigestData
     expect(body).toHaveProperty('month');
+    expect(body).toHaveProperty('availability', 'no_data');
     expect(body).toHaveProperty('period');
     expect(body).toHaveProperty('summary');
     expect(body).toHaveProperty('wins');
@@ -336,6 +337,27 @@ describe('GET /api/public/insights/:workspaceId/digest — digest shape', () => 
     const body = await res.json() as { month: unknown };
     expect(typeof body.month).toBe('string');
     expect((body.month as string).length).toBeGreaterThan(0);
+  });
+
+  it('ignores historical month query parameters and keeps current UTC authority', async () => {
+    const res = await api(`/api/public/insights/${wsId}/digest?month=January%202020`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      availability: unknown;
+      month: unknown;
+      period: { start: unknown };
+    };
+    const now = new Date();
+    const expectedMonth = now.toLocaleString('en-US', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+    const expectedStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+
+    expect(body.availability).toBe('no_data');
+    expect(body.month).toBe(expectedMonth);
+    expect(body.period.start).toBe(expectedStart);
   });
 
   it('digest.period has start and end ISO strings', async () => {
@@ -382,12 +404,14 @@ describe('GET /api/public/insights/:workspaceId/digest — digest shape', () => 
     expect(typeof metrics.pagesOptimized).toBe('number');
   });
 
-  it('digest.summary is a non-empty string', async () => {
+  it('digest.summary is truthful no-data copy when no current-month evidence exists', async () => {
     const res = await api(`/api/public/insights/${wsId}/digest`);
     expect(res.status).toBe(200);
     const body = await res.json() as { summary: unknown };
     expect(typeof body.summary).toBe('string');
     expect((body.summary as string).length).toBeGreaterThan(0);
+    expect(body.summary).toContain('No current-month results are available yet');
+    expect(body.summary).not.toMatch(/held steady|solid baseline/i);
   });
 
   it('returns 404 for non-existent workspace', async () => {

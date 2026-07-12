@@ -21,6 +21,7 @@ import { Pencil, RefreshCw } from 'lucide-react';
 import { SectionCard } from '../../ui/SectionCard';
 import { EmptyState } from '../../ui/EmptyState';
 import { Button } from '../../ui/Button';
+import { Icon } from '../../ui/Icon';
 import { FormTextarea } from '../../ui/forms/FormTextarea';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import type { StrategyPov } from '../../../../shared/types/strategy-pov';
@@ -39,6 +40,14 @@ interface DraftedPovEditorProps {
   onRegenerate?: () => void;
   isGenerating?: boolean;
   className?: string;
+  title?: string;
+  subtitle?: string;
+  /** Opt-in prototype composition for the Engine spine. The default full editor is unchanged. */
+  presentation?: 'default' | 'engine-summary';
+  /** Truthful staged-move count used only by the Engine summary footer. */
+  stagedCount?: number;
+  /** Opens the canonical full-editor Drawer from the Engine summary. */
+  onOpenEditor?: () => void;
 }
 
 const DEBOUNCE_MS = 700;
@@ -147,6 +156,11 @@ export function DraftedPovEditor({
   onRegenerate,
   isGenerating = false,
   className,
+  title = 'The point of view',
+  subtitle,
+  presentation = 'default',
+  stagedCount,
+  onOpenEditor,
 }: DraftedPovEditorProps) {
   // Local draft mirrors the POV; edits flow through here and are emitted on a debounce.
   const [draft, setDraft] = useState<StrategyPovEdit>({});
@@ -189,11 +203,23 @@ export function DraftedPovEditor({
 
   if (!pov) {
     return (
-      <SectionCard title="The point of view" className={className}>
+      <SectionCard
+        title={title}
+        subtitle={subtitle}
+        titleIcon={subtitle ? (
+          presentation === 'engine-summary'
+            ? <Icon name="pencil" size="md" className="text-[var(--teal)]" />
+            : <Icon as={Pencil} size="md" className="text-[var(--teal)]" />
+        ) : undefined}
+        iconChip={!!subtitle}
+        className={className}
+      >
         <EmptyState
           icon={Pencil}
           title="No point of view drafted yet"
-          description="Generate the issue to draft a curated point of view over your sent moves."
+          description={presentation === 'engine-summary'
+            ? 'Generate a point of view from the current strategy and staged moves.'
+            : 'Generate the issue to draft a curated point of view over your sent moves.'}
           action={
             onRegenerate ? (
               <Button
@@ -213,9 +239,47 @@ export function DraftedPovEditor({
     );
   }
 
+  if (presentation === 'engine-summary') {
+    const moveWord = stagedCount === 1 ? 'move' : 'moves';
+    const stagingSummary = stagedCount === undefined
+      ? 'Recommendation staging unavailable'
+      : `Draft auto-generated from your ${stagedCount} staged ${moveWord} · edited by you before send`;
+    return (
+      <SectionCard
+        title={title}
+        subtitle={subtitle}
+        titleIcon={subtitle ? <Icon name="pencil" size="md" className="text-[var(--teal)]" /> : undefined}
+        iconChip={!!subtitle}
+        className={className}
+        action={onOpenEditor ? (
+          <Button variant="secondary" size="sm" onClick={onOpenEditor}>
+            <Icon name="pencil" size="sm" />
+            Edit POV
+          </Button>
+        ) : undefined}
+      >
+        <div
+          data-testid="drafted-pov-summary"
+          className="relative rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-4 py-3"
+        >
+          <div className="space-y-2.5 t-body leading-relaxed text-[var(--brand-text)]">
+            {situation && <p className="whitespace-pre-wrap">{situation}</p>}
+            {!leadCut && leadSentence && <p className="whitespace-pre-wrap">{leadSentence}</p>}
+          </div>
+          <div className="mt-3 border-t border-[var(--brand-border)] pt-3 t-caption-sm text-[var(--brand-text-muted)]">
+            {stagingSummary}
+          </div>
+        </div>
+      </SectionCard>
+    );
+  }
+
   return (
     <SectionCard
-      title="The point of view"
+      title={title}
+      subtitle={subtitle}
+      titleIcon={subtitle ? <Icon as={Pencil} size="md" className="text-[var(--teal)]" /> : undefined}
+      iconChip={!!subtitle}
       className={className}
       action={
         onRegenerate ? (

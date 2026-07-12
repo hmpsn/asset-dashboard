@@ -18,6 +18,13 @@ import { describe, it, expect } from 'vitest';
 
 const ROOT = join(__dirname, '../..');
 const appTsx = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8'); // readFile-ok
+const internalBriefSenders = [
+  'src/components/PageIntelligence.tsx',
+  'src/components/CommandPalette.tsx',
+  'src/components/competitors-rebuilt/KeywordGapsCard.tsx',
+  'src/components/strategy/StrategyCompetitiveTab.tsx',
+  'src/components/strategy/ContentGaps.tsx',
+];
 
 describe('zombie route redirects contract', () => {
   it('seo-briefs tab no longer renders ContentBriefs directly', () => {
@@ -59,5 +66,13 @@ describe('zombie route redirects contract', () => {
       pipeline.includes("searchParams.get('tab')") ||
       pipeline.includes('searchParams.get("tab")')
     ).toBe(true);
+  });
+
+  it('internal Create Brief senders bypass the zombie redirect so fixContext survives', () => {
+    for (const relativePath of internalBriefSenders) {
+      const source = readFileSync(join(ROOT, relativePath), 'utf8'); // readFile-ok
+      expect(source, relativePath).not.toMatch(/adminPath\([^\n]*['"]seo-briefs['"]/);
+      expect(source, relativePath).not.toMatch(/targetRoute:\s*['"]seo-briefs['"]/);
+    }
   });
 });

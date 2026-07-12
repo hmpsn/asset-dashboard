@@ -65,14 +65,15 @@ export function SchemaBusinessProfilePanel({
   if (!showCallout) return null;
 
   return (
-    <InlineBanner
-      tone="warning"
+    <GroupBlock
+      icon={MapPin}
+      iconColor="var(--amber)"
       title="Business profile needs location data"
-      onDismiss={onDismiss}
-      dismissLabel="Dismiss business profile reminder"
+      meta="Add an address to unlock LocalBusiness schema on high-value pages."
+      collapsible
+      defaultOpen={false}
     >
-      <div className="flex flex-wrap items-center gap-3">
-        <span>Add an address to unlock LocalBusiness schema on high-value pages.</span>
+      <div className="flex flex-wrap items-center gap-3 p-3">
         <Button
           size="sm"
           variant="secondary"
@@ -81,8 +82,11 @@ export function SchemaBusinessProfilePanel({
           <Icon as={MapPin} size="sm" />
           Complete profile
         </Button>
+        <Button size="sm" variant="ghost" onClick={onDismiss}>
+          Dismiss reminder
+        </Button>
       </div>
-    </InlineBanner>
+    </GroupBlock>
   );
 }
 
@@ -213,7 +217,7 @@ export function SchemaCompletenessPanel({ pages, workspaceId }: CompletenessPane
       meta={groups.length === 0 ? 'All generated pages include the recommended profile fields.' : 'Known profile gaps from validation findings.'}
       stats={[{ label: 'Fields', value: groups.length }, { label: 'Pages', value: pages.length }]}
       collapsible
-      defaultOpen={groups.length > 0}
+      defaultOpen={false}
     >
       {groups.length === 0 ? (
         <div className="p-3 t-caption text-[var(--brand-text-muted)]">No actionable profile gaps were found in this snapshot.</div>
@@ -333,9 +337,9 @@ export function SchemaSitePlanBridge({ siteId, workspaceId }: SitePlanBridgeProp
       icon={Globe}
       iconColor="var(--teal)"
       title="Schema site plan"
-      meta="T1 carry-over: role assignment, canonical entities, send, activate, and retract stay on the proven machinery."
+      meta="Set page roles, canonical entities, client approval, activation, and retraction from one reviewed plan."
       collapsible
-      defaultOpen
+      defaultOpen={false}
     >
       <div className="p-2">
         <SchemaPlanPanel siteId={siteId} workspaceId={workspaceId} />
@@ -346,21 +350,20 @@ export function SchemaSitePlanBridge({ siteId, workspaceId }: SitePlanBridgeProp
 
 export function SchemaHowToFooter() {
   return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4">
-      <div className="flex items-start gap-3">
-        <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface-3)]">
-          <Icon as={FileJson} size="md" style={{ color: 'var(--blue)' }} />
-        </span>
-        <div className="min-w-0">
-          <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Publishing contract</div>
-          <div className="mt-1 grid gap-1.5 md:grid-cols-3">
-            <KeyValueRow label="Webflow pages" value="Custom code publish, with manual fallback" />
-            <KeyValueRow label="CMS items" value="Mapped schema field publish" />
-            <KeyValueRow label="Managed scope" value="Generated JSON-LD only" />
-          </div>
-        </div>
+    <GroupBlock
+      icon={FileJson}
+      iconColor="var(--blue)"
+      title="Publishing paths"
+      meta="Webflow, CMS, and managed-scope delivery details."
+      collapsible
+      defaultOpen={false}
+    >
+      <div className="grid gap-1.5 p-3 md:grid-cols-3">
+        <KeyValueRow label="Webflow pages" value="Custom code publish, with manual fallback" />
+        <KeyValueRow label="CMS items" value="Mapped schema field publish" />
+        <KeyValueRow label="Managed scope" value="Generated JSON-LD only" />
       </div>
-    </div>
+    </GroupBlock>
   );
 }
 
@@ -377,7 +380,7 @@ export function SchemaGeneratorEmptySetup({ onRunScan }: EmptySetupProps) {
         </span>
         <div>
           <h2 className="t-h2 text-[var(--brand-text-bright)]">Schema generator</h2>
-          <p className="mt-1 t-caption text-[var(--brand-text-muted)]">Generate structured data across the connected Webflow site, then review, edit, validate, send, or publish page by page.</p>
+          <p className="mt-1 t-body text-[var(--brand-text-muted)]">Generate structured data across the connected Webflow site, then review, edit, validate, send, or publish page by page.</p>
         </div>
         <Button size="md" variant="primary" onClick={onRunScan}>
           <Icon as={Layers} size="sm" />
@@ -390,8 +393,8 @@ export function SchemaGeneratorEmptySetup({ onRunScan }: EmptySetupProps) {
 
 export function SchemaInventoryAbsentBanner() {
   return (
-    <InlineBanner tone="info" size="sm" title="Server-owned coverage is pending">
-      Coverage and missing-schema counts are intentionally absent until the schema snapshot and Site Audit projections provide authoritative values.
+    <InlineBanner tone="info" size="sm" title="Coverage is being verified">
+      Coverage and missing-schema counts appear after the next trusted schema snapshot and Site Audit readout.
     </InlineBanner>
   );
 }

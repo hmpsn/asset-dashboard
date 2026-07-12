@@ -4,6 +4,7 @@ import { SectionCard } from '../ui/SectionCard.js';
 import { Skeleton } from '../ui/Skeleton.js';
 import { TierGate } from '../ui/TierGate.js';
 import { Icon } from '../ui/Icon.js';
+import { InlineBanner } from '../ui/InlineBanner.js';
 import { Award, ArrowUpRight, Calendar, CheckCircle } from 'lucide-react';
 import type { Tier } from '../ui/TierGate.js';
 import type { MonthlyDigestData, ROIHighlight, DigestItem } from '../../../shared/types/narrative.js';
@@ -44,8 +45,23 @@ export function MonthlyDigest({ workspaceId, tier }: Props) {
  * non-briefing caller behaves identically to before the split.
  */
 export function MonthlyDigestContent({ digest }: { digest: MonthlyDigestData }) {
+  const title = `${digest.month} Performance`;
+  const titleIcon = <Icon as={Calendar} size="md" className="text-[var(--brand-text)]" />;
+
+  if (digest.availability === 'no_data') {
+    return (
+      <SectionCard title={title} titleIcon={titleIcon}>
+        <InlineBanner
+          tone="info"
+          title="This month is still taking shape"
+          message={digest.summary}
+        />
+      </SectionCard>
+    );
+  }
+
   return (
-    <SectionCard title={`${digest.month} Performance`} titleIcon={<Icon as={Calendar} size="md" className="text-[var(--brand-text)]" />}>
+    <SectionCard title={title} titleIcon={titleIcon}>
       <div className="space-y-6">
         {/* AI summary */}
         {digest.summary && (
@@ -114,6 +130,9 @@ export function MonthlyDigestContent({ digest }: { digest: MonthlyDigestData }) 
                   )}
                   {typeof roi.attributedValue === 'number' && roi.attributedValue > 0 && (
                     <div className="t-caption text-emerald-400 mt-0.5">~${roi.attributedValue.toFixed(2)} estimated value</div>
+                  )}
+                  {roi.attribution === 'externally_executed' && (
+                    <div className="t-caption text-[var(--brand-text-muted)] mt-0.5">Implemented on your side</div>
                   )}
                 </li>
               ))}

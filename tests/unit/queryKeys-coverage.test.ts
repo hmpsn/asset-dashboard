@@ -79,6 +79,18 @@ describe('queryKeys.admin content keys', () => {
     expect(queryKeys.admin.contentPipeline(WS)).toEqual(['content-pipeline', WS]);
   });
 
+  it('content performance read and trend keys share a workspace prefix', () => {
+    const all = queryKeys.admin.contentPerformanceAll(WS);
+    const read = queryKeys.admin.contentPerformance(WS, 90);
+    const trend = queryKeys.admin.contentPerformanceTrend(WS, ID);
+
+    expect(all).toEqual(['admin-content-performance', WS]);
+    expect(read).toEqual(['admin-content-performance', WS, 'read', 90]);
+    expect(trend).toEqual(['admin-content-performance', WS, 'trend', ID]);
+    expect(read.slice(0, all.length)).toEqual([...all]);
+    expect(trend.slice(0, all.length)).toEqual([...all]);
+  });
+
   it('roi key shape', () => {
     expect(queryKeys.admin.roi(WS)).toEqual(['admin-roi', WS]);
   });

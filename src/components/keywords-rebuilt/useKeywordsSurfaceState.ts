@@ -129,6 +129,8 @@ export function useKeywordsSurfaceState(): UseKeywordsSurfaceStateReturn {
   const [searchParams, setSearchParams] = useSearchParams();
   const committedSearch = searchParams.get('search') ?? '';
   const lastSyncedSearchRef = useRef(committedSearch);
+  const drawerOriginFocusRef = useRef<HTMLElement | null>(null);
+  const focusRestoreFrameRef = useRef<number | null>(null);
   const [searchInput, setSearchInput] = useState(committedSearch);
   const debouncedSearchInput = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS);
 
@@ -167,6 +169,12 @@ export function useKeywordsSurfaceState(): UseKeywordsSurfaceStateReturn {
     updateParams({ search: nextSearch, page: DEFAULT_PAGE });
   }, [committedSearch, debouncedSearchInput, searchInput, updateParams]);
 
+  useEffect(() => () => {
+    if (focusRestoreFrameRef.current != null) {
+      window.cancelAnimationFrame(focusRestoreFrameRef.current);
+    }
+  }, []);
+
   const setLens = useCallback((nextLens: KeywordsSurfaceLens) => {
     const nextSort = defaultSortForLens(nextLens);
     updateParams({
@@ -198,11 +206,27 @@ export function useKeywordsSurfaceState(): UseKeywordsSurfaceStateReturn {
   }, [updateParams]);
 
   const openKeyword = useCallback((keyword: string) => {
+    if (focusRestoreFrameRef.current != null) {
+      window.cancelAnimationFrame(focusRestoreFrameRef.current);
+      focusRestoreFrameRef.current = null;
+    }
+    if (typeof document !== 'undefined') {
+      const activeElement = document.activeElement;
+      drawerOriginFocusRef.current = activeElement instanceof HTMLElement ? activeElement : null;
+    }
     updateParams({ [HUB_DEEP_LINK_PARAMS.query]: keywordTrackingKey(keyword) }, false);
   }, [updateParams]);
 
   const closeKeyword = useCallback(() => {
+    const origin = drawerOriginFocusRef.current;
+    drawerOriginFocusRef.current = null;
     updateParams({ [HUB_DEEP_LINK_PARAMS.query]: null }, false);
+
+    if (!origin || typeof window === 'undefined') return;
+    focusRestoreFrameRef.current = window.requestAnimationFrame(() => {
+      focusRestoreFrameRef.current = null;
+      if (document.contains(origin)) origin.focus();
+    });
   }, [updateParams]);
 
   const rowsQuery = useMemo<KeywordCommandCenterRowsQuery>(() => ({

@@ -12,6 +12,7 @@ import {
   buildConversationContext,
   getSession as getChatSession,
   generateSessionSummary,
+  shouldAttemptSessionSummary,
 } from '../chat-memory.js';
 import { addActivity } from '../activity-log.js';
 import { createLogger } from '../logger.js';
@@ -353,7 +354,7 @@ ${pageAssist.blocks.keywordBlock}${pageAssist.blocks.brandVoiceBlock}${pageAssis
       if (session && session.messages.length === 2) {
         addActivity(ws.id, 'chat_session', `Rewrite chat: ${pageTitle || pageUrl || 'page'}`, 'Started AI rewrite conversation');
       }
-      if (session && session.messages.length >= 6 && !session.summary) {
+      if (session && shouldAttemptSessionSummary(session.messages.length)) {
         generateSessionSummary(ws.id, sessionId).catch(() => {});
       }
     }

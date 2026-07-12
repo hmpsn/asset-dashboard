@@ -6,6 +6,7 @@ import {
   Icon,
   InlineBanner,
   MetricTile,
+  SectionCard,
   Skeleton,
   type DataColumn,
 } from '../ui';
@@ -13,6 +14,7 @@ import type { ReferringDomain } from '../../api/seo';
 
 interface BacklinkProfileCardProps {
   workspaceId: string;
+  domain?: string | null;
 }
 
 type RefDomainRecord = Record<string, unknown> & {
@@ -93,75 +95,82 @@ const columns: DataColumn[] = [
   },
 ];
 
-export function BacklinkProfileCard({ workspaceId }: BacklinkProfileCardProps) {
+export function BacklinkProfileCard({ workspaceId, domain }: BacklinkProfileCardProps) {
   const { data, isLoading, error } = useBacklinkProfile(workspaceId);
   const errorMessage = error instanceof Error ? error.message : error ? String(error) : '';
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="backlink-profile-title">
-      <div>
-        <h2 id="backlink-profile-title" className="t-ui font-semibold text-[var(--brand-text-bright)]">
-          Backlink profile
-        </h2>
-        <p className="t-caption-sm text-[var(--brand-text-muted)]">
-          Authority footprint and the top referring domains currently visible to the provider.
-        </p>
-      </div>
-
-      {isLoading ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-[92px] w-full" />)}
-        </div>
-      ) : errorMessage ? (
-        <InlineBanner
-          tone={errorMessage.includes('No SEO data provider configured') ? 'warning' : 'error'}
-          title={errorMessage.includes('No SEO data provider configured') ? 'Backlink data requires DataForSEO' : 'Backlink profile did not load'}
-        >
-          {errorMessage.includes('No SEO data provider configured') ? (
-            <span>
-              Set <code className="font-mono text-[var(--brand-text-bright)]">DATAFORSEO_LOGIN</code> and{' '}
-              <code className="font-mono text-[var(--brand-text-bright)]">DATAFORSEO_PASSWORD</code> in the environment to enable it.
-            </span>
-          ) : errorMessage}
-        </InlineBanner>
-      ) : !data?.overview ? (
-        <EmptyState
-          icon={EmptyIcon}
-          title="No backlink data returned"
-          description="This can happen for a new domain or a low-authority site."
-        />
-      ) : (
-        <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricTile label="Total backlinks" value={NUMBER_FORMAT.format(data.overview.totalBacklinks)} accent="var(--blue)" />
-            <MetricTile label="Ref. domains" value={NUMBER_FORMAT.format(data.overview.referringDomains)} accent="var(--teal)" />
-            <MetricTile
-              label="Follow links"
-              value={`${Math.round((data.overview.followLinks / Math.max(1, data.overview.totalBacklinks)) * 100)}%`}
-              sub={`${NUMBER_FORMAT.format(data.overview.followLinks)} follow`}
-              accent="var(--emerald)"
-            />
-            <MetricTile
-              label="Link types"
-              value={`${NUMBER_FORMAT.format(data.overview.textLinks)} text`}
-              sub={`${NUMBER_FORMAT.format(data.overview.imageLinks)} image`}
-              accent="var(--amber)"
-            />
-          </div>
-
-          {data.referringDomains.length === 0 ? (
-            <InlineBanner tone="info" title="No referring domains returned">
-              The provider returned backlink totals but no domain-level rows.
+    <section aria-labelledby="backlink-profile-title">
+      <h2 id="backlink-profile-title" className="sr-only" aria-label="Backlink profile" />
+      <SectionCard
+        title="Backlink profile"
+        subtitle={domain ?? 'Authority footprint and top referring domains'}
+        titleIcon={<Icon name="link" size="sm" className="text-[var(--teal)]" />}
+        iconChip
+        noPadding
+        variant="subtle"
+      >
+        <div className="px-[18px] py-4">
+          {isLoading ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-[92px] w-full" />)}
+            </div>
+          ) : errorMessage ? (
+            <InlineBanner
+              tone={errorMessage.includes('No SEO data provider configured') ? 'warning' : 'error'}
+              title={errorMessage.includes('No SEO data provider configured') ? 'Backlink data needs SEO provider credentials' : 'Backlink profile did not load'}
+            >
+              {errorMessage.includes('No SEO data provider configured') ? (
+                <span>
+                  Set <code className="font-mono text-[var(--brand-text-bright)]">DATAFORSEO_LOGIN</code> and{' '}
+                  <code className="font-mono text-[var(--brand-text-bright)]">DATAFORSEO_PASSWORD</code> in the environment to enable it.
+                </span>
+              ) : errorMessage}
             </InlineBanner>
-          ) : (
-            <DataTable
-              columns={columns}
-              rows={data.referringDomains.map(toRecord)}
-              getRowKey={(row) => (row as RefDomainRecord).source.domain}
+          ) : !data?.overview ? (
+            <EmptyState
+              icon={EmptyIcon}
+              title="No backlink data returned"
+              description="This can happen for a new domain or a low-authority site."
             />
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <MetricTile className="rounded-[var(--radius-lg)] px-4 py-[14px]" label="Total backlinks" value={NUMBER_FORMAT.format(data.overview.totalBacklinks)} accent="var(--blue)" />
+                <MetricTile className="rounded-[var(--radius-lg)] px-4 py-[14px]" label="Referring domains" value={NUMBER_FORMAT.format(data.overview.referringDomains)} accent="var(--blue)" />
+                <MetricTile
+                  className="rounded-[var(--radius-lg)] px-4 py-[14px]"
+                  label="Follow links"
+                  value={`${Math.round((data.overview.followLinks / Math.max(1, data.overview.totalBacklinks)) * 100)}%`}
+                  sub={`${NUMBER_FORMAT.format(data.overview.followLinks)} follow`}
+                  accent="var(--blue)"
+                />
+                <MetricTile
+                  className="rounded-[var(--radius-lg)] px-4 py-[14px]"
+                  label="Link types"
+                  value={`${NUMBER_FORMAT.format(data.overview.textLinks)} text`}
+                  sub={`${NUMBER_FORMAT.format(data.overview.imageLinks)} image`}
+                  accent="var(--blue)"
+                />
+              </div>
+
+              <h3 className="t-mono mb-2 mt-4 font-bold text-[var(--brand-text-bright)]">Top referring domains</h3>
+              {data.referringDomains.length === 0 ? (
+                <InlineBanner tone="info" title="No referring domains returned">
+                  The backlink scan returned totals but no domain-level rows.
+                </InlineBanner>
+              ) : (
+                <DataTable
+                  columns={columns}
+                  rows={data.referringDomains.map(toRecord)}
+                  getRowKey={(row) => (row as RefDomainRecord).source.domain}
+                  className="rounded-none border-0 bg-transparent"
+                />
+              )}
+            </>
           )}
-        </>
-      )}
+        </div>
+      </SectionCard>
     </section>
   );
 }

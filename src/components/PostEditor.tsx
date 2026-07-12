@@ -79,6 +79,7 @@ interface PostEditorProps {
   postId: string;
   onClose: () => void;
   onDelete?: () => void;
+  workspaceLayout?: boolean;
 }
 
 type EditingTarget =
@@ -138,7 +139,7 @@ function PostStatusBadge({ status }: { status: GeneratedPost['status'] }) {
   return <span className={`t-caption-sm px-2 py-0.5 rounded-[var(--radius-sm)] border font-medium ${c.color}`}>{c.label}</span>;
 }
 
-export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEditorProps) {
+export function PostEditor({ workspaceId, postId, onClose, onDelete, workspaceLayout = false }: PostEditorProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -565,7 +566,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       )}
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className={`flex items-start justify-between gap-4 ${workspaceLayout ? 'flex-col' : ''}`}>
         <div className="flex-1 min-w-0">
           {editingTitle ? (
             <div className="flex items-center gap-2">
@@ -606,7 +607,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             <span className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1"><Icon as={Clock} size="sm" />{formatDate(post.updatedAt)}</span>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        <div className={`flex items-center gap-1.5 flex-shrink-0 ${workspaceLayout ? 'flex-wrap' : ''}`}>
           {!isGenerating && (
             <>
               <Button
@@ -667,7 +668,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             </>
           )}
           <IconButton icon={Trash2} label="Delete post" variant="danger" size="sm" onClick={() => setDeleteConfirm(true)} />
-          <IconButton icon={X} label="Close editor" variant="ghost" size="sm" onClick={onClose} />
+          {!workspaceLayout && <IconButton icon={X} label="Close editor" variant="ghost" size="sm" onClick={onClose} />}
         </div>
       </div>
 

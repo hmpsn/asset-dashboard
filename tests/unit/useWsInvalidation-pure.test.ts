@@ -53,7 +53,7 @@ describe('useWsInvalidation registry parity (pure)', () => {
     expect(keys).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
   });
 
-  it('WORKSPACE_UPDATED fans out to admin and client billing/analytics readers', () => {
+  it('WORKSPACE_UPDATED fans out to workspace and Google provider readers', () => {
     const keys = adminKeys(WS_EVENTS.WORKSPACE_UPDATED);
 
     expect(keys).toContainEqual(queryKeys.admin.workspaceHome(WS_ID));
@@ -64,6 +64,27 @@ describe('useWsInvalidation registry parity (pure)', () => {
     expect(keys).toContainEqual(queryKeys.client.gscAll(WS_ID));
     expect(keys).toContainEqual(queryKeys.client.clientInsights(WS_ID));
     expect(keys).toContainEqual(queryKeys.client.latestRanks(WS_ID));
+    expect(keys).toContainEqual(queryKeys.client.monthlyDigest(WS_ID));
+  });
+
+  it('STRATEGY_KEYWORD_SET_UPDATED refreshes only the managed keyword membership', () => {
+    expect(adminKeys(WS_EVENTS.STRATEGY_KEYWORD_SET_UPDATED)).toEqual([
+      queryKeys.admin.strategyKeywordSet(WS_ID),
+    ]);
+  });
+
+  it('insight, anomaly, annotation, and keyword events do not refetch provider families', () => {
+    for (const event of [
+      WS_EVENTS.INSIGHT_BRIDGE_UPDATED,
+      WS_EVENTS.INSIGHT_RESOLVED,
+      WS_EVENTS.ANOMALIES_UPDATE,
+      WS_EVENTS.ANNOTATION_BRIDGE_CREATED,
+      WS_EVENTS.STRATEGY_KEYWORD_SET_UPDATED,
+    ]) {
+      const keys = adminKeys(event);
+      expect(keys).not.toContainEqual(queryKeys.admin.ga4All(WS_ID));
+      expect(keys).not.toContainEqual(queryKeys.admin.gscAny());
+    }
   });
 
   it('OUTCOME_SCORED invalidates admin and client outcome paths including timeline and top-wins', () => {
@@ -78,6 +99,15 @@ describe('useWsInvalidation registry parity (pure)', () => {
     expect(keys).toContainEqual(queryKeys.client.outcomeWins(WS_ID));
     expect(keys).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
     expect(keys).toContainEqual(queryKeys.client.intelligence(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.contentPerformanceAll(WS_ID));
+  });
+
+  it('CONTENT_PUBLISHED invalidates content performance even when its surface is not mounted', () => {
+    const keys = adminKeys(WS_EVENTS.CONTENT_PUBLISHED);
+
+    expect(keys).toContainEqual(queryKeys.admin.posts(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.contentPipeline(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.contentPerformanceAll(WS_ID));
   });
 
   it('OUTCOME_LEARNINGS_UPDATED refreshes learnings and both intelligence roots', () => {
@@ -90,11 +120,21 @@ describe('useWsInvalidation registry parity (pure)', () => {
     expect(keys).toContainEqual(queryKeys.client.intelligence(WS_ID));
   });
 
-  it('OUTCOME_EXTERNAL_DETECTED only invalidates outcomeActions + client outcomeWins', () => {
+  it('VOICE_PROFILE_UPDATED refreshes the profile and both admin intelligence roots', () => {
+    const keys = adminKeys(WS_EVENTS.VOICE_PROFILE_UPDATED);
+
+    expect(keys).toContainEqual(queryKeys.admin.voiceProfile(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.intelligence(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
+    expect(keys).toContainEqual(queryKeys.client.monthlyDigest(WS_ID));
+  });
+
+  it('OUTCOME_EXTERNAL_DETECTED refreshes outcome readers and the monthly digest', () => {
     const keys = adminKeys(WS_EVENTS.OUTCOME_EXTERNAL_DETECTED);
 
     expect(keys).toContainEqual(queryKeys.admin.outcomeActions(WS_ID));
     expect(keys).toContainEqual(queryKeys.client.outcomeWins(WS_ID));
+    expect(keys).toContainEqual(queryKeys.client.monthlyDigest(WS_ID));
     expect(keys).not.toContainEqual(queryKeys.admin.outcomeScorecard(WS_ID));
   });
 

@@ -1,22 +1,24 @@
 // @ds-rebuilt
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { SearchTrafficLens, SearchTrafficTableMode } from './types';
 
 export const SEARCH_TRAFFIC_LENSES = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'search', label: 'Search Performance' },
-  { id: 'traffic', label: 'Site Traffic' },
+  { id: 'search', label: 'Search performance' },
+  { id: 'traffic', label: 'Site traffic' },
   { id: 'annotations', label: 'Annotations' },
 ] as const;
 
 const LENS_PARAM = 'lens';
 const DAYS_PARAM = 'days';
 const TABLE_PARAM = 'view';
-const DEFAULT_LENS: SearchTrafficLens = 'overview';
+const DEFAULT_LENS: SearchTrafficLens = 'search';
 const DEFAULT_DAYS = 28;
 const VALID_DAYS = new Set([7, 14, 28, 90, 180, 365, 480]);
-const LENS_VALUES = new Set<string>(SEARCH_TRAFFIC_LENSES.map((lens) => lens.id));
+const LENS_VALUES = new Set<string>([
+  ...SEARCH_TRAFFIC_LENSES.map((lens) => lens.id),
+  'overview',
+]);
 const TABLE_VALUES = new Set<string>(['queries', 'pages']);
 
 type ParamValue = string | number | null | undefined;
@@ -42,6 +44,18 @@ export function useSearchTrafficSurfaceState() {
   const days = readDays(searchParams);
   const tableMode = readTableMode(searchParams);
 
+  useEffect(() => {
+    const rawLens = searchParams.get(LENS_PARAM);
+    const shouldClearLens = rawLens === DEFAULT_LENS || (rawLens !== null && !LENS_VALUES.has(rawLens));
+    if (!shouldClearLens) return;
+
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete(LENS_PARAM);
+      return next;
+    }, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const updateParams = useCallback((updates: Record<string, ParamValue>, replace = true) => {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
@@ -54,7 +68,7 @@ export function useSearchTrafficSurfaceState() {
   }, [setSearchParams]);
 
   const setLens = useCallback((nextLens: SearchTrafficLens) => {
-    updateParams({ [LENS_PARAM]: nextLens });
+    updateParams({ [LENS_PARAM]: nextLens === DEFAULT_LENS ? null : nextLens });
   }, [updateParams]);
 
   const setDays = useCallback((nextDays: number) => {
@@ -74,4 +88,3 @@ export function useSearchTrafficSurfaceState() {
     setTableMode,
   };
 }
-

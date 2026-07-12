@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ContentTopicRequest, GeneratedPost } from '../../shared/types/content.js';
+import type { ContentMatrix, ContentTopicRequest, GeneratedPost } from '../../shared/types/content.js';
 import type { OutcomeReadback } from '../../shared/types/outcome-tracking.js';
 import type { Workspace } from '../../shared/types/workspace.js';
 import type { OutcomeReadbacks } from '../../server/outcome-tracking.js';
@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getBrief: vi.fn(),
   getGA4LandingPages: vi.fn(),
   getAllGscPages: vi.fn(),
+  getPageTrend: vi.fn(),
   getScoredOutcomeReadbacks: vi.fn(),
   getWorkspace: vi.fn(),
   listContentRequests: vi.fn(),
@@ -41,13 +42,14 @@ vi.mock('../../server/outcome-tracking.js', () => ({
 
 vi.mock('../../server/search-console.js', () => ({
   getAllGscPages: mocks.getAllGscPages,
+  getPageTrend: mocks.getPageTrend,
 }));
 
 vi.mock('../../server/workspaces.js', () => ({
   getWorkspace: mocks.getWorkspace,
 }));
 
-import { getContentPerformance } from '../../server/domains/content/content-performance.js';
+import { getContentPerformance, getContentPerformanceTrend } from '../../server/domains/content/content-performance.js';
 
 function makeWorkspace(): Workspace {
   return {
@@ -150,9 +152,18 @@ describe('getContentPerformance outcome readbacks', () => {
     const response = await getContentPerformance('ws-content-performance');
 
     expect(response.items).toHaveLength(1);
+    expect(response.items[0]).toMatchObject({ itemId: 'req-source', requestId: 'req-source', source: 'request' });
     expect(response.items[0].joinback?.postId).toBe('post-source');
     expect(response.items[0].outcome).toBe(sourceOutcome);
     expect(response.items[0].outcome?.actionId).toBe('source-action');
+    expect(response.summary).toMatchObject({
+      piecesTracked: 1,
+      piecesPublished: 1,
+      piecesDelivered: 0,
+      measuredOutcomes: 1,
+      wins: 1,
+      averagePositionGain: 8,
+    });
     expect(mocks.getScoredOutcomeReadbacks).toHaveBeenCalledTimes(1);
   });
 
@@ -185,5 +196,79 @@ describe('getContentPerformance outcome readbacks', () => {
 
     expect(response.items.length).toBeGreaterThan(0);
     expect(response.items.every(item => item.outcome === undefined)).toBe(true); // every-ok — length asserted on the line above
+  });
+
+  it('resolves a published matrix item trend without a request lookup', async () => {
+    mocks.getWorkspace.mockReturnValue({
+      ...makeWorkspace(),
+      webflowSiteId: 'site-1',
+      gscPropertyUrl: 'sc-domain:example.com',
+    });
+    const matrix: ContentMatrix = {
+      id: 'matrix-1',
+      workspaceId: 'ws-content-performance',
+      name: 'Locations',
+      templateId: 'template-1',
+      dimensions: [],
+      urlPattern: '/locations/{city}',
+      keywordPattern: '{city} dentist',
+      cells: [{
+        id: 'cell-1',
+        variableValues: { city: 'Austin' },
+        targetKeyword: 'austin dentist',
+        plannedUrl: '/locations/austin',
+        status: 'published',
+      }],
+      stats: { total: 1, planned: 0, briefGenerated: 0, drafted: 0, reviewed: 0, published: 1 },
+      createdAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-15T00:00:00.000Z',
+    };
+    mocks.listMatrices.mockReturnValue([matrix]);
+    mocks.getPageTrend.mockResolvedValue([{ date: '2026-06-16', clicks: 3, impressions: 40, ctr: 7.5, position: 5 }]);
+
+    const result = await getContentPerformanceTrend('ws-content-performance', 'cell-1');
+
+    expect(result?.availability).toBe('available');
+    expect(result?.trend).toHaveLength(1);
+    expect(mocks.getPageTrend).toHaveBeenCalledWith(
+      'site-1',
+      'sc-domain:example.com',
+      'https://example.com/locations/austin',
+      90,
+      expect.objectContaining({ startDate: '2026-06-15' }),
+    );
+  });
+
+  it('removes admin outcome internals from public items while retaining aggregate win counts', async () => {
+    const outcome = makeOutcome({ actionId: 'private-action', score: 'strong_win' });
+    mocks.listContentRequests.mockReturnValue([makeRequest({ id: 'req-public', targetKeyword: 'Emergency Dentist Cost' })]);
+    mocks.getScoredOutcomeReadbacks.mockReturnValue(makeReadbacks({
+      byKeyword: new Map([['emergency dentist cost', outcome]]),
+    }));
+
+    const response = await getContentPerformance('ws-content-performance', { audience: 'public' });
+
+    expect(response.summary.wins).toBe(1);
+    expect(response.summary.measuredOutcomes).toBe(1);
+    expect(response.items[0].outcome).toBeUndefined();
+    expect(JSON.stringify(response.items[0])).not.toContain('private-action');
+  });
+
+  it('returns a typed unavailable reason when Search Console cannot provide a trend', async () => {
+    mocks.getWorkspace.mockReturnValue({
+      ...makeWorkspace(),
+      webflowSiteId: 'site-1',
+      gscPropertyUrl: 'sc-domain:example.com',
+    });
+    mocks.listContentRequests.mockReturnValue([makeRequest({ id: 'req-provider', targetPageSlug: '/guide' })]);
+    mocks.getPageTrend.mockRejectedValue(new Error('Not connected to Google'));
+
+    const result = await getContentPerformanceTrend('ws-content-performance', 'req-provider');
+
+    expect(result).toEqual({
+      availability: 'provider_unavailable',
+      reason: 'Search Console could not provide this page trend. Reconnect Google or try again later.',
+      trend: [],
+    });
   });
 });

@@ -57,6 +57,6 @@ export function sourceTypeLabel(value: WorkQueueSourceType): string {
     case 'setup_gap':
       return 'Setup';
     case 'churn_signal':
-      return 'Risk';
+      return 'Client risk';
   }
 }

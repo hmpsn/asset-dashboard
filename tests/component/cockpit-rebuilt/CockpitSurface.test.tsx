@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -269,7 +269,7 @@ describe('CockpitSurface rebuilt', () => {
     });
 
     expect(await screen.findByTestId('cockpit-rebuilt-surface')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Cockpit' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Client-facing work is ready to review and send.' })).toBeInTheDocument();
   });
 
   it('meets the rebuilt a11y floor after animate-pulse settles', async () => {
@@ -296,12 +296,135 @@ describe('CockpitSurface rebuilt', () => {
     expect(screen.queryByText('Close Core Web Vitals cleanup')).not.toBeInTheDocument();
   });
 
+  it('keeps the Risk deep link truthful without selecting Optimizations', async () => {
+    renderSurface(`/ws/${workspaceId}?stream=unclassified`);
+
+    expect(await screen.findByText('Client has not viewed the portal')).toBeInTheDocument();
+    expect(screen.queryByText('Close Core Web Vitals cleanup')).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText('Queue filters')).getByRole('button', { name: /^Risk/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(screen.getByLabelText('Queue filters')).getByRole('button', { name: /Client risk/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('radio', { name: /Optimizations/ })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('radio', { name: /To send/ })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('radio', { name: /Monetization/ })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('keeps internal rebuild and migration language out of the visible Cockpit UI', async () => {
+    const { container } = renderSurface();
+
+    expect(await screen.findByTestId('cockpit-rebuilt-surface')).toBeInTheDocument();
+
+    const visibleText = container.textContent ?? '';
+    expect(visibleText).not.toMatch(/rebuild/i);
+    expect(visibleText).not.toMatch(/migration/i);
+    expect(visibleText).not.toMatch(/carry-over/i);
+    expect(visibleText).not.toMatch(/route tab/i);
+    expect(visibleText).not.toMatch(/url state/i);
+    expect(visibleText).not.toMatch(/legacy aliases/i);
+    expect(visibleText).not.toMatch(/mounted below/i);
+  });
+
+  it('keeps Cockpit calibration copy on styleguide typography roles', async () => {
+    renderSurface();
+
+    expect(await screen.findByText('Client-facing work is ready to review and send.')).toHaveClass('t-h2');
+    expect(screen.getByText('One send item and optimization work are waiting in the shared work queue.')).toHaveClass('t-body');
+    expect(screen.getByText('1 error in site audit')).toHaveClass('t-ui');
+    expect(screen.getByText('3 warnings · score 82')).toHaveClass('t-caption-sm');
+    expect(screen.getByText('#3')).toHaveClass('t-body');
+  });
+
+  it('places one unique-decision band between the verdict and work streams', async () => {
+    renderSurface();
+
+    const verdict = await screen.findByRole('heading', { name: 'Client-facing work is ready to review and send.' });
+    const band = screen.getByRole('region', { name: 'Cockpit decision metrics' });
+    const firstStream = screen.getByRole('radio', { name: /Optimizations/ });
+
+    expect(verdict.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(band.compareDocumentPosition(firstStream) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(band).getByText('Organic value')).toBeInTheDocument();
+    expect(within(band).getByText('$42,000')).toBeInTheDocument();
+    expect(within(band).getByText('Content velocity')).toBeInTheDocument();
+    expect(within(band).getByText('3/mo')).toBeInTheDocument();
+    expect(within(band).getByText('4 this month · +50% trend')).toBeInTheDocument();
+    expect(within(band).getByText('Overall health')).toBeInTheDocument();
+    expect(within(band).getByText('84')).toBeInTheDocument();
+    expect(within(band).getByText('On track')).toBeInTheDocument();
+    expect(band.querySelectorAll('.t-label')).toHaveLength(3);
+    expect(within(band).queryByText(/clicks|impressions|users|sessions/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps unavailable decision metrics honest instead of fabricating zeroes', async () => {
+    const state = makeCockpitState();
+    mocks.cockpitState = {
+      ...state,
+      kpis: {
+        ...state.kpis,
+        trafficValue: { ...state.kpis.trafficValue, organic: null },
+        contentVelocity: {
+          ...state.kpis.contentVelocity,
+          currentMonthPublished: null,
+          trailingThreeMonthAvg: null,
+        },
+        overallHealth: { score: null, label: 'Establishing' },
+      },
+    };
+
+    renderSurface();
+
+    const band = await screen.findByRole('region', { name: 'Cockpit decision metrics' });
+    expect(within(band).getAllByText('—')).toHaveLength(3);
+    expect(within(band).getByText('Unavailable')).toBeInTheDocument();
+    expect(within(band).getAllByText('Establishing')).toHaveLength(2);
+    expect(within(band).queryByText('0')).not.toBeInTheDocument();
+  });
+
+  it('uses the compact prototype frame and keeps operator controls reachable through the topbar host', async () => {
+    renderSurface();
+
+    const surface = await screen.findByTestId('cockpit-rebuilt-surface');
+    const pageFrame = surface.parentElement;
+    const contextLine = screen.getByTestId('cockpit-context-line');
+
+    expect(pageFrame).toHaveStyle({ maxWidth: '1168px', padding: '0px' });
+    expect(contextLine).toHaveTextContent('Client cockpit · Acme Dental');
+    expect(contextLine).toHaveTextContent('Today, scoped to one');
+    expect(within(contextLine).queryByRole('img')).not.toBeInTheDocument();
+    expect(screen.getByTestId('cockpit-topbar-actions-fallback')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Activity/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Refresh Cockpit data/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Settings/i })).toBeInTheDocument();
+  });
+
+  it('keeps source filters functional when they are composed inside the work-queue card', async () => {
+    renderSurface();
+
+    const queue = await screen.findByTestId('cockpit-work-queue');
+    const filters = within(queue).getByLabelText('Queue filters');
+    fireEvent.click(within(filters).getByRole('button', { name: /^Decay/ }));
+
+    expect(screen.getByText('Refresh decaying service page')).toBeInTheDocument();
+    expect(screen.queryByText('Close Core Web Vitals cleanup')).not.toBeInTheDocument();
+    expect(within(filters).getByRole('button', { name: /^Decay/ })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('keeps weekly accomplishments as supporting evidence after the core queue and rail', async () => {
+    renderSurface();
+
+    const coreGrid = await screen.findByTestId('cockpit-core-grid');
+    const weekly = screen.getByTestId('weekly-accomplishments');
+
+    expect(coreGrid.compareDocumentPosition(weekly) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('opens the carried-over work-order panel from a work-order queue row', async () => {
     renderSurface();
 
     fireEvent.click(await screen.findByRole('button', { name: /Open panel/i }));
 
     expect(await screen.findByTestId('work-order-panel')).toHaveTextContent(`Work orders for ${workspaceId}`);
+    expect(screen.getAllByTestId('work-order-panel')).toHaveLength(1);
+    expect(screen.getAllByRole('dialog', { name: /Work orders/i })).toHaveLength(1);
   });
 
   it('opens the activity drawer from the toolbar', async () => {
@@ -310,6 +433,7 @@ describe('CockpitSurface rebuilt', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Activity/i }));
 
     expect(await screen.findByRole('dialog', { name: /Recent activity/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('dialog', { name: /Recent activity/i })).toHaveLength(1);
     expect(screen.getByTestId('activity-feed')).toHaveTextContent('Published July article');
   });
 });

@@ -1,7 +1,7 @@
 // @ds-rebuilt
 import { useMemo } from 'react';
 import { useWorkspaces } from '../../hooks/admin';
-import { Badge, ErrorState, LensSwitcher, PageHeader, Skeleton, Toolbar, ToolbarSpacer } from '../ui';
+import { ErrorState, LensSwitcher, PageHeader, Skeleton } from '../ui';
 import { PageSpeedLens } from './PageSpeedLens';
 import { PageWeightLens } from './PageWeightLens';
 import { PERFORMANCE_LENSES, type PerformanceLens, usePerformanceSurfaceState } from './usePerformanceSurfaceState';
@@ -9,6 +9,9 @@ import { PERFORMANCE_LENSES, type PerformanceLens, usePerformanceSurfaceState } 
 interface PerformanceSurfaceProps {
   workspaceId: string;
 }
+
+const PERFORMANCE_SUBTITLE = 'Page weight and Core Web Vitals — the detect side of speed. Heavy pages fix in the Asset Manager.';
+const SURFACE_WRAP_CLASS = 'mx-auto flex min-h-full w-full max-w-[1080px] flex-col gap-4 px-4 pb-20 sm:px-[30px]';
 
 export function PerformanceSurface({ workspaceId }: PerformanceSurfaceProps) {
   const state = usePerformanceSurfaceState();
@@ -21,7 +24,7 @@ export function PerformanceSurface({ workspaceId }: PerformanceSurfaceProps) {
 
   if (workspaces.isLoading && !workspace) {
     return (
-      <div className="flex min-h-full flex-col gap-5" aria-label="Loading Performance">
+      <div className={SURFACE_WRAP_CLASS} aria-label="Loading Performance">
         <Skeleton className="h-[72px] w-full" />
         <Skeleton className="h-[54px] w-full" />
         <Skeleton className="h-[360px] w-full" />
@@ -31,10 +34,10 @@ export function PerformanceSurface({ workspaceId }: PerformanceSurfaceProps) {
 
   if (workspaces.isError && !workspace) {
     return (
-      <div className="flex min-h-full flex-col gap-5">
+      <div className={SURFACE_WRAP_CLASS}>
         <PageHeader
           title="Performance"
-          subtitle="Page weight, Core Web Vitals, and PageSpeed diagnostics."
+          subtitle={PERFORMANCE_SUBTITLE}
         />
         <ErrorState
           type="data"
@@ -49,10 +52,10 @@ export function PerformanceSurface({ workspaceId }: PerformanceSurfaceProps) {
 
   if (!workspace || !siteId) {
     return (
-      <div className="flex min-h-full flex-col gap-5">
+      <div className={SURFACE_WRAP_CLASS}>
         <PageHeader
           title="Performance"
-          subtitle="Page weight, Core Web Vitals, and PageSpeed diagnostics."
+          subtitle={PERFORMANCE_SUBTITLE}
         />
         <ErrorState
           type="permission"
@@ -65,13 +68,26 @@ export function PerformanceSurface({ workspaceId }: PerformanceSurfaceProps) {
   }
 
   return (
-    <div className="flex min-h-full flex-col gap-5">
+    <div className={SURFACE_WRAP_CLASS}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="h-1.5 w-1.5 flex-none rounded-[var(--radius-pill)] bg-[var(--blue)]" aria-hidden="true" />
+          <span className="truncate t-micro font-semibold uppercase tracking-[0.14em] text-[var(--brand-text-muted)]">
+            Performance · {workspace.name}
+          </span>
+        </div>
+        <span className="truncate t-caption-sm text-[var(--brand-text-muted)]">
+          {workspace.webflowSiteName ?? siteId}
+        </span>
+      </div>
+
       <PageHeader
         title="Performance"
-        subtitle="Page weight, Core Web Vitals, and PageSpeed diagnostics."
+        subtitle={PERFORMANCE_SUBTITLE}
+        className="max-w-[760px]"
       />
 
-      <Toolbar label="Performance view controls" className="w-full">
+      <div className="max-w-full overflow-x-auto pb-px" role="group" aria-label="Performance view controls">
         <LensSwitcher
           id="performance-rebuilt-lens"
           options={PERFORMANCE_LENSES.map((lens) => ({
@@ -81,15 +97,14 @@ export function PerformanceSurface({ workspaceId }: PerformanceSurfaceProps) {
           value={state.lens}
           onChange={(value) => state.setLens(value as PerformanceLens)}
           size="sm"
+          mono
         />
-        <ToolbarSpacer />
-        <Badge label={workspace.webflowSiteName ?? siteId} tone="blue" variant="outline" size="sm" />
-      </Toolbar>
+      </div>
 
       {state.lens === 'weight' ? (
-        <PageWeightLens workspaceId={workspaceId} siteId={siteId} />
+        <PageWeightLens key={`${workspaceId}:${siteId}:weight`} workspaceId={workspaceId} siteId={siteId} />
       ) : (
-        <PageSpeedLens workspaceId={workspaceId} siteId={siteId} />
+        <PageSpeedLens key={`${workspaceId}:${siteId}:speed`} workspaceId={workspaceId} siteId={siteId} />
       )}
     </div>
   );

@@ -73,16 +73,49 @@ export function contentSourceTone(source: ContentPerformanceSource | undefined):
 
 export function normalizeSlug(slug: string | null | undefined): string {
   if (!slug) return '';
+  const trimmed = slug.trim();
+  if (!trimmed || trimmed.startsWith('//') || /[\u0000-\u001f\u007f\\]/.test(trimmed)) return '';
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const parsed = new URL(trimmed);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.pathname || '/' : '';
+    } catch {
+      return '';
+    }
+  }
+  if (/^[a-z][a-z\d+.-]*:/i.test(trimmed)) return '';
   // page-slug-url-ok — external live-site URL (site domain + slug), not an internal app route
-  return slug.startsWith('/') ? slug : `/${slug}`;
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+}
+
+export function normalizeLiveSiteBase(siteLabel: string | null | undefined): string | null {
+  if (!siteLabel) return null;
+  let base = siteLabel.trim();
+  if (!base) return null;
+  if (base.toLowerCase().startsWith('sc-domain:')) base = base.slice('sc-domain:'.length).trim();
+  if (!base || base.startsWith('//') || /[\u0000-\u001f\u007f\\]/.test(base)) return null;
+  if (/^[a-z][a-z\d+.-]*:/i.test(base) && !/^https?:\/\//i.test(base)) return null;
+  if (!/^https?:\/\//i.test(base)) base = `https://${base}`;
+
+  try {
+    const parsed = new URL(base);
+    if ((parsed.protocol !== 'http:' && parsed.protocol !== 'https:') || !parsed.hostname) return null;
+    if (parsed.username || parsed.password) return null;
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+export function resolveLiveSiteBase(
+  liveDomain: string | null | undefined,
+  gscPropertyUrl: string | null | undefined,
+): string | null {
+  return normalizeLiveSiteBase(liveDomain) ?? normalizeLiveSiteBase(gscPropertyUrl);
 }
 
 export function buildLiveContentUrl(siteLabel: string | null | undefined, targetPageSlug: string | null | undefined): string | null {
+  const base = normalizeLiveSiteBase(siteLabel);
   const slug = normalizeSlug(targetPageSlug);
-  if (!siteLabel || !slug) return null;
-  let base = siteLabel.trim();
-  if (!base) return null;
-  if (base.startsWith('sc-domain:')) base = base.replace('sc-domain:', '');
-  if (!base.startsWith('http://') && !base.startsWith('https://')) base = `https://${base}`;
-  return `${base.replace(/\/$/, '')}${slug}`;
+  return base && slug ? `${base}${slug}` : null;
 }

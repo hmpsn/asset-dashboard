@@ -273,7 +273,7 @@
     {
       "id": 28,
       "title": "Competitive Intelligence Hub",
-      "oneLiner": "SEMRush-powered side-by-side domain comparison — traffic value, keyword gaps, backlink counts, and top competitor keywords in one view",
+      "oneLiner": "DataForSEO-powered side-by-side domain comparison — traffic value, keyword gaps, backlink counts, and top competitor keywords in one view",
       "category": "analytics",
       "painPoints": ["competitive-intel", "keyword-strategy"],
       "tier": "growth",
@@ -283,7 +283,7 @@
     {
       "id": 29,
       "title": "Backlink Profile Overview",
-      "oneLiner": "Domain-level backlink dashboard with referring domains, follow/nofollow ratio, and top 15 linking sites from SEMRush",
+      "oneLiner": "Domain-level backlink dashboard with referring domains, follow/nofollow ratio, and top linking sites from DataForSEO",
       "category": "analytics",
       "painPoints": ["competitive-intel", "reporting"],
       "tier": "growth",
@@ -653,7 +653,7 @@
     {
       "id": 66,
       "title": "Weekly AI Briefing",
-      "oneLiner": "Every Monday, an AI-curated 5-minute editorial briefing — wins, risks, opportunities, competitive intel — replaces the data dashboard with a tight magazine-rhythm layout. Admin-reviewed before reaching the client.",
+      "oneLiner": "Weekly curation of wins, risks, opportunities, and competitive intelligence, with admin review, a published client projection, and briefing metadata feeding workspace-intelligence client signals.",
       "category": "intelligence",
       "painPoints": ["client-engagement", "reporting", "client-retention"],
       "tier": "growth",

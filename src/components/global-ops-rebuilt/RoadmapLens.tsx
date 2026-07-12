@@ -2,158 +2,59 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ShippingVelocityChart } from '../RoadmapVelocityChart';
 import {
-  Badge,
   Button,
-  DataTable,
-  EmptyState,
   FormSelect,
-  Icon,
   InlineBanner,
-  MetricTile,
-  PageContainer,
-  PageHeader,
   SearchField,
-  SectionCard,
   Segmented,
-  Toolbar,
-  ToolbarSpacer,
 } from '../ui';
 import { roadmap as roadmapApi } from '../../api/platform';
 import { queryKeys } from '../../lib/queryKeys';
-import { formatDate, formatNumber } from './globalOpsFormatters';
 import { mutationErrorMessage } from './globalOpsMutationFeedback';
 import { ROADMAP_VIEWS, useRoadmapViewState, type RoadmapView } from './useGlobalOpsSurfaceState';
 import type { RoadmapItem, SprintData } from '../../../shared/types/roadmap';
+import { RoadmapBacklog } from './wave-a/RoadmapBacklog';
+import { RoadmapHero } from './wave-a/RoadmapHero';
+import { RoadmapMetricStrip } from './wave-a/RoadmapMetricStrip';
+import { RoadmapProgressCard } from './wave-a/RoadmapProgressCard';
+import { RoadmapSprintGroups } from './wave-a/RoadmapSprintGroups';
+import { RoadmapVelocityCard } from './wave-a/RoadmapVelocityCard';
+import type {
+  RoadmapDisplayGroup,
+  RoadmapDisplayRow,
+  RoadmapPriority,
+  RoadmapRuntimeStatus,
+  VelocityPoint,
+} from './wave-a/roadmapDisplayTypes';
+import {
+  compareRows,
+  DIR_OPTIONS,
+  isSortDir,
+  isSortKey,
+  makeRows,
+  normalizeRuntimeStatus,
+  PRIORITIES,
+  RUNTIME_STATUSES,
+  shortSprintLabel,
+  SORT_OPTIONS,
+  STATUS_CYCLE,
+  type SortDir,
+  type SortKey,
+} from './wave-a/roadmapModel';
 
 type RoadmapStatus = RoadmapItem['status'];
-type RoadmapPriority = NonNullable<RoadmapItem['priority']>;
-type SortKey = 'priority' | 'status' | 'sprint' | 'createdAt' | 'title' | 'est';
-type SortDir = 'asc' | 'desc';
-
-type RoadmapRow = {
-  rowKey: string;
-  id: string;
-  rawId: RoadmapItem['id'];
-  sprintId: string;
-  sprint: string;
-  title: string;
-  status: RoadmapStatus;
-  priority: RoadmapPriority | '—';
-  est: string;
-  createdAt: string | null;
-  shippedAt: string | null;
-  source: string;
-  notes: string;
-  tags: string;
-  featureId: number | null;
-};
 
 const VIEW_LABELS: Record<RoadmapView, string> = {
-  sprint: 'Sprint',
-  backlog: 'Backlog',
+  sprint: 'Sprint View',
+  backlog: 'Backlog View',
 };
-
-const STATUS_CYCLE: readonly RoadmapStatus[] = ['pending', 'in_progress', 'done'];
-const PRIORITY_ORDER: Record<RoadmapPriority, number> = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
-const STATUS_ORDER: Record<RoadmapStatus, number> = { in_progress: 0, pending: 1, done: 2 };
-
-const SORT_OPTIONS = [
-  { value: 'priority', label: 'Priority' },
-  { value: 'status', label: 'Status' },
-  { value: 'sprint', label: 'Sprint' },
-  { value: 'createdAt', label: 'Added date' },
-  { value: 'title', label: 'Title' },
-  { value: 'est', label: 'Estimate' },
-];
-
-const DIR_OPTIONS = [
-  { value: 'asc', label: 'Ascending' },
-  { value: 'desc', label: 'Descending' },
-];
-
-function rowKey(sprintId: string, itemId: RoadmapItem['id']) {
-  return `${sprintId}::${String(itemId)}`;
-}
-
-function statusLabel(status: RoadmapStatus) {
-  return status.replace('_', ' ');
-}
-
-function statusTone(status: RoadmapStatus) {
-  if (status === 'done') return 'emerald';
-  if (status === 'in_progress') return 'teal';
-  return 'zinc';
-}
-
-function priorityTone(priority: RoadmapPriority | '—') {
-  if (priority === 'P0' || priority === 'P1') return 'red';
-  if (priority === 'P2') return 'amber';
-  if (priority === 'P3') return 'blue';
-  return 'zinc';
-}
-
-function estToHours(raw: string): number {
-  const value = raw.trim().toLowerCase();
-  if (!value || value === '—') return Number.POSITIVE_INFINITY;
-  const parts = value.split('-').map((part) => part.trim()).filter(Boolean);
-  const parsed = parts.map((part) => {
-    const match = part.match(/^(\d+(?:\.\d+)?)\s*([mh])?$/);
-    if (!match) return Number.POSITIVE_INFINITY;
-    const amount = Number(match[1]);
-    const unit = match[2] ?? (value.includes('m') && !value.includes('h') ? 'm' : 'h');
-    return unit === 'm' ? amount / 60 : amount;
-  });
-  if (parsed.some((value) => !Number.isFinite(value))) return Number.POSITIVE_INFINITY;
-  return parsed.reduce((sum, value) => sum + value, 0) / parsed.length;
-}
-
-function compareRows(a: RoadmapRow, b: RoadmapRow, sort: SortKey): number {
-  if (sort === 'priority') {
-    return (a.priority === '—' ? 99 : PRIORITY_ORDER[a.priority]) - (b.priority === '—' ? 99 : PRIORITY_ORDER[b.priority]);
-  }
-  if (sort === 'status') return STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
-  if (sort === 'createdAt') return (a.createdAt ?? '').localeCompare(b.createdAt ?? '');
-  if (sort === 'est') return estToHours(a.est) - estToHours(b.est);
-  return String(a[sort]).localeCompare(String(b[sort]));
-}
-
-function isSortKey(value: string | null): value is SortKey {
-  return SORT_OPTIONS.some((option) => option.value === value);
-}
-
-function isSortDir(value: string | null): value is SortDir {
-  return value === 'asc' || value === 'desc';
-}
-
-function makeRows(sprints: SprintData[]): RoadmapRow[] {
-  return sprints.flatMap((sprint) =>
-    sprint.items.map((item) => ({
-      rowKey: rowKey(sprint.id, item.id),
-      id: `#${String(item.id)}`,
-      rawId: item.id,
-      sprintId: sprint.id,
-      sprint: sprint.name,
-      title: item.title,
-      status: item.status,
-      priority: item.priority ?? '—',
-      est: item.est ?? '—',
-      createdAt: item.createdAt ?? null,
-      shippedAt: item.shippedAt ?? null,
-      source: item.source ?? '—',
-      notes: item.notes ?? '',
-      tags: item.tags?.join(', ') ?? '',
-      featureId: item.featureId ?? null,
-    })),
-  );
-}
 
 export function RoadmapLens() {
   const state = useRoadmapViewState();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   const search = searchParams.get('q') ?? '';
   const sortParam = searchParams.get('sort');
@@ -170,27 +71,21 @@ export function RoadmapLens() {
   });
 
   const toggleStatus = useMutation({
-    mutationFn: ({ row, nextStatus }: { row: RoadmapRow; nextStatus: RoadmapStatus }) =>
+    mutationFn: ({ row, nextStatus }: { row: RoadmapDisplayRow; nextStatus: RoadmapStatus }) =>
       roadmapApi.updateItem(row.rawId, row.sprintId, { status: nextStatus }),
     onMutate: async ({ row, nextStatus }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.admin.roadmap() });
       const previousSnapshot = queryClient.getQueryData<SprintData[]>(queryKeys.admin.roadmap());
-      queryClient.setQueryData<SprintData[]>(queryKeys.admin.roadmap(), (prev) =>
-        (prev ?? []).map((sprint) =>
-          sprint.id !== row.sprintId
-            ? sprint
-            : {
-                ...sprint,
-                items: sprint.items.map((item) =>
-                  String(item.id) === String(row.rawId) ? { ...item, status: nextStatus } : item,
-                ),
-              },
-        ),
+      queryClient.setQueryData<SprintData[]>(queryKeys.admin.roadmap(), (previous) =>
+        (previous ?? []).map((sprint) => sprint.id !== row.sprintId ? sprint : {
+          ...sprint,
+          items: sprint.items.map((item) => String(item.id) === String(row.rawId) ? { ...item, status: nextStatus } : item),
+        }),
       );
       return { previousSnapshot };
     },
-    onError: (_error, _vars, ctx) => {
-      if (ctx?.previousSnapshot) queryClient.setQueryData(queryKeys.admin.roadmap(), ctx.previousSnapshot);
+    onError: (_error, _variables, context) => {
+      if (context?.previousSnapshot) queryClient.setQueryData(queryKeys.admin.roadmap(), context.previousSnapshot);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.admin.roadmap() });
@@ -198,194 +93,260 @@ export function RoadmapLens() {
   });
 
   const sprints = roadmap.data ?? [];
-  const allItems = sprints.flatMap((sprint) => sprint.items);
-  const done = allItems.filter((item) => item.status === 'done').length;
-  const inProgress = allItems.filter((item) => item.status === 'in_progress').length;
-  const total = allItems.length;
+  const allRows = useMemo(() => makeRows(sprints), [sprints]);
+  const total = allRows.length;
+  const done = allRows.filter((row) => row.status === 'done').length;
+  const inProgress = allRows.filter((row) => row.status === 'in_progress').length;
+  const pending = allRows.filter((row) => row.status === 'pending').length;
+  const deferred = allRows.filter((row) => row.status === 'deferred').length;
   const completion = total > 0 ? Math.round((done / total) * 100) : 0;
 
-  const rows = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const base = makeRows(sprints).filter((row) => {
-      if (state.view === 'sprint' && row.status === 'done') return false;
-      if (!q) return true;
-      return [row.title, row.notes, row.sprint, row.source, row.tags, row.id]
-        .some((value) => value.toLowerCase().includes(q));
+  const priorityParam = searchParams.get('priority');
+  const statusParam = searchParams.get('status');
+  const sprintParam = searchParams.get('sprint');
+  const featureParam = searchParams.get('feature');
+  const tagParam = searchParams.get('tag');
+  const priority = priorityParam && PRIORITIES.includes(priorityParam as RoadmapPriority) ? priorityParam : 'all';
+  const status = statusParam && RUNTIME_STATUSES.includes(statusParam as RoadmapRuntimeStatus) ? statusParam : 'all';
+  const sprint = sprintParam && sprints.some((item) => item.id === sprintParam) ? sprintParam : 'all';
+
+  const featureValues = useMemo(
+    () => Array.from(new Set(allRows.map((row) => row.feature).filter((value): value is string => Boolean(value)))).sort(),
+    [allRows],
+  );
+  const tagValues = useMemo(
+    () => Array.from(new Set(allRows.flatMap((row) => row.tags))).sort(),
+    [allRows],
+  );
+  const feature = featureParam && featureValues.includes(featureParam) ? featureParam : 'all';
+  const tag = tagParam && tagValues.includes(tagParam) ? tagParam : 'all';
+
+  const filteredRows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const rows = allRows.filter((row) => {
+      if (priority !== 'all' && row.priority !== priority) return false;
+      if (status !== 'all' && row.status !== status) return false;
+      if (sprint !== 'all' && row.sprintId !== sprint) return false;
+      if (feature !== 'all' && row.feature !== feature) return false;
+      if (tag !== 'all' && !row.tags.includes(tag)) return false;
+      if (!query) return true;
+      return [row.id, row.title, row.notes, row.sprint, row.source, row.feature ?? '', row.status, ...row.tags]
+        .some((value) => value.toLowerCase().includes(query));
     });
-    return [...base].sort((a, b) => {
+    return [...rows].sort((a, b) => {
       const result = compareRows(a, b, sort);
       return dir === 'asc' ? result : -result;
     });
-  }, [dir, search, sort, sprints, state.view]);
+  }, [allRows, dir, feature, priority, search, sort, sprint, status, tag]);
 
-  const selected = rows.find((row) => row.rowKey === selectedKey) ?? null;
+  const groups = useMemo<RoadmapDisplayGroup[]>(() => sprints.map((sprintData) => {
+    const rows = filteredRows.filter((row) => row.sprintId === sprintData.id);
+    const sourceRows = allRows.filter((row) => row.sprintId === sprintData.id);
+    return {
+      id: sprintData.id,
+      name: sprintData.name,
+      rationale: sprintData.rationale ?? null,
+      hours: sprintData.hours ?? null,
+      done: sourceRows.filter((row) => row.status === 'done').length,
+      total: sourceRows.length,
+      rows,
+    };
+  }).filter((group) => group.rows.length > 0), [allRows, filteredRows, sprints]);
+
+  // "Shipping velocity" = items shipped per recent *completed* sprint. The roadmap API orders
+  // fully-shipped sprints newest-first below the backlog (scripts/sort-roadmap.ts), so restrict to
+  // fully-shipped sprints before slicing — otherwise slice(0, 4) picks the top-of-list in-flight
+  // sprints (partial done-counts) and can exclude the shipped history the widget advertises.
+  const velocityPoints = useMemo<VelocityPoint[]>(() => sprints
+    .filter((sprintData) => sprintData.items.length > 0
+      && sprintData.items.every((item) => normalizeRuntimeStatus(item.status) === 'done'))
+    .map((sprintData) => ({
+      id: sprintData.id,
+      label: shortSprintLabel(sprintData.name),
+      fullLabel: sprintData.name,
+      count: sprintData.items.filter((item) => normalizeRuntimeStatus(item.status) === 'done').length,
+    }))
+    .slice(0, 4)
+    .reverse(), [sprints]);
+
+  const currentSprint = sprints.find((sprintData) => sprintData.items.some((item) => {
+    const itemStatus = normalizeRuntimeStatus(item.status);
+    return itemStatus === 'pending' || itemStatus === 'in_progress';
+  }))?.name ?? null;
 
   const updateParam = (key: string, value: string) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (!value) next.delete(key);
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (!value || value === 'all') next.delete(key);
       else next.set(key, value);
       return next;
     }, { replace: true });
   };
 
-  const cycleStatus = (row: RoadmapRow) => {
+  const clearFilters = () => {
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      ['q', 'priority', 'status', 'sprint', 'feature', 'tag', 'sort', 'dir'].forEach((key) => next.delete(key));
+      return next;
+    }, { replace: true });
+  };
+
+  const cycleStatus = (row: RoadmapDisplayRow) => {
+    if (row.status === 'deferred') return;
     const currentIndex = STATUS_CYCLE.indexOf(row.status);
     const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
     toggleStatus.mutate({ row, nextStatus });
   };
 
+  const cyclingKey = toggleStatus.isPending ? toggleStatus.variables?.row.rowKey ?? null : null;
+  const filtersActive = Boolean(search)
+    || priority !== 'all'
+    || status !== 'all'
+    || sprint !== 'all'
+    || feature !== 'all'
+    || tag !== 'all'
+    || sort !== 'priority'
+    || dir !== 'asc';
+
   return (
-    <PageContainer width="wide" className="min-h-full" gap={false}>
-      <div data-testid="roadmap-rebuilt" data-active-view={state.view} className="flex flex-col gap-[var(--section-gap)]">
-        <PageHeader
-          title="Roadmap"
-          subtitle="Sprint execution, backlog triage, velocity, and status-cycle operations."
-          actions={<Badge label="Uses ?view=" tone="blue" variant="soft" />}
+    <div
+      data-testid="roadmap-rebuilt"
+      data-active-view={state.view}
+      className="mx-auto flex min-h-full w-full max-w-[1100px] flex-col gap-[14px] px-4 pb-[90px] pt-2 sm:px-[30px]"
+    >
+      <RoadmapHero total={total} done={done} inProgress={inProgress} pending={pending} deferred={deferred} />
+
+      {state.invalidView && (
+        <InlineBanner
+          tone="warning"
+          title="Unknown Roadmap view"
+          message="The requested view is not active, so Roadmap opened Sprint."
         />
+      )}
 
-        {state.invalidView && (
-          <InlineBanner
-            tone="warning"
-            title="Unknown Roadmap view"
-            message="The requested view is not active, so Roadmap opened Sprint."
-          />
-        )}
+      {roadmap.isError && (
+        <InlineBanner
+          tone="error"
+          title="Roadmap could not be loaded"
+          message="The latest roadmap data is unavailable. Retry before changing an item status."
+        />
+      )}
 
-        <div className="grid gap-3 md:grid-cols-4">
-          <MetricTile label="Total Items" value={formatNumber(total)} accent="var(--teal)" />
-          <MetricTile label="Completed" value={formatNumber(done)} accent="var(--emerald)" />
-          <MetricTile label="In Progress" value={formatNumber(inProgress)} accent="var(--amber)" />
-          <MetricTile label="Completion" value={`${completion}%`} accent="var(--blue)" />
-        </div>
+      <RoadmapMetricStrip total={total} done={done} inProgress={inProgress} completion={completion} />
+      <RoadmapVelocityCard points={velocityPoints} loading={roadmap.isLoading} />
+      <RoadmapProgressCard
+        total={total}
+        done={done}
+        inProgress={inProgress}
+        pending={pending}
+        deferred={deferred}
+        currentSprint={currentSprint}
+      />
 
-        <SectionCard title="Velocity" titleIcon={<Icon name="sparkle" size="md" className="text-[var(--blue)]" />}>
-          {roadmap.isLoading ? (
-            <div className="h-[220px]" aria-busy="true" />
-          ) : (
-            <ShippingVelocityChart items={allItems} />
-          )}
-        </SectionCard>
+      <Segmented
+        options={ROADMAP_VIEWS.map((view) => ({ value: view, label: VIEW_LABELS[view] }))}
+        value={state.view}
+        onChange={(value) => state.setView(value as RoadmapView)}
+        className="w-fit"
+      />
 
-        <Toolbar label="Roadmap controls">
-          <Segmented
-            options={ROADMAP_VIEWS.map((view) => ({ value: view, label: VIEW_LABELS[view] }))}
-            value={state.view}
-            onChange={(value) => state.setView(value as RoadmapView)}
-          />
-          <SearchField
-            value={search}
-            onChange={(value) => updateParam('q', value)}
-            placeholder="Search roadmap"
-            debounceMs={150}
-            className="min-w-[220px] flex-1 md:flex-none"
-          />
-          <ToolbarSpacer />
-          <FormSelect
-            aria-label="Sort roadmap"
-            value={sort}
-            onChange={(value) => updateParam('sort', value)}
-            options={SORT_OPTIONS}
-            className="w-[150px]"
-          />
-          <FormSelect
-            aria-label="Sort direction"
-            value={dir}
-            onChange={(value) => updateParam('dir', value)}
-            options={DIR_OPTIONS}
-            className="w-[140px]"
-          />
-        </Toolbar>
-
-        <DataTable
-          columns={[
-            { key: 'id', label: '#', sortable: true, width: '74px' },
-            { key: 'title', label: 'Item', sortable: true, width: '1.4fr' },
-            {
-              key: 'status',
-              label: 'Status',
-              sortable: true,
-              width: '128px',
-              render: (value) => <Badge label={statusLabel(value as RoadmapStatus)} tone={statusTone(value as RoadmapStatus)} variant="soft" />,
-            },
-            {
-              key: 'priority',
-              label: 'Priority',
-              sortable: true,
-              width: '96px',
-              render: (value) => <Badge label={String(value)} tone={priorityTone(value as RoadmapPriority | '—')} variant="soft" />,
-            },
-            { key: 'sprint', label: 'Sprint', sortable: true, width: '1fr' },
-            { key: 'est', label: 'Est', sortable: true, align: 'right', width: '82px' },
-            { key: 'createdAt', label: 'Added', sortable: true, width: '120px', render: (value) => typeof value === 'string' ? formatDate(value) : '—' },
-            {
-              key: 'rowKey',
-              label: 'Cycle',
-              width: '92px',
-              align: 'right',
-              render: (_value, row) => (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => cycleStatus(row as RoadmapRow)}
-                  loading={toggleStatus.isPending}
-                >
-                  Cycle
-                </Button>
-              ),
-            },
+      <div role="toolbar" aria-label="Roadmap filters" className="flex flex-wrap items-center gap-2 pb-0.5">
+        <SearchField
+          value={search}
+          onChange={(value) => updateParam('q', value)}
+          placeholder="Search items…"
+          debounceMs={150}
+          className="min-w-[180px] flex-1"
+        />
+        <FormSelect
+          aria-label="Filter by priority"
+          value={priority}
+          onChange={(value) => updateParam('priority', value)}
+          options={[{ value: 'all', label: 'All priorities' }, ...PRIORITIES.map((value) => ({ value, label: value }))]}
+          className="w-[120px] shrink-0"
+        />
+        <FormSelect
+          aria-label="Filter by status"
+          value={status}
+          onChange={(value) => updateParam('status', value)}
+          options={[
+            { value: 'all', label: 'All statuses' },
+            { value: 'pending', label: 'Pending' },
+            { value: 'in_progress', label: 'In progress' },
+            { value: 'done', label: 'Done' },
+            { value: 'deferred', label: 'On hold' },
           ]}
-          rows={rows}
-          getRowKey={(row) => String(row.rowKey)}
-          loading={roadmap.isLoading}
-          empty={
-            <EmptyState
-              icon={({ className }) => <Icon name="sitemap" className={className} />}
-              title="No roadmap items match"
-              description="Clear search or switch views to inspect more work."
-            />
-          }
-          onRowClick={(row) => setSelectedKey(String(row.rowKey))}
+          className="w-[114px] shrink-0"
         />
-
-        {toggleStatus.isError && (
-          <InlineBanner
-            tone="error"
-            title="Roadmap update failed"
-            message={mutationErrorMessage(toggleStatus.error, 'Roadmap status update failed')}
-          />
-        )}
-
-        {selected && (
-          <SectionCard
-            title={selected.title}
-            titleIcon={<Icon name="clipboard" size="md" className="text-[var(--teal)]" />}
-            titleExtra={<Badge label={selected.sprint} tone="blue" variant="soft" />}
-          >
-            <div className="grid gap-3 md:grid-cols-4">
-              <div>
-                <div className="t-label text-[var(--brand-text-muted)]">Status</div>
-                <div className="mt-1"><Badge label={statusLabel(selected.status)} tone={statusTone(selected.status)} variant="soft" /></div>
-              </div>
-              <div>
-                <div className="t-label text-[var(--brand-text-muted)]">Priority</div>
-                <div className="mt-1"><Badge label={selected.priority} tone={priorityTone(selected.priority)} variant="soft" /></div>
-              </div>
-              <div>
-                <div className="t-label text-[var(--brand-text-muted)]">Source</div>
-                <div className="mt-1 t-caption text-[var(--brand-text)]">{selected.source}</div>
-              </div>
-              <div>
-                <div className="t-label text-[var(--brand-text-muted)]">Shipped</div>
-                <div className="mt-1 t-caption text-[var(--brand-text)]">{selected.shippedAt ? formatDate(selected.shippedAt) : '—'}</div>
-              </div>
-            </div>
-            <p className="mt-4 t-caption text-[var(--brand-text)]">
-              {selected.notes || 'No description added yet.'}
-            </p>
-          </SectionCard>
+        <FormSelect
+          aria-label="Filter by sprint"
+          value={sprint}
+          onChange={(value) => updateParam('sprint', value)}
+          options={[{ value: 'all', label: 'All sprints' }, ...sprints.map((item) => ({ value: item.id, label: item.name }))]}
+          className="w-[116px] shrink-0"
+        />
+        <FormSelect
+          aria-label="Filter by feature"
+          value={feature}
+          onChange={(value) => updateParam('feature', value)}
+          options={[{ value: 'all', label: 'All features' }, ...featureValues.map((value) => ({ value, label: value }))]}
+          disabled={featureValues.length === 0}
+          className="w-[114px] shrink-0"
+        />
+        <FormSelect
+          aria-label="Filter by tag"
+          value={tag}
+          onChange={(value) => updateParam('tag', value)}
+          options={[{ value: 'all', label: 'All tags' }, ...tagValues.map((value) => ({ value, label: value }))]}
+          disabled={tagValues.length === 0}
+          className="w-[104px] shrink-0"
+        />
+        <FormSelect
+          aria-label="Sort roadmap"
+          value={sort}
+          onChange={(value) => updateParam('sort', value)}
+          options={SORT_OPTIONS}
+          className="w-[118px] shrink-0"
+        />
+        <FormSelect
+          aria-label="Sort direction"
+          value={dir}
+          onChange={(value) => updateParam('dir', value)}
+          options={DIR_OPTIONS}
+          className="w-[104px] shrink-0"
+        />
+        {filtersActive && (
+          <Button variant="secondary" size="sm" onClick={clearFilters} className="shrink-0">Clear</Button>
         )}
       </div>
-    </PageContainer>
+
+      {state.view === 'sprint' ? (
+        <RoadmapSprintGroups
+          groups={groups}
+          expandedKey={expandedKey}
+          cyclingKey={cyclingKey}
+          loading={roadmap.isLoading}
+          onToggle={(key) => setExpandedKey((current) => current === key ? null : key)}
+          onCycle={cycleStatus}
+        />
+      ) : (
+        <RoadmapBacklog
+          rows={filteredRows}
+          expandedKey={expandedKey}
+          cyclingKey={cyclingKey}
+          loading={roadmap.isLoading}
+          onToggle={(key) => setExpandedKey((current) => current === key ? null : key)}
+          onCycle={cycleStatus}
+        />
+      )}
+
+      {toggleStatus.isError && (
+        <InlineBanner
+          tone="error"
+          title="Roadmap update failed"
+          message={mutationErrorMessage(toggleStatus.error, 'Roadmap status update failed')}
+        />
+      )}
+    </div>
   );
 }

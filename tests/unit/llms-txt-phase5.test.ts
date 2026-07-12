@@ -51,4 +51,25 @@ describe('queueLlmsTxtRegeneration', () => {
     // Should not throw when called (even if generation fails in test env)
     expect(() => mod.queueLlmsTxtRegeneration('ws-test', 'schema_published')).not.toThrow();
   });
+
+  it('persists the generated result before recording automatic freshness', async () => {
+    const mod = await import('../../server/llms-txt-generator.js');
+    const { createWorkspace, deleteWorkspace } = await import('../../server/workspaces.js');
+    const workspace = createWorkspace('LLMs.txt Auto Persistence');
+
+    try {
+      mod.queueLlmsTxtRegeneration(workspace.id, 'keyword_strategy_updated');
+
+      await vi.waitFor(() => {
+        expect(mod.getStoredResult(workspace.id)).not.toBeNull();
+      }, { timeout: 5_000 });
+
+      const stored = mod.getStoredResult(workspace.id);
+      expect(stored).toMatchObject({ pageCount: 0 });
+      expect(stored?.content).toContain('# LLMs.txt Auto Persistence');
+      expect(mod.getLastGenerated(workspace.id)).not.toBeNull();
+    } finally {
+      deleteWorkspace(workspace.id);
+    }
+  });
 });

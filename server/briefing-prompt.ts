@@ -5,10 +5,14 @@
 // (weekly opener prose). The full-narrative AI path (buildBriefingInstructions
 // + briefingAIResponseSchema) was replaced by deterministic templates in
 // `server/briefing-templates/` (Phase 2.5a) and removed in the 2.5d cleanup.
-// Voice DNA + guardrails (Layer 2) are injected upstream by buildSystemPrompt()
-// in server/prompt-assembly.ts — do NOT duplicate that content here.
+// Voice authority is assembled in two complementary layers: the effective
+// voice block supplies legacy/draft voice and calibrated samples, while
+// buildSystemPrompt() supplies calibrated DNA + guardrails. The authority
+// helper deliberately omits calibrated DNA/guardrails, so this stays single-copy.
 import { callAI } from './ai.js';
 import { createLogger } from './logger.js';
+import { buildEffectiveBrandVoiceBlock } from './intelligence/seo-context-source.js';
+import { buildSystemPrompt } from './prompt-assembly.js';
 import { sanitizeInlinePromptText } from './utils/text.js';
 import type { BriefingStory } from '../shared/types/briefing.js';
 
@@ -51,6 +55,14 @@ function containsHedge(s: string): boolean {
 
 /** Display string for the "BANNED words:" line in AI prompts. KEEP IN SYNC with HEDGE_WORDS_CI_RE + HEDGE_MAY_RE. */
 const BANNED_WORDS_TEXT = 'potentially, could, may, appears, suggests, might, seems';
+
+function buildBriefingSystemPrompt(workspaceId: string, baseInstructions: string): string {
+  const effectiveVoiceBlock = buildEffectiveBrandVoiceBlock(workspaceId);
+  return buildSystemPrompt(
+    workspaceId,
+    effectiveVoiceBlock ? `${baseInstructions}${effectiveVoiceBlock}` : baseInstructions,
+  );
+}
 
 /**
  * Detect paired quotation marks in `s`. Returns true when:
@@ -124,11 +136,11 @@ export async function punchHeroHeadline(
     // System prompt carries the rules — codebase idiom (see
     // server/copy-generation.ts, server/content-posts-ai.ts). The user
     // message carries only the data the model needs to act on.
-    const systemMsg = [
+    const systemMsg = buildBriefingSystemPrompt(workspaceId, [
       `You rewrite SEO briefing headlines to be 5-12 words, more memorable, definite tense.`,
       `BANNED words: ${BANNED_WORDS_TEXT}.`,
       `Return ONLY the rewritten headline as a single line. No quotes, no preamble.`,
-    ].join(' ');
+    ].join(' '));
     const userMsg = [
       `Original headline: ${sanitizeInlinePromptText(deterministicHeadline)}`,
       insightHint ? `Underlying data: ${sanitizeInlinePromptText(insightHint)}` : '',
@@ -203,7 +215,7 @@ export async function writeWeeklyOpener(
 
     // System prompt carries rules; user prompt carries data. Codebase
     // idiom — Anthropic models obey system instructions more reliably.
-    const systemMsg = [
+    const systemMsg = buildBriefingSystemPrompt(ctx.workspaceId, [
       `You write a single-line "letter from the editor" intro that frames a weekly SEO briefing.`,
       `Rules:`,
       `- 25 words MAX. Period-terminated.`,
@@ -212,7 +224,7 @@ export async function writeWeeklyOpener(
       `- No quotation marks. No bold/italics. Plain prose.`,
       `- Definite tense. Confident editorial voice.`,
       `Return ONLY the line.`,
-    ].join('\n');
+    ].join('\n'));
     const userMsg = [
       `Workspace: ${sanitizeInlinePromptText(ctx.workspaceName)}`,
       `Week of: ${ctx.weekOf}`,

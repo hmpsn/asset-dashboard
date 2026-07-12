@@ -163,7 +163,7 @@ describe('intelligence follow-up builders', () => {
     expect(buildWorkspaceIntelligence).toHaveBeenCalledWith('ws-test', {
       slices: result.intelligence ? vi.mocked(buildWorkspaceIntelligence).mock.calls[0]?.[1]?.slices : [],
       learningsDomain: 'all',
-      enrichWithBacklinks: true,
+      enrichWithBacklinks: false,
     });
     expect(result.workspaceContextBlock).toContain('WORKSPACE INTELLIGENCE CONTEXT');
     expect(result.learningsBlock).toContain('## Intelligence');

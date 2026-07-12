@@ -9,10 +9,17 @@
  */
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
+const intelligenceMocks = vi.hoisted(() => ({
+  invalidateIntelligenceCache: vi.fn(),
+}));
+
 // Mock getSearchOverview — must be hoisted before any imports that use it
 vi.mock('../../server/search-console.js', () => ({
   getSearchOverview: vi.fn(),
   getSearchQueryObservations: vi.fn(),
+}));
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
+  invalidateIntelligenceCache: intelligenceMocks.invalidateIntelligenceCache,
 }));
 
 import {
@@ -120,6 +127,8 @@ describe('runRankTrackingSnapshots', () => {
       'SELECT COUNT(*) as count FROM discovered_queries WHERE workspace_id = ?',
     ).get(testWsId) as { count: number };
     expect(discoveredRows.count).toBeGreaterThan(0);
+    expect(intelligenceMocks.invalidateIntelligenceCache).toHaveBeenCalledTimes(1);
+    expect(intelligenceMocks.invalidateIntelligenceCache).toHaveBeenCalledWith(testWsId);
   });
 
   it('continues processing other workspaces when one throws', async () => {
@@ -136,11 +145,15 @@ describe('runRankTrackingSnapshots', () => {
     mockGetSearchOverview
       .mockRejectedValueOnce(new Error('GSC auth failed'))  // first workspace throws
       .mockResolvedValueOnce({ topQueries: [] });           // second workspace succeeds
-    mockGetSearchQueryObservations.mockResolvedValueOnce([]);
+    mockGetSearchQueryObservations
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
 
     await runRankTrackingSnapshots([testWsId, ws2.id]);
 
     expect(mockGetSearchOverview).toHaveBeenCalledTimes(2);
+    expect(intelligenceMocks.invalidateIntelligenceCache).toHaveBeenCalledTimes(1);
+    expect(intelligenceMocks.invalidateIntelligenceCache).toHaveBeenCalledWith(ws2.id);
     deleteWorkspace(ws2.id);
   });
 

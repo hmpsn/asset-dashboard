@@ -38,6 +38,7 @@ import {
 import { assertCreditBudget, CreditBudgetError } from './credit-budget-gate.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { addActivity } from './activity-log.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { WS_EVENTS } from './ws-events.js';
 import { isRefreshJobCancelled, waitForHeapHeadroom } from './seo-refresh-runner-runtime.js';
 import { LOCAL_SEO_MARKET_STATUS } from '../shared/types/local-seo.js';
@@ -119,6 +120,18 @@ function toStoreRow(
 }
 
 export async function runLocalGbpRefreshJob(workspaceId: string, jobId: string): Promise<void> {
+  let persistedSnapshotsAwaitingInvalidation = false;
+  const invalidateFlushedSnapshots = (): void => {
+    if (!persistedSnapshotsAwaitingInvalidation) return;
+    try {
+      invalidateIntelligenceCache(workspaceId);
+      persistedSnapshotsAwaitingInvalidation = false;
+    } catch (err) {
+      // Cache invalidation is advisory to the provider job. Preserve the stored
+      // snapshots and retry once from finally rather than failing the refresh.
+      log.warn({ err, workspaceId }, 'local-gbp refresh: intelligence cache invalidation failed');
+    }
+  };
   try {
     const workspace = getWorkspace(workspaceId);
     if (!workspace) {
@@ -209,8 +222,12 @@ export async function runLocalGbpRefreshJob(workspaceId: string, jobId: string):
       if (byPlaceId.size === 0) return;
       const rows = [...byPlaceId.values()];
       storeBusinessListingSnapshots(workspaceId, today, rows);
+      persistedSnapshotsAwaitingInvalidation = true;
       listingsPersisted += rows.length;
       byPlaceId.clear();
+      // The progress/completion events below invite immediate refetches. Clear
+      // intelligence after each persisted batch, before signaling those reads.
+      invalidateFlushedSnapshots();
     };
 
     /** Observe-only budget check before a PAID provider read. Returns false → skip the call. */
@@ -337,6 +354,11 @@ export async function runLocalGbpRefreshJob(workspaceId: string, jobId: string):
       result: summary,
     });
   } finally {
-    unregisterAbort(jobId);
+    try {
+      // Retry only when a successful write could not be invalidated in-band.
+      invalidateFlushedSnapshots();
+    } finally {
+      unregisterAbort(jobId);
+    }
   }
 }

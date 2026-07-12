@@ -23,9 +23,14 @@ import { createLogger } from './logger.js';
 import { callAI } from './ai.js';
 import { STUDIO_BOT_UA } from './constants.js';
 import db from './db/index.js';
+import { parseJsonSafe } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { isProgrammingError } from './errors.js';
+import { z } from 'zod';
+import type { Workspace } from '../shared/types/workspace.js';
+import { buildEffectiveBusinessPriorities } from './intelligence/business-priorities-source.js';
+import { sanitizeInlinePromptText } from './utils/text.js';
 
 const log = createLogger('llms-txt');
 
@@ -85,20 +90,83 @@ interface CacheRow {
   generated_at: string;
 }
 
-export function upsertSummary(workspaceId: string, pageUrl: string, summary: string) {
+const SUMMARY_CACHE_ENVELOPE_PREFIX = 'hmpsn:llms-summary:v1:';
+
+const summaryCacheEnvelopeSchema = z.object({
+  version: z.literal(1),
+  evidenceHash: z.string().regex(/^[a-f0-9]{64}$/),
+  summary: z.string().min(1),
+}).strip();
+
+interface SummaryCacheEnvelope {
+  version: 1;
+  evidenceHash: string;
+  summary: string;
+}
+
+interface ParsedCachedSummary {
+  summary: string;
+  evidenceHash?: string;
+}
+
+function serializeCachedSummary(summary: string, evidenceHash?: string): string {
+  if (!evidenceHash) return summary;
+  const envelope: SummaryCacheEnvelope = {
+    version: 1,
+    evidenceHash,
+    summary,
+  };
+  return `${SUMMARY_CACHE_ENVELOPE_PREFIX}${JSON.stringify(envelope)}`;
+}
+
+function parseCachedSummary(raw: string, workspaceId: string): ParsedCachedSummary | null {
+  if (!raw.startsWith(SUMMARY_CACHE_ENVELOPE_PREFIX)) {
+    return { summary: raw };
+  }
+
+  const envelope = parseJsonSafe(
+    raw.slice(SUMMARY_CACHE_ENVELOPE_PREFIX.length),
+    summaryCacheEnvelopeSchema,
+    null,
+    { workspaceId, field: 'summary', table: 'llms_txt_cache' },
+  );
+  if (!envelope) return null;
+  return {
+    summary: envelope.summary,
+    evidenceHash: envelope.evidenceHash,
+  };
+}
+
+export function upsertSummary(
+  workspaceId: string,
+  pageUrl: string,
+  summary: string,
+  evidenceHash?: string,
+) {
   const id = randomUUID();
-  cacheStmts().upsert.run({ id, workspace_id: workspaceId, page_url: pageUrl, summary });
+  cacheStmts().upsert.run({
+    id,
+    workspace_id: workspaceId,
+    page_url: pageUrl,
+    summary: serializeCachedSummary(summary, evidenceHash),
+  });
 }
 
 export function getSummary(workspaceId: string, pageUrl: string) {
   const row = cacheStmts().getOne.get(workspaceId, pageUrl) as CacheRow | undefined;
   if (!row) return null;
-  return { summary: row.summary, generatedAt: row.generated_at };
+  const parsed = parseCachedSummary(row.summary, workspaceId);
+  if (!parsed) return null;
+  return { ...parsed, generatedAt: row.generated_at };
 }
 
 export function getSummaries(workspaceId: string) {
   const rows = cacheStmts().getAll.all(workspaceId) as CacheRow[];
-  return rows.map(r => ({ pageUrl: r.page_url, summary: r.summary, generatedAt: r.generated_at }));
+  return rows.flatMap(row => {
+    const parsed = parseCachedSummary(row.summary, workspaceId);
+    if (!parsed) return [];
+    return [{ pageUrl: row.page_url, ...parsed, generatedAt: row.generated_at }];
+  });
 }
 
 export function deleteSummary(workspaceId: string, pageUrl: string): boolean {
@@ -197,7 +265,8 @@ export function queueLlmsTxtRegeneration(workspaceId: string, trigger: string) {
   setImmediate(async () => {
     try {
       log.info({ workspaceId, trigger }, 'Auto-regenerating LLMs.txt');
-      await generateLlmsTxt(workspaceId);
+      const result = await generateLlmsTxt(workspaceId);
+      storeResult(workspaceId, result);
       setLastGenerated(workspaceId, trigger);
       log.info({ workspaceId, trigger }, 'LLMs.txt auto-regeneration complete');
     } catch (err) {
@@ -271,24 +340,132 @@ export async function validateUrls(urls: string[], concurrency = 10): Promise<st
 
 // ── AI Summary Generation ──
 
-async function generatePageSummary(workspaceId: string, title: string, description: string, pageUrl: string): Promise<string> {
+interface SummaryKeywordContext {
+  primaryKeyword: string;
+  secondaryKeywords: string[];
+  searchIntent: string;
+}
+
+interface SummaryBusinessContext {
+  strategyContext: string;
+  industry: string;
+  targetAudience: string;
+  goals: string[];
+  priorities: string[];
+}
+
+interface PageSummaryEvidence {
+  contractVersion: 1;
+  page: {
+    url: string;
+    title: string;
+    metaDescription: string;
+  };
+  keywordContext: SummaryKeywordContext;
+  businessContext: SummaryBusinessContext;
+}
+
+function normalizeEvidenceText(value: string | null | undefined): string {
+  return sanitizeInlinePromptText(value, 2000);
+}
+
+function normalizeEvidenceList(values: readonly string[] | null | undefined): string[] {
+  const unique = new Map<string, string>();
+  for (const value of values ?? []) {
+    const normalized = normalizeEvidenceText(value);
+    if (normalized) unique.set(normalized.toLowerCase(), normalized);
+  }
+  return [...unique.values()].sort((a, b) => a.localeCompare(b));
+}
+
+function resolveSummaryBusinessContext(workspace: Workspace): SummaryBusinessContext {
+  return {
+    strategyContext: normalizeEvidenceText(workspace.keywordStrategy?.businessContext),
+    industry: normalizeEvidenceText(workspace.intelligenceProfile?.industry),
+    targetAudience: normalizeEvidenceText(workspace.intelligenceProfile?.targetAudience),
+    goals: normalizeEvidenceList(workspace.intelligenceProfile?.goals),
+    priorities: normalizeEvidenceList(buildEffectiveBusinessPriorities(workspace.id)),
+  };
+}
+
+function buildPageSummaryEvidence(input: {
+  url: string;
+  title: string;
+  description?: string;
+  keywordContext?: Partial<SummaryKeywordContext>;
+  businessContext: SummaryBusinessContext;
+}): PageSummaryEvidence {
+  return {
+    contractVersion: 1,
+    page: {
+      url: normalizeEvidenceText(input.url),
+      title: normalizeEvidenceText(input.title),
+      metaDescription: normalizeEvidenceText(input.description),
+    },
+    keywordContext: {
+      primaryKeyword: normalizeEvidenceText(input.keywordContext?.primaryKeyword),
+      secondaryKeywords: normalizeEvidenceList(input.keywordContext?.secondaryKeywords),
+      searchIntent: normalizeEvidenceText(input.keywordContext?.searchIntent),
+    },
+    businessContext: input.businessContext,
+  };
+}
+
+function hashPageSummaryEvidence(evidence: PageSummaryEvidence): string {
+  return createHash('sha256').update(JSON.stringify(evidence)).digest('hex');
+}
+
+function formatPageSummaryEvidence(evidence: PageSummaryEvidence): string {
+  const keywordLines = [
+    `- Primary keyword: ${evidence.keywordContext.primaryKeyword || 'None provided'}`,
+    `- Secondary keywords: ${evidence.keywordContext.secondaryKeywords.join(', ') || 'None provided'}`,
+    `- Search intent: ${evidence.keywordContext.searchIntent || 'None provided'}`,
+  ];
+  const businessLines = [
+    `- Strategy context: ${evidence.businessContext.strategyContext || 'None provided'}`,
+    `- Industry: ${evidence.businessContext.industry || 'None provided'}`,
+    `- Target audience: ${evidence.businessContext.targetAudience || 'None provided'}`,
+    `- Goals: ${evidence.businessContext.goals.join('; ') || 'None provided'}`,
+    `- Business priorities: ${evidence.businessContext.priorities.join('; ') || 'None provided'}`,
+  ];
+
+  return [
+    'Page evidence:',
+    `- Title: ${evidence.page.title}`,
+    `- URL: ${evidence.page.url}`,
+    `- Meta description: ${evidence.page.metaDescription || 'None provided'}`,
+    '',
+    'Keyword context:',
+    ...keywordLines,
+    '',
+    'Business context:',
+    ...businessLines,
+    '',
+    'Summarize this page in 2-3 sentences.',
+  ].join('\n');
+}
+
+async function generatePageSummary(
+  workspaceId: string,
+  evidence: PageSummaryEvidence,
+): Promise<string | null> {
   try {
     const result = await callAI({
       model: 'gpt-5.4-mini',
-      system: 'You are a concise web content summarizer. Summarize the given page in 2-3 sentences for an AI assistant. Capture: what the page is about, what services/expertise it represents, and who the target audience is. Be factual and precise. Do not use marketing language.',
+      system: 'You are a concise web content summarizer. Summarize the given page in 2-3 sentences for an AI assistant. Capture what the page is about, what services or expertise it represents, and who the target audience is. Use only the supplied page, keyword, and business evidence. Do not infer offerings, audiences, or claims that are not present; omit unsupported details instead. Be factual and precise. Do not use marketing language or Markdown.',
       messages: [{
         role: 'user',
-        content: `Page: ${title}\nURL: ${pageUrl}\nMeta description: ${description || 'None'}\n\nSummarize this page in 2-3 sentences.`,
+        content: formatPageSummaryEvidence(evidence),
       }],
       maxTokens: 200,
       temperature: 0.3,
       feature: 'llms-txt-summary',
       workspaceId,
     });
-    return result.text.trim();
+    return result.text.trim() || null;
   } catch (err) {
-    log.warn({ err, pageUrl }, 'Failed to generate page summary');
-    return description || '';
+    log.warn({ err, pageUrl: evidence.page.url }, 'Failed to generate page summary');
+    return null;
   }
 }
 
@@ -415,6 +592,8 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
   const domain = ws.liveDomain?.replace(/^https?:\/\//, '').replace(/\/+$/, '');
   const siteName = ws.name || domain || 'Website';
   const baseUrl = domain ? `https://${domain}` : '';
+  const siteDescription = ws.keywordStrategy?.businessContext;
+  const summaryBusinessContext = resolveSummaryBusinessContext(ws);
 
   const pages: LlmsTxtPage[] = [];
 
@@ -451,15 +630,19 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
   }
 
   // 2. Enrich with keyword strategy data
-  const keywordMap = new Map<string, { keyword: string; intent?: string }>();
+  const keywordMap = new Map<string, SummaryKeywordContext>();
   const kwPages = listPageKeywords(ws.id);
   for (const pm of kwPages) {
     const path = pm.pagePath.startsWith('/') ? pm.pagePath : `/${pm.pagePath}`;
-    keywordMap.set(path.toLowerCase(), { keyword: pm.primaryKeyword || '', intent: pm.searchIntent });
+    keywordMap.set(path.toLowerCase(), {
+      primaryKeyword: pm.primaryKeyword || '',
+      secondaryKeywords: pm.secondaryKeywords || [],
+      searchIntent: pm.searchIntent || '',
+    });
   }
   for (const page of pages) {
     const kwData = keywordMap.get(page.path.toLowerCase());
-    if (kwData?.keyword) page.keywords = [kwData.keyword];
+    if (kwData?.primaryKeyword) page.keywords = [kwData.primaryKeyword];
   }
 
   // 3. URL validation (filter broken links)
@@ -484,11 +667,28 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
   }
 
   // 4. AI summaries (cached)
-  const existingCache = new Map(getSummaries(workspaceId).map(s => [s.pageUrl, s.summary]));
-  const needsSummary = pages.filter(p => {
-    const url = baseUrl ? `${baseUrl}${p.path}` : p.path;
-    return !existingCache.has(url);
+  const existingCache = new Map(getSummaries(workspaceId).map(summary => [summary.pageUrl, {
+    summary: summary.summary,
+    evidenceHash: summary.evidenceHash,
+  }]));
+  const summaryWork = pages.map(page => {
+    const url = baseUrl ? `${baseUrl}${page.path}` : page.path;
+    const evidence = buildPageSummaryEvidence({
+      url,
+      title: page.title,
+      description: page.description,
+      keywordContext: keywordMap.get(page.path.toLowerCase()),
+      businessContext: summaryBusinessContext,
+    });
+    return {
+      url,
+      evidence,
+      evidenceHash: hashPageSummaryEvidence(evidence),
+    };
   });
+  const needsSummary = summaryWork.filter(item =>
+    existingCache.get(item.url)?.evidenceHash !== item.evidenceHash
+  );
 
   // Generate missing summaries in batches of 5
   if (needsSummary.length > 0) {
@@ -496,13 +696,16 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
     for (let i = 0; i < needsSummary.length; i += 5) {
       const batch = needsSummary.slice(i, i + 5);
       const results = await Promise.all(
-        batch.map(p => generatePageSummary(workspaceId, p.title, p.description || '', baseUrl ? `${baseUrl}${p.path}` : p.path))
+        batch.map(item => generatePageSummary(workspaceId, item.evidence))
       );
       for (let j = 0; j < batch.length; j++) {
-        const url = baseUrl ? `${baseUrl}${batch[j].path}` : batch[j].path;
-        if (results[j]) {
-          upsertSummary(workspaceId, url, results[j]);
-          existingCache.set(url, results[j]);
+        const summary = results[j];
+        if (summary) {
+          upsertSummary(workspaceId, batch[j].url, summary, batch[j].evidenceHash);
+          existingCache.set(batch[j].url, {
+            summary,
+            evidenceHash: batch[j].evidenceHash,
+          });
         }
       }
     }
@@ -511,7 +714,7 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
   // Attach summaries to pages
   for (const page of pages) {
     const url = baseUrl ? `${baseUrl}${page.path}` : page.path;
-    page.summary = existingCache.get(url);
+    page.summary = existingCache.get(url)?.summary;
   }
 
   // 5. Planned content
@@ -554,12 +757,10 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
   } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'llms-txt-generator: programming error'); /* non-critical */ }
 
   // 6. Build both tiers
-  const businessContext = ws.keywordStrategy?.businessContext;
-
   const content = buildLlmsTxtIndex({
     siteName,
     baseUrl,
-    description: businessContext,
+    description: siteDescription,
     pages,
     plannedPages,
   });
@@ -567,7 +768,7 @@ export async function generateLlmsTxt(workspaceId: string): Promise<LlmsTxtResul
   const fullContent = buildLlmsFullTxt({
     siteName,
     baseUrl,
-    description: businessContext,
+    description: siteDescription,
     pages,
   });
 

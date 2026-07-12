@@ -28,6 +28,7 @@ import { scoringConfigOverrideSchema } from './schemas/outcome-schemas.js';
 import { normalizeSocialProfiles } from './social-profiles.js';
 import { normalizeRuntimeSeoDataProvider } from './seo-data-provider.js';
 import { z } from 'zod';
+import { invalidateMonthlyDigestCache } from './monthly-digest-cache.js';
 
 // ── Brand name resolution ──
 
@@ -528,6 +529,9 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
 
   const existing = rowToWorkspace(row);
   const normalizedUpdates = { ...updates };
+  const digestInputsChanged = (
+    ['webflowSiteId', 'gscPropertyUrl', 'ga4PropertyId', 'customPromptNotes'] as const
+  ).some(key => key in normalizedUpdates);
   if (normalizedUpdates.businessProfile) {
     const normalizedSocialProfiles = normalizeSocialProfiles(normalizedUpdates.businessProfile.socialProfiles);
     normalizedUpdates.businessProfile = {
@@ -626,11 +630,14 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     db.prepare(sql).run(params);
   }
 
-  return attachPageStates(rowToWorkspace(stmts().getById.get(id) as WorkspaceRow));
+  const updated = attachPageStates(rowToWorkspace(stmts().getById.get(id) as WorkspaceRow));
+  if (digestInputsChanged) invalidateMonthlyDigestCache(id);
+  return updated;
 }
 
 export function deleteWorkspace(id: string): boolean {
   const result = stmts().deleteById.run(id);
+  if (result.changes > 0) invalidateMonthlyDigestCache(id);
   return result.changes > 0;
 }
 

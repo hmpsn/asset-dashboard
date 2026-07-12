@@ -36,6 +36,7 @@ export function usePageJoin(
   strategyPages: UnifiedPage[];
   webflowPages: UnifiedPage[];
   isLoading: boolean;
+  isFetching: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
 } {
@@ -130,6 +131,7 @@ export function usePageJoin(
   const isLoading =
     (pagesQuery.isLoading && pagesQuery.data === undefined) ||
     (strategyQuery.isLoading && strategyQuery.data === undefined);
+  const isFetching = Boolean(pagesQuery.isFetching || strategyQuery.isFetching);
 
   const error: Error | null =
     (pagesQuery.error as Error | null) ?? (strategyQuery.error as Error | null) ?? null;
@@ -138,5 +140,5 @@ export function usePageJoin(
     await Promise.all([pagesQuery.refetch(), strategyQuery.refetch()]);
   };
 
-  return { pages, strategyPages, webflowPages, isLoading, error, refetch };
+  return { pages, strategyPages, webflowPages, isLoading, isFetching, error, refetch };
 }

@@ -11,6 +11,8 @@ import { rowToWorkspaceLearnings } from './db/outcome-mappers.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
+import { invalidateMonthlyDigestCache } from './monthly-digest-cache.js';
+import { clearIntelligenceCache } from './intelligence/cache-clear.js';
 import type { WorkspaceLearningsRow } from './db/outcome-mappers.js';
 import type {
   WorkspaceLearnings,
@@ -808,6 +810,8 @@ export async function recomputeAllWorkspaceLearnings(): Promise<void> {
         computed_at: learnings.computedAt,
       });
 
+      invalidateMonthlyDigestCache(workspaceId);
+      clearIntelligenceCache(workspaceId);
       broadcastToWorkspace(workspaceId, WS_EVENTS.OUTCOME_LEARNINGS_UPDATED, {
         totalScoredActions: learnings.totalScoredActions,
         confidence: learnings.confidence,

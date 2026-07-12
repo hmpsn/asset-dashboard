@@ -78,6 +78,7 @@ vi.mock('../../server/chat-memory.js', () => ({
   buildConversationContext: vi.fn(() => ({ historyMessages: [], priorContext: '' })),
   getSession: vi.fn(),
   generateSessionSummary: vi.fn(),
+  shouldAttemptSessionSummary: vi.fn((count: number) => count >= 6),
 }));
 vi.mock('../../server/prompt-assembly.js', () => ({ buildSystemPrompt: vi.fn((_workspaceId: string, prompt: string) => prompt) }));
 vi.mock('../../server/external-fetch.js', () => ({

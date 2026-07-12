@@ -27,11 +27,11 @@ import { countHtmlWords } from '../content-posts-ai.js';
 import { getPageKeyword, listPageKeywords, listPageKeywordsPaged } from '../page-keywords.js';
 import { assembleStoredKeywordStrategy } from '../keyword-strategy-assembler.js';
 import { getClientActor, requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
-import { getPageTrend, getQueryPageData } from '../search-console.js';
+import { getQueryPageData } from '../search-console.js';
 import { getWorkspace, computeEffectiveTier } from '../workspaces.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../rank-tracking.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
-import { handlePublicContentPerformance } from '../domains/content/content-performance.js';
+import { getContentPerformanceTrend, handlePublicContentPerformance } from '../domains/content/content-performance.js';
 import { isProgrammingError } from '../errors.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';
 import { resolveWorkspaceLocationCode } from '../local-seo.js';
@@ -65,7 +65,6 @@ const router = Router();
 const ACTIVITY_COMMENT_PREVIEW_LENGTH = 200;
 type TrackedKeywordActivityType = 'client_keyword_tracked' | 'client_keyword_removed';
 const requirePublicContentWriteAuth = requireAuthenticatedClientPortalAuth('workspaceId');
-const PUBLIC_CONTENT_PERFORMANCE_STATUSES = new Set(['delivered', 'published']);
 
 router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));
 
@@ -574,30 +573,9 @@ router.get('/api/public/content-performance/:workspaceId', async (req, res) => {
 
 router.get('/api/public/content-performance/:workspaceId/:requestId/trend', async (req, res) => {
   try {
-    const ws = getWorkspace(req.params.workspaceId);
-    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-    const request = getContentRequest(req.params.workspaceId, req.params.requestId);
-    if (!request) return res.status(404).json({ error: 'Request not found' });
-    if (!PUBLIC_CONTENT_PERFORMANCE_STATUSES.has(request.status)) {
-      return res.status(404).json({ error: 'Request not found' });
-    }
-    if (!request.targetPageSlug || !ws.gscPropertyUrl || !ws.webflowSiteId) {
-      return res.json({ trend: [] });
-    }
-
-    let siteBase = ws.gscPropertyUrl.replace(/\/$/, '');
-    if (siteBase.startsWith('sc-domain:')) {
-      siteBase = `https://${siteBase.replace('sc-domain:', '')}`;
-    }
-    const pagePath = normalizePageUrl(request.targetPageSlug);
-    const pageUrl = `${siteBase}${pagePath === '/' ? '' : pagePath}`;
-
-    const publishDate = request.updatedAt || request.requestedAt;
-    const startDate = publishDate.split('T')[0];
-    const endDate = new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0];
-
-    const trend = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, pageUrl, 90, { startDate, endDate });
-    res.json({ trend });
+    const result = await getContentPerformanceTrend(req.params.workspaceId, req.params.requestId, { audience: 'public' });
+    if (!result) return res.status(404).json({ error: 'Published item not found' });
+    res.json(result);
   } catch (err: unknown) {
     log.warn({ err, workspaceId: req.params.workspaceId, requestId: req.params.requestId }, 'public content performance trend failed');
     res.status(500).json({ error: 'Unable to load content performance trend' });

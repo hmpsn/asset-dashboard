@@ -1,7 +1,7 @@
 import React from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { ICON_NAMES } from './iconNames';
+import { ICON_NAMES, type IconName } from './iconNames';
 
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 
@@ -10,11 +10,7 @@ export interface IconProps extends React.HTMLAttributes<HTMLSpanElement> {
    * Semantic key from ICON_NAMES → a Font Awesome Sharp Regular glyph (the icon
    * system of record). Preferred for new code.
    */
-  name?: string;
-  /** Raw Font Awesome classes, e.g. "fa-sharp fa-solid fa-star". Overrides `name`. */
-  fa?: string;
-  /** FA family prefix used with `name`. Default "fa-sharp fa-regular". */
-  family?: string;
+  name?: IconName;
   /**
    * A lucide-react component. Supported during the incremental lucide→FA
    * migration; existing call sites keep working unchanged. Prefer `name`.
@@ -33,7 +29,7 @@ const SIZE_MAP: Record<IconSize, string> = {
   '2xl': 'w-8 h-8',
 };
 
-// Pixel font-size for the Font Awesome (`name`/`fa`) path — matches SIZE_MAP's rem box.
+// Pixel font-size for the Font Awesome `name` path — matches SIZE_MAP's rem box.
 const SIZE_PX: Record<IconSize, number> = {
   xs: 8, sm: 12, md: 16, lg: 20, xl: 24, '2xl': 32,
 };
@@ -41,7 +37,7 @@ const SIZE_PX: Record<IconSize, number> = {
 /**
  * Inline icon wrapper. Renders a `<span>` so it is safe inside `<p>`, `<li>`, or
  * any inline-flow container. Two glyph sources:
- *   1. `name` (from ICON_NAMES) or `fa` → a Font Awesome Sharp Regular glyph
+ *   1. `name` (from ICON_NAMES) → a Font Awesome Sharp Regular glyph
  *      (`<i class="fa-sharp fa-regular fa-…">`). The icon system of record (D5).
  *   2. `as` → a lucide-react component (supported during the migration).
  *
@@ -50,7 +46,7 @@ const SIZE_PX: Record<IconSize, number> = {
  * wrapper gains `role="img"` so screen readers announce it.
  */
 export const Icon = React.forwardRef<HTMLSpanElement, IconProps>(function Icon(
-  { name, fa, family = 'fa-sharp fa-regular', as: Component, size = 'md', className, ...rest },
+  { name, as: Component, size = 'md', className, ...rest },
   ref,
 ) {
   // When the consumer passes aria-label / aria-labelledby, the <span> becomes a
@@ -58,9 +54,10 @@ export const Icon = React.forwardRef<HTMLSpanElement, IconProps>(function Icon(
   // with aria-label is not guaranteed to be announced per ARIA.
   const isSemantic = 'aria-label' in rest || 'aria-labelledby' in rest;
 
-  // Font Awesome path (name / fa) — the icon system of record.
-  if (fa || name) {
-    const glyphClass = fa ?? `${family} fa-${ICON_NAMES[name as keyof typeof ICON_NAMES] ?? name}`;
+  // Font Awesome registry path — the icon system of record. Keeping the prop
+  // registry-only makes the generated production CSS subset complete by type.
+  if (name) {
+    const glyphClass = `fa-sharp fa-regular fa-${ICON_NAMES[name]}`;
     return (
       <span
         ref={ref}

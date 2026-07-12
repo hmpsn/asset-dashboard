@@ -7,6 +7,8 @@ import { callAI } from './ai.js';
 import { getVoiceProfile, updateVoiceProfile } from './voice-calibration.js';
 import type { VoiceGuardrails } from '../shared/types/brand-engine.js';
 import type { CopyIntelligencePattern, IntelligencePatternType } from '../shared/types/copy-pipeline.js';
+import { broadcastToWorkspace } from './broadcast.js';
+import { WS_EVENTS } from './ws-events.js';
 
 const log = createLogger('copy-intelligence');
 const INTELLIGENCE_PATTERN_TYPES = new Set<IntelligencePatternType>([
@@ -240,6 +242,11 @@ export function promoteToGuardrail(
     log.error({ err, wsId, patternId }, 'Failed to promote pattern to guardrail');
     return { success: false, error: 'Could not update voice profile guardrails' };
   }
+
+  broadcastToWorkspace(wsId, WS_EVENTS.VOICE_PROFILE_UPDATED, {
+    patternId,
+    source: 'copy_intelligence_guardrail',
+  });
 
   log.info(
     { wsId, patternId, patternType: pattern.patternType, field, frequency: pattern.frequency },

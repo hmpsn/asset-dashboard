@@ -35,6 +35,7 @@ export interface BriefListProps {
   onRegenerateBrief: (briefId: string, feedback: string) => void;
   onRegenerateOutline?: (briefId: string, feedback?: string) => void;
   regeneratingOutline?: string | null;
+  workspaceMode?: boolean;
 }
 
 export function BriefList({
@@ -60,6 +61,7 @@ export function BriefList({
   onRegenerateBrief,
   onRegenerateOutline,
   regeneratingOutline,
+  workspaceMode = false,
 }: BriefListProps) {
   const linkedBriefIds = new Set(clientRequests.filter(r => r.briefId).map(r => r.briefId!));
   let standaloneBriefs = briefs.filter(b => !linkedBriefIds.has(b.id));
@@ -105,8 +107,8 @@ export function BriefList({
                   size="sm"
                   className="flex-1 min-w-0 !px-0 !py-0 !justify-start text-left bg-transparent hover:bg-transparent"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-[var(--brand-text-bright)] truncate">{brief.targetKeyword}</span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="min-w-0 truncate text-xs font-medium text-[var(--brand-text-bright)]">{brief.targetKeyword}</span>
                     {brief.difficultyScore != null && (
                       <span className={`t-caption-sm px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${brief.difficultyScore <= 30 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : brief.difficultyScore <= 60 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>{brief.difficultyScore}/100</span>
                     )}
@@ -120,7 +122,7 @@ export function BriefList({
                   {brief.contentFormat && <span className="t-caption-sm px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400/80 border border-amber-500/20 capitalize hidden sm:inline-block">{brief.contentFormat}</span>}
                 </div>
                 {/* Quick actions */}
-                <div className="flex items-center gap-0.5 flex-shrink-0 opacity-40 group-hover/brief:opacity-100 group-focus-within/brief:opacity-100 transition-opacity">
+                {!workspaceMode && <div className="flex items-center gap-0.5 flex-shrink-0 opacity-40 group-hover/brief:opacity-100 group-focus-within/brief:opacity-100 transition-opacity">
                   <IconButton
                     icon={Copy}
                     label="Copy for AI tool"
@@ -148,7 +150,7 @@ export function BriefList({
                     onClick={(e) => { e.stopPropagation(); onConfirmDeleteBrief(brief); }}
                     className="rounded hover:bg-red-500/10 text-[var(--brand-text-muted)] hover:text-red-400"
                   />
-                </div>
+                </div>}
                 {/* Date + expand */}
                 <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">{formatDate(brief.createdAt)}</span>
                 <IconButton

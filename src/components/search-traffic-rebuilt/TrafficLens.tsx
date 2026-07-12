@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { Activity, ArrowRight, BarChart3, Leaf, TableProperties, Users, Zap } from 'lucide-react';
+import { Activity, ArrowRight, BarChart3, Users, Zap } from 'lucide-react';
 import { useState } from 'react';
 import { AnnotatedTrendChart, type TrendLine } from '../charts/AnnotatedTrendChart';
 import { InsightFeed } from '../insights';
@@ -9,23 +9,25 @@ import {
   Button,
   ChartCard,
   DataTable,
+  Disclosure,
   EmptyState,
   GroupBlock,
+  Icon,
   InlineBanner,
   KeyValueRow,
   Meter,
   Skeleton,
 } from '../ui';
 import type { DataColumn } from '../ui';
-import { useAnalyticsOverview } from '../../hooks/admin/useAnalyticsOverview';
+import { useAnalyticsOverviewFromData } from '../../hooks/admin/useAnalyticsOverview';
 import { useInsightFeed } from '../../hooks/admin/useInsightFeed';
 import { useToggleSet } from '../../hooks/useToggleSet';
 import { SparkMetricTile } from './SparkMetricTile';
+import { ReportSectionHeader } from './ReportSectionHeader';
 import type { SearchTrafficGa4Data } from './types';
 import {
   SERIES,
   buildSparkline,
-  dateRangeLabel,
   deltaLabel,
   formatDuration,
   formatNumber,
@@ -63,8 +65,11 @@ const conversionColumns: DataColumn[] = [
 
 export function TrafficLens({ workspaceId, ga4PropertyId, days, data, onOpenBreakdowns }: TrafficLensProps) {
   const [activeLines, toggleLine] = useToggleSet(['users', 'sessions']);
-  const [eventsOpen, setEventsOpen] = useState(false);
-  const overviewData = useAnalyticsOverview(workspaceId, undefined, undefined, ga4PropertyId, days);
+  const [eventsOpen, setEventsOpen] = useState(true);
+  const overviewData = useAnalyticsOverviewFromData(workspaceId, null, data, {
+    gsc: false,
+    ga4: !!ga4PropertyId,
+  });
   const { feed, isLoading: feedLoading } = useInsightFeed(workspaceId);
 
   if (!ga4PropertyId) {
@@ -100,6 +105,7 @@ export function TrafficLens({ workspaceId, ga4PropertyId, days, data, onOpenBrea
 
   const chartLines = TRAFFIC_LINES.map((line) => ({ ...line, active: activeLines.has(line.key) }));
   const totalSourceSessions = data.sources.reduce((sum, source) => sum + source.sessions, 0);
+  const trafficFeed = feed.filter((item) => item.domain === 'traffic' || item.domain === 'cross');
 
   return (
     <div className="flex flex-col gap-4">
@@ -108,16 +114,6 @@ export function TrafficLens({ workspaceId, ga4PropertyId, days, data, onOpenBrea
           {data.error}. The last loaded GA4 rows are still shown when available.
         </InlineBanner>
       )}
-
-      <AnomalyAlerts workspaceId={workspaceId} isAdmin />
-
-      <div className="flex items-center justify-between gap-3">
-        <span className="t-caption text-[var(--brand-text-muted)]">{dateRangeLabel(data.overview.dateRange)}</span>
-        <Button size="sm" variant="secondary" onClick={onOpenBreakdowns}>
-          <TableProperties size={14} aria-hidden="true" />
-          Breakdowns
-        </Button>
-      </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SparkMetricTile
@@ -164,7 +160,18 @@ export function TrafficLens({ workspaceId, ga4PropertyId, days, data, onOpenBrea
         />
       </div>
 
-      <ChartCard title="Traffic trend" action={<Badge label={`${days}d`} tone="zinc" variant="soft" size="sm" />}>
+      <ChartCard
+        title="Traffic trend"
+        action={(
+          <div className="flex items-center gap-2">
+            <Badge label={`${days}d`} tone="zinc" variant="soft" size="sm" />
+            <Button size="sm" variant="secondary" onClick={onOpenBreakdowns}>
+              <Icon name="layers" size="sm" aria-hidden="true" />
+              Breakdowns
+            </Button>
+          </div>
+        )}
+      >
         {overviewData.trendData.length > 0 ? (
           <AnnotatedTrendChart
             data={overviewData.trendData}
@@ -179,16 +186,65 @@ export function TrafficLens({ workspaceId, ga4PropertyId, days, data, onOpenBrea
         )}
       </ChartCard>
 
-      <ChartCard title="Traffic insights">
-        <InsightFeed
-          feed={feed}
-          loading={feedLoading}
-          domain="traffic"
-          showFilterChips
-          workspaceId={workspaceId}
-          limit={5}
-        />
-      </ChartCard>
+      <ReportSectionHeader
+        number="01"
+        title="Acquisition"
+        description="Where sessions originated and which devices visitors used."
+      />
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ChartCard title="Traffic sources">
+          <div className="flex flex-col gap-3">
+            {data.sources.slice(0, 8).map((source) => {
+              const label = `${source.source || '(direct)'}${source.medium && source.medium !== '(none)' ? ` / ${source.medium}` : ''}`;
+              return (
+                <Meter
+                  key={label}
+                  label={`${label} · ${formatNumber(source.sessions)} sessions`}
+                  value={source.sessions}
+                  max={Math.max(totalSourceSessions, 1)}
+                  color={SERIES.sessions}
+                  ariaLabel={`${label} session share`}
+                />
+              );
+            })}
+            {data.sources.length === 0 && <EmptyState icon={Activity} title="No sources" description="GA4 did not return source rows." className="py-4" />}
+          </div>
+        </ChartCard>
+
+        <ChartCard title="Devices">
+          <div className="flex flex-col gap-3">
+            {data.devices.slice(0, 8).map((device) => (
+              <Meter
+                key={device.device}
+                label={`${device.device || 'Unknown'} · ${formatNumber(device.users)} users`}
+                value={device.percentage}
+                max={100}
+                color={SERIES.users}
+                showValue
+                ariaLabel={`${device.device || 'Unknown'} user share`}
+              />
+            ))}
+            {data.devices.length === 0 && <EmptyState icon={Users} title="No device split" description="GA4 did not return device rows." className="py-4" />}
+          </div>
+        </ChartCard>
+      </div>
+
+      {data.organic && (
+        <ChartCard title="Organic vs all traffic" titleIcon={<Icon name="globe" size="md" className="text-[var(--emerald)]" aria-hidden="true" />}>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Meter label="Organic user share" value={data.organic.shareOfTotalUsers} color={SERIES.pageviews} showValue />
+            <KeyValueRow label="Organic users" value={`${formatNumber(data.organic.organicUsers)} of ${formatNumber(data.overview.totalUsers)}`} valueColor="var(--emerald)" divider={false} />
+            <KeyValueRow label="Organic engagement" value={formatPercent(data.organic.engagementRate)} valueColor="var(--emerald)" divider={false} />
+          </div>
+        </ChartCard>
+      )}
+
+      <ReportSectionHeader
+        number="02"
+        title="Engagement"
+        description="How audience quality and behavior changed after arrival."
+      />
 
       <div className="grid gap-4 xl:grid-cols-2">
         {data.comparison && (
@@ -221,23 +277,19 @@ export function TrafficLens({ workspaceId, ga4PropertyId, days, data, onOpenBrea
                 divider={index !== 0}
               />
             )) : (
-              <p className="t-caption text-[var(--brand-text-muted)]">GA4 did not return new/returning rows.</p>
+              <p className="t-body text-[var(--brand-text-muted)]">GA4 did not return new/returning rows.</p>
             )}
           </div>
         </GroupBlock>
       </div>
 
-      {data.organic && (
-        <ChartCard title="Organic vs all traffic" titleIcon={<Leaf size={16} className="text-[var(--emerald)]" aria-hidden="true" />}>
-          <div className="grid gap-4 md:grid-cols-3">
-            <Meter label="Organic user share" value={data.organic.shareOfTotalUsers} color={SERIES.pageviews} showValue />
-            <KeyValueRow label="Organic users" value={`${formatNumber(data.organic.organicUsers)} of ${formatNumber(data.overview.totalUsers)}`} valueColor="var(--emerald)" divider={false} />
-            <KeyValueRow label="Organic engagement" value={formatPercent(data.organic.engagementRate)} valueColor="var(--emerald)" divider={false} />
-          </div>
-        </ChartCard>
-      )}
+      <ReportSectionHeader
+        number="03"
+        title="Conversion"
+        description="Landing pages and the key events they produced."
+      />
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+      <div className="flex flex-col gap-4">
         <ChartCard title="Landing pages" action={<Badge label={`${data.landingPages.length} rows`} tone="blue" variant="soft" size="sm" />}>
           <DataTable
             columns={landingColumns}
@@ -246,45 +298,41 @@ export function TrafficLens({ workspaceId, ga4PropertyId, days, data, onOpenBrea
             empty={<EmptyState icon={ArrowRight} title="No landing pages" description="GA4 did not return landing page rows for this window." />}
           />
         </ChartCard>
-
-        <ChartCard title="Traffic sources">
-          <div className="flex flex-col gap-3">
-            {data.sources.slice(0, 8).map((source) => {
-              const label = `${source.source || '(direct)'}${source.medium && source.medium !== '(none)' ? ` / ${source.medium}` : ''}`;
-              return (
-                <Meter
-                  key={label}
-                  label={`${label} · ${formatNumber(source.sessions)} sessions`}
-                  value={source.sessions}
-                  max={Math.max(totalSourceSessions, 1)}
-                  color={SERIES.sessions}
-                  ariaLabel={`${label} session share`}
-                />
-              );
-            })}
-            {data.sources.length === 0 && <EmptyState icon={Activity} title="No sources" description="GA4 did not return source rows." className="py-4" />}
-          </div>
+        <ChartCard
+          title="Events & conversions"
+          titleIcon={<Icon name="zap" size="md" className="text-[var(--amber)]" aria-hidden="true" />}
+          action={<Button size="sm" variant="ghost" onClick={() => setEventsOpen((open) => !open)}>{eventsOpen ? 'Hide' : 'Show'}</Button>}
+        >
+          {eventsOpen ? (
+            <DataTable
+              columns={conversionColumns}
+              rows={data.conversions as unknown as Record<string, unknown>[]}
+              getRowKey={(row, index) => `${String(row.eventName)}-${index}`}
+              empty={<EmptyState icon={Zap} title="No conversions" description="GA4 did not return key event rows for this window." />}
+            />
+          ) : (
+            <div className="t-body text-[var(--brand-text-muted)]">
+              {data.conversions.length} tracked conversion event{data.conversions.length === 1 ? '' : 's'} available.
+            </div>
+          )}
         </ChartCard>
       </div>
 
-      <ChartCard
-        title="Events & conversions"
-        titleIcon={<Zap size={16} className="text-[var(--amber)]" aria-hidden="true" />}
-        action={<Button size="sm" variant="ghost" onClick={() => setEventsOpen((open) => !open)}>{eventsOpen ? 'Hide' : 'Show'}</Button>}
-      >
-        {eventsOpen ? (
-          <DataTable
-            columns={conversionColumns}
-            rows={data.conversions as unknown as Record<string, unknown>[]}
-            getRowKey={(row, index) => `${String(row.eventName)}-${index}`}
-            empty={<EmptyState icon={Zap} title="No conversions" description="GA4 did not return key event rows for this window." />}
-          />
-        ) : (
-          <div className="t-caption text-[var(--brand-text-muted)]">
-            {data.conversions.length} tracked conversion event{data.conversions.length === 1 ? '' : 's'} available.
-          </div>
-        )}
-      </ChartCard>
+      <Disclosure summary="Monitoring & insights" badges={[{ label: `${trafficFeed.length} signals`, tone: 'blue' }]}>
+        <div className="flex flex-col gap-4 pt-2">
+          <AnomalyAlerts workspaceId={workspaceId} isAdmin />
+          <ChartCard title="Traffic insights">
+            <InsightFeed
+              feed={feed}
+              loading={feedLoading}
+              domain="traffic"
+              showFilterChips
+              workspaceId={workspaceId}
+              limit={5}
+            />
+          </ChartCard>
+        </div>
+      </Disclosure>
     </div>
   );
 }

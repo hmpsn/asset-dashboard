@@ -55,10 +55,10 @@ export type NavGroupKey =
 
 /**
  * Flag-driven behavior for a nav entry: relabel, re-describe, or hide a surface
- * while a feature flag is ON. No entry currently uses this (the keyword-hub
- * relabel/hide retired when the Hub became the only keyword surface), but the
- * mechanism is retained so future flag-gated nav changes live in ONE place
- * instead of being re-implemented per surface.
+ * while a feature flag is ON. Home uses it to become Cockpit, and Content
+ * Performance uses it to disappear once Pipeline Published becomes its rebuilt
+ * receiving home. Keep future flag-gated nav changes here instead of duplicating
+ * them across shell and palette consumers.
  */
 export interface NavFlagBehavior {
   /** The feature flag this behavior keys off of. */
@@ -88,21 +88,20 @@ export interface NavEntry {
 /**
  * Page union values intentionally NOT in the registry, with the reason.
  *
- * These are redirect-only targets, backward-compat aliases, or surfaces that
- * have been folded into a parent surface (their content now lives as a sub-tab
- * elsewhere). They are not standalone navigation destinations, so they carry
- * no nav metadata. The contract test asserts this list + the registry together
- * cover the entire Page union, so a new redirect-only Page can't silently slip
- * through without a documented decision.
+ * These routes intentionally have no global nav metadata. They include
+ * redirects, backward-compat aliases, folded capabilities, standalone
+ * workspace receivers, and rebuilt-sidebar-only presentation entries. The
+ * contract test asserts this list + the registry together cover the entire
+ * Page union, so a new non-registry Page cannot silently slip through without
+ * a documented decision.
  */
 export const NON_REGISTRY_PAGES: Page[] = [
   'seo-briefs',     // folded into content-pipeline (Briefs sub-tab) — W3.3
   'content',        // folded into content-pipeline (Posts sub-tab) — W3.3
   'calendar',       // redirect → content-pipeline?tab=calendar
-  'subscriptions',  // folded into content-pipeline (Subscriptions sub-tab)
+  'subscriptions',  // preserved standalone legacy receiver; ?tab=subscriptions folds into content-pipeline
   'workspace-settings', // reached via per-workspace settings, not the main nav
-  'competitors',    // The Issue Phase 6 — dedicated competitor interior page; reached via a deep-link
-                    // from The Issue cockpit (flag-ON), not the global nav, so flag-OFF nav is byte-identical
+  'competitors',    // dedicated interior page; rebuilt sidebar presents it locally, global nav remains unchanged
 ];
 
 /**
@@ -159,7 +158,8 @@ export const NAV_REGISTRY: NavEntry[] = [
   { id: 'requests', label: 'Requests', icon: MessageSquare, group: 'content',
     description: 'Client content requests and feedback' },
   { id: 'content-perf', label: 'Content Perf', icon: ChartSpline, group: 'content', needsSite: true,
-    description: 'Post-publish content performance metrics' },
+    description: 'Post-publish content performance metrics',
+    flagBehavior: { flag: 'ui-rebuild-shell', hideWhenOn: true } },
 
   // ── Admin (global) ──
   { id: 'outcomes-overview', label: 'Team Outcomes', icon: BriefcaseBusiness, group: 'admin',

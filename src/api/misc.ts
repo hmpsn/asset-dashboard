@@ -98,9 +98,9 @@ export const analyticsAnnotations = {
       const params = new URLSearchParams();
       for (const [k, v] of Object.entries(opts)) { if (v != null) params.set(k, v); }
       const qs = params.toString();
-      return getSafe<unknown[]>(`/api/google/annotations/${wsId}${qs ? '?' + qs : ''}`, []);
+      return get<unknown[]>(`/api/google/annotations/${wsId}${qs ? '?' + qs : ''}`);
     }
-    return getSafe<unknown[]>(`/api/google/annotations/${wsId}`, []);
+    return get<unknown[]>(`/api/google/annotations/${wsId}`);
   },
 
   create: (wsId: string, body: Record<string, unknown>) =>

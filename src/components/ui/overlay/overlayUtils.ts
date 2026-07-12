@@ -30,6 +30,76 @@ export function getFocusable(root: HTMLElement): HTMLElement[] {
   );
 }
 
+// ─── Stacked-overlay coordination ────────────────────────────────────────────
+// Portal overlays share the same z-index layer, so DOM order is also their
+// visual stacking order. Keyboard and backdrop handlers must yield to the last
+// connected panel; stopPropagation alone is insufficient because Modal and
+// Drawer attach native listeners to the same `document` target.
+export const OVERLAY_PANEL_SELECTOR = '[data-overlay-panel="true"]';
+
+/** Whether `root` is the visually topmost open canonical overlay panel. */
+export function isTopmostOverlay(root: HTMLElement | null): boolean {
+  if (!root || typeof document === 'undefined' || !root.isConnected) return false;
+  const panels = document.querySelectorAll<HTMLElement>(OVERLAY_PANEL_SELECTOR);
+  return panels.length > 0 && panels[panels.length - 1] === root;
+}
+
+/** Whether `element` belongs to the visually topmost canonical overlay panel. */
+export function isElementInTopmostOverlay(element: Element | null): boolean {
+  if (!element || typeof document === 'undefined' || !element.isConnected) return false;
+  const containingPanel = element.closest<HTMLElement>(OVERLAY_PANEL_SELECTOR);
+  return isTopmostOverlay(containingPanel);
+}
+
+type OverlayStackListener = () => void;
+
+const overlayStackListeners = new Set<OverlayStackListener>();
+let overlayStackObserver: MutationObserver | null = null;
+
+function nodeContainsOverlayPanel(node: Node): boolean {
+  if (!(node instanceof Element)) return false;
+  return node.matches(OVERLAY_PANEL_SELECTOR) || node.querySelector(OVERLAY_PANEL_SELECTOR) !== null;
+}
+
+function mutationChangesOverlayStack(mutation: MutationRecord): boolean {
+  return Array.from(mutation.addedNodes).some(nodeContainsOverlayPanel)
+    || Array.from(mutation.removedNodes).some(nodeContainsOverlayPanel);
+}
+
+function notifyOverlayStackListeners(): void {
+  for (const listener of [...overlayStackListeners]) listener();
+}
+
+function startOverlayStackObserver(): void {
+  if (
+    overlayStackObserver
+    || typeof document === 'undefined'
+    || !document.body
+    || typeof MutationObserver === 'undefined'
+  ) return;
+
+  overlayStackObserver = new MutationObserver((mutations) => {
+    if (mutations.some(mutationChangesOverlayStack)) notifyOverlayStackListeners();
+  });
+  overlayStackObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+function stopOverlayStackObserver(): void {
+  if (overlayStackListeners.size > 0) return;
+  overlayStackObserver?.disconnect();
+  overlayStackObserver = null;
+}
+
+/** Subscribe while a consumer needs to react to canonical overlay membership/order changes. */
+export function subscribeToOverlayStack(listener: OverlayStackListener): () => void {
+  overlayStackListeners.add(listener);
+  startOverlayStackObserver();
+  return () => {
+    overlayStackListeners.delete(listener);
+    stopOverlayStackObserver();
+  };
+}
+
 // ─── Body-scroll lock coordination across stacked overlays ────────────────────
 // Simple reference counter: each open overlay increments; each close
 // decrements. The lock is applied only when the counter transitions 0→1 and

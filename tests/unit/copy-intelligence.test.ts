@@ -15,6 +15,12 @@ import { createVoiceProfile, getVoiceProfile, updateVoiceProfile } from '../../s
 import { callOpenAI } from '../../server/openai-helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 
+const mockBroadcastToWorkspace = vi.hoisted(() => vi.fn());
+
+vi.mock('../../server/broadcast.js', () => ({
+  broadcastToWorkspace: mockBroadcastToWorkspace,
+}));
+
 vi.mock('../../server/openai-helpers.js', () => ({
   callOpenAI: vi.fn(),
 }));
@@ -67,6 +73,7 @@ beforeEach(() => {
   cleanupA = wsA.cleanup;
   cleanupB = wsB.cleanup;
   mockCallOpenAI.mockReset();
+  mockBroadcastToWorkspace.mockClear();
 });
 
 afterEach(() => {
@@ -222,6 +229,11 @@ describe('copy-intelligence guardrail promotion', () => {
     expect(getVoiceProfile(wsId)?.guardrails?.toneBoundaries).toEqual([
       'Sound precise without getting stiff',
     ]);
+    expect(mockBroadcastToWorkspace).toHaveBeenCalledWith(
+      wsId,
+      'voice:updated',
+      expect.objectContaining({ patternId: pattern.id }),
+    );
   });
 
   it('promotes non-tone patterns to anti-pattern guardrails without duplicating existing text', () => {

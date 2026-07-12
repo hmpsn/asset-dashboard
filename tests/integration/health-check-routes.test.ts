@@ -63,6 +63,8 @@ describe('GET /api/integrations/health/:workspaceId', () => {
     );
     expect(keys.has('webflow')).toBe(true);
     expect(keys.has('google')).toBe(true);
+    expect(keys.has('pagespeed')).toBe(true);
+    expect(keys.has('gbp')).toBe(true);
     expect(keys.has('openai')).toBe(true);
     expect(keys.has('email')).toBe(true);
   });

@@ -17,6 +17,7 @@ import {
 } from '../webflow.js';
 import type { CmsImageUsage } from '../../shared/types/cms-images.ts';
 import {
+  computeEffectiveTier,
   getWorkspace,
   getTokenForSite,
 } from '../workspaces.js';
@@ -44,7 +45,8 @@ router.post('/api/webflow/:workspaceId/generate-alt/:assetId', requireWorkspaceA
 
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'alt_text_generations')) {
+  const effectiveTier = computeEffectiveTier(ws);
+  if (!incrementIfAllowed(ws.id, effectiveTier, 'alt_text_generations')) {
     return res.status(429).json({ error: 'Monthly AI generation limit reached' });
   }
 
@@ -150,7 +152,8 @@ router.post('/api/webflow/:workspaceId/bulk-generate-alt', requireWorkspaceAcces
 
   const bulkWs = getWorkspace(req.params.workspaceId);
   if (!bulkWs) return res.status(404).json({ error: 'Workspace not found' });
-  const usage = checkUsageLimit(bulkWs.id, bulkWs.tier || 'free', 'alt_text_generations');
+  const bulkEffectiveTier = computeEffectiveTier(bulkWs);
+  const usage = checkUsageLimit(bulkWs.id, bulkEffectiveTier, 'alt_text_generations');
   if (!usage.allowed) return res.status(429).json({ error: 'Monthly AI generation limit reached', used: usage.used, limit: usage.limit });
 
   let siteContext = '';
@@ -209,7 +212,7 @@ router.post('/api/webflow/:workspaceId/bulk-generate-alt', requireWorkspaceAcces
   let done = 0;
   for (const asset of assets) {
     // Per-asset atomic check+increment prevents unbounded overshoot when batch size > remaining budget.
-    if (!incrementIfAllowed(bulkWs.id, bulkWs.tier || 'free', 'alt_text_generations')) {
+    if (!incrementIfAllowed(bulkWs.id, bulkEffectiveTier, 'alt_text_generations')) {
       send({ type: 'status', message: `Monthly AI limit reached after ${done}/${assets.length} images`, done, total: assets.length });
       break;
     }
@@ -225,14 +228,11 @@ router.post('/api/webflow/:workspaceId/bulk-generate-alt', requireWorkspaceAcces
         });
         buffer = Buffer.from(bytes);
       } catch (err) {
+        if (!isExternalFetchError(err)) throw err;
         done++;
         decrementUsage(bulkWs.id, 'alt_text_generations');
-        if (isExternalFetchError(err)) {
-          const detail = err.kind === 'http' && err.status ? `Download failed: ${err.status}` : `Download failed: ${err.kind}`;
-          send({ type: 'result', assetId: asset.assetId, altText: null, updated: false, error: detail, done, total: assets.length });
-        } else {
-          throw err;
-        }
+        const detail = err.kind === 'http' && err.status ? `Download failed: ${err.status}` : `Download failed: ${err.kind}`;
+        send({ type: 'result', assetId: asset.assetId, altText: null, updated: false, error: detail, done, total: assets.length });
         continue;
       }
       const ext = path.extname(asset.imageUrl).split('?')[0] || '.jpg';

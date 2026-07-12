@@ -1,9 +1,16 @@
 import type {
   BacklinksOverview,
+  BusinessListingResult,
+  BusinessListingsRequest,
+  DomainAuthorityMetric,
   DomainKeyword,
   DomainOverview,
   KeywordGapEntry,
   KeywordMetrics,
+  LlmMentionsRequest,
+  LlmMentionsResult,
+  NationalSerpProviderRequest,
+  NationalSerpResult,
   OrganicCompetitor,
   QuestionKeyword,
   ReferringDomain,
@@ -13,9 +20,13 @@ import type {
 import {
   LOCAL_VISIBILITY_SOURCE_ENDPOINT,
   LOCAL_VISIBILITY_STATUS,
+  LOCAL_SEO_LOCATION_LOOKUP_STATUS,
+  type LocalSeoLocationLookupRequest,
+  type LocalSeoLocationLookupResponse,
   type LocalVisibilityProviderRequest,
   type LocalVisibilityProviderResult,
 } from '../../shared/types/local-seo.js';
+import { LOCAL_PROVIDER_FIXTURE } from './local-provider-fixtures.js';
 
 function keywordMetric(keyword: string): KeywordMetrics {
   return {
@@ -139,14 +150,166 @@ export class FakeSeoProvider implements SeoDataProvider {
     }));
   }
 
-  async getLocalVisibility(request: LocalVisibilityProviderRequest): Promise<LocalVisibilityProviderResult> {
-    const domain = 'example.com';
+  async resolveLocalSeoLocation(
+    request: LocalSeoLocationLookupRequest,
+    workspaceId: string,
+  ): Promise<LocalSeoLocationLookupResponse> {
+    if (workspaceId !== LOCAL_PROVIDER_FIXTURE.workspaceId) {
+      return {
+        query: request,
+        status: LOCAL_SEO_LOCATION_LOOKUP_STATUS.PROVIDER_UNAVAILABLE,
+        candidates: [],
+        degradedReason: 'Advanced local fixtures are scoped to the provider-rich demo workspace.',
+      };
+    }
+    const candidate = {
+      providerLocationCode: 1026201,
+      providerLocationName: 'Austin,Texas,United States',
+      countryIsoCode: 'US',
+      locationType: 'City',
+      score: 1,
+    };
+    return {
+      query: request,
+      status: LOCAL_SEO_LOCATION_LOOKUP_STATUS.MATCHED,
+      candidates: [candidate],
+      bestCandidate: candidate,
+    };
+  }
+
+  async getNationalSerp(
+    request: NationalSerpProviderRequest,
+    workspaceId: string,
+  ): Promise<NationalSerpResult> {
+    if (workspaceId !== LOCAL_PROVIDER_FIXTURE.workspaceId) {
+      return {
+        query: request.keyword,
+        position: null,
+        matchedUrl: null,
+        features: [],
+        aiOverviewPresent: false,
+        aiOverviewCited: null,
+      };
+    }
+    return {
+      query: request.keyword,
+      position: 3,
+      matchedUrl: `https://${LOCAL_PROVIDER_FIXTURE.domain}/services/seo`,
+      features: ['ai_overview', 'featured_snippet', 'people_also_ask', 'organic'],
+      aiOverviewPresent: true,
+      aiOverviewCited: true,
+    };
+  }
+
+  async getBusinessListings(
+    _request: BusinessListingsRequest,
+    workspaceId: string,
+  ): Promise<BusinessListingResult[]> {
+    if (workspaceId !== LOCAL_PROVIDER_FIXTURE.workspaceId) return [];
+    return [
+      {
+        title: LOCAL_PROVIDER_FIXTURE.businessName,
+        placeId: LOCAL_PROVIDER_FIXTURE.gbpPlaceId,
+        cid: 'cid_provider_rich_primary',
+        domain: LOCAL_PROVIDER_FIXTURE.domain,
+        category: 'Marketing agency',
+        city: 'Austin',
+        rating: 4.8,
+        reviewCount: 187,
+        ratingDistribution: { '1': 2, '2': 1, '3': 5, '4': 24, '5': 155 },
+        attributes: {
+          items: ['has_wheelchair_accessible_entrance', 'offers_online_appointments', 'identifies_as_women_owned'],
+          completenessScore: 94,
+        },
+        totalPhotos: 64,
+        claimed: true,
+        isOwned: true,
+      },
+      {
+        title: 'Signal Studio',
+        placeId: 'place_signal_studio',
+        domain: 'signal-studio.example',
+        category: 'Marketing agency',
+        city: 'Austin',
+        rating: 4.9,
+        reviewCount: 264,
+        totalPhotos: 91,
+        claimed: true,
+        isOwned: false,
+      },
+      {
+        title: 'North Loop Growth',
+        placeId: 'place_north_loop_growth',
+        domain: 'north-loop-growth.example',
+        category: 'Internet marketing service',
+        city: 'Austin',
+        rating: 4.6,
+        reviewCount: 143,
+        totalPhotos: 38,
+        claimed: true,
+        isOwned: false,
+      },
+    ];
+  }
+
+  async getLlmMentions(
+    request: LlmMentionsRequest,
+    workspaceId: string,
+  ): Promise<LlmMentionsResult> {
+    if (workspaceId !== LOCAL_PROVIDER_FIXTURE.workspaceId) {
+      return {
+        domain: request.domain,
+        platform: request.platform ?? 'chat_gpt',
+        mentions: 0,
+        aiSearchVolume: 0,
+        competitors: [],
+        sourceDomains: [],
+      };
+    }
+    return {
+      domain: LOCAL_PROVIDER_FIXTURE.domain,
+      platform: request.platform ?? 'chat_gpt',
+      mentions: 42,
+      aiSearchVolume: 8_460,
+      shareOfVoice: 0.42,
+      competitors: [
+        { name: 'Signal Studio', mentions: 31, aiSearchVolume: 6_240 },
+        { name: 'North Loop Growth', mentions: 18, aiSearchVolume: 3_710 },
+        { name: 'Searchcraft', mentions: 9, aiSearchVolume: 1_920 },
+      ],
+      sourceDomains: [
+        { domain: LOCAL_PROVIDER_FIXTURE.domain, mentions: 27 },
+        { domain: 'clutch.co', mentions: 11 },
+        { domain: 'austinbusinessjournal.com', mentions: 7 },
+      ],
+    };
+  }
+
+  async getDomainAuthorityMetrics(
+    domains: string[],
+    workspaceId: string,
+  ): Promise<DomainAuthorityMetric[]> {
+    if (workspaceId !== LOCAL_PROVIDER_FIXTURE.workspaceId) return [];
+    const fixtures: Record<string, Omit<DomainAuthorityMetric, 'domain'>> = {
+      [LOCAL_PROVIDER_FIXTURE.domain]: { authorityRank: 61, top3Keywords: 148 },
+      'signal-studio.example': { authorityRank: 54, top3Keywords: 93 },
+      'north-loop-growth.example': { authorityRank: 48, top3Keywords: 71 },
+    };
+    return domains.flatMap((domain) => fixtures[domain] ? [{ domain, ...fixtures[domain] }] : []);
+  }
+
+  async getLocalVisibility(
+    request: LocalVisibilityProviderRequest,
+    workspaceId: string,
+  ): Promise<LocalVisibilityProviderResult> {
+    const providerRich = workspaceId === LOCAL_PROVIDER_FIXTURE.workspaceId;
+    const domain = providerRich ? LOCAL_PROVIDER_FIXTURE.domain : 'example.com';
     return {
       keyword: request.keyword,
       marketId: request.market.id,
       provider: 'fake-seo-provider',
       sourceEndpoint: LOCAL_VISIBILITY_SOURCE_ENDPOINT.GOOGLE_ORGANIC_SERP,
-      capturedAt: new Date().toISOString(),
+      capturedAt: providerRich ? LOCAL_PROVIDER_FIXTURE.capturedAt : new Date().toISOString(),
       localPackPresent: true,
       status: LOCAL_VISIBILITY_STATUS.SUCCESS,
       results: [

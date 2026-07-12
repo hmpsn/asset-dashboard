@@ -4,9 +4,8 @@
  * Covers three improvements:
  *  I10 – PUT sections addActivity: updating sections calls addActivity with
  *         type 'brandscript_sections_updated'.
- *  I13 – Tier gate: free-tier workspace is blocked with 429 + code:'usage_limit'
- *         before any AI work begins on /complete, and the usage counter is NOT
- *         incremented.
+ *  I13 – Missing-script preflight: /complete returns 404 before quota
+ *         reservation, including on a free-tier workspace.
  *  I14 – aiLimiter burst: the 4th POST to the same /complete path within 60 s
  *         is blocked by the per-IP burst limiter (3 req/min).
  *
@@ -88,27 +87,24 @@ describe('I10 – PUT sections records activity', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// I13 — Tier gate: free-tier is blocked before AI call on /complete
+// I13 — Missing scripts are rejected before the usage gate
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('I13 – tier gate on /api/brandscripts/:workspaceId/:id/complete', () => {
-  it('returns 429 with code:usage_limit for a free-tier workspace', async () => {
+describe('I13 – missing-script preflight on /api/brandscripts/:workspaceId/:id/complete', () => {
+  it('returns 404 before the free-tier usage gate', async () => {
     const res = await postJson(`/api/brandscripts/${freeWsId}/fake-bs-id/complete`, {});
-    expect(res.status).toBe(429);
-    const body = await res.json() as { error: string; code?: string };
-    expect(body.code).toBe('usage_limit');
-    expect(typeof body.error).toBe('string');
-    expect(body.error.length).toBeGreaterThan(0);
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({ error: 'Not found' });
   });
 
-  it('does NOT increment the usage counter when the tier gate fires', async () => {
+  it('does NOT reserve usage for a missing script', async () => {
     const ws = seedWorkspace({ tier: 'free' });
     try {
       const before = getUsageCount(ws.workspaceId, 'brandscript_generations');
       expect(before).toBe(0);
 
       const res = await postJson(`/api/brandscripts/${ws.workspaceId}/fake-bs-id/complete`, {});
-      expect(res.status).toBe(429);
+      expect(res.status).toBe(404);
 
       const after = getUsageCount(ws.workspaceId, 'brandscript_generations');
       expect(after).toBe(0); // counter must not have moved
@@ -124,9 +120,8 @@ describe('I13 – tier gate on /api/brandscripts/:workspaceId/:id/complete', () 
 // Strategy: use a fresh growth-tier workspace per test invocation so the
 // aiLimiter rate-limiter key (which includes req.path / workspaceId) is unique
 // and does not bleed from other tests.
-// Requests 1–3 reach the handler and get 429 from the tier gate OR 404/500
-// from missing AI keys — either is fine as long as it's not a 429 from the
-// aiLimiter. The 4th request with the same path must be 429 from the limiter.
+// Requests 1–3 reach the handler and return 404 for the missing script. The
+// 4th request with the same path must be 429 from the limiter.
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('I14 – aiLimiter burst cap on /api/brandscripts/:workspaceId/:id/complete', () => {

@@ -14,9 +14,31 @@ import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.
 import { aiLimiter } from '../middleware.js';
 import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 import { sanitizeErrorMessage } from '../utils/text.js';
-import { getWorkspace } from '../workspaces.js';
+import { computeEffectiveTier, getWorkspace } from '../workspaces.js';
+import { createLogger } from '../logger.js';
 
 const router = Router();
+const log = createLogger('brandscript-routes');
+
+function runBrandscriptPostCommitEffect(
+  workspaceId: string,
+  effect: 'activity' | 'broadcast' | 'intelligence-cache',
+  run: () => void,
+): void {
+  try {
+    run();
+  } catch (err) {
+    log.warn({ err, workspaceId, effect }, 'brandscript post-commit effect failed');
+  }
+}
+
+function refundBrandscriptUsage(workspaceId: string): void {
+  try {
+    decrementUsage(workspaceId, 'brandscript_generations');
+  } catch (err) {
+    log.warn({ err, workspaceId }, 'failed to refund brandscript generation usage');
+  }
+}
 
 // ── Zod schemas ─────────────────────────────────────────────────────────────
 
@@ -80,7 +102,8 @@ router.post(
   async (req, res) => {
     const { name, rawText } = req.body;
     const ws = getWorkspace(req.params.workspaceId);
-    const tier = (ws?.tier ?? 'free') as string;
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    const tier = computeEffectiveTier(ws);
 
     if (!incrementIfAllowed(req.params.workspaceId, tier, 'brandscript_generations')) {
       return res.status(429).json({
@@ -89,16 +112,24 @@ router.post(
       });
     }
 
+    let bs: Awaited<ReturnType<typeof importBrandscript>>;
     try {
-      const bs = await importBrandscript(req.params.workspaceId, name || 'Imported Brandscript', rawText);
-      addActivity(req.params.workspaceId, 'brandscript_imported', `Imported brandscript "${bs.name}"`);
-      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: bs.id });
-      invalidateIntelligenceCache(req.params.workspaceId);
-      res.json(bs);
+      bs = await importBrandscript(req.params.workspaceId, name || 'Imported Brandscript', rawText);
     } catch (err) {
-      decrementUsage(req.params.workspaceId, 'brandscript_generations');
-      res.status(500).json({ error: sanitizeErrorMessage(err, 'Import failed') });
+      refundBrandscriptUsage(req.params.workspaceId);
+      return res.status(500).json({ error: sanitizeErrorMessage(err, 'Import failed') });
     }
+
+    runBrandscriptPostCommitEffect(req.params.workspaceId, 'activity', () => {
+      addActivity(req.params.workspaceId, 'brandscript_imported', `Imported brandscript "${bs.name}"`);
+    });
+    runBrandscriptPostCommitEffect(req.params.workspaceId, 'broadcast', () => {
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: bs.id });
+    });
+    runBrandscriptPostCommitEffect(req.params.workspaceId, 'intelligence-cache', () => {
+      invalidateIntelligenceCache(req.params.workspaceId);
+    });
+    return res.json(bs);
   },
 );
 
@@ -163,8 +194,18 @@ router.post(
   requireWorkspaceAccess('workspaceId'),
   aiLimiter,
   async (req, res) => {
+    const existing = getBrandscript(req.params.workspaceId, req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Not found' });
+
+    // A fully-authored brandscript is a truthful no-op: return the same public
+    // shape without reserving quota or claiming that AI completed any work.
+    if (existing.sections.every(section => section.content?.trim())) {
+      return res.json(existing);
+    }
+
     const ws = getWorkspace(req.params.workspaceId);
-    const tier = (ws?.tier ?? 'free') as string;
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    const tier = computeEffectiveTier(ws);
 
     if (!incrementIfAllowed(req.params.workspaceId, tier, 'brandscript_generations')) {
       return res.status(429).json({
@@ -172,21 +213,45 @@ router.post(
         code: 'usage_limit',
       });
     }
-
+    let completion: Awaited<ReturnType<typeof completeBrandscript>>;
     try {
-      const bs = await completeBrandscript(req.params.workspaceId, req.params.id);
-      if (!bs) {
-        decrementUsage(req.params.workspaceId, 'brandscript_generations');
-        return res.status(404).json({ error: 'Not found' });
-      }
-      addActivity(req.params.workspaceId, 'brandscript_completed', `AI completed sections in brandscript "${bs.name}"`);
-      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: req.params.id });
-      invalidateIntelligenceCache(req.params.workspaceId);
-      res.json(bs);
+      completion = await completeBrandscript(req.params.workspaceId, req.params.id);
     } catch (err) {
-      decrementUsage(req.params.workspaceId, 'brandscript_generations');
-      res.status(500).json({ error: sanitizeErrorMessage(err, 'Completion failed') });
+      refundBrandscriptUsage(req.params.workspaceId);
+      return res.status(500).json({ error: sanitizeErrorMessage(err, 'Completion failed') });
     }
+
+    const completedBrandscript = completion.brandscript;
+    if (!completedBrandscript) {
+      refundBrandscriptUsage(req.params.workspaceId);
+      return res.status(404).json({ error: 'Not found' });
+    }
+    if (!completion.generated) {
+      refundBrandscriptUsage(req.params.workspaceId);
+      return res.json(completedBrandscript);
+    }
+    if (completion.appliedSectionCount === 0) {
+      return res.status(409).json({
+        error: 'Brandscript changed while AI was working. Your edits were preserved; review them before retrying.',
+        code: 'brandscript_changed',
+      });
+    }
+
+    const noun = completion.appliedSectionCount === 1 ? 'section' : 'sections';
+    runBrandscriptPostCommitEffect(req.params.workspaceId, 'activity', () => {
+      addActivity(
+        req.params.workspaceId,
+        'brandscript_completed',
+        `AI completed ${completion.appliedSectionCount} ${noun} in brandscript "${completedBrandscript.name}"`,
+      );
+    });
+    runBrandscriptPostCommitEffect(req.params.workspaceId, 'broadcast', () => {
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRANDSCRIPT_UPDATED, { brandscriptId: req.params.id });
+    });
+    runBrandscriptPostCommitEffect(req.params.workspaceId, 'intelligence-cache', () => {
+      invalidateIntelligenceCache(req.params.workspaceId);
+    });
+    return res.json(completedBrandscript);
   },
 );
 

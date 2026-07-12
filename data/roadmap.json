@@ -1,6 +1,119 @@
 {
   "sprints": [
     {
+      "id": "sprint-ui-rebuild-parity-recovery-2026-07-09",
+      "name": "UI Rebuild - prototype parity recovery and staged extraction",
+      "hours": "phased - isolated integration sandbox, then one staging PR per dependency",
+      "rationale": "Use Cockpit and the hmpsn studio prototype as behavior-first calibration surfaces. Prove interaction, routing, capability homes, typography, navigation, and desktop composition in an isolated flag-gated branch before extracting small staging PRs. Integration acceptance is not production shipment.",
+      "items": [
+        {
+          "id": "ui-rebuild-parity-integration-sandbox",
+          "title": "Prototype parity integration sandbox - calibrated surfaces, route census, and browser evidence",
+          "source": "Sol-orchestrated parallel UI parity sweep 2026-07-09",
+          "est": "phased",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-09",
+          "owner": "workspace-command-center",
+          "notes": "Completed 2026-07-09 in the isolated codex/ui-prototype-alignment branch. The sandbox contains the reviewed integration cohorts for Cockpit calibration, Insights Engine, Brand & AI, Content Pipeline, SEO Editor, Site Audit, Search & Traffic, shell focus/Page Rewriter, Performance and Site Audit repair senders, Asset Manager, Global Ops corrections, route accounting, and the opt-in rebuilt-admin PageHeader pilot. Nine focused suites pass 120 tests; the branch-wide run passes 28,525 tests across 2,033 files; hooks lint, typecheck, Vite build, pr-check, deferred-ledger verification, browser smoke, and diff hygiene pass. A fresh independent Sol Ultra review returned PASS for the historical integration/behavior checkpoint only. This records behavior acceptance, not owner-approved visual parity, staging, or production shipment."
+        },
+        {
+          "id": "ui-rebuild-parity-staging-extraction",
+          "title": "Extract parity integration into dependency-ordered staging PRs",
+          "source": "docs/ui-rebuild/parity/shipping-manifest.md",
+          "est": "phased",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-07-09",
+          "owner": "workspace-command-center",
+          "notes": "Dormant during the active visual-parity goal. Do not start staging extraction unless Joshua explicitly authorizes it after the owner-approval sequence. When authorized, start each shipping branch from staging and extract governance, typography authority, shell/nav, then one approved surface per PR; never open the integration sandbox itself as one giant PR."
+        },
+        {
+          "id": "ui-rebuild-engine-owner-visual-recheck",
+          "title": "Insights Engine owner visual re-review against the prototype",
+          "source": "ODP-001 circle-back trigger",
+          "est": "S",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-09",
+          "owner": "workspace-command-center",
+          "notes": "Completed 2026-07-10 in codex/ui-visual-parity. Joshua explicitly approved Insights Engine with ODP-001-V1 through V6 as recommended. V1 now keeps the compact narrated POV in the spine and the complete editor in a Drawer; V2 moves Engine actions exact-once into the rebuilt topbar; V3 keeps Details and Stage inline while disclosing Edit/Fix/Park and placing compact curation/attention state beside the queue. V4-V6 are documented owner-approved exceptions for truthful live preview content, provider evidence plus collapsed Operations, and the separate Lost visibility backend read contract. Final matched 1440x900 and 1600x1000 evidence, overlays, Operations, staged-send, and the 390x844 overflow floor are in /tmp/asset-dashboard-codex-visual-parity/insights/final-approved-pass/. A fresh Sol review returned PASS with no safe-local defects; 143 focused/integration tests, hooks lint, typecheck, Vite build, pr-check, and diff hygiene pass. Status: owner-approved."
+        },
+        {
+          "id": "ui-rebuild-brand-ai-owner-visual-recheck",
+          "title": "Brand & AI owner visual re-review against the prototype",
+          "source": "ODP-BRAND-V1 through V7 circle-backs",
+          "est": "S",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-10",
+          "completedAt": "2026-07-10",
+          "owner": "brand-engine",
+          "notes": "Completed 2026-07-10 in codex/ui-visual-parity. V1-V7 restore the source-led grouped cockpit, truthful configured-input evidence, all 17 generators exactly once in the 7/2/5/3 group mapping, focused Identity and Brandscript receivers, the owner-approved 680px workflow Modal, truthful production interiors/actions, and explicit data/typography exceptions. Final 1440x900, 1600x1000, workflow, focus, library, error-fallback, and 390x844 evidence is in /tmp/asset-dashboard-codex-visual-parity/brand-ai/final-v1-v7/. Ten focused suites pass 218 tests; hooks lint, typecheck, Vite build, pr-check, diff hygiene, and a fresh Sol rendered review pass. Joshua reviewed the live surface and said, ‘It looks great. I'd like you to continue rolling through our parity pass, and I'll provide the finer feedback once we've wrapped everything.’ Status: owner-approved; finer feedback is deferred to the registry-wide review."
+        },
+        {
+          "id": "ui-rebuild-registry-owner-visual-parity",
+          "title": "Owner-approved desktop visual parity for every mounted rebuilt route home",
+          "source": "docs/ui-rebuild/parity/registry-final-owner-review.md",
+          "est": "phased",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-10",
+          "completedAt": "2026-07-11",
+          "owner": "workspace-command-center",
+          "notes": "Completed 2026-07-11 in codex/ui-visual-parity. Joshua approved the final 24-route batch with all documented production/data/backend exceptions and retained the Page Rewriter 62px Focus rail; Insights Engine and Brand & AI were approved separately, and Joshua then explicitly approved the Page Intelligence plus Content Performance receiving-home bundle. All 27 direct REBUILT_SURFACES mounts are therefore owner-approved, and Content Performance is separately owner-approved as the flag-on folded receiver in Pipeline Published while its flag-off legacy route remains compatible. The source-led pass covers Cockpit, Content Pipeline, SEO Editor, Search & Traffic, Asset Manager, Performance, Site Audit, Schema, Links, Competitors, Keyword Hub, Page Rewriter, Local Presence, Page Intelligence, and all 11 Global Ops route homes at 1440x900 and 1600x1000 while preserving ui-rebuild-shell, route/deep-link contracts, aliases, and exact-once capability homes. The later independent multi-agent capability, bug/wiring, AI-intelligence, and optimization audit found no P0 functionality loss; its separate closure item records the implemented repairs and verification. Rendered reviewer PASS and automated gates remain supporting evidence only, never substitutes for owner approval. Evidence: /tmp/asset-dashboard-codex-visual-parity/registry-final/, /tmp/asset-dashboard-codex-visual-parity/page-intelligence/, and /tmp/asset-dashboard-codex-visual-parity/content-performance/. This is owner-approved visual parity in the isolated branch, not staging or production shipment; staging extraction remains separately pending and unauthorized."
+        },
+        {
+          "id": "ui-rebuild-post-parity-owner-closure",
+          "title": "Post-parity capability, wiring, AI reliability, and approved decision closeout",
+          "source": "docs/superpowers/plans/2026-07-11-post-parity-owner-closure.md",
+          "est": "phased",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-11",
+          "completedAt": "2026-07-12",
+          "owner": "workspace-command-center",
+          "notes": "Completed locally 2026-07-12 in codex/ui-visual-parity. AUD-D1 through AUD-D7 and AUD-B1 are owner-approved, implemented, committed, and P5-verified. The closure restores Engine operational/history homes, Cockpit and Published evidence bands, rebuilt-shell connection health and command reachability, current-month Digest truth, edit-safe POV freshness, and overlay-aware Tooltip stacking. Follow-up hardening adds truthful Engine/Pipeline loading and error states, strict named AI output contracts, closed-world Digest clause selection, concurrent-edit-safe Brand/Discovery persistence, effective-tier quota authority including active trials, exact-once bulk alt-text accounting, and an executable 33-consumer intelligence census. The all-project suite passed 2,077 files and 29,063 tests with one skip and three todos; bundle verification passes at 1.72 MiB gzip across 269 assets with 73 new sub-50KiB warnings only. Approved CSS 37,307 B and Page Rewriter 8,819 B baselines are applied while the aggregate baseline remains 1,720,000 B. Fresh independent review returned PASS; changed-surface browser checks passed at 1440x900 and 1600x1000 without overflow/current dev-server errors; typecheck, hooks, build, PR checks, bundle/deferred/flag/lexicon gates, and the 13-step quick platform verifier pass. Live-provider proof still requires dedicated staging credentials and separate authority. No push, PR, or staging extraction is authorized."
+        },
+        {
+          "id": "ui-rebuild-provider-readiness",
+          "title": "Provider-ready local fixtures, health truth, and bounded staging smoke",
+          "source": "Visual-parity provider readiness follow-on 2026-07-10",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-10",
+          "completedAt": "2026-07-10",
+          "owner": "integrations",
+          "notes": "Completed locally on codex/ui-visual-parity. DataForSEO is the canonical SEO data provider; SEMrush remains intentionally retired. Added explicit local-fake/local-live/staging environment profiles, deterministic provider-rich demo fixtures scoped to ws_demo_provider_rich, truthful DataForSEO/GSC/GA4/PageSpeed/GBP health and verification states, and a read-only staging smoke with an HTTPS/non-production guard, redacted output, and a default one-call paid-provider ceiling. Local deterministic fixtures validate workflow wiring without provider keys; keys are required only for live/staging proof. Provider-backed mutations and refresh events now invalidate the canonical workspace-intelligence and generated-summary caches so Admin Chat and AI summaries do not retain stale provider evidence. No OAuth identities, API keys, reviews, or unsupported actions are fabricated. Focused provider/health/env and intelligence-invalidation coverage passes; staging live-provider verification remains intentionally unrun until dedicated staging credentials and Joshua-authorized staging access are available."
+        },
+        {
+          "id": "ui-rebuild-page-intelligence-standalone",
+          "title": "Standalone Page Intelligence prototype-led rebuild",
+          "source": "ODP-012 B receiving-home decision",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-10",
+          "completedAt": "2026-07-11",
+          "owner": "seo-health",
+          "notes": "Completed in codex/ui-visual-parity and explicitly owner-approved by Joshua as part of the Page Intelligence plus Content Performance receiving-home bundle. The flag-on route mounts a standalone Research workbench modeled on the prototype SEO Editor master/detail composition while the flag-off legacy receiver remains intact. Pages/Architecture/Guide, single and bulk analysis, progress/cancel, keyword editing/tracking, local/rank context, SEO copy, fix queue, and production handoffs remain reachable. New ?tab= and ?page= receivers use URL page identity before Page Intelligence fixContext, wait for the complete page join on cold loads, and never auto-select the first row. Post-approval closure commit 3b7f4343f pins the real flag loading-to-ON/OFF receivers, exact-once action homes, and the contained 390px list-to-detail/back usability floor. Follow-up e4b12beb7 preserves Back/origin focus across that mobile flow and waits through cached background page refreshes before consuming a requested identity. Browser evidence for empty/detail states at 1440x900, 1600x1000, and 390px is under /tmp/asset-dashboard-codex-visual-parity/page-intelligence/. Status: owner-approved; rendered review and automated PASS are supporting evidence only, while Joshua's explicit approval is the acceptance source."
+        },
+        {
+          "id": "ui-rebuild-content-performance-receiving-home",
+          "title": "Content Performance receiving home in Pipeline Published",
+          "source": "Owner-approved receiving-home plan 2026-07-10",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-10",
+          "completedAt": "2026-07-11",
+          "owner": "content-production",
+          "notes": "Completed in codex/ui-visual-parity and explicitly owner-approved by Joshua as part of the Page Intelligence plus Content Performance receiving-home bundle. Pipeline Published owns the prototype-led four-stat/result-card composition and server-authoritative readback summary. The nonexistent refresh mutation was removed, matrix/request items have stable identities, trends return typed availability and load only after intentional Drawer open to avoid N live GSC calls, public items omit admin outcome internals, and ?tab=published&item= deep links initialize and clear truthfully. Flag-on /content-perf bookmarks redirect with item identity and the rebuilt sidebar removes the duplicate; flag-off keeps the legacy route/nav. Browser evidence at both fixed viewports is under /tmp/asset-dashboard-codex-visual-parity/content-performance/; the owner workspace is truthfully empty while populated composition is component-fixture protected. Status: owner-approved; rendered review and automated PASS are supporting evidence only, while Joshua's explicit approval is the acceptance source."
+        }
+      ]
+    },
+    {
       "id": "sprint-seo-decision-engine-2026-06-23",
       "name": "SEO Decision Engine — close the data→decision gap (8-phase program)",
       "hours": "TBD — phased, one PR per phase, staging-first",

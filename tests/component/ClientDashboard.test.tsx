@@ -230,11 +230,14 @@ vi.mock('../../src/lib/lazyWithRetry', () => ({
 // ── Now import subject under test ─────────────────────────────────────────────
 import { get, getOptional } from '../../src/api/client';
 import { ClientDashboard } from '../../src/components/ClientDashboard';
+import { useWorkspaceEvents } from '../../src/hooks/useWorkspaceEvents';
 import { useRecommendations } from '../../src/hooks/useRecommendations';
 import {
   resolveClientTab,
   KNOWN_CLIENT_TABS,
 } from '../../src/lib/client-dashboard-tab';
+import { queryKeys } from '../../src/lib/queryKeys';
+import { WS_EVENTS } from '../../src/lib/wsEvents';
 import type { WorkspaceInfo } from '../../src/components/client/types';
 
 const mockGet = vi.mocked(get);
@@ -270,7 +273,7 @@ function renderDashboard(
 ) {
   const queryClient = makeQueryClient();
   const { workspaceId = 'ws-test', betaMode = false, initialTab } = props;
-  return render(
+  const result = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <ClientDashboard
@@ -281,6 +284,7 @@ function renderDashboard(
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  return { ...result, queryClient };
 }
 
 // ── Pure function tests: resolveClientTab ────────────────────────────────────
@@ -471,6 +475,28 @@ describe('ClientDashboard — authenticated render', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Powered by/i)).toBeInTheDocument();
+    });
+  });
+
+  it('forwards WORKSPACE_UPDATED payload data into centralized client invalidation', async () => {
+    mockGet.mockResolvedValue(makeWorkspace());
+    const { queryClient } = renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('client-header')).toBeInTheDocument();
+    });
+
+    const subscription = [...vi.mocked(useWorkspaceEvents).mock.calls]
+      .reverse()
+      .find(([subscribedWorkspaceId]) => subscribedWorkspaceId === 'ws-test');
+    const workspaceUpdated = subscription?.[1][WS_EVENTS.WORKSPACE_UPDATED];
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    expect(workspaceUpdated).toBeTypeOf('function');
+    act(() => workspaceUpdated?.({ googleConnectionChanged: true }));
+
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.client.intelligence('ws-test'),
     });
   });
 });

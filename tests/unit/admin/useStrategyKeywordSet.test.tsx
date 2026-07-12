@@ -14,11 +14,6 @@ vi.mock('../../../src/api/keyword-strategy.js', () => ({
   keepStrategyKeywordApi: (...a: unknown[]) => postMock('keep', ...a),
 }));
 
-// Mock useWorkspaceEvents — does not need to do anything in unit tests
-vi.mock('../../../src/hooks/useWorkspaceEvents.js', () => ({
-  useWorkspaceEvents: vi.fn(),
-}));
-
 import { useStrategyKeywordSet } from '../../../src/hooks/admin/useStrategyKeywordSet';
 import { queryKeys } from '../../../src/lib/queryKeys';
 import type { ActiveStrategyKeyword } from '../../../shared/types/strategy-keyword-set';

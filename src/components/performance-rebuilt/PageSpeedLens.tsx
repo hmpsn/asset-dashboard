@@ -1,5 +1,6 @@
 // @ds-rebuilt
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   useAdminPageSpeedBulk,
   useAdminPageSpeedSingle,
@@ -28,13 +29,14 @@ import {
   MetricRing,
   MetricTile,
   SearchField,
+  SectionCard,
   Segmented,
   Skeleton,
   Toolbar,
   ToolbarSpacer,
   type DataColumn,
 } from '../ui';
-import { scoreColor } from '../ui/constants';
+import { adminPath } from '../../routes';
 import { mutationErrorMessage } from './performanceMutationFeedback';
 import {
   formatCls,
@@ -54,6 +56,7 @@ interface PageSpeedLensProps {
 }
 
 type PageSpeedMode = 'single' | 'bulk';
+type SinglePageResults = Partial<Record<PageSpeedStrategy, PageSpeedResult>>;
 
 type PageSpeedRecord = Record<string, unknown> & {
   source: PageSpeedResult;
@@ -126,6 +129,23 @@ function pagePath(page: WebflowPageOption): string {
   return page.publishedPath ?? page.slug;
 }
 
+function resultMatchesPage(result: PageSpeedResult, page: WebflowPageOption): boolean {
+  if (result.page.trim().toLowerCase() === page.title.trim().toLowerCase()) return true;
+  try {
+    const resultPath = new URL(result.url).pathname.replace(/\/$/, '') || '/';
+    // page-slug-url-ok — comparison-only path normalization, never a navigable or fetch URL.
+    const selectedPath = (page.publishedPath ?? (page.slug ? `/${page.slug}` : '/')).replace(/\/$/, '') || '/';
+    return resultPath === selectedPath;
+  } catch {
+    return false;
+  }
+}
+
+function savedPageResult(result: SiteSpeedResult | null | undefined, page: WebflowPageOption | null): PageSpeedResult | null {
+  if (!result || !page) return null;
+  return result.pages.find((candidate) => resultMatchesPage(candidate, page)) ?? null;
+}
+
 function pageSpeedRows(result: SiteSpeedResult | null): PageSpeedRecord[] {
   return (result?.pages ?? []).map((page) => ({
     source: page,
@@ -172,20 +192,21 @@ function VitalTile({
   value: number | null | undefined;
   formatted: string;
 }) {
+  const available = typeof value === 'number' && Number.isFinite(value);
   const rating = vitalRating(vitalKey, value);
   return (
     <MetricTile
       label={label}
       value={formatted}
-      accent={ratingAccent(rating)}
-      sub={rating === 'good' ? 'Good' : rating === 'poor' ? 'Poor' : 'Needs work'}
+      accent={available ? ratingAccent(rating) : 'var(--brand-text-muted)'}
+      sub={!available ? 'Unavailable' : rating === 'good' ? 'Good' : rating === 'poor' ? 'Poor' : 'Needs work'}
     />
   );
 }
 
 function VitalsGrid({ vitals }: { vitals: CoreWebVitals }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
       {VITALS.map((item) => (
         <VitalTile
           key={item.key}
@@ -196,6 +217,46 @@ function VitalsGrid({ vitals }: { vitals: CoreWebVitals }) {
         />
       ))}
     </div>
+  );
+}
+
+function SingleStrategyResultCard({
+  strategy,
+  result,
+  page,
+}: {
+  strategy: PageSpeedStrategy;
+  result: PageSpeedResult | null;
+  page: WebflowPageOption;
+}) {
+  const label = strategyLabel(strategy);
+  return (
+    <SectionCard
+      title={`${label} result`}
+      subtitle={result ? `${result.page || page.title} · ${formatPageSpeedDate(result.fetchedAt)}` : `No saved test for ${page.title}`}
+      titleIcon={<Icon name={strategy === 'mobile' ? 'user' : 'globe'} size="sm" className="text-[var(--blue)]" />}
+      iconChip
+      action={result ? <ProvenanceBadge fieldDataAvailable={result.fieldDataAvailable} /> : undefined}
+      className="min-w-0"
+    >
+      {result ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <MetricRing score={result.score} size={82} noAnimation />
+            <p className="t-body text-[var(--brand-text-muted)]">
+              Lighthouse performance score plus the full Core Web Vitals set.
+            </p>
+          </div>
+          <VitalsGrid vitals={result.vitals} />
+        </div>
+      ) : (
+        <div className="flex min-h-[116px] items-center">
+          <p className="t-body text-[var(--brand-text-muted)]">
+            Use the test controls above to add a truthful {label.toLowerCase()} result for this page.
+          </p>
+        </div>
+      )}
+    </SectionCard>
   );
 }
 
@@ -219,7 +280,7 @@ function ScoreSummary({
             <Badge label={label} tone="teal" variant="soft" size="sm" />
             <ProvenanceBadge fieldDataAvailable={fieldDataAvailable} />
           </div>
-          <p className="mt-2 t-caption text-[var(--brand-text-muted)]">
+          <p className="mt-2 t-body text-[var(--brand-text-muted)]">
             Lighthouse performance score plus the full Core Web Vitals set.
           </p>
         </div>
@@ -229,7 +290,7 @@ function ScoreSummary({
   );
 }
 
-function PageSpeedDetail({ result }: { result: PageSpeedResult }) {
+function PageSpeedEvidence({ result }: { result: PageSpeedResult }) {
   const opportunityColumns = useMemo<DataColumn[]>(() => [
     {
       key: 'title',
@@ -295,11 +356,10 @@ function PageSpeedDetail({ result }: { result: PageSpeedResult }) {
   ], []);
 
   return (
-    <div className="flex flex-col gap-5">
-      <ScoreSummary result={result} label={strategyLabel(result.strategy)} fieldDataAvailable={result.fieldDataAvailable} />
+    <div className="flex flex-col gap-3">
       <GroupBlock
         title={`Opportunities (${result.opportunities.length})`}
-        meta="Savings reported by PageSpeed Insights. Fix routing is deferred to a shared destination contract."
+        meta="Savings reported by PageSpeed Insights. Most speed opportunities resolve in Asset Manager after review."
         collapsible
         defaultOpen={false}
       >
@@ -333,63 +393,24 @@ function PageSpeedDetail({ result }: { result: PageSpeedResult }) {
   );
 }
 
-function StrategySnapshotCard({
-  strategy,
-  result,
-  scannedAt,
-  loading,
-  onRun,
-  pending,
-}: {
-  strategy: PageSpeedStrategy;
-  result: SiteSpeedResult | null;
-  scannedAt: string;
-  loading: boolean;
-  onRun: () => void;
-  pending: boolean;
-}) {
+function PageSpeedDetail({ result }: { result: PageSpeedResult }) {
   return (
-    <GroupBlock
-      title={strategyLabel(strategy)}
-      meta={scannedAt ? `Last scanned ${scannedAt}` : 'No saved bulk scan'}
-      stats={result ? [
-        { label: 'Score', value: result.averageScore, color: typeof result.averageScore === 'number' ? scoreColor(result.averageScore) : 'var(--brand-text-muted)' },
-        { label: 'Pages', value: result.pages.length, color: 'var(--blue)' },
-      ] : []}
-      collapsible
-      defaultOpen={!!result}
-    >
-      {loading && !result ? (
-        <Skeleton className="h-[88px] w-full" />
-      ) : result ? (
-        <div className="flex flex-col gap-3">
-          <ScoreSummary result={result} label={`${strategyLabel(strategy)} average`} />
-          <Button size="sm" variant="secondary" onClick={onRun} disabled={pending}>
-            <Icon name="refresh" size="sm" />
-            Re-run {strategyLabel(strategy)}
-          </Button>
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="t-caption-sm text-[var(--brand-text-muted)]">Run a bulk scan to populate this strategy snapshot.</span>
-          <Button size="sm" variant="secondary" onClick={onRun} disabled={pending}>
-            <Icon name="refresh" size="sm" />
-            Run {strategyLabel(strategy)}
-          </Button>
-        </div>
-      )}
-    </GroupBlock>
+    <div className="flex flex-col gap-4">
+      <ScoreSummary result={result} label={strategyLabel(result.strategy)} fieldDataAvailable={result.fieldDataAvailable} />
+      <PageSpeedEvidence result={result} />
+    </div>
   );
 }
 
 export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [mode, setMode] = useState<PageSpeedMode>('single');
   const [strategy, setStrategy] = useState<PageSpeedStrategy>('mobile');
   const [maxPages, setMaxPages] = useState(3);
   const [pageSearch, setPageSearch] = useState('');
   const [selectedPageId, setSelectedPageId] = useState('');
-  const [singleResult, setSingleResult] = useState<PageSpeedResult | null>(null);
+  const [singleResultsByPage, setSingleResultsByPage] = useState<Record<string, SinglePageResults>>({});
   const [selectedResult, setSelectedResult] = useState<PageSpeedResult | null>(null);
   const pages = useAdminPerformancePages(workspaceId, siteId);
   const mobileSnapshot = useAdminPageSpeedSnapshot(workspaceId, siteId, 'mobile');
@@ -399,13 +420,14 @@ export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
   const currentSnapshot = strategy === 'mobile' ? mobileSnapshot : desktopSnapshot;
   const currentBulkResult = (bulk.data?.strategy === strategy ? bulk.data : currentSnapshot.data?.result) ?? null;
   const currentScannedAt = formatScanDate(currentSnapshot.data?.createdAt);
-  const selectedPage = pages.data?.find((page) => page.id === selectedPageId) ?? null;
+  const effectiveSelectedPageId = selectedPageId || pages.data?.[0]?.id || '';
+  const selectedPage = pages.data?.find((page) => page.id === effectiveSelectedPageId) ?? null;
+  const selectedSingleResults = singleResultsByPage[effectiveSelectedPageId];
+  const mobileResult = selectedSingleResults?.mobile ?? savedPageResult(mobileSnapshot.data?.result, selectedPage);
+  const desktopResult = selectedSingleResults?.desktop ?? savedPageResult(desktopSnapshot.data?.result, selectedPage);
+  const activeSingleResult = strategy === 'mobile' ? mobileResult : desktopResult;
+  const hasAnySingleResult = !!mobileResult || !!desktopResult;
   const busy = bulk.isPending || single.isPending;
-
-  useEffect(() => {
-    if (selectedPageId || !pages.data?.length) return;
-    setSelectedPageId(pages.data[0].id);
-  }, [pages.data, selectedPageId]);
 
   const filteredPages = useMemo(() => {
     const query = pageSearch.trim().toLowerCase();
@@ -416,7 +438,6 @@ export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
   const runBulk = (nextStrategy = strategy) => {
     setMode('bulk');
     setStrategy(nextStrategy);
-    setSingleResult(null);
     toast(`${strategyLabel(nextStrategy)} PageSpeed bulk test started`, 'info');
     bulk.mutate(
       { strategy: nextStrategy, maxPages },
@@ -431,7 +452,6 @@ export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
     if (!selectedPage) return;
     setMode('single');
     setStrategy(nextStrategy);
-    setSingleResult(null);
     toast(`${strategyLabel(nextStrategy)} PageSpeed test started`, 'info');
     single.mutate(
       {
@@ -442,7 +462,10 @@ export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
       },
       {
         onSuccess: (result) => {
-          setSingleResult(result);
+          setSingleResultsByPage((current) => ({
+            ...current,
+            [selectedPage.id]: { ...current[selectedPage.id], [nextStrategy]: result },
+          }));
           toast(`${strategyLabel(nextStrategy)} PageSpeed test complete`, 'success');
         },
         onError: (error) => toast(mutationErrorMessage(error, 'PageSpeed test failed'), 'error'),
@@ -525,82 +548,82 @@ export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
     },
   ], []);
 
-  const hardError = (bulk.isError || single.isError) && !currentBulkResult && !singleResult;
-  const error = single.error ?? bulk.error;
+  const activeError = mode === 'single' ? single.error : bulk.error;
+  const hasActiveResult = mode === 'single' ? hasAnySingleResult : !!currentBulkResult;
+  const hardError = (mode === 'single' ? single.isError : bulk.isError) && !hasActiveResult;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-[14px]">
       <Toolbar label="PageSpeed controls" className="w-full">
-        <Segmented options={MODE_OPTIONS} value={mode} onChange={(value) => setMode(value as PageSpeedMode)} />
+        <Segmented
+          options={MODE_OPTIONS}
+          value={mode}
+          onChange={(value) => {
+            setMode(value as PageSpeedMode);
+            setSelectedResult(null);
+          }}
+        />
         <Segmented options={STRATEGY_OPTIONS} value={strategy} onChange={(value) => setStrategy(value as PageSpeedStrategy)} />
         <ToolbarSpacer />
-        {currentScannedAt && <span className="t-caption text-[var(--brand-text-muted)]">Last scanned {currentScannedAt}</span>}
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => (mode === 'single' ? runSingle(strategy) : runBulk(strategy))}
-          disabled={busy || (mode === 'single' && !selectedPage)}
-        >
-          <Icon name="refresh" size="sm" />
-          Re-scan
-        </Button>
+        {mode === 'bulk' && currentScannedAt && (
+          <span className="t-caption text-[var(--brand-text-muted)]">Last scanned {currentScannedAt}</span>
+        )}
       </Toolbar>
 
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_220px]">
-        {mode === 'single' ? (
-          <div className="flex min-w-0 flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <SearchField
-                value={pageSearch}
-                onChange={setPageSearch}
-                placeholder="Search Webflow pages"
-                className="min-w-[220px] flex-1"
-              />
-              <FormSelect
-                aria-label="PageSpeed page"
-                value={selectedPageId}
-                onChange={setSelectedPageId}
-                options={filteredPages.map((page) => ({ value: page.id, label: pageLabel(page) }))}
-                placeholder={pages.isLoading ? 'Loading pages' : 'Select a page'}
-                className="min-w-[260px] flex-1"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="primary" onClick={() => runSingle('mobile')} disabled={busy || !selectedPage}>
-                <Icon name="gauge" size="sm" />
-                Test Mobile
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => runSingle('desktop')} disabled={busy || !selectedPage}>
-                <Icon name="gauge" size="sm" />
-                Test Desktop
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex min-w-0 flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-3">
-            <p className="t-caption text-[var(--brand-text-muted)]">
-              Bulk tests the top published pages and persists the averaged strategy snapshot.
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="primary" onClick={() => runBulk('mobile')} disabled={busy}>
-                <Icon name="gauge" size="sm" />
-                Test Mobile
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => runBulk('desktop')} disabled={busy}>
-                <Icon name="gauge" size="sm" />
-                Test Desktop
-              </Button>
-            </div>
-          </div>
-        )}
-        <FormSelect
-          aria-label="Bulk PageSpeed page count"
-          value={String(maxPages)}
-          onChange={(value) => setMaxPages(Number(value))}
-          options={MAX_PAGE_OPTIONS}
-          className="self-start"
-        />
-      </div>
+      {mode === 'single' ? (
+        <Toolbar label="Single-page PageSpeed test" className="w-full">
+          <SearchField
+            value={pageSearch}
+            onChange={setPageSearch}
+            placeholder="Search Webflow pages"
+            className="min-w-[220px] flex-1"
+          />
+          <FormSelect
+            aria-label="PageSpeed page"
+            value={effectiveSelectedPageId}
+            onChange={(value) => {
+              setSelectedPageId(value);
+              setSelectedResult(null);
+            }}
+            options={filteredPages.map((page) => ({ value: page.id, label: pageLabel(page) }))}
+            placeholder={pages.isLoading ? 'Loading pages' : 'Select a page'}
+            className="min-w-[260px] flex-1"
+          />
+          <Button size="sm" variant="primary" onClick={() => runSingle('mobile')} disabled={busy || !selectedPage}>
+            <Icon name="gauge" size="sm" />
+            Test Mobile
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => runSingle('desktop')} disabled={busy || !selectedPage}>
+            <Icon name="gauge" size="sm" />
+            Test Desktop
+          </Button>
+        </Toolbar>
+      ) : (
+        <SectionCard
+          title="Bulk PageSpeed scan"
+          subtitle="Test the top published pages and persist the averaged strategy snapshot."
+          variant="subtle"
+        >
+          <Toolbar label="Bulk PageSpeed test" className="w-full">
+            <FormSelect
+              aria-label="Bulk PageSpeed page count"
+              value={String(maxPages)}
+              onChange={(value) => setMaxPages(Number(value))}
+              options={MAX_PAGE_OPTIONS}
+              className="w-[150px]"
+            />
+            <ToolbarSpacer />
+            <Button size="sm" variant="primary" onClick={() => runBulk('mobile')} disabled={busy}>
+              <Icon name="gauge" size="sm" />
+              Test Mobile
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => runBulk('desktop')} disabled={busy}>
+              <Icon name="gauge" size="sm" />
+              Test Desktop
+            </Button>
+          </Toolbar>
+        </SectionCard>
+      )}
 
       {busy && (
         <InlineBanner tone="info" title="Running PageSpeed analysis">
@@ -608,10 +631,10 @@ export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
         </InlineBanner>
       )}
 
-      {(bulk.isError || single.isError) && (currentBulkResult || singleResult) && (
+      {(mode === 'single' ? single.isError : bulk.isError) && hasActiveResult && (
         <InlineBanner tone="warning" title="PageSpeed data may be stale">
           <div className="flex flex-wrap items-center gap-2">
-            <span>{pageSpeedErrorMessage(mutationErrorMessage(error, 'PageSpeed analysis failed'))}</span>
+            <span>{pageSpeedErrorMessage(mutationErrorMessage(activeError, 'PageSpeed analysis failed'))}</span>
             <Button size="sm" variant="secondary" onClick={() => (mode === 'single' ? runSingle(strategy) : runBulk(strategy))}>
               Retry
             </Button>
@@ -619,7 +642,7 @@ export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
         </InlineBanner>
       )}
 
-      {currentSnapshot.isError && !currentBulkResult && !singleResult && !hardError && (
+      {mode === 'bulk' && currentSnapshot.isError && !currentBulkResult && !hardError && (
         <ErrorState
           type="data"
           title="PageSpeed snapshot did not load"
@@ -633,45 +656,40 @@ export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
         <ErrorState
           type="data"
           title="PageSpeed analysis failed"
-          message={pageSpeedErrorMessage(mutationErrorMessage(error, 'PageSpeed analysis failed'))}
+          message={pageSpeedErrorMessage(mutationErrorMessage(activeError, 'PageSpeed analysis failed'))}
           action={{ label: 'Retry', onClick: () => (mode === 'single' ? runSingle(strategy) : runBulk(strategy)) }}
           className="min-h-[320px]"
         />
       )}
 
-      {busy && !currentBulkResult && !singleResult && !hardError && (
+      {mode === 'bulk' && busy && !hasActiveResult && !hardError && (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Loading PageSpeed results">
           {Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-[92px] w-full" />)}
         </div>
       )}
 
-      {!busy && !currentBulkResult && !singleResult && !hardError && (
-        <EmptyState
-          icon={SpeedEmptyIcon}
-          title="Run a PageSpeed test"
-          description="Test a single page or bulk-test the top pages to restore Core Web Vitals and Lighthouse diagnostics."
-          action={(
-            <Button size="sm" variant="primary" onClick={() => (mode === 'single' ? runSingle(strategy) : runBulk(strategy))} disabled={mode === 'single' && !selectedPage}>
-              <Icon name="refresh" size="sm" />
-              Run Audit
-            </Button>
-          )}
-        />
-      )}
-
-      {singleResult && (
-        <div className="flex flex-col gap-4">
+      {mode === 'single' && selectedPage && !hardError && (
+        <section className="flex flex-col gap-3" aria-labelledby="selected-page-results-heading">
           <div className="flex flex-wrap items-center gap-2">
             <Badge label="Single Page" tone="teal" variant="soft" size="sm" />
-            <span className="t-caption text-[var(--brand-text-muted)]">
-              {singleResult.page || singleResult.url} · {formatPageSpeedDate(singleResult.fetchedAt)}
-            </span>
+            <h3 id="selected-page-results-heading" className="t-ui font-semibold text-[var(--brand-text-bright)]">Selected page results</h3>
+            <span className="t-caption text-[var(--brand-text-muted)]">{pageLabel(selectedPage)}</span>
           </div>
-          <PageSpeedDetail result={singleResult} />
-        </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <SingleStrategyResultCard strategy="mobile" result={mobileResult} page={selectedPage} />
+            <SingleStrategyResultCard strategy="desktop" result={desktopResult} page={selectedPage} />
+          </div>
+          {activeSingleResult ? (
+            <PageSpeedEvidence result={activeSingleResult} />
+          ) : (
+            <InlineBanner tone="info" size="sm" title={`No ${strategyLabel(strategy).toLowerCase()} evidence for ${selectedPage.title}`}>
+              Run this strategy to restore its opportunities and diagnostics.
+            </InlineBanner>
+          )}
+        </section>
       )}
 
-      {currentBulkResult && (
+      {mode === 'bulk' && currentBulkResult && !hardError && (
         <div className="flex flex-col gap-4">
           <ScoreSummary result={currentBulkResult} label={`${strategyLabel(currentBulkResult.strategy)} average`} />
           <DataTable
@@ -684,24 +702,32 @@ export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
         </div>
       )}
 
-      <div className="grid gap-3 xl:grid-cols-2">
-        <StrategySnapshotCard
-          strategy="mobile"
-          result={mobileSnapshot.data?.result ?? null}
-          scannedAt={formatScanDate(mobileSnapshot.data?.createdAt)}
-          loading={mobileSnapshot.isLoading}
-          onRun={() => runBulk('mobile')}
-          pending={busy}
+      {mode === 'bulk' && !busy && !currentBulkResult && !hardError && (
+        <EmptyState
+          icon={SpeedEmptyIcon}
+          title="Run a bulk PageSpeed test"
+          description="Choose a strategy and page count to restore the saved site-wide PageSpeed snapshot."
+          action={<Button size="sm" variant="primary" onClick={() => runBulk(strategy)}>Run Audit</Button>}
         />
-        <StrategySnapshotCard
-          strategy="desktop"
-          result={desktopSnapshot.data?.result ?? null}
-          scannedAt={formatScanDate(desktopSnapshot.data?.createdAt)}
-          loading={desktopSnapshot.isLoading}
-          onRun={() => runBulk('desktop')}
-          pending={busy}
-        />
-      </div>
+      )}
+
+      <InlineBanner tone="info" size="sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <span>
+            <strong className="font-semibold text-[var(--brand-text-bright)]">Speed fixes start in Asset Manager.</strong>
+            {' '}Use PageSpeed to identify Core Web Vitals issues, then repair oversized source files before retesting.
+          </span>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => navigate(`${adminPath(workspaceId, 'media')}?filter=oversized`)}
+          >
+            <Icon name="image" size="sm" />
+            Asset Manager
+            <Icon name="arrowRight" size="sm" />
+          </Button>
+        </div>
+      </InlineBanner>
 
       <Drawer
         open={selectedResult != null}

@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   linkAlertToInsight: vi.fn(),
   upsertInsight: vi.fn(),
   deleteStaleInsightsByType: vi.fn(),
+  invalidateIntelligenceCache: vi.fn(),
 }));
 
 vi.mock('../../server/logger.js', () => ({
@@ -26,6 +27,9 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
 vi.mock('../../server/seo-data-provider.js', () => ({
   getConfiguredProvider: mocks.getConfiguredProvider,
 }));
+vi.mock('../../server/seo-target-geo.js', () => ({
+  workspaceProviderGeo: () => ({}),
+}));
 vi.mock('../../server/competitor-snapshot-store.js', () => ({
   getLatestCompetitorSnapshot: mocks.getLatestCompetitorSnapshot,
   saveCompetitorSnapshot: mocks.saveCompetitorSnapshot,
@@ -38,19 +42,16 @@ vi.mock('../../server/analytics-insights-store.js', () => ({
   upsertInsight: mocks.upsertInsight,
   deleteStaleInsightsByType: mocks.deleteStaleInsightsByType,
 }));
+vi.mock('../../server/intelligence/cache-invalidation.js', () => ({
+  invalidateIntelligenceCache: mocks.invalidateIntelligenceCache,
+}));
 
 import {
-  startCompetitorMonitoringCron,
+  runCompetitorCheck,
   startIntelligenceCrons,
   stopCompetitorMonitoringCron,
   stopIntelligenceCrons,
 } from '../../server/intelligence-crons.js';
-
-async function advanceCompetitorStartup(): Promise<void> {
-  await vi.advanceTimersByTimeAsync(15 * 60 * 1000);
-  await Promise.resolve();
-  await Promise.resolve();
-}
 
 beforeEach(() => {
   stopIntelligenceCrons();
@@ -120,8 +121,7 @@ describe('intelligence crons', () => {
       { id: 'ws_1', liveDomain: 'https://example.com', competitorDomains: ['competitor.com'], seoDataProvider: 'dataforseo' },
     ]);
 
-    startCompetitorMonitoringCron();
-    await advanceCompetitorStartup();
+    await runCompetitorCheck();
 
     expect(mocks.listWorkspaces).not.toHaveBeenCalled();
     expect(mocks.upsertInsight).not.toHaveBeenCalled();
@@ -138,8 +138,7 @@ describe('intelligence crons', () => {
       getDomainKeywords: vi.fn(),
     });
 
-    startCompetitorMonitoringCron();
-    await advanceCompetitorStartup();
+    await runCompetitorCheck();
 
     expect(mocks.deleteStaleInsightsByType).toHaveBeenCalledTimes(2);
     expect(mocks.deleteStaleInsightsByType).toHaveBeenCalledWith('ws_missing', 'competitor_alert', expect.any(String));
@@ -162,11 +161,35 @@ describe('intelligence crons', () => {
     });
     mocks.snapshotExistsForDate.mockReturnValue(true);
 
-    startCompetitorMonitoringCron();
-    await advanceCompetitorStartup();
+    await runCompetitorCheck();
 
     expect(getDomainKeywords).not.toHaveBeenCalled();
     expect(mocks.deleteStaleInsightsByType).not.toHaveBeenCalled();
+    expect(mocks.invalidateIntelligenceCache).not.toHaveBeenCalled();
+  });
+
+  it('invalidates intelligence once after persisting a multi-domain competitor batch', async () => {
+    const getDomainKeywords = vi.fn().mockResolvedValue([
+      { keyword: 'seo agency', position: 3, volume: 700 },
+    ]);
+    mocks.listWorkspaces.mockReturnValue([
+      {
+        id: 'ws_multi',
+        liveDomain: 'https://example.com',
+        competitorDomains: ['one.example', 'two.example'],
+        seoDataProvider: 'dataforseo',
+      },
+    ]);
+    mocks.getConfiguredProvider.mockReturnValue({
+      isConfigured: () => true,
+      getDomainKeywords,
+    });
+
+    await runCompetitorCheck();
+
+    expect(mocks.saveCompetitorSnapshot).toHaveBeenCalledTimes(2);
+    expect(mocks.invalidateIntelligenceCache).toHaveBeenCalledTimes(1);
+    expect(mocks.invalidateIntelligenceCache).toHaveBeenCalledWith('ws_multi');
   });
 
 });

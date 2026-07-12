@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Badge, Button, ClickableRow, Icon } from '../ui';
+import { Badge, Button, ClickableRow, Icon, InlineBanner } from '../ui';
 import { RefreshCw, Plus, Minus, ArrowRight, ArrowUpRight, ChevronDown, Eye, Lightbulb } from 'lucide-react';
 import { keywords } from '../../api/seo';
 import { formatDate } from '../../utils/formatDates';
@@ -11,22 +11,53 @@ import { strategyNextActionTarget } from '../../lib/strategyNextActionTarget';
 
 export interface StrategyDiffProps {
   workspaceId: string;
+  defaultExpanded?: boolean;
+  presentation?: 'default' | 'engine-spine';
 }
 
-export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
+export function StrategyDiff({
+  workspaceId,
+  defaultExpanded = false,
+  presentation = 'default',
+}: StrategyDiffProps) {
   const navigate = useNavigate();
-  const [expanded, setExpanded] = useState(false);
+  const [expandedOverride, setExpandedOverride] = useState<boolean | null>(null);
+  const expanded = expandedOverride ?? defaultExpanded;
 
   // useQuery (keyed on admin.strategyDiff) so the diff refetches when a strategy regen broadcasts
   // strategy:updated — strategyMutationKeys invalidates this key. The previous raw useEffect never
   // re-fetched, leaving the diff stale until the component remounted.
-  const { data: diff, isLoading: loading } = useQuery({
+  const { data: diff, isLoading: loading, isError, refetch } = useQuery({
     queryKey: queryKeys.admin.strategyDiff(workspaceId),
     queryFn: () => keywords.strategyDiff(workspaceId),
     enabled: !!workspaceId,
   });
 
-  if (loading || !diff) return null;
+  if (loading) return null;
+  if (isError) {
+    return defaultExpanded ? (
+      <InlineBanner
+        tone="error"
+        title="Strategy comparison did not load"
+        message="Retry the comparison before reviewing what changed."
+        data-testid="strategy-diff-error"
+      >
+        <Button variant="link" size="sm" onClick={() => void refetch()}>
+          Retry comparison
+        </Button>
+      </InlineBanner>
+    ) : null;
+  }
+  if (!diff) {
+    return defaultExpanded ? (
+      <InlineBanner
+        tone="info"
+        title="No previous strategy comparison"
+        message="The first comparison will appear after the next strategy refresh."
+        data-testid="strategy-diff-empty"
+      />
+    ) : null;
+  }
 
   const retired = (diff.summary?.deprecated ?? 0) + (diff.summary?.replaced ?? 0);
   const totalChanges = diff.summary
@@ -34,19 +65,32 @@ export function StrategyDiff({ workspaceId }: StrategyDiffProps) {
     : diff.newKeywords.length + diff.lostKeywords.length + diff.newGaps.length + diff.resolvedGaps.length + diff.keywordChanges.length;
   const hasChanges = totalChanges > 0 || (diff.summary?.preserved ?? 0) > 0 || diff.lostKeywords.length > 0;
 
-  if (!hasChanges) return null;
+  if (!hasChanges) {
+    return defaultExpanded ? (
+      <InlineBanner
+        tone="info"
+        title="No strategy changes since the last run"
+        message="The current strategy matches the previous comparison."
+        data-testid="strategy-diff-empty"
+      />
+    ) : null;
+  }
   const explanationPreview = diff.explanations?.filter(explanation => !explanation.rawEvidenceOnly).slice(0, 3) ?? [];
 
   return (
     // pr-check-disable-next-line -- brand asymmetric signature on StrategyDiff "What Changed" callout; amber-bordered non-SectionCard chrome
     <div className="bg-[var(--surface-2)] border border-amber-500/20 overflow-hidden rounded-[var(--radius-signature-lg)]">
       <ClickableRow
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => setExpandedOverride(!expanded)}
         aria-expanded={expanded}
         className="flex items-center justify-between px-4 py-3 hover:bg-[var(--surface-3)]/50"
       >
         <div className="flex items-center gap-2">
-          <Icon as={RefreshCw} size="md" className="text-amber-400" />
+          {presentation === 'engine-spine' ? (
+            <Icon name="clock" size="md" className="text-amber-400" />
+          ) : (
+            <Icon as={RefreshCw} size="md" className="text-amber-400" />
+          )}
           <span className="t-body font-semibold text-amber-300">What Changed</span>
           <span className="t-caption-sm text-[var(--brand-text-muted)]">
             {totalChanges} strategy update{totalChanges !== 1 ? 's' : ''} since {formatDate(diff.previousGeneratedAt)}

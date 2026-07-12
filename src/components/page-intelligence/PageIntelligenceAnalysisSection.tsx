@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Zap,
 } from 'lucide-react';
+import { keywordComparisonKey } from '../../../shared/keyword-normalization';
 import type { UnifiedPage } from '../../../shared/types/page-join';
 import { scoreBgBarClass, scoreColorClass, Button, Icon, MetricRing } from '../ui';
 import {
@@ -39,6 +40,10 @@ export function PageIntelligenceAnalysisSection({
   onAnalyzePage,
 }: Props) {
   if (!analysis) return null;
+
+  const mappedPrimaryKeyword = page.strategy?.primaryKeyword;
+  const analysisRepeatsMappedKeyword = Boolean(mappedPrimaryKeyword)
+    && keywordComparisonKey(mappedPrimaryKeyword) === keywordComparisonKey(analysis.primaryKeyword);
 
   return (
     <div className="space-y-3 pt-2 border-t border-[var(--brand-border)]">
@@ -86,11 +91,13 @@ export function PageIntelligenceAnalysisSection({
         <div className="flex items-center gap-2 mb-2">
           <Icon as={Target} size="md" className="text-accent-brand" />
           <span className="t-caption font-medium text-[var(--brand-text-bright)]">Primary Keyword: <span className="text-white">{analysis.primaryKeyword}</span></span>
-          <PageIntelligenceTrackKeywordButton
-            keyword={analysis.primaryKeyword}
-            trackedKeywords={trackedKeywords}
-            onTrackKeyword={onTrackKeyword}
-          />
+          {!analysisRepeatsMappedKeyword && (
+            <PageIntelligenceTrackKeywordButton
+              keyword={analysis.primaryKeyword}
+              trackedKeywords={trackedKeywords}
+              onTrackKeyword={onTrackKeyword}
+            />
+          )}
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           {(['inTitle', 'inMeta', 'inContent', 'inSlug'] as const).map(key => {

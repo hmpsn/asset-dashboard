@@ -5,7 +5,7 @@ import { enqueuePlaybook } from '../../playbooks.js';
 import { mutationError, runWorkspaceMutation } from '../../workspace-mutation-helper.js';
 import { getClientPortalUrl, getWorkspace } from '../../workspaces.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
-import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
+import { clearIntelligenceCache } from '../../intelligence/cache-clear.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { InvalidTransitionError } from '../../state-machines.js';
 import type { ClientAction, ClientActionPayload, ClientActionSourceType } from '../../../shared/types/client-actions.js';
@@ -42,8 +42,8 @@ export type RespondToClientActionRequest = {
 };
 
 function broadcastActionUpdate(workspaceId: string, actionId: string, action: string) {
+  clearIntelligenceCache(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.CLIENT_ACTION_UPDATE, { actionId, action });
-  invalidateIntelligenceCache(workspaceId);
 }
 
 export function createAdminClientAction(workspaceId: string, input: CreateClientActionRequest): ClientAction {
@@ -121,7 +121,6 @@ export function updateAdminClientAction(
   actionId: string,
   updates: UpdateClientActionRequest,
 ): ClientAction {
-  let feedbackStatus: 'approved' | 'completed' | null = null;
   const updated = runWorkspaceMutation({
     workspaceId,
     defaultErrorMessage: 'Failed to update client action',
@@ -130,15 +129,20 @@ export function updateAdminClientAction(
       if (!existing) throw mutationError(404, 'Client action not found');
       const next = updateClientAction(currentWorkspaceId, actionId, updates);
       if (!next) throw mutationError(404, 'Client action not found');
+      const feedbackStatus =
+        updates.status === 'completed' && existing.status !== 'completed'
+          ? 'completed'
+          : updates.status === 'approved' && existing.status !== 'approved'
+            ? 'approved'
+            : null;
+      if (feedbackStatus) {
+        applyClientActionFeedbackLoop(currentWorkspaceId, next, feedbackStatus);
+      }
       return next;
     },
     onActivity: ({ workspaceId: currentWorkspaceId, existing, result }) => {
       if (!existing) return;
-      if (updates.status === 'approved' && existing.status !== 'approved') {
-        feedbackStatus = 'approved';
-      }
       if (updates.status === 'completed' && existing.status !== 'completed') {
-        feedbackStatus = 'completed';
         addActivity(
           currentWorkspaceId,
           'client_action_completed',
@@ -158,9 +162,6 @@ export function updateAdminClientAction(
       return null;
     },
   });
-  if (feedbackStatus) {
-    applyClientActionFeedbackLoop(workspaceId, updated, feedbackStatus);
-  }
   return updated;
 }
 
@@ -184,6 +185,9 @@ export function respondToPublicClientAction(
         clientNote: response.clientNote,
       });
       if (!next) throw mutationError(404, 'Client action not found');
+      if (response.status === 'approved') {
+        applyClientActionFeedbackLoop(currentWorkspaceId, next, 'approved');
+      }
       return next;
     },
     onActivity: ({ workspaceId: currentWorkspaceId, result }) => {
@@ -208,7 +212,6 @@ export function respondToPublicClientAction(
   });
 
   if (response.status === 'approved') {
-    applyClientActionFeedbackLoop(workspaceId, updated, 'approved');
     const ws = getWorkspace(workspaceId);
     notifyTeamActionApproved({
       workspaceId,

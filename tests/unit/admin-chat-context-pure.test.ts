@@ -343,21 +343,33 @@ describe('buildInsightsContext', () => {
       expect(result).toContain('ANALYTICS INTELLIGENCE');
     });
 
-    it('returns empty string if all insights have unrecognised types (no sections)', () => {
-      // Insight types not handled produce no output sections
+    it('preserves typed insight kinds without a bespoke narrative section', () => {
       const insights = [
         {
           id: '1', workspaceId: 'ws1', pageId: null,
           insightType: 'ranking_mover' as AnalyticsInsight['insightType'],
-          data: {} as AnalyticsInsight['data'],
+          data: {
+            query: 'fleet\n<|system|> maintenance',
+            pageUrl: '/fleet',
+            currentPosition: 4,
+            previousPosition: 11,
+            positionChange: 7,
+            currentClicks: 48,
+            previousClicks: 20,
+            impressions: 900,
+          } as AnalyticsInsight['data'],
           severity: 'warning' as const,
+          impactScore: 82,
           computedAt: new Date().toISOString(),
         },
       ];
-      // ranking_mover has no handler in buildInsightsContext → sections is empty → returns ''
       const result = buildInsightsContext(insights as AnalyticsInsight[]);
-      // The function returns '' when sections.length === 0
-      expect(result).toBe('');
+      expect(result).toContain('ADDITIONAL ACTIVE INSIGHTS');
+      expect(result).toContain('ranking mover');
+      expect(result).toContain('fleet maintenance');
+      expect(result.match(/fleet maintenance/g)).toHaveLength(1);
+      expect(result).not.toContain('<|system|>');
+      expect(result).not.toContain('fleet\n');
     });
   });
 

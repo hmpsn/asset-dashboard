@@ -14,7 +14,7 @@ describe('CommandCenterVerdict', () => {
       />,
     );
 
-    expect(screen.getByRole('heading', { name: 'Acme has three things ready' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Acme has three things ready' })).toHaveClass('t-h1');
     expect(screen.getByText('Today')).toBeInTheDocument();
     expect(screen.getByText('Data as of today')).toBeInTheDocument();
     await expectNoA11yViolations(container);

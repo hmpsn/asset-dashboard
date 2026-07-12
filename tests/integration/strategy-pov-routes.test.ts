@@ -15,6 +15,8 @@ vi.mock('../../server/broadcast.js', () => ({
   broadcastToWorkspace: vi.fn(),
 }));
 
+const refreshAvailableMock = vi.fn();
+
 // Mock the generator so the route's generate/regenerate paths are deterministic and never call AI.
 // The store is REAL — GET/PATCH exercise the override∪draft resolution + version bump against SQLite.
 const generatedPov: StrategyPov = {
@@ -33,13 +35,30 @@ vi.mock('../../server/strategy-pov-generator.js', async (importOriginal) => {
   return {
     ...actual,
     POV_UNCHANGED: actual.POV_UNCHANGED,
+    POV_REFRESH_AVAILABLE: actual.POV_REFRESH_AVAILABLE,
     generateStrategyPov: vi.fn(),
+    getStrategyPovRefreshAvailable: (...args: unknown[]) => refreshAvailableMock(...args),
   };
 });
 
-import { generateStrategyPov as mockGenerate, POV_UNCHANGED, loadPovRecs } from '../../server/strategy-pov-generator.js';
+import {
+  generateStrategyPov as mockGenerate,
+  loadPovRecs,
+  POV_REFRESH_AVAILABLE,
+  POV_UNCHANGED,
+} from '../../server/strategy-pov-generator.js';
 
 const REQUEST_TIMEOUT_MS = 20_000;
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
 
 async function startTestServer(): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   delete process.env.APP_PASSWORD;
@@ -80,6 +99,8 @@ describe('integration: strategy POV routes', () => {
       realSave(workspaceId, pov, 'hash-v1');
       return pov;
     });
+    refreshAvailableMock.mockReset();
+    refreshAvailableMock.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -92,6 +113,7 @@ describe('integration: strategy POV routes', () => {
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body.pov).toBeNull();
+    expect(body.refreshAvailable).toBe(false);
   });
 
   it('generate persists the POV; GET returns it', async () => {
@@ -107,6 +129,7 @@ describe('integration: strategy POV routes', () => {
       leadMoveRecId: 'rec-a',
       version: 0,
     });
+    expect(body.refreshAvailable).toBe(false);
   });
 
   it('PATCH a field returns the edited override + bumped version; GET reflects it (override beats draft)', async () => {
@@ -122,6 +145,7 @@ describe('integration: strategy POV routes', () => {
     expect(patchBody.pov.leadSentence).toBe('OPERATOR EDIT: ship the cluster.');
     expect(patchBody.pov.version).toBe(1);
     expect(patchBody.pov.editedAt).not.toBeNull();
+    expect(patchBody.refreshAvailable).toBe(false);
     // Untouched field survives.
     expect(patchBody.pov.situation).toBe('A drafted situation.');
 
@@ -129,6 +153,45 @@ describe('integration: strategy POV routes', () => {
     const body = await res.json();
     expect(body.pov.leadSentence).toBe('OPERATOR EDIT: ship the cluster.');
     expect(body.pov.version).toBe(1);
+    expect(body.refreshAvailable).toBe(false);
+  });
+
+  it('PATCH re-reads the latest POV after async freshness work so reversed responses never return stale fields', async () => {
+    await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/strategy-pov/generate`, { method: 'POST' });
+    const firstFreshness = deferred<boolean>();
+    refreshAvailableMock
+      .mockImplementationOnce(() => firstFreshness.promise)
+      .mockResolvedValue(false);
+
+    const firstPatchPromise = fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/strategy-pov`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ situation: 'First edit, delayed response.' }),
+    });
+    await vi.waitFor(() => expect(refreshAvailableMock).toHaveBeenCalledTimes(1));
+
+    const secondPatch = await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/strategy-pov`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ leadSentence: 'Second edit lands before the first response.' }),
+    });
+    const secondBody = await secondPatch.json();
+    firstFreshness.resolve(false);
+    const firstPatch = await firstPatchPromise;
+    const firstBody = await firstPatch.json();
+
+    expect(secondPatch.status).toBe(200);
+    expect(firstPatch.status).toBe(200);
+    expect(secondBody.pov).toMatchObject({
+      version: 2,
+      situation: 'First edit, delayed response.',
+      leadSentence: 'Second edit lands before the first response.',
+    });
+    expect(firstBody.pov).toMatchObject({
+      version: 2,
+      situation: 'First edit, delayed response.',
+      leadSentence: 'Second edit lands before the first response.',
+    });
   });
 
   it('PATCH with no existing POV returns 404', async () => {
@@ -150,7 +213,93 @@ describe('integration: strategy POV routes', () => {
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body.unchanged).toBe(true);
+    expect(body.refreshAvailable).toBe(false);
     expect(body.pov).toMatchObject({ situation: 'A drafted situation.' });
+  });
+
+  it('a competing generation is returned as unchanged and is never mislabeled as an edit preservation', async () => {
+    await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/strategy-pov/generate`, { method: 'POST' });
+    vi.mocked(mockGenerate).mockRejectedValueOnce(new Error('POV_GENERATION_SUPERSEDED'));
+
+    const res = await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/strategy-pov/generate`, { method: 'POST' });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toMatchObject({
+      refreshAvailable: false,
+      unchanged: true,
+      pov: { situation: 'A drafted situation.' },
+    });
+    expect(body).not.toHaveProperty('editPreserved');
+  });
+
+  it('normal generate preserves an edited stale POV and exposes refreshAvailable', async () => {
+    await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/strategy-pov/generate`, { method: 'POST' });
+    const patch = await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/strategy-pov`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ situation: 'Operator-authored situation.' }),
+    });
+    expect(patch.status).toBe(200);
+    vi.mocked(mockGenerate).mockRejectedValueOnce(new Error(POV_REFRESH_AVAILABLE));
+
+    const res = await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/strategy-pov/generate`, { method: 'POST' });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toMatchObject({
+      refreshAvailable: true,
+      editPreserved: true,
+      pov: { situation: 'Operator-authored situation.' },
+    });
+  });
+
+  it('GET exposes current freshness and preserves the last-good POV when freshness assembly fails', async () => {
+    await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/strategy-pov/generate`, { method: 'POST' });
+    refreshAvailableMock.mockResolvedValueOnce(true);
+
+    const staleRes = await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/strategy-pov`);
+    expect(await staleRes.json()).toMatchObject({
+      refreshAvailable: true,
+      pov: { situation: 'A drafted situation.' },
+    });
+
+    refreshAvailableMock.mockRejectedValueOnce(new Error('intelligence temporarily unavailable'));
+    const degradedRes = await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/strategy-pov`);
+    expect(degradedRes.status).toBe(200);
+    expect(await degradedRes.json()).toMatchObject({
+      refreshAvailable: false,
+      pov: { situation: 'A drafted situation.' },
+    });
+  });
+
+  it('explicit regenerate returns a fresh canonical response', async () => {
+    const res = await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/strategy-pov/regenerate`, { method: 'POST' });
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body).toMatchObject({
+      refreshAvailable: false,
+      pov: { situation: 'A drafted situation.' },
+    });
+  });
+
+  it('explicit regenerate still preserves a newer edit that lands while generation is in flight', async () => {
+    await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/strategy-pov/generate`, { method: 'POST' });
+    const patch = await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/strategy-pov`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ situation: 'Newest operator edit.' }),
+    });
+    expect(patch.status).toBe(200);
+    vi.mocked(mockGenerate).mockRejectedValueOnce(new Error(POV_REFRESH_AVAILABLE));
+
+    const res = await fetch(`${baseUrl}/api/workspaces/${seeded.workspaceId}/strategy-pov/regenerate`, { method: 'POST' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      refreshAvailable: true,
+      editPreserved: true,
+      pov: { situation: 'Newest operator edit.' },
+    });
   });
 
   it('generate returns 500 when POV_UNCHANGED is reported but no cached POV exists', async () => {

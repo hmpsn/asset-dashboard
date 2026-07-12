@@ -424,6 +424,7 @@ describe('GET /api/public/content-performance/:workspaceId', () => {
 	        'daysSincePublish',
 	        'ga4',
 	        'gsc',
+	        'itemId',
 	        'pageType',
 	        'publishedAt',
 	        'requestId',

@@ -2,14 +2,13 @@
 import { useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, LogOut, Moon, PanelLeftClose, PanelLeftOpen, Settings, Sun } from 'lucide-react';
+import { DollarSign, LogOut, Moon, PanelLeftClose, PanelLeftOpen, Settings, Sun, Users } from 'lucide-react';
 import { auth } from '../../api';
 import { featureFlags } from '../../api/misc';
 import { GLOBAL_TABS, adminPath, type Page } from '../../routes';
 import {
   NAV_REGISTRY,
   type NavEntry,
-  type NavGroupKey,
   isNavEntryHidden,
   resolveNavDescription,
   resolveNavLabel,
@@ -32,10 +31,30 @@ interface RebuiltNavItem {
 }
 
 interface RebuiltNavGroup {
-  key: NavGroupKey;
+  key: RebuiltNavPresentationKey;
   label: string;
   accent: string;
   items: RebuiltNavItem[];
+}
+
+type RebuiltNavPresentationKey =
+  | 'top'
+  | 'strategy-content'
+  | 'search-site-health'
+  | 'optimization'
+  | 'client-facing'
+  | 'admin';
+
+interface RebuiltNavSpec {
+  id: Page;
+  label?: string;
+}
+
+interface RebuiltNavGroupPresentation {
+  key: RebuiltNavPresentationKey;
+  label: string;
+  accent: string;
+  items: RebuiltNavSpec[];
 }
 
 export interface RebuiltSidebarProps {
@@ -53,25 +72,98 @@ export interface RebuiltSidebarProps {
   /** Whole-sidebar icon-rail collapse (distinct from per-group accordion collapse). */
   rail: boolean;
   onToggleRail: () => void;
+  onNavigate?: () => void;
 }
 
 const SIDEBAR_COLLAPSED_KEY = 'admin-sidebar-collapsed';
+const NAV_ENTRY_BY_ID = new Map<Page, NavEntry>(NAV_REGISTRY.map((entry) => [entry.id, entry]));
 
-// nav-registry-ok — group chrome is presentation only; item identity comes from NAV_REGISTRY.
-const GROUP_PRESENTATION: Array<{ key: NavGroupKey; label: string; accent: string }> = [
-  { key: 'home', label: '', accent: 'var(--teal)' },
-  { key: 'monitoring', label: 'MONITORING', accent: 'var(--blue)' },
-  { key: 'site-health', label: 'SITE HEALTH', accent: 'var(--emerald)' },
-  { key: 'seo-strategy', label: 'STRATEGY', accent: 'var(--teal)' },
-  { key: 'optimization', label: 'OPTIMIZATION', accent: 'var(--teal)' },
-  { key: 'content', label: 'CONTENT', accent: 'var(--brand-yellow)' },
-  { key: 'admin', label: 'ADMIN', accent: 'var(--brand-text)' },
+const EXTRA_REBUILT_NAV_ENTRIES: Partial<Record<Page, NavEntry>> = {
+  competitors: {
+    id: 'competitors',
+    label: 'Competitors',
+    icon: Users,
+    group: 'seo-strategy',
+    description: 'Competitive intelligence, keyword gaps, and alerts',
+    needsSite: true,
+  },
+};
+
+// nav-registry-ok — rebuilt sidebar grouping is prototype presentation only;
+// route identity and descriptions still come from NAV_REGISTRY where possible.
+const GROUP_PRESENTATION: RebuiltNavGroupPresentation[] = [
+  {
+    key: 'top',
+    label: '',
+    accent: 'var(--teal)',
+    items: [
+      { id: 'home', label: 'Cockpit' },
+      { id: 'seo-strategy', label: 'Insights Engine' },
+    ],
+  },
+  {
+    key: 'strategy-content',
+    label: 'STRATEGY & CONTENT',
+    accent: 'var(--blue)',
+    items: [
+      { id: 'seo-keywords', label: 'Keywords' },
+      { id: 'competitors' },
+      { id: 'content-pipeline', label: 'Content Pipeline' },
+      { id: 'local-seo' },
+    ],
+  },
+  {
+    key: 'search-site-health',
+    label: 'SEARCH & SITE HEALTH',
+    accent: 'var(--cyan)',
+    items: [
+      { id: 'analytics-hub' },
+      { id: 'page-intelligence' },
+      { id: 'seo-audit' },
+      { id: 'performance' },
+      { id: 'links' },
+      { id: 'media', label: 'Asset Manager' },
+    ],
+  },
+  {
+    key: 'optimization',
+    label: 'OPTIMIZATION',
+    accent: 'var(--teal)',
+    items: [
+      { id: 'seo-editor' },
+      { id: 'seo-schema' },
+      { id: 'rewrite' },
+      { id: 'brand' },
+    ],
+  },
+  {
+    key: 'client-facing',
+    label: 'CLIENT-FACING',
+    accent: 'var(--brand-yellow)',
+    items: [
+      { id: 'outcomes' },
+      { id: 'requests' },
+    ],
+  },
+  {
+    key: 'admin',
+    label: 'ADMIN',
+    accent: 'var(--brand-text)',
+    items: [
+      { id: 'outcomes-overview' },
+      { id: 'prospect' },
+      { id: 'ai-usage' },
+      { id: 'roadmap' },
+      { id: 'features' },
+      { id: 'diagnostics' },
+    ],
+  },
 ];
 
 function buildNavGroups(isFlagEnabled: (flag: FeatureFlagKey) => boolean): RebuiltNavGroup[] {
-  const entryToNavItem = (entry: NavEntry): RebuiltNavItem => ({
+  const entryToNavItem = (entry: NavEntry, spec: RebuiltNavSpec): RebuiltNavItem => ({
     id: entry.id,
-    label: resolveNavLabel(entry, isFlagEnabled),
+    label: spec.label ?? resolveNavLabel(entry, isFlagEnabled),
     icon: entry.icon,
     desc: resolveNavDescription(entry, isFlagEnabled),
     needsSite: entry.needsSite,
@@ -79,8 +171,13 @@ function buildNavGroups(isFlagEnabled: (flag: FeatureFlagKey) => boolean): Rebui
   });
 
   return GROUP_PRESENTATION.map((presentation) => ({
-    ...presentation,
-    items: NAV_REGISTRY.filter((entry) => entry.group === presentation.key).map(entryToNavItem),
+    key: presentation.key,
+    label: presentation.label,
+    accent: presentation.accent,
+    items: presentation.items.flatMap((spec) => {
+      const entry = NAV_ENTRY_BY_ID.get(spec.id) ?? EXTRA_REBUILT_NAV_ENTRIES[spec.id];
+      return entry ? [entryToNavItem(entry, spec)] : [];
+    }),
   }));
 }
 
@@ -112,6 +209,7 @@ export function RebuiltSidebar({
   onLogout,
   rail,
   onToggleRail,
+  onNavigate,
 }: RebuiltSidebarProps) {
   const navigate = useNavigate();
   const { data: flagValues } = useQuery({
@@ -170,8 +268,13 @@ export function RebuiltSidebar({
     const isGlobal = GLOBAL_TABS.has(item.id);
     const disabled = isNavItemDisabled(item, selected);
     if (disabled) return;
-    if (isGlobal) navigate('/' + item.id);
-    else if (selected) navigate(adminPath(selected.id, item.id));
+    if (isGlobal) {
+      navigate('/' + item.id);
+      onNavigate?.();
+    } else if (selected) {
+      navigate(adminPath(selected.id, item.id));
+      onNavigate?.();
+    }
   };
 
   const roving = useRovingTabindex(enabledVisibleItems.length, {
@@ -267,6 +370,7 @@ export function RebuiltSidebar({
             onSelect={(workspace) => {
               if (GLOBAL_TABS.has(tab)) navigate(adminPath(workspace.id));
               else navigate(adminPath(workspace.id, tab));
+              onNavigate?.();
             }}
             onCreate={onCreate}
             onDelete={onDelete}
@@ -347,7 +451,10 @@ export function RebuiltSidebar({
           workspaceId={selected?.id}
         />
         <IconButton
-          onClick={() => navigate('/revenue')}
+          onClick={() => {
+            navigate('/revenue');
+            onNavigate?.();
+          }}
           icon={DollarSign}
           label="Revenue"
           size="md"
@@ -358,7 +465,10 @@ export function RebuiltSidebar({
           }}
         />
         <IconButton
-          onClick={() => navigate('/settings')}
+          onClick={() => {
+            navigate('/settings');
+            onNavigate?.();
+          }}
           icon={Settings}
           label="Settings"
           size="md"

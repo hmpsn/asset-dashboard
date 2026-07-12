@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Document, Packer } from 'docx';
 import { get, post } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { parseRewriteSectionTarget } from '../../lib/rewriteResponse';
@@ -11,7 +10,12 @@ import {
   type PageData,
   type SitemapPage,
 } from './pageRewriteChatModel';
-import { buildDocHtml, buildPrintableDocHtml, serializeDocToDocx, serializeDocToMarkdown } from './pageRewriteChatDocument';
+import {
+  buildDocHtml,
+  buildPrintableDocHtml,
+  serializeDocToMarkdown,
+  snapshotPageRewriteDocBody,
+} from './pageRewriteChatDocument';
 import {
   applyRewriteToSection,
   clearFormattingSelection,
@@ -281,51 +285,13 @@ export function usePageRewriteChatShell({ workspaceId, initialPageUrl, toast }: 
       return;
     }
     if (mode === 'docx') {
-      const doc = new Document({
-        styles: {
-          default: {
-            document: { run: { font: 'Calibri', size: 24, color: '1a1a1a' } },
-          },
-          paragraphStyles: [
-            {
-              id: 'Heading1', name: 'Heading 1', basedOn: 'Normal', next: 'Normal', quickFormat: true,
-              run: { font: 'Calibri', size: 56, bold: true, color: '111111' },
-              paragraph: { spacing: { before: 480, after: 160 }, outlineLevel: 0 },
-            },
-            {
-              id: 'Heading2', name: 'Heading 2', basedOn: 'Normal', next: 'Normal', quickFormat: true,
-              run: { font: 'Calibri', size: 40, bold: true, color: '111111' },
-              paragraph: { spacing: { before: 400, after: 120 }, outlineLevel: 1 },
-            },
-            {
-              id: 'Heading3', name: 'Heading 3', basedOn: 'Normal', next: 'Normal', quickFormat: true,
-              run: { font: 'Calibri', size: 32, bold: true, color: '222222' },
-              paragraph: { spacing: { before: 320, after: 80 }, outlineLevel: 2 },
-            },
-            {
-              id: 'Heading4', name: 'Heading 4', basedOn: 'Normal', next: 'Normal', quickFormat: true,
-              run: { font: 'Calibri', size: 26, bold: true, italics: true, color: '444444' },
-              paragraph: { spacing: { before: 240, after: 60 }, outlineLevel: 3 },
-            },
-          ],
-        },
-        sections: [{
-          properties: {
-            page: {
-              size: { width: 12240, height: 15840 },
-              margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
-            },
-          },
-          children: serializeDocToDocx(docBodyRef.current, pageData),
-        }],
-      });
-      Packer.toBlob(doc).then(blob => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${slug}-brief.docx`;
-        a.click();
-        URL.revokeObjectURL(url);
+      const docSnapshot = snapshotPageRewriteDocBody(docBodyRef.current);
+      void import('./pageRewriteDocxExport').then(({ downloadPageRewriteDocx }) => downloadPageRewriteDocx({
+        docBody: docSnapshot,
+        pageData,
+        fileName: `${slug}-brief.docx`,
+        profile: 'legacy',
+      })).then(() => {
         setExportOpen(false);
       }).catch(err => {
         console.error('DOCX export failed:', err);

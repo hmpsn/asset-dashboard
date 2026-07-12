@@ -1,6 +1,6 @@
 // @ds-rebuilt
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -35,6 +35,7 @@ import { expectNoA11yViolations } from '../a11y';
 const mocks = vi.hoisted(() => ({
   apiPost: vi.fn(),
   addKeywordMutate: vi.fn(),
+  featureFlagsList: vi.fn(),
   workspaceHandlers: {} as Record<string, () => void>,
 }));
 
@@ -43,6 +44,17 @@ vi.mock('../../../src/api/client', async () => {
   return {
     ...actual,
     post: (...args: unknown[]) => mocks.apiPost(...args),
+  };
+});
+
+vi.mock('../../../src/api/misc', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/api/misc')>('../../../src/api/misc');
+  return {
+    ...actual,
+    featureFlags: {
+      ...actual.featureFlags,
+      list: () => mocks.featureFlagsList(),
+    },
   };
 });
 
@@ -64,10 +76,6 @@ vi.mock('../../../src/hooks/useWorkspaceEvents', () => ({
 vi.mock('../../../src/components/local-seo/LocalSeoMarketSetupDrawer', () => ({
   LocalSeoMarketSetupDrawer: ({ open }: { open: boolean }) =>
     open ? <div data-testid="local-seo-market-setup-drawer">Market setup drawer</div> : null,
-}));
-
-vi.mock('../../../src/components/local-seo/LocalSeoVisibilityPanel', () => ({
-  LocalSeoVisibilityPanel: () => <div data-testid="legacy-local-seo-visibility-panel">Legacy visibility panel</div>,
 }));
 
 const workspaceId = 'ws-local-presence-rebuilt';
@@ -173,6 +181,13 @@ const gbpAggregate: GbpReviewsReadResponse = {
   completenessScore: 76,
 };
 
+const featureFlagResponse = {
+  'local-gbp': true,
+  'gbp-auth-connection': true,
+  'gbp-auth-reviews': true,
+  'gbp-review-responses': true,
+};
+
 const connection: GbpConnectionSafe = {
   configured: true,
   connected: true,
@@ -200,19 +215,14 @@ const gbpLocation: GbpLocationSummary = {
   syncedAt: now,
 };
 
-function createQueryClient(): QueryClient {
+function createQueryClient(seedFeatureFlags = true): QueryClient {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
       mutations: { retry: false },
     },
   });
-  client.setQueryData(queryKeys.shared.featureFlags(), {
-    'local-gbp': true,
-    'gbp-auth-connection': true,
-    'gbp-auth-reviews': true,
-    'gbp-review-responses': true,
-  });
+  if (seedFeatureFlags) client.setQueryData(queryKeys.shared.featureFlags(), featureFlagResponse);
   client.setQueryData(queryKeys.admin.localSeoVariant(workspaceId, false), localSeoRead);
   client.setQueryData(queryKeys.admin.localGbpReviews(workspaceId), gbpAggregate);
   return client;
@@ -332,11 +342,15 @@ function seedReviewQueries(client: QueryClient) {
   client.setQueryData(queryKeys.admin.gbpReviewResponses(workspaceId), workflowRead);
 }
 
-function renderWithProviders(ui: ReactElement, client = createQueryClient()) {
+function renderWithProviders(
+  ui: ReactElement,
+  client = createQueryClient(),
+  route = `/ws/${workspaceId}/local-seo?lens=overview`,
+) {
   return render(
     <QueryClientProvider client={client}>
       <ToastProvider>
-        <MemoryRouter initialEntries={[`/ws/${workspaceId}/local-seo?lens=overview`]}>
+        <MemoryRouter initialEntries={[route]}>
           {ui}
         </MemoryRouter>
       </ToastProvider>
@@ -356,6 +370,7 @@ beforeAll(() => {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.workspaceHandlers = {};
+  mocks.featureFlagsList.mockReturnValue(new Promise(() => {}));
   mocks.addKeywordMutate.mockImplementation((_keyword: string, options?: { onSuccess?: () => void; onSettled?: () => void }) => {
     options?.onSuccess?.();
     options?.onSettled?.();
@@ -375,7 +390,100 @@ beforeEach(() => {
 });
 
 describe('LocalPresenceSurface', () => {
-  it('renders real local posture and map-pack share-of-voice without a verified badge', async () => {
+  it('presents the prototype rank/profile and reviews modes without legacy peer tabs', async () => {
+    renderWithProviders(<LocalPresenceSurface workspaceId={workspaceId} />);
+
+    expect(await screen.findByRole('heading', { name: 'Local Presence' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Rank & profile/i })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Reviews & replies/i })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /Overview/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /Visibility/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /Setup/i })).not.toBeInTheDocument();
+    expect(screen.getByText('Austin Office')).toHaveClass('t-page');
+    expect(screen.getByText('Local visibility')).toBeInTheDocument();
+    expect(screen.getAllByText('Markets', { selector: 'span.t-label' })).toHaveLength(1);
+    expect(screen.getAllByText('Checked', { selector: 'span.t-label' })).toHaveLength(1);
+    expect(screen.getAllByText('Visible', { selector: 'span.t-label' })).toHaveLength(2);
+    expect(screen.queryByTestId('legacy-local-seo-visibility-panel')).not.toBeInTheDocument();
+  });
+
+  it('maps rank/profile cockpit copy to styleguide typography roles', async () => {
+    renderWithProviders(<LocalPresenceSurface workspaceId={workspaceId} />);
+
+    expect(await screen.findByRole('heading', { name: 'Local Presence' })).toBeInTheDocument();
+    expect(screen.getByText('Retained keyword checks across configured markets.')).toHaveClass('t-caption-sm');
+    expect(screen.getByText('Market trend')).toHaveClass('t-ui');
+    expect(screen.getByText('Austin Office')).toHaveClass('t-page');
+    expect(screen.getAllByText('Map Pack Rival').some((element) => element.classList.contains('t-ui'))).toBe(true);
+    expect(screen.getAllByText('Austin, TX').some((element) => element.classList.contains('t-ui'))).toBe(true);
+    expect(screen.getByText('2/4 visible on 2026-07-06')).toHaveClass('t-body');
+  });
+
+  it('keeps setup as a drawer-only compatibility state', async () => {
+    renderWithProviders(
+      <LocalPresenceSurface workspaceId={workspaceId} />,
+      createQueryClient(),
+      `/ws/${workspaceId}/local-seo?tab=setup`,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Local Presence' })).toBeInTheDocument();
+    expect(await screen.findByTestId('local-seo-market-setup-drawer')).toBeInTheDocument();
+    expect(screen.queryByText('Markets and refresh settings')).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Rank & profile/i })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('maps legacy visibility links into the rank/profile workspace exactly once', async () => {
+    renderWithProviders(
+      <LocalPresenceSurface workspaceId={workspaceId} />,
+      createQueryClient(),
+      `/ws/${workspaceId}/local-seo?lens=visibility`,
+    );
+
+    expect(await screen.findByRole('radio', { name: /Rank & profile/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByTestId('legacy-local-seo-visibility-panel')).not.toBeInTheDocument();
+    expect(screen.getByText('Local visibility')).toBeInTheDocument();
+    expect(screen.getByText('confident matches')).toBeInTheDocument();
+  });
+
+  it('switches to Reviews & replies from the rank/profile workspace', async () => {
+    const client = createQueryClient();
+    seedReviewQueries(client);
+    renderWithProviders(<LocalPresenceSurface workspaceId={workspaceId} />, client);
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Reviews & replies/i }));
+
+    expect(await screen.findByText('Review response pipeline')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Reviews & replies/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByTestId('legacy-local-seo-visibility-panel')).not.toBeInTheDocument();
+  });
+
+  it('mounts through a real feature-flag loading to loaded transition', async () => {
+    const client = createQueryClient(false);
+    renderWithProviders(<LocalPresenceSurface workspaceId={workspaceId} />, client);
+
+    expect(await screen.findByRole('heading', { name: 'Local Presence' })).toBeInTheDocument();
+    expect(screen.getAllByText('Local packs').length).toBeGreaterThan(0);
+
+    act(() => {
+      client.setQueryData(queryKeys.shared.featureFlags(), featureFlagResponse);
+    });
+
+    await waitFor(() => expect(screen.getAllByText('Reviews').length).toBeGreaterThan(0));
+    expect(screen.getByRole('radio', { name: /Rank & profile/i })).toBeInTheDocument();
+  });
+
+  it('keeps flag-off reviews availability copy user-facing', async () => {
+    const client = createQueryClient(false);
+    renderWithProviders(<LocalPresenceSurface workspaceId={workspaceId} />, client);
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Reviews & replies/i }));
+
+    expect(await screen.findByText('Google Business Profile connection is not enabled')).toBeInTheDocument();
+    expect(screen.getByText(/not available for this workspace yet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/backend feature lifecycle|backend lifecycle|feature flag|response flag/i)).not.toBeInTheDocument();
+  });
+
+  it('renders real local posture and map-pack share-of-voice without a verified badge or internal terms', async () => {
     const { container } = renderWithProviders(<LocalPresenceSurface workspaceId={workspaceId} />);
 
     expect(await screen.findByRole('heading', { name: 'Local Presence' })).toBeInTheDocument();
@@ -388,9 +496,8 @@ describe('LocalPresenceSurface', () => {
     await waitFor(() => expect(container.querySelectorAll('.animate-pulse').length).toBe(0));
     await expectNoA11yViolations(container);
 
-    fireEvent.click(screen.getByRole('radio', { name: /Visibility/i }));
-
-    expect(await screen.findByTestId('legacy-local-seo-visibility-panel')).toBeInTheDocument();
+    expect(screen.queryByText(/provider degraded|setup-state reads|backend feature lifecycle|rebuild|migration|carry-over/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('legacy-local-seo-visibility-panel')).not.toBeInTheDocument();
     expect(screen.getByText('confident matches')).toBeInTheDocument();
   });
 

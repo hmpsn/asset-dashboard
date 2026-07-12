@@ -83,14 +83,14 @@ export function ScheduleDrawer({
             onChange={setEnabled}
             label="Enable scheduled audits"
           />
-          <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">
+          <p className="t-body text-[var(--brand-text-muted)] mt-2">
             Enabled schedules run in the background and reuse the same snapshot history.
           </p>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-1.5" htmlFor="site-audit-schedule-interval">
+            <label className="t-label text-[var(--brand-text-muted)] block mb-1.5" htmlFor="site-audit-schedule-interval">
               Run every
             </label>
             <FormSelect
@@ -106,7 +106,7 @@ export function ScheduleDrawer({
             />
           </div>
           <div>
-            <label className="t-caption-sm text-[var(--brand-text-muted)] block mb-1.5" htmlFor="site-audit-schedule-threshold">
+            <label className="t-label text-[var(--brand-text-muted)] block mb-1.5" htmlFor="site-audit-schedule-threshold">
               Alert on score drop
             </label>
             <FormSelect
@@ -125,7 +125,7 @@ export function ScheduleDrawer({
 
         <div className="flex items-start gap-3 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-3 py-3">
           <Icon name="info" size="md" className="mt-0.5 text-[var(--blue)]" />
-          <p className="t-caption-sm text-[var(--brand-text-muted)]">
+          <p className="t-body text-[var(--brand-text-muted)]">
             Schedules are additive to manual runs. Operators can still run an on-demand audit at any time.
           </p>
         </div>

@@ -12,6 +12,8 @@ import { WS_EVENTS } from './ws-events.js';
 import { rowToActionPlaybook } from './db/outcome-mappers.js';
 import type { ActionPlaybookRow } from './db/outcome-mappers.js';
 import type { ActionPlaybook } from '../shared/types/outcome-tracking.js';
+import { invalidateMonthlyDigestCache } from './monthly-digest-cache.js';
+import { clearIntelligenceCache } from './intelligence/cache-clear.js';
 
 const log = createLogger('outcome-playbooks');
 
@@ -133,6 +135,8 @@ export async function detectAllWorkspacePlaybooks(): Promise<void> {
     const { discovered } = detectPlaybookPatterns(ws.id);
     totalDiscovered += discovered;
     if (discovered > 0) {
+      invalidateMonthlyDigestCache(ws.id);
+      clearIntelligenceCache(ws.id);
       broadcastToWorkspace(ws.id, WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED, { discovered });
     }
   }

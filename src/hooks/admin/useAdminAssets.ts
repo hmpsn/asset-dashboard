@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { get, getSafe } from '../../api/client';
+import { get } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { STALE_TIMES } from '../../lib/queryClient';
 import type { CmsImageScanResult } from '../../../shared/types/cms-images';
@@ -27,8 +27,9 @@ export function useWebflowAssets(siteId: string, workspaceId: string) {
   return useQuery<Asset[]>({
     queryKey: queryKeys.admin.webflowAssets(siteId, workspaceId),
     queryFn: async () => {
-      const data = await getSafe<Asset[]>(`/api/webflow/assets/${siteId}?workspaceId=${encodeURIComponent(workspaceId)}`, []);
-      return Array.isArray(data) ? data : [];
+      const data = await get<Asset[]>(`/api/webflow/assets/${siteId}?workspaceId=${encodeURIComponent(workspaceId)}`);
+      if (!Array.isArray(data)) throw new Error('Asset response was not an array');
+      return data;
     },
     enabled: !!siteId && !!workspaceId,
     staleTime: STALE_TIMES.NORMAL,

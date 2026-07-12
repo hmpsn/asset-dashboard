@@ -157,6 +157,7 @@ export function RebuiltBreadcrumb({
   return (
     <nav
       aria-label="Breadcrumb"
+      className="t-ui"
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -164,8 +165,6 @@ export function RebuiltBreadcrumb({
         minWidth: 0,
         width: '100%',
         color: 'var(--brand-text-dim)',
-        fontFamily: 'var(--font-sans)',
-        fontSize: '12.5px',
       }}
     >
       {items.map((item, index) => (

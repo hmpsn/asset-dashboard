@@ -9,7 +9,7 @@ export interface CommandCenterVerdictProps {
   title: ReactNode;
   description?: ReactNode;
   meta?: ReactNode;
-  iconName?: IconName;
+  iconName?: IconName | null;
   className?: string;
   id?: string;
   style?: CSSProperties;
@@ -33,7 +33,8 @@ export function CommandCenterVerdict({
     <section
       id={id}
       className={cn(
-        'relative overflow-hidden rounded-[var(--radius-lg)] border border-[var(--brand-border)]',
+        // pr-check-disable-next-line -- brand signature radius on the verdict container (owner-ratified global asymmetric-on-containers, ui-parity)
+        'relative overflow-hidden rounded-[var(--radius-signature-lg)] border border-[var(--brand-border)]',
         'bg-[var(--surface-2)] px-5 py-4',
         className,
       )}
@@ -45,18 +46,20 @@ export function CommandCenterVerdict({
         style={{ background: 'linear-gradient(90deg, transparent, color-mix(in srgb, var(--teal) 10%, transparent))' }}
       />
       <div className="relative flex items-start gap-3">
-        <span
-          className="mt-0.5 inline-flex h-8 w-8 flex-none items-center justify-center rounded-[var(--radius-md)]"
-          style={{ background: 'var(--brand-mint-dim)', color: 'var(--teal)' }}
-        >
-          <Icon name={iconName} size="md" aria-hidden="true" />
-        </span>
+        {iconName && (
+          <span
+            className="mt-0.5 inline-flex h-8 w-8 flex-none items-center justify-center rounded-[var(--radius-md)]"
+            style={{ background: 'var(--brand-mint-dim)', color: 'var(--teal)' }}
+          >
+            <Icon name={iconName} size="md" aria-hidden="true" />
+          </span>
+        )}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {eyebrow && <p className="t-label m-0 text-[var(--teal)]">{eyebrow}</p>}
-            {meta && <div className="ml-auto t-caption-sm text-[var(--brand-text-muted)]">{meta}</div>}
+            {meta && <div className="w-full t-caption-sm text-[var(--brand-text-muted)] sm:ml-auto sm:w-auto">{meta}</div>}
           </div>
-          <h2 className="t-page m-0 mt-1 max-w-[48rem] font-semibold text-[var(--brand-text-bright)]">
+          <h2 className="t-h1 m-0 mt-2 max-w-[32ch] text-[var(--brand-text-bright)]">
             {title}
           </h2>
           {description && (

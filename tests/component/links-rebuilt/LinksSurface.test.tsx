@@ -1,7 +1,7 @@
 // @ds-rebuilt
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '../../../src/components/Toast';
 import { LinksSurface } from '../../../src/components/links-rebuilt/LinksSurface';
@@ -345,10 +345,24 @@ function renderSurface(initialEntry = '/ws/ws-1/links', client = createClient())
       <MemoryRouter initialEntries={[initialEntry]}>
         <ToastProvider>
           <LinksSurface workspaceId="ws-1" />
+          <LocationProbe />
         </ToastProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <span data-testid="location-search">{location.search}</span>;
+}
+
+function expectTextToHaveClass(text: RegExp | string, className: string) {
+  expect(screen.getByText(text)).toHaveClass(className);
+}
+
+function expectComesBefore(first: HTMLElement, second: HTMLElement) {
+  expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 }
 
 function FlaggedLinksHarness() {
@@ -396,10 +410,33 @@ describe('LinksSurface rebuilt admin surface', () => {
     renderSurface('/ws/ws-1/links?tab=redirects');
 
     expect(await screen.findByRole('radio', { name: /Redirects/i })).toHaveAttribute('aria-checked', 'true');
-    expect(await screen.findByText('Redirect recommendations')).toBeInTheDocument();
+    expect(await screen.findByText('Suggested 301 redirects')).toBeInTheDocument();
+    const root = screen.getByTestId('links-surface-root');
+    expect(root).toHaveClass('max-w-[1120px]');
+    expectComesBefore(screen.getByTestId('links-context-row'), screen.getByTestId('links-secondary-controls'));
+    expectComesBefore(screen.getByTestId('redirects-metrics'), screen.getByTestId('redirects-how-it-works'));
+    expectComesBefore(screen.getByTestId('redirects-how-it-works'), screen.getByTestId('redirects-primary'));
     expect(screen.getAllByText('/old-service').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByText('Scan evidence'));
     expect(screen.getByText('Redirect chains')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Match' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Re-scan' })).toHaveLength(1);
+    expectTextToHaveClass(/Update internal links so they point directly to the final destination/i, 't-body');
+  });
+
+  it('writes prototype tab state and clears the default Redirects URL', async () => {
+    renderSurface('/ws/ws-1/links');
+
+    expect(await screen.findByRole('radio', { name: /Redirects/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId('location-search')).toBeEmptyDOMElement();
+
+    fireEvent.click(screen.getByRole('radio', { name: /Internal Links/i }));
+    expect(screen.getByTestId('location-search')).toHaveTextContent('?tab=internal');
+    expect(await screen.findByText(/cosmetic dentistry/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('radio', { name: /Redirects/i }));
+    expect(screen.getByTestId('location-search')).toBeEmptyDOMElement();
+    expect(await screen.findByText('Suggested 301 redirects')).toBeInTheDocument();
   });
 
   it('receives ?tab=internal and keeps list/grouped views plus the client-send batch action', async () => {
@@ -408,9 +445,13 @@ describe('LinksSurface rebuilt admin surface', () => {
     expect(await screen.findByRole('radio', { name: /Internal Links/i })).toHaveAttribute('aria-checked', 'true');
     expect(await screen.findByText(/cosmetic dentistry/)).toBeInTheDocument();
     expect(screen.getAllByText('Orphan pages').length).toBeGreaterThan(0);
+    expectComesBefore(screen.getByTestId('internal-metrics'), screen.getByTestId('internal-orphans'));
+    expectComesBefore(screen.getByTestId('internal-orphans'), screen.getByTestId('internal-primary'));
+    expect(screen.getAllByRole('button', { name: 'Re-analyze' })).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('radio', { name: 'By source' }));
     expect(await screen.findByText('Services')).toBeInTheDocument();
+    expectTextToHaveClass(/Copy the generated HTML, open the source page/i, 't-body');
 
     fireEvent.click(screen.getByText('Send recommendations to client'));
     fireEvent.click(screen.getByRole('button', { name: /Send to client/i }));
@@ -423,12 +464,24 @@ describe('LinksSurface rebuilt admin surface', () => {
     });
   });
 
+  it('frames link repairs as measured outcomes instead of claiming wins inside the workshop', async () => {
+    renderSurface('/ws/ws-1/links?tab=internal');
+
+    expect(await screen.findByText(/cosmetic dentistry/)).toBeInTheDocument();
+    expect(screen.getByText('Link fixes become outcomes after measurement')).toBeInTheDocument();
+    expectTextToHaveClass(/Use Links for redirects, internal links, and dead-link repair/i, 't-body');
+    expect(screen.getByText(/graduate the measured win into Insights Engine/i)).toBeInTheDocument();
+  });
+
   it('receives ?tab=dead-links, shows the domain-aware link check, and supports session reviewed state', async () => {
     renderSurface('/ws/ws-1/links?tab=dead-links');
 
     expect(await screen.findByRole('radio', { name: /Dead Links/i })).toHaveAttribute('aria-checked', 'true');
     expect(await screen.findByLabelText('Crawl domain')).toHaveValue('https://acme.com');
     expect(await screen.findByText('https://example.com/dead')).toBeInTheDocument();
+    expectComesBefore(screen.getByTestId('dead-metrics'), screen.getByTestId('dead-note'));
+    expectComesBefore(screen.getByTestId('dead-note'), screen.getByTestId('dead-primary'));
+    expect(screen.getAllByLabelText('Crawl domain')).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Review' }));
     expect(screen.getByRole('button', { name: 'Reviewed' })).toHaveAttribute('aria-pressed', 'true');
@@ -436,6 +489,17 @@ describe('LinksSurface rebuilt admin surface', () => {
     fireEvent.click(screen.getByText('https://example.com/dead'));
     const dialog = await screen.findByRole('dialog', { name: /example.com\/dead/i });
     expect(within(dialog).getByText('Redirect action')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Use Redirects to review 301 targets/i)).toHaveClass('t-body');
+  });
+
+  it('keeps internal implementation language out of the dead-link drawer', async () => {
+    renderSurface('/ws/ws-1/links?tab=dead-links');
+
+    expect(await screen.findByText('https://example.com/dead')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('https://example.com/dead'));
+    const dialog = await screen.findByRole('dialog', { name: /example.com\/dead/i });
+
+    expect(dialog).not.toHaveTextContent(/deferred|v1|signed write target|receiver|mounted below|legacy alias|rebuild|migration|URL state|route tab/i);
   });
 
   it('keeps the legacy ?tab=dead alias and bad-param fallback receiver behavior', async () => {
@@ -452,8 +516,20 @@ describe('LinksSurface rebuilt admin surface', () => {
 
     expect(await screen.findByRole('radio', { name: /Architecture/i })).toHaveAttribute('aria-checked', 'true');
     expect(await screen.findByText('Schema priority queue')).toBeInTheDocument();
+    expectComesBefore(screen.getByTestId('architecture-metrics'), screen.getByTestId('architecture-orphans'));
+    expectComesBefore(screen.getByTestId('architecture-orphans'), screen.getByTestId('architecture-primary'));
+    expectComesBefore(screen.getByTestId('architecture-primary'), screen.getByTestId('architecture-schema'));
     expect(screen.getAllByRole('button', { name: /Gaps/i }).some((button) => button.getAttribute('aria-pressed') === 'true')).toBe(true);
     expect(screen.getByText('Dental Implants')).toBeInTheDocument();
+    expectTextToHaveClass(/Implants are a service gap from keyword strategy/i, 't-caption-sm');
+    expectTextToHaveClass(/Use gaps as page-planning inputs/i, 't-body');
+  });
+
+  it('keeps internal implementation language out of the visible architecture view', async () => {
+    const { container } = renderSurface('/ws/ws-1/links?tab=architecture');
+
+    expect(await screen.findByText('Schema priority queue')).toBeInTheDocument();
+    expect(container).not.toHaveTextContent(/deferred|v1|signed write target|receiver|mounted below|legacy alias|rebuild|migration|URL state|route tab/i);
   });
 
   it('meets the a11y floor after skeletons settle', async () => {

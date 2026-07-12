@@ -1,24 +1,41 @@
 import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
 import { validate, z } from '../middleware/validate.js';
-import { upload } from '../middleware.js';
+import { aiLimiter, upload } from '../middleware.js';
 import fs from 'fs';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import {
-  listSources, addSource, deleteSource, processSource,
+  listSources, addSource, deleteSource, getSourceProcessState, processSource,
   listExtractions, listExtractionsBySource,
   updateExtractionStatus, updateExtractionContent,
   SourceAlreadyProcessedError,
+  SourceNotFoundError,
+  SourceProcessingConflictError,
+  SourceProcessingInProgressError,
 } from '../discovery-ingestion.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { isProgrammingError } from '../errors.js';
 import { InvalidTransitionError } from '../state-machines.js';
 import { createLogger } from '../logger.js';
-
+import { decrementUsage, incrementIfAllowed } from '../usage-tracking.js';
+import { computeEffectiveTier, getWorkspace } from '../workspaces.js';
 
 const log = createLogger('discovery-ingestion');
+
+function runDiscoveryPostCommitEffect(
+  workspaceId: string,
+  sourceId: string,
+  effect: 'activity' | 'broadcast' | 'intelligence-cache',
+  run: () => void,
+): void {
+  try {
+    run();
+  } catch (err) {
+    log.warn({ err, workspaceId, sourceId, effect }, 'discovery post-commit effect failed');
+  }
+}
 // Accept text and markdown MIME types. Browsers are inconsistent for .md files,
 // so we also accept application/octet-stream when the extension matches — the
 // extension + mimetype pair is validated together in the upload loop.
@@ -65,6 +82,11 @@ const patchExtractionSchema = z.object({
 const processSourceSchema = z.object({
   force: z.boolean().optional(),
 });
+
+const SOURCE_ALREADY_PROCESSED_RESPONSE = {
+  error: 'This discovery source has already been processed. Use force to replace its existing extractions.',
+  code: 'source_already_processed',
+} as const;
 
 // List sources
 router.get('/api/discovery/:workspaceId/sources', requireWorkspaceAccess('workspaceId'), (req, res) => {
@@ -173,27 +195,83 @@ router.delete('/api/discovery/:workspaceId/sources/:id', requireWorkspaceAccess(
 // Process source (AI extraction). Idempotent by default — re-processing an
 // already-processed source returns 409 unless { force: true } is passed, in
 // which case existing extractions are deleted and replaced.
-router.post('/api/discovery/:workspaceId/sources/:id/process', requireWorkspaceAccess('workspaceId'), validate(processSourceSchema), async (req, res) => {
-  const { force } = req.body as { force?: boolean };
-  try {
-    const extractions = await processSource(req.params.workspaceId, req.params.id, { force });
-    addActivity(
-      req.params.workspaceId,
-      'discovery_processed',
-      `${force ? 'Re-extracted' : 'Extracted'} ${extractions.length} insight${extractions.length !== 1 ? 's' : ''} from discovery source`,
-    );
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.DISCOVERY_UPDATED, { sourceId: req.params.id, extractionCount: extractions.length, replaced: !!force });
-    invalidateIntelligenceCache(req.params.workspaceId);
-    res.json({ extractions });
-  } catch (err) {
-    if (err instanceof SourceAlreadyProcessedError) {
-      // Safe to surface: this error is a deliberate 409 with a fixed, non-sensitive message.
-      return res.status(409).json({ error: err.message, code: 'source_already_processed' });
+router.post(
+  '/api/discovery/:workspaceId/sources/:id/process',
+  requireWorkspaceAccess('workspaceId'),
+  aiLimiter,
+  validate(processSourceSchema),
+  async (req, res) => {
+    const workspaceId = req.params.workspaceId;
+    const sourceId = req.params.id;
+    const { force } = req.body as { force?: boolean };
+    const workspace = getWorkspace(workspaceId);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+
+    // Preserve the existing 404/409 behavior without consuming quota. This is
+    // only a fast preflight; processSource repeats the checks after reservation
+    // and its post-AI transaction remains authoritative for races.
+    const sourceState = getSourceProcessState(workspaceId, sourceId);
+    if (sourceState === 'missing') return res.status(404).json({ error: 'Discovery source not found' });
+    if (sourceState === 'processed' && !force) {
+      return res.status(409).json(SOURCE_ALREADY_PROCESSED_RESPONSE);
     }
-    // Do not echo `err.message` — AI/DB errors can leak internal paths or secrets.
-    res.status(500).json({ error: 'Processing failed' });
-  }
-});
+
+    const tier = computeEffectiveTier(workspace);
+    if (!incrementIfAllowed(workspaceId, tier, 'brandscript_generations')) {
+      return res.status(429).json({
+        error: 'Monthly limit reached for your tier',
+        code: 'usage_limit',
+      });
+    }
+
+    let extractions: Awaited<ReturnType<typeof processSource>>;
+    try {
+      extractions = await processSource(workspaceId, sourceId, { force });
+    } catch (err) {
+      try {
+        decrementUsage(workspaceId, 'brandscript_generations');
+      } catch (refundError) {
+        log.warn({ err: refundError, workspaceId, sourceId }, 'failed to refund discovery processing usage');
+      }
+
+      if (err instanceof SourceAlreadyProcessedError) {
+        return res.status(409).json(SOURCE_ALREADY_PROCESSED_RESPONSE);
+      }
+      if (err instanceof SourceProcessingInProgressError) {
+        return res.status(409).json({
+          error: 'This discovery source is already being processed. Try again after the current run finishes.',
+          code: 'source_processing_in_progress',
+        });
+      }
+      if (err instanceof SourceProcessingConflictError) {
+        return res.status(409).json({
+          error: 'This discovery source changed while it was processing. Reload it before trying again.',
+          code: 'source_processing_conflict',
+        });
+      }
+      if (err instanceof SourceNotFoundError) {
+        return res.status(404).json({ error: 'Discovery source not found' });
+      }
+      // Do not echo `err.message` — AI/DB errors can leak internal paths or secrets.
+      return res.status(500).json({ error: 'Processing failed' });
+    }
+
+    runDiscoveryPostCommitEffect(workspaceId, sourceId, 'activity', () => {
+      addActivity(
+        workspaceId,
+        'discovery_processed',
+        `${force ? 'Re-extracted' : 'Extracted'} ${extractions.length} insight${extractions.length !== 1 ? 's' : ''} from discovery source`,
+      );
+    });
+    runDiscoveryPostCommitEffect(workspaceId, sourceId, 'broadcast', () => {
+      broadcastToWorkspace(workspaceId, WS_EVENTS.DISCOVERY_UPDATED, { sourceId, extractionCount: extractions.length, replaced: !!force });
+    });
+    runDiscoveryPostCommitEffect(workspaceId, sourceId, 'intelligence-cache', () => {
+      invalidateIntelligenceCache(workspaceId);
+    });
+    return res.json({ extractions });
+  },
+);
 
 // List all extractions for workspace
 router.get('/api/discovery/:workspaceId/extractions', requireWorkspaceAccess('workspaceId'), (req, res) => {

@@ -98,7 +98,10 @@ export function useLinksSurfaceState() {
   }, [setSearchParams]);
 
   const setTab = useCallback((nextTab: LinksSurfaceTab) => {
-    updateParams({ [TAB_PARAM]: nextTab, [DETAIL_PARAM]: null });
+    updateParams({
+      [TAB_PARAM]: nextTab === DEFAULT_TAB ? null : nextTab,
+      [DETAIL_PARAM]: null,
+    });
   }, [updateParams]);
 
   const setSearch = useCallback((value: string) => {

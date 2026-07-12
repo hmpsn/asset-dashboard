@@ -74,6 +74,7 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
     ],
     promptAssemblyModules: [
       'server/content-brief.ts',
+      'server/content-posts-ai-jobs.ts',
       'server/prompt-assembly.ts',
       'server/workspace-intelligence.ts',
     ],
@@ -81,6 +82,7 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
       'server/ai.ts',
       'server/content-brief.ts',
       'server/content-posts-ai.ts',
+      'server/content-posts-ai-jobs.ts',
       'server/content-posts-db.ts',
     ],
     parserOrValidationSignals: [
@@ -328,12 +330,12 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
     promptAssemblyModules: [
       'server/prompt-assembly.ts',
       'server/voice-calibration.ts',
-      'server/routes/content-posts.ts',
+      'server/content-posts-ai-jobs.ts',
     ],
     dispatcherModules: [
       'server/ai.ts',
       'server/routes/brand-identity.ts',
-      'server/routes/content-posts.ts',
+      'server/content-posts-ai-jobs.ts',
     ],
     parserOrValidationSignals: [
       'researchMode: true',
@@ -539,7 +541,7 @@ export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
     dimension: 'evidence_grounding',
     severity: 'hard',
     evidenceFiles: [
-      'server/routes/content-posts.ts',
+      'server/content-posts-ai-jobs.ts',
       'tests/contract/factual-ai-output-contracts.test.ts',
     ],
     assertions: [

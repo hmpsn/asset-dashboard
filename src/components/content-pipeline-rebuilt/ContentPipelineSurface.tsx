@@ -1,44 +1,62 @@
 // @ds-rebuilt
-import { useCallback, useMemo, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
-import { useContentPipeline, useWorkspaces, useWorkspaceIntelligence } from '../../hooks/admin';
-import { adminContentPerformanceKeys } from '../../hooks/admin/useAdminContentPerformance';
+import {
+  useAdminBriefsList,
+  useAdminPostsList,
+  useAdminRequestsList,
+  useAiSuggestedBriefs,
+  useContentPipeline,
+  useWorkspaces,
+  useWorkspaceIntelligence,
+} from '../../hooks/admin';
+import { useAdminWorkOrders } from '../../hooks/admin/useWorkOrders';
+import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import { queryKeys } from '../../lib/queryKeys';
+import { awaitSuccessfulRefetches } from '../../lib/reactQueryRefresh';
 import { WS_EVENTS } from '../../lib/wsEvents';
 import type { FixContext } from '../../types/fix-context';
-import { ContentPipelineGuide } from '../ContentPipelineGuide';
 import { ErrorBoundary } from '../ErrorBoundary';
+import { RebuiltTopbarActions } from '../layout/RebuiltAppChrome';
 import { useToast } from '../Toast';
 import {
-  Badge,
   Button,
-  ClickableRow,
   Drawer,
-  GroupBlock,
+  ErrorState,
   Icon,
-  KeyValueRow,
+  InlineBanner,
   LensSwitcher,
   Menu,
-  MetricTile,
   PageHeader,
-  Skeleton,
-  Toolbar,
   ToolbarSpacer,
-  WorkflowStepper,
   type MenuItem,
   type Tier,
 } from '../ui';
-import { ContentPipelineLenses } from './ContentPipelineLenses';
-import type { ContentPipelineData } from './ContentPipelineLenses';
+import { ContentLifecycleBoard, deriveLifecycleBoardItems } from './ContentLifecycleBoard';
+import { ContentPipelineIntake, deriveContentIntake } from './ContentPipelineIntake';
 import {
-  CONTENT_PIPELINE_TABS,
+  ContentPipelineLenses,
+  isContentPipelineStandaloneTab,
+} from './ContentPipelineLenses';
+import type { ContentPipelineData } from './ContentPipelineLenses';
+import { ContentPipelineInteriorLoading } from './ContentPipelineInteriorLoading';
+import { ContentPipelineWorkspaces } from './ContentPipelineWorkspaces';
+import {
   type ContentPipelineTab,
   useContentPipelineSurfaceState,
 } from './useContentPipelineSurfaceState';
-import { formatContentDate, formatInteger } from './contentPipelineFormatters';
 import { mutationErrorMessage } from './contentPipelineMutationFeedback';
+import { resolveLiveSiteBase } from './contentPipelineFormatters';
+
+const LazyContentPipelineGuide = lazyWithRetry(() => import('../ContentPipelineGuide').then((module) => ({
+  default: module.ContentPipelineGuide,
+})));
+const LazyPublishedContentLens = lazyWithRetry(() => import('./PublishedContentLens').then((module) => ({
+  default: module.PublishedContentLens,
+})));
 
 interface ContentPipelineSurfaceProps {
   workspaceId: string;
@@ -52,28 +70,6 @@ const EXPORTS = [
   { key: 'strategy', label: 'Keyword Strategy' },
 ] as const;
 
-const TAB_ACCENT: Record<ContentPipelineTab, string> = {
-  planner: 'var(--teal)',
-  calendar: 'var(--amber)',
-  intake: 'var(--teal)',
-  briefs: 'var(--blue)',
-  posts: 'var(--teal)',
-  publish: 'var(--emerald)',
-  'content-health': 'var(--amber)',
-  published: 'var(--blue)',
-};
-
-const TAB_DESCRIPTION: Record<ContentPipelineTab, string> = {
-  planner: 'Matrix and template planning',
-  calendar: 'Scheduling and item deep-links',
-  intake: 'AI-suggested opportunities',
-  briefs: 'Briefs and client requests',
-  posts: 'Drafting, review, and publish actions',
-  publish: 'Recurring content capacity',
-  'content-health': 'Decay and cannibalization acting home',
-  published: 'Performance readback',
-};
-
 function buildSignalPrefill(keyword: string, pageUrl?: string): FixContext {
   return {
     targetRoute: 'content-pipeline',
@@ -82,80 +78,174 @@ function buildSignalPrefill(keyword: string, pageUrl?: string): FixContext {
   };
 }
 
-function tabCount(tab: ContentPipelineTab, data: ContentPipelineData | undefined, suggestedBriefs: number | undefined): number | undefined {
-  const summary = data?.summary;
-  if (tab === 'planner') return summary?.matrices;
-  if (tab === 'briefs') return summary?.briefs;
-  if (tab === 'posts') return summary?.posts;
-  if (tab === 'intake') return suggestedBriefs;
-  if (tab === 'content-health') return (data?.decay?.totalDecaying ?? 0);
-  if (tab === 'published') return summary?.published;
-  return undefined;
+function readBriefFixContext(routerState: unknown): FixContext | null {
+  const fixContext = (routerState as { fixContext?: FixContext } | null)?.fixContext;
+  return fixContext?.targetRoute === 'content-pipeline' ? fixContext : null;
 }
 
-function CapabilityRow({
-  tab,
-  active,
-  count,
-  onClick,
-}: {
-  tab: ContentPipelineTab;
-  active: boolean;
-  count?: number;
-  onClick: () => void;
-}) {
-  const label = CONTENT_PIPELINE_TABS.find((item) => item.id === tab)?.label ?? tab;
-  return (
-    <ClickableRow
-      active={active}
-      onClick={onClick}
-      className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-3 transition-colors duration-[var(--dur-fast)] hover:border-[var(--brand-border-hover)]"
-    >
-      <span className="flex items-start gap-3">
-        <span
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface-3)]"
-          style={{ color: TAB_ACCENT[tab] }}
-          aria-hidden="true"
-        >
-          <Icon name={tab === 'published' ? 'chart' : tab === 'content-health' ? 'gauge' : tab === 'calendar' ? 'clock' : tab === 'posts' ? 'doc' : tab === 'briefs' ? 'clipboard' : 'layers'} size="sm" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block t-caption font-semibold text-[var(--brand-text-bright)]">{label}</span>
-          <span className="mt-1 block t-caption-sm text-[var(--brand-text-muted)]">{TAB_DESCRIPTION[tab]}</span>
-        </span>
-        {count !== undefined && <Badge label={formatInteger(count)} tone="zinc" variant="soft" size="sm" />}
-      </span>
-    </ClickableRow>
-  );
+type ContentPipelineMode = 'board' | 'calendar' | 'published' | 'content-health' | 'planner';
+
+const MODE_OPTIONS: Array<{ value: ContentPipelineMode; label: string; count?: (data: ContentPipelineData | undefined) => number | undefined }> = [
+  { value: 'board', label: 'Board' },
+  { value: 'calendar', label: 'Calendar' },
+  { value: 'published', label: 'Published', count: (data) => data?.summary?.published },
+  { value: 'content-health', label: 'Content Health', count: (data) => data?.decay?.totalDecaying },
+  { value: 'planner', label: 'Matrix', count: (data) => data?.summary?.matrices },
+];
+
+function modeForTab(tab: ContentPipelineTab): ContentPipelineMode | undefined {
+  if (tab === 'briefs' || tab === 'intake' || tab === 'posts') return 'board';
+  if (tab === 'publish') return undefined;
+  return tab;
 }
 
 export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfaceProps) {
+  const location = useLocation();
   const state = useContentPipelineSurfaceState();
   const shellFlagEnabled = useFeatureFlag('ui-rebuild-shell');
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const pipelineQuery = useContentPipeline(workspaceId);
+  const lifecycleBoardVisible = state.tab === 'briefs'
+    || state.tab === 'intake'
+    || state.tab === 'publish'
+    || Boolean(state.postId);
+  const pipelineQuery = useContentPipeline(workspaceId, { includeContentLists: false });
   const workspaces = useWorkspaces();
   const intelligence = useWorkspaceIntelligence(workspaceId, ['contentPipeline']);
+  // Briefs/posts stay mounted because their authoritative counts are visible in
+  // the lens switcher on every tab. React Query shares these observers with
+  // active interiors, so this does not duplicate the underlying request.
+  const briefsQuery = useAdminBriefsList(workspaceId);
+  const requestsQuery = useAdminRequestsList(workspaceId, lifecycleBoardVisible);
+  const postsQuery = useAdminPostsList(workspaceId);
+  const suggestionsQuery = useAiSuggestedBriefs(workspaceId, lifecycleBoardVisible);
+  const workOrdersQuery = useAdminWorkOrders(workspaceId, lifecycleBoardVisible);
   const [guideOpen, setGuideOpen] = useState(false);
-  const [briefFixContext, setBriefFixContext] = useState<FixContext | null>(null);
-  const [prefillNonce, setPrefillNonce] = useState(0);
+  const [capacityDrawerOpen, setCapacityDrawerOpen] = useState(false);
+  const [focusedBriefId, setFocusedBriefId] = useState<string | null>(null);
+  const [briefFixContext, setBriefFixContext] = useState<FixContext | null>(() => readBriefFixContext(location.state));
+  const [blankBriefOpen, setBlankBriefOpen] = useState(() => readBriefFixContext(location.state) !== null);
 
   const workspace = useMemo(
     () => workspaces.data?.find((item) => item.id === workspaceId),
     [workspaceId, workspaces.data],
   );
-  const workspaceTier = (workspace?.tier ?? 'free') as Tier;
-  const siteLabel = workspace?.gscPropertyUrl ?? workspace?.webflowSiteName ?? null;
+  const workspaceTier = workspace?.tier as Tier | undefined;
+  const siteLabel = resolveLiveSiteBase(workspace?.liveDomain, workspace?.gscPropertyUrl);
   const contentPipeline = intelligence.data?.contentPipeline;
-  const pipelineData = pipelineQuery.data as ContentPipelineData | undefined;
-  const suggestedBriefs = contentPipeline?.suggestedBriefs;
-  const dataAsOf = formatContentDate(workspace?.createdAt);
+  const pipelineData = useMemo<ContentPipelineData | undefined>(() => {
+    if (!pipelineQuery.data) return undefined;
+    return {
+      ...pipelineQuery.data,
+      summary: pipelineQuery.data.summary
+        ? {
+            ...pipelineQuery.data.summary,
+            briefs: briefsQuery.data?.length ?? 0,
+            posts: postsQuery.data?.length ?? 0,
+          }
+        : null,
+    };
+  }, [briefsQuery.data, pipelineQuery.data, postsQuery.data]);
+  const mode = modeForTab(state.tab);
+  const boardFocus = state.tab === 'intake' ? 'intake' : 'brief';
+  const lifecycleItems = useMemo(() => deriveLifecycleBoardItems({
+    briefs: briefsQuery.data,
+    requests: requestsQuery.data,
+    posts: postsQuery.data,
+  }), [briefsQuery.data, postsQuery.data, requestsQuery.data]);
+  const intakeSnapshot = useMemo(() => deriveContentIntake({
+    briefs: briefsQuery.data,
+    requests: requestsQuery.data,
+    posts: postsQuery.data,
+    suggestions: suggestionsQuery.data,
+    workOrders: workOrdersQuery.data,
+  }), [briefsQuery.data, postsQuery.data, requestsQuery.data, suggestionsQuery.data, workOrdersQuery.data]);
+  const focusedBrief = useMemo(
+    () => briefsQuery.data?.find((brief) => brief.id === focusedBriefId) ?? null,
+    [briefsQuery.data, focusedBriefId],
+  );
+  const focusedPost = useMemo(
+    () => postsQuery.data?.find((post) => post.id === state.postId) ?? null,
+    [postsQuery.data, state.postId],
+  );
+  const subscriptionSummary = contentPipeline?.subscriptions;
+  const intelligenceResponseAvailable = intelligence.data !== undefined;
+  const intelligenceSnapshotAvailable = contentPipeline !== undefined;
+  const intelligenceSnapshotPending = !intelligenceResponseAvailable && !intelligence.isError;
+  const intelligenceSnapshotUnavailable = !intelligenceSnapshotAvailable
+    && (intelligence.isError || intelligenceResponseAvailable);
+  const intelligenceSnapshotStale = intelligence.isError && intelligenceSnapshotAvailable;
+  const subscriptionSnapshotAvailable = subscriptionSummary !== undefined;
+  const capacityUnavailable = intelligenceSnapshotUnavailable
+    || (intelligenceSnapshotAvailable && !subscriptionSnapshotAvailable);
+  const activePlanCount = subscriptionSummary?.active ?? 0;
+  const capacityOpen = capacityDrawerOpen || state.tab === 'publish';
+  const capacityHeadline = intelligenceSnapshotPending
+    ? 'Loading capacity'
+    : capacityUnavailable
+      ? 'Capacity unavailable'
+      : activePlanCount > 0
+        ? `${activePlanCount} active plan${activePlanCount === 1 ? '' : 's'}`
+        : 'No content plan';
+  const capacityDetailBase = activePlanCount > 0
+    ? `${subscriptionSummary?.totalPages ?? 0} pages covered`
+    : 'Set up plan';
+  const capacityDetail = intelligenceSnapshotPending
+    ? 'Checking content plan'
+    : capacityUnavailable
+      ? 'Retry data'
+      : intelligenceSnapshotStale
+        ? `${capacityDetailBase} · May be stale`
+        : capacityDetailBase;
+  const lifecycleQueries = [
+    briefsQuery,
+    requestsQuery,
+    postsQuery,
+    suggestionsQuery,
+    workOrdersQuery,
+  ] as const;
+  const lifecycleUnavailable = lifecycleBoardVisible
+    && lifecycleQueries.some((query) => query.isError && query.data === undefined);
+  const lifecycleLoading = lifecycleBoardVisible
+    && !lifecycleUnavailable
+    && lifecycleQueries.some((query) => query.data === undefined && !query.isError);
+  const lifecycleStale = lifecycleBoardVisible
+    && lifecycleQueries.some((query) => query.isError && query.data !== undefined);
+  const pipelineSnapshotAvailable = pipelineQuery.data !== undefined;
+  const pipelineSnapshotPending = !pipelineSnapshotAvailable && !pipelineQuery.isError;
+  const healthUnavailable = (pipelineQuery.isError && !pipelineSnapshotAvailable)
+    || intelligenceSnapshotUnavailable;
+  const healthLoading = !healthUnavailable && (
+    pipelineSnapshotPending
+    || intelligenceSnapshotPending
+  );
+  const healthStale = (pipelineQuery.isError && pipelineSnapshotAvailable)
+    || intelligenceSnapshotStale;
+
+  const retryLifecycleQueries = () => {
+    void Promise.all(
+      lifecycleQueries
+        .filter((query) => query.isError)
+        .map((query) => query.refetch()),
+    );
+  };
+
+  const retryHealthQueries = () => {
+    const refetches: Array<Promise<unknown>> = [];
+    if (pipelineQuery.isError) refetches.push(pipelineQuery.refetch());
+    if (intelligence.isError || intelligenceSnapshotUnavailable) refetches.push(intelligence.refetch());
+    void Promise.all(refetches);
+  };
 
   const invalidateContentPipeline = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligence(workspaceId, ['contentPipeline']) });
-    queryClient.invalidateQueries({ queryKey: adminContentPerformanceKeys.all(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.briefs(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.workOrders(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.contentPerformanceAll(workspaceId) });
   }, [queryClient, workspaceId]);
 
   useWorkspaceEvents(workspaceId, {
@@ -184,10 +274,27 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
 
   const handleRefresh = async () => {
     try {
+      const contentPerformanceKey = queryKeys.admin.contentPerformanceAll(workspaceId);
+      await queryClient.invalidateQueries({ queryKey: contentPerformanceKey, refetchType: 'none' });
+      const lifecycleDetailRefetches = lifecycleBoardVisible
+        ? [
+            requestsQuery.refetch(),
+            suggestionsQuery.refetch(),
+            workOrdersQuery.refetch(),
+          ]
+        : [];
       await Promise.all([
-        pipelineQuery.refetch(),
-        intelligence.refetch(),
-        queryClient.invalidateQueries({ queryKey: adminContentPerformanceKeys.all(workspaceId) }),
+        queryClient.refetchQueries(
+          { queryKey: contentPerformanceKey, type: 'active' },
+          { throwOnError: true },
+        ),
+        awaitSuccessfulRefetches([
+          pipelineQuery.refetch(),
+          intelligence.refetch(),
+          briefsQuery.refetch(),
+          postsQuery.refetch(),
+          ...lifecycleDetailRefetches,
+        ]),
       ]);
       toast('Content Pipeline data refreshed', 'success');
     } catch (error) {
@@ -195,162 +302,271 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
     }
   };
 
-  const handleCreateBrief = (keyword: string, pageUrl?: string, _suggestedBriefId?: string) => {
-    setBriefFixContext(buildSignalPrefill(keyword, pageUrl));
-    setPrefillNonce((current) => current + 1);
+  const clearBriefFixContext = () => setBriefFixContext(null);
+  const lifecycleCountsReady = briefsQuery.data !== undefined && postsQuery.data !== undefined;
+  const lensOptions = MODE_OPTIONS.map((option) => ({
+    value: option.value,
+    label: option.label,
+    count: option.value === 'board'
+      ? (lifecycleCountsReady ? lifecycleItems.length : undefined)
+      : option.count?.(pipelineData),
+  }));
+
+  const openMode = (nextMode: ContentPipelineMode) => {
+    setCapacityDrawerOpen(false);
+    setFocusedBriefId(null);
+    setBlankBriefOpen(false);
+    clearBriefFixContext();
+    state.setTab(nextMode === 'board' ? 'briefs' : nextMode);
+  };
+
+  const openBriefs = () => {
+    setFocusedBriefId(null);
+    setBlankBriefOpen(true);
     state.setTab('briefs');
   };
 
-  const clearBriefFixContext = () => setBriefFixContext(null);
+  const openNewPiece = () => {
+    clearBriefFixContext();
+    openBriefs();
+  };
 
-  const workflowSteps = [
-    {
-      number: 1,
-      label: 'Strategy',
-      completed: ['briefs', 'posts', 'publish', 'published'].includes(state.tab),
-      current: state.tab === 'planner',
-      onClick: () => state.setTab('planner'),
-    },
-    {
-      number: 2,
-      label: 'Briefs',
-      completed: ['posts', 'publish', 'published'].includes(state.tab),
-      current: state.tab === 'briefs' || state.tab === 'intake',
-      onClick: () => state.setTab('briefs'),
-    },
-    {
-      number: 3,
-      label: 'Drafts',
-      completed: ['publish', 'published'].includes(state.tab),
-      current: state.tab === 'posts',
-      onClick: () => state.setTab('posts'),
-    },
-    {
-      number: 4,
-      label: 'Publish',
-      completed: state.tab === 'published',
-      current: state.tab === 'publish' || state.tab === 'published',
-      onClick: () => state.setTab('publish'),
-    },
-  ];
+  const openIntake = () => {
+    setBlankBriefOpen(false);
+    state.setTab('intake');
+  };
 
-  const lensOptions = CONTENT_PIPELINE_TABS.map((tab) => ({
-    value: tab.id,
-    label: tab.label,
-    count: tabCount(tab.id, pipelineData, suggestedBriefs),
-  }));
+  const openDrafts = () => {
+    setBlankBriefOpen(false);
+    state.setTab('posts');
+  };
+
+  const openBrief = (briefId: string) => {
+    setBlankBriefOpen(false);
+    setFocusedBriefId(briefId);
+  };
+
+  const openPost = (postId: string) => {
+    setFocusedBriefId(null);
+    setBlankBriefOpen(false);
+    state.openPost(postId);
+  };
+
+  const openWorkflowTab = (tab: ContentPipelineTab) => {
+    if (tab === 'briefs') {
+      openBriefs();
+      return;
+    }
+    if (tab === 'intake') {
+      openIntake();
+      return;
+    }
+    if (tab === 'posts') {
+      openDrafts();
+      return;
+    }
+    setBlankBriefOpen(false);
+    state.setTab(tab);
+  };
+
+  const handleCreateBrief = (keyword: string, pageUrl?: string, _suggestedBriefId?: string) => {
+    setBriefFixContext(buildSignalPrefill(keyword, pageUrl));
+    openBriefs();
+  };
+
+  const closeCapacity = () => {
+    setCapacityDrawerOpen(false);
+    if (state.tab === 'publish') state.setTab('briefs');
+  };
+
+  const openCapacity = () => {
+    if (intelligenceSnapshotPending) return;
+    if (capacityUnavailable) {
+      void intelligence.refetch();
+      return;
+    }
+    setCapacityDrawerOpen(true);
+  };
+
+  const closeBriefWorkspace = () => {
+    setFocusedBriefId(null);
+    setBlankBriefOpen(false);
+    clearBriefFixContext();
+  };
+
+  const topbarActions = (
+    <div data-testid="content-pipeline-header-actions" className="flex max-w-full items-center justify-end gap-2 overflow-x-auto">
+      <Button size="sm" onClick={openNewPiece}>
+        <Icon name="plus" size="sm" />
+        New piece
+      </Button>
+      <Menu
+        align="end"
+        trigger={(
+          <Button size="sm" variant="secondary">
+            <Icon name="download" size="sm" />
+            Export
+          </Button>
+        )}
+        items={exportMenuItems}
+      />
+      <Button size="sm" variant="secondary" onClick={() => void handleRefresh()} disabled={pipelineQuery.isFetching || intelligence.isFetching}>
+        <Icon name="refresh" size="sm" />
+        Refresh
+      </Button>
+      <Button size="sm" variant="secondary" onClick={() => setGuideOpen(true)}>
+        <Icon name="info" size="sm" />
+        Guide
+      </Button>
+    </div>
+  );
 
   return (
-    <ErrorBoundary label="Content Pipeline rebuilt surface">
-      <div className="flex min-h-full flex-col gap-5" data-rebuild-flag={shellFlagEnabled ? 'on' : 'default'}>
-        <PageHeader
-          title="Content Pipeline"
-          subtitle="Plan, brief, draft, publish, and read back content performance from one admin cockpit."
-          actions={(
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {dataAsOf !== '—' && <span className="t-caption-sm text-[var(--brand-text-muted)]">Workspace since {dataAsOf}</span>}
-              <Menu
-                align="end"
-                trigger={(
-                  <Button size="sm" variant="secondary">
-                    <Icon name="download" size="sm" />
-                    Export
-                  </Button>
-                )}
-                items={exportMenuItems}
-              />
-              <Button size="sm" variant="secondary" onClick={() => void handleRefresh()} disabled={pipelineQuery.isFetching || intelligence.isFetching}>
-                <Icon name="refresh" size="sm" />
-                Refresh
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => setGuideOpen(true)}>
-                <Icon name="info" size="sm" />
-                Guide
-              </Button>
-            </div>
-          )}
-        />
+    <ErrorBoundary label="Content Pipeline">
+      <div className="mr-auto flex min-h-full w-full max-w-[var(--page-max)] flex-col gap-4" data-rebuild-flag={shellFlagEnabled ? 'on' : 'default'}>
+        <RebuiltTopbarActions fallback={<div data-testid="content-pipeline-topbar-actions-fallback">{topbarActions}</div>}>
+          {topbarActions}
+        </RebuiltTopbarActions>
 
-        <Toolbar label="Content Pipeline view controls" className="w-full">
-          <LensSwitcher
-            id="content-pipeline-rebuilt-lens"
-            options={lensOptions}
-            value={state.tab}
-            onChange={(value) => state.setTab(value as ContentPipelineTab)}
-            size="sm"
+        <div className="flex flex-wrap items-end gap-4" aria-label="Content Pipeline overview and view controls">
+          <PageHeader
+            title="Content Pipeline"
+            subtitle={(
+              <>
+                Active work for <strong className="font-semibold text-[var(--brand-text-bright)]">{workspace?.name ?? 'this workspace'}</strong> — idea to approved, one card at a time. Scheduled pieces live in <strong className="font-semibold text-[var(--brand-text-bright)]">Calendar</strong>; live pieces and their results in <strong className="font-semibold text-[var(--brand-text-bright)]">Published</strong>.
+              </>
+            )}
+            className="max-w-full flex-[0_1_44ch] [&_p]:mt-1 [&_p]:whitespace-normal [&_p]:overflow-visible [&_p]:text-clip [&_p]:leading-relaxed"
           />
           <ToolbarSpacer />
-          <Badge label={state.rawTab === 'subscriptions' ? 'subscriptions alias' : '?tab= receiver'} tone="zinc" variant="soft" size="sm" />
-        </Toolbar>
-
-        {pipelineQuery.isLoading && !pipelineData ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Loading Content Pipeline summary">
-            {Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-[92px] w-full" />)}
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-auto shrink-0 gap-2 px-2.5 py-1.5 text-left"
+            onClick={openCapacity}
+            disabled={intelligenceSnapshotPending}
+            aria-pressed={capacityOpen || state.tab === 'publish'}
+            aria-busy={intelligenceSnapshotPending}
+          >
+            <Icon name="layers" size="sm" className="text-[var(--teal)]" />
+            <span className="flex flex-col items-start leading-tight">
+              <span className="t-caption-sm font-semibold text-[var(--brand-text-bright)]">{capacityHeadline}</span>
+              <span className="t-micro text-[var(--brand-text-dim)]">{capacityDetail}</span>
+            </span>
+          </Button>
+          <div className="basis-full overflow-x-auto pb-px">
+            <LensSwitcher
+              id="content-pipeline-rebuilt-lens"
+              options={lensOptions}
+              value={mode}
+              onChange={(value) => openMode(value as ContentPipelineMode)}
+              size="sm"
+            />
           </div>
+        </div>
+
+        {state.tab === 'published' ? (
+          <Suspense fallback={<ContentPipelineInteriorLoading label="published content" />}>
+            <LazyPublishedContentLens
+              workspaceId={workspaceId}
+              siteLabel={siteLabel}
+              selectedItemId={state.itemId}
+              onOpenItem={state.openPublishedItem}
+              onCloseItem={state.clearPublishedItem}
+            />
+          </Suspense>
+        ) : lifecycleBoardVisible ? lifecycleUnavailable ? (
+          <ErrorState
+            type="data"
+            title="Content Pipeline work did not load"
+            message="Briefs, requests, or drafts could not be loaded. Retry before relying on the lifecycle Board."
+            action={{ label: 'Retry', onClick: retryLifecycleQueries }}
+            className="min-h-[360px]"
+          />
+        ) : lifecycleLoading ? (
+          <ContentPipelineInteriorLoading label="Content Pipeline work" />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <MetricTile label="Briefs" value={pipelineData?.summary?.briefs ?? 0} accent="var(--blue)" />
-            <MetricTile label="Posts" value={pipelineData?.summary?.posts ?? 0} accent="var(--teal)" />
-            <MetricTile label="Matrices" value={pipelineData?.summary?.matrices ?? 0} accent="var(--teal)" />
-            <MetricTile label="Published Cells" value={pipelineData?.summary?.published ?? 0} accent="var(--emerald)" />
-            <MetricTile label="Health Signals" value={pipelineData?.decay?.totalDecaying ?? 0} accent={(pipelineData?.decay?.critical ?? 0) > 0 ? 'var(--red)' : 'var(--amber)'} />
+          <div className="flex flex-col gap-3">
+            {lifecycleStale && (
+              <InlineBanner tone="warning" title="Pipeline work may be stale">
+                The last loaded lifecycle snapshot remains visible. Refresh when the source is healthy.
+              </InlineBanner>
+            )}
+            <ContentLifecycleBoard
+              key={boardFocus}
+              items={lifecycleItems}
+              focus={boardFocus}
+              intakeCount={intakeSnapshot.total}
+              intakeSummary={intakeSnapshot.summary}
+              intakeContent={(
+                <ContentPipelineIntake
+                  workspaceId={workspaceId}
+                  snapshot={intakeSnapshot}
+                  onCreateBrief={handleCreateBrief}
+                />
+              )}
+              onOpenBriefs={openBriefs}
+              onOpenDrafts={openDrafts}
+              onOpenBrief={openBrief}
+              onOpenPost={openPost}
+            />
           </div>
-        )}
-
-        <WorkflowStepper steps={workflowSteps} compact />
-
-        <GroupBlock
-          title="Cockpit"
-          meta="Every current content subsystem is mounted below as a carried-over mode; the shell owns routing and summaries only."
-          stats={[
-            { label: 'Active tab', value: CONTENT_PIPELINE_TABS.find((tab) => tab.id === state.tab)?.label ?? state.tab, color: TAB_ACCENT[state.tab] },
-            { label: 'Post receiver', value: state.postId ? 'armed' : 'idle', color: state.postId ? 'var(--teal)' : 'var(--blue)' },
-          ]}
-          collapsible
-          defaultOpen={state.tab === 'briefs'}
-        >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {CONTENT_PIPELINE_TABS.map((tab) => (
-              <CapabilityRow
-                key={tab.id}
-                tab={tab.id}
-                active={state.tab === tab.id}
-                count={tabCount(tab.id, pipelineData, suggestedBriefs)}
-                onClick={() => state.setTab(tab.id)}
+        ) : isContentPipelineStandaloneTab(state.tab) ? (
+          state.tab === 'content-health' && healthUnavailable ? (
+            <ErrorState
+              type="data"
+              title="Content health did not load"
+              message="Decay or workspace intelligence data could not be loaded. Retry before treating the workspace as healthy."
+              action={{ label: 'Retry', onClick: retryHealthQueries }}
+              className="min-h-[360px]"
+            />
+          ) : state.tab === 'content-health' && healthLoading ? (
+            <ContentPipelineInteriorLoading label="content health" />
+          ) : (
+            <div className="flex flex-col gap-3">
+              {state.tab === 'content-health' && healthStale && (
+                <InlineBanner tone="warning" title="Content health may be stale">
+                  The last loaded decay and intelligence evidence remains visible. Refresh when the source is healthy.
+                </InlineBanner>
+              )}
+              <ContentPipelineLenses
+                workspaceId={workspaceId}
+                tab={state.tab}
+                pipelineData={pipelineData}
+                contentPipeline={contentPipeline}
+                workspaceTier={workspaceTier}
+                onOpenTab={openWorkflowTab}
               />
-            ))}
-          </div>
-        </GroupBlock>
+            </div>
+          )
+        ) : null}
 
-        {state.postId && state.tab === 'posts' && (
-          <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-3 py-2">
-            <KeyValueRow label="Post deep-link receiver" value={state.postId} divider={false} mono />
-          </div>
-        )}
-
-        <ContentPipelineLenses
+        <ContentPipelineWorkspaces
           workspaceId={workspaceId}
-          tab={state.tab}
-          pipelineData={pipelineData}
-          contentPipeline={contentPipeline}
-          workspaceTier={workspaceTier}
-          siteLabel={siteLabel}
+          focusedBrief={focusedBrief}
+          blankBriefOpen={blankBriefOpen}
+          focusedPost={focusedPost}
+          postId={state.postId}
+          postWorkspaceOpen={Boolean(state.postId)}
+          capacityOpen={capacityOpen}
           briefFixContext={briefFixContext}
-          prefillNonce={prefillNonce}
-          clearBriefFixContext={clearBriefFixContext}
-          onCreateBrief={handleCreateBrief}
-          onOpenTab={state.setTab}
+          onClearBriefFixContext={clearBriefFixContext}
+          onCloseBrief={closeBriefWorkspace}
+          onClosePost={state.clearPost}
+          onCloseCapacity={closeCapacity}
         />
 
         <Drawer
           open={guideOpen}
           onClose={() => setGuideOpen(false)}
           title="Content Pipeline Guide"
-          subtitle="Carry-over workflow guide for planner, briefs, posts, subscriptions, and exports."
+          subtitle="Workflow guide for planning, briefs, drafts, subscriptions, and exports."
           eyebrow="Workflow guide"
           width={560}
         >
-          <ContentPipelineGuide />
+          <Suspense fallback={<ContentPipelineInteriorLoading label="the Content Pipeline guide" compact />}>
+            <LazyContentPipelineGuide />
+          </Suspense>
         </Drawer>
       </div>
     </ErrorBoundary>

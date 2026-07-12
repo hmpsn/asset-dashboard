@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../src/api/client';
 import { Dashboard } from '../../../src/App';
@@ -481,6 +481,11 @@ function setupKeywordHooks() {
   ]);
 }
 
+function LocationProbe() {
+  const location = useLocation();
+  return <span hidden data-testid="location-probe">{`${location.pathname}${location.search}`}</span>;
+}
+
 function renderSurface(path: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const result = render(
@@ -488,6 +493,7 @@ function renderSurface(path: string) {
       <MemoryRouter initialEntries={[path]}>
         <ToastProvider>
           <KeywordsSurface workspaceId="ws-1" />
+          <LocationProbe />
         </ToastProvider>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -519,9 +525,53 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByRole('button', { name: /^Tracked/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('searchbox')).toHaveValue('cosmetic');
     expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: 'tracked', search: 'cosmetic', page: 3 });
-    // The keyword deep-link opens the detail drawer (the stray keyword-labeled button
-    // above the lenses was removed as dead UI); the drawer's title carries the keyword.
-    expect(screen.getByRole('dialog', { name: /emergency dentist/i })).toBeInTheDocument();
+    // A keyword deep link opens a geometry-preserving canonical Drawer immediately,
+    // while its heavier detail workspace loads asynchronously.
+    const directLinkFallback = screen.getByRole('dialog', { name: /emergency dentist/i });
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(directLinkFallback).toHaveStyle({ width: '440px' });
+    expect(within(directLinkFallback).getByRole('heading', { name: 'emergency dentist' })).toBeInTheDocument();
+    expect(within(directLinkFallback).getByText('Loading keyword details…')).toBeInTheDocument();
+
+    // Close the inbound deep link synchronously, then open from the real lifecycle
+    // card before the shared lazy import resolves. This proves the trigger captured
+    // by the URL-state hook survives the fallback -> loaded Drawer replacement.
+    fireEvent.click(within(directLinkFallback).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    const trigger = screen.getByRole('button', { name: /cosmetic dentistry/i });
+    trigger.focus();
+    expect(trigger).toHaveFocus();
+    fireEvent.click(trigger);
+
+    const triggerFallback = screen.getByRole('dialog', { name: /cosmetic dentistry/i });
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(within(triggerFallback).getByText('Loading keyword details…')).toBeInTheDocument();
+
+    await screen.findByText('#14 → #6 · Win · 30d');
+    const loadedDialog = screen.getByRole('dialog', { name: /cosmetic dentistry/i });
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(loadedDialog).toHaveStyle({ width: '440px' });
+    expect(within(loadedDialog).queryByText('Loading keyword details…')).not.toBeInTheDocument();
+
+    fireEvent.click(within(loadedDialog).getByRole('button', { name: 'Close' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+      expect(document.body.style.overflow).toBe('');
+    });
+    const closedParams = new URL(
+      screen.getByTestId('location-probe').textContent ?? '',
+      'http://localhost',
+    ).searchParams;
+    expect([...closedParams.entries()]).toEqual([
+      ['lens', 'lifecycle'],
+      ['filter', 'tracked'],
+      ['search', 'cosmetic'],
+      ['page', '3'],
+    ]);
 
     await expectNoA11yViolations(container);
   }, 15_000);
@@ -554,6 +604,26 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(initialHookMock.mock.calls.at(-1)?.[2]).toMatchObject({ enabled: false });
     expect(summaryHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ enabled: true });
     expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES });
+  });
+
+  it('composes four truthful summary cells before the lens tray and separate working tools', () => {
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    const surface = screen.getByTestId('keywords-surface');
+    const summary = within(surface).getByTestId('keywords-summary');
+    const lensTray = within(surface).getByTestId('keywords-lens-tray');
+    const tools = within(surface).getByTestId('keywords-tools');
+
+    expect(surface).toHaveClass('max-w-[1128px]');
+    expect(within(summary).getAllByTestId('keywords-summary-cell')).toHaveLength(4);
+    expect(within(summary).getByText('Total keywords')).toBeInTheDocument();
+    expect(within(summary).getByText('Rank tracked')).toBeInTheDocument();
+    expect(within(summary).getByText('Needs review')).toBeInTheDocument();
+    expect(within(summary).getByText('Monthly value')).toBeInTheDocument();
+    expect(summary.compareDocumentPosition(lensTray) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(lensTray.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(tools).getByRole('searchbox')).toBeInTheDocument();
+    expect(within(tools).getByLabelText('Advanced keyword filter')).toBeInTheDocument();
   });
 
   it('renders keyword rows, provenance, opportunity, and money empty states without fabricating dollars', () => {
@@ -622,7 +692,9 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByText('2 selected')).toBeInTheDocument();
 
     expect(screen.getByText('Client keyword feedback')).toBeInTheDocument();
-    expect(screen.getByText('dental implants')).toBeInTheDocument();
+    expect(screen.getByText('dental implants')).toHaveClass('t-ui');
+    expect(screen.getByText('Client wants this service prioritized.')).toHaveClass('t-caption-sm');
+    expect(screen.getByText(/Clicks & impressions:/)).toHaveClass('t-body');
     fireEvent.click(screen.getAllByRole('button', { name: 'Add to strategy' }).at(-1)!);
     expect(rowActionMutateMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -670,9 +742,15 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
   it('opens the detail drawer from a row click and renders value, provenance, and outcome context', async () => {
     const { container } = renderSurface('/ws/ws-1/seo-keywords');
 
-    fireEvent.click(screen.getAllByText('cosmetic dentistry')[0]);
+    const trigger = screen.getByRole('row', { name: /cosmetic dentistry/i });
+    const triggerCell = within(trigger).getByText('cosmetic dentistry');
+    fireEvent.pointerDown(triggerCell, { button: 0 });
+    expect(trigger).toHaveFocus();
+    fireEvent.click(triggerCell);
 
-    const dialog = await screen.findByRole('dialog');
+    await screen.findByText('#14 → #6 · Win · 30d');
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveStyle({ width: '440px' });
     expect(within(dialog).getByRole('heading', { name: 'cosmetic dentistry' })).toBeInTheDocument();
     expect(within(dialog).getByText('#14 → #6 · Win · 30d')).toBeInTheDocument();
     expect(within(dialog).getByText('Why this score')).toBeInTheDocument();
@@ -680,21 +758,36 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(within(dialog).getByText('$2,400/mo')).toBeInTheDocument();
     expect(within(dialog).getByText('strategy primary')).toBeInTheDocument();
     expect(within(dialog).getAllByText('Austin').length).toBeGreaterThan(0);
-    expect(within(dialog).getByText('Live SERP #4')).toBeInTheDocument();
+    expect(within(dialog).getByText('Live SERP #4')).toHaveClass('t-ui');
     expect(within(dialog).getByText('Cited in AI Overview')).toBeInTheDocument();
     expect(within(dialog).getByText('Snippet')).toBeInTheDocument();
     expect(within(dialog).getByText('Visible #2')).toBeInTheDocument();
-    expect(within(dialog).getByText(/Austin Smile Studio/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Austin Smile Studio/)).toHaveClass('t-ui');
+    expect(within(dialog).getByText('Top local result evidence')).toHaveClass('t-ui');
+    expect(within(dialog).getByText(/Local SEO is market-specific local-pack visibility/)).toHaveClass('t-body');
     expect(within(dialog).getByRole('button', { name: 'Generate brief' })).toBeInTheDocument();
     await expectNoA11yViolations(container);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+      expect(document.body.style.overflow).toBe('');
+    });
   });
 
   it('opens the detail drawer from a ?q deep link', async () => {
     renderSurface('/ws/ws-1/seo-keywords?q=emergency+dentist');
 
-    const dialog = await screen.findByRole('dialog');
+    await screen.findByText('Tracked client keyword');
+    const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByRole('heading', { name: 'emergency dentist' })).toBeInTheDocument();
     expect(within(dialog).getByText('Tracked client keyword')).toBeInTheDocument();
+    expect(within(dialog).getByText('No sources linked')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('—').length).toBeGreaterThan(0);
+    expect(within(dialog).queryByText('No CPC')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Keyword command center/i)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/No source labels/i)).not.toBeInTheDocument();
   });
 
   it('invalidates the keyword command-center prefix for live workspace events', () => {
@@ -851,6 +944,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     renderSurface('/ws/ws-1/seo-keywords');
 
     expect(screen.getByText('Keyword intelligence is locked')).toBeInTheDocument();
+    expect(screen.queryByText(/command-center access/i)).not.toBeInTheDocument();
     expect(screen.queryByText('cosmetic dentistry')).not.toBeInTheDocument();
   });
 
@@ -858,7 +952,8 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     renderSurface('/ws/ws-1/seo-keywords');
     fireEvent.click(screen.getAllByText('cosmetic dentistry')[0]);
 
-    const dialog = await screen.findByRole('dialog');
+    await screen.findByText('Why this score');
+    const dialog = screen.getByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Retire keyword' }));
     expect(rowActionMutateMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -875,9 +970,16 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
   });
 
   it('shows hard delete only for eligible manual rows and closes after confirmed delete', async () => {
-    renderSurface('/ws/ws-1/seo-keywords?q=emergency+dentist');
+    renderSurface('/ws/ws-1/seo-keywords?lens=rankings&filter=tracked&page=2');
 
-    const dialog = await screen.findByRole('dialog');
+    const trigger = screen.getByRole('row', { name: /emergency dentist/i });
+    const triggerCell = within(trigger).getByText('emergency dentist');
+    fireEvent.pointerDown(triggerCell, { button: 0 });
+    expect(trigger).toHaveFocus();
+    fireEvent.click(triggerCell);
+
+    await screen.findByRole('button', { name: 'Delete' });
+    const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeInTheDocument();
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
@@ -890,14 +992,30 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByText('Keyword permanently deleted')).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+      expect(document.body.style.overflow).toBe('');
     });
+    const closedParams = new URL(
+      screen.getByTestId('location-probe').textContent ?? '',
+      'http://localhost',
+    ).searchParams;
+    expect([...closedParams.entries()]).toEqual([
+      ['lens', 'rankings'],
+      ['filter', 'tracked'],
+      ['page', '2'],
+    ]);
   });
 
   it('shows the bulk bar on selection and fires non-protected bulk actions immediately', () => {
     renderSurface('/ws/ws-1/seo-keywords');
 
-    fireEvent.click(screen.getByLabelText('Select cosmetic dentistry'));
+    const checkbox = screen.getByLabelText('Select cosmetic dentistry');
+    checkbox.focus();
+    fireEvent.pointerDown(checkbox, { button: 0 });
+    expect(checkbox).toHaveFocus();
+    fireEvent.click(checkbox);
     expect(screen.getByText('1 selected')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Track' }));
     expect(bulkMutateMock).toHaveBeenCalledWith(
@@ -946,9 +1064,10 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     // Global overlay chrome must SURVIVE the rebuilt mount (review PR #1480 regression:
     // the rebuilt branch dropped these). CommandPalette renders unconditionally — it
     // hosts the global ⌘K listener, so losing it kills the shortcut on every rebuilt
-    // surface. (AdminChat is gated on hasOpenAIKey — false in this fixture. StatusBar is
-    // intentionally deferred to an AppShell footer slot, DEF-shell-005.)
+    // surface. (AdminChat is gated on hasOpenAIKey — false in this fixture. The rebuilt
+    // shell owns connection health once in its persistent AppShell footer.)
     expect(screen.getByTestId('command-palette')).toBeInTheDocument();
     expect(screen.queryByTestId('legacy-status')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('region', { name: 'Connection health' })).toHaveLength(1);
   });
 });

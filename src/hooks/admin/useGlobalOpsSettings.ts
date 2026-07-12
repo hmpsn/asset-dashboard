@@ -72,9 +72,11 @@ export function useGlobalOpsGscSites(enabled: boolean) {
 }
 
 export function useGlobalOpsHealth() {
-  return useQuery({
-    queryKey: queryKeys.admin.globalOpsHealth(),
+  return useQuery<GlobalOpsHealthStatus>({
+    queryKey: queryKeys.admin.health(),
     queryFn: () => get<GlobalOpsHealthStatus>('/api/health'),
+    staleTime: STALE_TIMES.STABLE,
+    refetchOnWindowFocus: true,
   });
 }
 

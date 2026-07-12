@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { IdentityTab } from '../../../src/components/brand/IdentityTab';
+import type { BrandDeliverableType } from '../../../shared/types/brand-engine';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -68,8 +69,18 @@ function wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-function renderIdentityTab(workspaceId = 'ws-1') {
-  return render(<IdentityTab workspaceId={workspaceId} />, { wrapper });
+function renderIdentityTab(
+  workspaceId = 'ws-1',
+  options: { focusType?: BrandDeliverableType | null; onClearFocus?: () => void } = {},
+) {
+  return render(
+    <IdentityTab
+      workspaceId={workspaceId}
+      focusType={options.focusType}
+      onClearFocus={options.onClearFocus}
+    />,
+    { wrapper },
+  );
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -118,6 +129,49 @@ describe('IdentityTab', () => {
     });
     expect(screen.getByText('Professional')).toBeInTheDocument();
     expect(screen.getByText('Premium')).toBeInTheDocument();
+  });
+
+  it('renders only the focused real deliverable while preserving the bare library default', async () => {
+    mockList.mockResolvedValue([
+      makeDeliverable({ id: 'del-mission', deliverableType: 'mission' }),
+      makeDeliverable({ id: 'del-tagline', deliverableType: 'tagline', content: 'Made for real life.' }),
+    ]);
+
+    const { unmount } = renderIdentityTab('ws-1', { focusType: 'tagline' });
+
+    expect(await screen.findByTestId('focused-brand-deliverable')).toHaveAttribute('data-deliverable-type', 'tagline');
+    expect(screen.getByText('Tagline')).toBeInTheDocument();
+    expect(screen.queryByText('Mission Statement')).not.toBeInTheDocument();
+    expect(screen.queryByText('Essentials')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /export all/i })).not.toBeInTheDocument();
+
+    unmount();
+    renderIdentityTab();
+
+    expect(await screen.findByText('Essentials')).toBeInTheDocument();
+    expect(screen.getByText('Mission Statement')).toBeInTheDocument();
+    expect(screen.getByText('Tagline')).toBeInTheDocument();
+  });
+
+  it('shows the focused Generate card when that type is missing, even if the library is empty', async () => {
+    mockList.mockResolvedValue([]);
+
+    renderIdentityTab('ws-1', { focusType: 'emotional_triggers' });
+
+    expect(await screen.findByTestId('focused-brand-deliverable')).toHaveAttribute('data-deliverable-type', 'emotional_triggers');
+    expect(screen.getByText('Emotional Triggers')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^generate$/i })).toBeInTheDocument();
+    expect(screen.queryByText('No brand deliverables yet')).not.toBeInTheDocument();
+  });
+
+  it('clears only focused Identity state from the focused editor control', async () => {
+    const onClearFocus = vi.fn();
+    mockList.mockResolvedValue([makeDeliverable({ deliverableType: 'tagline' })]);
+
+    renderIdentityTab('ws-1', { focusType: 'tagline', onClearFocus });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'View all brand identity' }));
+    expect(onClearFocus).toHaveBeenCalledTimes(1);
   });
 
   // Deliverable label

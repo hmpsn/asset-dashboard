@@ -7,7 +7,8 @@ import type {
   KeywordCommandCenterSummaryResponse,
 } from '../../../shared/types/keyword-command-center';
 import { KEYWORD_LIFECYCLE_STAGES } from '../../../shared/types/keyword-command-center';
-import { Badge, BoardCard, BoardColumn, Button, GroupBlock, InlineBanner, Skeleton } from '../ui';
+import { Badge, BoardCard, BoardColumn, Button, ClickableRow, GroupBlock, InlineBanner, IntentTag, Skeleton } from '../ui';
+import type { KeywordIntent } from '../ui';
 import { KeywordsTable, type KeywordRowsQueryResult } from './KeywordsTable';
 import type { UseKeywordsSurfaceStateReturn } from './useKeywordsSurfaceState';
 
@@ -37,6 +38,19 @@ const LIFECYCLE_META: Array<{
   { stage: KEYWORD_LIFECYCLE_STAGES.RANKING, title: 'Ranking', accent: 'var(--amber)' },
   { stage: KEYWORD_LIFECYCLE_STAGES.WINNING, title: 'Winning', accent: 'var(--emerald)' },
 ];
+
+const INTENTS = new Set<KeywordIntent>(['commercial', 'informational', 'transactional', 'local']);
+
+function asIntent(value: string | undefined): KeywordIntent | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase() as KeywordIntent;
+  return INTENTS.has(normalized) ? normalized : null;
+}
+
+function lifecycleAccent(row: KeywordCommandCenterRow): string {
+  const stage = row.lifecycleStage ?? KEYWORD_LIFECYCLE_STAGES.DISCOVERED;
+  return LIFECYCLE_META.find((meta) => meta.stage === stage)?.accent ?? 'var(--blue)';
+}
 
 // Sum of the group's last-window Search Console impressions. Labeled honestly as
 // "Impressions" — this is realized search exposure, NOT projected opportunity/upside
@@ -130,7 +144,31 @@ function groupRowsByCluster(rows: KeywordCommandCenterRow[], summary?: KeywordCo
   return groups;
 }
 
-function KeywordMiniRow({
+function GroupedKeywordRow({
+  row,
+  onOpen,
+}: {
+  row: KeywordCommandCenterRow;
+  onOpen: (row: KeywordCommandCenterRow) => void;
+}) {
+  const intent = asIntent(row.metrics.intent);
+  return (
+    <ClickableRow
+      aria-label={`Open ${row.keyword}`}
+      className="flex items-center gap-3 rounded-[var(--radius-md)] px-3 py-[9px]"
+      onClick={() => onOpen(row)}
+    >
+      <span aria-hidden="true" className="h-2 w-2 flex-none rounded-[var(--radius-pill)]" style={{ background: lifecycleAccent(row) }} />
+      <span className="min-w-0 flex-1 truncate t-ui font-semibold text-[var(--brand-text-bright)]">{row.keyword}</span>
+      {intent ? <IntentTag intent={intent} /> : <Badge label="Unknown" tone="zinc" variant="outline" size="sm" />}
+      <span className="w-10 flex-none text-right t-ui font-bold tabular-nums text-[var(--brand-text-bright)]">
+        {row.metrics.currentPosition != null ? `#${row.metrics.currentPosition}` : '—'}
+      </span>
+    </ClickableRow>
+  );
+}
+
+function LifecycleKeywordCard({
   row,
   onOpen,
 }: {
@@ -146,7 +184,7 @@ function KeywordMiniRow({
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <Badge label={row.metrics.currentPosition != null ? `#${row.metrics.currentPosition}` : 'No rank'} tone="blue" variant="soft" size="sm" />
         {typeof row.opportunityScore === 'number' && (
-          <Badge label={`${Math.round(row.opportunityScore)} opp`} tone="teal" variant="soft" size="sm" />
+          <Badge label={`${Math.round(row.opportunityScore)} opp`} tone="blue" variant="soft" size="sm" />
         )}
       </div>
     </BoardCard>
@@ -179,9 +217,9 @@ function GroupedLens({
           collapsible
           defaultOpen
         >
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          <div className="flex flex-col">
             {group.rows.map((row) => (
-              <KeywordMiniRow key={row.normalizedKeyword} row={row} onOpen={onOpen} />
+              <GroupedKeywordRow key={row.normalizedKeyword} row={row} onOpen={onOpen} />
             ))}
           </div>
         </GroupBlock>
@@ -202,9 +240,9 @@ function LifecycleLens({
       {LIFECYCLE_META.map((meta) => {
         const stageRows = rows.filter((row) => (row.lifecycleStage ?? KEYWORD_LIFECYCLE_STAGES.DISCOVERED) === meta.stage);
         return (
-          <BoardColumn key={meta.stage} title={meta.title} count={stageRows.length} accent={meta.accent}>
+          <BoardColumn key={meta.stage} title={meta.title} count={stageRows.length} accent={meta.accent} className="max-h-[680px]">
             {stageRows.map((row) => (
-              <KeywordMiniRow key={row.normalizedKeyword} row={row} onOpen={onOpen} />
+              <LifecycleKeywordCard key={row.normalizedKeyword} row={row} onOpen={onOpen} />
             ))}
           </BoardColumn>
         );

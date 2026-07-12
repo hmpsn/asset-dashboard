@@ -3,10 +3,10 @@
  * shown in "The Issue" admin cockpit (Phase 1 Lane A).
  *
  * Verifies:
- * - One segment per archetype that has a count > 0
+ * - Four directly labeled prototype allocation groups
  * - Cut/parked trailing note rendered when either > 0
- * - Legend labels present for populated archetypes
- * - Renders with no errors when all archetypes are zero
+ * - Stable 34px bar height and percentages
+ * - Renders all four groups when counts are zero
  */
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
@@ -40,19 +40,27 @@ function makeRec(overrides: Partial<Recommendation>): Recommendation {
 }
 
 describe('StanceBar', () => {
-  it('renders one segment per archetype with count > 0 (via recs prop)', () => {
+  it('rolls six recommendation archetypes into four directly labeled prototype allocations', () => {
     const recs = [
       makeRec({ type: 'content', lifecycle: 'active' }),
+      makeRec({ type: 'strategy', lifecycle: 'active' }),
       makeRec({ type: 'content_refresh', lifecycle: 'active' }),
+      makeRec({ type: 'cannibalization', lifecycle: 'active' }),
       makeRec({ type: 'technical', lifecycle: 'active' }),
+      makeRec({ type: 'local_visibility', lifecycle: 'active' }),
     ];
     const { container } = render(<StanceBar recs={recs} />);
-    // 3 archetypes have >0 active recs: authority_bet, refresh_reclaim, technical
-    const segments = container.querySelectorAll('[data-archetype]');
-    expect(segments.length).toBe(3);
+
+    const bar = screen.getByTestId('stance-allocation-bar');
+    expect(bar).toHaveClass('sm:h-[34px]');
+    expect(container.querySelectorAll('[data-stance-group]')).toHaveLength(4);
+    expect(screen.getByText('Win demand 33%')).toBeInTheDocument();
+    expect(screen.getByText('Protect 33%')).toBeInTheDocument();
+    expect(screen.getByText('Technical 17%')).toBeInTheDocument();
+    expect(screen.getByText('Local 17%')).toBeInTheDocument();
   });
 
-  it('renders one segment per archetype with count > 0 (via stance prop)', () => {
+  it('accepts a precomputed stance while retaining the four-group presentation', () => {
     const recs = [
       makeRec({ type: 'content', lifecycle: 'active' }),
       makeRec({ type: 'cannibalization', lifecycle: 'active' }),
@@ -60,8 +68,25 @@ describe('StanceBar', () => {
     ];
     const stance = deriveStance(recs);
     const { container } = render(<StanceBar stance={stance} />);
-    const segments = container.querySelectorAll('[data-archetype]');
-    expect(segments.length).toBe(3);
+    expect(container.querySelectorAll('[data-stance-group]')).toHaveLength(4);
+    expect(screen.getByText('Win demand 33%')).toBeInTheDocument();
+    expect(screen.getByText('Protect 33%')).toBeInTheDocument();
+    expect(screen.getByText('Local 33%')).toBeInTheDocument();
+  });
+
+  it('uses move counts as the visual proportions and gives zero-count groups no bar width', () => {
+    const { container } = render(<StanceBar recs={[
+      makeRec({ type: 'content', lifecycle: 'active' }),
+      makeRec({ type: 'strategy', lifecycle: 'active' }),
+      makeRec({ type: 'technical', lifecycle: 'active' }),
+    ]} />);
+
+    const demand = container.querySelector<HTMLElement>('[data-stance-group="demand"]');
+    const technical = container.querySelector<HTMLElement>('[data-stance-group="technical"]');
+    const local = container.querySelector<HTMLElement>('[data-stance-group="local"]');
+    expect(demand).toHaveStyle({ flexBasis: '0%', flexGrow: '2' });
+    expect(technical).toHaveStyle({ flexBasis: '0%', flexGrow: '1' });
+    expect(local).toHaveStyle({ flexBasis: '0%', flexGrow: '0' });
   });
 
   it('shows cut/parked trailing note when either > 0', () => {
@@ -82,22 +107,12 @@ describe('StanceBar', () => {
     expect(screen.queryByTestId('stance-bar-cutparked')).toBeNull();
   });
 
-  it('renders legend labels for populated archetypes', () => {
-    const recs = [
-      makeRec({ type: 'content', lifecycle: 'active' }),   // authority_bet
-      makeRec({ type: 'technical', lifecycle: 'active' }), // technical
-    ];
-    render(<StanceBar recs={recs} />);
-    expect(screen.getByText('New authority bets')).toBeInTheDocument();
-    expect(screen.getByText('Technical fixes')).toBeInTheDocument();
-  });
-
   it('renders gracefully when all counts are zero (empty recs)', () => {
     const { container } = render(<StanceBar recs={[]} />);
-    // No segments
-    const segments = container.querySelectorAll('[data-archetype]');
-    expect(segments.length).toBe(0);
-    // Should still render container without throwing
-    expect(container.firstChild).not.toBeNull();
+    expect(container.querySelectorAll('[data-stance-group]')).toHaveLength(4);
+    expect(screen.getByText('Win demand 0%')).toBeInTheDocument();
+    expect(screen.getByText('Protect 0%')).toBeInTheDocument();
+    expect(screen.getByText('Technical 0%')).toBeInTheDocument();
+    expect(screen.getByText('Local 0%')).toBeInTheDocument();
   });
 });

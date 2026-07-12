@@ -1,36 +1,18 @@
 // @ds-rebuilt
-import { ArrowDownRight, BarChart3, FileText, Gauge, Layers, Shield } from 'lucide-react';
+import { Fragment } from 'react';
 import type { WorkQueueClassification } from '../../../shared/types/work-queue';
-import {
-  Button,
-  ClickableRow,
-  ClientSwitcherRow,
-  ClientThreadRow,
-  DataTable,
-  EmptyState,
-  GroupBlock,
-  Icon,
-  Meter,
-  MetricTile,
-  Segmented,
-} from '../ui';
-import { SeoChangeImpact } from '../workspace-home';
-import type { CockpitEvidenceView } from './useCockpitSurfaceState';
+import { Button, ClickableRow, ClientThreadRow, Icon, SectionCard } from '../ui';
+import type { IconName } from '../ui/iconNames';
 import type { CockpitKpiModel, CockpitRankRow, CockpitRequestRow } from '../../hooks/admin/useCockpitRebuilt';
-import { formatCompactNumber, formatPercent } from './cockpitFormatters';
+import { formatPercent } from './cockpitFormatters';
 
 interface CockpitEvidenceRailProps {
-  workspaceId: string;
   workspaceName: string;
   workspaceInitials: string;
-  hasGsc: boolean;
-  healthTone: 'ok' | 'risk' | 'new';
   workQueue: WorkQueueClassification;
   requests: CockpitRequestRow[];
   ranks: CockpitRankRow[];
   kpis: CockpitKpiModel;
-  view: CockpitEvidenceView;
-  onViewChange: (view: CockpitEvidenceView) => void;
   onOpenRoute: (route: string) => void;
   route: {
     analytics: string;
@@ -45,171 +27,191 @@ interface CockpitEvidenceRailProps {
   };
 }
 
-function EmptyRankIcon({ className }: { className?: string }) {
-  return <Icon name="search" className={className} />;
+type Severity = 'high' | 'med' | 'low';
+
+const SEVERITY: Record<Severity, { label: string; color: string }> = {
+  high: { label: 'High', color: 'var(--red)' },
+  med: { label: 'Med', color: 'var(--amber)' },
+  low: { label: 'Low', color: 'var(--blue)' },
+};
+
+/** Right-aligned "Keyword →" style link-out for a rail card header. */
+function LinkOut({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <Button variant="ghost" size="sm" onClick={onClick}>
+      {label}
+      <Icon name="arrowRight" size="sm" />
+    </Button>
+  );
 }
 
-function rowForRank(rank: CockpitRankRow): Record<string, unknown> {
-  const change = rank.change == null ? '—' : rank.change > 0 ? `+${rank.change}` : String(rank.change);
-  return {
-    id: rank.id,
-    query: rank.query,
-    position: rank.position ?? '—',
-    previous: rank.previousPosition ?? '—',
-    change,
-    raw: rank,
-  };
+/** Compact technical hand-off row: icon chip + title/meta + severity pill + Fix. (`.ck-trow`) */
+function TechRow({
+  iconName,
+  color,
+  title,
+  meta,
+  severity,
+  onFix,
+}: {
+  iconName: IconName;
+  color: string;
+  title: string;
+  meta: string;
+  severity: Severity;
+  onFix: () => void;
+}) {
+  const sev = SEVERITY[severity];
+  return (
+    <div className="flex items-center gap-[11px] border-t border-[var(--brand-border)] px-4 py-2.5 first:border-t-0">
+      <span
+        className="inline-flex h-[26px] w-[26px] flex-none items-center justify-center rounded-[var(--radius-md)]"
+        style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, color }}
+      >
+        <Icon name={iconName} size="sm" aria-hidden="true" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="truncate t-ui font-semibold text-[var(--brand-text-bright)]">{title}</div>
+        <div className="truncate t-caption-sm text-[var(--brand-text-muted)]">{meta}</div>
+      </div>
+      <span
+        className="flex-none rounded-[var(--radius-pill)] px-[7px] py-0.5 t-caption-sm font-bold uppercase tracking-[0.04em]"
+        style={{ color: sev.color, background: `color-mix(in srgb, ${sev.color} 12%, transparent)` }}
+      >
+        {sev.label}
+      </span>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={onFix}
+        className="flex-none rounded-[var(--radius-md)] border-[var(--brand-border)] bg-[var(--surface-3)] px-[11px] py-1.5 font-semibold text-[var(--blue)] hover:border-[var(--brand-border-hover)]"
+      >
+        Fix
+      </Button>
+    </div>
+  );
+}
+
+/** Compact keyword-position row: query + #position + Δ. (`.ck-krow`) */
+function KeywordRow({ rank }: { rank: CockpitRankRow }) {
+  const change = rank.change ?? null;
+  const moveColor = change == null || change === 0
+    ? 'var(--brand-text-dim)'
+    : change > 0
+      ? 'var(--emerald)'
+      : 'var(--red)';
+  const moveLabel = change == null || change === 0
+    ? '—'
+    : change > 0
+      ? `+${change}`
+      : String(change);
+  return (
+    <div className="flex items-center gap-[11px] border-t border-[var(--brand-border)] px-4 py-2 first:border-t-0">
+      <span className="min-w-0 flex-1 truncate t-ui text-[var(--brand-text-bright)]">{rank.query}</span>
+      <span className="flex-none t-body font-bold text-[var(--brand-text-bright)] tabular-nums">
+        {rank.position == null ? '—' : `#${rank.position}`}
+      </span>
+      <span className="flex-none w-10 text-right t-caption-sm font-semibold tabular-nums" style={{ color: moveColor }}>
+        {moveLabel}
+      </span>
+    </div>
+  );
+}
+
+/** One stage of the content-in-flight funnel: dot + count + label. (`.co-mstage`) */
+function FunnelStage({ count, label, color }: { count: number; label: string; color: string }) {
+  return (
+    <div className="flex-1 text-center">
+      <span className="mx-auto mb-1 block h-1.5 w-1.5 rounded-[var(--radius-pill)]" style={{ background: color }} aria-hidden="true" />
+      <div className="t-stat-sm font-extrabold leading-none text-[var(--brand-text-bright)] tabular-nums">{count}</div> {/* stat-primitive-ok: compact content-funnel stage count inside the Cockpit evidence rail, not a labeled StatCard/CompactStatBar metric grid */}
+      <div className="mt-0.5 t-label text-[var(--brand-text-dim)]">{label}</div>
+    </div>
+  );
+}
+
+function FunnelArrow() {
+  return (
+    <span className="flex flex-none items-center px-0.5 text-[var(--brand-text-dim)]" aria-hidden="true">
+      <Icon name="arrowRight" size="sm" />
+    </span>
+  );
 }
 
 export function CockpitEvidenceRail({
-  workspaceId,
   workspaceName,
   workspaceInitials,
-  hasGsc,
-  healthTone,
   workQueue,
   requests,
   ranks,
   kpis,
-  view,
-  onViewChange,
   onOpenRoute,
   route,
 }: CockpitEvidenceRailProps) {
-  const rankRows = ranks.map(rowForRank);
-  const requestRows = requests.filter((request) => request.status !== 'closed' && request.status !== 'resolved').slice(0, 4);
-  const issueCount = workQueue.items.filter((item) => item.direction === 'negative').length;
+  const workspaceFirstName = workspaceName.trim().split(/\s+/)[0] || workspaceName;
+  // Exclude terminal admin request states. NB: the admin RequestStatus union has no 'resolved'
+  // ('resolved' is a client-projection value) — the terminal "done" state is 'completed'.
+  const openRequests = requests.filter((r) => r.status !== 'closed' && r.status !== 'completed').slice(0, 4);
+  const rankRows = ranks.slice(0, 5);
+
+  // Technical hand-offs synthesised from KPI slices → compact severity rows.
+  const techRows: Array<{ key: string; iconName: IconName; color: string; title: string; meta: string; severity: Severity; route: string }> = [];
+  if (kpis.siteHealth.errors > 0 || kpis.siteHealth.warnings > 0 || kpis.siteHealth.score != null) {
+    techRows.push({
+      key: 'audit',
+      iconName: 'gauge',
+      color: 'var(--red)',
+      title: `${kpis.siteHealth.errors} error${kpis.siteHealth.errors === 1 ? '' : 's'} in site audit`,
+      meta: `${kpis.siteHealth.warnings} warnings · score ${kpis.siteHealth.score ?? '—'}`,
+      severity: kpis.siteHealth.errors > 0 ? 'high' : kpis.siteHealth.warnings > 0 ? 'med' : 'low',
+      route: route.siteAudit,
+    });
+  }
+  if (kpis.contentDecay.total > 0) {
+    techRows.push({
+      key: 'decay',
+      iconName: 'file',
+      color: 'var(--amber)',
+      title: `${kpis.contentDecay.total} decaying page${kpis.contentDecay.total === 1 ? '' : 's'}`,
+      meta: `${kpis.contentDecay.critical} critical · ${formatPercent(kpis.contentDecay.avgDeclinePct, { alreadyPercent: true })} avg decline`,
+      severity: kpis.contentDecay.critical > 0 ? 'high' : 'med',
+      route: route.contentHealth,
+    });
+  }
+  if (kpis.coverageGaps > 0) {
+    techRows.push({
+      key: 'coverage',
+      iconName: 'target',
+      color: 'var(--blue)',
+      title: `${kpis.coverageGaps} coverage gap${kpis.coverageGaps === 1 ? '' : 's'}`,
+      meta: 'Strategy hand-off to the Engine',
+      severity: 'low',
+      route: route.strategy,
+    });
+  }
+
   const pipeline = kpis.contentPipeline;
-  const pipelinePercent = pipeline.percent ?? 0;
+  const funnel: Array<{ count: number; label: string; color: string }> = [
+    { count: pipeline.inProgress, label: 'Drafting', color: 'var(--blue)' },
+    { count: pipeline.review, label: 'Your review', color: 'var(--amber)' },
+    { count: pipeline.approved, label: 'Ready', color: 'var(--teal)' },
+    { count: pipeline.published, label: 'Published', color: 'var(--emerald)' },
+  ];
+  const needsReview = pipeline.review > 0;
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]" data-testid="cockpit-evidence-rail">
-      <div className="flex min-w-0 flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <Segmented
-            options={[
-              { value: 'rankings', label: 'Rankings' },
-              { value: 'technicals', label: 'Technicals' },
-            ]}
-            value={view}
-            onChange={(value) => onViewChange(value as CockpitEvidenceView)}
-          />
-          <span className="t-caption-sm text-[var(--brand-text-muted)]">
-            Evidence stays read-only here; destination surfaces own the workshops.
-          </span>
-        </div>
-
-        {view === 'rankings' ? (
-          <div data-testid="cockpit-rankings-view">
-            <DataTable
-              columns={[
-                { key: 'query', label: 'Keyword', width: 'minmax(180px,1.4fr)', sortable: true },
-                { key: 'position', label: 'Position', width: '92px', align: 'right', sortable: true },
-                { key: 'previous', label: 'Previous', width: '92px', align: 'right' },
-                {
-                  key: 'change',
-                  label: 'Change',
-                  width: '88px',
-                  align: 'right',
-                  render: (value) => (
-                    <span className="tabular-nums text-[var(--brand-text-bright)]">{String(value)}</span>
-                  ),
-                },
-              ]}
-              rows={rankRows}
-              getRowKey={(row) => String(row.id)}
-              onRowClick={() => onOpenRoute(route.keywords)}
-              empty={
-                <EmptyState
-                  icon={EmptyRankIcon}
-                  title="No tracked rankings yet"
-                  description="Add tracked keywords from Keyword Hub before the Cockpit can show rank movement."
-                  action={<Button variant="secondary" size="sm" onClick={() => onOpenRoute(route.keywords)}>Open Keyword Hub</Button>}
-                />
-              }
-            />
-          </div>
-        ) : (
-          <div className="grid gap-3" data-testid="cockpit-technicals-view">
-            <GroupBlock
-              title="Content and technical hand-offs"
-              meta="Destination surfaces own edits, scans, and approvals."
-              icon={Gauge}
-              iconColor="var(--blue)"
-              stats={[
-                { label: 'issues', value: issueCount, color: issueCount > 0 ? 'var(--amber)' : 'var(--emerald)' },
-                { label: 'coverage', value: kpis.coverageGaps, color: 'var(--blue)' },
-              ]}
-            >
-              <div className="grid gap-2">
-                <ClickableRow
-                  className="rounded-[var(--radius-md)] border border-[var(--brand-border)] px-3 py-3"
-                  onClick={() => onOpenRoute(route.siteAudit)}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon name="gauge" size="md" className="text-[var(--blue)]" />
-                    <div className="min-w-0 flex-1">
-                      <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Site Audit</div>
-                      <div className="t-caption-sm text-[var(--brand-text-muted)]">
-                        {kpis.siteHealth.errors} errors · {kpis.siteHealth.warnings} warnings · score {kpis.siteHealth.score ?? '—'}
-                      </div>
-                    </div>
-                  </div>
-                </ClickableRow>
-                <ClickableRow
-                  className="rounded-[var(--radius-md)] border border-[var(--brand-border)] px-3 py-3"
-                  onClick={() => onOpenRoute(route.contentHealth)}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon name="file" size="md" className="text-[var(--amber)]" />
-                    <div className="min-w-0 flex-1">
-                      <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Content Health</div>
-                      <div className="t-caption-sm text-[var(--brand-text-muted)]">
-                        {kpis.contentDecay.total} decaying pages · {formatPercent(kpis.contentDecay.avgDeclinePct, { alreadyPercent: true })} average decline
-                      </div>
-                    </div>
-                  </div>
-                </ClickableRow>
-                <ClickableRow
-                  className="rounded-[var(--radius-md)] border border-[var(--brand-border)] px-3 py-3"
-                  onClick={() => onOpenRoute(route.strategy)}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon name="target" size="md" className="text-[var(--blue)]" />
-                    <div className="min-w-0 flex-1">
-                      <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Coverage Gaps</div>
-                      <div className="t-caption-sm text-[var(--brand-text-muted)]">
-                        {kpis.coverageGaps} strategy gap{kpis.coverageGaps === 1 ? '' : 's'} need an Engine hand-off.
-                      </div>
-                    </div>
-                  </div>
-                </ClickableRow>
-              </div>
-              <div className="mt-3 border-t border-[var(--brand-border)] pt-3">
-                <SeoChangeImpact workspaceId={workspaceId} hasGsc={hasGsc} embedded />
-              </div>
-            </GroupBlock>
-          </div>
-        )}
-      </div>
-
-      <aside className="flex min-w-0 flex-col gap-3">
-        <GroupBlock
-          title="From client"
-          meta="Requests and replies route to the inbox owner."
-          icon={Shield}
-          iconColor="var(--teal)"
-          stats={[{ label: 'open', value: requestRows.length, color: requestRows.length > 0 ? 'var(--amber)' : 'var(--emerald)' }]}
-        >
-          <ClientSwitcherRow
-            name={workspaceName}
-            initials={workspaceInitials}
-            meta={`${formatCompactNumber(workQueue.items.length)} queue items`}
-            health={healthTone}
-            active
-          />
-          {requestRows.length > 0 ? (
-            requestRows.map((request) => (
+    <div className="flex flex-col gap-[14px]" data-testid="cockpit-evidence-rail">
+      {/* 1 — From client (leads the rail) */}
+      <SectionCard
+        title={`From ${workspaceFirstName}`}
+        titleIcon={<Icon name="message" size="sm" className="text-[var(--blue)]" />}
+        iconChip
+        subtitle="Replies from their portal — a human is waiting"
+        action={<LinkOut label="Inbox" onClick={() => onOpenRoute(route.requests)} />}
+        noPadding
+      >
+        {openRequests.length > 0 ? (
+          <div className="flex flex-col">
+            {openRequests.map((request) => (
               <ClientThreadRow
                 key={request.id}
                 author={workspaceName}
@@ -218,76 +220,105 @@ export function CockpitEvidenceRail({
                 message={request.title}
                 when={request.createdAt ? new Date(request.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : undefined}
               />
-            ))
-          ) : (
-            <div className="px-4 py-3 t-caption-sm text-[var(--brand-text-muted)]">
-              No open client requests in this workspace.
-            </div>
-          )}
-          <div className="border-t border-[var(--brand-border)] px-4 py-3">
-            <Button variant="secondary" size="sm" onClick={() => onOpenRoute(route.requests)}>
-              Open requests
-            </Button>
+            ))}
           </div>
-        </GroupBlock>
+        ) : (
+          <div className="px-4 py-3 t-caption text-[var(--brand-text-muted)]">
+            Nothing waiting from {workspaceFirstName} right now.
+          </div>
+        )}
+      </SectionCard>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-          <MetricTile
-            label="Pipeline"
-            value={pipeline.percent == null ? '—' : `${pipeline.percent}%`}
-            sub={`${pipeline.published}/${pipeline.total} published · ${pipeline.review} review`}
-            accent="var(--teal)"
-            icon={Layers}
-            onClick={() => onOpenRoute(route.contentBriefs)}
-          />
-          <GroupBlock
-            title="Pipeline meter"
-            meta={`${pipeline.total} planned cells`}
-            icon={Layers}
-            iconColor="var(--teal)"
-          >
-            <Meter
-              label="Content pipeline"
-              value={pipelinePercent}
-              max={100}
-              gradient
-              showValue
-              ariaLabel="Content pipeline published percentage"
-            />
-            <div className="mt-2 t-caption-sm text-[var(--brand-text-muted)]">
-              {pipeline.approved} approved · {pipeline.inProgress} in progress.
-            </div>
-          </GroupBlock>
-          <MetricTile
-            label="Content Velocity"
-            value={kpis.contentVelocity.trailingThreeMonthAvg == null ? '—' : `${kpis.contentVelocity.trailingThreeMonthAvg}/mo`}
-            delta={kpis.contentVelocity.trendPct ?? undefined}
-            deltaLabel="%"
-            sub={`${kpis.contentVelocity.currentMonthPublished ?? 0} this month`}
-            accent="var(--blue)"
-            icon={FileText}
-            onClick={() => onOpenRoute(route.contentPublished)}
-          />
-          <MetricTile
-            label="Users"
-            value={formatCompactNumber(kpis.ga4.users)}
-            delta={kpis.ga4.usersDelta ?? undefined}
-            deltaLabel="%"
-            sub={`${formatCompactNumber(kpis.ga4.sessions)} sessions`}
-            accent="var(--blue)"
-            icon={BarChart3}
-            onClick={() => onOpenRoute(route.analytics)}
-          />
-          <MetricTile
-            label="Content Decay"
-            value={kpis.contentDecay.total || '—'}
-            sub={`${kpis.contentDecay.critical} critical · ${kpis.contentDecay.warning} warning`}
-            accent={kpis.contentDecay.critical > 0 ? 'var(--red)' : 'var(--amber)'}
-            icon={ArrowDownRight}
-            onClick={() => onOpenRoute(route.contentHealth)}
-          />
+      {/* 2 — Technicals & optimization */}
+      <SectionCard
+        title="Technicals & optimization"
+        titleIcon={<Icon name="gauge" size="sm" className="text-[var(--blue)]" />}
+        iconChip
+        subtitle="Site health — the invisible plumbing"
+        action={(
+          <span className="rounded-[var(--radius-pill)] border border-[color-mix(in_srgb,var(--blue)_25%,transparent)] bg-[color-mix(in_srgb,var(--blue)_10%,transparent)] px-2 py-0.5 t-caption-sm text-[var(--blue)]">
+            stays here
+          </span>
+        )}
+        noPadding
+      >
+        {techRows.length > 0 ? (
+          <div className="flex flex-col">
+            {techRows.map((row) => (
+              <TechRow
+                key={row.key}
+                iconName={row.iconName}
+                color={row.color}
+                title={row.title}
+                meta={row.meta}
+                severity={row.severity}
+                onFix={() => onOpenRoute(row.route)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="px-4 py-3 t-caption text-[var(--brand-text-muted)]">No technical issues flagged right now.</div>
+        )}
+        <div className="flex items-start gap-2 border-t border-dashed border-[var(--brand-border)] bg-[color-mix(in_srgb,var(--amber)_3%,transparent)] px-4 py-3 t-caption-sm leading-relaxed text-[var(--brand-text-muted)]">
+          <Icon name="star" size="sm" className="mt-0.5 flex-none text-[var(--amber)]" aria-hidden="true" />
+          <span>
+            Technical fixes <strong className="font-semibold text-[var(--amber)]">stay in the Cockpit</strong> — they move into the Insights Engine only when they become a measured proof point.
+          </span>
         </div>
-      </aside>
+      </SectionCard>
+
+      {/* 3 — Keyword position */}
+      <SectionCard
+        title="Keyword position"
+        titleIcon={<Icon name="key" size="sm" className="text-[var(--blue)]" />}
+        iconChip
+        subtitle="Tracked terms · this client"
+        action={<LinkOut label="Keywords" onClick={() => onOpenRoute(route.keywords)} />}
+        noPadding
+      >
+        {rankRows.length > 0 ? (
+          <div className="flex flex-col">
+            {rankRows.map((rank) => (
+              <KeywordRow key={rank.id} rank={rank} />
+            ))}
+          </div>
+        ) : (
+          <div className="px-4 py-3 t-caption text-[var(--brand-text-muted)]">No tracked rankings yet.</div>
+        )}
+      </SectionCard>
+
+      {/* 4 — Content in flight (funnel) */}
+      <SectionCard
+        title="Content in flight"
+        titleIcon={<Icon name="clipboard" size="sm" className="text-[var(--teal)]" />}
+        iconChip
+        subtitle="Recommendation → published"
+        action={<LinkOut label="Pipeline" onClick={() => onOpenRoute(route.contentBriefs)} />}
+        noPadding
+      >
+        <div className="flex items-stretch gap-[5px] px-4 pb-1 pt-[13px]">
+          {funnel.map((stage, index) => (
+            <Fragment key={stage.label}>
+              <FunnelStage count={stage.count} label={stage.label} color={stage.color} />
+              {index < funnel.length - 1 && <FunnelArrow />}
+            </Fragment>
+          ))}
+        </div>
+        <ClickableRow
+          onClick={() => onOpenRoute(needsReview ? route.contentBriefs : route.contentPublished)}
+          className="flex w-full items-center gap-2 border-t border-[var(--brand-border)] px-4 py-3 text-left transition-colors hover:bg-[var(--surface-3)]"
+        >
+          <Icon name="clipboard" size="sm" className="flex-none text-[var(--teal)]" />
+          <span className="min-w-0 flex-1 truncate t-ui text-[var(--brand-text)]">
+            {needsReview
+              ? `${pipeline.review} draft${pipeline.review === 1 ? '' : 's'} ready for your review`
+              : `${pipeline.published}/${pipeline.total} cells published`}
+          </span>
+          <Icon name="arrowRight" size="sm" className="flex-none text-[var(--brand-text-dim)]" />
+        </ClickableRow>
+      </SectionCard>
+
+      <span className="sr-only" data-testid="cockpit-rail-queue-count">{workQueue.items.length}</span>
     </div>
   );
 }

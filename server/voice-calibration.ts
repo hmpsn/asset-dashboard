@@ -6,10 +6,13 @@ import { getVoiceProfile } from './voice-profile-read-model.js';
 import { buildSystemPrompt, guardrailsToPromptInstructions } from './prompt-assembly.js';
 import { renderVoiceDNAForPrompt } from './voice-dna-render.js';
 import { parseJsonFallback, parseJsonSafeArray } from './db/json-validation.js';
+import { parseVoiceCalibrationOutput, parseVoiceRefinementOutput } from './schemas/ai-brand-engine.js';
 import { variationFeedbackItemSchema } from './schemas/voice-calibration.js';
 import { VOICE_PROFILE_TRANSITIONS, validateTransition, InvalidTransitionError } from './state-machines.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
+import { invalidateMonthlyDigestCache } from './monthly-digest-cache.js';
+import { clearIntelligenceCache } from './intelligence/cache-clear.js';
 import type {
   VoiceProfile, VoiceSample, CalibrationSession, CalibrationVariation,
   VoiceDNA, VoiceGuardrails, ContextModifier, VoiceProfileStatus,
@@ -166,6 +169,11 @@ export function updateVoiceProfile(
     context_modifiers_json: updates.contextModifiers !== undefined ? JSON.stringify(updates.contextModifiers) : (profile.contextModifiers ? JSON.stringify(profile.contextModifiers) : null),
     updated_at: now,
   });
+  const digestVoiceInputChanged = (
+    ['status', 'voiceDNA', 'guardrails'] as const
+  ).some(key => key in updates);
+  if (digestVoiceInputChanged) invalidateMonthlyDigestCache(workspaceId);
+  clearIntelligenceCache(workspaceId);
   return { ...profile, ...updates, updatedAt: now };
 }
 
@@ -286,17 +294,17 @@ Return valid JSON: { "variations": ["variation 1 text", "variation 2 text", "var
   log.info({ workspaceId, promptType }, 'generating calibration variations');
   // ai-race-ok: see rationale above — single-writer per request via randomUUID PK.
   const text = await callCreativeAI({
+    operation: 'voice-calibration',
     systemPrompt: system,
     userPrompt,
     maxTokens: 2000,
     temperature: 0.85,
-    feature: 'voice-calibration',
     workspaceId,
     json: true,
   });
 
-  const parsed = parseJsonFallback<{ variations: string[] }>(text, { variations: [] });
-  const variations: CalibrationVariation[] = (parsed.variations || []).map(variation => ({ text: variation }));
+  const parsed = parseVoiceCalibrationOutput(text);
+  const variations: CalibrationVariation[] = parsed.variations.map(variation => ({ text: variation }));
 
   const id = `cal_${randomUUID().slice(0, 8)}`;
   const now = new Date().toISOString();
@@ -331,16 +339,16 @@ Return valid JSON: { "refined": "the refined text" }`;
   const system = buildSystemPrompt(workspaceId, 'You are a copywriter refining copy based on feedback. Adjust precisely as directed. Apply the style quality rules that follow, but if the original copy uses a pattern those rules discourage, preserve it — brand accuracy takes precedence over style guidelines.');
 
   const text = await callCreativeAI({
+    operation: 'voice-refinement',
     systemPrompt: system,
     userPrompt,
     maxTokens: 1000,
     temperature: 0.75,
-    feature: 'voice-refinement',
     workspaceId,
     json: true,
   });
 
-  const parsed = parseJsonFallback<{ refined: string }>(text, { refined: original.text });
+  const parsed = parseVoiceRefinementOutput(text);
 
   // Re-read the session INSIDE the transaction and mutate against the fresh
   // state — a concurrent refine on the same session during our AI call would

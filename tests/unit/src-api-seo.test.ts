@@ -363,20 +363,13 @@ describe('src/api/seo — contentPerformance', () => {
     expect(url).toBe('/api/content-performance/ws-1');
   });
 
-  it('contentPerformance.get with days param', async () => {
-    await contentPerformance.get('ws-1', 30);
-    const [url] = mockedGet.mock.calls[0];
-    expect(url).toContain('days=30');
-  });
-
   it('contentPerformance.publicGet uses getOptional', async () => {
     await contentPerformance.publicGet('ws-1');
     expect(mockedGetOptional).toHaveBeenCalledWith('/api/public/content-performance/ws-1');
   });
 
-  it('contentPerformance.refresh uses post', async () => {
-    await contentPerformance.refresh('ws-1');
-    expect(mockedPost).toHaveBeenCalledWith('/api/content-performance/ws-1/refresh');
+  it('does not expose the removed phantom refresh mutation', () => {
+    expect(contentPerformance).not.toHaveProperty('refresh');
   });
 });
 

@@ -1,11 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { Suspense, useState, useLayoutEffect, useRef, useCallback } from 'react';
 import { X, MessageSquare, Bot, Plus, PanelRightClose, PanelRightOpen } from 'lucide-react';
-import { ChatPanel } from './ChatPanel';
 import type { ChatMessage } from './ChatPanel';
 import { chat } from '../api/misc';
 import { useSmartPlaceholder } from '../hooks/useSmartPlaceholder';
 import { Icon, Button, IconButton, ClickableRow, cn } from './ui';
 import { formatDate } from '../utils/formatDates';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
+
+const ChatPanel = lazyWithRetry(() => import('./ChatPanel').then(module => ({ default: module.ChatPanel })));
 
 const ADMIN_QUICK_QUESTIONS = [
   'Give me a full status report on this site',
@@ -30,6 +32,11 @@ interface AdminChatProps {
   workspaceName: string;
 }
 
+interface AdminChatRequestContext {
+  workspaceId: string;
+  epoch: number;
+}
+
 export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -48,15 +55,37 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
   // ── Resize state ──
   const resizing = useRef<{ edge: 'left' | 'top' | 'corner'; startX: number; startY: number; startW: number; startH: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const requestContextRef = useRef<AdminChatRequestContext>({ workspaceId, epoch: 0 });
 
-  // Reset state when workspace changes
-  // effect-layout-ok — workspace-change reset is intentional post-prop sync, not derived layout state.
-  useEffect(() => {
+  const isCurrentRequest = useCallback((context: AdminChatRequestContext) => (
+    requestContextRef.current.workspaceId === context.workspaceId
+    && requestContextRef.current.epoch === context.epoch
+  ), []);
+
+  const invalidatePendingRequests = useCallback(() => {
+    requestContextRef.current = {
+      workspaceId: requestContextRef.current.workspaceId,
+      epoch: requestContextRef.current.epoch + 1,
+    };
+  }, []);
+
+  // Invalidate pending work and clear workspace-owned state before paint. The
+  // App-level key is the primary isolation boundary; this guard also protects
+  // direct mounts and any future parent that updates the prop in place.
+  useLayoutEffect(() => { // effect-layout-ok — security boundary must settle before the next workspace paints
+    if (requestContextRef.current.workspaceId !== workspaceId) {
+      requestContextRef.current = {
+        workspaceId,
+        epoch: requestContextRef.current.epoch + 1,
+      };
+    }
     setMessages([]);
     setInput('');
     setChatMode('analyst');
     setSessionId(`as-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    setSessions([]);
     setShowHistory(false);
+    setLoading(false);
   }, [workspaceId]);
 
   // ── Resize handlers ──
@@ -85,46 +114,67 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
   // ── Chat logic ──
   const askAi = async (question: string) => {
     if (!question.trim()) return;
+    const requestContext = { ...requestContextRef.current };
     setMessages(prev => [...prev, { role: 'user', content: question.trim() }]);
     setInput('');
     setLoading(true);
     try {
       const data = await chat.adminAsk({ workspaceId, question: question.trim(), sessionId });
+      if (!isCurrentRequest(requestContext)) return;
       if (data.mode) setChatMode(data.mode);
       setMessages(prev => [...prev, { role: 'assistant', content: data.error ? `Error: ${data.error}` : (data.answer ?? '') }]);
     } catch (err) {
+      if (!isCurrentRequest(requestContext)) return;
       console.error('AdminChat operation failed:', err);
       setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]);
     } finally {
-      setLoading(false);
+      if (isCurrentRequest(requestContext)) setLoading(false);
     }
   };
 
   const newSession = () => {
+    invalidatePendingRequests();
     setSessionId(`as-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
     setMessages([]);
     setChatMode('analyst');
     setShowHistory(false);
+    setLoading(false);
   };
 
   const toggleHistory = () => {
-    setShowHistory(v => {
-      if (!v) chat.sessions(workspaceId, 'admin').then(d => { if (Array.isArray(d)) setSessions(d as typeof sessions); }).catch((err) => { console.error('AdminChat operation failed:', err); });
-      return !v;
+    if (showHistory) {
+      setShowHistory(false);
+      return;
+    }
+
+    setShowHistory(true);
+    const requestContext = { ...requestContextRef.current };
+    void chat.sessions(workspaceId, 'admin').then(d => {
+      if (isCurrentRequest(requestContext) && Array.isArray(d)) setSessions(d as typeof sessions);
+    }).catch((err) => {
+      if (isCurrentRequest(requestContext)) console.error('AdminChat operation failed:', err);
     });
   };
 
   const loadSession = (id: string) => {
+    invalidatePendingRequests();
+    const requestContext = { ...requestContextRef.current };
     setSessionId(id);
     setShowHistory(false);
+    setLoading(false);
     chat.session(workspaceId, id).then(d => {
-      if (d?.messages) setMessages(d.messages.map((m: { role: string; content: string }) => ({ role: m.role as 'user' | 'assistant', content: m.content })));
-    }).catch((err) => { console.error('AdminChat operation failed:', err); });
+      if (isCurrentRequest(requestContext) && d?.messages) {
+        setMessages(d.messages.map((m: { role: string; content: string }) => ({ role: m.role as 'user' | 'assistant', content: m.content })));
+      }
+    }).catch((err) => {
+      if (isCurrentRequest(requestContext)) console.error('AdminChat operation failed:', err);
+    });
   };
 
   const { placeholder: smartPlaceholder, suggestions } = useSmartPlaceholder({
     workspaceId,
     isAdminContext: true,
+    enabled: open,
   });
 
   const placeholder = chatMode === 'content_reviewer'
@@ -135,7 +185,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
 
   // ── Container classes ──
   const containerCls = cn(
-    'shadow-2xl shadow-black/40 z-[var(--z-modal)] flex flex-col',
+    'shadow-2xl shadow-black/40 z-[var(--z-tooltip)] flex flex-col',
     docked
       ? 'fixed top-0 right-0 h-screen border-l border-[var(--brand-border)] bg-[var(--surface-2)]'
       : 'fixed bottom-6 right-6 bg-[var(--surface-2)] rounded-[var(--radius-xl)] border border-[var(--brand-border)] overflow-hidden'
@@ -146,7 +196,7 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
       {/* ── Floating trigger button ── */}
       {!open && (
         <Button onClick={() => setOpen(true)} variant="primary" size="lg" icon={Bot}
-          className="fixed bottom-6 right-6 rounded-[var(--radius-pill)] shadow-lg shadow-black/30 z-[var(--z-modal)]">
+          className="fixed bottom-6 right-6 hidden rounded-[var(--radius-pill)] shadow-lg shadow-black/30 z-[var(--z-tooltip)] sm:inline-flex">
           Admin Insights
         </Button>
       )}
@@ -252,26 +302,39 @@ export function AdminChat({ workspaceId, workspaceName }: AdminChatProps) {
               ))}
             </div>
           ) : (
-            <ChatPanel
-              messages={messages}
-              loading={loading}
-              input={input}
-              onInputChange={setInput}
-              onSend={askAi}
-              quickQuestions={ADMIN_QUICK_QUESTIONS}
-              placeholder={placeholder}
-              accent="teal"
-              suggestionChips={chatMode === 'analyst' ? suggestions : undefined}
-              onChipClick={(chip) => {
-                setInput(chip);
-                askAi(chip);
-              }}
-              emptyExtra={
-                <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">
-                  Internal analyst for <strong className="text-[var(--brand-text)]">{workspaceName}</strong>. Full data access — paste a URL to analyze a page, or paste content for a review.
-                </p>
-              }
-            />
+            <Suspense
+              fallback={(
+                <div
+                  role="status"
+                  aria-live="polite"
+                  aria-label="Loading Admin Insights conversation"
+                  className="flex flex-1 items-center justify-center p-6 t-caption text-[var(--brand-text-muted)]"
+                >
+                  Preparing your conversation…
+                </div>
+              )}
+            >
+              <ChatPanel
+                messages={messages}
+                loading={loading}
+                input={input}
+                onInputChange={setInput}
+                onSend={askAi}
+                quickQuestions={ADMIN_QUICK_QUESTIONS}
+                placeholder={placeholder}
+                accent="teal"
+                suggestionChips={chatMode === 'analyst' ? suggestions : undefined}
+                onChipClick={(chip) => {
+                  setInput(chip);
+                  askAi(chip);
+                }}
+                emptyExtra={
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] mt-2">
+                    Internal analyst for <strong className="text-[var(--brand-text)]">{workspaceName}</strong>. Full data access — paste a URL to analyze a page, or paste content for a review.
+                  </p>
+                }
+              />
+            </Suspense>
           )}
         </div>
       )}

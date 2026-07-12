@@ -87,7 +87,7 @@ export function validationTone(status: SchemaValidationRecord['status'] | undefi
 }
 
 export function validationLabel(status: SchemaValidationRecord['status'] | undefined): string {
-  if (status === 'valid') return 'Schema valid';
+  if (status === 'valid') return 'Valid';
   if (status === 'warnings') return 'Warnings';
   if (status === 'errors') return 'Fix errors';
   return 'Not validated';

@@ -56,6 +56,17 @@ vi.mock('../../server/broadcast.js', () => ({
   broadcastToWorkspace: vi.fn(),
 }));
 
+const mockInvalidateMonthlyDigestCache = vi.hoisted(() => vi.fn());
+const mockClearIntelligenceCache = vi.hoisted(() => vi.fn());
+
+vi.mock('../../server/monthly-digest-cache.js', () => ({
+  invalidateMonthlyDigestCache: mockInvalidateMonthlyDigestCache,
+}));
+
+vi.mock('../../server/intelligence/cache-clear.js', () => ({
+  clearIntelligenceCache: mockClearIntelligenceCache,
+}));
+
 // Mutable state captured in vi.hoisted so it can be mutated by individual tests
 const googleAuthState = vi.hoisted(() => ({
   globalAuthUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=_global',
@@ -425,6 +436,8 @@ describe('GET /api/google/callback — OAuth callback edge cases', () => {
   beforeEach(async () => {
     ws = seedWorkspace();
     googleAuthState.exchangeResult = { success: true };
+    mockInvalidateMonthlyDigestCache.mockClear();
+    mockClearIntelligenceCache.mockClear();
     const srv = await startTestServer();
     baseUrl = srv.baseUrl;
     stop = srv.stop;
@@ -467,6 +480,8 @@ describe('GET /api/google/callback — OAuth callback edge cases', () => {
     const location = headers.get('location') ?? '';
     expect(location).toContain('google=connected');
     expect(location).toContain(ws.webflowSiteId);
+    expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledWith(ws.workspaceId);
+    expect(mockClearIntelligenceCache).toHaveBeenCalledWith(ws.workspaceId);
   });
 
   it('returns 500 when code exchange fails', async () => {

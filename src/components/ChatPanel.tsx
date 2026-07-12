@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Sparkles, Send, Loader2, MessageSquare } from 'lucide-react';
 import { Button, ClickableRow, FormInput, Icon } from './ui';
-import { RenderMarkdown } from './client/helpers';
+import { RenderMarkdown } from './client/RenderMarkdown';
 import { pickPhrase } from '../lib/loadingPhrases';
 import { ServiceInterestCTA } from './client/ServiceInterestCTA';
 

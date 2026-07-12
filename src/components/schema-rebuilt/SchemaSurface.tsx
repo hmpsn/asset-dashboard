@@ -1,10 +1,10 @@
 // @ds-rebuilt
 import { useCallback } from 'react';
-import { BookOpen, FileJson, RefreshCw } from 'lucide-react';
+import { BookOpen, FileJson } from 'lucide-react';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { WS_EVENTS } from '../../lib/wsEvents';
 import { useAdminSchemaWorkspace, useInvalidateAdminSchemaQueries } from '../../hooks/admin/useAdminSchema';
-import { Button, ErrorState, Icon, LensSwitcher, PageHeader, Skeleton, Toolbar, ToolbarSpacer } from '../ui';
+import { Button, ErrorState, Icon, LensSwitcher, PageHeader, Skeleton } from '../ui';
 import { GeneratorLens } from './GeneratorLens';
 import { WorkflowGuideLens } from './WorkflowGuideLens';
 import { useSchemaSurfaceState, type SchemaSurfaceTab } from './useSchemaSurfaceState';
@@ -17,6 +17,8 @@ const LENS_ICONS: Record<SchemaSurfaceTab, typeof FileJson> = {
   generator: FileJson,
   guide: BookOpen,
 };
+
+const SURFACE_WRAP_CLASS = 'mx-auto flex min-h-full w-full max-w-[1080px] flex-col gap-[14px] px-4 pb-[90px] sm:px-[30px]';
 
 export function SchemaSurface({ workspaceId }: SchemaSurfaceProps) {
   const state = useSchemaSurfaceState();
@@ -47,7 +49,7 @@ export function SchemaSurface({ workspaceId }: SchemaSurfaceProps) {
 
   if (workspaceState.isLoading && !workspaceState.workspace) {
     return (
-      <div className="flex min-h-full flex-col gap-5" aria-label="Loading Schema">
+      <div className={SURFACE_WRAP_CLASS} aria-label="Loading Schema">
         <Skeleton className="h-[72px] w-full" />
         <Skeleton className="h-[54px] w-full" />
         <Skeleton className="h-[320px] w-full" />
@@ -57,7 +59,7 @@ export function SchemaSurface({ workspaceId }: SchemaSurfaceProps) {
 
   if (workspaceState.isError && !workspaceState.workspace) {
     return (
-      <div className="flex min-h-full flex-col gap-5">
+      <div className={SURFACE_WRAP_CLASS}>
         <PageHeader title="Schema" subtitle="Generate, validate, approve, and publish structured data." />
         <ErrorState
           type="data"
@@ -72,7 +74,7 @@ export function SchemaSurface({ workspaceId }: SchemaSurfaceProps) {
 
   if (!workspaceState.workspace) {
     return (
-      <div className="flex min-h-full flex-col gap-5">
+      <div className={SURFACE_WRAP_CLASS}>
         <PageHeader title="Schema" subtitle="Generate, validate, approve, and publish structured data." />
         <ErrorState type="data" title="Workspace not found" message="Choose a workspace before generating schema." className="min-h-[420px]" />
       </div>
@@ -81,7 +83,7 @@ export function SchemaSurface({ workspaceId }: SchemaSurfaceProps) {
 
   if (!workspaceState.siteId) {
     return (
-      <div className="flex min-h-full flex-col gap-5">
+      <div className={SURFACE_WRAP_CLASS}>
         <PageHeader title="Schema" subtitle="Generate, validate, approve, and publish structured data." />
         <ErrorState
           type="permission"
@@ -94,36 +96,40 @@ export function SchemaSurface({ workspaceId }: SchemaSurfaceProps) {
   }
 
   return (
-    <div className="flex min-h-full flex-col gap-5">
-      <PageHeader
-        title="Schema"
-        subtitle={state.tab === 'guide'
-          ? 'Workflow reference for plan, generation, validation, publishing, delivery, and measurement.'
-          : 'Generate JSON-LD, review page-level evidence, validate graph safety, and publish through existing schema services.'}
-        actions={(
+    <div className={SURFACE_WRAP_CLASS}>
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+        <h1
+          aria-label="Schema"
+          className="flex min-w-0 items-center gap-2 t-micro font-semibold uppercase tracking-[0.14em] text-[var(--brand-text-muted)]"
+        >
+          <span className="h-[7px] w-[7px] flex-none rounded-[var(--radius-pill)] bg-[var(--teal)]" aria-hidden="true" />
+          <span className="truncate">Schema · {workspaceState.workspace.name}</span>
+        </h1>
+        <div className="ml-auto flex min-w-0 items-center gap-2">
+          <span className="truncate t-caption-sm text-[var(--brand-text-muted)]">
+            {workspaceState.workspace.webflowSiteName || workspaceState.workspace.name}
+          </span>
           <Button
             size="sm"
-            variant="secondary"
+            variant="ghost"
             onClick={refreshSchema}
+            aria-label="Refresh schema data"
+            className="h-6 px-2"
           >
-            <Icon as={RefreshCw} size="sm" />
+            <Icon name="refresh" size="sm" />
             Refresh
           </Button>
-        )}
-      />
+        </div>
+      </div>
 
-      <Toolbar label="Schema controls">
+      <div className="max-w-full overflow-x-auto pb-px" role="group" aria-label="Schema controls">
         <LensSwitcher
           options={lensOptions}
           value={state.tab}
           onChange={(value) => state.setTab(value as SchemaSurfaceTab)}
           size="sm"
         />
-        <ToolbarSpacer />
-        <span className="t-caption text-[var(--brand-text-muted)]">
-          {workspaceState.workspace.webflowSiteName || workspaceState.workspace.name}
-        </span>
-      </Toolbar>
+      </div>
 
       {state.tab === 'guide' ? (
         <WorkflowGuideLens />

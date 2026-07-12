@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-07",
+  "updatedAt": "2026-07-11",
   "tolerance": 0.05,
   "total": 1720000,
   "entries": {
-    "css:assets/index.css": 35499,
-    "css:vendor/fontawesome/fontawesome.min.css": 36118,
+    "css:assets/index.css": 37307,
+    "css:vendor/fontawesome/fontawesome-sharp-regular-subset.min.css": 1203,
     "css:vendor/fontawesome/sharp-regular.min.css": 301,
     "font:fonts/fa-sharp-regular-400.woff2": 291992,
     "js:analytics": 863,
@@ -209,7 +209,8 @@
     "js:work-orders": 223,
     "js:wrench": 233,
     "js:wsEvents": 2229,
-    "js:pageRewriteChatActions": 100018,
-    "js:src/components/page-rewriter-rebuilt/PageRewriterSurface.tsx": 7814
+    "js:pageRewriteChatActions": 2317,
+    "js:src/components/page-rewrite-chat/pageRewriteDocxExport.ts": 97195,
+    "js:src/components/page-rewriter-rebuilt/PageRewriterSurface.tsx": 8819
   }
 }

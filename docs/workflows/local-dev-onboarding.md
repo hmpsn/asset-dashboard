@@ -10,10 +10,12 @@ Wave 5 item: `platform-reliability-local-dev-onboarding`
 
 1. `cp .env.example .env`
 2. `npm install`
-3. Set `LOCAL_FAKE_PROVIDERS=true` in `.env` for synthetic AI + SEO provider responses.
-4. `npm run seed:demo`
-5. `npm run dev:all`
-6. `npm run smoke:core`
+3. Set `DATA_DIR` to an absolute directory unique to this checkout or worktree.
+4. Keep the default `PROVIDER_ENV_PROFILE=local-fake`, `NODE_ENV=development`, and `LOCAL_FAKE_PROVIDERS=true` for synthetic AI + SEO provider responses.
+5. `npm run verify:env`
+6. `npm run seed:demo`
+7. `npm run dev:all`
+8. `npm run smoke:core`
 
 ## One-Command Routines
 
@@ -51,6 +53,7 @@ Admin URLs:
 - `/ws/ws_demo_empty`
 - `/ws/ws_demo_broken_integrations`
 - `/ws/ws_demo_rich_cms`
+- `/ws/ws_demo_provider_rich` (provider-backed populated visual fixture; requires `LOCAL_FAKE_PROVIDERS=true`)
 
 Client URLs:
 
@@ -60,24 +63,54 @@ Client URLs:
 - `/client/ws_demo_empty`
 - `/client/ws_demo_broken_integrations`
 - `/client/ws_demo_rich_cms`
+- `/client/ws_demo_provider_rich`
 
-## Environment Tiers
+## Provider environment profiles
+
+`PROVIDER_ENV_PROFILE` is a verification profile, not a feature flag. Run `npm run verify:env` before starting provider-dependent work; it checks that required keys and callback URLs are structurally valid without printing their values or making provider calls.
+
+| Profile | Intended use | Required mode |
+|---------|--------------|---------------|
+| `local-fake` | Deterministic, non-billable UI development and onboarding | `NODE_ENV=development`, `LOCAL_FAKE_PROVIDERS=true`, isolated absolute `DATA_DIR` |
+| `local-live` | Explicit local testing against live DataForSEO, Google OAuth/GBP, and PageSpeed | `NODE_ENV=development`, `LOCAL_FAKE_PROVIDERS=false`, isolated absolute `DATA_DIR`, all live-provider variables below |
+| `staging` | Provider-connected release smoke on the isolated staging service | `NODE_ENV=production`, `LOCAL_FAKE_PROVIDERS=false`, HTTPS callbacks and dedicated staging credentials |
+
+For `local-live`, configure all of the following in the uncommitted `.env` file:
+
+- `DATAFORSEO_LOGIN` and `DATAFORSEO_PASSWORD`
+- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REDIRECT_URI=http://localhost:3001/api/google/callback`
+- `GOOGLE_BUSINESS_PROFILE_REDIRECT_URI=http://localhost:3001/api/google-business-profile/callback`
+- independent 32+ character `GOOGLE_OAUTH_ENCRYPTION_KEY` and `GOOGLE_OAUTH_STATE_SECRET` values
+- `GOOGLE_PSI_KEY`
+
+Register both local callback URLs on the non-production Google OAuth client. Then run:
+
+```bash
+npm run verify:env -- --profile=local-live
+```
+
+The verifier is offline and does not prove provider access. Live calls can consume DataForSEO credits or Google quota, so the canonical credentialed end-to-end check remains the read-only, cost-capped staging smoke described in `docs/workflows/staging-environment.md`.
+
+SEMrush is retired as a runtime provider. Do not add `SEMRUSH_API_KEY`; DataForSEO is the canonical SEO provider.
+
+## Environment tiers
 
 ### Tier 1: Fast Local (no external creds)
 
-- Required: `APP_PASSWORD` (optional in dev), `LOCAL_FAKE_PROVIDERS=true`
+- Required: `PROVIDER_ENV_PROFILE=local-fake`, `NODE_ENV=development`, `LOCAL_FAKE_PROVIDERS=true`, and an isolated `DATA_DIR`
 - External keys optional
 - Best for: onboarding, UI development, local flow checks
 
 ### Tier 2: Core Integrations
 
 - Add: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `WEBFLOW_API_TOKEN`
-- Keep Google/SEMRush/DataForSEO optional
+- Keep Google and DataForSEO optional unless deliberately switching to `local-live`
 - Best for: AI + CMS flow development
 
 ### Tier 3: Full Production-Like
 
-- Add all provider + billing + email keys from `.env.example`
+- Use the `local-live` profile and add its provider variables plus the billing and email keys needed for the flow under test
 - Best for: end-to-end integration validation
 
 ## Fake Provider Mode
@@ -89,3 +122,5 @@ Client URLs:
 - Non-local environments (for example staging/test/prod) ignore this flag by design.
 
 Use this mode when you need predictable, non-billable local onboarding and smoke execution.
+
+Fake mode validates workflow composition, not live provider contracts. The explicit `ws_demo_provider_rich` fixture covers deterministic GSC, GA4, PageSpeed, local visibility, and advanced DataForSEO read shapes. Real Google OAuth, authenticated GBP reviews/replies, provider quotas, and credential validity still require the credentialed staging smoke.

@@ -5,11 +5,12 @@ import { post, put } from '../../api/client';
 import { seoSuggestions, type SeoSuggestionClient } from '../../api/seo';
 import { useBackgroundTasks } from '../useBackgroundTasks';
 import { useToggleSet, UNBOUNDED_TOGGLE_SET_OPTIONS } from '../useToggleSet';
-import { useRecommendations } from '../useRecommendations';
+import { recommendationAppliesToPage } from '../useRecommendations';
 import { usePageEditStates } from '../usePageEditStates';
 import { resolvePagePath } from '../../lib/pathUtils';
 import { queryKeys } from '../../lib/queryKeys';
 import { useToast } from '../../components/Toast';
+import { useAdminRecommendationSet } from './useAdminRecommendations';
 import { useSeoEditor } from './useSeoEditor';
 import { useCmsEditor } from './useCmsEditor';
 import { usePageJoin } from './usePageJoin';
@@ -86,7 +87,11 @@ export function useSeoEditorSurfaceData({ workspaceId }: UseSeoEditorSurfaceData
   const cmsQuery = useCmsEditor(siteId, workspaceId);
   const pageJoin = usePageJoin(workspaceId, siteId);
   const pageStates = usePageEditStates(workspaceId);
-  const recommendations = useRecommendations(workspaceId);
+  const recommendations = useAdminRecommendationSet(workspaceId, { enabled: !!workspaceId });
+  const recommendationRows = useMemo(
+    () => recommendations.data?.recommendations ?? [],
+    [recommendations.data?.recommendations],
+  );
 
   const resolvedTargets = useMemo(
     () => resolveSeoEditorWriteTargets({
@@ -123,8 +128,10 @@ export function useSeoEditorSurfaceData({ workspaceId }: UseSeoEditorSurfaceData
           secondaryKeywords: joined.strategy.secondaryKeywords ?? [],
         } : undefined);
         const state = pageStates.getState(target.pageId);
-        const recs = page && recommendations.loaded
-          ? recommendations.forPage(resolvePagePath(page)).filter((recommendation: { type: string }) => recommendation.type === 'metadata')
+        const recs = page && recommendations.isSuccess
+          ? recommendationRows
+            .filter((recommendation) => recommendationAppliesToPage(recommendation, resolvePagePath(page)))
+            .filter((recommendation) => recommendation.type === 'metadata')
           : [];
         result.push({
           id: target.id,
@@ -179,7 +186,7 @@ export function useSeoEditorSurfaceData({ workspaceId }: UseSeoEditorSurfaceData
     }
 
     return result;
-  }, [cmsQuery.data?.collections, joinedById, keywordByPageId, pageStates, pagesQuery.data, recommendations, resolvedTargets.targets]);
+  }, [cmsQuery.data?.collections, joinedById, keywordByPageId, pageStates, pagesQuery.data, recommendationRows, recommendations.isSuccess, resolvedTargets.targets]);
 
   const refetchAll = useCallback(async () => {
     await Promise.all([

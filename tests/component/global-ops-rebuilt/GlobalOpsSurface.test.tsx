@@ -9,6 +9,8 @@ import {
   AiUsageBusinessSurface,
   DiagnosticsSurface,
   GlobalSettingsSurface,
+  OutcomeWorkspaceSurface,
+  OutcomesOverviewSurface,
   ProspectBusinessSurface,
   RequestsSurface,
   RevenueBusinessSurface,
@@ -25,6 +27,16 @@ const mocks = vi.hoisted(() => ({
   roadmapUpdate: vi.fn(),
   startJob: vi.fn(),
   archiveMutate: vi.fn(),
+  workspaceOverview: vi.fn(),
+  outcomeOverview: vi.fn(),
+}));
+
+vi.mock('../../../src/hooks/admin/useWorkspaceOverview', () => ({
+  useWorkspaceOverviewData: () => mocks.workspaceOverview(),
+}));
+
+vi.mock('../../../src/hooks/admin/useOutcomes', () => ({
+  useOutcomeOverview: () => mocks.outcomeOverview(),
 }));
 
 vi.mock('../../../src/api/misc', async () => {
@@ -140,6 +152,40 @@ beforeEach(() => {
   mocks.roadmapUpdate.mockReset();
   mocks.startJob.mockReset();
   mocks.archiveMutate.mockReset();
+  mocks.workspaceOverview.mockReset();
+  mocks.outcomeOverview.mockReset();
+  mocks.workspaceOverview.mockReturnValue({
+    data: {
+      workspaces: [{
+        id: 'ws-1',
+        name: 'Acme Dental',
+        outcomeValue: {
+          valuePerMonth: 1200,
+          wins: 4,
+          withValue: 1,
+          platformExecuted: 3,
+          externallyExecuted: 1,
+        },
+        gscRollup: { clicks: 240, avgPosition: 5.2 },
+        siteHealthIssueMatrix: { totalIssues: 2 },
+      }],
+    },
+    isLoading: false,
+  });
+  mocks.outcomeOverview.mockReturnValue({
+    data: [{
+      workspaceId: 'ws-1',
+      workspaceName: 'Acme Dental',
+      winRate: 0.5,
+      trend: 'stable',
+      activeActions: 2,
+      scoredLast30d: 3,
+      topWin: null,
+      attentionNeeded: false,
+      coverage: { tracked: 5, measured: 4, reconciled: 3 },
+    }],
+    isLoading: false,
+  });
   mocks.roadmapGet.mockResolvedValue({
     sprints: [
       {
@@ -259,5 +305,63 @@ describe('Global Ops rebuilt receivers', () => {
     expect(screen.getByTestId('requests-rebuilt')).toHaveAttribute('data-active-tab', 'deliverables');
     expect(screen.getByTestId('deliverables-pane')).toBeInTheDocument();
     expect(screen.getByTestId('requests-invalid-tab-fallback')).toBeInTheDocument();
+  });
+
+  it('uses server-owned workspace evidence without inventing a cross-workspace rollup', () => {
+    renderWithProviders(<OutcomesOverviewSurface />, '/outcomes-overview');
+
+    expect(screen.getByTestId('outcomes-book-rebuilt')).toBeInTheDocument();
+    expect(screen.queryByText('Wins counted')).not.toBeInTheDocument();
+    expect(screen.queryByText('Client-side called')).not.toBeInTheDocument();
+    expect(screen.getByText('3 / 5')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Workspace' }).parentElement?.style.gridTemplateColumns)
+      .toContain('minmax(180px, 1.3fr)');
+  });
+
+  it('does not expose internal rebuild or migration language', () => {
+    const forbidden = [
+      /additive aliases/i,
+      /legacy parity/i,
+      /carry-over parity/i,
+      /deferred/i,
+      /\?view=/i,
+      /workspace-scoped route/i,
+      /handoff planned/i,
+    ];
+    const assertVisibleCopy = () => {
+      const visibleText = document.body.textContent ?? '';
+      forbidden.forEach((pattern) => expect(visibleText).not.toMatch(pattern));
+    };
+
+    let result = renderWithProviders(<BusinessLens defaultTab="revenue" />, '/revenue');
+    assertVisibleCopy();
+    result.unmount();
+
+    result = renderWithProviders(<WorkspaceSettingsSurface workspaceId="ws-1" />, '/ws/ws-1/workspace-settings?tab=dashboard');
+    assertVisibleCopy();
+    result.unmount();
+
+    result = renderWithProviders(<WorkspaceSettingsSurface />, '/workspace-settings');
+    assertVisibleCopy();
+    result.unmount();
+
+    result = renderWithProviders(<RoadmapSurface />, '/roadmap');
+    assertVisibleCopy();
+    result.unmount();
+
+    result = renderWithProviders(<RequestsSurface workspaceId="ws-1" />, '/ws/ws-1/requests?tab=actions');
+    assertVisibleCopy();
+    result.unmount();
+
+    result = renderWithProviders(<RequestsSurface />, '/requests');
+    assertVisibleCopy();
+    result.unmount();
+
+    result = renderWithProviders(<DiagnosticsSurface />, '/diagnostics');
+    assertVisibleCopy();
+    result.unmount();
+
+    result = renderWithProviders(<OutcomeWorkspaceSurface />, '/outcomes');
+    assertVisibleCopy();
   });
 });

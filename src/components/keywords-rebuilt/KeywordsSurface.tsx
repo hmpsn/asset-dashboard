@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { useCallback, useMemo, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import { BarChart3, Clock, FileText, Network, Target, type LucideIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
@@ -11,6 +11,7 @@ import {
 } from '../../hooks/admin/useKeywordCommandCenter';
 import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { queryKeys } from '../../lib/queryKeys';
+import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import { WS_EVENTS } from '../../lib/wsEvents';
 import { KEYWORD_COMMAND_CENTER_ACTIONS, KEYWORD_COMMAND_CENTER_FILTERS } from '../../../shared/types/keyword-command-center';
 import type { KeywordCommandCenterSummaryResponse } from '../../../shared/types/keyword-command-center';
@@ -18,8 +19,7 @@ import type { AdminKeywordFeedbackListRow } from '../../../shared/types/keyword-
 import { useKeywordFeedback } from '../strategy/hooks/useKeywordFeedback';
 import { useToast } from '../Toast';
 import { mutationErrorMessage } from './keywordMutationFeedback';
-import { Badge, Button, ErrorState, PageHeader, LensSwitcher, SearchField, Toolbar, ToolbarSpacer, FilterChip, InlineBanner, MetricTile, Skeleton, FormInput, FormSelect, GroupBlock } from '../ui';
-import { KeywordDrawer } from './KeywordDrawer';
+import { Badge, Button, Drawer, ErrorState, PageHeader, LensSwitcher, LoadingState, SearchField, Toolbar, ToolbarSpacer, FilterChip, InlineBanner, MetricTile, Skeleton, FormInput, FormSelect, GroupBlock } from '../ui';
 import { KeywordsLenses } from './KeywordsLenses';
 import type { KeywordRowsQueryResult } from './KeywordsTable';
 import {
@@ -33,6 +33,10 @@ interface KeywordsSurfaceProps {
   workspaceId: string;
 }
 
+const LazyKeywordDrawer = lazyWithRetry(() => import('./KeywordDrawer').then((module) => ({
+  default: module.KeywordDrawer,
+})));
+
 const MONEY_FORMAT = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
@@ -40,6 +44,18 @@ const MONEY_FORMAT = new Intl.NumberFormat('en-US', {
 });
 
 const PRIMARY_FILTER_IDS = new Set<string>(KEYWORDS_SURFACE_FILTERS.map((filter) => filter.id));
+
+const KEYWORDS_HEADER_CLASS = [
+  'flex-col items-start gap-3 sm:flex-row sm:items-start',
+  '[&_h2]:![font-size:var(--type-h2-size)] [&_h2]:!font-bold',
+  '[&_p]:!max-w-[60ch] [&_p]:!whitespace-normal',
+].join(' ');
+
+const SUMMARY_TILE_CLASS = [
+  '!flex !h-full !min-h-[80px] !min-w-0 !flex-col !rounded-[var(--radius-lg)]',
+  '[&>div:first-child]:order-2 [&>div:first-child]:!mb-0',
+  '[&>div:nth-child(2)]:order-1 [&>div:nth-child(2)]:mb-1',
+].join(' ');
 
 // Per-lens icon anchors for the LensSwitcher (parity with the prototype's lens tabs).
 const LENS_ICONS: Record<KeywordsSurfaceLens, LucideIcon> = {
@@ -94,6 +110,22 @@ function formatFeedbackDate(value: string | null): string | null {
   return Number.isNaN(parsed.getTime()) ? null : FEEDBACK_DATE_FORMAT.format(parsed);
 }
 
+function SummaryCell({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string | number;
+  accent: string;
+}) {
+  return (
+    <div data-testid="keywords-summary-cell" className="min-w-0 [&>*]:h-full">
+      <MetricTile label={label} value={value} accent={accent} className={SUMMARY_TILE_CLASS} />
+    </div>
+  );
+}
+
 function FeedbackRow({
   row,
   onAdd,
@@ -116,7 +148,7 @@ function FeedbackRow({
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <Badge label={row.status} tone={FEEDBACK_TONE[row.status]} variant="soft" size="sm" />
-          <span className="t-caption font-semibold text-[var(--brand-text-bright)]">{row.keyword}</span>
+          <span className="t-ui font-semibold text-[var(--brand-text-bright)]">{row.keyword}</span>
           {date && <span className="t-mono text-[var(--brand-text-dim)]">{date}</span>}
         </div>
         {row.reason && <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">{row.reason}</p>}
@@ -144,7 +176,7 @@ function FeedbackGroup({
   return (
     <div>
       <div className="mb-2 t-label text-[var(--brand-text-muted)]">{label}</div>
-      <div className="grid gap-2 lg:grid-cols-2">
+      <div className="flex flex-col gap-2">
         {rows.slice(0, 12).map((row) => (
           <FeedbackRow key={`${row.status}-${row.keyword}`} row={row} onAdd={onAdd} disabled={disabled} />
         ))}
@@ -182,9 +214,6 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
   } : undefined;
   const counts = summary?.counts;
   const trafficValue = summary?.trafficValueMonthly;
-  const activeFilterLabel = summary?.filters.find((filter) => filter.id === state.filter)?.label
-    ?? KEYWORDS_SURFACE_FILTERS.find((filter) => filter.id === state.filter)?.label
-    ?? 'All';
   const advancedFilterOptions = useMemo(() => (
     summary?.filters
       .filter((filter) => !PRIMARY_FILTER_IDS.has(filter.id))
@@ -232,15 +261,16 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
 
   if (isLockedError(summaryError)) {
     return (
-      <div className="flex min-h-full flex-col gap-5">
+      <div className="flex min-h-full w-full max-w-[1128px] flex-col gap-5">
         <PageHeader
           title="Keywords"
           subtitle="Rankings, opportunities, pages, clusters, and lifecycle for every tracked keyword."
+          className={KEYWORDS_HEADER_CLASS}
         />
         <ErrorState
           type="permission"
           title="Keyword intelligence is locked"
-          message="This workspace plan does not include keyword command-center access yet. Upgrade the workspace or choose a workspace with keyword access."
+          message="This workspace plan does not include keyword intelligence yet. Upgrade the workspace or choose a workspace with keyword access."
           className="min-h-[420px]"
         />
       </div>
@@ -248,12 +278,13 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
   }
 
   return (
-    <div className="flex min-h-full flex-col gap-5">
+    <div data-testid="keywords-surface" className="flex min-h-full w-full max-w-[1128px] flex-col">
       <PageHeader
         title="Keywords"
         subtitle="Rankings, opportunities, pages, clusters, and lifecycle for every tracked keyword."
+        className={KEYWORDS_HEADER_CLASS}
         actions={(
-          <div className="flex min-w-[280px] items-center gap-2">
+          <div className="flex w-full max-w-[280px] items-center gap-2 sm:min-w-[260px]">
             <FormInput
               value={addKeywordValue}
               onChange={setAddKeywordValue}
@@ -270,7 +301,50 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
         )}
       />
 
-      <Toolbar label="Keyword view controls" className="w-full">
+      {summaryIsError && !summary ? (
+        <div className="mt-[18px]">
+          <ErrorState
+            title="Keyword summary did not load"
+            message="The keyword table is still available below if row data is cached. Retry the summary when the connection is healthy."
+            action={{ label: 'Retry summary', onClick: () => refetchSummary() }}
+            type="data"
+          />
+        </div>
+      ) : (
+        <div data-testid="keywords-summary" className="mt-[18px] grid grid-cols-2 gap-[10px] xl:grid-cols-4">
+          {summaryIsLoading && !summary ? (
+            Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-[80px] w-full" />
+            ))
+          ) : (
+            <>
+              <SummaryCell label="Total keywords" value={counts?.total ?? 0} accent="var(--blue)" />
+              <SummaryCell label="Rank tracked" value={counts?.tracked ?? 0} accent="var(--blue)" />
+              <SummaryCell label="Needs review" value={counts?.needsReview ?? 0} accent="var(--amber)" />
+              <SummaryCell
+                label="Monthly value"
+                value={typeof trafficValue === 'number' ? MONEY_FORMAT.format(trafficValue) : '—'}
+                accent="var(--blue)"
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      {summaryIsError && summary && (
+        <div className="mt-3">
+          <InlineBanner tone="warning" title="Summary may be stale">
+            <div className="flex flex-wrap items-center gap-2">
+              <span>Keyword summary data did not refresh, so the last loaded numbers are still shown.</span>
+              <Button size="sm" variant="secondary" onClick={() => refetchSummary()}>
+                Retry summary
+              </Button>
+            </div>
+          </InlineBanner>
+        </div>
+      )}
+
+      <div data-testid="keywords-lens-tray" className="mt-4 w-fit max-w-full overflow-x-auto rounded-[var(--radius-lg)]">
         <LensSwitcher
           id="keywords-rebuilt-lens"
           options={KEYWORDS_SURFACE_LENSES.map((lens) => ({
@@ -281,119 +355,105 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
           }))}
           value={state.lens}
           onChange={(value) => state.setLens(value as typeof state.lens)}
-          size="sm"
+          size="md"
         />
-        <SearchField
-          value={state.searchInput}
-          onChange={state.setSearchInput}
-          placeholder="Search keywords"
-          className="min-w-[220px] flex-1"
-        />
-        <ToolbarSpacer />
-        {advancedFilterOptions.length > 0 && (
-          <FormSelect
-            aria-label="Advanced keyword filter"
-            value={PRIMARY_FILTER_IDS.has(state.filter) ? '' : state.filter}
-            onChange={(value) => state.setFilter(value as typeof state.filter)}
-            placeholder="More filters"
-            options={advancedFilterOptions}
-            className="w-[220px]"
-          />
-        )}
-      </Toolbar>
-
-      <div className="flex flex-wrap gap-2" aria-label="Keyword filters">
-        {KEYWORDS_SURFACE_FILTERS.map((filter) => (
-          <FilterChip
-            key={filter.id}
-            label={filter.label}
-            count={summary?.filters.find((meta) => meta.id === filter.id)?.count}
-            active={state.filter === filter.id}
-            onClick={() => state.setFilter(filter.id)}
-          />
-        ))}
       </div>
 
-      {summaryIsError && !summary ? (
-        <ErrorState
-          title="Keyword summary did not load"
-          message="The keyword table is still available below if row data is cached. Retry the summary when the connection is healthy."
-          action={{ label: 'Retry summary', onClick: () => refetchSummary() }}
-          type="data"
-        />
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {summaryIsLoading && !summary ? (
-            Array.from({ length: 5 }).map((_, index) => (
-              <Skeleton key={index} className="h-[92px] w-full" />
-            ))
-          ) : (
-            <>
-              <MetricTile label="Total" value={counts?.total ?? 0} sub={activeFilterLabel} accent="var(--blue)" />
-              <MetricTile label="In Strategy" value={counts?.inStrategy ?? 0} accent="var(--teal)" />
-              <MetricTile label="Tracked" value={counts?.tracked ?? 0} accent="var(--blue)" />
-              <MetricTile label="Needs Review" value={counts?.needsReview ?? 0} accent="var(--amber)" />
-              <MetricTile
-                label="Monthly Value"
-                value={typeof trafficValue === 'number' ? MONEY_FORMAT.format(trafficValue) : '—'}
-                accent="var(--emerald)"
-              />
-            </>
+      <div data-testid="keywords-tools" className="mt-4 flex flex-col gap-2">
+        <Toolbar label="Keyword search and advanced filters" className="w-full">
+          <SearchField
+            value={state.searchInput}
+            onChange={state.setSearchInput}
+            placeholder="Search keywords…"
+            className="w-full max-w-[320px]"
+          />
+          <ToolbarSpacer />
+          {advancedFilterOptions.length > 0 && (
+            <FormSelect
+              aria-label="Advanced keyword filter"
+              value={PRIMARY_FILTER_IDS.has(state.filter) ? '' : state.filter}
+              onChange={(value) => state.setFilter(value as typeof state.filter)}
+              placeholder="More filters"
+              options={advancedFilterOptions}
+              className="w-[190px] max-w-full"
+            />
           )}
+        </Toolbar>
+
+        <div className="flex flex-wrap gap-2" aria-label="Keyword filters">
+          {KEYWORDS_SURFACE_FILTERS.map((filter) => (
+            <FilterChip
+              key={filter.id}
+              label={filter.label}
+              count={summary?.filters.find((meta) => meta.id === filter.id)?.count}
+              active={state.filter === filter.id}
+              onClick={() => state.setFilter(filter.id)}
+            />
+          ))}
         </div>
+      </div>
+
+      <div className="mt-3">
+        <KeywordsLenses workspaceId={workspaceId} state={state} summary={summary} initialRowsResult={initialRowsResult} />
+      </div>
+
+      <div className="mt-4">
+        <GroupBlock
+          title="Client keyword feedback"
+          meta="Requested, declined, and approved keyword direction from the client portal."
+          stats={[
+            { label: 'Requested', value: feedbackData.requested.length, color: 'var(--teal)' },
+            { label: 'Declined', value: feedbackData.declined.length, color: 'var(--red)' },
+            { label: 'Approved', value: feedbackData.approved.length, color: 'var(--emerald)' },
+          ]}
+          collapsible
+          defaultOpen={feedback.rows.length > 0}
+        >
+          {feedback.rows.length === 0 ? (
+            <p className="t-body text-[var(--brand-text-muted)]">No client keyword feedback submitted yet.</p>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {feedbackData.requested.length > 0 && (
+                <FeedbackGroup
+                  label="Requested by client"
+                  rows={feedbackData.requested}
+                  onAdd={handleAddRequestedKeyword}
+                  disabled={feedbackAction.isPending}
+                />
+              )}
+              {feedbackData.declined.length > 0 && (
+                <FeedbackGroup label="Declined by client" rows={feedbackData.declined} />
+              )}
+              {feedbackData.approved.length > 0 && (
+                <FeedbackGroup label="Approved" rows={feedbackData.approved} />
+              )}
+            </div>
+          )}
+        </GroupBlock>
+      </div>
+
+      {state.selectedKeyword && (
+        <Suspense
+          fallback={(
+            <Drawer
+              open
+              onClose={state.closeKeyword}
+              title={state.selectedKeyword}
+              subtitle="Keyword detail"
+              eyebrow="Keyword detail"
+              width={440}
+            >
+              <LoadingState message="Loading keyword details…" />
+            </Drawer>
+          )}
+        >
+          <LazyKeywordDrawer
+            workspaceId={workspaceId}
+            keyword={state.selectedKeyword}
+            onClose={state.closeKeyword}
+          />
+        </Suspense>
       )}
-
-      {summaryIsError && summary && (
-        <InlineBanner tone="warning" title="Summary may be stale">
-          <div className="flex flex-wrap items-center gap-2">
-            <span>Keyword summary data did not refresh, so the last loaded numbers are still shown.</span>
-            <Button size="sm" variant="secondary" onClick={() => refetchSummary()}>
-              Retry summary
-            </Button>
-          </div>
-        </InlineBanner>
-      )}
-
-      <KeywordsLenses workspaceId={workspaceId} state={state} summary={summary} initialRowsResult={initialRowsResult} />
-
-      <GroupBlock
-        title="Client keyword feedback"
-        meta="Requested, declined, and approved keyword direction from the client portal."
-        stats={[
-          { label: 'Requested', value: feedbackData.requested.length, color: 'var(--teal)' },
-          { label: 'Declined', value: feedbackData.declined.length, color: 'var(--red)' },
-          { label: 'Approved', value: feedbackData.approved.length, color: 'var(--emerald)' },
-        ]}
-        collapsible
-        defaultOpen={feedback.rows.length > 0}
-      >
-        {feedback.rows.length === 0 ? (
-          <p className="t-caption-sm text-[var(--brand-text-muted)]">No client keyword feedback submitted yet.</p>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {feedbackData.requested.length > 0 && (
-              <FeedbackGroup
-                label="Requested by client"
-                rows={feedbackData.requested}
-                onAdd={handleAddRequestedKeyword}
-                disabled={feedbackAction.isPending}
-              />
-            )}
-            {feedbackData.declined.length > 0 && (
-              <FeedbackGroup label="Declined by client" rows={feedbackData.declined} />
-            )}
-            {feedbackData.approved.length > 0 && (
-              <FeedbackGroup label="Approved" rows={feedbackData.approved} />
-            )}
-          </div>
-        )}
-      </GroupBlock>
-
-      <KeywordDrawer
-        workspaceId={workspaceId}
-        keyword={state.selectedKeyword}
-        onClose={state.closeKeyword}
-      />
     </div>
   );
 }

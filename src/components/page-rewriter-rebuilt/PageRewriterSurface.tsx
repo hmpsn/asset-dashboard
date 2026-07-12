@@ -1,9 +1,9 @@
 // @ds-rebuilt
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminPath } from '../../routes';
+import { useRebuiltFocusMode } from '../layout/RebuiltAppChrome';
 import { useToast } from '../Toast';
-import { Button, Icon, InlineBanner, LensSwitcher, PageHeader, Toolbar, ToolbarSpacer } from '../ui';
+import { Button, Icon, InlineBanner } from '../ui';
 import { PageRewriterChatPane } from './PageRewriterChatPane';
 import { PageRewriterDocumentPane } from './PageRewriterDocumentPane';
 import { PageRewriterPagePicker } from './PageRewriterPagePicker';
@@ -13,64 +13,44 @@ interface PageRewriterSurfaceProps {
   workspaceId: string;
 }
 
-type PageRewriterView = 'split' | 'chat' | 'document';
-
-const VIEW_OPTIONS: Array<{ value: PageRewriterView; label: string }> = [
-  { value: 'split', label: 'Split' },
-  { value: 'chat', label: 'Chat' },
-  { value: 'document', label: 'Document' },
-];
-
-function isPageRewriterView(value: string): value is PageRewriterView {
-  return VIEW_OPTIONS.some((option) => option.value === value);
-}
+const WORKSPACE_GRID_CLASS = 'grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(330px,44%)_minmax(0,1fr)] lg:overflow-hidden';
 
 export function PageRewriterSurface({ workspaceId }: PageRewriterSurfaceProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { focusMode, setFocusMode } = useRebuiltFocusMode();
   const state = usePageRewriterSurfaceState({ workspaceId, toast });
-  const [view, setView] = useState<PageRewriterView>('split');
-
-  const showChat = view === 'split' || view === 'chat';
-  const showDocument = view === 'split' || view === 'document';
-  const gridClass = view === 'split'
-    ? 'grid gap-4 xl:grid-cols-[minmax(360px,44%)_minmax(0,1fr)]'
-    : 'grid gap-4';
 
   return (
-    <div className="flex min-h-full flex-col gap-5">
-      <PageHeader
-        title="Page Rewriter"
-        subtitle="Load a live page, rewrite sections with page intelligence, and export the edited draft."
-        actions={(
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))}
-          >
-            <Icon name="arrowLeft" size="sm" />
-            Back to audit
-          </Button>
-        )}
-      />
-
-      <Toolbar label="Page rewriter controls" className="w-full">
-        <LensSwitcher
-          id="page-rewriter-view"
-          options={VIEW_OPTIONS}
-          value={view}
-          onChange={(value) => {
-            if (isPageRewriterView(value)) setView(value);
-          }}
+    <div
+      data-testid="page-rewriter-workspace"
+      className="mx-auto flex min-h-full w-full max-w-[var(--page-max)] flex-col gap-3 lg:h-[calc(100dvh_-_var(--shell-topbar)_-_var(--page-pad-y)_-_var(--page-pad-bottom))] lg:min-h-0"
+    >
+      <div data-testid="page-rewriter-context-row" className="flex flex-wrap items-center gap-2">
+        <div className="mr-auto flex min-w-0 items-center gap-2 t-micro font-semibold uppercase text-[var(--purple)]">
+          <span className="h-2 w-2 flex-none rounded-[var(--radius-pill)] bg-[var(--purple)]" aria-hidden="true" />
+          <span className="truncate">Page rewriter · AI rewrite workspace</span>
+        </div>
+        <Button
           size="sm"
-        />
-        <ToolbarSpacer />
-        {state.pageData?.primaryKeyword && (
-          <span className="t-caption text-[var(--brand-text-muted)]">
-            Primary keyword: <span className="font-semibold text-[var(--teal)]">{state.pageData.primaryKeyword}</span>
-          </span>
-        )}
-      </Toolbar>
+          variant="ghost"
+          onClick={() => navigate(adminPath(workspaceId, 'seo-audit'))}
+        >
+          <Icon name="arrowLeft" size="sm" />
+          Back to audit
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          aria-label={focusMode ? 'Exit focus mode' : 'Enter focus mode'}
+          aria-pressed={focusMode}
+          title={focusMode ? 'Exit focus mode (Esc)' : 'Enter focus mode'}
+          onClick={() => setFocusMode(!focusMode)}
+        >
+          <Icon name={focusMode ? 'eyeOff' : 'eye'} size="sm" />
+          {focusMode ? 'Exit focus' : 'Focus'}
+        </Button>
+      </div>
 
       <PageRewriterPagePicker
         pageData={state.pageData}
@@ -95,13 +75,13 @@ export function PageRewriterSurface({ workspaceId }: PageRewriterSurfaceProps) {
 
       {state.invalidPageUrlParam && (
         <InlineBanner tone="warning" size="sm" title="Page link ignored">
-          The pageUrl parameter must be a full http or https URL.
+          The page link in this URL must be a full http or https address.
         </InlineBanner>
       )}
 
-      <div className={gridClass}>
-        {showChat && <PageRewriterChatPane state={state} />}
-        {showDocument && <PageRewriterDocumentPane state={state} onOpenPicker={state.openCombo} />}
+      <div className={WORKSPACE_GRID_CLASS}>
+        <PageRewriterChatPane state={state} />
+        <PageRewriterDocumentPane state={state} onOpenPicker={state.openCombo} />
       </div>
     </div>
   );

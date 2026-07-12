@@ -1,13 +1,7 @@
 // @ds-rebuilt
-import type { ReactNode } from 'react';
-import { ContentBriefs } from '../ContentBriefs';
-import { ContentCalendar } from '../ContentCalendar';
-import { ContentManager } from '../ContentManager';
-import { ContentPlanner } from '../ContentPlanner';
-import { ContentSubscriptions } from '../ContentSubscriptions';
-import { AiSuggested } from '../pipeline/AiSuggested';
-import type { FixContext } from '../../types/fix-context';
+import { Suspense, type ReactNode } from 'react';
 import type { ContentPipelineSlice, CannibalizationWarning, DecayAlert } from '../../../shared/types/intelligence';
+import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import {
   Badge,
   Button,
@@ -20,9 +14,19 @@ import {
   type DataColumn,
   type Tier,
 } from '../ui';
-import { PublishedContentLens } from './PublishedContentLens';
+import { ContentPipelineInteriorLoading } from './ContentPipelineInteriorLoading';
 import type { ContentPipelineTab } from './useContentPipelineSurfaceState';
 import { formatContentDate, formatInteger, formatPercentValue } from './contentPipelineFormatters';
+
+const LazyContentCalendar = lazyWithRetry(() => import('../ContentCalendar').then((module) => ({
+  default: module.ContentCalendar,
+})));
+const LazyContentManager = lazyWithRetry(() => import('../ContentManager').then((module) => ({
+  default: module.ContentManager,
+})));
+const LazyContentPlanner = lazyWithRetry(() => import('../ContentPlanner').then((module) => ({
+  default: module.ContentPlanner,
+})));
 
 interface PipelineSummary {
   briefs: number;
@@ -46,16 +50,22 @@ export interface ContentPipelineData {
 
 interface ContentPipelineLensesProps {
   workspaceId: string;
-  tab: ContentPipelineTab;
+  tab: ContentPipelineStandaloneTab;
   pipelineData?: ContentPipelineData;
   contentPipeline?: ContentPipelineSlice;
-  workspaceTier: Tier;
-  siteLabel?: string | null;
-  briefFixContext: FixContext | null;
-  prefillNonce: number;
-  clearBriefFixContext: () => void;
-  onCreateBrief: (keyword: string, pageUrl?: string, suggestedBriefId?: string) => void;
+  workspaceTier?: Tier;
   onOpenTab: (tab: ContentPipelineTab) => void;
+}
+
+export type ContentPipelineStandaloneTab = Extract<
+  ContentPipelineTab,
+  'planner' | 'calendar' | 'posts' | 'content-health'
+>;
+
+export function isContentPipelineStandaloneTab(
+  tab: ContentPipelineTab,
+): tab is ContentPipelineStandaloneTab {
+  return tab === 'planner' || tab === 'calendar' || tab === 'posts' || tab === 'content-health';
 }
 
 type HealthRecord = Record<string, unknown> & {
@@ -72,7 +82,7 @@ function CarryOverPanel({
   tab,
   children,
 }: {
-  tab: ContentPipelineTab;
+  tab: ContentPipelineStandaloneTab;
   children: ReactNode;
 }) {
   return (
@@ -97,7 +107,8 @@ function healthRows(
   slice: ContentPipelineSlice | undefined,
 ): HealthRecord[] {
   const rows: HealthRecord[] = [];
-  if (decay && decay.totalDecaying > 0) {
+  const detailedDecayAlerts = slice?.decayAlerts ?? [];
+  if (decay && decay.totalDecaying > 0 && detailedDecayAlerts.length === 0) {
     rows.push({
       id: 'decay-summary',
       kind: 'decay',
@@ -108,7 +119,7 @@ function healthRows(
       source: decay,
     });
   }
-  for (const alert of slice?.decayAlerts ?? []) {
+  for (const alert of detailedDecayAlerts) {
     rows.push({
       id: `decay-${alert.pageUrl}`,
       kind: 'decay',
@@ -126,7 +137,7 @@ function healthRows(
       title: warning.keyword,
       severity: warning.severity,
       detail: `${warning.pages.length} competing page${warning.pages.length === 1 ? '' : 's'}`,
-      detectedAt: 'Workspace intelligence',
+      detectedAt: 'Latest scan',
       source: warning,
     });
   }
@@ -134,20 +145,39 @@ function healthRows(
 }
 
 function ContentHealthLens({
-  workspaceId,
   pipelineData,
   contentPipeline,
   workspaceTier,
   onOpenTab,
 }: {
-  workspaceId: string;
   pipelineData?: ContentPipelineData;
   contentPipeline?: ContentPipelineSlice;
-  workspaceTier: Tier;
+  workspaceTier?: Tier;
   onOpenTab: (tab: ContentPipelineTab) => void;
 }) {
   const decay = pipelineData?.decay;
   const rows = healthRows(decay, contentPipeline);
+  const upgradeRequired = workspaceTier === 'free';
+  const refreshBriefs = contentPipeline?.decayAlerts?.filter((alert) => alert.hasRefreshBrief).length ?? 0;
+
+  if (rows.length === 0) {
+    return (
+      <CarryOverPanel tab="content-health">
+        <EmptyState
+          icon={HealthEmptyIcon}
+          title="No decaying content"
+          description="Every published piece is holding or growing its traffic. Pages that start sliding will surface here for a refresh."
+          action={(
+            <Button size="sm" variant="secondary" onClick={() => onOpenTab('briefs')}>
+              <Icon name="clipboard" size="sm" />
+              Draft refresh brief
+            </Button>
+          )}
+        />
+      </CarryOverPanel>
+    );
+  }
+
   const columns: DataColumn[] = [
     {
       key: 'title',
@@ -193,30 +223,30 @@ function ContentHealthLens({
       ),
     },
   ];
-  const advancedUnlocked = workspaceTier === 'growth' || workspaceTier === 'premium';
-
   return (
     <CarryOverPanel tab="content-health">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricTile label="Decaying Pages" value={decay?.totalDecaying ?? 0} sub="Content decay" accent={(decay?.critical ?? 0) > 0 ? 'var(--red)' : 'var(--amber)'} />
+      <InlineBanner tone="info" title="The maintenance loop">
+        These pages ranked, then slipped. Start a refresh brief to bring the work back through the same production lifecycle as new content.
+      </InlineBanner>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <MetricTile label="Pages Decaying" value={decay?.totalDecaying ?? contentPipeline?.decayAlerts?.length ?? 0} accent={(decay?.critical ?? 0) > 0 ? 'var(--red)' : 'var(--amber)'} />
         <MetricTile label="Critical" value={decay?.critical ?? 0} accent="var(--red)" />
-        <MetricTile label="Warnings" value={decay?.warning ?? 0} accent="var(--amber)" />
         <MetricTile label="Cannibalization" value={contentPipeline?.cannibalizationWarnings?.length ?? 0} accent="var(--blue)" />
-        <MetricTile label="Suggested Briefs" value={contentPipeline?.suggestedBriefs ?? 0} accent="var(--teal)" />
       </div>
 
-      {!advancedUnlocked && (
-        <InlineBanner tone="info" title="Advanced repair stays tier-aware">
-          Crawl-backed repair and deeper cannibalization workflows remain gated. This acting home shows the signals and routes operators to intake or briefs without adding duplicate repair controls.
+      {upgradeRequired && (
+        <InlineBanner tone="info" title="Upgrade for deeper repair">
+          Crawl-backed repair and deeper cannibalization workflows require a higher plan. You can still review these signals and start a brief here.
         </InlineBanner>
       )}
 
       <GroupBlock
-        title="Acting queue"
-        meta="Decay and cannibalization signals route into intake and brief creation from this page."
+        title="Pages to maintain"
+        meta="Decay and cannibalization signals that need an operator decision."
         stats={[
-          { label: 'Signals', value: rows.length, color: rows.length > 0 ? 'var(--amber)' : 'var(--emerald)' },
-          { label: 'Workspace', value: workspaceId, color: 'var(--blue)' },
+          { label: 'Signals', value: rows.length, color: 'var(--amber)' },
+          { label: 'Refresh briefs', value: refreshBriefs, color: refreshBriefs > 0 ? 'var(--teal)' : 'var(--brand-text-muted)' },
         ]}
         defaultOpen
       >
@@ -235,13 +265,9 @@ function ContentHealthLens({
             )}
           />
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" onClick={() => onOpenTab('intake')}>
-              <Icon name="sparkle" size="sm" />
-              Review intake
-            </Button>
             <Button size="sm" variant="secondary" onClick={() => onOpenTab('briefs')}>
               <Icon name="clipboard" size="sm" />
-              Draft brief
+              Draft refresh brief
             </Button>
           </div>
         </div>
@@ -256,17 +282,16 @@ export function ContentPipelineLenses({
   pipelineData,
   contentPipeline,
   workspaceTier,
-  siteLabel,
-  briefFixContext,
-  prefillNonce,
-  clearBriefFixContext,
-  onCreateBrief,
   onOpenTab,
 }: ContentPipelineLensesProps) {
   if (tab === 'planner') {
     return (
       <CarryOverPanel tab="planner">
-        <ContentPlanner workspaceId={workspaceId} embedded />
+        <div className="[&>div]:!space-y-4" data-testid="content-pipeline-matrix-composition">
+          <Suspense fallback={<ContentPipelineInteriorLoading label="the content matrix" />}>
+            <LazyContentPlanner workspaceId={workspaceId} embedded />
+          </Suspense>
+        </div>
       </CarryOverPanel>
     );
   }
@@ -274,29 +299,11 @@ export function ContentPipelineLenses({
   if (tab === 'calendar') {
     return (
       <CarryOverPanel tab="calendar">
-        <ContentCalendar workspaceId={workspaceId} embedded />
-      </CarryOverPanel>
-    );
-  }
-
-  if (tab === 'intake') {
-    return (
-      <CarryOverPanel tab="intake">
-        <AiSuggested workspaceId={workspaceId} onCreateBrief={onCreateBrief} />
-      </CarryOverPanel>
-    );
-  }
-
-  if (tab === 'briefs') {
-    return (
-      <CarryOverPanel tab="briefs">
-        <ContentBriefs
-          key={briefFixContext ? `briefs-${workspaceId}-${prefillNonce}` : `briefs-${workspaceId}`}
-          workspaceId={workspaceId}
-          fixContext={briefFixContext}
-          clearFixContext={clearBriefFixContext}
-          embedded
-        />
+        <div className="[&>div>div:nth-child(2)]:hidden [&>div]:!space-y-4" data-testid="content-pipeline-calendar-composition">
+          <Suspense fallback={<ContentPipelineInteriorLoading label="the content calendar" />}>
+            <LazyContentCalendar workspaceId={workspaceId} embedded />
+          </Suspense>
+        </div>
       </CarryOverPanel>
     );
   }
@@ -304,37 +311,21 @@ export function ContentPipelineLenses({
   if (tab === 'posts') {
     return (
       <CarryOverPanel tab="posts">
-        <ContentManager workspaceId={workspaceId} embedded />
+        <Suspense fallback={<ContentPipelineInteriorLoading label="content drafts" />}>
+          <LazyContentManager workspaceId={workspaceId} embedded />
+        </Suspense>
       </CarryOverPanel>
     );
   }
 
-  if (tab === 'publish') {
-    return (
-      <CarryOverPanel tab="publish">
-        <InlineBanner tone="info" title="Production actions stay with drafts">
-          Send-to-client, status progression, Webflow publish, exports, voice scoring, and editor actions remain in the Draft/Post workspace so action bars do not scatter across tabs.
-        </InlineBanner>
-        <ContentSubscriptions workspaceId={workspaceId} embedded />
-      </CarryOverPanel>
-    );
-  }
-
-  if (tab === 'content-health') {
-    return (
-      <ContentHealthLens
-        workspaceId={workspaceId}
-        pipelineData={pipelineData}
-        contentPipeline={contentPipeline}
-        workspaceTier={workspaceTier}
-        onOpenTab={onOpenTab}
-      />
-    );
-  }
+  if (tab !== 'content-health') return null;
 
   return (
-    <CarryOverPanel tab="published">
-      <PublishedContentLens workspaceId={workspaceId} siteLabel={siteLabel} />
-    </CarryOverPanel>
+    <ContentHealthLens
+      pipelineData={pipelineData}
+      contentPipeline={contentPipeline}
+      workspaceTier={workspaceTier}
+      onOpenTab={onOpenTab}
+    />
   );
 }

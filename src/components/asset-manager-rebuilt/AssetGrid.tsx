@@ -1,6 +1,6 @@
 // @ds-rebuilt
 import type { ReactElement } from 'react';
-import { ExternalLink, Image, Minimize2, Sparkles, Wand2 } from 'lucide-react';
+import { Image, Minimize2, Sparkles, Wand2 } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -8,7 +8,6 @@ import {
   ClickableRow,
   EmptyState,
   Icon,
-  IconButton,
   Tooltip,
   cn,
 } from '../ui';
@@ -54,7 +53,7 @@ function QuotaTooltip({
   if (!locked) return children;
   return (
     <Tooltip content={reason} placement="top" contentClassName="max-w-sm">
-      <span className="inline-flex" tabIndex={0}>
+      <span className="inline-flex flex-1" tabIndex={0}>
         {children}
       </span>
     </Tooltip>
@@ -94,12 +93,14 @@ export function AssetGrid({
   }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-label="Asset grid">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(216px,1fr))] gap-[14px]" aria-label="Asset grid">
       {assets.map((asset) => {
         const url = assetUrl(asset);
         const name = assetName(asset);
         const dims = dimensionText(asset);
         const isSvg = asset.contentType.includes('svg');
+        const isOversized = asset.size > 500 * 1024 && !isSvg;
+        const isMissingAlt = !asset.altText?.trim();
         const canCompress = Boolean(url) && !isSvg && !asset.richTextOnly;
         const selectedAsset = selected.has(asset.id);
 
@@ -111,7 +112,7 @@ export function AssetGrid({
               selectedAsset ? 'border-[var(--teal)]' : 'border-[var(--brand-border)] hover:border-[var(--brand-border-hover)]',
             )}
           >
-            <div className="relative aspect-[4/3] bg-[var(--surface-1)]">
+            <div data-testid="asset-preview" className="relative h-[132px] bg-[var(--surface-1)]">
               <ClickableRow
                 aria-label={`Open ${name}`}
                 className="flex h-full w-full items-center justify-center bg-transparent p-0 hover:bg-transparent"
@@ -131,13 +132,15 @@ export function AssetGrid({
                   srOnlyLabel
                 />
               </div>
-              <div className="absolute right-2 top-2 flex gap-1">
-                {asset.unused && <Badge label="Unused" tone="red" variant="soft" size="sm" />}
+              <div className="absolute right-2 top-2 flex flex-col items-end gap-1">
+                {isOversized && <Badge label="Oversized" tone="amber" variant="solid" size="sm" />}
+                {isMissingAlt && <Badge label="No alt" tone="red" variant="solid" size="sm" />}
+                {asset.unused && <Badge label="Unused" tone="zinc" variant="soft" size="sm" />}
                 {asset.source === 'cms' && <Badge label="CMS" tone="blue" variant="soft" size="sm" />}
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 p-3">
+            <div className="flex flex-col gap-2 px-3 pb-3 pt-2.5">
               <div className="min-w-0">
                 <ClickableRow
                   className="block max-w-full bg-transparent p-0 t-ui font-semibold text-[var(--brand-text-bright)] hover:bg-transparent"
@@ -145,70 +148,56 @@ export function AssetGrid({
                 >
                   <span className="block truncate">{name}</span>
                 </ClickableRow>
-                <div className="mt-1 flex flex-wrap items-center gap-2 t-caption-sm text-[var(--brand-text-muted)]">
+                <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 t-micro text-[var(--brand-text-muted)]">
                   <span>{formatBytes(asset.size || 0)}</span>
                   {dims && <span>{dims}</span>}
                   <span>{asset.contentType}</span>
+                  {asset.cmsUsages && asset.cmsUsages.length > 0 && (
+                    <span>{asset.cmsUsages.length} CMS {asset.cmsUsages.length === 1 ? 'ref' : 'refs'}</span>
+                  )}
                 </div>
               </div>
-
-              <div className="min-h-[38px] t-caption-sm text-[var(--brand-text-muted)]">
-                {asset.altText?.trim() || <span className="text-[var(--amber)]">Missing alt text</span>}
-              </div>
-
-              {asset.cmsUsages && asset.cmsUsages.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {asset.cmsUsages.slice(0, 2).map((usage) => (
-                    <Badge
-                      key={`${usage.collectionId}:${usage.fieldSlug}:${usage.itemId}`}
-                      label={usage.fieldDisplayName}
-                      tone={usage.fieldType === 'RichText' ? 'amber' : 'blue'}
-                      variant="soft"
-                      size="sm"
-                    />
-                  ))}
-                  {asset.cmsUsages.length > 2 && <Badge label={`+${asset.cmsUsages.length - 2}`} tone="zinc" variant="soft" size="sm" />}
-                </div>
-              )}
 
               <div className="flex items-center gap-1.5">
-                <QuotaTooltip locked={quotaLocked} reason={quotaReason}>
-                  <IconButton
-                    icon={Sparkles}
-                    label="Generate alt text"
-                    size="md"
-                    variant="solid"
-                    disabled={quotaLocked || actionBusy(asset.id, 'alt') || !url}
-                    onClick={() => onGenerateAlt(asset)}
-                  />
-                </QuotaTooltip>
-                <IconButton
-                  icon={Minimize2}
-                  label={asset.richTextOnly ? 'Compression unavailable for RichText-only CMS image' : 'Compress image'}
-                  size="md"
-                  variant="solid"
+                <Button
+                  aria-label={asset.richTextOnly ? 'Compression unavailable for RichText-only CMS image' : 'Compress image'}
+                  size="sm"
+                  variant="secondary"
+                  className="flex-1 justify-center"
                   disabled={actionBusy(asset.id, 'compress') || !canCompress}
                   onClick={() => onCompress(asset)}
-                />
-                <QuotaTooltip locked={quotaLocked} reason={quotaReason}>
-                  <IconButton
-                    icon={Wand2}
-                    label="Draft smart name"
-                    size="md"
-                    variant="solid"
-                    disabled={quotaLocked || actionBusy(asset.id, 'rename') || !url}
-                    onClick={() => onSmartRename(asset)}
-                  />
-                </QuotaTooltip>
-                {url && (
-                  <IconButton
-                    icon={ExternalLink}
-                    label="Open asset in new tab"
-                    size="md"
-                    variant="ghost"
-                    className="ml-auto"
-                    onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
-                  />
+                >
+                  <Icon as={Minimize2} size="sm" aria-hidden="true" />
+                  Compress
+                </Button>
+                {isMissingAlt ? (
+                  <QuotaTooltip locked={quotaLocked} reason={quotaReason}>
+                    <Button
+                      aria-label="Generate alt text"
+                      size="sm"
+                      variant="primary"
+                      className="flex-1 justify-center"
+                      disabled={quotaLocked || actionBusy(asset.id, 'alt') || !url}
+                      onClick={() => onGenerateAlt(asset)}
+                    >
+                      <Icon as={Sparkles} size="sm" aria-hidden="true" />
+                      Alt text
+                    </Button>
+                  </QuotaTooltip>
+                ) : (
+                  <QuotaTooltip locked={quotaLocked} reason={quotaReason}>
+                    <Button
+                      aria-label="Draft smart name"
+                      size="sm"
+                      variant="secondary"
+                      className="flex-1 justify-center"
+                      disabled={quotaLocked || actionBusy(asset.id, 'rename') || !url}
+                      onClick={() => onSmartRename(asset)}
+                    >
+                      <Icon as={Wand2} size="sm" aria-hidden="true" />
+                      Rename
+                    </Button>
+                  </QuotaTooltip>
                 )}
               </div>
             </div>

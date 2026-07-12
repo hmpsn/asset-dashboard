@@ -12,7 +12,7 @@ import { createLogger } from './logger.js';
 import { parseAIJson } from './openai-helpers.js';
 import { getActionBySource, recordAction } from './outcome-tracking.js';
 import { decrementUsage, incrementIfAllowed } from './usage-tracking.js';
-import { getWorkspace } from './workspaces.js';
+import { computeEffectiveTier, getWorkspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import { scrapeWorkspaceSite } from './workspace-site-scrape.js';
 import {
@@ -278,7 +278,7 @@ export async function startWorkspaceContextGenerationJob(type: BackgroundJobType
       );
     }
 
-    if (!incrementIfAllowed(ws.id, ws.tier || 'free', 'workspace_context_generations')) {
+    if (!incrementIfAllowed(ws.id, computeEffectiveTier(ws), 'workspace_context_generations')) {
       throw new WorkspaceContextJobStartError('Monthly AI generation limit reached', 429);
     }
 

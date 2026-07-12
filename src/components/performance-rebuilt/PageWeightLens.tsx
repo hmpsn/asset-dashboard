@@ -13,16 +13,18 @@ import { useToast } from '../Toast';
 import {
   Badge,
   Button,
+  ClickableRow,
   DataTable,
   Drawer,
   EmptyState,
   ErrorState,
-  FilterChip,
+  FormSelect,
   Icon,
   InlineBanner,
   Meter,
   MetricTile,
   SearchField,
+  SectionCard,
   Skeleton,
   Toolbar,
   ToolbarSpacer,
@@ -38,22 +40,12 @@ import {
   pageSourceLabel,
   pageWeightAccent,
   pageWeightPercent,
-  pageWeightStatus,
-  pageWeightTone,
 } from './performanceFormatters';
 
 interface PageWeightLensProps {
   workspaceId: string;
   siteId: string;
 }
-
-type PageWeightRecord = Record<string, unknown> & {
-  source: PageWeightPage;
-  page: string;
-  sourceType: string;
-  assets: number;
-  totalSize: number;
-};
 
 type AssetRecord = Record<string, unknown> & {
   source: PageAsset;
@@ -91,16 +83,6 @@ function assetRows(assets: PageAsset[]): AssetRecord[] {
   }));
 }
 
-function pageRows(pages: PageWeightPage[]): PageWeightRecord[] {
-  return pages.map((page) => ({
-    source: page,
-    page: page.page,
-    sourceType: pageSource(page.page),
-    assets: page.assetCount,
-    totalSize: page.totalSize,
-  }));
-}
-
 export function PageWeightLens({ workspaceId, siteId }: PageWeightLensProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -112,7 +94,7 @@ export function PageWeightLens({ workspaceId, siteId }: PageWeightLensProps) {
   const data = scan.data ?? snapshot.data?.result ?? null;
   const lastScanned = formatScanDate(snapshot.data?.createdAt);
   const pages = data?.pages ?? [];
-  const maxSize = pages[0]?.totalSize ?? 0;
+  const maxSize = pages.reduce((largest, page) => Math.max(largest, page.totalSize), 0);
   const heavyPages = pages.filter((page) => page.totalSize > PAGE_WEIGHT_THRESHOLDS.heavy).length;
   const avgWeight = averagePageWeight(pages);
 
@@ -127,12 +109,6 @@ export function PageWeightLens({ workspaceId, siteId }: PageWeightLensProps) {
     });
   }, [filter, pages, search]);
 
-  const sourceCounts = useMemo(() => {
-    const counts: Record<PageWeightSourceFilter, number> = { all: pages.length, page: 0, cms: 0, css: 0 };
-    for (const page of pages) counts[pageSource(page.page)] += 1;
-    return counts;
-  }, [pages]);
-
   const runScan = () => {
     toast('Page weight re-scan started', 'info');
     scan.mutate(undefined, {
@@ -145,73 +121,6 @@ export function PageWeightLens({ workspaceId, siteId }: PageWeightLensProps) {
     setSearch('');
     setFilter('all');
   };
-
-  const columns = useMemo<DataColumn[]>(() => [
-    {
-      key: 'page',
-      label: 'Page',
-      width: 'minmax(260px, 1.8fr)',
-      sortable: true,
-      render: (_value, record) => {
-        const row = (record as PageWeightRecord).source;
-        const source = pageSource(row.page);
-        return (
-          <div className="min-w-0">
-            <span className="block truncate font-semibold text-[var(--brand-text-bright)]">{row.page}</span>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              <Badge label={pageSourceLabel(source)} tone={source === 'page' ? 'blue' : source === 'cms' ? 'teal' : 'amber'} variant="soft" size="sm" />
-              <span className="t-caption-sm text-[var(--brand-text-muted)]">
-                {row.assetCount} asset{row.assetCount === 1 ? '' : 's'}
-              </span>
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      key: 'weight',
-      label: 'Weight',
-      width: 'minmax(220px, 1.2fr)',
-      render: (_value, record) => {
-        const row = (record as PageWeightRecord).source;
-        return (
-          <div className="min-w-0">
-            <div className="mb-1 flex items-center gap-2">
-              <span className="t-caption font-semibold tabular-nums text-[var(--brand-text-bright)]">
-                {formatBytes(row.totalSize)}
-              </span>
-              <Badge label={pageWeightStatus(row.totalSize)} tone={pageWeightTone(row.totalSize)} variant="soft" size="sm" />
-            </div>
-            <Meter
-              value={pageWeightPercent(row, maxSize)}
-              color={pageWeightAccent(row.totalSize)}
-              ariaLabel={`${row.page} page weight rank`}
-            />
-          </div>
-        );
-      },
-    },
-    {
-      key: 'assets',
-      label: 'Assets',
-      width: '92px',
-      align: 'right',
-      sortable: true,
-      render: (_value, record) => (
-        <span className="tabular-nums">{(record as PageWeightRecord).source.assetCount}</span>
-      ),
-    },
-    {
-      key: 'totalSize',
-      label: 'Bytes',
-      width: '120px',
-      align: 'right',
-      sortable: true,
-      render: (_value, record) => (
-        <span className="tabular-nums">{formatBytes((record as PageWeightRecord).source.totalSize)}</span>
-      ),
-    },
-  ], [maxSize]);
 
   const assetColumns = useMemo<DataColumn[]>(() => [
     {
@@ -318,17 +227,30 @@ export function PageWeightLens({ workspaceId, siteId }: PageWeightLensProps) {
     );
   }
 
-  const rows = pageRows(filteredPages);
   const defaultEmpty = pages.length === 0;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-[14px]">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricTile label="Pages with Assets" value={data?.totalPages ?? 0} accent="var(--blue)" className="min-w-0" />
+        <MetricTile label="Total Asset Size" value={formatBytes(data?.totalAssetSize ?? 0)} accent="var(--blue)" className="min-w-0" />
+        <MetricTile label="Heavy Pages (>2MB)" value={heavyPages} accent={heavyPages > 0 ? 'var(--orange)' : 'var(--emerald)'} className="min-w-0" />
+        <MetricTile label="Avg Page Weight" value={formatBytes(avgWeight)} accent="var(--blue)" className="min-w-0" />
+      </div>
+
       <Toolbar label="Page weight controls" className="w-full">
         <SearchField
           value={search}
           onChange={setSearch}
           placeholder="Search pages or assets"
           className="min-w-[240px] flex-1"
+        />
+        <FormSelect
+          aria-label="Page weight source"
+          value={filter}
+          onChange={(value) => setFilter(value as PageWeightSourceFilter)}
+          options={SOURCE_FILTERS.map((item) => ({ value: item.id, label: item.label }))}
+          className="w-full sm:w-[150px]"
         />
         <ToolbarSpacer />
         {lastScanned && <span className="t-caption text-[var(--brand-text-muted)]">Last scanned {lastScanned}</span>}
@@ -338,57 +260,50 @@ export function PageWeightLens({ workspaceId, siteId }: PageWeightLensProps) {
         </Button>
       </Toolbar>
 
-      <div className="flex flex-wrap gap-2" aria-label="Page weight source filters">
-        {SOURCE_FILTERS.map((item) => (
-          <FilterChip
-            key={item.id}
-            label={item.label}
-            count={sourceCounts[item.id]}
-            active={filter === item.id}
-            onClick={() => setFilter(item.id)}
-          />
-        ))}
-      </div>
-
       {scan.isError && data && (
         <InlineBanner tone="warning" title="Page weight may be stale">
           <div className="flex flex-wrap items-center gap-2">
-            <span>Page weight data did not refresh, so the last loaded scan is still shown.</span>
+            <span className="t-body">Page weight data did not refresh, so the last loaded scan is still shown.</span>
             <Button size="sm" variant="secondary" onClick={runScan}>Retry scan</Button>
           </div>
         </InlineBanner>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricTile label="Pages with Assets" value={data?.totalPages ?? 0} accent="var(--blue)" />
-        <MetricTile label="Total Asset Size" value={formatBytes(data?.totalAssetSize ?? 0)} accent="var(--blue)" />
-        <MetricTile label="Heavy Pages" value={heavyPages} sub="Over 2MB" accent={heavyPages > 0 ? 'var(--orange)' : 'var(--emerald)'} />
-        <MetricTile label="Avg Page Weight" value={formatBytes(avgWeight)} accent="var(--teal)" />
-      </div>
-
-      {heavyPages > 0 && (
-        <InlineBanner tone="warning" title={`${heavyPages} heavy page${heavyPages === 1 ? '' : 's'} found`}>
-          <div className="flex flex-wrap items-center gap-2">
-            <span>Open Asset Manager's audit lens to review oversized files and compression candidates.</span>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => navigate(`${adminPath(workspaceId, 'media')}?tab=audit&filter=oversized`)}
-            >
-              <Icon name="image" size="sm" />
-              Open assets
-            </Button>
-          </div>
-        </InlineBanner>
-      )}
-
-      <DataTable
-        columns={columns}
-        rows={rows}
-        loading={scan.isPending && rows.length === 0}
-        getRowKey={(record) => (record as PageWeightRecord).source.page}
-        onRowClick={(record) => setSelectedPage((record as PageWeightRecord).source)}
-        empty={defaultEmpty ? (
+      {filteredPages.length > 0 ? (
+        <div className="flex flex-col gap-2" aria-label="Page weight results">
+          {filteredPages.map((page) => {
+            return (
+              <SectionCard key={page.page} noPadding variant="subtle">
+                <ClickableRow
+                  className="grid min-h-[58px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-2.5 sm:grid-cols-[minmax(0,1fr)_90px_92px]"
+                  onClick={() => setSelectedPage(page)}
+                  aria-label={`Inspect ${page.page}, ${page.assetCount} assets, ${formatBytes(page.totalSize)}`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Icon name="arrowRight" size="sm" className="flex-none text-[var(--brand-text-dim)]" aria-hidden="true" />
+                      <span className="truncate t-ui font-semibold text-[var(--brand-text-bright)]">{page.page}</span>
+                    </div>
+                    <div className="ml-[22px] mt-2">
+                      <Meter
+                        value={pageWeightPercent(page, maxSize)}
+                        color={pageWeightAccent(page.totalSize)}
+                        ariaLabel={`${page.page} page weight rank`}
+                      />
+                    </div>
+                  </div>
+                  <span className="hidden text-right t-caption-sm tabular-nums text-[var(--brand-text-muted)] sm:block">
+                    {page.assetCount} asset{page.assetCount === 1 ? '' : 's'}
+                  </span>
+                  <span className="text-right t-ui font-semibold tabular-nums" style={{ color: pageWeightAccent(page.totalSize) }}>
+                    {formatBytes(page.totalSize)}
+                  </span>
+                </ClickableRow>
+              </SectionCard>
+            );
+          })}
+        </div>
+      ) : (defaultEmpty ? (
           <EmptyState
             icon={WeightEmptyIcon}
             title="No page-weight results"
@@ -402,8 +317,29 @@ export function PageWeightLens({ workspaceId, siteId }: PageWeightLensProps) {
             description="Clear the search or source filter to show the scanned pages again."
             action={<Button size="sm" variant="secondary" onClick={clearFilters}>Clear filters</Button>}
           />
-        )}
-      />
+        ))}
+
+      {heavyPages > 0 && (
+        <InlineBanner tone="warning" size="sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span>
+              <strong className="font-semibold text-[var(--brand-text-bright)]">
+                {heavyPages} heavy page{heavyPages === 1 ? '' : 's'} found
+              </strong>
+              {' — '}compress their images in Asset Manager to cut weight and improve LCP.
+            </span>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => navigate(`${adminPath(workspaceId, 'media')}?filter=oversized`)}
+            >
+              <Icon name="image" size="sm" />
+              Asset Manager
+              <Icon name="arrowRight" size="sm" />
+            </Button>
+          </div>
+        </InlineBanner>
+      )}
 
       <Drawer
         open={selectedPage != null}
@@ -420,7 +356,7 @@ export function PageWeightLens({ workspaceId, siteId }: PageWeightLensProps) {
               <MetricTile label="Assets" value={selectedPage.assetCount} accent="var(--blue)" />
               <MetricTile label="Source" value={pageSourceLabel(pageSource(selectedPage.page))} accent="var(--teal)" />
             </div>
-            <p className="t-caption text-[var(--brand-text-muted)]">
+            <p className="t-body text-[var(--brand-text-muted)]">
               Assets over 500KB are emphasized because they are strong compression candidates.
             </p>
             <DataTable

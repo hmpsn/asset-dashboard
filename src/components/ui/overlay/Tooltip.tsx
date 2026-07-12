@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../../../lib/utils';
+import { isElementInTopmostOverlay, subscribeToOverlayStack } from './overlayUtils';
 import { prefersReducedMotion } from './reducedMotion';
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -94,6 +95,7 @@ export function Tooltip({
   const triggerRef = useRef<HTMLElement | null>(null);
   const tipRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [, setOverlayStackRevision] = useState(0);
   const tipId = useId();
   const reducedMotion = prefersReducedMotion();
 
@@ -132,6 +134,13 @@ export function Tooltip({
       computeTooltipPosition(tEl.getBoundingClientRect(), tipEl.getBoundingClientRect(), placement),
     );
   }, [visible, placement, content]);
+
+  useLayoutEffect(() => {
+    if (!visible) return;
+    return subscribeToOverlayStack(() => {
+      setOverlayStackRevision((revision) => revision + 1);
+    });
+  }, [visible]);
 
   if (!isValidElement(children)) {
     throw new Error('Tooltip requires a single React element as its child.');
@@ -178,6 +187,9 @@ export function Tooltip({
   } as ChildProps);
 
   const motionClass = reducedMotion ? '' : 'transition-opacity duration-150';
+  const zIndex = isElementInTopmostOverlay(triggerRef.current)
+    ? 'var(--z-modal-fullscreen)'
+    : 'var(--z-tooltip)';
 
   // Portal to document.body so ancestors with transform/filter/contain do not create
   // a new stacking context that would break position:fixed relative to the viewport.
@@ -194,7 +206,7 @@ export function Tooltip({
               position: 'fixed',
               top: position.top,
               left: position.left,
-              zIndex: 'var(--z-tooltip)' as unknown as number,
+              zIndex: zIndex as unknown as number,
               pointerEvents: 'none',
             }}
             className={cn('bg-[var(--surface-1)] text-[var(--brand-text-bright)] text-xs px-2 py-1 rounded-[var(--radius-md)] border border-[var(--brand-border)] shadow-lg max-w-xs', motionClass, contentClassName)}

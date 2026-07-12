@@ -17,19 +17,6 @@ describe('Icon', () => {
     expect(i!.getAttribute('aria-hidden')).toBe('true');
   });
 
-  it('passes an unknown name through as the literal fa- glyph', () => {
-    const { container } = render(<Icon name="rocket-launch" />);
-    expect(container.querySelector('i')!.className).toContain('fa-rocket-launch');
-  });
-
-  it('renders raw fa classes when `fa` is given (overrides name)', () => {
-    const { container } = render(<Icon fa="fa-sharp fa-solid fa-star" name="home" />);
-    const cls = container.querySelector('i')!.className;
-    expect(cls).toContain('fa-solid');
-    expect(cls).toContain('fa-star');
-    expect(cls).not.toContain('fa-house');
-  });
-
   it('still renders a lucide component via `as` (migration path)', () => {
     const { container } = render(<Icon as={Search} size="md" />);
     expect(container.querySelector('svg')).not.toBeNull();

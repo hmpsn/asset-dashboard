@@ -11,6 +11,7 @@ import {
   buildConversationContext,
   getSession as getChatSession,
   generateSessionSummary,
+  shouldAttemptSessionSummary,
 } from '../chat-memory.js';
 import {
   getTokenUsage,
@@ -92,7 +93,7 @@ router.post('/api/admin-chat', aiLimiter, requireWorkspaceAccessFromBody(), asyn
       if (session && session.messages.length === 2) {
         addActivity(ws.id, 'chat_session', 'Admin chat: ' + question.trim().slice(0, 80), `Admin started a new Insights conversation`);
       }
-      if (session && session.messages.length >= 6 && !session.summary) {
+      if (session && shouldAttemptSessionSummary(session.messages.length)) {
         generateSessionSummary(ws.id, sessionId).catch(() => {});
       }
     }

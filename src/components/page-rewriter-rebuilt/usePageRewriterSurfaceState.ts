@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { Document, Packer } from 'docx';
 import { ApiError, get, post } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import { parseRewriteSectionTarget } from '../../lib/rewriteResponse';
@@ -12,9 +11,6 @@ import {
 } from '../page-rewrite-chat/pageRewriteChatModel';
 import {
   buildDocHtml,
-  buildPrintableDocHtml,
-  serializeDocToDocx,
-  serializeDocToMarkdown,
 } from '../page-rewrite-chat/pageRewriteChatDocument';
 import {
   applyRewriteToSection,
@@ -22,6 +18,7 @@ import {
   execFormatCommand,
   wrapSelectionHeading,
 } from '../page-rewrite-chat/pageRewriteChatActions';
+import { exportPageRewriterDocument } from './pageRewriterExport';
 import { mutationErrorMessage } from './pageRewriterMutationFeedback';
 import type {
   PageRewriterExportMode,
@@ -54,10 +51,6 @@ function pageUrlFromParams(params: URLSearchParams): string | null {
   return validatedPageUrl(params.get(PAGE_REWRITER_DEEP_LINK_PARAM));
 }
 
-function slugFromPage(data: PageRewriterPageData | null): string {
-  return (data?.slug || 'page').replace(/\//g, '-').replace(/^-/, '') || 'page';
-}
-
 async function writeClipboard(text: string): Promise<void> {
   if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable');
   await navigator.clipboard.writeText(text);
@@ -66,6 +59,11 @@ async function writeClipboard(text: string): Promise<void> {
 interface UsePageRewriterSurfaceStateParams {
   workspaceId: string;
   toast: ToastFn;
+}
+
+interface PageLoadRequest {
+  url: string;
+  requestId: number;
 }
 
 export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewriterSurfaceStateParams) {
@@ -91,11 +89,24 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
   const [quotaBannerDismissed, setQuotaBannerDismissed] = useState(false);
   const [quotaPartialMessage, setQuotaPartialMessage] = useState<string | null>(null);
 
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatTranscriptRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const comboInputRef = useRef<HTMLInputElement>(null);
   const docBodyRef = useRef<HTMLDivElement | null>(null);
   const autoLoadedUrlRef = useRef<string | null>(null);
+  const observedUrlStateRef = useRef<{ workspaceId: string; pageUrl: string | null } | null>(null);
+  const pageLoadRequestSequenceRef = useRef(0);
+  const activePageLoadRequestRef = useRef<number | null>(null);
+  const chatContextEpochRef = useRef(0);
+  const chatRequestSequenceRef = useRef(0);
+  const activeChatRequestRef = useRef<{ requestId: number; contextEpoch: number } | null>(null);
+
+  const invalidateChatContext = useCallback(() => {
+    chatContextEpochRef.current += 1;
+    activeChatRequestRef.current = null;
+    sendingRef.current = false;
+    setSending(false);
+  }, []);
 
   const updateParams = useCallback((updates: Record<string, ParamValue>, replace = true) => {
     setSearchParams((current) => {
@@ -114,19 +125,30 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
     staleTime: 5 * 60 * 1000,
   });
 
-  const loadPageMutation = useMutation<PageRewriterPageData, Error, string>({
-    mutationFn: (url) => post<PageRewriterPageData>(`/api/rewrite-chat/${workspaceId}/load-page`, { url }),
-    onMutate: (url) => {
+  const loadPageMutation = useMutation<PageRewriterPageData, Error, PageLoadRequest>({
+    mutationFn: ({ url }) => post<PageRewriterPageData>(`/api/rewrite-chat/${workspaceId}/load-page`, { url }),
+    onMutate: ({ url, requestId }) => {
+      if (activePageLoadRequestRef.current !== requestId) return;
+      // A page load changes the chat's grounding immediately, before the URL is
+      // updated after a successful response. Retire any answer still in flight
+      // so it cannot land in the next page's transcript.
+      invalidateChatContext();
+      autoLoadedUrlRef.current = url;
       setPageError(null);
+      setPageData(null);
       setLastAttemptedPageUrl(url);
       if (docBodyRef.current) docBodyRef.current.dataset.pageKey = '';
     },
-    onSuccess: (data, url) => {
+    onSuccess: (data, { url, requestId }) => {
+      if (activePageLoadRequestRef.current !== requestId || autoLoadedUrlRef.current !== url) return;
+      activePageLoadRequestRef.current = null;
       setPageData(data);
       setPageUrl(url);
       updateParams({ [PAGE_REWRITER_DEEP_LINK_PARAM]: url }, false);
     },
-    onError: (error) => {
+    onError: (error, { url, requestId }) => {
+      if (activePageLoadRequestRef.current !== requestId || autoLoadedUrlRef.current !== url) return;
+      activePageLoadRequestRef.current = null;
       setPageData(null);
       setPageError(error);
     },
@@ -150,20 +172,53 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
       setPageError(new Error('Enter a full http or https URL.'));
       return;
     }
-    loadPageMutation.mutate(url);
+    // A picker selection writes pageUrl after the request succeeds. Mark the URL
+    // before mutating so the receiving search-param effect does not load the same
+    // selection a second time when that URL update arrives.
+    const requestId = pageLoadRequestSequenceRef.current + 1;
+    pageLoadRequestSequenceRef.current = requestId;
+    activePageLoadRequestRef.current = requestId;
+    autoLoadedUrlRef.current = url;
+    loadPageMutation.mutate({ url, requestId });
   }, [loadPageMutation]);
 
   useEffect(() => {
-    if (typeof chatEndRef.current?.scrollIntoView !== 'function') return;
-    chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    const transcript = chatTranscriptRef.current;
+    if (!transcript) return;
+    transcript.scrollTop = transcript.scrollHeight;
   }, [messages]);
 
   useEffect(() => {
-    if (!initialPageUrl) return;
+    const observed = observedUrlStateRef.current;
+    if (observed?.workspaceId === workspaceId && observed.pageUrl === initialPageUrl) return;
+    observedUrlStateRef.current = { workspaceId, pageUrl: initialPageUrl };
+    invalidateChatContext();
+
+    if (!initialPageUrl) {
+      activePageLoadRequestRef.current = null;
+      autoLoadedUrlRef.current = null;
+      setPageUrl('');
+      setLastAttemptedPageUrl('');
+      setPageData(null);
+      setPageError(null);
+      setMessages([]);
+      setInput('');
+      setCopiedIdx(null);
+      setMsgEdits({});
+      if (docBodyRef.current) {
+        docBodyRef.current.dataset.pageKey = '';
+        docBodyRef.current.innerHTML = '';
+      }
+      return;
+    }
+
+    if (observed && observed.workspaceId !== workspaceId) {
+      autoLoadedUrlRef.current = null;
+    }
     if (autoLoadedUrlRef.current === initialPageUrl) return;
     autoLoadedUrlRef.current = initialPageUrl;
     loadPage(initialPageUrl);
-  }, [initialPageUrl, loadPage]);
+  }, [initialPageUrl, invalidateChatContext, loadPage, workspaceId]);
 
   const selectPage = useCallback((page: PageRewriterSitemapPage) => {
     setComboQuery('');
@@ -205,6 +260,17 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
     const question = (text ?? input).trim();
     if (!question || sendingRef.current || quotaHit) return;
 
+    const requestId = chatRequestSequenceRef.current + 1;
+    chatRequestSequenceRef.current = requestId;
+    const contextEpoch = chatContextEpochRef.current;
+    activeChatRequestRef.current = { requestId, contextEpoch };
+    const isCurrentRequest = () => {
+      const active = activeChatRequestRef.current;
+      return active?.requestId === requestId
+        && active.contextEpoch === contextEpoch
+        && chatContextEpochRef.current === contextEpoch;
+    };
+
     sendingRef.current = true;
     setInput('');
     setSending(true);
@@ -219,6 +285,7 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
         pageTitle: pageData?.title,
         pageIssues: pageData?.issues,
       });
+      if (!isCurrentRequest()) return;
       const sectionTarget = parseRewriteSectionTarget(response.answer);
       setMessages((prev) => [...prev, {
         role: 'assistant',
@@ -227,6 +294,7 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
         sectionTarget,
       }]);
     } catch (error) {
+      if (!isCurrentRequest()) return;
       if (error instanceof ApiError && error.status === 429) {
         setQuotaHit(true);
         setQuotaBannerDismissed(false);
@@ -239,9 +307,12 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
         timestamp: Date.now(),
       }]);
     } finally {
-      sendingRef.current = false;
-      setSending(false);
-      inputRef.current?.focus();
+      if (isCurrentRequest()) {
+        activeChatRequestRef.current = null;
+        sendingRef.current = false;
+        setSending(false);
+        inputRef.current?.focus();
+      }
     }
   }, [input, pageData, pageUrl, quotaHit, sessionId, workspaceId]);
 
@@ -266,80 +337,15 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
   }, [toast]);
 
   const handleExport = useCallback((mode: PageRewriterExportMode) => {
-    const slug = slugFromPage(pageData);
-    if (mode === 'pdf') {
-      try {
-        const printRoot = document.getElementById('page-rewrite-print-root') ?? document.createElement('div');
-        printRoot.id = 'page-rewrite-print-root';
-        printRoot.className = 'page-rewrite-print-root';
-        printRoot.innerHTML = buildPrintableDocHtml(docBodyRef.current, pageData);
-        if (!printRoot.parentElement) document.body.appendChild(printRoot);
-        const cleanup = () => {
-          document.body.classList.remove('page-rewrite-printing');
-          printRoot.innerHTML = '';
-          window.removeEventListener('afterprint', cleanup);
-        };
-        document.body.classList.add('page-rewrite-printing');
-        window.addEventListener('afterprint', cleanup, { once: true });
-        window.print();
-        window.setTimeout(cleanup, 60_000);
-      } catch {
-        toast('PDF export failed. Please try again.', 'error');
-      }
-      return;
-    }
-
-    if (mode === 'docx') {
-      const doc = new Document({
-        styles: {
-          default: {
-            document: { run: { font: 'Calibri', size: 24, color: '1a1a1a' } },
-          },
-        },
-        sections: [{
-          properties: {
-            page: {
-              size: { width: 12240, height: 15840 },
-              margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
-            },
-          },
-          children: serializeDocToDocx(docBodyRef.current, pageData),
-        }],
-      });
-      void Packer.toBlob(doc).then((blob) => {
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = `${slug}-rewrite.docx`;
-        anchor.click();
-        URL.revokeObjectURL(url);
-        toast('DOCX export ready', 'success');
-      }).catch(() => toast('DOCX export failed. Please try again.', 'error'));
-      return;
-    }
-
-    if (mode === 'copyHtml') {
-      void writeClipboard(docBodyRef.current?.innerHTML ?? '')
-        .then(() => toast('Copied HTML', 'success'))
-        .catch(() => toast('Could not copy HTML', 'error'));
-      return;
-    }
-
-    const markdown = serializeDocToMarkdown(docBodyRef.current, pageData);
-    if (mode === 'copyMarkdown') {
-      void writeClipboard(markdown)
-        .then(() => toast('Copied Markdown', 'success'))
-        .catch(() => toast('Could not copy Markdown', 'error'));
-      return;
-    }
-
-    const blob = new Blob([markdown], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${slug}-rewrite.md`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    // Clipboard and print APIs must be entered during the click's user-activation
+    // window. The exporter keeps only the heavyweight DOCX library behind an
+    // async boundary; cheap modes start synchronously from this handler.
+    void exportPageRewriterDocument({
+      mode,
+      docBody: docBodyRef.current,
+      pageData,
+      toast,
+    });
   }, [pageData, toast]);
 
   const docBodyRefCallback = useCallback((el: HTMLDivElement | null) => {
@@ -355,6 +361,7 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
     const retryUrl = lastAttemptedPageUrl || pageUrl || initialPageUrl;
     if (retryUrl) loadPage(retryUrl);
   }, [initialPageUrl, lastAttemptedPageUrl, loadPage, pageUrl]);
+  const loadingPage = loadPageMutation.isPending && autoLoadedUrlRef.current !== null && !pageData && !pageError;
 
   return {
     pageUrl,
@@ -362,7 +369,7 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
     pageError,
     pageErrorMessage: pageError ? mutationErrorMessage(pageError, 'Failed to load page') : '',
     pageErrorStatus: pageError instanceof ApiError ? pageError.status : null,
-    loadingPage: loadPageMutation.isPending,
+    loadingPage,
     invalidPageUrlParam,
     messages,
     input,
@@ -380,7 +387,7 @@ export function usePageRewriterSurfaceState({ workspaceId, toast }: UsePageRewri
     quotaBannerVisible: quotaHit && !quotaBannerDismissed,
     quotaPartialMessage,
     aiDisabledReason: quotaHit ? 'AI quota reached for this workspace. Try again after quota resets.' : null,
-    chatEndRef,
+    chatTranscriptRef,
     inputRef,
     comboInputRef,
     sendMessage,

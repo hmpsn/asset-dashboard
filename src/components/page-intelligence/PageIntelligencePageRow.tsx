@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import type { UnifiedPage } from '../../../shared/types/page-join';
 import type { LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo';
-import { scoreColorClass, Icon, IconButton, ClickableRow } from '../ui';
+import { scoreColorClass, Icon, IconButton } from '../ui';
 import { LocalSeoVisibilityBadge } from '../local-seo/LocalSeoVisibilityPanel';
 import { intentColor } from './pageIntelligenceDisplay';
 import { KeywordMetricCell } from '../shared/KeywordMetricCell';
@@ -97,9 +97,20 @@ export function PageIntelligencePageRow({
 
   return (
     <div className="border-b border-[var(--brand-border)]/50 last:border-b-0">
-      <ClickableRow
+      {/* button-ok: full-row expand toggle hosts an inline Track IconButton; a real button element here would nest one button inside another (invalid HTML / hydration error). div+role keeps keyboard (Enter/Space), focus-visible, and hover semantics. */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${page.title}`}
         onClick={() => onToggleExpanded(page.id)}
-        className="flex items-center justify-between px-4 py-2.5 hover:bg-[var(--surface-3)]/20"
+        onKeyDown={event => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onToggleExpanded(page.id);
+          }
+        }}
+        className="flex w-full items-center justify-between px-4 py-2.5 text-left cursor-pointer transition-colors hover:bg-[var(--surface-3)]/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-mint)]"
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {isAnalyzing ? (
@@ -169,7 +180,7 @@ export function PageIntelligencePageRow({
             </span>
           )}
         </div>
-      </ClickableRow>
+      </div>
 
       {isExpanded && (
         <PageIntelligencePageDetails

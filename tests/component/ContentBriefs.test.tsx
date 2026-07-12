@@ -172,14 +172,16 @@ vi.mock('../../src/components/briefs/RequestList', () => ({
 vi.mock('../../src/components/briefs/BriefList', () => ({
   BriefList: ({
     briefs,
+    expanded,
     onConfirmDeleteBrief,
     onSetExpanded,
   }: {
     briefs: ContentBrief[];
+    expanded: string | null;
     onConfirmDeleteBrief: (b: ContentBrief) => void;
     onSetExpanded: (id: string | null) => void;
   }) => (
-    <div data-testid="brief-list">
+    <div data-testid="brief-list" data-expanded-brief={expanded ?? ''}>
       {briefs.length === 0 && <div data-testid="no-briefs">No briefs</div>}
       {briefs.map(b => (
         <div key={b.id} data-testid={`brief-card-${b.id}`}>
@@ -353,6 +355,75 @@ describe('ContentBriefs', () => {
     renderComponent();
     expect(screen.getByTestId('brief-card-brief-1')).toBeInTheDocument();
     expect(screen.getByTestId('brief-card-brief-2')).toBeInTheDocument();
+  });
+
+  it('opens a valid initial brief without changing the default list contract', () => {
+    const b1 = makeBrief({ id: 'brief-1', targetKeyword: 'keyword 1' });
+    const b2 = makeBrief({ id: 'brief-2', targetKeyword: 'keyword 2' });
+    setHooks({ briefs: [b1, b2] });
+
+    renderComponent('ws-1', { initialBriefId: 'brief-2' });
+
+    expect(screen.getByTestId('brief-list')).toHaveAttribute('data-expanded-brief', 'brief-2');
+  });
+
+  it('falls back to the unchanged collapsed list for a missing initial brief', async () => {
+    setHooks({ briefs: [makeBrief({ id: 'brief-1' })] });
+
+    renderComponent('ws-1', { initialBriefId: 'brief-missing' });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('brief-list')).toHaveAttribute('data-expanded-brief', '');
+    });
+    expect(screen.getByTestId('brief-card-brief-1')).toBeInTheDocument();
+    expect(screen.getByTestId('brief-generator')).toBeInTheDocument();
+    expect(screen.getByTestId('request-list')).toBeInTheDocument();
+  });
+
+  it('follows a valid initial brief id when the focused card changes while mounted', async () => {
+    const b1 = makeBrief({ id: 'brief-1', targetKeyword: 'keyword 1' });
+    const b2 = makeBrief({ id: 'brief-2', targetKeyword: 'keyword 2' });
+    setHooks({ briefs: [b1, b2] });
+
+    const view = renderComponent('ws-1', { initialBriefId: 'brief-1' });
+    expect(screen.getByTestId('brief-list')).toHaveAttribute('data-expanded-brief', 'brief-1');
+
+    view.rerender(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <ContentBriefs workspaceId="ws-1" initialBriefId="brief-2" />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('brief-list')).toHaveAttribute('data-expanded-brief', 'brief-2');
+    });
+  });
+
+  it('renders only the established generator in generator display mode', () => {
+    setHooks({ briefs: [makeBrief()], requests: [makeRequest()], posts: [makePost()] });
+
+    renderComponent('ws-1', { display: 'generator' });
+
+    expect(screen.getByTestId('brief-generator')).toBeInTheDocument();
+    expect(screen.queryByTestId('request-list')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('brief-list')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('post-editor')).not.toBeInTheDocument();
+  });
+
+  it('renders only admitted request ids in requests display mode', () => {
+    const first = makeRequest({ id: 'request-first', topic: 'First request' });
+    const second = makeRequest({ id: 'request-second', topic: 'Second request' });
+    setHooks({ briefs: [makeBrief()], requests: [first, second], posts: [makePost()] });
+
+    renderComponent('ws-1', { display: 'requests', requestIds: ['request-second'] });
+
+    expect(screen.getByTestId('request-list')).toBeInTheDocument();
+    expect(screen.getByTestId('request-request-second')).toBeInTheDocument();
+    expect(screen.queryByTestId('request-request-first')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('brief-generator')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('brief-list')).not.toBeInTheDocument();
   });
 
   // 6. PageHeader shows brief count
@@ -594,7 +665,7 @@ describe('ContentBriefs', () => {
   // 19. fixContext prefills keyword
   it('prefills keyword from fixContext.primaryKeyword', () => {
     const fixContext = {
-      targetRoute: 'seo-briefs',
+      targetRoute: 'content-pipeline',
       primaryKeyword: 'my-target-keyword',
       pageId: 'page-1',
       pageSlug: '/page',
