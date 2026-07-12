@@ -3,7 +3,7 @@
 Audit date: 2026-07-11
 Branch: `codex/ui-visual-parity`
 Scope: legacy-versus-rebuilt capability preservation, runtime wiring, general bugs, AI summaries/workspace-intelligence integration, and behavior-preserving performance opportunities
-Status: safe repair and optimization waves implemented; the final all-project suite passes; all seven workflow decisions and the two measured bundle-ratchet entries are `owner-approved` and in implementation
+Status: safe repair and optimization waves implemented; `AUD-D1`–`AUD-D7` and `AUD-B1` are `owner-approved`, implementation-committed, and P5-verified locally
 
 This audit follows the owner-approved visual baseline. It does not revoke the original 26-route approval or the later Page Intelligence / Content Performance receiving-home approval. It also does not convert an automated reviewer `PASS` into approval of a newly discovered exception.
 
@@ -12,8 +12,9 @@ This audit follows the owner-approved visual baseline. It does not revoke the or
 - No P0 functionality loss was found.
 - Real safe-local functionality, state, invalidation, overlay, cache, AI-context, and summary-cadence defects were fixed.
 - Ten high-value frontend performance wins were implemented without changing route meaning, capability homes, or settled loaded composition.
-- Seven material choices required owner approval because they change composition, capability grouping, time authority, AI refresh semantics, or shared design-system behavior; all seven are now approved and in implementation.
-- The clean current all-project suite is complete; an explicit bundle-budget disposition is still required, so this audit is not a release-readiness claim.
+- Seven material choices required owner approval because they change composition, capability grouping, time authority, AI refresh semantics, or shared design-system behavior; all seven are owner-approved and their implementations are committed.
+- The measured `AUD-B1` CSS and Page Rewriter baselines are committed without increasing the aggregate baseline.
+- The all-project suite, fresh independent review, changed-surface browser pass, and final combined platform gates required by P5 are complete locally. This audit is not a release-readiness or staging-verification claim.
 
 ## Implemented Safe Repair Wave
 
@@ -45,7 +46,7 @@ The safe wave closes the directly fixable integration gaps:
 - chat auto-summaries trigger on crossed 6/20/40-message thresholds, recover from odd counts and failures, preserve manual summaries, protect last-good state, and prevent old session incarnations or slower calls from overwriting newer summaries;
 - deterministic AI reliability reports match named runtime operations.
 
-The two semantic choices—monthly-digest time authority (`AUD-D5`) and POV evidence/voice refresh policy (`AUD-D6`)—are owner-approved and execute under explicit truthfulness/edit-preservation contracts.
+The two semantic choices—monthly-digest time authority (`AUD-D5`) and POV evidence/voice refresh policy (`AUD-D6`)—are owner-approved, committed, and P5-verified under explicit truthfulness/edit-preservation contracts.
 
 ## Safe Optimization Waves
 
@@ -65,18 +66,24 @@ Independent review and settled 1440×900 / 1600×1000 smoke support these change
 
 Remaining behavior-preserving optimization opportunities are lower priority: generic Admin Chat backend fanout/concurrency, Global Ops catch-all chunking, SEO Editor duplicated projections, the app-wide queue observer, invalidate-plus-immediate-refetch churn, and Cockpit whole-surface rerenders for freshness copy. The aggregate bundle is below its ceiling; the two owner-approved measured per-file ratchets are applied without increasing the aggregate baseline.
 
-## Owner Circle-Backs
+## Owner Circle-Back Closure Record
 
-The following recommendations are recorded in `owner-decision-packet.md`. Joshua approved all eight directions on 2026-07-11 with **“Let’s do it.”** Implementation follows the contract-first closure plan; approval of the direction is not evidence that the implementation has passed:
+Joshua approved all eight directions on 2026-07-11 with **“Let’s do it.”** Their implementation commits and final local P5 evidence are now present on the integration branch. This is not a new visual-approval event.
 
-1. `AUD-D1` — active-only Engine Backing Moves plus collapsed Operations homes for Weekly Briefing review, terminal recommendation history/un-dismiss/full OV-EMV, and SEO Change Impact.
-2. `AUD-D2` — unique Cockpit KPI band for organic traffic value, content velocity, and overall health without duplicating Search/GA4 metrics.
-3. `AUD-D3` — compact rebuilt-shell connection-health strip/footer or an explicit StatusBar omission exception.
-4. `AUD-D4` — compact Published impressions/sessions secondary summary row or an explicit card/Drawer-only exception.
-5. `AUD-D5` — current-month operational digest authority with durable historical snapshots deferred to a later backend project.
-6. `AUD-D6` — POV hash over used evidence/effective voice, `refresh available`, no automatic overwrite of operator edits, and removal of unused slices.
-7. `AUD-D7` — shared overlay-aware Tooltip behavior for Asset Manager Drawer help.
-8. `AUD-B1` — measured CSS/Page Rewriter ratchets at 37,307 B / 8,819 B while the aggregate baseline remains 1,720,000 B.
+| ID | Status | Implementation references | Committed outcome |
+|---|---|---|---|
+| `AUD-D1` | `owner-approved; implementation committed; P5 verified locally` | `29bac116a`, repaired by `833c26a9b` | Engine Backing Moves use canonical active recommendations; collapsed Operations homes preserve Weekly Briefings, terminal history/un-dismiss/full OV-EMV, and SEO Change Impact. |
+| `AUD-D2` | `owner-approved; implementation committed; P5 verified locally` | `1c0f40ee3` | Cockpit has the unique organic-value, content-velocity, and overall-health decision band without duplicating Search/GA4 KPIs. |
+| `AUD-D3` | `owner-approved; implementation committed; P5 verified locally` | `f46d4cfcd`, repaired by `f8d75d60e` and `43aec6960` | The rebuilt shell restores compact connection health, shared Global Ops health truth, and rebuilt command reachability. |
+| `AUD-D4` | `owner-approved; implementation committed; P5 verified locally` | `c1dafb697`, repaired by `1229e48ff` | Pipeline Published adds authoritative impressions/sessions evidence and distinguishes unavailable provider data from empty work. |
+| `AUD-D5` | `owner-approved; implementation committed; P5 verified locally` | `8892adc0d`, repaired by `a3efae499` | The operational digest is current-month and evidence-honest, including its structured summary boundary; durable historical snapshots remain deferred. |
+| `AUD-D6` | `owner-approved; implementation committed; P5 verified locally` | backend `1451f78e2`; UI `29bac116a`, repaired by `833c26a9b` | POV fingerprints use rendered evidence/effective voice, expose freshness, and preserve operator edits until explicit regeneration. |
+| `AUD-D7` | `owner-approved; implementation committed; P5 verified locally` | `1243b713d` | Shared Tooltips elevate relative to the active canonical overlay while ordinary page Tooltips keep their normal layer. |
+| `AUD-B1` | `owner-approved; implementation committed; P5 verified locally` | `d611db84d` | CSS is baselined at 37,307 B and Page Rewriter at 8,819 B; aggregate remains 1,720,000 B. |
+
+The post-implementation repair hashes `43aec6960`, `833c26a9b`, and `1229e48ff` are respectively the shell, Engine, and Pipeline truth/reachability hardening required with their primary owner-closure commits.
+
+Additional cross-cutting hardening is committed in `eee07ed51` (structured AI reliability contracts), `d686d8030` (Brand AI persistence and trial metering), `a3efae499` (digest structured-evidence boundary), and `58a7068d5` (effective-trial quota gates). The intelligence-consumer census and its executable inventory were reconciled in `fe5d5ff58`. These commits strengthen the closure stack but do not broaden the approved visual scope.
 
 The approved scope includes the bounded backend work required for `AUD-D6`. It does not authorize durable historical digest snapshots, live-provider spend, staging extraction, a push, or a PR.
 
@@ -95,9 +102,11 @@ Supporting evidence completed during the audit:
 
 Current verification truth:
 
-- the clean current all-project suite passed 2,065 files and 28,834 tests, with one intentional skip and three todos. The process emitted non-failing jsdom navigation and Node listener-count warnings but no failed files or tests.
-- aggregate bundle gzip is green at 1,793,622 B against the 1,806,000 B ceiling (12,378 B headroom). Font Awesome base CSS fell from 36,118 B to 1,203 B, and the Page Rewriter action/DOCX allocation fell from 100,018 B to 99,512 B. Joshua approved measured CSS and Page Rewriter baselines of 37,307 B and 8,819 B; they are applied while the aggregate baseline remains 1,720,000 B.
-- the bounded live provider smoke remains unexecuted without dedicated staging credentials and separate staging authority. Deterministic local fixtures cover workflow verification; credentials are needed only for live/staging provider proof.
+- the latest recorded all-project suite passed 2,077 files and 29,063 tests, with one intentional skip and three todos;
+- the production build emitted 269 assets totaling 1.72 MiB gzip; 73 newly observed assets are warning-only and each remains below 50 KiB;
+- the owner-approved baselines are committed at 37,307 B for CSS and 8,819 B for Page Rewriter while the aggregate baseline remains 1,720,000 B;
+- fresh independent review returned `PASS`; changed-surface browser smoke at 1440×900 and 1600×1000 found no overflow or current dev-server errors; typecheck, hooks, build, PR checks, bundle/deferred/flag/lexicon checks, and the 13-step quick platform verifier pass, completing P5 locally;
+- the bounded live-provider smoke remains unexecuted without dedicated credentials and separate staging authority. Deterministic local fixtures cover local workflow verification; credentials are needed only for live/staging provider proof.
 
 ## Shipping Boundary
 

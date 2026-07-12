@@ -1,7 +1,7 @@
 # Post-Parity Owner Closure — Feature Spec
 
 **Date:** 2026-07-11
-**Status:** OWNER-APPROVED / IMPLEMENTATION IN PROGRESS
+**Status:** OWNER-APPROVED / IMPLEMENTATION COMMITTED / P5 VERIFIED LOCALLY
 **Authority:** `AUD-D1`–`AUD-D7` and `AUD-B1` in `docs/ui-rebuild/parity/owner-decision-packet.md`
 
 ## 1. Ownership Snapshot
@@ -31,7 +31,24 @@
   - the operational digest represents the current UTC month only
 - No new database column is required. The POV store keeps its canonical hash and version as the concurrency boundary.
 
-## 4. Query Cache + Real-Time Contract
+## 4. Implementation Record
+
+All eight owner decisions have committed implementations. These records do not constitute P5 acceptance or a new visual approval.
+
+| Decision | Status | Implementation references |
+|---|---|---|
+| `AUD-B1` | owner-approved; implementation committed; P5 verified | `d611db84d` |
+| `AUD-D2` | owner-approved; implementation committed; P5 verified | `1c0f40ee3` |
+| `AUD-D5` | owner-approved; implementation committed and repaired; P5 verified | `8892adc0d`, `a3efae499` |
+| `AUD-D6` backend | owner-approved; implementation committed; P5 verified | `1451f78e2` |
+| `AUD-D4` | owner-approved; implementation committed and repaired; P5 verified | `c1dafb697`, `1229e48ff` |
+| `AUD-D7` | owner-approved; implementation committed; P5 verified | `1243b713d` |
+| `AUD-D1` / `AUD-D6` UI | owner-approved; implementation committed and repaired; P5 verified | `29bac116a`, `833c26a9b` |
+| `AUD-D3` | owner-approved; implementation committed and repaired; P5 verified | `f46d4cfcd`, `f8d75d60e`, `43aec6960` |
+
+The shell, Pipeline, and Engine post-implementation hardening hashes are `43aec6960`, `1229e48ff`, and `833c26a9b`, respectively. Structured AI and effective-trial metering hardening is committed in `eee07ed51`, `d686d8030`, `a3efae499`, and `58a7068d5`; the intelligence-consumer census and executable inventory are reconciled in `fe5d5ff58`.
+
+## 5. Query Cache + Real-Time Contract
 
 - Strategy POV reads keep `queryKeys.admin.strategyPov(workspaceId)`.
 - `WS_EVENTS.STRATEGY_POV_GENERATED` refreshes saved POV state.
@@ -39,7 +56,7 @@
 - Digest reads keep `queryKeys.client.monthlyDigest(workspaceId)` and existing producer invalidations.
 - D1, D2, D3, D4, and D7 add no mutation and therefore add no event.
 
-## 5. Test Ownership
+## 6. Test Ownership
 
 - D1/D6: strategy POV unit/integration/cron coverage plus Engine component coverage
 - D2: Cockpit component coverage
@@ -49,7 +66,7 @@
 - D7: Tooltip and stacked-overlay component coverage
 - Critical failures: hidden recommendation states, automatic loss of operator edits, stale prompt reuse after evidence/voice change, mixed-period client claims, false no-data/zero claims, duplicate provider KPIs, and tooltips below the active Drawer
 
-## 6. Verification Commands
+## 7. Verification Commands And Current Evidence
 
 - Focused red/green tests in every lane
 - `npm run lint:hooks`
@@ -61,9 +78,21 @@
 - `npx vitest run`
 - Fixed desktop browser checks at `1440x900` and `1600x1000`
 
-## 7. Open Questions / Risks
+Final P5 evidence:
+
+- full suite: 2,077 files and 29,063 tests passed, with one skip and three todos;
+- production build: 269 assets totaling 1.72 MiB gzip, with 73 new sub-50 KiB warning-only assets;
+- committed owner-approved baselines: CSS 37,307 B, Page Rewriter 8,819 B, aggregate 1,720,000 B;
+- fresh independent review: `PASS` after repair of all findings;
+- live fixed-viewport review: required 1440×900 and 1600×1000 changed-surface checks pass without overflow or current dev-server warnings/errors;
+- final combined gates: typecheck, hooks lint, build, PR checks, bundle/deferred/feature-flag/lexicon verifiers, and `verify:platform:quick` pass.
+
+P5 is complete locally from this combined evidence. It is not a release-readiness or staging-verification claim.
+
+## 8. Open Questions / Risks
 
 - Durable historical digest snapshots are explicitly deferred; current code must not reconstruct historical operational claims from mutable stores.
 - Live-provider verification remains outside scope without separate staging authority and credentials.
 - The single-row admin/client Strategy POV storage model is pre-existing and is not widened into a migration in this closure.
-- Direction approval does not substitute for implementation review or final rendered evidence.
+- Direction approval and committed implementation did not substitute for final P5 review or rendered evidence; those gates are now recorded above.
+- No push, PR, staging extraction, live-provider spend, or new visual approval is authorized by this spec.

@@ -4,6 +4,8 @@ Baseline: the integration checkpoint commit that introduces this file on `codex/
 
 This commit is the immutable fork point for the earlier behavior checkpoint. It is intentionally broader than a shipping PR and did not itself establish visual parity. The later `codex/ui-visual-parity` surface commits now carry owner-approved parity for all 27 directly mounted route homes plus the folded Content Performance receiving home. The original 26-route approval remains the historical batch; Page Intelligence and Content Performance were approved later as one receiving-home bundle. Never open either integration stack as one PR; extraction remains dormant and must start from `staging` only after separate Joshua authorization.
 
+Post-parity closure status: `AUD-D1`–`AUD-D7` and `AUD-B1` are `owner-approved`, implementation-committed, and P5-verified locally. This status does not create a new visual approval or authorize a push, PR, staging extraction, or live-provider spend.
+
 ## Baseline Verification
 
 - `npm run lint:hooks`
@@ -92,8 +94,8 @@ The independent functionality, runtime-wiring, bug, AI-intelligence, and optimiz
 | Provider-backed intelligence invalidation | `1757ef409` | Intelligence crons, local/LLM/rank producers, and cache-invalidation tests. |
 | AI reliability runtime evidence | `7405e802b` | AI reliability scripts/registry and harness coverage only. |
 | Canonical stacked overlays | `4e647d093` | Modal, Drawer, ConfirmDialog, shared overlay machinery, and component tests. |
-| Digest/calendar/cache freshness | `ba62f607e` | Monthly digest and intelligence/learnings invalidation; keep `AUD-D5` unresolved. |
-| Generated-context freshness | `09bc10bfa` | Workspace intelligence, briefing voice, LLMs.txt, Admin Chat context, chat summaries, and focused AI tests; keep `AUD-D6` unresolved. |
+| Digest/calendar/cache freshness | `ba62f607e` | Monthly digest and intelligence/learnings invalidation; pre-closure input to the now-committed `AUD-D5` implementation. |
+| Generated-context freshness | `09bc10bfa` | Workspace intelligence, briefing voice, LLMs.txt, Admin Chat context, chat summaries, and focused AI tests; pre-closure input to the now-committed `AUD-D6` implementation. |
 | Final navigation and URL-state wiring | `a90971567` | Client dashboard subscriptions, Command Palette flag behavior, Pipeline editor identity, and Page Rewriter request epochs. |
 | Closed Admin Chat deferral | `f8c9fa0f9` | Lazy ChatPanel and disabled closed-state smart-placeholder intelligence. |
 | Search & Traffic provider scoping | `ffd900f20` | Active-lens provider reads, observer reuse, analytics stale times, and event-specific invalidation. |
@@ -105,8 +107,31 @@ The independent functionality, runtime-wiring, bug, AI-intelligence, and optimiz
 | Keywords detail deferral | `36a6bbd2c` | Lazy canonical 440px Drawer, immediate loading shell, URL cleanup, body-scroll release, and originating-row focus restoration. |
 | Aggregate bundle closeout | `71a7ddc19` | Deterministic registry-only Font Awesome subset, scanner-proven dead-CSS cleanup, dev-harness production exclusion, and click-time-snapshotted on-demand DOCX export. |
 
+## Owner-Approved Closure Implementation Cohorts
+
+The owner-closure decisions are no longer queued or in progress. Each implementation is committed and P5-verified locally. This remains an extraction manifest, not release or staging authority.
+
+| Decision | Implementation references | Semantic extraction boundary |
+|---|---|---|
+| `AUD-B1` | `d611db84d` | Lock the shared closure contracts and measured 37,307 B CSS / 8,819 B Page Rewriter baselines while keeping the aggregate baseline at 1,720,000 B. |
+| `AUD-D2` | `1c0f40ee3` | Add only the unique Cockpit organic-value, content-velocity, and overall-health decision band. |
+| `AUD-D5` | `8892adc0d` + `a3efae499` | Keep the operational monthly digest current-month and evidence-honest; close the structured summary boundary without simulating durable historical snapshots. |
+| `AUD-D6` backend | `1451f78e2` | Make POV prompt fingerprints evidence/voice-aware, expose freshness, and preserve operator edits until explicit regeneration. |
+| `AUD-D4` | `c1dafb697` + `1229e48ff` | Add authoritative Published impressions/sessions evidence and preserve the unavailable-data versus empty-work distinction. |
+| `AUD-D7` | `1243b713d` | Elevate shared Tooltips relative to the active canonical overlay without changing the ordinary page layer. |
+| `AUD-D1` / `AUD-D6` UI | `29bac116a` + `833c26a9b` | Restore Engine Operations/history capability homes and truthful POV freshness/evidence states. |
+| `AUD-D3` | `f46d4cfcd` + `f8d75d60e` + `43aec6960` | Restore rebuilt-shell connection health, shared Global Ops health truth, and rebuilt command reachability. |
+
+The paired repair references are `43aec6960` for shell reachability, `833c26a9b` for Engine evidence truth, and `1229e48ff` for Pipeline availability truth. Preserve each with its owning primary implementation during any future surface-scoped extraction.
+
+Cross-cutting structured-AI and trial-metering hardening is committed in `eee07ed51`, `d686d8030`, `a3efae499`, and `58a7068d5`. The intelligence-consumer census and executable inventory are reconciled in `fe5d5ff58`. These are semantic hardening inputs, not visual-approval records and not authorization to ship the integration branch wholesale.
+
 ## Current Verification Caveats
 
-Do not describe this stack as release-ready yet. Focused suites, hooks lint, typecheck, production build, PR checks, AI quality/reliability reports, and fixed-viewport browser smoke support the hardening wave. The clean current all-project run passed 2,065 files and 28,834 tests, with one intentional skip and three todos. Owner decisions and the bundle disposition below remain required.
+P5 is complete locally, but do not describe this stack as release-ready or staging-verified. `AUD-D1`–`AUD-D7` and `AUD-B1` are owner-approved and implementation-committed; fresh independent review, changed-surface browser smoke, and the combined P5 gate record pass.
 
-The aggregate bundle ratchet is now green at 1,793,622 B against a 1,806,000 B ceiling after deterministic Font Awesome subsetting, scanner-proven dead-CSS cleanup, production harness exclusion, and on-demand click-snapshotted DOCX export. Two per-file entries still need surgical owner disposition: CSS is 37,307 B against a 37,274 B tolerance ceiling, and the behavior-safe Page Rewriter route is 8,819 B against an 8,326 B ceiling. Seventy-one new assets are warn-only. Independent review recommends measured baselines of 37,307 B and 8,819 B without changing the aggregate baseline. No push, PR, staging extraction, or baseline increase is authorized by this manifest.
+The latest recorded all-project run passed 2,077 files and 29,063 tests, with one intentional skip and three todos. The production build emitted 269 assets totaling 1.72 MiB gzip; 73 newly observed assets are warning-only and each is below 50 KiB. The approved baselines are committed at 37,307 B for CSS and 8,819 B for Page Rewriter while the aggregate baseline remains 1,720,000 B.
+
+The fixed 1440×900 and 1600×1000 changed-surface review found no overflow or current dev-server warnings/errors, the fresh independent review returned `PASS`, and typecheck, hooks, build, PR checks, bundle/deferred/flag/lexicon checks, plus the 13-step quick platform verifier pass.
+
+The bounded live-provider smoke remains unexecuted because dedicated credentials and separate staging authority were not provided. No push, PR, staging extraction, live-provider spend, or new visual approval is recorded by this manifest.

@@ -1,7 +1,7 @@
 # Admin Rebuilt Route Coverage Audit
 
-Audit state: route, nav, interior-state, and layout accounting complete; 27 direct rebuilt mounts plus the folded Content Performance receiving home are owner-approved; post-parity audit circle-backs remain open
-Last updated: 2026-07-11
+Audit state: route, nav, interior-state, and layout accounting complete; 27 direct rebuilt mounts plus the folded Content Performance receiving home are owner-approved; post-parity closure decisions are owner-approved, implemented, and P5-verified locally
+Last updated: 2026-07-12
 Source of truth files: `src/routes.ts`, `src/lib/navRegistry.tsx`, `src/components/layout/rebuiltSurfaces.ts`, and `hmpsn studio Design System/mockup/nav.js`
 
 This audit answers four questions that the per-surface contracts do not answer by themselves:
@@ -90,19 +90,19 @@ Interior state has been checked in contracts, component tests, and smoke for the
 
 | Contract | Route ids covered | Interior states accounted for | Visual status / constraint |
 |---|---|---|---|
-| Cockpit | `home` | Verdict spine, stream selector, work queue, evidence rail, activity Drawer, work-order modal, `stream=` deep link | `owner-approved`; corrected 1168px desktop composition and important overlays approved with unsupported prototype Send/Promote actions retained as explicit exceptions |
+| Cockpit | `home` | Verdict spine, unique-decision band, stream selector, work queue, evidence rail, activity Drawer, work-order modal, `stream=` deep link | `owner-approved`; corrected 1168px desktop composition and important overlays approved with unsupported prototype Send/Promote actions retained as explicit exceptions; `AUD-D2` is committed and P5-verified |
 | Brand & AI | `brand` | Grouped overview, modal workflows, `?tab=`/focused receivers, all 17 generators across four groups | `owner-approved`; truthful production interiors/actions and V5–V7 remain explicit exceptions |
 | Schema | `seo-schema` | Generator, Workflow Guide, site-plan disclosure, page detail Drawer, publish/send/history | `owner-approved`; corrected 1080/1020 generator and guide composition approved with the production Drawer retained as an explicit exception |
 | Links | `links` | Redirects, Internal Links, Dead Links, Architecture, detail Drawers, legacy alias | `owner-approved`; corrected 1120/1060 four-lens workshop approved with copy/send retained until a real Insert write target exists |
 | Performance | `performance` | Page Weight, paired single-page Mobile/Desktop results, isolated Bulk mode, weight/speed Drawers, Asset handoff | `owner-approved`; corrected fixed-viewport composition approved with live PageSpeed data unavailable and Drawer/Bulk workflows retained as explicit exceptions |
 | Competitors | `competitors` | Competitive stack, alert feed, setup states, detail Drawer, Hub/brief/send actions | `owner-approved`; corrected 1120/1060 stack and honest provider setup state approved with populated composition fixture-backed |
 | Keyword Hub | `seo-keywords` | Rankings, Opportunities, Pages, Clusters, bounded Lifecycle, detail Drawer | `owner-approved`; corrected 1128px five-lens workbench approved with unsupported trends/deltas retained as no-fabrication exceptions |
-| Insights Engine | `seo-strategy` | Spine, changes, signals, compact POV/full-editor Drawer, moves/More menu, projections, client preview, collapsed operations, staged topbar send | `owner-approved`; V1–V3 implemented, V4–V6 approved exceptions |
-| Content Pipeline | `content-pipeline` | Item-backed Board/Intake, focused Brief/Draft/Review workspaces, Calendar, Published, Content Health, Matrix, capacity/guide overlays | `owner-approved`; unsupported backend operations remain documented exceptions |
+| Insights Engine | `seo-strategy` | Spine, changes, signals, compact POV/full-editor Drawer, moves/More menu, projections, client preview, collapsed operations/history, POV freshness, staged topbar send | `owner-approved`; V1–V3 implemented, V4–V6 approved exceptions; `AUD-D1` / `AUD-D6` are committed and P5-verified |
+| Content Pipeline | `content-pipeline` | Item-backed Board/Intake, focused Brief/Draft/Review workspaces, Calendar, Published aggregate evidence, Content Health, Matrix, capacity/guide overlays | `owner-approved`; unsupported backend operations remain documented exceptions; `AUD-D4` is committed and P5-verified |
 | SEO Editor | `seo-editor` | Inline Static/CMS worktable, Manual read-only rows, source/quick filters, selected toolbar, 600/860px Research Drawer, URL state | `owner-approved`; keyboard review queue remains an explicit workflow exception |
 | Site Audit | `seo-audit` | Site Audit, compact History, state-aware compatibility evidence, schedule/issue/report overlays | `owner-approved`; Drawers and richer production operations remain explicit exceptions |
 | Search & Traffic | `analytics-hub` | Search Performance, Site Traffic, Annotations, hidden Overview receiver, Breakdowns Drawer | `owner-approved`; unavailable live providers and unsupported proof-stage action remain explicit exceptions |
-| Assets | `media` | Dense Browse workshop, compact Repair results, Upload/asset/organize overlays, bulk and repair handoffs | `owner-approved`; production Drawers and DS color semantics remain explicit exceptions |
+| Assets | `media` | Dense Browse workshop, compact Repair results, Upload/asset/organize overlays, bulk and repair handoffs, overlay-aware shared Tooltip | `owner-approved`; production Drawers and DS color semantics remain explicit exceptions; `AUD-D7` is committed and P5-verified |
 | Page Rewriter | `rewrite` | Two-pane workspace, shell focus mode, page picker, export menu, `?pageUrl=` | `owner-approved`; export-only v1 and retained 62px Focus rail approved, while draft/publish remains separate backend scope |
 | Local Presence | `local-seo` | Rank/profile, Reviews/replies, setup Drawer, legacy visibility receiver | `owner-approved`; geo-grid/GBP Performance remain explicit backend exceptions |
 | Page Intelligence | `page-intelligence` | Pages master/detail Research workbench, Architecture, Guide, single/bulk analysis, keyword edit/tracking, local/rank context, SEO copy, `?tab=`/`?page=` | `owner-approved`; standalone receiving-home decision preserves the flag-off legacy route and every established capability |
@@ -116,14 +116,29 @@ The behavior checkpoint accounted for layout and route state across the original
 Current layout buckets:
 
 - `owner-approved`: all 27 directly mounted rebuilt route homes, including Page Intelligence, plus the folded Content Performance receiving home. The original 26-route approval remains the historical batch; Joshua separately approved the later receiving-home bundle.
-- `awaiting owner approval`: no mounted or folded receiving-home visual comparison. The seven post-parity audit circle-backs are now owner-approved decisions in implementation; they are not silently accepted exceptions. See `post-parity-functionality-wiring-ai-audit.md`.
+- `awaiting owner approval`: none among the mounted/folded visual comparisons or post-parity circle-backs. The circle-backs were separately owner-approved, implemented, and P5-verified; they are not silently accepted exceptions. See `post-parity-functionality-wiring-ai-audit.md`.
 - `behavior-safe / visual-unverified`: none among the currently mounted or folded receiving homes.
 - Consolidated owner-review packet and measured registry-closeout evidence: `docs/ui-rebuild/parity/registry-final-owner-review.md` and `/tmp/asset-dashboard-codex-visual-parity/registry-final/`.
 - Receiving-home proof and owner review complete: Page Intelligence stays standalone under `ODP-012 B`; Content Pipeline Published is the flag-on Content Performance receiver. Both route ids remain intact, and both follow-ons are owner-approved.
 - Redirect/folded only: SEO Briefs, Content, and Calendar.
 - Preserved legacy standalone receiver: Subscriptions; its Content Pipeline query alias is accounted for separately.
 
-Provider evidence follow-on: `ws_demo_provider_rich` now supplies deterministic development-only GSC, GA4, PageSpeed, SEO-provider, and local-search evidence when `LOCAL_FAKE_PROVIDERS=true`. Integration health distinguishes configured, connected, verified, provider mode, and supported capabilities. This closes local evidence repeatability, not the authenticated-provider exceptions: GBP OAuth/reviews and live staging verification still require dedicated credentials, and the bounded read-only staging smoke has not been run.
+Post-parity implementation coverage:
+
+| Closure item | Current status | Implementation commits |
+|---|---|---|
+| `AUD-D1` | `decision owner-approved; implementation committed; P5 verified locally` | `29bac116a`, `833c26a9b` |
+| `AUD-D2` | `decision owner-approved; implementation committed; P5 verified locally` | `1c0f40ee3` |
+| `AUD-D3` | `decision owner-approved; implementation committed; P5 verified locally` | `f46d4cfcd`, `f8d75d60e`, `43aec6960` |
+| `AUD-D4` | `decision owner-approved; implementation committed; P5 verified locally` | `c1dafb697`, `1229e48ff` |
+| `AUD-D5` | `decision owner-approved; implementation committed; P5 verified locally` | `8892adc0d`, `a3efae499` |
+| `AUD-D6` | `decision owner-approved; implementation committed; P5 verified locally` | Backend `1451f78e2`; UI `29bac116a`, `833c26a9b` |
+| `AUD-D7` | `decision owner-approved; implementation committed; P5 verified locally` | `1243b713d` |
+| `AUD-B1` | `decision owner-approved; implementation committed; P5 verified locally` | `d611db84d` |
+
+Structured-AI, persistence, and effective-tier usage hardening is committed in `eee07ed51`, `d686d8030`, and `58a7068d5`; `fe5d5ff58` reconciles the intelligence-consumer census. P5 evidence is 2,077 files / 29,063 tests passed, 1 skipped, 3 todo; 269 bundle assets / 1.72 MiB gzip with 73 sub-50KiB assets warn-only; fresh independent `PASS`; fixed-viewport changed-surface review without overflow/current dev-server errors; and a passing 13-step quick platform verifier. Approved baselines remain CSS 37,307 B, Page Rewriter 8,819 B, and aggregate 1,720,000 B.
+
+Provider evidence follow-on: `ws_demo_provider_rich` now supplies deterministic development-only GSC, GA4, PageSpeed, SEO-provider, and local-search evidence when `LOCAL_FAKE_PROVIDERS=true`. Integration health distinguishes configured, connected, verified, provider mode, and supported capabilities. This closes local evidence repeatability, not the authenticated-provider exceptions: GBP OAuth/reviews and live staging verification still require dedicated credentials, and the bounded read-only staging smoke has not been run. No push, PR, staging extraction/verification, or live-provider spend is authorized by this record.
 
 ## Accepted Scope Direction
 

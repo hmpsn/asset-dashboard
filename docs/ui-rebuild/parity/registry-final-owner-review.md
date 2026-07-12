@@ -1,11 +1,12 @@
 # Registry-Wide Desktop Visual Review
 
 Review dates: 2026-07-10 through 2026-07-11
+Closure record updated: 2026-07-12
 Scope: the original 26-route owner-approved registry, the later owner-approved Page Intelligence direct mount, and the owner-approved folded Content Performance receiving home
 Desktop viewports: 1440×900 and 1600×1000
-Status: all 27 direct rebuilt mounts and the folded Content Performance receiving home are `owner-approved`; seven post-parity audit decisions are also `owner-approved` and in implementation
+Status: all 27 direct rebuilt mounts and the folded Content Performance receiving home are `owner-approved`; for `AUD-D1` through `AUD-D7` and `AUD-B1`, the closure state is `decision owner-approved; implementation committed; P5 verified locally`
 
-This packet preserves the consolidated owner-decision record for the original 26-route visual-parity closeout and tracks the later receiving-home additions separately. Joshua explicitly approved those original 26 route homes, then explicitly approved the Page Intelligence / Content Performance receiving-home bundle after its rendered TL;DR. Automated review remains supporting evidence only. The later audit decisions at the end of this packet are not approved exceptions.
+This packet preserves the consolidated owner-decision record for the original 26-route visual-parity closeout and tracks the later receiving-home additions separately. Joshua explicitly approved those original 26 route homes, then explicitly approved the Page Intelligence / Content Performance receiving-home bundle after its rendered TL;DR. Automated review remains supporting evidence only. The later audit decisions at the end of this packet are separately owner-approved implementation directions, not retroactive visual approvals or silent exceptions; their committed code is now P5-verified locally.
 
 ## Registry Status
 
@@ -93,7 +94,7 @@ These states were reviewed for containment, typography, exact-once reachability,
 
 - Page Rewriter Focus retains the accepted shared shell's 62px icon rail, while the prototype removes navigation entirely. Joshua explicitly approved retaining the rail on 2026-07-10.
 
-No safe-local visual defect remains in the approved capture set. The post-approval independent audit below nevertheless found capability, semantic, and shared-design-system choices that were not part of the earlier exception record. Those decisions remain open until Joshua resolves them.
+No safe-local visual defect remains in the approved capture set. The post-approval independent audit below nevertheless found capability, semantic, and shared-design-system choices that were not part of the earlier exception record. Joshua separately approved those directions, and their implementations are committed and P5-verified locally; this does not alter the settled visual-approval history.
 
 ## Page Intelligence receiving-home follow-on
 
@@ -107,12 +108,25 @@ With `ui-rebuild-shell` on, Content Performance bookmarks now replace-navigate i
 
 The multi-agent legacy-capability, runtime-wiring, bug, AI-summary/intelligence, and optimization sweep found no P0 functionality loss. Safe repairs landed in `8f6c3ce83`, `476db936a`, `8a8f42f85`, `1757ef409`, `7405e802b`, `4e647d093`, `ba62f607e`, `09bc10bfa`, and `a90971567`; the first three safe performance wins landed in `f8c9fa0f9`, `ffd900f20`, and `fe8ab70a2`. These commits preserve the approved settled composition and do not constitute new owner approval.
 
-Seven findings required an explicit owner decision rather than silent exception conversion: Engine Operations/history, unique Cockpit KPIs, rebuilt-shell connection health, Published impressions/sessions summary placement, monthly-digest time authority, POV evidence/voice refresh semantics, and overlay-aware shared Tooltips. Joshua approved `AUD-D1` through `AUD-D7` on 2026-07-11; implementation and fresh evidence follow the closure plan.
+Seven findings required an explicit owner decision rather than silent exception conversion: Engine Operations/history, unique Cockpit KPIs, rebuilt-shell connection health, Published impressions/sessions summary placement, monthly-digest time authority, POV evidence/voice refresh semantics, and overlay-aware shared Tooltips. Joshua approved `AUD-D1` through `AUD-D7` on 2026-07-11. The owner-approved bundle disposition is tracked as `AUD-B1`. All eight implementation families are committed and P5-verified locally.
 
-Current verification is intentionally not described as a clean release gate. Focused suites, hooks lint, typecheck, production build, PR checks, AI quality/reliability reports, and live fixed-viewport smoke support the repair wave. The clean current all-project suite passed 2,065 files and 28,834 tests, with one intentional skip and three todos. Keywords and aggregate bundle gzip now pass; aggregate is 1,793,622 B against a 1,806,000 B ceiling. Bundle verification remains red only for CSS 37,307 B against a 37,274 B ceiling and the behavior-safe Page Rewriter route at 8,819 B against 8,326 B; 71 new assets are warning-only. The seven workflow decisions and these two measured per-file ratchet dispositions remain required.
+| Closure item | Current status | Implementation commits |
+|---|---|---|
+| `AUD-D1` | `decision owner-approved; implementation committed; P5 verified locally` | `29bac116a`, `833c26a9b` |
+| `AUD-D2` | `decision owner-approved; implementation committed; P5 verified locally` | `1c0f40ee3` |
+| `AUD-D3` | `decision owner-approved; implementation committed; P5 verified locally` | `f46d4cfcd`, `f8d75d60e`, `43aec6960` |
+| `AUD-D4` | `decision owner-approved; implementation committed; P5 verified locally` | `c1dafb697`, `1229e48ff` |
+| `AUD-D5` | `decision owner-approved; implementation committed; P5 verified locally` | `8892adc0d`, `a3efae499` |
+| `AUD-D6` | `decision owner-approved; implementation committed; P5 verified locally` | Backend `1451f78e2`; UI `29bac116a`, `833c26a9b` |
+| `AUD-D7` | `decision owner-approved; implementation committed; P5 verified locally` | `1243b713d` |
+| `AUD-B1` | `decision owner-approved; implementation committed; P5 verified locally` | `d611db84d` |
+
+Supplemental structured-AI, persistence, and effective-tier usage hardening is committed in `eee07ed51`, `d686d8030`, and `58a7068d5`; the intelligence-consumer census is reconciled in `fe5d5ff58`. These are supporting implementation records rather than new owner decisions.
+
+P5 is complete locally, not a release gate. The full suite passed 2,077 files / 29,063 tests, with 1 skipped and 3 todo. Bundle verification reports 269 assets / 1.72 MiB gzip, with 73 sub-50KiB assets warn-only; the approved baselines are CSS 37,307 B, Page Rewriter 8,819 B, and aggregate 1,720,000 B. Fresh independent review returned `PASS`; changed-surface browser evidence passed at both fixed viewports without overflow/current dev-server errors; and the 13-step quick platform verifier passed. No push, PR, staging extraction/verification, or live-provider spend is authorized; authenticated live-provider proof remains unexecuted without dedicated credentials and separate authority.
 
 ## Owner Decision Record
 
 On 2026-07-10 Joshua approved all remaining 24 route homes as the recommended deferred-feedback batch, with every documented exception retained and Page Rewriter's 62px Focus rail kept. This advances all 26 mounted rebuilt route homes to `owner-approved`. Later fine feedback is a refinement pass and does not invalidate this acceptance record unless Joshua explicitly reopens a surface.
 
-On 2026-07-11 Joshua explicitly replied **“Approved”** to the Page Intelligence / Content Performance receiving-home bundle after its TL;DR. This advances Page Intelligence as the 27th owner-approved direct mount and approves Pipeline Published as the folded Content Performance home. It does not approve `AUD-D1` through `AUD-D7`.
+On 2026-07-11 Joshua explicitly replied **“Approved”** to the Page Intelligence / Content Performance receiving-home bundle after its TL;DR. This advances Page Intelligence as the 27th owner-approved direct mount and approves Pipeline Published as the folded Content Performance home. That receiving-home approval did not itself approve `AUD-D1` through `AUD-D7`; Joshua separately approved those later directions on 2026-07-11 with **“Let’s do it.”** Their implementations are committed and P5-verified locally.

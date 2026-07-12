@@ -121,9 +121,12 @@ Accepted owner directions, circle-back triggers, and remaining risks are tracked
    - Deliverable: one discrepancy matrix, corrected evidence set, fresh review, and explicit Joshua decision per surface.
 
 23. Post-parity functionality, wiring, and AI-intelligence audit
-   - Audit status: no P0 loss found; safe repairs implemented; Joshua approved all seven owner circle-backs and the targeted bundle disposition on 2026-07-11; implementation follows the closure plan.
+   - Audit status: no P0 loss found; safe repairs implemented. For `AUD-D1` through `AUD-D7` and `AUD-B1`, the closure state is `decision owner-approved; implementation committed; P5 verified locally`. This status records Joshua's 2026-07-11 approval, the later commits, and the combined P5 evidence; it is not a new visual approval.
    - Deliverable completed: safe client review targets, workspace-owned state isolation, admin refresh wiring, provider-backed intelligence invalidation, AI reliability evidence matching, stacked overlay coordination, digest/cache freshness, generated-context freshness, and final navigation/deep-link wiring landed in `8f6c3ce83` through `a90971567` as enumerated in `post-parity-functionality-wiring-ai-audit.md`.
-   - Remaining decision gate: `AUD-D1` through `AUD-D7` cover Engine legacy workflow homes, unique Cockpit KPIs, shell connection health, Published impressions/sessions placement, monthly-digest time authority, POV refresh semantics, and shared Tooltip overlay behavior. None is an approved exception yet.
+   - Owner-closure commits: `AUD-B1` `d611db84d`; `AUD-D2` `1c0f40ee3`; `AUD-D5` `8892adc0d` + `a3efae499`; `AUD-D6` backend `1451f78e2`; `AUD-D4` `c1dafb697` + `1229e48ff`; `AUD-D7` `1243b713d`; `AUD-D1` / `AUD-D6` UI `29bac116a` + `833c26a9b`; and `AUD-D3` `f46d4cfcd` + `f8d75d60e` + `43aec6960`.
+   - Supporting hardening: structured AI contracts, persistence, and effective-tier usage gates landed in `eee07ed51`, `d686d8030`, and `58a7068d5`; the intelligence-consumer census was reconciled in `fe5d5ff58`.
+   - Current supporting verification: 2,077 files / 29,063 tests passed, 1 skipped, 3 todo; bundle verification reports 269 assets / 1.72 MiB gzip with 73 sub-50KiB assets remaining warn-only. Approved baselines remain CSS 37,307 B, Page Rewriter 8,819 B, and aggregate 1,720,000 B.
+   - P5 result: fresh independent review returned `PASS`; fixed 1440×900 and 1600×1000 changed-surface checks found no overflow or current dev-server warning/error; typecheck, hooks, build, PR checks, bundle/deferred/flag/lexicon gates, and the 13-step quick platform verifier pass. No push, PR, staging extraction/verification, or live-provider spend is authorized.
 
 24. First safe optimization wave
    - Implementation status: complete and independently reviewed; this is performance evidence, not a new visual approval.
