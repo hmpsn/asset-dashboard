@@ -10,6 +10,7 @@ import {
   Badge,
   Button,
   ClickableRow,
+  CompactStatBar,
   Drawer,
   EmptyState,
   ErrorState,
@@ -208,6 +209,37 @@ function SummaryStats({ summary }: { summary: ContentPerformanceSummary }) {
   );
 }
 
+function PublishedAggregateEvidence({
+  summary,
+  items,
+}: {
+  summary: ContentPerformanceSummary;
+  items: ContentPerformanceItem[];
+}) {
+  const searchAvailable = items.some((item) => item.gsc != null);
+  const analyticsAvailable = items.some((item) => item.ga4 != null);
+
+  return (
+    <section aria-label="Published aggregate evidence">
+      <CompactStatBar
+        items={[
+          {
+            label: 'Impressions',
+            value: searchAvailable ? formatInteger(summary.totalImpressions) : '—',
+            valueColor: searchAvailable ? 'text-[var(--blue)]' : 'text-[var(--brand-text-dim)]',
+          },
+          {
+            label: 'Sessions',
+            value: analyticsAvailable ? formatInteger(summary.totalSessions) : '—',
+            valueColor: analyticsAvailable ? 'text-[var(--blue)]' : 'text-[var(--brand-text-dim)]',
+          },
+        ]}
+        className="w-full"
+      />
+    </section>
+  );
+}
+
 function PublishedDetail({ workspaceId, item, siteLabel }: { workspaceId: string; item: ContentPerformanceItem | null; siteLabel?: string | null }) {
   if (!item) return null;
   const liveUrl = buildLiveContentUrl(siteLabel, item.targetPageSlug);
@@ -295,6 +327,7 @@ export function PublishedContentLens({ workspaceId, siteLabel, selectedItemId = 
     <div className="flex flex-col gap-4" data-testid="content-pipeline-published-lens">
       {query.isError && query.data && <InlineBanner tone="warning" title="Published data may be stale">The last loaded results remain visible. Re-scan when the source is healthy.</InlineBanner>}
       <SummaryStats summary={query.data!.summary} />
+      <PublishedAggregateEvidence summary={query.data!.summary} items={items} />
       <Toolbar label="Published content controls" className="w-full py-1.5">
         <div className="flex flex-wrap gap-1.5">{STATUS_FILTERS.map((filter) => <FilterChip key={filter.id} label={filter.label} count={counts[filter.id]} active={statusFilter === filter.id} onClick={() => setStatusFilter(filter.id)} />)}</div>
         <ToolbarSpacer />

@@ -1,6 +1,6 @@
 // @ds-rebuilt
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useState } from 'react';
 import { MemoryRouter, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -1066,6 +1066,58 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     expect(screen.getAllByText('45,000').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Clicks').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Impressions').length).toBeGreaterThan(0);
+
+    const summaryLabel = screen.getByText('Pieces live');
+    const aggregateEvidence = screen.getByRole('region', { name: 'Published aggregate evidence' });
+    const controls = screen.getByLabelText('Published content controls');
+    expect(summaryLabel.compareDocumentPosition(aggregateEvidence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(aggregateEvidence.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(aggregateEvidence).getByText('Impressions')).toBeInTheDocument();
+    expect(within(aggregateEvidence).getByText('45,000')).toBeInTheDocument();
+    expect(within(aggregateEvidence).getByText('Sessions')).toBeInTheDocument();
+    expect(within(aggregateEvidence).getByText('640')).toBeInTheDocument();
+  });
+
+  it('distinguishes unavailable Published providers from legitimate zero totals', async () => {
+    const unavailable = {
+      ...publishedResponse,
+      items: publishedResponse.items.map((item) => ({ ...item, gsc: null, ga4: null })),
+    };
+    mocks.contentPerformanceHook.mockReturnValue({
+      data: unavailable,
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const first = renderSurface(`/ws/${workspaceId}/content-pipeline?tab=published`);
+    const unavailableEvidence = await screen.findByRole('region', { name: 'Published aggregate evidence' });
+    expect(within(unavailableEvidence).getAllByText('—')).toHaveLength(2);
+
+    first.unmount();
+    mocks.contentPerformanceHook.mockReturnValue({
+      data: {
+        ...publishedResponse,
+        summary: { ...publishedResponse.summary, totalImpressions: 0, totalSessions: 0 },
+        items: publishedResponse.items.map((item) => ({
+          ...item,
+          gsc: item.gsc ? { ...item.gsc, impressions: 0 } : item.gsc,
+          ga4: item.ga4 ? { ...item.ga4, sessions: 0 } : item.ga4,
+        })),
+      },
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=published`);
+    const zeroEvidence = await screen.findByRole('region', { name: 'Published aggregate evidence' });
+    expect(within(zeroEvidence).getAllByText('0')).toHaveLength(2);
+    expect(within(zeroEvidence).queryByText('—')).not.toBeInTheDocument();
   });
 
   it('opens View live against the workspace liveDomain rather than an integration label', async () => {
@@ -1123,6 +1175,7 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     expect(screen.getByRole('button', { name: 'Re-scan' })).toBeInTheDocument();
     expect(screen.queryByText('Pieces Live')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Published content controls')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Published aggregate evidence' })).not.toBeInTheDocument();
   });
 
   it('preserves the calendar ?tab=posts&post= receiver and clears only post on close', async () => {
