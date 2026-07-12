@@ -1,5 +1,5 @@
 import { isLocalFakeProviderModeEnabled } from '../local-provider-mode.js';
-import type { PageSpeedResult, SiteSpeedResult } from '../pagespeed.js';
+import type { PageSpeedResult, SiteSpeedResult } from '../pagespeed-types.js';
 
 export const LOCAL_PROVIDER_FIXTURE = {
   workspaceId: 'ws_demo_provider_rich',
