@@ -21,6 +21,7 @@ import {
 import { RebuiltTopbarActions } from '../layout/RebuiltAppChrome';
 import { WeeklyAccomplishments } from '../workspace-home';
 import { CockpitActivityDrawer } from './CockpitActivityDrawer';
+import { CockpitDecisionBand } from './CockpitDecisionBand';
 import { CockpitEvidenceRail } from './CockpitEvidenceRail';
 import { CockpitWorkOrderDrawer } from './CockpitWorkOrderDrawer';
 import { CockpitWorkQueue, STREAM_META, toSelectableWorkStream } from './CockpitWorkQueue';
@@ -295,6 +296,8 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
           {cockpit.verdict?.narrative ?? 'The server has not returned a Cockpit verdict for this workspace yet.'}
         </p>
       </div>
+
+      <CockpitDecisionBand kpis={cockpit.kpis} />
 
       {/* co-streams — full-width work-stream selector, sibling of the grid below */}
       <WorkStreamSelector

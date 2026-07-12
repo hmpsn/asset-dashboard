@@ -333,6 +333,52 @@ describe('CockpitSurface rebuilt', () => {
     expect(screen.getByText('#3')).toHaveClass('t-body');
   });
 
+  it('places one unique-decision band between the verdict and work streams', async () => {
+    renderSurface();
+
+    const verdict = await screen.findByRole('heading', { name: 'Client-facing work is ready to review and send.' });
+    const band = screen.getByRole('region', { name: 'Cockpit decision metrics' });
+    const firstStream = screen.getByRole('radio', { name: /Optimizations/ });
+
+    expect(verdict.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(band.compareDocumentPosition(firstStream) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(band).getByText('Organic value')).toBeInTheDocument();
+    expect(within(band).getByText('$42,000')).toBeInTheDocument();
+    expect(within(band).getByText('Content velocity')).toBeInTheDocument();
+    expect(within(band).getByText('3/mo')).toBeInTheDocument();
+    expect(within(band).getByText('4 this month · +50% trend')).toBeInTheDocument();
+    expect(within(band).getByText('Overall health')).toBeInTheDocument();
+    expect(within(band).getByText('84')).toBeInTheDocument();
+    expect(within(band).getByText('On track')).toBeInTheDocument();
+    expect(band.querySelectorAll('.t-label')).toHaveLength(3);
+    expect(within(band).queryByText(/clicks|impressions|users|sessions/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps unavailable decision metrics honest instead of fabricating zeroes', async () => {
+    const state = makeCockpitState();
+    mocks.cockpitState = {
+      ...state,
+      kpis: {
+        ...state.kpis,
+        trafficValue: { ...state.kpis.trafficValue, organic: null },
+        contentVelocity: {
+          ...state.kpis.contentVelocity,
+          currentMonthPublished: null,
+          trailingThreeMonthAvg: null,
+        },
+        overallHealth: { score: null, label: 'Establishing' },
+      },
+    };
+
+    renderSurface();
+
+    const band = await screen.findByRole('region', { name: 'Cockpit decision metrics' });
+    expect(within(band).getAllByText('—')).toHaveLength(3);
+    expect(within(band).getByText('Unavailable')).toBeInTheDocument();
+    expect(within(band).getAllByText('Establishing')).toHaveLength(2);
+    expect(within(band).queryByText('0')).not.toBeInTheDocument();
+  });
+
   it('uses the compact prototype frame and keeps operator controls reachable through the topbar host', async () => {
     renderSurface();
 
