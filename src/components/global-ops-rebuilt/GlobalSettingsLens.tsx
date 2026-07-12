@@ -40,6 +40,18 @@ const PRUNE_LABELS: Record<GlobalOpsPruneType, { label: string; detail: string }
   activity: { label: 'Prune activity logs', detail: 'Trims old activity beyond the retention cap.' },
 };
 
+function validBookingPreviewUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? trimmed : null;
+  } catch {
+    return null;
+  }
+}
+
 export function GlobalSettingsLens() {
   const { toast } = useToast();
   const workspaces = useGlobalOpsWorkspaces();
@@ -61,6 +73,7 @@ export function GlobalSettingsLens() {
 
   const workspaceList = workspaces.data ?? [];
   const linkedWorkspaceCount = workspaceList.filter((workspace) => Boolean(workspace.webflowSiteId)).length;
+  const bookingPreviewUrl = validBookingPreviewUrl(bookingUrl);
 
   const handleConnectGoogle = () => {
     googleAuthUrl.mutate(undefined, {
@@ -191,6 +204,7 @@ export function GlobalSettingsLens() {
             type="url"
             value={bookingUrl}
             onChange={setBookingUrl}
+            aria-label="Booking URL"
             placeholder="https://cal.com/yourname"
             className="flex-1"
           />
@@ -198,6 +212,17 @@ export function GlobalSettingsLens() {
             <Icon name="check" size="sm" /> Save
           </Button>
         </div>
+        {bookingPreviewUrl && (
+          <a
+            href={bookingPreviewUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex w-fit items-center gap-1.5 t-caption-sm text-[var(--teal)] transition-opacity hover:opacity-90"
+          >
+            <Icon name="external" size="xs" aria-hidden="true" />
+            Preview link
+          </a>
+        )}
       </SectionCard>
 
       <FeatureFlagSettings />

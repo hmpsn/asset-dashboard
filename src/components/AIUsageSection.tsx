@@ -106,11 +106,12 @@ export function AIUsageSection({ compact = false }: { compact?: boolean } = {}) 
   const fmtCost = (v: number) => v < 0.01 ? '<$0.01' : `$${v.toFixed(2)}`;
   const compactMetricValueClass = compact ? 't-stat-sm text-[20px] font-extrabold leading-none' : 'text-sm'; // arbitrary-text-ok stat-primitive-ok — source Business KPI tiles are exactly 20px; the nearest DS role is 18px.
   const rangeControl = (
-    <div className="flex gap-1" aria-label="Usage date range">
+    <div className="flex gap-1" role="group" aria-label="Usage date range">
       {[7, 14, 30].map(d => (
         <Button
           key={d}
           onClick={() => { setLoading(true); setDays(d); }}
+          aria-pressed={days === d}
           variant="ghost"
           size="sm"
           className={cn(
@@ -148,7 +149,7 @@ export function AIUsageSection({ compact = false }: { compact?: boolean } = {}) 
     <SectionCard
       title="AI Usage"
       titleIcon={usageTitleIcon}
-      action={compact ? undefined : rangeControl}
+      action={rangeControl}
     >
       {/* AI cards + daily cost chart only when there IS AI activity — the section can
           also be shown for DataForSEO usage alone, where these would read all-zero. */}
@@ -197,7 +198,6 @@ export function AIUsageSection({ compact = false }: { compact?: boolean } = {}) 
           <div className="flex flex-wrap items-center justify-end gap-3">
             <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]"><div className="w-2 h-2 rounded-[var(--radius-pill)] bg-emerald-500" /> OpenAI</div>
             <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]"><div className="w-2 h-2 rounded-[var(--radius-pill)] bg-orange-500" /> Anthropic</div>
-            {compact && rangeControl}
           </div>
         </div>
         <ResponsiveContainer width="100%" height={120}>

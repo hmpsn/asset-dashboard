@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
@@ -167,6 +167,21 @@ describe('Global Ops Wave A composition contracts', () => {
     }, -1);
     expect(within(surface).queryByText('GSC properties')).not.toBeInTheDocument();
     expect(within(surface).queryByRole('grid')).not.toBeInTheDocument();
+  });
+
+  it('offers a safe new-tab preview only while the booking URL is valid', () => {
+    renderWithProviders(<GlobalSettingsLens />, '/settings');
+
+    const preview = screen.getByRole('link', { name: 'Preview link' });
+    expect(preview).toHaveAttribute('href', 'https://cal.example/rinse');
+    expect(preview).toHaveAttribute('target', '_blank');
+    expect(preview).toHaveAttribute('rel', expect.stringContaining('noopener'));
+    expect(preview).toHaveAttribute('rel', expect.stringContaining('noreferrer'));
+
+    fireEvent.change(screen.getByPlaceholderText('https://cal.com/yourname'), {
+      target: { value: 'javascript:alert(1)' },
+    });
+    expect(screen.queryByRole('link', { name: 'Preview link' })).not.toBeInTheDocument();
   });
 
   it('pairs the production seven-tab settings UI with the prototype identity header', () => {

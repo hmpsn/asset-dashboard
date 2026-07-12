@@ -213,7 +213,6 @@ export const queryKeys = {
     workspaceOverview: () => ['admin-workspace-overview'] as const,
     globalOpsGoogleStatus: () => ['admin-global-ops-google-status'] as const,
     globalOpsGscSites: () => ['admin-global-ops-gsc-sites'] as const,
-    globalOpsHealth: () => ['admin-global-ops-health'] as const,
     globalOpsStorage: () => ['admin-global-ops-storage'] as const,
     globalOpsStudioConfig: () => ['admin-global-ops-studio-config'] as const,
     health: () => ['admin-health'] as const,
