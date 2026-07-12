@@ -25,7 +25,9 @@ import { useToast } from '../Toast';
 import {
   Button,
   Drawer,
+  ErrorState,
   Icon,
+  InlineBanner,
   LensSwitcher,
   Menu,
   PageHeader,
@@ -128,7 +130,7 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
     () => workspaces.data?.find((item) => item.id === workspaceId),
     [workspaceId, workspaces.data],
   );
-  const workspaceTier = (workspace?.tier ?? 'free') as Tier;
+  const workspaceTier = workspace?.tier as Tier | undefined;
   const siteLabel = resolveLiveSiteBase(workspace?.liveDomain, workspace?.gscPropertyUrl);
   const contentPipeline = intelligence.data?.contentPipeline;
   const pipelineData = useMemo<ContentPipelineData | undefined>(() => {
@@ -167,14 +169,73 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
     [postsQuery.data, state.postId],
   );
   const subscriptionSummary = contentPipeline?.subscriptions;
+  const intelligenceResponseAvailable = intelligence.data !== undefined;
+  const intelligenceSnapshotAvailable = contentPipeline !== undefined;
+  const intelligenceSnapshotPending = !intelligenceResponseAvailable && !intelligence.isError;
+  const intelligenceSnapshotUnavailable = !intelligenceSnapshotAvailable
+    && (intelligence.isError || intelligenceResponseAvailable);
+  const intelligenceSnapshotStale = intelligence.isError && intelligenceSnapshotAvailable;
+  const subscriptionSnapshotAvailable = subscriptionSummary !== undefined;
+  const capacityUnavailable = intelligenceSnapshotUnavailable
+    || (intelligenceSnapshotAvailable && !subscriptionSnapshotAvailable);
   const activePlanCount = subscriptionSummary?.active ?? 0;
   const capacityOpen = capacityDrawerOpen || state.tab === 'publish';
-  const capacityHeadline = activePlanCount > 0
-    ? `${activePlanCount} active plan${activePlanCount === 1 ? '' : 's'}`
-    : 'No content plan';
-  const capacityDetail = activePlanCount > 0
+  const capacityHeadline = intelligenceSnapshotPending
+    ? 'Loading capacity'
+    : capacityUnavailable
+      ? 'Capacity unavailable'
+      : activePlanCount > 0
+        ? `${activePlanCount} active plan${activePlanCount === 1 ? '' : 's'}`
+        : 'No content plan';
+  const capacityDetailBase = activePlanCount > 0
     ? `${subscriptionSummary?.totalPages ?? 0} pages covered`
     : 'Set up plan';
+  const capacityDetail = intelligenceSnapshotPending
+    ? 'Checking content plan'
+    : capacityUnavailable
+      ? 'Retry data'
+      : intelligenceSnapshotStale
+        ? `${capacityDetailBase} · May be stale`
+        : capacityDetailBase;
+  const lifecycleQueries = [
+    briefsQuery,
+    requestsQuery,
+    postsQuery,
+    suggestionsQuery,
+    workOrdersQuery,
+  ] as const;
+  const lifecycleUnavailable = lifecycleBoardVisible
+    && lifecycleQueries.some((query) => query.isError && query.data === undefined);
+  const lifecycleLoading = lifecycleBoardVisible
+    && !lifecycleUnavailable
+    && lifecycleQueries.some((query) => query.data === undefined && !query.isError);
+  const lifecycleStale = lifecycleBoardVisible
+    && lifecycleQueries.some((query) => query.isError && query.data !== undefined);
+  const pipelineSnapshotAvailable = pipelineQuery.data !== undefined;
+  const pipelineSnapshotPending = !pipelineSnapshotAvailable && !pipelineQuery.isError;
+  const healthUnavailable = (pipelineQuery.isError && !pipelineSnapshotAvailable)
+    || intelligenceSnapshotUnavailable;
+  const healthLoading = !healthUnavailable && (
+    pipelineSnapshotPending
+    || intelligenceSnapshotPending
+  );
+  const healthStale = (pipelineQuery.isError && pipelineSnapshotAvailable)
+    || intelligenceSnapshotStale;
+
+  const retryLifecycleQueries = () => {
+    void Promise.all(
+      lifecycleQueries
+        .filter((query) => query.isError)
+        .map((query) => query.refetch()),
+    );
+  };
+
+  const retryHealthQueries = () => {
+    const refetches: Array<Promise<unknown>> = [];
+    if (pipelineQuery.isError) refetches.push(pipelineQuery.refetch());
+    if (intelligence.isError || intelligenceSnapshotUnavailable) refetches.push(intelligence.refetch());
+    void Promise.all(refetches);
+  };
 
   const invalidateContentPipeline = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
@@ -318,6 +379,15 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
     if (state.tab === 'publish') state.setTab('briefs');
   };
 
+  const openCapacity = () => {
+    if (intelligenceSnapshotPending) return;
+    if (capacityUnavailable) {
+      void intelligence.refetch();
+      return;
+    }
+    setCapacityDrawerOpen(true);
+  };
+
   const closeBriefWorkspace = () => {
     setFocusedBriefId(null);
     setBlankBriefOpen(false);
@@ -373,8 +443,10 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
             size="sm"
             variant="secondary"
             className="h-auto shrink-0 gap-2 px-2.5 py-1.5 text-left"
-            onClick={() => setCapacityDrawerOpen(true)}
+            onClick={openCapacity}
+            disabled={intelligenceSnapshotPending}
             aria-pressed={capacityOpen || state.tab === 'publish'}
+            aria-busy={intelligenceSnapshotPending}
           >
             <Icon name="layers" size="sm" className="text-[var(--teal)]" />
             <span className="flex flex-col items-start leading-tight">
@@ -403,34 +475,70 @@ export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfacePr
               onCloseItem={state.clearPublishedItem}
             />
           </Suspense>
-        ) : lifecycleBoardVisible ? (
-          <ContentLifecycleBoard
-            key={boardFocus}
-            items={lifecycleItems}
-            focus={boardFocus}
-            intakeCount={intakeSnapshot.total}
-            intakeSummary={intakeSnapshot.summary}
-            intakeContent={(
-              <ContentPipelineIntake
-                workspaceId={workspaceId}
-                snapshot={intakeSnapshot}
-                onCreateBrief={handleCreateBrief}
-              />
+        ) : lifecycleBoardVisible ? lifecycleUnavailable ? (
+          <ErrorState
+            type="data"
+            title="Content Pipeline work did not load"
+            message="Briefs, requests, or drafts could not be loaded. Retry before relying on the lifecycle Board."
+            action={{ label: 'Retry', onClick: retryLifecycleQueries }}
+            className="min-h-[360px]"
+          />
+        ) : lifecycleLoading ? (
+          <ContentPipelineInteriorLoading label="Content Pipeline work" />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {lifecycleStale && (
+              <InlineBanner tone="warning" title="Pipeline work may be stale">
+                The last loaded lifecycle snapshot remains visible. Refresh when the source is healthy.
+              </InlineBanner>
             )}
-            onOpenBriefs={openBriefs}
-            onOpenDrafts={openDrafts}
-            onOpenBrief={openBrief}
-            onOpenPost={openPost}
-          />
+            <ContentLifecycleBoard
+              key={boardFocus}
+              items={lifecycleItems}
+              focus={boardFocus}
+              intakeCount={intakeSnapshot.total}
+              intakeSummary={intakeSnapshot.summary}
+              intakeContent={(
+                <ContentPipelineIntake
+                  workspaceId={workspaceId}
+                  snapshot={intakeSnapshot}
+                  onCreateBrief={handleCreateBrief}
+                />
+              )}
+              onOpenBriefs={openBriefs}
+              onOpenDrafts={openDrafts}
+              onOpenBrief={openBrief}
+              onOpenPost={openPost}
+            />
+          </div>
         ) : isContentPipelineStandaloneTab(state.tab) ? (
-          <ContentPipelineLenses
-            workspaceId={workspaceId}
-            tab={state.tab}
-            pipelineData={pipelineData}
-            contentPipeline={contentPipeline}
-            workspaceTier={workspaceTier}
-            onOpenTab={openWorkflowTab}
-          />
+          state.tab === 'content-health' && healthUnavailable ? (
+            <ErrorState
+              type="data"
+              title="Content health did not load"
+              message="Decay or workspace intelligence data could not be loaded. Retry before treating the workspace as healthy."
+              action={{ label: 'Retry', onClick: retryHealthQueries }}
+              className="min-h-[360px]"
+            />
+          ) : state.tab === 'content-health' && healthLoading ? (
+            <ContentPipelineInteriorLoading label="content health" />
+          ) : (
+            <div className="flex flex-col gap-3">
+              {state.tab === 'content-health' && healthStale && (
+                <InlineBanner tone="warning" title="Content health may be stale">
+                  The last loaded decay and intelligence evidence remains visible. Refresh when the source is healthy.
+                </InlineBanner>
+              )}
+              <ContentPipelineLenses
+                workspaceId={workspaceId}
+                tab={state.tab}
+                pipelineData={pipelineData}
+                contentPipeline={contentPipeline}
+                workspaceTier={workspaceTier}
+                onOpenTab={openWorkflowTab}
+              />
+            </div>
+          )
         ) : null}
 
         <ContentPipelineWorkspaces

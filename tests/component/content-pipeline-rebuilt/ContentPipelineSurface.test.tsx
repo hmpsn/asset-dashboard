@@ -576,6 +576,8 @@ beforeEach(() => {
     data: pipelineData,
     isLoading: false,
     isFetching: false,
+    isError: false,
+    error: null,
     refetch: vi.fn().mockResolvedValue({ data: pipelineData, error: null }),
   });
   mocks.workspacesHook.mockReturnValue({
@@ -587,6 +589,8 @@ beforeEach(() => {
     data: { contentPipeline: contentPipelineSlice },
     isLoading: false,
     isFetching: false,
+    isError: false,
+    error: null,
     refetch: vi.fn().mockResolvedValue({ data: { contentPipeline: contentPipelineSlice }, error: null }),
   });
   mocks.briefsHook.mockReturnValue({ data: briefs, isLoading: false, isError: false, refetch: vi.fn().mockResolvedValue({ data: briefs, error: null }) });
@@ -763,6 +767,73 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
 
     expect(await screen.findByTestId('legacy-calendar')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Board' })).not.toHaveTextContent('0');
+  });
+
+  it('shows a loading interior instead of an empty lifecycle Board while required lists have no cache', async () => {
+    mocks.briefsHook.mockReturnValue({ data: undefined, isLoading: true, isError: false, refetch: vi.fn() });
+    mocks.requestsHook.mockReturnValue({ data: undefined, isLoading: true, isError: false, refetch: vi.fn() });
+    mocks.postsHook.mockReturnValue({ data: undefined, isLoading: true, isError: false, refetch: vi.fn() });
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=briefs`);
+
+    expect(await screen.findByText('Loading Content Pipeline work…')).toBeInTheDocument();
+    expect(screen.queryByTestId('content-pipeline-board')).not.toBeInTheDocument();
+    expect(screen.queryByText('Nothing is waiting to be triaged.')).not.toBeInTheDocument();
+  });
+
+  it('keeps a paused no-cache lifecycle read in the loading state', async () => {
+    mocks.briefsHook.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isPending: true,
+      isError: false,
+      fetchStatus: 'paused',
+      refetch: vi.fn(),
+    });
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=briefs`);
+
+    expect(await screen.findByText('Loading Content Pipeline work…')).toBeInTheDocument();
+    expect(screen.queryByTestId('content-pipeline-board')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['briefs', 'brief data', mocks.briefsHook],
+    ['requests', 'request data', mocks.requestsHook],
+    ['posts', 'draft data', mocks.postsHook],
+  ] as const)('shows a retryable Board error when uncached %s fail', async (_name, label, queryMock) => {
+    const refetch = vi.fn().mockResolvedValue({ data: [], error: null });
+    queryMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error(`${label} unavailable`),
+      refetch,
+    });
+
+    const view = renderSurface(`/ws/${workspaceId}/content-pipeline?tab=briefs`);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Content Pipeline work did not load');
+    expect(screen.queryByTestId('content-pipeline-board')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+    view.unmount();
+  });
+
+  it('keeps cached lifecycle work visible and warns when a background refetch fails', async () => {
+    mocks.briefsHook.mockReturnValue({
+      data: briefs,
+      isLoading: false,
+      isError: true,
+      error: new Error('brief refresh failed'),
+      refetch: vi.fn(),
+    });
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=briefs`);
+
+    expect(await screen.findByTestId('content-pipeline-board')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Pipeline work may be stale');
+    expect(screen.getByRole('button', { name: /Standalone brief title/i })).toBeInTheDocument();
   });
 
   it('mounts only the active lazy interior across lens transitions', async () => {
@@ -1051,6 +1122,224 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     expect(screen.getByRole('button', { name: 'Draft refresh brief' })).toBeInTheDocument();
     expect(screen.queryByText('Pages Decaying')).not.toBeInTheDocument();
     expect(screen.queryByText(workspaceId)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['loading', { data: undefined, isLoading: true, isFetching: true, isError: false }],
+    ['failed', { data: undefined, isLoading: false, isFetching: false, isError: true, error: new Error('workspaces unavailable') }],
+    ['missing the current workspace', { data: [], isLoading: false, isFetching: false, isError: false }],
+  ] as const)('does not infer a free tier while the workspace list is %s', async (_state, workspacesState) => {
+    mocks.workspacesHook.mockReturnValue(workspacesState);
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=content-health`);
+
+    expect(await screen.findByText('Pages to maintain')).toBeInTheDocument();
+    expect(screen.queryByText('Upgrade for deeper repair')).not.toBeInTheDocument();
+  });
+
+  it('shows deeper-repair upgrade guidance for an authoritative free-tier workspace', async () => {
+    mocks.workspacesHook.mockReturnValue({
+      data: [{ ...workspace, tier: 'free' }],
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+    });
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=content-health`);
+
+    expect(await screen.findByText('Upgrade for deeper repair')).toBeInTheDocument();
+  });
+
+  it('shows a loading interior instead of healthy decay copy while health sources have no cache', async () => {
+    mocks.contentPipelineHook.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isFetching: true,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    mocks.intelligenceHook.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isFetching: true,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=content-health`);
+
+    expect(await screen.findByText('Loading content health…')).toBeInTheDocument();
+    expect(screen.queryByText('No decaying content')).not.toBeInTheDocument();
+  });
+
+  it('keeps a paused no-cache decay read in the loading state', async () => {
+    mocks.contentPipelineHook.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isPending: true,
+      isFetching: false,
+      fetchStatus: 'paused',
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=content-health`);
+
+    expect(await screen.findByText('Loading content health…')).toBeInTheDocument();
+    expect(screen.queryByText('No decaying content')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['decay summary', mocks.contentPipelineHook, pipelineData],
+    ['workspace intelligence', mocks.intelligenceHook, { contentPipeline: contentPipelineSlice }],
+  ] as const)('shows a retryable health error when uncached %s fail', async (_name, queryMock, successfulData) => {
+    const refetch = vi.fn().mockResolvedValue({ data: successfulData, error: null });
+    queryMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isFetching: false,
+      isError: true,
+      error: new Error('health source unavailable'),
+      refetch,
+    });
+
+    const view = renderSurface(`/ws/${workspaceId}/content-pipeline?tab=content-health`);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Content health did not load');
+    expect(screen.queryByText('No decaying content')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+    view.unmount();
+  });
+
+  it('treats a fulfilled intelligence response without the requested slice as unavailable', async () => {
+    const refetch = vi.fn().mockResolvedValue({ data: { contentPipeline: contentPipelineSlice }, error: null });
+    mocks.intelligenceHook.mockReturnValue({
+      data: {},
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+      refetch,
+    });
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=content-health`);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Content health did not load');
+    expect(screen.queryByText('No decaying content')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      'loading',
+      { data: undefined, isLoading: true, isFetching: true, isError: false, error: null, refetch: vi.fn() },
+      'Loading capacity',
+    ],
+    [
+      'fulfilled without the requested slice',
+      { data: {}, isLoading: false, isFetching: false, isError: false, error: null, refetch: vi.fn() },
+      'Capacity unavailable',
+    ],
+    [
+      'failed without cache',
+      { data: undefined, isLoading: false, isFetching: false, isError: true, error: new Error('unavailable'), refetch: vi.fn() },
+      'Capacity unavailable',
+    ],
+  ] as const)('keeps persistent capacity truthful while intelligence is %s', async (_label, queryState, expected) => {
+    mocks.intelligenceHook.mockReturnValue(queryState);
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=briefs`);
+
+    const capacity = await screen.findByRole('button', { name: new RegExp(expected, 'i') });
+    expect(capacity).not.toHaveTextContent('No content plan');
+    expect(capacity).not.toHaveTextContent('Set up plan');
+    if (_label === 'loading') {
+      expect(capacity).toBeDisabled();
+      expect(capacity).toHaveAttribute('aria-busy', 'true');
+      fireEvent.click(capacity);
+      expect(screen.queryByRole('dialog', { name: 'Content subscription' })).not.toBeInTheDocument();
+    } else {
+      expect(capacity).toBeEnabled();
+    }
+  });
+
+  it('treats a present intelligence slice without subscription assembly as retryable capacity unavailability', async () => {
+    const refetch = vi.fn().mockResolvedValue({ data: { contentPipeline: contentPipelineSlice }, error: null });
+    mocks.intelligenceHook.mockReturnValue({
+      data: {
+        contentPipeline: {
+          ...contentPipelineSlice,
+          subscriptions: undefined,
+        },
+      },
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+      refetch,
+    });
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=briefs`);
+
+    const capacity = await screen.findByRole('button', { name: /Capacity unavailable/i });
+    expect(capacity).not.toHaveTextContent('No content plan');
+    expect(capacity).not.toHaveTextContent('Set up plan');
+    fireEvent.click(capacity);
+    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog', { name: 'Content subscription' })).not.toBeInTheDocument();
+  });
+
+  it('keeps cached capacity values visible with stale semantics after a refetch error', async () => {
+    mocks.intelligenceHook.mockReturnValue({
+      data: {
+        contentPipeline: {
+          ...contentPipelineSlice,
+          subscriptions: { active: 2, totalPages: 7 },
+        },
+      },
+      isLoading: false,
+      isFetching: false,
+      isError: true,
+      error: new Error('capacity refresh failed'),
+      refetch: vi.fn(),
+    });
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=briefs`);
+
+    const capacity = await screen.findByRole('button', { name: /2 active plans/i });
+    expect(capacity).toHaveTextContent('7 pages covered');
+    expect(capacity).toHaveTextContent('May be stale');
+    expect(capacity).not.toHaveTextContent('Capacity unavailable');
+  });
+
+  it('keeps cached content-health evidence visible and warns when refetches fail', async () => {
+    mocks.contentPipelineHook.mockReturnValue({
+      data: pipelineData,
+      isLoading: false,
+      isFetching: false,
+      isError: true,
+      error: new Error('decay refresh failed'),
+      refetch: vi.fn(),
+    });
+    mocks.intelligenceHook.mockReturnValue({
+      data: { contentPipeline: contentPipelineSlice },
+      isLoading: false,
+      isFetching: false,
+      isError: true,
+      error: new Error('intelligence refresh failed'),
+      refetch: vi.fn(),
+    });
+
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=content-health`);
+
+    expect(await screen.findByText('Pages to maintain')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Content health may be stale');
+    expect(screen.queryByText('No decaying content')).not.toBeInTheDocument();
   });
 
   it('receives ?tab=published and renders the shared content-performance read', async () => {

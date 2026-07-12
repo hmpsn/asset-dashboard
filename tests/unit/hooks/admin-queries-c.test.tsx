@@ -365,6 +365,39 @@ describe('useContentPipeline', () => {
     expect(result.current.data?.decay).toBeNull();
   });
 
+  it('surfaces aggregate source failures instead of manufacturing an empty healthy snapshot', async () => {
+    const decayError = new Error('content decay unavailable');
+    mockGet.mockImplementation((url: string) => (
+      url.includes('/api/content-decay/')
+        ? Promise.reject(decayError)
+        : Promise.resolve([])
+    ));
+
+    const { result } = renderHook(
+      () => useContentPipeline('ws-1', { includeContentLists: false }),
+      { wrapper: makeWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 5_000 });
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.error).toBe(decayError);
+  });
+
+  it('preserves the legacy aggregate fallback while the rebuilt consumer opts into truthful errors', async () => {
+    mockGet.mockRejectedValue(new Error('legacy aggregate source unavailable'));
+
+    const { result } = renderHook(
+      () => useContentPipeline('ws-1'),
+      { wrapper: makeWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 5_000 });
+    expect(result.current.data).toEqual({
+      summary: { briefs: 0, posts: 0, matrices: 0, cells: 0, published: 0 },
+      decay: null,
+    });
+  });
+
   it('skips duplicate brief and post payloads when authoritative lists are already mounted', async () => {
     mockGet
       .mockResolvedValueOnce([{ cells: [{ status: 'published' }, { status: 'draft' }] }])

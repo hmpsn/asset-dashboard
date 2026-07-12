@@ -53,7 +53,7 @@ interface ContentPipelineLensesProps {
   tab: ContentPipelineStandaloneTab;
   pipelineData?: ContentPipelineData;
   contentPipeline?: ContentPipelineSlice;
-  workspaceTier: Tier;
+  workspaceTier?: Tier;
   onOpenTab: (tab: ContentPipelineTab) => void;
 }
 
@@ -152,12 +152,12 @@ function ContentHealthLens({
 }: {
   pipelineData?: ContentPipelineData;
   contentPipeline?: ContentPipelineSlice;
-  workspaceTier: Tier;
+  workspaceTier?: Tier;
   onOpenTab: (tab: ContentPipelineTab) => void;
 }) {
   const decay = pipelineData?.decay;
   const rows = healthRows(decay, contentPipeline);
-  const advancedUnlocked = workspaceTier === 'growth' || workspaceTier === 'premium';
+  const upgradeRequired = workspaceTier === 'free';
   const refreshBriefs = contentPipeline?.decayAlerts?.filter((alert) => alert.hasRefreshBrief).length ?? 0;
 
   if (rows.length === 0) {
@@ -235,7 +235,7 @@ function ContentHealthLens({
         <MetricTile label="Cannibalization" value={contentPipeline?.cannibalizationWarnings?.length ?? 0} accent="var(--blue)" />
       </div>
 
-      {!advancedUnlocked && (
+      {upgradeRequired && (
         <InlineBanner tone="info" title="Upgrade for deeper repair">
           Crawl-backed repair and deeper cannibalization workflows require a higher plan. You can still review these signals and start a brief here.
         </InlineBanner>

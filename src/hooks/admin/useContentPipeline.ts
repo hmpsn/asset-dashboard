@@ -49,8 +49,12 @@ export function useContentPipeline(
         includeContentLists
           ? get<GeneratedPost[]>(`/api/content-posts/${workspaceId}`, signal).catch(() => [])
           : Promise.resolve([]),
-        get<ContentMatrix[]>(`/api/content-matrices/${workspaceId}`, signal).catch(() => []),
-        get<{ summary?: DecaySummary }>(`/api/content-decay/${workspaceId}`, signal).catch(() => null),
+        includeContentLists
+          ? get<ContentMatrix[]>(`/api/content-matrices/${workspaceId}`, signal).catch(() => [])
+          : get<ContentMatrix[]>(`/api/content-matrices/${workspaceId}`, signal),
+        includeContentLists
+          ? get<{ summary?: DecaySummary }>(`/api/content-decay/${workspaceId}`, signal).catch(() => null)
+          : get<{ summary?: DecaySummary }>(`/api/content-decay/${workspaceId}`, signal),
       ]);
 
       const briefArr = Array.isArray(briefs) ? briefs : [];
