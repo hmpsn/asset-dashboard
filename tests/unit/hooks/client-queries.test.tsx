@@ -554,6 +554,7 @@ describe('useMonthlyDigest', () => {
 
   it('returns digest data on success', async () => {
     const digest = {
+      availability: 'ready' as const,
       month: 'January 2024',
       period: { start: '2024-01-01', end: '2024-01-31' },
       summary: 'Great month',

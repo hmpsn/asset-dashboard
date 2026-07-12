@@ -7,7 +7,6 @@ import type { CustomDateRange } from './google-analytics.js';
 import type { MonthlyDigestData, DigestItem, ROIHighlight } from '../shared/types/narrative.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
 import type { Workspace } from './workspaces.js';
-import { buildRecommendationGenerationContext } from './intelligence/generation-context-builders.js';
 import { getInsights } from './analytics-insights-store.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { isProgrammingError } from './errors.js';
@@ -16,6 +15,56 @@ import { listWorkOrders } from './work-orders.js';
 import { getOrComputeMonthlyDigest } from './monthly-digest-cache.js';
 
 const log = createLogger('monthly-digest');
+const NO_DATA_SUMMARY = 'No current-month results are available yet. This digest will update after search activity, site visits, completed work, or measured results are recorded.';
+
+interface CurrentUtcReportingWindow {
+  dateRange: CustomDateRange;
+  startIso: string;
+  endIso: string;
+  endExclusiveIso: string;
+  startMs: number;
+  endExclusiveMs: number;
+}
+
+function getCurrentUtcReportingWindow(now: Date): CurrentUtcReportingWindow {
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const monthEndExclusive = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const conservativeReportingCutoff = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() - 3,
+  ));
+  const queriedEndDay = conservativeReportingCutoff < monthEndExclusive
+    ? new Date(Math.max(start.getTime(), conservativeReportingCutoff.getTime()))
+    : new Date(monthEndExclusive.getTime() - 24 * 60 * 60 * 1000);
+  const nominalEndExclusiveMs = queriedEndDay.getTime() + 24 * 60 * 60 * 1000;
+  const endExclusive = new Date(Math.max(
+    start.getTime(),
+    Math.min(now.getTime(), nominalEndExclusiveMs),
+  ));
+  const end = new Date(Math.max(start.getTime(), endExclusive.getTime() - 1));
+  const dateOnly = (date: Date) => date.toISOString().slice(0, 10);
+
+  return {
+    dateRange: {
+      startDate: dateOnly(start),
+      endDate: dateOnly(end),
+    },
+    startIso: start.toISOString(),
+    endIso: end.toISOString(),
+    endExclusiveIso: endExclusive.toISOString(),
+    startMs: start.getTime(),
+    endExclusiveMs: endExclusive.getTime(),
+  };
+}
+
+function isInReportingWindow(value: string | null | undefined, window: CurrentUtcReportingWindow): boolean {
+  if (!value) return false;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp)
+    && timestamp >= window.startMs
+    && timestamp < window.endExclusiveMs;
+}
 
 /**
  * Generate a monthly performance digest for a workspace.
@@ -23,46 +72,40 @@ const log = createLogger('monthly-digest');
  */
 export async function generateMonthlyDigest(
   ws: Workspace,
-  month?: string, // "March 2026" — defaults to current month
 ): Promise<MonthlyDigestData> {
   const now = new Date();
-  const monthLabel = month ?? now.toLocaleString('en-US', {
+  const monthLabel = now.toLocaleString('en-US', {
     month: 'long',
     year: 'numeric',
     timeZone: 'UTC',
   });
 
-  // Parse the month label into actual dates so period/comparisons reflect the correct month
-  const targetDate = parseMonthLabel(monthLabel, now);
-  const currentMonthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
-  if (targetDate.getTime() > currentMonthStart) {
-    throw new RangeError(`Monthly digest cannot be generated for a future month: ${monthLabel}`);
-  }
-  const monthWindow = getUtcMonthWindow(targetDate, now);
+  const reportingWindow = getCurrentUtcReportingWindow(now);
   // The current-month reporting cutoff advances each UTC day. Include the
   // effective provider window in the identity so a cache created just before
   // midnight cannot serve yesterday's period for another 24 hours.
-  const cacheIdentity = `${monthLabel}:${monthWindow.dateRange.startDate}:${monthWindow.dateRange.endDate}`;
+  const cacheIdentity = `${monthLabel}:${reportingWindow.startIso}:${reportingWindow.endExclusiveIso}`;
 
   return getOrComputeMonthlyDigest(
     ws.id,
     cacheIdentity,
     now.getTime(),
-    () => computeDigest(ws, monthLabel, monthWindow),
+    () => computeDigest(ws, monthLabel, reportingWindow),
   );
 }
 
 async function computeDigest(
   ws: Workspace,
   monthLabel: string,
-  monthWindow: ReturnType<typeof getUtcMonthWindow>,
+  reportingWindow: CurrentUtcReportingWindow,
 ): Promise<MonthlyDigestData> {
   // Deterministic digest rollups (wins, resolved "issues addressed", pagesOptimized)
   // need FULL insight coverage — resolved/positive items are typically low-impact and
   // fall outside the slice's prompt-facing bounds (`all` top-100, `byType` top-25/type
   // since G3). Full iteration is not slice-backed post-cap, so this is a documented
-  // direct-read exception per docs/rules/intelligence-consumer-builders.md; the AI
-  // prompt context below still goes through buildRecommendationGenerationContext.
+  // direct-read exception per docs/rules/intelligence-consumer-builders.md. The
+  // current-month AI prompt is built only from this bounded read; lifetime
+  // workspace learnings are intentionally excluded from an operational digest.
   let insights: AnalyticsInsight[] = [];
   try {
     insights = [...getInsights(ws.id)].sort( // intel-builder-ok: non-prompt deterministic rollups need full pre-cap coverage (see comment above)
@@ -72,10 +115,16 @@ async function computeDigest(
     if (isProgrammingError(err)) log.warn({ err }, 'monthly-digest: programming error reading insights');
     // insights unavailable — digest degrades to integration metrics only
   }
-  const roiHighlights = getROIHighlightsFromOutcomes(ws.id, 5);
+  const currentMonthInsights = insights.filter((insight) => (
+    isInReportingWindow(insight.computedAt, reportingWindow)
+  ));
+  const roiHighlights = getROIHighlightsFromOutcomes(ws.id, 5, {
+    start: reportingWindow.startIso,
+    endExclusive: reportingWindow.endExclusiveIso,
+  });
 
   // Wins: positive severity or positive ranking mover
-  const wins = insights
+  const wins = currentMonthInsights
     .filter(i => i.severity === 'positive' || (i.insightType === 'ranking_mover' && isPositiveMove(i)))
     .slice(0, 5)
     .map(insightToDigestItem);
@@ -85,7 +134,7 @@ async function computeDigest(
   // via Bridge #7 — they never reach 'resolved'. Count the applied/completed work directly so
   // the digest does not report "0 measurable improvements" after real work is done.
   const resolvedInsightItems = insights
-    .filter(i => i.resolutionStatus === 'resolved')
+    .filter(i => i.resolutionStatus === 'resolved' && isInReportingWindow(i.resolvedAt, reportingWindow))
     .map(i => ({
       title: i.pageTitle ?? 'Page optimization',
       detail: i.resolutionNote ?? 'Issue addressed',
@@ -100,7 +149,7 @@ async function computeDigest(
     // state directly instead of requiring every sibling to apply successfully.
     .flatMap(b =>
       b.items
-        .filter(item => item.status === 'applied')
+        .filter(item => item.status === 'applied' && isInReportingWindow(item.updatedAt, reportingWindow))
         .map(item => ({
           title: item.pageTitle || 'Page optimization',
           detail: `${item.field === 'seoTitle' ? 'Title' : 'Meta description'} updated via approved changes`,
@@ -117,7 +166,11 @@ async function computeDigest(
   const completedWorkOrderItems = listWorkOrders(ws.id)
     // `closed` is the terminal close-out of completed work, not an undo. Keep
     // it in the completed-work narrative after the operator closes the thread.
-    .filter(o => o.status === 'completed' || o.status === 'closed')
+    .filter(o => {
+      if (o.status !== 'completed' && o.status !== 'closed') return false;
+      const completedAt = o.completedAt ?? (o.status === 'closed' ? o.closedAt : undefined) ?? o.updatedAt;
+      return isInReportingWindow(completedAt, reportingWindow);
+    })
     .map(o => ({
       title: `${o.productType.replace(/_/g, ' ')} completed`,
       detail: `${o.pageIds.length} page${o.pageIds.length !== 1 ? 's' : ''} fixed`,
@@ -161,11 +214,11 @@ async function computeDigest(
           ws.webflowSiteId,
           ws.gscPropertyUrl,
           COMPARISON_DAYS,
-          monthWindow.dateRange,
+          reportingWindow.dateRange,
         )
       : Promise.reject(new Error('GSC not configured')),
     ws.ga4PropertyId
-      ? getGA4PeriodComparison(ws.ga4PropertyId, COMPARISON_DAYS, monthWindow.dateRange)
+      ? getGA4PeriodComparison(ws.ga4PropertyId, COMPARISON_DAYS, reportingWindow.dateRange)
       : Promise.reject(new Error('GA4 not configured')),
   ]);
 
@@ -191,25 +244,36 @@ async function computeDigest(
     pagesOptimized: issuesAddressed.length,
   };
 
-  // Fetch workspace learnings for outcome context
-  let learningsSummary: string | undefined;
-  let recentOutcomesCount: number | undefined;
-  const { intelligence, promptContext } = await buildRecommendationGenerationContext(ws.id, {
-    slices: ['learnings'],
-    learningsDomain: 'all',
-    verbosity: 'detailed',
-    tokenBudget: 1800,
-    includeLocalSeo: false,
-  });
-  if (promptContext.includes('## Outcome Learnings')) {
-    learningsSummary = promptContext;
-    recentOutcomesCount = intelligence.learnings?.summary?.totalScoredActions;
+  const attentionInsights = currentMonthInsights
+    .filter(insight => insight.severity === 'critical'
+      || insight.severity === 'warning'
+      || insight.severity === 'opportunity')
+    .slice(0, 5);
+  const hasProviderEvidence = gscResult.status === 'fulfilled' || ga4Result.status === 'fulfilled';
+  const hasOperationalEvidence = wins.length > 0
+    || issuesAddressed.length > 0
+    || roiHighlights.length > 0
+    || attentionInsights.length > 0;
+  if (!hasProviderEvidence && !hasOperationalEvidence) {
+    return {
+      availability: 'no_data',
+      month: monthLabel,
+      period: {
+        start: reportingWindow.startIso,
+        end: reportingWindow.endIso,
+      },
+      summary: NO_DATA_SUMMARY,
+      wins: [],
+      issuesAddressed: [],
+      metrics,
+      roiHighlights: [],
+    };
   }
 
-  // Top wins from outcome tracking — reuse already-fetched insights, no second DB call
+  // Reuse the bounded insight read for prompt evidence; no lifetime learning totals.
   let topWinsBlock = '';
   try {
-    const positiveInsights = insights
+    const positiveInsights = currentMonthInsights
       .filter(i => i.severity === 'positive')
       .sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0))
       .slice(0, 3);
@@ -224,8 +288,11 @@ async function computeDigest(
     issuesAddressed,
     roiHighlights,
     { ...metrics, sessionsChange },
-    learningsSummary,
-    recentOutcomesCount,
+    attentionInsights,
+    {
+      search: gscResult.status === 'fulfilled',
+      analytics: ga4Result.status === 'fulfilled',
+    },
     topWinsBlock,
     ws.id,
   );
@@ -234,8 +301,8 @@ async function computeDigest(
     availability: 'ready',
     month: monthLabel,
     period: {
-      start: monthWindow.startIso,
-      end: monthWindow.endIso,
+      start: reportingWindow.startIso,
+      end: reportingWindow.endIso,
     },
     summary,
     wins,
@@ -282,6 +349,11 @@ function formatInsightForDigest(insight: AnalyticsInsight): string {
   }
 }
 
+function formatAttentionInsightForDigest(insight: AnalyticsInsight): string {
+  if (insight.insightType === 'ranking_mover') return 'Ranking movement flagged for review';
+  return formatInsightForDigest(insight);
+}
+
 async function generateDigestSummary(
   month: string,
   wins: DigestItem[],
@@ -294,49 +366,65 @@ async function generateDigestSummary(
     pagesOptimized: number;
     sessionsChange?: number;
   },
-  learningsSummary?: string,
-  recentOutcomesCount?: number,
+  attentionInsights: AnalyticsInsight[],
+  providerEvidence: { search: boolean; analytics: boolean },
   topWinsBlock?: string,
   workspaceId?: string,
 ): Promise<string> {
-  const clicksTrend = metrics.clicksChange > 0 ? `+${metrics.clicksChange.toFixed(1)}%` : metrics.clicksChange < 0 ? `${metrics.clicksChange.toFixed(1)}%` : null;
-  const impressionsTrend = metrics.impressionsChange > 0 ? `+${metrics.impressionsChange.toFixed(1)}%` : metrics.impressionsChange < 0 ? `${metrics.impressionsChange.toFixed(1)}%` : null;
-  const positionTrend = metrics.avgPositionChange > 0 ? `improved ${metrics.avgPositionChange} spot${metrics.avgPositionChange !== 1 ? 's' : ''}` : null;
-  const sessionsTrend = metrics.sessionsChange && metrics.sessionsChange !== 0
-    ? `${metrics.sessionsChange > 0 ? '+' : ''}${metrics.sessionsChange.toFixed(1)}%`
-    : null;
+  const signedPercent = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
+  const positionTrend = metrics.avgPositionChange > 0
+    ? `improved ${metrics.avgPositionChange} spot${metrics.avgPositionChange !== 1 ? 's' : ''}`
+    : metrics.avgPositionChange < 0
+      ? `worsened ${Math.abs(metrics.avgPositionChange)} spot${Math.abs(metrics.avgPositionChange) !== 1 ? 's' : ''}`
+      : 'no change (0 spots)';
 
   const metricLines = [
-    clicksTrend ? `Search clicks: ${clicksTrend}` : null,
-    impressionsTrend ? `Impressions: ${impressionsTrend}` : null,
-    sessionsTrend ? `Site sessions: ${sessionsTrend}` : null,
-    positionTrend ? `Average ranking position: ${positionTrend}` : null,
+    providerEvidence.search ? `Search clicks: ${signedPercent(metrics.clicksChange)}` : null,
+    providerEvidence.search ? `Impressions: ${signedPercent(metrics.impressionsChange)}` : null,
+    providerEvidence.analytics && metrics.sessionsChange != null
+      ? `Site sessions: ${signedPercent(metrics.sessionsChange)}`
+      : null,
+    providerEvidence.search ? `Average ranking position: ${positionTrend}` : null,
   ].filter(Boolean).join('\n');
 
-  try {
-    const roiDollarLines = roi
-    .filter(r => typeof r.attributedValue === 'number' && r.attributedValue !== null && r.attributedValue > 0)
-    .map(r => `  • ${r.pageTitle}: $${r.attributedValue!.toFixed(2)} estimated value (${r.action})`)
-    .join('\n');
+  const attentionBlock = attentionInsights.length > 0
+    ? `\nSignals requiring attention this period:\n${attentionInsights.map(insight => (
+        `- [${insight.severity}] ${insight.pageTitle ?? insight.insightType}: ${formatAttentionInsightForDigest(insight)}`
+      )).join('\n')}`
+    : '';
 
-  const prompt = `Write a 2-3 sentence monthly performance update for a website client's dashboard.
+  try {
+    const roiEvidenceLines = roi.map(result => {
+      const value = typeof result.attributedValue === 'number' && result.attributedValue > 0
+        ? `; $${result.attributedValue.toFixed(2)} estimated value`
+        : '';
+      const execution = result.attribution === 'externally_executed'
+        ? 'implemented on the client side; do not claim agency execution credit'
+        : result.attribution === 'platform_executed'
+          ? 'implemented through the platform; agency execution credit is permitted for this row'
+          : 'execution attribution unavailable; do not assign execution credit';
+      return `  • ${result.pageTitle}: ${result.result} (${result.action})${value}. Execution: ${execution}.`;
+    }).join('\n');
+
+    const prompt = `Write a 2-3 sentence monthly performance update for a website client's dashboard.
 
 Data for ${month}:
 - ${wins.length} performance win${wins.length === 1 ? '' : 's'} identified
 - ${issues.length} optimization${issues.length === 1 ? '' : 's'} completed
 - ${metrics.pagesOptimized} page${metrics.pagesOptimized === 1 ? '' : 's'} optimized
-- ${roi.length} measurable improvement${roi.length === 1 ? '' : 's'}${roiDollarLines ? `\n- Estimated dollar value from tracked outcomes:\n${roiDollarLines}` : ''}
-${recentOutcomesCount !== undefined ? `- ${recentOutcomesCount} tracked outcome${recentOutcomesCount === 1 ? '' : 's'} in workspace learnings` : ''}
+- ${roi.length} measurable improvement${roi.length === 1 ? '' : 's'}${roiEvidenceLines ? `\nMeasured results with authoritative execution framing:\n${roiEvidenceLines}` : ''}
 ${metricLines ? `\nSearch performance this period:\n${metricLines}` : ''}
-${learningsSummary ? `\nWorkspace outcome learnings:\n${learningsSummary}` : ''}
 ${topWinsBlock ?? ''}
+${attentionBlock}
 
 Voice rules (follow exactly):
 - Lead with the most interesting metric or outcome — never start with "In [Month]" or "This month"
-- Positive and energetic, like a teammate sharing good news. Not corporate or templated.
+- Match the evidence direction exactly. Never recast a decline or a legitimate zero as a win, momentum, or a strong baseline.
+- Clear and constructive, like a teammate giving a factual update. Not corporate or templated.
 - Use "your site" or "your pages", not "the site" or "the website"
 - Mention ONE specific number if it's notable (>10% change). Don't list multiple stats.
 - If metrics are flat or slightly negative, frame around what's being learned or where attention is focused — without making promises or commitments about future work.
+- Preserve every measured result's execution framing. Client-side work must never receive agency execution credit; unknown attribution stays neutral.
 - Never say "we're on it", "we're working on", "we will", or "rest assured" — the scope of work depends on the client's retainer.
 - 2-3 sentences max. Warm but concise.`;
 
@@ -355,71 +443,72 @@ Voice rules (follow exactly):
       workspaceId: workspaceId ?? '',
     });
 
-    return result.text || fallbackSummary(month, wins.length, issues.length);
+    return result.text.trim() || fallbackSummary(wins, issues, roi, metrics, attentionInsights, providerEvidence);
   } catch (err) {
     log.warn({ err }, 'AI digest summary failed — using fallback');
-    return fallbackSummary(month, wins.length, issues.length);
+    return fallbackSummary(wins, issues, roi, metrics, attentionInsights, providerEvidence);
   }
 }
 
-function fallbackSummary(_month: string, wins: number, issues: number): string {
-  if (wins > 0 && issues > 0) {
-    return `Your site picked up ${wins} performance win${wins === 1 ? '' : 's'} this period, and ${issues} optimization${issues === 1 ? ' was' : 's were'} completed. Plenty of momentum to build on.`;
-  }
-  if (wins > 0) {
-    return `${wins} performance win${wins === 1 ? '' : 's'} spotted on your site this period — good signals across the board.`;
-  }
-  if (issues > 0) {
-    return `${issues} optimization${issues === 1 ? ' was' : 's were'} completed this period, keeping your site on track.`;
-  }
-  return `Your site's search performance held steady this period. A solid baseline to build from.`;
-}
-
-/**
- * Parse a month label like "March 2026" into a Date.
- * Falls back to `fallback` if parsing fails.
- */
-function parseMonthLabel(label: string, fallback: Date): Date {
-  const monthNames = [
-    'january', 'february', 'march', 'april', 'may', 'june',
-    'july', 'august', 'september', 'october', 'november', 'december',
-  ] as const;
-  const match = /^([A-Za-z]+)\s+(\d{4})$/.exec(label.trim());
-  const month = match ? monthNames.indexOf(match[1].toLowerCase() as typeof monthNames[number]) : -1;
-  const year = match ? Number(match[2]) : Number.NaN;
-  if (month < 0 || !Number.isInteger(year)) {
-    return new Date(Date.UTC(fallback.getUTCFullYear(), fallback.getUTCMonth(), 1));
-  }
-  return new Date(Date.UTC(year, month, 1));
-}
-
-function getUtcMonthWindow(targetDate: Date, now: Date): {
-  dateRange: CustomDateRange;
-  startIso: string;
-  endIso: string;
-} {
-  const year = targetDate.getUTCFullYear();
-  const month = targetDate.getUTCMonth();
-  const start = new Date(Date.UTC(year, month, 1));
-  const endExclusive = new Date(Date.UTC(year, month + 1, 1));
-  const isCurrentUtcMonth = year === now.getUTCFullYear() && month === now.getUTCMonth();
-  const conservativeReportingCutoff = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate() - 3,
-  ));
-  const queriedEndDay = isCurrentUtcMonth && conservativeReportingCutoff < endExclusive
-    ? new Date(Math.max(start.getTime(), conservativeReportingCutoff.getTime()))
-    : new Date(endExclusive.getTime() - 24 * 60 * 60 * 1000);
-  const end = new Date(queriedEndDay.getTime() + (24 * 60 * 60 * 1000) - 1);
-  const dateOnly = (date: Date) => date.toISOString().slice(0, 10);
-
-  return {
-    dateRange: {
-      startDate: dateOnly(start),
-      endDate: dateOnly(end),
-    },
-    startIso: start.toISOString(),
-    endIso: end.toISOString(),
+function fallbackSummary(
+  wins: DigestItem[],
+  issues: DigestItem[],
+  roi: ROIHighlight[],
+  metrics: {
+    clicksChange: number;
+    impressionsChange: number;
+    avgPositionChange: number;
+    pagesOptimized: number;
+    sessionsChange?: number;
+  },
+  attentionInsights: AnalyticsInsight[],
+  providerEvidence: { search: boolean; analytics: boolean },
+): string {
+  const directionalMetrics: Array<{ magnitude: number; sentence: string }> = [];
+  const addPercentDirection = (label: string, value: number | undefined) => {
+    if (value == null || !Number.isFinite(value) || value === 0) return;
+    directionalMetrics.push({
+      magnitude: Math.abs(value),
+      sentence: `${label} ${value > 0 ? 'increased' : 'decreased'} ${Math.abs(value).toFixed(1)}% in the current reporting window.`,
+    });
   };
+  if (providerEvidence.search) {
+    addPercentDirection('Search clicks', metrics.clicksChange);
+    addPercentDirection('Search impressions', metrics.impressionsChange);
+    if (Number.isFinite(metrics.avgPositionChange) && metrics.avgPositionChange !== 0) {
+      directionalMetrics.push({
+        magnitude: Math.abs(metrics.avgPositionChange),
+        sentence: `Average search position ${metrics.avgPositionChange > 0 ? 'improved' : 'worsened'} by ${Math.abs(metrics.avgPositionChange).toFixed(1)} spot${Math.abs(metrics.avgPositionChange) === 1 ? '' : 's'} in the current reporting window.`,
+      });
+    }
+  }
+  if (providerEvidence.analytics) addPercentDirection('Site sessions', metrics.sessionsChange);
+
+  const metricSentence = directionalMetrics.sort((a, b) => b.magnitude - a.magnitude)[0]?.sentence
+    ?? (providerEvidence.search || providerEvidence.analytics
+      ? 'Connected provider comparisons are available for this reporting window; no percentage change was recorded in the reported metrics.'
+      : null);
+
+  let workSentence: string | null = null;
+  if (wins.length > 0 && issues.length > 0) {
+    workSentence = `Your site picked up ${wins.length} performance win${wins.length === 1 ? '' : 's'} this period, and ${issues.length} optimization${issues.length === 1 ? ' was' : 's were'} completed.`;
+  } else if (wins.length > 0) {
+    workSentence = `${wins.length} performance win${wins.length === 1 ? '' : 's'} spotted on your site this period.`;
+  } else if (issues.length > 0) {
+    workSentence = `${issues.length} optimization${issues.length === 1 ? ' was' : 's were'} completed this period.`;
+  }
+
+  const attentionSentence = attentionInsights.length > 0
+    ? `${attentionInsights.length} current-month signal${attentionInsights.length === 1 ? '' : 's'} ${attentionInsights.length === 1 ? 'requires' : 'require'} attention: ${attentionInsights.slice(0, 2).map(insight => insight.pageTitle ?? insight.insightType).join(' and ')}.`
+    : null;
+  const externalCount = roi.filter(result => result.attribution === 'externally_executed').length;
+  const roiSentence = roi.length > 0
+    ? `${roi.length} measured result${roi.length === 1 ? ' was' : 's were'} recorded${externalCount > 0 ? `, including ${externalCount} from work implemented on the client side` : ''}.`
+    : null;
+
+  return [metricSentence, workSentence, attentionSentence, roiSentence]
+    .filter((sentence): sentence is string => sentence != null)
+    .slice(0, 3)
+    .join(' ')
+    || 'Current-month evidence is available, but it does not support a directional performance claim.';
 }

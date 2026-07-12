@@ -100,6 +100,26 @@ const stmts = createStmtCache(() => ({
     ORDER BY ao.measured_at DESC
     LIMIT ?
   `),
+  getWinsWithValueByWorkspaceInWindow: db.prepare(`
+    SELECT ao.*, ta.page_url, ta.action_type, ta.attribution
+    FROM action_outcomes ao
+    JOIN tracked_actions ta ON ta.id = ao.action_id
+    WHERE ta.workspace_id = ?
+      AND ao.score IN ('strong_win', 'win')
+      AND ta.attribution != 'not_acted_on'
+      AND julianday(ao.measured_at) >= julianday(?)
+      AND julianday(ao.measured_at) < julianday(?)
+      AND ao.checkpoint_days = (
+        SELECT MAX(ao2.checkpoint_days)
+        FROM action_outcomes ao2
+        WHERE ao2.action_id = ao.action_id
+          AND ao2.score IN ('strong_win', 'win')
+          AND julianday(ao2.measured_at) >= julianday(?)
+          AND julianday(ao2.measured_at) < julianday(?)
+      )
+    ORDER BY ao.measured_at DESC
+    LIMIT ?
+  `),
   getScoredByWorkspace: db.prepare(`
     SELECT ta.*, ao.score AS outcome_score, ao.checkpoint_days AS outcome_checkpoint_days, ao.delta_summary AS outcome_delta_summary, ao.measured_at AS scored_at
     FROM tracked_actions ta
@@ -993,12 +1013,31 @@ export function getWorkspaceOutcomeValueRollup(workspaceId: string, limit = 100)
  * clicksGained is taken from deltaSummary.delta_absolute when primary_metric is clicks;
  * falls back to 0 for non-clicks metrics so the field is always a number.
  */
-export function getROIHighlightsFromOutcomes(workspaceId: string, limit = 10): ROIHighlight[] {
+export interface ROIHighlightWindow {
+  start: string;
+  endExclusive: string;
+}
+
+export function getROIHighlightsFromOutcomes(
+  workspaceId: string,
+  limit = 10,
+  window?: ROIHighlightWindow,
+): ROIHighlight[] {
   interface WinRow extends ActionOutcomeRow {
     page_url: string | null;
     action_type: string;
+    attribution: string;
   }
-  const rows = stmts().getWinsWithValueByWorkspace.all(workspaceId, limit) as WinRow[];
+  const rows = (window
+    ? stmts().getWinsWithValueByWorkspaceInWindow.all(
+        workspaceId,
+        window.start,
+        window.endExclusive,
+        window.start,
+        window.endExclusive,
+        limit,
+      )
+    : stmts().getWinsWithValueByWorkspace.all(workspaceId, limit)) as WinRow[];
   return rows.map(row => {
     const delta = parseJsonFallback<{
       primary_metric?: string;
@@ -1039,8 +1078,19 @@ export function getROIHighlightsFromOutcomes(workspaceId: string, limit = 10): R
     const result = `${scoreText}${deltaText}`;
 
     const attributedValue = typeof row.attributed_value === 'number' ? row.attributed_value : null;
+    const attribution = row.attribution === 'platform_executed' || row.attribution === 'externally_executed'
+      ? row.attribution
+      : undefined;
 
-    return { pageTitle, pageUrl, action, result, clicksGained, attributedValue };
+    return {
+      pageTitle,
+      pageUrl,
+      action,
+      result,
+      clicksGained,
+      attributedValue,
+      ...(attribution ? { attribution } : {}),
+    };
   });
 }
 

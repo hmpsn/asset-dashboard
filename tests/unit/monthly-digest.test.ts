@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   logWarn: vi.fn(),
   getInsights: vi.fn(),
   getROIHighlights: vi.fn(),
+  listBatches: vi.fn(),
+  listWorkOrders: vi.fn(),
   callAI: vi.fn(),
   getSearchPeriodComparison: vi.fn(),
   getGA4PeriodComparison: vi.fn(),
@@ -31,8 +33,16 @@ vi.mock('../../server/analytics-insights-store.js', () => ({
   getInsights: mocks.getInsights,
 }));
 
-vi.mock('../../server/roi-attribution.js', () => ({
-  getROIHighlights: mocks.getROIHighlights,
+vi.mock('../../server/outcome-tracking.js', () => ({
+  getROIHighlightsFromOutcomes: mocks.getROIHighlights,
+}));
+
+vi.mock('../../server/approvals.js', () => ({
+  listBatches: mocks.listBatches,
+}));
+
+vi.mock('../../server/work-orders.js', () => ({
+  listWorkOrders: mocks.listWorkOrders,
 }));
 
 vi.mock('../../server/ai.js', () => ({
@@ -91,7 +101,7 @@ function makeInsight(overrides: Partial<AnalyticsInsight> = {}): AnalyticsInsigh
     pageId: '/services',
     insightType: 'ranking_mover',
     severity: 'positive',
-    computedAt: '2026-05-25T00:00:00.000Z',
+    computedAt: '2026-05-20T00:00:00.000Z',
     data: { currentPosition: 4, previousPosition: 10 },
     impactScore: 80,
     pageTitle: 'Service Page',
@@ -105,6 +115,8 @@ beforeEach(() => {
 
   mocks.getInsights.mockReturnValue([]);
   mocks.getROIHighlights.mockReturnValue([]);
+  mocks.listBatches.mockReturnValue([]);
+  mocks.listWorkOrders.mockReturnValue([]);
   mocks.callAI.mockResolvedValue({ text: 'AI summary text' });
   mocks.getSearchPeriodComparison.mockResolvedValue({
     changePercent: { clicks: 12.5, impressions: -4.2 },
@@ -160,30 +172,158 @@ afterEach(() => {
 });
 
 describe('monthly-digest generation', () => {
-  it('computes requested month period boundaries and inverts ranking-position delta sign', async () => {
+  it('returns honest no-data output and skips AI when the current month has no evidence', async () => {
+    const ws = makeWorkspace({
+      id: 'ws_no_current_evidence',
+      webflowSiteId: undefined,
+      gscPropertyUrl: undefined,
+      ga4PropertyId: undefined,
+    });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.availability).toBe('no_data');
+    expect(result.summary).toContain('No current-month results are available yet');
+    expect(result.summary).not.toMatch(/held steady|solid baseline/i);
+    expect(mocks.callAI).not.toHaveBeenCalled();
+  });
+
+  it('keeps fulfilled zero-valued provider evidence ready', async () => {
+    const ws = makeWorkspace({ id: 'ws_zero_provider_evidence' });
+    mocks.getSearchPeriodComparison.mockResolvedValueOnce({
+      current: { clicks: 0, impressions: 0, ctr: 0, position: 0 },
+      previous: { clicks: 0, impressions: 0, ctr: 0, position: 0 },
+      changePercent: { clicks: 0, impressions: 0, ctr: 0, position: 0 },
+      change: { clicks: 0, impressions: 0, ctr: 0, position: 0 },
+    });
+    mocks.getGA4PeriodComparison.mockResolvedValueOnce({
+      current: { totalUsers: 0, totalSessions: 0 },
+      previous: { totalUsers: 0, totalSessions: 0 },
+      changePercent: { users: 0, sessions: 0, pageviews: 0 },
+      change: { users: 0, sessions: 0, pageviews: 0 },
+    });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.availability).toBe('ready');
+    expect(mocks.callAI).toHaveBeenCalledOnce();
+  });
+
+  it('bounds insight wins and resolutions to the current UTC month', async () => {
+    const ws = makeWorkspace({
+      id: 'ws_current_insight_window',
+      webflowSiteId: undefined,
+      gscPropertyUrl: undefined,
+      ga4PropertyId: undefined,
+    });
+    mocks.getInsights.mockReturnValue([
+      makeInsight({ id: 'prior-win', computedAt: '2026-04-30T23:59:59.999Z', pageTitle: 'Prior win' }),
+      makeInsight({ id: 'current-win', computedAt: '2026-05-01T00:00:00.000Z', pageTitle: 'Current win' }),
+      makeInsight({
+        id: 'prior-resolution',
+        insightType: 'page_health',
+        severity: 'warning',
+        computedAt: '2026-05-10T00:00:00.000Z',
+        resolutionStatus: 'resolved',
+        resolvedAt: '2026-04-30T23:59:59.999Z',
+      }),
+      makeInsight({
+        id: 'current-resolution',
+        insightType: 'page_health',
+        severity: 'warning',
+        computedAt: '2026-04-10T00:00:00.000Z',
+        resolutionStatus: 'resolved',
+        resolvedAt: '2026-05-01T00:00:00.000Z',
+      }),
+    ]);
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.wins.map((item) => item.insightId)).toEqual(['current-win']);
+    expect(result.issuesAddressed.map((item) => item.insightId)).toEqual(['current-resolution']);
+  });
+
+  it('computes current UTC month period boundaries and inverts ranking-position delta sign', async () => {
+    vi.setSystemTime(new Date('2024-02-25T12:00:00.000Z'));
     const ws = makeWorkspace({ id: 'ws_period_math' });
 
-    const result = await generateMonthlyDigest(ws, 'February 2024');
+    const result = await generateMonthlyDigest(ws);
 
     expect(result.month).toBe('February 2024');
     expect(result.period.start).toMatch(/^2024-02-01T/);
-    expect(result.period.end).toMatch(/^2024-02-29T/);
+    expect(result.period.end).toMatch(/^2024-02-22T/);
     expect(result.metrics.clicksChange).toBe(12.5);
     expect(result.metrics.impressionsChange).toBe(-4.2);
     expect(result.metrics.avgPositionChange).toBe(1.3);
     expect(result.period.start).toBe('2024-02-01T00:00:00.000Z');
-    expect(result.period.end).toBe('2024-02-29T23:59:59.999Z');
+    expect(result.period.end).toBe('2024-02-22T23:59:59.999Z');
     expect(mocks.getSearchPeriodComparison).toHaveBeenCalledWith(
       'wf_1',
       'sc-domain:example.com',
       28,
-      { startDate: '2024-02-01', endDate: '2024-02-29' },
+      { startDate: '2024-02-01', endDate: '2024-02-22' },
     );
     expect(mocks.getGA4PeriodComparison).toHaveBeenCalledWith(
       'ga4_1',
       28,
-      { startDate: '2024-02-01', endDate: '2024-02-29' },
+      { startDate: '2024-02-01', endDate: '2024-02-22' },
     );
+    expect(mocks.getROIHighlights).toHaveBeenCalledWith('ws_period_math', 5, {
+      start: '2024-02-01T00:00:00.000Z',
+      endExclusive: '2024-02-23T00:00:00.000Z',
+    });
+  });
+
+  it('uses the declared provider cutoff for current-month insight and ROI evidence too', async () => {
+    const ws = makeWorkspace({ id: 'ws_one_reporting_window' });
+    mocks.getInsights.mockReturnValue([
+      makeInsight({ id: 'inside-cutoff', computedAt: '2026-05-22T23:59:59.999Z', pageTitle: 'Inside cutoff' }),
+      makeInsight({ id: 'after-cutoff', computedAt: '2026-05-23T00:00:00.000Z', pageTitle: 'After cutoff' }),
+    ]);
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.period).toEqual({
+      start: '2026-05-01T00:00:00.000Z',
+      end: '2026-05-22T23:59:59.999Z',
+    });
+    expect(result.wins.map((item) => item.insightId)).toEqual(['inside-cutoff']);
+    expect(mocks.getROIHighlights).toHaveBeenCalledWith(ws.id, 5, {
+      start: result.period.start,
+      endExclusive: '2026-05-23T00:00:00.000Z',
+    });
+  });
+
+  it('clamps the first-day reporting endpoint to now and advances the cache identity with that endpoint', async () => {
+    vi.setSystemTime(new Date('2026-05-01T12:00:00.000Z'));
+    const ws = makeWorkspace({ id: 'ws_first_day_partial_window' });
+    mocks.getInsights.mockReturnValue([
+      makeInsight({ id: 'before-noon', computedAt: '2026-05-01T10:00:00.000Z', pageTitle: 'Before noon' }),
+      makeInsight({ id: 'after-noon', computedAt: '2026-05-01T12:30:00.000Z', pageTitle: 'After noon' }),
+    ]);
+
+    const noon = await generateMonthlyDigest(ws);
+
+    expect(noon.period).toEqual({
+      start: '2026-05-01T00:00:00.000Z',
+      end: '2026-05-01T11:59:59.999Z',
+    });
+    expect(noon.wins.map((item) => item.insightId)).toEqual(['before-noon']);
+    expect(mocks.getROIHighlights).toHaveBeenNthCalledWith(1, ws.id, 5, {
+      start: noon.period.start,
+      endExclusive: '2026-05-01T12:00:00.000Z',
+    });
+
+    vi.setSystemTime(new Date('2026-05-01T13:00:00.000Z'));
+    const onePm = await generateMonthlyDigest(ws);
+
+    expect(onePm.period.end).toBe('2026-05-01T12:59:59.999Z');
+    expect(onePm.wins.map((item) => item.insightId)).toEqual(['before-noon', 'after-noon']);
+    expect(mocks.getROIHighlights).toHaveBeenNthCalledWith(2, ws.id, 5, {
+      start: onePm.period.start,
+      endExclusive: '2026-05-01T13:00:00.000Z',
+    });
+    expect(mocks.callAI).toHaveBeenCalledTimes(2);
   });
 
   it('falls back to deterministic summary copy when AI throws and integrations are unavailable', async () => {
@@ -201,11 +341,12 @@ describe('monthly-digest generation', () => {
         id: 'resolved_1',
         severity: 'warning',
         resolutionStatus: 'resolved',
+        resolvedAt: '2026-05-20T00:00:00.000Z',
         resolutionNote: 'Fixed title duplication',
       }),
     ]);
 
-    const result = await generateMonthlyDigest(ws, 'March 2026');
+    const result = await generateMonthlyDigest(ws);
 
     expect(result.metrics.clicksChange).toBe(0);
     expect(result.metrics.impressionsChange).toBe(0);
@@ -256,17 +397,6 @@ describe('monthly-digest generation', () => {
     );
   });
 
-  it('rejects an explicit future month without querying providers or AI', async () => {
-    const ws = makeWorkspace({ id: 'ws_future_month_window' });
-
-    await expect(generateMonthlyDigest(ws, 'July 2026')).rejects.toThrow(
-      'Monthly digest cannot be generated for a future month: July 2026',
-    );
-    expect(mocks.getSearchPeriodComparison).not.toHaveBeenCalled();
-    expect(mocks.getGA4PeriodComparison).not.toHaveBeenCalled();
-    expect(mocks.callAI).not.toHaveBeenCalled();
-  });
-
   it('floors the current-month reporting cutoff at day one', async () => {
     vi.setSystemTime(new Date('2026-05-02T12:00:00.000Z'));
     const ws = makeWorkspace({ id: 'ws_current_month_day_one_floor' });
@@ -307,11 +437,12 @@ describe('monthly-digest generation', () => {
         severity: 'warning',
         impactScore: -1,
         resolutionStatus: 'resolved',
+        resolvedAt: '2026-05-20T00:00:00.000Z',
         resolutionNote: 'Fixed late issue',
       }),
     ]);
 
-    const result = await generateMonthlyDigest(ws, 'April 2026');
+    const result = await generateMonthlyDigest(ws);
 
     expect(result.metrics.pagesOptimized).toBe(1);
     expect(result.issuesAddressed).toEqual([
@@ -322,7 +453,7 @@ describe('monthly-digest generation', () => {
     ]);
   });
 
-  it('injects summary contract + learnings context into AI prompt', async () => {
+  it('keeps the AI prompt current-month scoped and excludes lifetime learnings totals', async () => {
     const ws = makeWorkspace({ id: 'ws_prompt_contract' });
 
     mocks.getGA4PeriodComparison.mockResolvedValueOnce({
@@ -335,7 +466,7 @@ describe('monthly-digest generation', () => {
       makeInsight({ id: 'pos_2', severity: 'positive', impactScore: 85, pageTitle: 'Services page' }),
     ]);
 
-    await generateMonthlyDigest(ws, 'April 2026');
+    await generateMonthlyDigest(ws);
 
     await vi.waitFor(() => {
       expect(mocks.callAI).toHaveBeenCalledTimes(1);
@@ -347,9 +478,10 @@ describe('monthly-digest generation', () => {
 
     expect(prompt).toContain('Voice rules (follow exactly):');
     expect(prompt).toContain('Lead with the most interesting metric or outcome');
-    expect(prompt).toContain('- 7 tracked outcomes in workspace learnings');
-    expect(prompt).toContain('Workspace outcome learnings:');
-    expect(prompt).toContain('Learning A: concise headlines improve CTR.');
+    expect(mocks.buildRecommendationGenerationContext).not.toHaveBeenCalled();
+    expect(prompt).not.toContain('tracked outcomes in workspace learnings');
+    expect(prompt).not.toContain('Workspace outcome learnings:');
+    expect(prompt).not.toContain('Learning A: concise headlines improve CTR.');
     expect(prompt).toContain('Notable wins this period:');
     expect(prompt).toContain('- Pricing page');
     expect(prompt).toContain('Search clicks: +12.5%');
@@ -358,13 +490,120 @@ describe('monthly-digest generation', () => {
     expect(prompt).toContain('Average ranking position: improved 1.3 spots');
   });
 
+  it('uses a metric-aware fallback for provider declines when AI fails', async () => {
+    const ws = makeWorkspace({ id: 'ws_declining_provider_fallback' });
+    mocks.getSearchPeriodComparison.mockResolvedValueOnce({
+      changePercent: { clicks: -24.6, impressions: -8.1 },
+      change: { position: 2.4 },
+    });
+    mocks.getGA4PeriodComparison.mockResolvedValueOnce({
+      changePercent: { sessions: -12.3 },
+    });
+    mocks.callAI.mockRejectedValueOnce(new Error('AI unavailable'));
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.availability).toBe('ready');
+    expect(result.summary).toMatch(/search clicks (?:decreased|declined) 24\.6%/i);
+    expect(result.summary).not.toMatch(/held steady|solid baseline|momentum|good signals|on track/i);
+  });
+
+  it('uses an honest metric-aware fallback for fulfilled zero-valued provider evidence', async () => {
+    const ws = makeWorkspace({ id: 'ws_zero_provider_fallback' });
+    mocks.getSearchPeriodComparison.mockResolvedValueOnce({
+      changePercent: { clicks: 0, impressions: 0 },
+      change: { position: 0 },
+    });
+    mocks.getGA4PeriodComparison.mockResolvedValueOnce({
+      changePercent: { sessions: 0 },
+    });
+    mocks.callAI.mockResolvedValueOnce({ text: '   ' });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.availability).toBe('ready');
+    expect(result.summary).toMatch(/no percentage change was recorded/i);
+    expect(result.summary).not.toMatch(/held steady|solid baseline/i);
+  });
+
+  it('treats current-month warning and opportunity insights as evidence in the prompt and fallback', async () => {
+    const ws = makeWorkspace({
+      id: 'ws_attention_signal_evidence',
+      webflowSiteId: undefined,
+      gscPropertyUrl: undefined,
+      ga4PropertyId: undefined,
+    });
+    mocks.getInsights.mockReturnValue([
+      makeInsight({
+        id: 'warning-signal',
+        insightType: 'page_health',
+        severity: 'warning',
+        pageTitle: 'Checkout page',
+        computedAt: '2026-05-20T00:00:00.000Z',
+      }),
+      makeInsight({
+        id: 'opportunity-signal',
+        insightType: 'ranking_opportunity',
+        severity: 'opportunity',
+        pageTitle: 'Pricing page',
+        computedAt: '2026-05-21T00:00:00.000Z',
+      }),
+    ]);
+    mocks.callAI.mockRejectedValueOnce(new Error('AI unavailable'));
+
+    const result = await generateMonthlyDigest(ws);
+    const prompt = (mocks.callAI.mock.calls[0]?.[0] as {
+      messages?: Array<{ content: string }>;
+    } | undefined)?.messages?.[0]?.content ?? '';
+
+    expect(result.availability).toBe('ready');
+    expect(prompt).toContain('Signals requiring attention this period:');
+    expect(prompt).toContain('Checkout page');
+    expect(prompt).toContain('Pricing page');
+    expect(result.summary).toMatch(/2 current-month signals require attention/i);
+    expect(result.summary).not.toMatch(/held steady|solid baseline/i);
+  });
+
+  it('gives every ROI prompt row explicit execution framing without crediting unknown attribution', async () => {
+    const ws = makeWorkspace({ id: 'ws_roi_execution_prompt' });
+    mocks.getROIHighlights.mockReturnValue([
+      {
+        pageTitle: 'Client-built page',
+        pageUrl: '/client-built',
+        action: 'Published new post',
+        result: 'Win (+20%)',
+        clicksGained: 20,
+        attributedValue: 80,
+        attribution: 'externally_executed',
+      },
+      {
+        pageTitle: 'Legacy page',
+        pageUrl: '/legacy',
+        action: 'Updated meta description',
+        result: 'Win (+10%)',
+        clicksGained: 10,
+        attributedValue: 40,
+      },
+    ]);
+
+    await generateMonthlyDigest(ws);
+
+    const prompt = (mocks.callAI.mock.calls[0]?.[0] as {
+      messages?: Array<{ content: string }>;
+    } | undefined)?.messages?.[0]?.content ?? '';
+    expect(prompt).toContain('implemented on the client side');
+    expect(prompt).toContain('do not claim agency execution credit');
+    expect(prompt).toContain('execution attribution unavailable');
+    expect(prompt).toContain('do not assign execution credit');
+  });
+
   it('uses fallback summary when AI returns an empty text payload', async () => {
     const ws = makeWorkspace({ id: 'ws_empty_ai' });
 
     mocks.callAI.mockResolvedValueOnce({ text: '' });
     mocks.getInsights.mockReturnValue([makeInsight({ id: 'win_only', severity: 'positive' })]);
 
-    const result = await generateMonthlyDigest(ws, 'May 2026');
+    const result = await generateMonthlyDigest(ws);
 
     expect(result.summary).toContain('1 performance win spotted on your site this period');
   });
@@ -379,8 +618,8 @@ describe('monthly-digest generation', () => {
       }),
     );
 
-    const first = generateMonthlyDigest(ws, 'April 2026');
-    const second = generateMonthlyDigest(ws, 'April 2026');
+    const first = generateMonthlyDigest(ws);
+    const second = generateMonthlyDigest(ws);
 
     await vi.waitFor(() => {
       expect(mocks.callAI).toHaveBeenCalledTimes(1);
@@ -403,12 +642,12 @@ describe('monthly-digest generation', () => {
       .mockResolvedValueOnce({ text: 'Other workspace summary' })
       .mockResolvedValueOnce({ text: 'Fresh invalidated summary' });
 
-    await generateMonthlyDigest(invalidatedWorkspace, 'January 2026');
-    await generateMonthlyDigest(otherWorkspace, 'January 2026');
+    await generateMonthlyDigest(invalidatedWorkspace);
+    await generateMonthlyDigest(otherWorkspace);
     invalidateMonthlyDigestCache(invalidatedWorkspace.id);
 
-    const fresh = await generateMonthlyDigest(invalidatedWorkspace, 'January 2026');
-    const stillCached = await generateMonthlyDigest(otherWorkspace, 'January 2026');
+    const fresh = await generateMonthlyDigest(invalidatedWorkspace);
+    const stillCached = await generateMonthlyDigest(otherWorkspace);
 
     expect(fresh.summary).toBe('Fresh invalidated summary');
     expect(stillCached.summary).toBe('Other workspace summary');
@@ -424,11 +663,11 @@ describe('monthly-digest generation', () => {
       }),
     );
 
-    const staleRequest = generateMonthlyDigest(ws, 'February 2026');
+    const staleRequest = generateMonthlyDigest(ws);
     await vi.waitFor(() => expect(resolvers).toHaveLength(1));
 
     invalidateMonthlyDigestCache(ws.id);
-    const freshRequest = generateMonthlyDigest(ws, 'February 2026');
+    const freshRequest = generateMonthlyDigest(ws);
     await vi.waitFor(() => expect(resolvers).toHaveLength(2));
 
     resolvers[1]({ text: 'Fresh summary' });
@@ -437,7 +676,7 @@ describe('monthly-digest generation', () => {
     resolvers[0]({ text: 'Stale summary' });
     expect((await staleRequest).summary).toBe('Stale summary');
 
-    const cachedAfterRace = await generateMonthlyDigest(ws, 'February 2026');
+    const cachedAfterRace = await generateMonthlyDigest(ws);
     expect(cachedAfterRace.summary).toBe('Fresh summary');
     expect(mocks.callAI).toHaveBeenCalledTimes(2);
   });

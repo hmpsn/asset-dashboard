@@ -204,6 +204,49 @@ afterEach(() => {
 });
 
 describe('digest issuesAddressed counting', () => {
+  it('counts only approvals and work orders completed in the current UTC month', async () => {
+    const ws = makeWorkspace({ id: 'ws_current_operational_window' });
+    mocks.listBatches.mockReturnValue([
+      makeAppliedBatch({
+        id: 'batch_prior',
+        workspaceId: ws.id,
+        items: makeAppliedBatch().items.map((item) => ({
+          ...item,
+          id: 'item_prior',
+          updatedAt: '2026-04-30T23:59:59.999Z',
+        })),
+      }),
+      makeAppliedBatch({
+        id: 'batch_current',
+        workspaceId: ws.id,
+        items: makeAppliedBatch().items.map((item) => ({
+          ...item,
+          id: 'item_current',
+          updatedAt: '2026-05-01T00:00:00.000Z',
+        })),
+      }),
+    ]);
+    mocks.listWorkOrders.mockReturnValue([
+      makeCompletedWorkOrder({
+        id: 'wo_prior',
+        workspaceId: ws.id,
+        completedAt: '2026-04-30T23:59:59.999Z',
+      }),
+      makeCompletedWorkOrder({
+        id: 'wo_current',
+        workspaceId: ws.id,
+        completedAt: '2026-05-01T00:00:00.000Z',
+      }),
+    ]);
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.issuesAddressed.map((item) => item.insightId)).toEqual([
+      'batch:batch_current:item_current',
+      'work-order:wo_current',
+    ]);
+  });
+
   it('reports issuesAddressed >= 1 for a workspace with one applied approval batch', async () => {
     // Seed: no resolved insights (resolutionStatus is in_progress from Bridge #7,
     // never upgraded to resolved by the apply path — this is the bug)
@@ -220,7 +263,7 @@ describe('digest issuesAddressed counting', () => {
     const ws = makeWorkspace({ id: 'ws_applied_approval' });
     mocks.listBatches.mockReturnValue([makeAppliedBatch({ workspaceId: ws.id })]);
 
-    const result = await generateMonthlyDigest(ws, 'May 2026');
+    const result = await generateMonthlyDigest(ws);
 
     expect(result.issuesAddressed.length).toBeGreaterThanOrEqual(1);
   });
@@ -246,7 +289,7 @@ describe('digest issuesAddressed counting', () => {
       }),
     ]);
 
-    const result = await generateMonthlyDigest(ws, 'May 2026');
+    const result = await generateMonthlyDigest(ws);
 
     expect(result.issuesAddressed).toEqual([
       expect.objectContaining({ insightId: 'batch:batch_1:item_applied' }),
@@ -260,7 +303,7 @@ describe('digest issuesAddressed counting', () => {
     const ws = makeWorkspace({ id: 'ws_completed_wo' });
     mocks.listWorkOrders.mockReturnValue([makeCompletedWorkOrder({ workspaceId: ws.id })]);
 
-    const result = await generateMonthlyDigest(ws, 'May 2026');
+    const result = await generateMonthlyDigest(ws);
 
     expect(result.issuesAddressed.length).toBeGreaterThanOrEqual(1);
   });
@@ -275,7 +318,7 @@ describe('digest issuesAddressed counting', () => {
       }),
     ]);
 
-    const result = await generateMonthlyDigest(ws, 'May 2026');
+    const result = await generateMonthlyDigest(ws);
 
     expect(result.issuesAddressed).toEqual([
       expect.objectContaining({ insightId: 'work-order:wo_1' }),
@@ -308,7 +351,7 @@ describe('digest issuesAddressed counting', () => {
     ]);
     mocks.listWorkOrders.mockReturnValue([]);
 
-    const result = await generateMonthlyDigest(ws, 'May 2026');
+    const result = await generateMonthlyDigest(ws);
 
     // Both distinct fixes survive (pre-fix the page-only key collapsed them to 1).
     expect(result.issuesAddressed.length).toBe(2);
@@ -342,7 +385,7 @@ describe('digest issuesAddressed counting', () => {
     ]);
     mocks.listWorkOrders.mockReturnValue([]);
 
-    const result = await generateMonthlyDigest(ws, 'May 2026');
+    const result = await generateMonthlyDigest(ws);
 
     expect(result.issuesAddressed.length).toBe(1);
   });
@@ -353,6 +396,7 @@ describe('digest issuesAddressed counting', () => {
         id: 'ins_resolved',
         severity: 'warning',
         resolutionStatus: 'resolved',
+        resolvedAt: '2026-05-20T00:00:00.000Z',
         resolutionNote: 'Fixed by audit',
         pageTitle: 'Services Page',
       }),
@@ -361,7 +405,7 @@ describe('digest issuesAddressed counting', () => {
     mocks.listWorkOrders.mockReturnValue([]);
 
     const ws = makeWorkspace({ id: 'ws_resolved_only' });
-    const result = await generateMonthlyDigest(ws, 'May 2026');
+    const result = await generateMonthlyDigest(ws);
 
     expect(result.issuesAddressed.length).toBe(1);
     expect(result.issuesAddressed[0].detail).toBe('Fixed by audit');
