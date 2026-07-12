@@ -44,6 +44,62 @@ export function isTopmostOverlay(root: HTMLElement | null): boolean {
   return panels.length > 0 && panels[panels.length - 1] === root;
 }
 
+/** Whether `element` belongs to the visually topmost canonical overlay panel. */
+export function isElementInTopmostOverlay(element: Element | null): boolean {
+  if (!element || typeof document === 'undefined' || !element.isConnected) return false;
+  const containingPanel = element.closest<HTMLElement>(OVERLAY_PANEL_SELECTOR);
+  return isTopmostOverlay(containingPanel);
+}
+
+type OverlayStackListener = () => void;
+
+const overlayStackListeners = new Set<OverlayStackListener>();
+let overlayStackObserver: MutationObserver | null = null;
+
+function nodeContainsOverlayPanel(node: Node): boolean {
+  if (!(node instanceof Element)) return false;
+  return node.matches(OVERLAY_PANEL_SELECTOR) || node.querySelector(OVERLAY_PANEL_SELECTOR) !== null;
+}
+
+function mutationChangesOverlayStack(mutation: MutationRecord): boolean {
+  return Array.from(mutation.addedNodes).some(nodeContainsOverlayPanel)
+    || Array.from(mutation.removedNodes).some(nodeContainsOverlayPanel);
+}
+
+function notifyOverlayStackListeners(): void {
+  for (const listener of [...overlayStackListeners]) listener();
+}
+
+function startOverlayStackObserver(): void {
+  if (
+    overlayStackObserver
+    || typeof document === 'undefined'
+    || !document.body
+    || typeof MutationObserver === 'undefined'
+  ) return;
+
+  overlayStackObserver = new MutationObserver((mutations) => {
+    if (mutations.some(mutationChangesOverlayStack)) notifyOverlayStackListeners();
+  });
+  overlayStackObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+function stopOverlayStackObserver(): void {
+  if (overlayStackListeners.size > 0) return;
+  overlayStackObserver?.disconnect();
+  overlayStackObserver = null;
+}
+
+/** Subscribe while a consumer needs to react to canonical overlay membership/order changes. */
+export function subscribeToOverlayStack(listener: OverlayStackListener): () => void {
+  overlayStackListeners.add(listener);
+  startOverlayStackObserver();
+  return () => {
+    overlayStackListeners.delete(listener);
+    stopOverlayStackObserver();
+  };
+}
+
 // ─── Body-scroll lock coordination across stacked overlays ────────────────────
 // Simple reference counter: each open overlay increments; each close
 // decrements. The lock is applied only when the counter transitions 0→1 and
