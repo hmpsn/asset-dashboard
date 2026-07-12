@@ -110,9 +110,17 @@ function EngineEmptyIcon({ className }: { className?: string }) {
 function EngineProjectionLenses({
   workspaceId,
   stagedRecIds,
+  isLoading,
+  isError,
+  isStale,
+  onRetry,
 }: {
   workspaceId: string;
   stagedRecIds: ReadonlySet<string>;
+  isLoading: boolean;
+  isError: boolean;
+  isStale: boolean;
+  onRetry: () => void;
 }) {
   const [projectionLens, setProjectionLens] = useState<ProjectionLens>('keywords');
 
@@ -145,22 +153,50 @@ function EngineProjectionLenses({
           />
         )}
       >
-        {projectionLens === 'keywords' ? (
-          <KeywordTargetsLens
-            workspaceId={workspaceId}
-            theIssueEnabled
-            embedded
-            includedRecIds={stagedRecIds}
-            presentation="engine-spine"
-          />
+        {isLoading ? (
+          <div data-testid="engine-projections-loading" className="space-y-3 p-4">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </div>
+        ) : isError ? (
+          <div className="p-4">
+            <ErrorState
+              type="data"
+              title="Projection data did not load"
+              message="Retry the recommendation read before relying on staged keyword targets or content work orders."
+              action={{ label: 'Retry projections', onClick: onRetry }}
+            />
+          </div>
         ) : (
-          <ContentWorkOrderLens
-            workspaceId={workspaceId}
-            theIssueEnabled
-            embedded
-            includedRecIds={stagedRecIds}
-            presentation="engine-spine"
-          />
+          <>
+            {isStale && (
+              <InlineBanner tone="warning" title="Projections may be stale" className="m-3 mb-0">
+                <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <span>The last staged recommendation set remains projected while the latest refresh is unavailable.</span>
+                  <Button size="sm" variant="secondary" onClick={onRetry}>
+                    Refresh projections
+                  </Button>
+                </div>
+              </InlineBanner>
+            )}
+            {projectionLens === 'keywords' ? (
+              <KeywordTargetsLens
+                workspaceId={workspaceId}
+                theIssueEnabled
+                embedded
+                includedRecIds={stagedRecIds}
+                presentation="engine-spine"
+              />
+            ) : (
+              <ContentWorkOrderLens
+                workspaceId={workspaceId}
+                theIssueEnabled
+                embedded
+                includedRecIds={stagedRecIds}
+                presentation="engine-spine"
+              />
+            )}
+          </>
         )}
       </SectionCard>
     </section>
@@ -177,6 +213,10 @@ function ClientTrustSpinePreview({
   stagedCount,
   curatedCount,
   totalMoves,
+  recommendationsReady,
+  recommendationsSummary,
+  povLoading,
+  povReadUnavailable,
 }: {
   workspaceName: string;
   verdict: string | undefined;
@@ -187,10 +227,27 @@ function ClientTrustSpinePreview({
   stagedCount: number;
   curatedCount: number;
   totalMoves: number;
+  recommendationsReady: boolean;
+  recommendationsSummary: string;
+  povLoading: boolean;
+  povReadUnavailable: boolean;
 }) {
-  const displayedVerdict = verdict || 'Draft the client-facing verdict before sending the update.';
-  const displayedExplanation = explanation || 'The client preview will combine the verdict, value frame, and proof once a point of view is drafted.';
-  const moveCount = totalMoves > 0 ? `${curatedCount} / ${totalMoves}` : '—';
+  const displayedVerdict = verdict
+    || (povReadUnavailable
+      ? 'Point of view temporarily unavailable.'
+      : povLoading
+        ? 'Loading the saved point of view.'
+        : 'Draft the client-facing verdict before sending the update.');
+  const displayedExplanation = explanation
+    || (povReadUnavailable
+      ? 'The saved client narrative could not be read. Retry before sending this preview.'
+      : povLoading
+        ? 'The client narrative will appear here as soon as the saved point of view loads.'
+        : 'The client preview will combine the verdict, value frame, and proof once a point of view is drafted.');
+  const moveCount = recommendationsReady ? `${curatedCount} / ${totalMoves}` : '—';
+  const moveSummary = recommendationsReady
+    ? `${stagedCount} staged · ${curatedCount} with client`
+    : recommendationsSummary;
 
   return (
     <div data-testid="engine-trust-spine-preview">
@@ -250,7 +307,7 @@ function ClientTrustSpinePreview({
               <MetricTile
                 label="Backing moves live"
                 value={moveCount}
-                sub={`${stagedCount} staged · ${curatedCount} with client`}
+                sub={moveSummary}
                 accent="var(--blue)"
               />
             </div>
@@ -285,6 +342,18 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
   const verdictExplanation = engine.strategyPov.pov?.situation
     || engine.strategyPov.pov?.leadSentence
     || undefined;
+  const recommendationsHaveData = engine.recommendations.data !== undefined;
+  const recommendationsInitialPending = !recommendationsHaveData && !engine.recommendations.isError;
+  const recommendationsUnavailable = engine.recommendations.isError && !recommendationsHaveData;
+  const recommendationsStale = engine.recommendations.isError && recommendationsHaveData;
+  const povInitialLoading = engine.strategyPov.isLoading && !engine.strategyPov.pov;
+  const povReadUnavailable = engine.strategyPov.isError && !engine.strategyPov.pov;
+  const backingMovesValue = recommendationsHaveData ? engine.activeRecs.length : '—';
+  const backingMovesSummary = recommendationsInitialPending
+    ? 'Loading recommendation queue'
+    : recommendationsUnavailable
+      ? 'Recommendation queue unavailable'
+      : `${engine.stagedCount} staged · ${engine.curatedCount} with client`;
   const selectedMove = useMemo(
     () => engine.cockpitRecs.find((rec) => rec.id === selectedMoveId) ?? null,
     [engine.cockpitRecs, selectedMoveId],
@@ -414,6 +483,14 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
     />
   );
 
+  const keywordSnapshotAvailable = engine.keywordQuery.data !== undefined;
+  const homeSnapshotAvailable = engine.homeQuery.data !== undefined;
+  const keywordReadUnavailable = engine.keywordQuery.isError && !keywordSnapshotAvailable;
+  const homeReadUnavailable = engine.homeQuery.isError && !homeSnapshotAvailable;
+  const initialSnapshotPending = !keywordReadUnavailable
+    && !homeReadUnavailable
+    && (!keywordSnapshotAvailable || !homeSnapshotAvailable);
+
   useEffect(() => {
     if (!state.rawLens || state.invalidLens) return;
     const target = document.getElementById(ENGINE_SECTION_IDS[state.lens]);
@@ -429,7 +506,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
     state.rawLens,
   ]);
 
-  if ((engine.keywordQuery.isLoading || engine.homeQuery.isLoading) && !engine.keywordQuery.data) {
+  if (initialSnapshotPending) {
     return (
       <PageContainer width="default" className="min-h-full" style={ENGINE_PAGE_STYLE}>
         <div data-testid="engine-rebuilt-loading" className="flex flex-col gap-5">
@@ -446,15 +523,28 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
     );
   }
 
-  if (engine.keywordQuery.isError && !engine.keywordQuery.data) {
+  if (keywordReadUnavailable || homeReadUnavailable) {
+    const bothReadsUnavailable = keywordReadUnavailable && homeReadUnavailable;
+    const retryUnavailableReads = () => {
+      const retries: Array<Promise<unknown>> = [];
+      if (keywordReadUnavailable) retries.push(engine.keywordQuery.refetch());
+      if (homeReadUnavailable) retries.push(engine.homeQuery.refetch());
+      void Promise.all(retries);
+    };
     return (
       <PageContainer width="default" className="min-h-full" style={ENGINE_PAGE_STYLE}>
         <PageHeader title="Insights Engine" subtitle="Operator strategy, curation, and evidence." />
         <ErrorState
           type="data"
-          title="Engine data did not load"
-          message="Retry the strategy read before reviewing operator work."
-          action={{ label: 'Retry', onClick: () => void engine.keywordQuery.refetch() }}
+          title={homeReadUnavailable && !keywordReadUnavailable
+            ? 'Engine summary did not load'
+            : 'Engine data did not load'}
+          message={bothReadsUnavailable
+            ? 'Retry the strategy and aggregate workspace reads before reviewing operator work.'
+            : keywordReadUnavailable
+              ? 'Retry the strategy read before reviewing operator work.'
+              : 'Retry the aggregate workspace read before relying on value, freshness, and work-queue evidence.'}
+          action={{ label: 'Retry', onClick: retryUnavailableReads }}
           className="min-h-[420px]"
         />
       </PageContainer>
@@ -545,14 +635,23 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
               iconName={null}
               title={(
                 <span className="block max-w-[26ch] font-bold">
-                  {verdictTitle ?? 'No strategy verdict drafted yet'}
+                  {verdictTitle
+                    ?? (povReadUnavailable
+                      ? 'Point of view temporarily unavailable'
+                      : povInitialLoading
+                        ? 'Loading point of view'
+                        : 'No strategy verdict drafted yet')}
                 </span>
               )}
               description={(
                 <span className="t-page">
                   {verdictTitle
                     ? verdictExplanation
-                    : 'Generate or refresh the point of view to draft the opening verdict.'}
+                    : povReadUnavailable
+                      ? 'Retry the saved point of view read before reviewing or sending the client narrative.'
+                      : povInitialLoading
+                        ? 'The saved client narrative is being loaded.'
+                        : 'Generate or refresh the point of view to draft the opening verdict.'}
                 </span>
               )}
               className="px-7 py-6"
@@ -590,8 +689,8 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
             />
             <MetricTile
               label="Backing moves live"
-              value={engine.activeRecs.length || '—'}
-              sub={`${engine.stagedCount} staged · ${engine.curatedCount} with client`}
+              value={backingMovesValue}
+              sub={backingMovesSummary}
               accent="var(--blue)"
               icon={Network}
             />
@@ -651,19 +750,52 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
               className="space-y-4 outline-none"
               style={{ outline: 'none' }}
             >
-              <DraftedPovEditor
-                pov={engine.strategyPov.pov}
-                title={`The point of view we send ${workspaceName}`}
-                subtitle="The plain-language read the client opens with"
-                onEdit={engine.strategyPov.edit}
-                struckRecIds={engine.struckRecIds}
-                onRegenerate={engine.strategyPov.regenerate}
-                isGenerating={engine.strategyPov.isGenerating}
-                presentation="engine-summary"
-                stagedCount={engine.stagedCount}
-                onOpenEditor={() => setPovEditorOpen(true)}
-              />
-              {engine.strategyPov.refreshAvailable && (
+              {povInitialLoading ? (
+                <SectionCard
+                  title={`The point of view we send ${workspaceName}`}
+                  subtitle="Loading the saved client narrative"
+                  titleIcon={<Icon name="file" size="md" className="text-[var(--teal)]" />}
+                  iconChip
+                >
+                  <div data-testid="engine-pov-loading" className="space-y-3">
+                    <Skeleton className="h-5 w-2/3" />
+                    <Skeleton className="h-16 w-full" />
+                  </div>
+                </SectionCard>
+              ) : povReadUnavailable ? (
+                <ErrorState
+                  type="data"
+                  title="Point of view did not load"
+                  message="Retry the saved POV read. Generate and regenerate remain separate actions."
+                  action={{ label: 'Retry', onClick: engine.strategyPov.retry }}
+                />
+              ) : (
+                <DraftedPovEditor
+                  pov={engine.strategyPov.pov}
+                  title={`The point of view we send ${workspaceName}`}
+                  subtitle="The plain-language read the client opens with"
+                  onEdit={engine.strategyPov.edit}
+                  struckRecIds={engine.struckRecIds}
+                  onRegenerate={engine.strategyPov.regenerate}
+                  isGenerating={engine.strategyPov.isGenerating}
+                  presentation="engine-summary"
+                  stagedCount={recommendationsHaveData ? engine.stagedCount : undefined}
+                  onOpenEditor={() => setPovEditorOpen(true)}
+                />
+              )}
+              {engine.strategyPov.isError && engine.strategyPov.pov && (
+                <InlineBanner
+                  tone="warning"
+                  title="Point of view may be stale"
+                  message="The latest POV read failed, so the last saved narrative remains visible."
+                >
+                  <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <span>The latest POV read failed, so the last saved narrative remains visible.</span>
+                    <Button variant="secondary" size="sm" onClick={engine.strategyPov.retry}>Retry</Button>
+                  </div>
+                </InlineBanner>
+              )}
+              {!povReadUnavailable && engine.strategyPov.refreshAvailable && (
                 <InlineBanner
                   tone="warning"
                   title="Point of view refresh available"
@@ -687,7 +819,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
                   </div>
                 </InlineBanner>
               )}
-              {engine.strategyPov.generateError != null && (
+              {!povReadUnavailable && engine.strategyPov.generateError != null && (
                 <InlineBanner
                   tone="error"
                   title="Point of view update failed"
@@ -712,7 +844,17 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
                 titleIcon={<Icon name="filter" size="md" className="text-[var(--teal)]" />}
                 iconChip
               >
-                <StanceBar recs={engine.activeRecs} />
+                {recommendationsInitialPending ? (
+                  <Skeleton className="h-14 w-full" />
+                ) : recommendationsUnavailable ? (
+                  <InlineBanner
+                    tone="warning"
+                    title="Effort allocation unavailable"
+                    message="The recommendation queue must load before Engine can show its allocation."
+                  />
+                ) : (
+                  <StanceBar recs={engine.activeRecs} />
+                )}
               </SectionCard>
             </section>
 
@@ -753,28 +895,72 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
                   />
                 </div>
               )}
-              <BackingMovesQueue
-                workspaceId={workspaceId}
-                recs={engine.activeRecs}
-                actions={engine.lifecycleActions}
-                onCut={engine.markCut}
-                shortlistCap={1}
-                subtitle="The recommendations staged to back this point of view"
-                onEditWording={engine.operatorSteering.editWording}
-                stagedCount={engine.stagedCount}
-                curatedCount={engine.curatedCount}
-                stagedRecIds={engine.stagedSendableSet}
-                stageableRecIds={engine.sendableSet}
-                onStage={engine.toggleStage}
-                onStageMany={engine.stageMany}
-                onAddRec={() => setAddRecOpen(true)}
-                onOpenDetails={setSelectedMoveId}
-                presentation="engine-spine"
-              />
+              {recommendationsStale && (
+                <InlineBanner tone="warning" title="Recommendation queue may be stale">
+                  <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <span>The latest refresh failed, so Engine is keeping the last loaded moves visible.</span>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => void engine.recommendations.refetch()}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                </InlineBanner>
+              )}
+              {recommendationsInitialPending ? (
+                <div data-testid="engine-recommendations-loading">
+                  <SectionCard
+                    title="Backing moves"
+                    subtitle="Loading the recommendations staged to back this point of view"
+                    titleIcon={<Icon name="layers" size="md" className="text-[var(--teal)]" />}
+                    iconChip
+                  >
+                    <div className="space-y-3">
+                      <Skeleton className="h-20 w-full" />
+                      <Skeleton className="h-20 w-full" />
+                    </div>
+                  </SectionCard>
+                </div>
+              ) : recommendationsUnavailable ? (
+                <ErrorState
+                  type="data"
+                  title="Recommendation queue did not load"
+                  message="Retry the canonical recommendation read before reviewing or sending Backing Moves."
+                  action={{ label: 'Retry', onClick: () => void engine.recommendations.refetch() }}
+                />
+              ) : (
+                <BackingMovesQueue
+                  workspaceId={workspaceId}
+                  recs={engine.activeRecs}
+                  actions={engine.lifecycleActions}
+                  onCut={engine.markCut}
+                  shortlistCap={1}
+                  subtitle="The recommendations staged to back this point of view"
+                  onEditWording={engine.operatorSteering.editWording}
+                  stagedCount={engine.stagedCount}
+                  curatedCount={engine.curatedCount}
+                  stagedRecIds={engine.stagedSendableSet}
+                  stageableRecIds={engine.sendableSet}
+                  onStage={engine.toggleStage}
+                  onStageMany={engine.stageMany}
+                  onAddRec={() => setAddRecOpen(true)}
+                  onOpenDetails={setSelectedMoveId}
+                  presentation="engine-spine"
+                />
+              )}
 
             </section>
 
-            <EngineProjectionLenses workspaceId={workspaceId} stagedRecIds={engine.stagedSendableSet} />
+            <EngineProjectionLenses
+              workspaceId={workspaceId}
+              stagedRecIds={engine.stagedSendableSet}
+              isLoading={recommendationsInitialPending}
+              isError={recommendationsUnavailable}
+              isStale={recommendationsStale}
+              onRetry={() => { void engine.recommendations.refetch(); }}
+            />
 
             <ClientTrustSpinePreview
               workspaceName={workspaceName}
@@ -786,6 +972,10 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
               stagedCount={engine.stagedCount}
               curatedCount={engine.curatedCount}
               totalMoves={engine.cockpitRecs.length}
+              recommendationsReady={recommendationsHaveData}
+              recommendationsSummary={backingMovesSummary}
+              povLoading={povInitialLoading}
+              povReadUnavailable={povReadUnavailable}
             />
 
           </>

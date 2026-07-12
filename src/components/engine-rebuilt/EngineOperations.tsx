@@ -87,6 +87,10 @@ export function EngineOperations({
   const clientSignalRows = engine.leads.leads.slice(0, 3);
   const healthTone = openWorkItems > 0 ? 'risk' : 'ok';
   const cannibalizationEntries = engine.strategy?.cannibalization ?? [];
+  const recommendationsHaveData = engine.recommendations.data !== undefined;
+  const recommendationHistoryLoading = !recommendationsHaveData && !engine.recommendations.isError;
+  const recommendationHistoryUnavailable = engine.recommendations.isError && !recommendationsHaveData;
+  const recommendationHistoryStale = engine.recommendations.isError && recommendationsHaveData;
 
   const configPanelProps = {
     workspaceId,
@@ -135,11 +139,15 @@ export function EngineOperations({
           meta="Completed, suppressed, and client-resolved recommendations with full value detail"
           collapsible
           defaultOpen={false}
-          stats={[{ label: 'history', value: engine.historyRecs.length }]}
+          stats={[{ label: 'history', value: recommendationsHaveData ? engine.historyRecs.length : '—' }]}
         >
           <EngineRecommendationHistory
             workspaceId={workspaceId}
             recommendations={engine.historyRecs}
+            isLoading={recommendationHistoryLoading}
+            isError={recommendationHistoryUnavailable}
+            isStale={recommendationHistoryStale}
+            onRetry={() => { void engine.recommendations.refetch(); }}
           />
         </GroupBlock>
       </ErrorBoundary>

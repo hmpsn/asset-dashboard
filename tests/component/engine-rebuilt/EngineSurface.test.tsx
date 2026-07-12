@@ -266,7 +266,7 @@ vi.mock('../../../src/components/strategy/issue/ContentWorkOrderLens', () => ({
       data-included-rec-ids={[...(includedRecIds ?? [])].join(',')}
       data-presentation={presentation}
     >
-      Content work-orders
+      {(includedRecIds?.size ?? 0) === 0 ? 'No content work orders yet' : 'Content work-orders'}
     </div>
   ),
 }));
@@ -284,7 +284,7 @@ vi.mock('../../../src/components/strategy/issue/KeywordTargetsLens', () => ({
       data-included-rec-ids={[...(includedRecIds ?? [])].join(',')}
       data-presentation={presentation}
     >
-      Keyword targets
+      {(includedRecIds?.size ?? 0) === 0 ? 'No keyword targets yet' : 'Keyword targets'}
     </div>
   ),
 }));
@@ -505,6 +505,8 @@ function makeEngineState(overrides: Partial<EngineState> = {}): EngineState {
       },
       isLoading: false,
       isError: false,
+      readError: null,
+      retry: vi.fn(),
       edit: vi.fn(),
       editPending: false,
       generate: vi.fn(),
@@ -645,6 +647,13 @@ function expectSpineOrder(sectionIds: readonly string[]) {
 describe('EngineSurface rebuilt', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.undismissRecommendation.mockImplementation((
+      _recId: string,
+      options?: { onSuccess?: () => void; onSettled?: () => void },
+    ) => {
+      options?.onSuccess?.();
+      options?.onSettled?.();
+    });
     scrollIntoViewMock.mockReset();
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
       configurable: true,
@@ -782,6 +791,245 @@ describe('EngineSurface rebuilt', () => {
 
     expect(await screen.findByTestId('engine-section-backing-moves')).toBeInTheDocument();
     expect(screen.queryByTestId('engine-move-support-row')).not.toBeInTheDocument();
+  });
+
+  it('keeps a cached strategy behind the loading composition while the aggregate home snapshot is cold', () => {
+    const engineState = makeEngineState();
+    mocks.engineState = makeEngineState({
+      homeQuery: {
+        ...engineState.homeQuery,
+        data: undefined,
+        isLoading: true,
+        isPending: true,
+        isError: false,
+        dataUpdatedAt: 0,
+      },
+    } as unknown as Partial<EngineState>);
+
+    renderSurface();
+
+    expect(screen.getByTestId('engine-rebuilt-loading')).toBeInTheDocument();
+    expect(screen.queryByTestId('engine-rebuilt-surface')).not.toBeInTheDocument();
+    expect(screen.queryByText('Freshness unavailable')).not.toBeInTheDocument();
+    expect(screen.queryByText('Value proof is still being prepared')).not.toBeInTheDocument();
+  });
+
+  it('shows a retryable aggregate-home error instead of manufacturing empty value proof', async () => {
+    const engineState = makeEngineState();
+    const retryHome = vi.fn().mockResolvedValue({ error: null });
+    mocks.engineState = makeEngineState({
+      homeQuery: {
+        ...engineState.homeQuery,
+        data: undefined,
+        isLoading: false,
+        isPending: false,
+        isError: true,
+        error: new Error('workspace summary unavailable'),
+        dataUpdatedAt: 0,
+        refetch: retryHome,
+      },
+    } as unknown as Partial<EngineState>);
+
+    renderSurface();
+
+    expect(await screen.findByText('Engine summary did not load')).toBeInTheDocument();
+    expect(screen.queryByTestId('engine-rebuilt-surface')).not.toBeInTheDocument();
+    expect(screen.queryByText('Freshness unavailable')).not.toBeInTheDocument();
+    expect(screen.queryByText('Value proof is still being prepared')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(retryHome).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps recommendation-backed composition in a contextual loading state until the first set arrives', async () => {
+    mocks.engineState = makeEngineState({
+      recommendations: {
+        data: undefined,
+        isLoading: true,
+        isError: false,
+        refetch: vi.fn(),
+      },
+      cockpitRecs: [],
+      activeRecs: [],
+      historyRecs: [],
+    } as unknown as Partial<EngineState>);
+
+    renderSurface('/ws/ws-engine/seo-strategy?lens=operations');
+
+    expect(await screen.findByTestId('engine-recommendations-loading')).toBeInTheDocument();
+    expect(screen.queryByText(/No recommendations match/i)).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('engine-section-value-frame')).getByText('Loading recommendation queue'))
+      .toBeInTheDocument();
+
+    const projections = screen.getByTestId('engine-section-projections');
+    expect(within(projections).getByTestId('engine-projections-loading')).toBeInTheDocument();
+    expect(within(projections).queryByText('No keyword targets yet')).not.toBeInTheDocument();
+    fireEvent.click(within(projections).getByRole('radio', { name: 'Content work orders' }));
+    expect(within(projections).queryByText('No content work orders yet')).not.toBeInTheDocument();
+
+    const historyToggle = screen.getByRole('button', { name: /Recommendation history/ });
+    expect(historyToggle).toHaveTextContent('—');
+    fireEvent.click(historyToggle);
+    expect(screen.getByTestId('engine-recommendation-history-loading')).toBeInTheDocument();
+    expect(screen.queryByText('No recommendation history yet')).not.toBeInTheDocument();
+  });
+
+  it('keeps paused no-cache recommendations pending across moves, projections, and history', async () => {
+    mocks.engineState = makeEngineState({
+      recommendations: {
+        data: undefined,
+        isLoading: false,
+        isPending: true,
+        isError: false,
+        fetchStatus: 'paused',
+        refetch: vi.fn(),
+      },
+      cockpitRecs: [],
+      activeRecs: [],
+      historyRecs: [],
+    } as unknown as Partial<EngineState>);
+
+    renderSurface('/ws/ws-engine/seo-strategy?lens=operations');
+
+    expect(await screen.findByTestId('engine-recommendations-loading')).toBeInTheDocument();
+    expect(screen.getByTestId('drafted-pov-editor')).not.toHaveAttribute('data-staged-count');
+    const projections = screen.getByTestId('engine-section-projections');
+    expect(within(projections).getByTestId('engine-projections-loading')).toBeInTheDocument();
+    expect(within(projections).queryByText('No keyword targets yet')).not.toBeInTheDocument();
+    fireEvent.click(within(projections).getByRole('radio', { name: 'Content work orders' }));
+    expect(within(projections).queryByText('No content work orders yet')).not.toBeInTheDocument();
+
+    const historyToggle = screen.getByRole('button', { name: /Recommendation history/ });
+    expect(historyToggle).toHaveTextContent('—');
+    fireEvent.click(historyToggle);
+    expect(screen.getByTestId('engine-recommendation-history-loading')).toBeInTheDocument();
+    expect(screen.queryByText('No recommendation history yet')).not.toBeInTheDocument();
+  });
+
+  it('shows one retryable recommendation error instead of empty queues when the first read fails', async () => {
+    const retryRecommendations = vi.fn();
+    mocks.engineState = makeEngineState({
+      recommendations: {
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: new Error('recommendations unavailable'),
+        refetch: retryRecommendations,
+      },
+      cockpitRecs: [],
+      activeRecs: [],
+      historyRecs: [],
+    } as unknown as Partial<EngineState>);
+
+    renderSurface('/ws/ws-engine/seo-strategy?lens=operations');
+
+    const moves = await screen.findByTestId('engine-section-backing-moves');
+    expect(screen.getByTestId('drafted-pov-editor')).not.toHaveAttribute('data-staged-count');
+    expect(within(moves).getByText('Recommendation queue did not load')).toBeInTheDocument();
+    expect(within(moves).queryByText(/No recommendations match/i)).not.toBeInTheDocument();
+    fireEvent.click(within(moves).getByRole('button', { name: 'Retry' }));
+    expect(retryRecommendations).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /Recommendation history/ }));
+    const history = screen.getByTestId('engine-recommendation-history');
+    expect(within(history).getByText('Recommendation history is unavailable')).toBeInTheDocument();
+    fireEvent.click(within(history).getByRole('button', { name: 'Retry' }));
+    expect(retryRecommendations).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('No recommendation history yet')).not.toBeInTheDocument();
+
+    const projections = screen.getByTestId('engine-section-projections');
+    expect(within(projections).getByText('Projection data did not load')).toBeInTheDocument();
+    expect(within(projections).queryByText('No keyword targets yet')).not.toBeInTheDocument();
+    fireEvent.click(within(projections).getByRole('radio', { name: 'Content work orders' }));
+    expect(within(projections).queryByText('No content work orders yet')).not.toBeInTheDocument();
+    fireEvent.click(within(projections).getByRole('button', { name: 'Retry projections' }));
+    expect(retryRecommendations).toHaveBeenCalledTimes(3);
+  });
+
+  it('preserves cached recommendations and history when a background refresh fails', async () => {
+    const engineState = makeEngineState();
+    const retryRecommendations = vi.fn();
+    const dismissed = {
+      ...baseRec,
+      id: 'dismissed-cached',
+      title: 'Cached dismissed recommendation',
+      status: 'dismissed' as const,
+      lifecycle: 'struck' as const,
+    };
+    mocks.engineState = makeEngineState({
+      recommendations: {
+        ...engineState.recommendations,
+        isLoading: false,
+        isError: true,
+        error: new Error('refresh failed'),
+        refetch: retryRecommendations,
+      },
+      cockpitRecs: [baseRec, dismissed],
+      activeRecs: [baseRec],
+      historyRecs: [dismissed],
+      stagedSendableSet: new Set(['rec-1']),
+      stagedCount: 1,
+    } as unknown as Partial<EngineState>);
+
+    renderSurface('/ws/ws-engine/seo-strategy?lens=operations');
+
+    expect(await screen.findByText('Recommendation queue may be stale')).toBeInTheDocument();
+    expect(screen.getByTestId('backing-moves-queue')).toHaveAttribute('data-rec-ids', 'rec-1');
+    const historyToggle = screen.getByRole('button', { name: /Recommendation history/ });
+    expect(historyToggle).toHaveTextContent('1');
+    fireEvent.click(historyToggle);
+    const history = screen.getByTestId('engine-recommendation-history');
+    expect(within(history).getByText('Recommendation history may be stale')).toBeInTheDocument();
+    expect(within(history).getByText('Cached dismissed recommendation')).toBeInTheDocument();
+    fireEvent.click(within(history).getByRole('button', { name: 'Refresh history' }));
+    expect(retryRecommendations).toHaveBeenCalledTimes(1);
+
+    const projections = screen.getByTestId('engine-section-projections');
+    expect(within(projections).getByText('Projections may be stale')).toBeInTheDocument();
+    expect(within(projections).getByTestId('keyword-targets-lens')).toHaveAttribute('data-included-rec-ids', 'rec-1');
+    fireEvent.click(within(projections).getByRole('button', { name: 'Refresh projections' }));
+    expect(retryRecommendations).toHaveBeenCalledTimes(2);
+  });
+
+  it('separates a failed POV read from generate and regenerate actions', async () => {
+    const engineState = makeEngineState();
+    const retryPov = vi.fn();
+    mocks.engineState = makeEngineState({
+      strategyPov: {
+        ...engineState.strategyPov,
+        pov: null,
+        isLoading: false,
+        isError: true,
+        readError: new Error('POV read unavailable'),
+        retry: retryPov,
+      },
+    });
+
+    renderSurface();
+
+    expect(await screen.findByRole('heading', { name: 'Point of view temporarily unavailable' })).toBeInTheDocument();
+    const povSection = screen.getByTestId('engine-section-pov');
+    expect(within(povSection).getByText('Point of view did not load')).toBeInTheDocument();
+    expect(within(povSection).queryByTestId('drafted-pov-editor')).not.toBeInTheDocument();
+    expect(within(povSection).queryByRole('button', { name: /Generate|Regenerate/ })).not.toBeInTheDocument();
+    fireEvent.click(within(povSection).getByRole('button', { name: 'Retry' }));
+    expect(retryPov).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a cached POV visible with a stale warning when its background read fails', async () => {
+    const engineState = makeEngineState();
+    mocks.engineState = makeEngineState({
+      strategyPov: {
+        ...engineState.strategyPov,
+        isError: true,
+        readError: new Error('POV refresh unavailable'),
+      },
+    });
+
+    renderSurface();
+
+    const povSection = await screen.findByTestId('engine-section-pov');
+    expect(within(povSection).getByTestId('drafted-pov-editor')).toBeInTheDocument();
+    expect(within(povSection).getByText('Point of view may be stale')).toBeInTheDocument();
   });
 
   it('keeps sent recommendations in attention classification while Backing Moves remains active-only', async () => {
@@ -976,7 +1224,65 @@ describe('EngineSurface rebuilt', () => {
 
     fireEvent.click(screen.getByText('Dismissed recommendation').closest('button')!);
     fireEvent.click(screen.getByRole('button', { name: 'Un-dismiss' }));
-    expect(mocks.undismissRecommendation).toHaveBeenCalledWith('dismissed-rec');
+    expect(mocks.undismissRecommendation).toHaveBeenCalledWith(
+      'dismissed-rec',
+      expect.objectContaining({
+        onError: expect.any(Function),
+        onSettled: expect.any(Function),
+        onSuccess: expect.any(Function),
+      }),
+    );
+    expect(screen.getByText('Dismissed status cleared')).toBeInTheDocument();
+    expect(screen.getByText(/Other lifecycle and client decisions remain unchanged/i)).toBeInTheDocument();
+    expect(screen.queryByText(/active queue|back to active/i)).not.toBeInTheDocument();
+  });
+
+  it('blocks duplicate un-dismiss submissions and preserves the row with retryable feedback on failure', async () => {
+    const dismissed = {
+      ...baseRec,
+      id: 'dismissed-rec',
+      title: 'Dismissed recommendation',
+      status: 'dismissed' as const,
+      lifecycle: 'struck' as const,
+    };
+    let mutationOptions: {
+      onError?: (error: unknown) => void;
+      onSettled?: () => void;
+    } | undefined;
+    mocks.undismissRecommendation.mockImplementationOnce((
+      _recId: string,
+      options: typeof mutationOptions,
+    ) => {
+      mutationOptions = options;
+    });
+    mocks.engineState = makeEngineState({
+      cockpitRecs: [dismissed],
+      activeRecs: [],
+      historyRecs: [dismissed],
+    } as Partial<EngineState>);
+
+    renderSurface('/ws/ws-engine/seo-strategy?lens=operations');
+    fireEvent.click(await screen.findByRole('button', { name: /Recommendation history/ }));
+    fireEvent.click(screen.getByText('Dismissed recommendation').closest('button')!);
+    const undismissButton = screen.getByRole('button', { name: 'Un-dismiss' });
+    fireEvent.click(undismissButton);
+    fireEvent.click(undismissButton);
+
+    expect(mocks.undismissRecommendation).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Clearing dismissed status')).toBeInTheDocument();
+    expect(screen.getByText(/Struck, throttled, and client lifecycle decisions remain in place/i)).toBeInTheDocument();
+    expect(screen.queryByText(/active queue|back to active/i)).not.toBeInTheDocument();
+
+    act(() => {
+      mutationOptions?.onError?.(new Error('Status service unavailable'));
+      mutationOptions?.onSettled?.();
+    });
+
+    expect(screen.getByText('Dismissed status was not cleared')).toBeInTheDocument();
+    expect(screen.getByText(/Status service unavailable/i)).toBeInTheDocument();
+    expect(screen.queryByText(/active queue|back to active/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Dismissed recommendation')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Un-dismiss' })).toBeInTheDocument();
   });
 
   it('uses the full recommendation set as the client-preview ratio denominator', async () => {

@@ -1,4 +1,4 @@
-import { getSafe, post, patch } from './client';
+import { get, post, patch } from './client';
 import type { StrategyPovResponse } from '../../shared/types/strategy-pov';
 
 /** Operator-editable fields (the PATCH body). Mirrors the route's patchPovSchema. */
@@ -12,10 +12,7 @@ export interface StrategyPovEdit {
 
 export const strategyPovApi = {
   get: (workspaceId: string) =>
-    getSafe<StrategyPovResponse>(
-      `/api/workspaces/${workspaceId}/strategy-pov`,
-      { pov: null, refreshAvailable: false },
-    ),
+    get<StrategyPovResponse>(`/api/workspaces/${workspaceId}/strategy-pov`),
 
   /** Generate (or return cached on no-change). Throws on non-2xx — handle via useMutation onError. */
   generate: (workspaceId: string) =>

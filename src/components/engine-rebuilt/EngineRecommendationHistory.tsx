@@ -1,9 +1,10 @@
 // @ds-rebuilt
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { Recommendation } from '../../../shared/types/recommendations';
 import { useAdminUndismissRecommendation } from '../../hooks/admin/useAdminRecommendations';
-import { EmptyState, Icon } from '../ui';
+import { Button, EmptyState, Icon, InlineBanner, Skeleton } from '../ui';
 import { RecommendationRow } from '../admin/recommendations/RecommendationRow';
+import { mutationErrorMessage } from './engineMutationFeedback';
 
 function HistoryEmptyIcon({ className }: { className?: string }) {
   return <Icon name="clock" className={className} />;
@@ -67,21 +68,99 @@ export function groupEngineRecommendationHistory(
 interface EngineRecommendationHistoryProps {
   workspaceId: string;
   recommendations: Recommendation[];
+  isLoading?: boolean;
+  isError?: boolean;
+  isStale?: boolean;
+  onRetry: () => void;
 }
 
 export function EngineRecommendationHistory({
   workspaceId,
   recommendations,
+  isLoading = false,
+  isError = false,
+  isStale = false,
+  onRetry,
 }: EngineRecommendationHistoryProps) {
   const undismiss = useAdminUndismissRecommendation(workspaceId);
+  const statusClearInFlight = useRef(false);
+  const [pendingRecId, setPendingRecId] = useState<string | null>(null);
+  const [statusClearError, setStatusClearError] = useState<unknown>(null);
+  const [statusClearSucceeded, setStatusClearSucceeded] = useState(false);
   const grouped = useMemo(
     () => groupEngineRecommendationHistory(recommendations),
     [recommendations],
   );
 
-  if (recommendations.length === 0) {
+  const clearDismissedStatus = (recId: string) => {
+    if (statusClearInFlight.current) return;
+    statusClearInFlight.current = true;
+    setPendingRecId(recId);
+    setStatusClearError(null);
+    setStatusClearSucceeded(false);
+    undismiss.mutate(recId, {
+      onSuccess: () => {
+        setPendingRecId(null);
+        setStatusClearSucceeded(true);
+      },
+      onError: (error) => {
+        setStatusClearError(error);
+        setPendingRecId(null);
+      },
+      onSettled: () => {
+        statusClearInFlight.current = false;
+      },
+    });
+  };
+
+  const statusClearedBanner = statusClearSucceeded ? (
+    <InlineBanner
+      tone="success"
+      title="Dismissed status cleared"
+      message="Other lifecycle and client decisions remain unchanged; this action changed only the dismissed status."
+      onDismiss={() => setStatusClearSucceeded(false)}
+    />
+  ) : null;
+  const staleBanner = isStale ? (
+    <InlineBanner tone="warning" title="Recommendation history may be stale">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span>The last loaded history remains visible. Refresh when the recommendation source is healthy.</span>
+        <Button size="sm" variant="secondary" onClick={onRetry}>
+          Refresh history
+        </Button>
+      </div>
+    </InlineBanner>
+  ) : null;
+
+  if (isLoading) {
+    return (
+      <div data-testid="engine-recommendation-history-loading" className="space-y-3">
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-20 w-full" />
+      </div>
+    );
+  }
+
+  if (isError) {
     return (
       <div data-testid="engine-recommendation-history">
+        <InlineBanner tone="warning" title="Recommendation history is unavailable">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span>History will remain hidden until the canonical recommendation read succeeds.</span>
+            <Button size="sm" variant="secondary" onClick={onRetry}>
+              Retry
+            </Button>
+          </div>
+        </InlineBanner>
+      </div>
+    );
+  }
+
+  if (recommendations.length === 0) {
+    return (
+      <div data-testid="engine-recommendation-history" className="space-y-4">
+        {staleBanner}
+        {statusClearedBanner}
         <EmptyState
           icon={HistoryEmptyIcon}
           title="No recommendation history yet"
@@ -93,6 +172,26 @@ export function EngineRecommendationHistory({
 
   return (
     <div data-testid="engine-recommendation-history" className="space-y-4">
+      {staleBanner}
+      {pendingRecId && (
+        <InlineBanner
+          tone="info"
+          title="Clearing dismissed status"
+          message="This changes only the recommendation status. Struck, throttled, and client lifecycle decisions remain in place."
+        />
+      )}
+      {statusClearedBanner}
+      {statusClearError != null && (
+        <InlineBanner
+          tone="error"
+          title="Dismissed status was not cleared"
+          message={mutationErrorMessage(
+            statusClearError,
+            'The dismissed status remains in place. Other lifecycle decisions were not changed. Try again in a moment.',
+          )}
+          onDismiss={() => setStatusClearError(null)}
+        />
+      )}
       {HISTORY_CATEGORIES.map(({ id, label }) => {
         const rows = grouped.get(id) ?? [];
         if (rows.length === 0) return null;
@@ -110,8 +209,8 @@ export function EngineRecommendationHistory({
                   key={rec.id}
                   rec={rec}
                   showUndismiss={rec.status === 'dismissed'}
-                  onUndismiss={rec.status === 'dismissed'
-                    ? (recId) => undismiss.mutate(recId)
+                  onUndismiss={rec.status === 'dismissed' && pendingRecId === null
+                    ? clearDismissedStatus
                     : undefined}
                 />
               ))}

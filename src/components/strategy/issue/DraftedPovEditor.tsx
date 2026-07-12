@@ -159,7 +159,7 @@ export function DraftedPovEditor({
   title = 'The point of view',
   subtitle,
   presentation = 'default',
-  stagedCount = 0,
+  stagedCount,
   onOpenEditor,
 }: DraftedPovEditorProps) {
   // Local draft mirrors the POV; edits flow through here and are emitted on a debounce.
@@ -241,6 +241,9 @@ export function DraftedPovEditor({
 
   if (presentation === 'engine-summary') {
     const moveWord = stagedCount === 1 ? 'move' : 'moves';
+    const stagingSummary = stagedCount === undefined
+      ? 'Recommendation staging unavailable'
+      : `Draft auto-generated from your ${stagedCount} staged ${moveWord} · edited by you before send`;
     return (
       <SectionCard
         title={title}
@@ -264,7 +267,7 @@ export function DraftedPovEditor({
             {!leadCut && leadSentence && <p className="whitespace-pre-wrap">{leadSentence}</p>}
           </div>
           <div className="mt-3 border-t border-[var(--brand-border)] pt-3 t-caption-sm text-[var(--brand-text-muted)]">
-            Draft auto-generated from your {stagedCount} staged {moveWord} · edited by you before send
+            {stagingSummary}
           </div>
         </div>
       </SectionCard>

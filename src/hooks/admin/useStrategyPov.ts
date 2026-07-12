@@ -60,6 +60,10 @@ export interface UseStrategyPovResult {
   pov: StrategyPov | null;
   isLoading: boolean;
   isError: boolean;
+  /** GET/read failure only. Generate and regenerate errors remain separate. */
+  readError: unknown;
+  /** Retry the canonical POV read without invoking generation. */
+  retry: () => void;
   /** Operator edit (debounced by the editor). Optimistic. */
   edit: (edit: StrategyPovEdit) => void;
   editPending: boolean;
@@ -172,8 +176,10 @@ export function useStrategyPov(workspaceId: string, enabled: boolean = true): Us
 
   return {
     pov: query.data?.pov ?? null,
-    isLoading: queryEnabled ? query.isLoading : false,
+    isLoading: queryEnabled ? query.isPending : false,
     isError: queryEnabled ? query.isError : false,
+    readError: queryEnabled ? query.error : null,
+    retry: () => { void query.refetch(); },
     edit: (edit: StrategyPovEdit) => editMutation.mutate(edit),
     editPending: editMutation.isPending,
     generate: () => {

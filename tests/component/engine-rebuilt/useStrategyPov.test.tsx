@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { PropsWithChildren } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StrategyPov, StrategyPovResponse } from '../../../shared/types/strategy-pov';
 import { queryKeys } from '../../../src/lib/queryKeys';
 import { WS_EVENTS } from '../../../src/lib/wsEvents';
@@ -30,6 +30,10 @@ vi.mock('../../../src/hooks/useWorkspaceEvents', () => ({
 }));
 
 import * as strategyPovHook from '../../../src/hooks/admin/useStrategyPov';
+
+afterEach(() => {
+  onlineManager.setOnline(true);
+});
 
 const workspaceId = 'ws-pov-monotonic';
 
@@ -138,6 +142,63 @@ describe('useStrategyPov monotonic response authority', () => {
 
     expect(result.current.pov?.version).toBe(3);
     expect(result.current.refreshAvailable).toBe(true);
+  });
+
+  it('exposes a distinct retryable read error when the initial POV request fails', async () => {
+    const error = new Error('POV read unavailable');
+    mocks.get.mockRejectedValueOnce(error);
+    const client = createClient();
+    const { result } = renderHook(
+      () => strategyPovHook.useStrategyPov(workspaceId, true),
+      { wrapper: wrapper(client) },
+    );
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.pov).toBeNull();
+    expect(result.current.readError).toBe(error);
+
+    mocks.get.mockResolvedValueOnce(response(2));
+    act(() => result.current.retry());
+    await waitFor(() => expect(result.current.pov?.version).toBe(2));
+    expect(result.current.isError).toBe(false);
+  });
+
+  it('exposes an enabled paused no-cache POV read as initial loading until a legitimate null response resolves', async () => {
+    onlineManager.setOnline(false);
+    const client = createClient();
+    const { result } = renderHook(
+      () => strategyPovHook.useStrategyPov(workspaceId, true),
+      { wrapper: wrapper(client) },
+    );
+
+    expect(result.current.pov).toBeNull();
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.isError).toBe(false);
+    expect(mocks.get).not.toHaveBeenCalled();
+
+    act(() => onlineManager.setOnline(true));
+    await waitFor(() => expect(mocks.get).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.pov).toBeNull();
+    expect(result.current.isError).toBe(false);
+  });
+
+  it('preserves a cached POV while surfacing a background read failure', async () => {
+    mocks.get.mockResolvedValueOnce(response(2));
+    const client = createClient();
+    const { result } = renderHook(
+      () => strategyPovHook.useStrategyPov(workspaceId, true),
+      { wrapper: wrapper(client) },
+    );
+    await waitFor(() => expect(result.current.pov?.version).toBe(2));
+
+    const error = new Error('POV refresh unavailable');
+    mocks.get.mockRejectedValueOnce(error);
+    act(() => result.current.retry());
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(result.current.pov?.version).toBe(2);
+    expect(result.current.readError).toBe(error);
   });
 
   it('keeps a newer server response when an older optimistic edit rolls back', async () => {
@@ -375,5 +436,40 @@ describe('useStrategyPov monotonic response authority', () => {
     expect(invalidate).toHaveBeenCalledTimes(2);
     expect(invalidate).toHaveBeenNthCalledWith(1, expected);
     expect(invalidate).toHaveBeenNthCalledWith(2, expected);
+  });
+});
+
+describe('strategyPovApi read semantics', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('treats a successful null POV payload as legitimate absence', async () => {
+    const payload = { pov: null, refreshAvailable: false } satisfies StrategyPovResponse;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })));
+    const actual = await vi.importActual<typeof import('../../../src/api/strategyPov')>(
+      '../../../src/api/strategyPov',
+    );
+
+    await expect(actual.strategyPovApi.get(workspaceId)).resolves.toEqual(payload);
+  });
+
+  it('rejects non-2xx and network failures instead of converting them to no POV', async () => {
+    const actual = await vi.importActual<typeof import('../../../src/api/strategyPov')>(
+      '../../../src/api/strategyPov',
+    );
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'Service unavailable' }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' },
+      }))
+      .mockRejectedValueOnce(new Error('network offline'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(actual.strategyPovApi.get(workspaceId)).rejects.toThrow('Service unavailable');
+    await expect(actual.strategyPovApi.get(workspaceId)).rejects.toThrow('network offline');
   });
 });

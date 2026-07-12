@@ -99,6 +99,19 @@ describe('DraftedPovEditor', () => {
     expect(screen.getByText('Draft auto-generated from your 1 staged move · edited by you before send')).toBeInTheDocument();
   });
 
+  it('does not claim zero staged moves when recommendation staging is unavailable', () => {
+    render(
+      <DraftedPovEditor
+        pov={POV}
+        onEdit={vi.fn()}
+        presentation="engine-summary"
+      />,
+    );
+
+    expect(screen.getByText('Recommendation staging unavailable')).toBeInTheDocument();
+    expect(screen.queryByText(/0 staged moves/i)).not.toBeInTheDocument();
+  });
+
   it('offers a truthful Generate state when the Engine summary has no POV', () => {
     const onRegenerate = vi.fn();
     render(
