@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AnalyticsInsight } from '../../shared/types/analytics.js';
+import { STUDIO_NAME, STUDIO_URL } from '../../server/constants.js';
 import type { Workspace } from '../../server/workspaces.js';
 
 const mocks = vi.hoisted(() => ({
@@ -18,7 +19,6 @@ const mocks = vi.hoisted(() => ({
   buildRecommendationGenerationContext: vi.fn(),
   learningsPromptContext: '',
   learningsTotal: undefined as number | undefined,
-  buildSystemPrompt: vi.fn(),
   isProgrammingError: vi.fn(),
 }));
 
@@ -70,16 +70,21 @@ vi.mock('../../server/intelligence/generation-context-builders.js', () => ({
   buildRecommendationGenerationContext: mocks.buildRecommendationGenerationContext,
 }));
 
-vi.mock('../../server/prompt-assembly.js', () => ({
-  buildSystemPrompt: mocks.buildSystemPrompt,
-}));
-
 vi.mock('../../server/errors.js', () => ({
   isProgrammingError: mocks.isProgrammingError,
 }));
 
 const { generateMonthlyDigest } = await import('../../server/monthly-digest.js');
 const { invalidateMonthlyDigestCache } = await import('../../server/monthly-digest-cache.js');
+
+const VALID_AI_SUMMARY = JSON.stringify({
+  clauseIds: ['metric.search.clicks', 'metric.search.impressions'],
+});
+
+const DEFAULT_SELECTED_SUMMARY = 'Search clicks increased 12.5% in the current reporting window. Search impressions decreased 4.2% in the current reporting window.';
+const DEFAULT_FALLBACK_SUMMARY = `${DEFAULT_SELECTED_SUMMARY} Average search position improved by 1.3 spots in the current reporting window.`;
+const POSITION_SCOPE_SUMMARY = 'Average search position improved by 1.3 spots in the current reporting window. Current-month evidence for May 2026 is available for review.';
+const IMPRESSIONS_SCOPE_SUMMARY = 'Search impressions decreased 4.2% in the current reporting window. Current-month evidence for May 2026 is available for review.';
 
 function makeWorkspace(overrides: Partial<Workspace> = {}): Workspace {
   return {
@@ -117,7 +122,7 @@ beforeEach(() => {
   mocks.getROIHighlights.mockReturnValue([]);
   mocks.listBatches.mockReturnValue([]);
   mocks.listWorkOrders.mockReturnValue([]);
-  mocks.callAI.mockResolvedValue({ text: 'AI summary text' });
+  mocks.callAI.mockResolvedValue({ text: VALID_AI_SUMMARY });
   mocks.getSearchPeriodComparison.mockResolvedValue({
     changePercent: { clicks: 12.5, impressions: -4.2 },
     change: { position: -1.27 },
@@ -162,7 +167,6 @@ beforeEach(() => {
       learningsAvailability: slices.includes('learnings') ? 'ready' : 'not_requested',
     };
   });
-  mocks.buildSystemPrompt.mockReturnValue('system prompt');
   mocks.isProgrammingError.mockReturnValue(true);
 });
 
@@ -206,6 +210,9 @@ describe('monthly-digest generation', () => {
     const result = await generateMonthlyDigest(ws);
 
     expect(result.availability).toBe('ready');
+    expect(result.summary).toContain('No percentage change was recorded for search clicks');
+    expect(result.summary).toContain('No percentage change was recorded for search impressions');
+    expect(result.summary).not.toMatch(/momentum|strong baseline|solid baseline/i);
     expect(mocks.callAI).toHaveBeenCalledOnce();
   });
 
@@ -453,7 +460,7 @@ describe('monthly-digest generation', () => {
     ]);
   });
 
-  it('keeps the AI prompt current-month scoped and excludes lifetime learnings totals', async () => {
+  it('offers only current-month deterministic clause IDs and excludes lifetime learnings totals', async () => {
     const ws = makeWorkspace({ id: 'ws_prompt_contract' });
 
     mocks.getGA4PeriodComparison.mockResolvedValueOnce({
@@ -472,22 +479,646 @@ describe('monthly-digest generation', () => {
       expect(mocks.callAI).toHaveBeenCalledTimes(1);
     });
     const callArgs = mocks.callAI.mock.calls[0][0] as {
+      operation?: string;
       messages: Array<{ role: string; content: string }>;
+      maxTokens?: number;
+      temperature?: number;
     };
     const prompt = callArgs.messages[0]?.content ?? '';
 
-    expect(prompt).toContain('Voice rules (follow exactly):');
-    expect(prompt).toContain('Lead with the most interesting metric or outcome');
+    expect(callArgs.operation).toBe('monthly-digest');
+    expect(callArgs.maxTokens).toBe(200);
+    expect(callArgs.temperature).toBe(0);
+    expect(prompt).toContain('Return exactly one JSON object');
+    expect(prompt).toContain('"clauseIds"');
+    expect(prompt).toContain('metric.search.clicks');
+    expect(prompt).toContain('Search clicks increased 12.5% in the current reporting window.');
+    expect(prompt).toContain('metric.search.impressions');
+    expect(prompt).toContain('Search impressions decreased 4.2% in the current reporting window.');
+    expect(prompt).toContain('metric.analytics.sessions');
+    expect(prompt).toContain('Site sessions increased 14.2% in the current reporting window.');
+    expect(prompt).toContain('work.activity');
+    expect(prompt).not.toContain('Voice rules');
     expect(mocks.buildRecommendationGenerationContext).not.toHaveBeenCalled();
     expect(prompt).not.toContain('tracked outcomes in workspace learnings');
     expect(prompt).not.toContain('Workspace outcome learnings:');
     expect(prompt).not.toContain('Learning A: concise headlines improve CTR.');
-    expect(prompt).toContain('Notable wins this period:');
-    expect(prompt).toContain('- Pricing page');
-    expect(prompt).toContain('Search clicks: +12.5%');
-    expect(prompt).toContain('Impressions: -4.2%');
-    expect(prompt).toContain('Site sessions: +14.2%');
-    expect(prompt).toContain('Average ranking position: improved 1.3 spots');
+    expect(prompt).not.toContain('Pricing page');
+  });
+
+  it('lets AI select and order available clauses while rendering exact server-owned sentences', async () => {
+    const ws = makeWorkspace({ id: 'ws_grounded_ai_summary' });
+    mocks.callAI.mockResolvedValueOnce({
+      text: JSON.stringify({
+        clauseIds: ['metric.search.impressions', 'metric.search.clicks'],
+      }),
+    });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).toBe(
+      'Search impressions decreased 4.2% in the current reporting window. Search clicks increased 12.5% in the current reporting window.',
+    );
+  });
+
+  it('renders selected provider metrics at one-decimal precision', async () => {
+    const ws = makeWorkspace({ id: 'ws_prompt_precision_metrics' });
+    mocks.getSearchPeriodComparison.mockResolvedValueOnce({
+      changePercent: { clicks: 12.54, impressions: -4.24 },
+      change: { position: -1.27 },
+    });
+    mocks.callAI.mockResolvedValueOnce({
+      text: JSON.stringify({
+        clauseIds: ['metric.search.clicks', 'metric.search.impressions'],
+      }),
+    });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).toBe(DEFAULT_SELECTED_SUMMARY);
+  });
+
+  it('renders measured ROI without live providers and preserves mixed execution attribution', async () => {
+    const ws = makeWorkspace({
+      id: 'ws_prompt_precision_value',
+      webflowSiteId: undefined,
+      gscPropertyUrl: undefined,
+      ga4PropertyId: undefined,
+    });
+    mocks.getROIHighlights.mockReturnValueOnce([
+      {
+        pageTitle: 'Platform page',
+        pageUrl: '/platform',
+        action: 'Updated pricing-page metadata',
+        result: 'Position improved',
+        clicksGained: 20,
+        attributedValue: 80.126,
+        attribution: 'platform_executed',
+      },
+      {
+        pageTitle: 'Client-built page',
+        pageUrl: '/client-built',
+        action: 'Published new page',
+        result: 'Position improved',
+        clicksGained: 10,
+        attributedValue: 40,
+        attribution: 'externally_executed',
+      },
+    ]);
+    mocks.callAI.mockResolvedValueOnce({
+      text: JSON.stringify({
+        clauseIds: ['roi.measured-results', 'reporting.scope'],
+      }),
+    });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).toBe(
+      '2 measured results were recorded with $120.13 in total estimated value; 1 followed work implemented through the platform, and 1 followed work implemented on the client side. Current-month evidence for May 2026 is available for review.',
+    );
+  });
+
+  it('rejects unsupported word-form and qualitative performance claims', async () => {
+    const ws = makeWorkspace({ id: 'ws_unsupported_qualitative_claims' });
+    const summary = 'Revenue doubled this month. Conversions surged across the site.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toMatch(/search clicks increased 12\.5%/i);
+    expect(mocks.logWarn).toHaveBeenCalled();
+  });
+
+  it('rejects a spelled-out provider magnitude that contradicts numeric evidence', async () => {
+    const ws = makeWorkspace({ id: 'ws_unsupported_spelled_metric' });
+    const summary = 'Search clicks increased ninety-nine percent. The latest signals identify where attention is useful.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toMatch(/search clicks increased 12\.5%/i);
+  });
+
+  it('rejects a spelled-out ranking magnitude that contradicts position evidence', async () => {
+    const ws = makeWorkspace({ id: 'ws_unsupported_spelled_position' });
+    const summary = 'Average search position improved ninety-nine spots. The latest signals identify where attention is useful.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+  });
+
+  it('rejects a spelled-out currency magnitude that contradicts attributed value', async () => {
+    const ws = makeWorkspace({ id: 'ws_unsupported_spelled_value' });
+    mocks.getROIHighlights.mockReturnValueOnce([{
+      pageTitle: 'Pricing page',
+      pageUrl: '/pricing',
+      action: 'Updated pricing-page metadata',
+      result: 'Search clicks increased 12.5%',
+      clicksGained: 20,
+      attributedValue: 80.13,
+      attribution: 'platform_executed',
+    }]);
+    const summary = 'Estimated value reached nine hundred dollars. The latest signals identify where attention is useful.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+  });
+
+  it('binds site-traffic direction to GA4 sessions instead of an unrelated positive metric', async () => {
+    const ws = makeWorkspace({ id: 'ws_site_traffic_direction' });
+    mocks.getGA4PeriodComparison.mockResolvedValueOnce({ changePercent: { sessions: -12.3 } });
+    const summary = 'Site traffic increased this month. The latest signals identify where attention is useful.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(mocks.logWarn).toHaveBeenCalled();
+  });
+
+  it('rejects site traffic when analytics evidence is unavailable', async () => {
+    const ws = makeWorkspace({ id: 'ws_site_traffic_without_analytics', ga4PropertyId: undefined });
+    mocks.getSearchPeriodComparison.mockResolvedValueOnce({
+      changePercent: { clicks: -12.5, impressions: -4.2 },
+      change: { position: 1.3 },
+    });
+    const summary = 'Site traffic increased this month. The latest signals identify where attention is useful.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+  });
+
+  it('rejects search metrics when search-provider evidence is unavailable', async () => {
+    const ws = makeWorkspace({ id: 'ws_clicks_without_search', gscPropertyUrl: undefined });
+    mocks.getGA4PeriodComparison.mockResolvedValueOnce({ changePercent: { sessions: 14.2 } });
+    const summary = 'Search clicks increased this month. The latest signals identify where attention is useful.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+  });
+
+  it('rejects analytics metrics when only non-provider operational evidence exists', async () => {
+    const ws = makeWorkspace({
+      id: 'ws_sessions_without_analytics',
+      gscPropertyUrl: undefined,
+      ga4PropertyId: undefined,
+    });
+    mocks.getInsights.mockReturnValueOnce([makeInsight({ id: 'operational-win', severity: 'positive' })]);
+    const summary = 'Site sessions increased this month. A performance win was identified.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+  });
+
+  it('binds search visibility direction to impressions', async () => {
+    const ws = makeWorkspace({ id: 'ws_search_visibility_direction' });
+    const summary = 'Search visibility increased this month. The latest signals identify where attention is useful.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+  });
+
+  it('rejects a qualitative metric that is absent from the evidence', async () => {
+    const ws = makeWorkspace({ id: 'ws_unsupported_conversion_claim' });
+    const summary = 'Conversions improved across your site. The latest signals identify where attention is useful.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+  });
+
+  it('does not treat a topic mention as measured authority for an unsupported metric', async () => {
+    const ws = makeWorkspace({ id: 'ws_conversion_topic_not_measurement' });
+    mocks.getInsights.mockReturnValueOnce([makeInsight({
+      id: 'conversion-topic',
+      pageTitle: 'Conversion rate optimization',
+      severity: 'positive',
+    })]);
+    const summary = 'Conversion rate improved across your site. The latest signals identify where attention is useful.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+  });
+
+  it('rejects an unsupported spelled-out evidence count', async () => {
+    const ws = makeWorkspace({ id: 'ws_unsupported_word_count' });
+    const summary = 'Ninety-nine wins were recorded this month. Current-month evidence is ready for review.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toMatch(/search clicks increased 12\.5%/i);
+  });
+
+  it('does not accept prose even when every prose claim is factually supported', async () => {
+    const ws = makeWorkspace({ id: 'ws_summary_abbreviation' });
+    const summary = 'U.S. Search clicks increased 12.5%. Impressions decreased 4.2%. Your latest signals identify where attention is most useful.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toBe(DEFAULT_FALLBACK_SUMMARY);
+  });
+
+  it.each([
+    ['one sentence', 'Your current-month evidence is ready for review.'],
+    ['four sentences', 'Evidence is ready. Signals are available. Your pages are represented. Attention areas are clear.'],
+    ['an agency commitment', "Search clicks increased 12.5%. We're working on the next round."],
+    ['a planned agency commitment', 'Search clicks increased 12.5%. We plan to optimize the next round.'],
+    ['an unsupported number', 'Search clicks increased 99%. Your current-month evidence is ready for review.'],
+  ])('falls back when AI returns %s', async (label, summary) => {
+    const ws = makeWorkspace({ id: `ws_invalid_summary_${label.replaceAll(' ', '_')}` });
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toMatch(/search clicks increased 12\.5%/i);
+    expect(mocks.logWarn).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['malformed JSON', '{"clauseIds":'],
+    ['unknown ID', JSON.stringify({ clauseIds: ['metric.search.clicks', 'metric.search.unknown'] })],
+    ['duplicate ID', JSON.stringify({ clauseIds: ['metric.search.clicks', 'metric.search.clicks'] })],
+    ['unavailable ID', JSON.stringify({ clauseIds: ['metric.search.clicks', 'metric.analytics.sessions'] })],
+    ['too few IDs', JSON.stringify({ clauseIds: ['metric.search.clicks'] })],
+    ['too many IDs', JSON.stringify({ clauseIds: ['metric.search.clicks', 'metric.search.impressions', 'metric.search.position', 'reporting.scope'] })],
+    ['model-authored prose field', JSON.stringify({
+      clauseIds: ['metric.search.clicks', 'metric.search.impressions'],
+      summary: 'Revenue doubled.',
+    })],
+  ])('falls back to server-selected clauses for %s', async (_label, modelOutput) => {
+    const ws = makeWorkspace({ id: `ws_invalid_clause_selection_${Math.random().toString(36).slice(2, 8)}` });
+    mocks.callAI.mockResolvedValueOnce({ text: modelOutput });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).toBe(DEFAULT_FALLBACK_SUMMARY);
+    expect(result.summary).not.toContain('Revenue doubled');
+    expect(mocks.logWarn).toHaveBeenCalled();
+  });
+
+  it('does not let an unrelated count authorize a false metric percentage', async () => {
+    const ws = makeWorkspace({ id: 'ws_numeric_count_collision' });
+    mocks.getInsights.mockReturnValue(Array.from({ length: 5 }, (_, index) => (
+      makeInsight({ id: `collision-win-${index}`, pageTitle: `Winning page ${index}` })
+    )));
+    const summary = 'Search clicks increased 5%. Your current-month evidence is ready for review.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toMatch(/search clicks increased 12\.5%/i);
+  });
+
+  it('does not let an opposite-signed metric authorize a false explicit delta', async () => {
+    const ws = makeWorkspace({ id: 'ws_numeric_sign_collision' });
+    mocks.getSearchPeriodComparison.mockResolvedValueOnce({
+      changePercent: { clicks: -12.5, impressions: -4.2 },
+      change: { position: 1.27 },
+    });
+    const summary = 'Search clicks were +12.5% in the reporting window. Your current-month evidence is ready for review.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toMatch(/search clicks decreased 12\.5%/i);
+  });
+
+  it('applies one coordinated direction predicate to every named metric', async () => {
+    const ws = makeWorkspace({ id: 'ws_coordinated_metric_direction' });
+    mocks.getSearchPeriodComparison.mockResolvedValueOnce({
+      changePercent: { clicks: -12.5, impressions: 4.2 },
+      change: { position: 0 },
+    });
+    const summary = 'Search clicks and impressions increased. Your current-month evidence is ready for review.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toMatch(/search clicks decreased 12\.5%/i);
+  });
+
+  it('does not allow metric values to swap contexts within one sentence', async () => {
+    const ws = makeWorkspace({ id: 'ws_swapped_metric_values' });
+    const summary = 'Search clicks increased 4.2%, while impressions decreased 12.5%. Your latest signals identify where attention is most useful.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toMatch(/search clicks increased 12\.5%/i);
+  });
+
+  it('does not allow count values to swap their labels', async () => {
+    const ws = makeWorkspace({
+      id: 'ws_swapped_count_values',
+      webflowSiteId: undefined,
+      gscPropertyUrl: undefined,
+      ga4PropertyId: undefined,
+    });
+    mocks.getInsights.mockReturnValue([
+      ...Array.from({ length: 5 }, (_, index) => (
+        makeInsight({ id: `count-win-${index}`, pageTitle: `Winning page ${index}` })
+      )),
+      ...Array.from({ length: 2 }, (_, index) => makeInsight({
+        id: `count-resolution-${index}`,
+        insightType: 'page_health',
+        severity: 'warning',
+        resolutionStatus: 'resolved',
+        resolvedAt: '2026-05-20T00:00:00.000Z',
+        pageId: `/resolved-${index}`,
+        pageTitle: `Resolved page ${index}`,
+      })),
+    ]);
+    const summary = 'Your site recorded 2 performance wins and 5 optimizations. Current-month evidence is ready for review.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toContain('5 performance wins');
+    expect(result.summary).toContain('2 optimizations were completed');
+  });
+
+  it('recognizes progressive direction words instead of letting a decline read as growth', async () => {
+    const ws = makeWorkspace({ id: 'ws_progressive_direction' });
+    mocks.getSearchPeriodComparison.mockResolvedValueOnce({
+      changePercent: { clicks: -12.5, impressions: -4.2 },
+      change: { position: 1.27 },
+    });
+    const summary = 'Search clicks are increasing. Current-month evidence is ready for review.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toMatch(/search clicks decreased 12\.5%/i);
+  });
+
+  it.each([
+    'Site traffic exploded this month. The latest signals identify where attention is useful.',
+    'Search clicks jumped this month. The latest signals identify where attention is useful.',
+    'Search visibility expanded this month. The latest signals identify where attention is useful.',
+  ])('rejects an unrecognized change verb instead of accepting it as directionless: %s', async (summary) => {
+    const ws = makeWorkspace({ id: `ws_unrecognized_direction_${Math.random().toString(36).slice(2, 8)}` });
+    mocks.getSearchPeriodComparison.mockResolvedValueOnce({
+      changePercent: { clicks: -12.5, impressions: -4.2 },
+      change: { position: 1.3 },
+    });
+    mocks.getGA4PeriodComparison.mockResolvedValueOnce({ changePercent: { sessions: -9.4 } });
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+  });
+
+  it('does not accept free prose for separately grounded directions', async () => {
+    const ws = makeWorkspace({ id: 'ws_separate_metric_directions' });
+    const summary = 'Search clicks increased 12.5%. Impressions decreased 4.2%.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toBe(DEFAULT_FALLBACK_SUMMARY);
+  });
+
+  it('falls back when AI reverses a provider metric direction', async () => {
+    const ws = makeWorkspace({ id: 'ws_wrong_direction_summary' });
+    mocks.getSearchPeriodComparison.mockResolvedValueOnce({
+      changePercent: { clicks: -24.6, impressions: -8.1 },
+      change: { position: 2.4 },
+    });
+    mocks.getGA4PeriodComparison.mockResolvedValueOnce({ changePercent: { sessions: -12.3 } });
+    const summary = 'Search clicks increased 24.6% in the reporting window. Your traffic is moving in the right direction.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toMatch(/search clicks decreased 24\.6%/i);
+  });
+
+  it('falls back when zero provider evidence is recast as momentum', async () => {
+    const ws = makeWorkspace({ id: 'ws_zero_recast_summary' });
+    mocks.getSearchPeriodComparison.mockResolvedValueOnce({
+      changePercent: { clicks: 0, impressions: 0 },
+      change: { position: 0 },
+    });
+    mocks.getGA4PeriodComparison.mockResolvedValueOnce({ changePercent: { sessions: 0 } });
+    const summary = 'Your site has strong momentum. Performance is moving in the right direction.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toMatch(/no percentage change was recorded/i);
+  });
+
+  it('does not let completed work authorize performance momentum when measured results are flat', async () => {
+    const ws = makeWorkspace({ id: 'ws_flat_metrics_completed_work' });
+    mocks.getSearchPeriodComparison.mockResolvedValueOnce({
+      changePercent: { clicks: 0, impressions: 0 },
+      change: { position: 0 },
+    });
+    mocks.getGA4PeriodComparison.mockResolvedValueOnce({ changePercent: { sessions: 0 } });
+    mocks.getInsights.mockReturnValueOnce([makeInsight({
+      id: 'resolved-work',
+      insightType: 'page_health',
+      severity: 'warning',
+      resolutionStatus: 'resolved',
+      resolvedAt: '2026-05-20T00:00:00.000Z',
+      pageTitle: 'Resolved page',
+    })]);
+    const summary = 'Your site has strong momentum. One optimization was completed.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).not.toMatch(/strong momentum/i);
+    expect(result.summary).toMatch(/1 optimization was completed/i);
+  });
+
+  it('does not let one negligible gain recast a materially negative mixed period as momentum', async () => {
+    const ws = makeWorkspace({ id: 'ws_mixed_negative_momentum' });
+    mocks.getSearchPeriodComparison.mockResolvedValueOnce({
+      changePercent: { clicks: 0.1, impressions: -50 },
+      change: { position: 10 },
+    });
+    mocks.getGA4PeriodComparison.mockResolvedValueOnce({ changePercent: { sessions: -30 } });
+    const summary = 'Your site has strong momentum. Performance is moving in the right direction.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).not.toMatch(/strong momentum|right direction/i);
+  });
+
+  it('falls back instead of assigning agency execution credit to client-side work', async () => {
+    const ws = makeWorkspace({ id: 'ws_external_credit_summary' });
+    mocks.getROIHighlights.mockReturnValueOnce([{
+      pageTitle: 'Client-built page',
+      pageUrl: '/client-built',
+      action: 'Published new post',
+      result: 'Position improved',
+      clicksGained: 20,
+      attributedValue: 80,
+      attribution: 'externally_executed',
+    }]);
+    const summary = "Our work drove the implementation for the client-built page. Your site's measured result is now recorded.";
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toMatch(/implemented on the client side/i);
+  });
+
+  it('treats third-person agency execution language as false credit for client-side work', async () => {
+    const ws = makeWorkspace({ id: 'ws_external_credit_third_person' });
+    mocks.getROIHighlights.mockReturnValueOnce([{
+      pageTitle: 'Client-built page',
+      pageUrl: '/client-built',
+      action: 'Published new post',
+      result: 'Position improved',
+      clicksGained: 20,
+      attributedValue: 80,
+      attribution: 'externally_executed',
+    }]);
+    const summary = 'The agency implemented the client-built page. Its measured result is now recorded.';
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toMatch(/implemented on the client side/i);
+  });
+
+  it.each([
+    'We led the implementation of the pricing page. Its measured result is now recorded.',
+    'Our team brought the pricing page live. Its measured result is now recorded.',
+    'We took care of publishing the pricing page. Its measured result is now recorded.',
+    'The agency was responsible for the launch of the pricing page. Its measured result is now recorded.',
+    'The studio implemented the pricing page. Its measured result is now recorded.',
+    `${STUDIO_NAME} implemented the pricing page. Its measured result is now recorded.`,
+    `The ${STUDIO_NAME} team implemented the pricing page. Its measured result is now recorded.`,
+    `${new URL(STUDIO_URL).hostname} implemented the pricing page. Its measured result is now recorded.`,
+    `The ${new URL(STUDIO_URL).hostname} team implemented the pricing page. Its measured result is now recorded.`,
+    'We helped publish the pricing page. Its measured result is now recorded.',
+    'We helped the client launch the pricing page. Its measured result is now recorded.',
+    'We oversaw the pricing page implementation. Its measured result is now recorded.',
+  ])('rejects external execution credit phrased as: %s', async (summary) => {
+    const ws = makeWorkspace({ id: `ws_external_credit_${Math.random().toString(36).slice(2, 8)}` });
+    mocks.getROIHighlights.mockReturnValueOnce([{
+      pageTitle: 'Pricing page',
+      pageUrl: '/pricing',
+      action: 'Published new page',
+      result: 'Position improved',
+      clicksGained: 20,
+      attributedValue: 80,
+      attribution: 'externally_executed',
+    }]);
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
+    expect(result.summary).toMatch(/implemented on the client side/i);
+  });
+
+  it('renders external execution only from the server-owned ROI clause', async () => {
+    const ws = makeWorkspace({ id: 'ws_honest_external_credit' });
+    mocks.getROIHighlights.mockReturnValueOnce([{
+      pageTitle: 'Pricing page',
+      pageUrl: '/pricing',
+      action: 'Published new page',
+      result: 'Position improved',
+      clicksGained: 20,
+      attributedValue: 80,
+      attribution: 'externally_executed',
+    }]);
+    mocks.callAI.mockResolvedValueOnce({
+      text: JSON.stringify({ clauseIds: ['roi.measured-results', 'reporting.scope'] }),
+    });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).toBe(
+      '1 measured result was recorded with $80.00 in total estimated value; 1 followed work implemented on the client side. Current-month evidence for May 2026 is available for review.',
+    );
+  });
+
+  it('renders mixed platform and client execution from one aggregate ROI clause', async () => {
+    const ws = makeWorkspace({ id: 'ws_mixed_execution_credit' });
+    mocks.getROIHighlights.mockReturnValueOnce([
+      {
+        pageTitle: 'Platform page',
+        pageUrl: '/platform',
+        action: 'Published new page',
+        result: 'Position improved',
+        clicksGained: 20,
+        attributedValue: 80,
+        attribution: 'platform_executed',
+      },
+      {
+        pageTitle: 'Client-built page',
+        pageUrl: '/client-built',
+        action: 'Published new page',
+        result: 'Position improved',
+        clicksGained: 10,
+        attributedValue: 40,
+        attribution: 'externally_executed',
+      },
+    ]);
+    mocks.callAI.mockResolvedValueOnce({
+      text: JSON.stringify({ clauseIds: ['roi.measured-results', 'reporting.scope'] }),
+    });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).toBe(
+      '2 measured results were recorded with $120.00 in total estimated value; 1 followed work implemented through the platform, and 1 followed work implemented on the client side. Current-month evidence for May 2026 is available for review.',
+    );
+  });
+
+  it.each([
+    'Search clicks increased 12.5%. We continue to optimize the next round.',
+    'Search clicks increased 12.5%. Our team is working on the next round.',
+    'Search clicks increased 12.5%. We are optimizing the next round.',
+  ])('rejects unsupported agency work commitments phrased as: %s', async (summary) => {
+    const ws = makeWorkspace({ id: `ws_commitment_${Math.random().toString(36).slice(2, 8)}` });
+    mocks.callAI.mockResolvedValueOnce({ text: summary });
+
+    const result = await generateMonthlyDigest(ws);
+
+    expect(result.summary).not.toBe(summary);
   });
 
   it('uses a metric-aware fallback for provider declines when AI fails', async () => {
@@ -557,14 +1188,15 @@ describe('monthly-digest generation', () => {
     } | undefined)?.messages?.[0]?.content ?? '';
 
     expect(result.availability).toBe('ready');
-    expect(prompt).toContain('Signals requiring attention this period:');
-    expect(prompt).toContain('Checkout page');
-    expect(prompt).toContain('Pricing page');
+    expect(prompt).toContain('attention.signals');
+    expect(prompt).toContain('2 current-month signals require attention');
+    expect(prompt).not.toContain('Checkout page');
+    expect(prompt).not.toContain('Pricing page');
     expect(result.summary).toMatch(/2 current-month signals require attention/i);
     expect(result.summary).not.toMatch(/held steady|solid baseline/i);
   });
 
-  it('gives every ROI prompt row explicit execution framing without crediting unknown attribution', async () => {
+  it('offers one deterministic ROI clause with explicit external and unknown execution framing', async () => {
     const ws = makeWorkspace({ id: 'ws_roi_execution_prompt' });
     mocks.getROIHighlights.mockReturnValue([
       {
@@ -591,10 +1223,11 @@ describe('monthly-digest generation', () => {
     const prompt = (mocks.callAI.mock.calls[0]?.[0] as {
       messages?: Array<{ content: string }>;
     } | undefined)?.messages?.[0]?.content ?? '';
-    expect(prompt).toContain('implemented on the client side');
-    expect(prompt).toContain('do not claim agency execution credit');
-    expect(prompt).toContain('execution attribution unavailable');
-    expect(prompt).toContain('do not assign execution credit');
+    expect(prompt).toContain('roi.measured-results');
+    expect(prompt).toContain('$120.00 in total estimated value');
+    expect(prompt).toContain('1 followed work implemented on the client side');
+    expect(prompt).toContain('execution attribution is unavailable for 1');
+    expect(prompt).not.toContain('do not claim agency execution credit');
   });
 
   it('uses fallback summary when AI returns an empty text payload', async () => {
@@ -625,11 +1258,11 @@ describe('monthly-digest generation', () => {
       expect(mocks.callAI).toHaveBeenCalledTimes(1);
     });
 
-    resolveAI?.({ text: 'Shared summary' });
+    resolveAI?.({ text: VALID_AI_SUMMARY });
 
     const [a, b] = await Promise.all([first, second]);
-    expect(a.summary).toBe('Shared summary');
-    expect(b.summary).toBe('Shared summary');
+    expect(a.summary).toBe(DEFAULT_SELECTED_SUMMARY);
+    expect(b.summary).toBe(DEFAULT_SELECTED_SUMMARY);
     expect(mocks.callAI).toHaveBeenCalledTimes(1);
   });
 
@@ -638,9 +1271,9 @@ describe('monthly-digest generation', () => {
     const otherWorkspace = makeWorkspace({ id: 'ws_cache_other' });
 
     mocks.callAI
-      .mockResolvedValueOnce({ text: 'Original invalidated summary' })
-      .mockResolvedValueOnce({ text: 'Other workspace summary' })
-      .mockResolvedValueOnce({ text: 'Fresh invalidated summary' });
+      .mockResolvedValueOnce({ text: VALID_AI_SUMMARY })
+      .mockResolvedValueOnce({ text: JSON.stringify({ clauseIds: ['metric.search.position', 'reporting.scope'] }) })
+      .mockResolvedValueOnce({ text: JSON.stringify({ clauseIds: ['metric.search.impressions', 'reporting.scope'] }) });
 
     await generateMonthlyDigest(invalidatedWorkspace);
     await generateMonthlyDigest(otherWorkspace);
@@ -649,8 +1282,8 @@ describe('monthly-digest generation', () => {
     const fresh = await generateMonthlyDigest(invalidatedWorkspace);
     const stillCached = await generateMonthlyDigest(otherWorkspace);
 
-    expect(fresh.summary).toBe('Fresh invalidated summary');
-    expect(stillCached.summary).toBe('Other workspace summary');
+    expect(fresh.summary).toBe(IMPRESSIONS_SCOPE_SUMMARY);
+    expect(stillCached.summary).toBe(POSITION_SCOPE_SUMMARY);
     expect(mocks.callAI).toHaveBeenCalledTimes(3);
   });
 
@@ -670,14 +1303,16 @@ describe('monthly-digest generation', () => {
     const freshRequest = generateMonthlyDigest(ws);
     await vi.waitFor(() => expect(resolvers).toHaveLength(2));
 
-    resolvers[1]({ text: 'Fresh summary' });
-    expect((await freshRequest).summary).toBe('Fresh summary');
+    resolvers[1]({
+      text: JSON.stringify({ clauseIds: ['metric.search.impressions', 'reporting.scope'] }),
+    });
+    expect((await freshRequest).summary).toBe(IMPRESSIONS_SCOPE_SUMMARY);
 
-    resolvers[0]({ text: 'Stale summary' });
-    expect((await staleRequest).summary).toBe('Stale summary');
+    resolvers[0]({ text: VALID_AI_SUMMARY });
+    expect((await staleRequest).summary).toBe(DEFAULT_SELECTED_SUMMARY);
 
     const cachedAfterRace = await generateMonthlyDigest(ws);
-    expect(cachedAfterRace.summary).toBe('Fresh summary');
+    expect(cachedAfterRace.summary).toBe(IMPRESSIONS_SCOPE_SUMMARY);
     expect(mocks.callAI).toHaveBeenCalledTimes(2);
   });
 });
