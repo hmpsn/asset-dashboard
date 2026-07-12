@@ -39,7 +39,12 @@ import {
   loadRecommendations,
   isActiveRec,
 } from './recommendations.js';
-import { generateStrategyPov, POV_UNCHANGED } from './strategy-pov-generator.js';
+import {
+  generateStrategyPov,
+  POV_GENERATION_SUPERSEDED,
+  POV_REFRESH_AVAILABLE,
+  POV_UNCHANGED,
+} from './strategy-pov-generator.js';
 import { sendRecommendation, markRecommendationAutoSent } from './recommendation-lifecycle.js';
 import { mirrorRecommendationToDeliverable } from './domains/inbox/recommendation-dual-write.js';
 import { getEarnedEnabledArchetypes } from './strategy-autosend-store.js';
@@ -148,14 +153,24 @@ async function runIssuePushForWorkspaceInner(
   // the same isActiveRec set this cron's isEligible gates on) — the draft is already ready, so it
   // STILL counts as a successful push for idempotency + doorbell purposes.
   let unchanged = false;
+  let editPreserved = false;
   try {
     await generateStrategyPov(workspaceId, { variant: 'admin' });
   } catch (err) {
     // brittle: matches the POV_UNCHANGED message string (the generator throws new Error(POV_UNCHANGED)).
     // Compared against the imported sentinel const, not a literal — but it is still a message-equality
     // check, so a future Error reusing that message would be misclassified. No dedicated error class exists.
-    if (err instanceof Error && err.message === POV_UNCHANGED) {
+    if (err instanceof Error && (
+      err.message === POV_UNCHANGED
+      || err.message === POV_GENERATION_SUPERSEDED
+    )) {
       unchanged = true;
+    } else if (err instanceof Error && err.message === POV_REFRESH_AVAILABLE) {
+      // Effective evidence/voice changed, but the standing draft contains an
+      // operator edit. A scheduler is never replacement authority: preserve the
+      // draft, mark the cycle ready, and let the UI offer explicit Regenerate.
+      unchanged = true;
+      editPreserved = true;
     } else {
       // Unexpected (AI 5xx, DB hiccup). Re-throw so the tick logs + retries next
       // hour WITHOUT stamping the week — a transient failure must not lock the
@@ -179,8 +194,12 @@ async function runIssuePushForWorkspaceInner(
       workspaceId,
       'strategy_issue_pushed',
       `The weekly Issue for ${ws.name} is drafted and ready to curate`,
-      unchanged ? 'No change since last cycle — the draft was already up to date' : undefined,
-      { weekOf, unchanged },
+      editPreserved
+        ? 'Evidence or voice changed — the operator-edited draft was preserved and can be refreshed explicitly'
+        : unchanged
+          ? 'No change since last cycle — the draft was already up to date'
+          : undefined,
+      { weekOf, unchanged, ...(editPreserved ? { editPreserved: true } : {}) },
     );
   } catch (err) {
     log.error({ err, workspaceId, weekOf }, 'issue doorbell failed (swallowed) — push stands, auto-send proceeds');
@@ -202,8 +221,12 @@ async function runIssuePushForWorkspaceInner(
     }
   }
 
-  log.info({ workspaceId, weekOf, unchanged }, 'weekly Issue pushed — operator doorbell rung');
-  return { status: unchanged ? 'unchanged' : 'pushed', weekOf };
+  log.info({ workspaceId, weekOf, unchanged, editPreserved }, 'weekly Issue pushed — operator doorbell rung');
+  return {
+    status: unchanged ? 'unchanged' : 'pushed',
+    weekOf,
+    ...(editPreserved ? { reason: 'operator edit preserved; refresh available' } : {}),
+  };
 }
 
 /**
