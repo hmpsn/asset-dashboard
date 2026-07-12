@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { isCuratedForClient } from '../../../shared/recommendation-predicates';
+import { isActiveRec, isCuratedForClient } from '../../../shared/recommendation-predicates';
 import type { WorkQueueClassification, WorkQueueItem, WorkQueueSourceType } from '../../../shared/types/work-queue';
 import type { Recommendation } from '../../../shared/types/recommendations';
 import { useFeatureFlag } from '../useFeatureFlag';
@@ -26,7 +26,6 @@ import {
   useStrategyMetrics,
   useStrategySettings,
 } from '../../components/strategy';
-import { isThrottledOpen } from '../../components/strategy/cockpitRowModel';
 
 export const EMPTY_ENGINE_WORK_QUEUE: WorkQueueClassification = {
   streams: { opt: 0, send: 0, money: 0, unclassified: 0 },
@@ -104,6 +103,24 @@ export function recToEngineWorkQueueItem(rec: Recommendation): WorkQueueItem {
   };
 }
 
+/**
+ * One canonical pass partitions the ordered recommendation set into the
+ * primary active queue and its exact history complement. Keeping both outputs
+ * together prevents independent partial predicates from dropping or
+ * duplicating lifecycle states.
+ */
+export function partitionEngineRecommendations(
+  recommendations: Recommendation[],
+  now: number = Date.now(),
+): { active: Recommendation[]; history: Recommendation[] } {
+  const active: Recommendation[] = [];
+  const history: Recommendation[] = [];
+  for (const rec of recommendations) {
+    (isActiveRec(rec, now) ? active : history).push(rec);
+  }
+  return { active, history };
+}
+
 export function useEngineRebuilt(workspaceId: string) {
   const queryClient = useQueryClient();
   const keywordQuery = useKeywordStrategy(workspaceId);
@@ -135,21 +152,17 @@ export function useEngineRebuilt(workspaceId: string) {
   const [struckRecIds, setStruckRecIds] = useState<string[]>([]);
 
   const cockpitRecs = recommendations.data?.recommendations ?? [];
-  const sendableRecIds = useMemo(
-    () => cockpitRecs
-      .filter(
-        (rec) =>
-          rec.lifecycle !== 'struck' &&
-          !isThrottledOpen(rec) &&
-          rec.status !== 'completed' &&
-          rec.status !== 'dismissed' &&
-          rec.clientStatus !== 'sent' &&
-          rec.clientStatus !== 'approved' &&
-          rec.clientStatus !== 'declined' &&
-          rec.clientStatus !== 'discussing',
-      )
-      .map((rec) => rec.id),
+  const recommendationPartition = useMemo(
+    () => partitionEngineRecommendations(cockpitRecs),
     [cockpitRecs],
+  );
+  const activeRecs = recommendationPartition.active;
+  const historyRecs = recommendationPartition.history;
+  const sendableRecIds = useMemo(
+    () => activeRecs
+      .filter((rec) => rec.clientStatus !== 'discussing')
+      .map((rec) => rec.id),
+    [activeRecs],
   );
   const sendableSet = useMemo(() => new Set(sendableRecIds), [sendableRecIds]);
   const stagedSendableIds = useMemo(
@@ -185,7 +198,7 @@ export function useEngineRebuilt(workspaceId: string) {
     () => countEngineWorkQueueSourceTypes(workQueue.items),
     [workQueue.items],
   );
-  const moveQueueItems = useMemo(() => cockpitRecs.map(recToEngineWorkQueueItem), [cockpitRecs]);
+  const moveQueueItems = useMemo(() => activeRecs.map(recToEngineWorkQueueItem), [activeRecs]);
   const moveQueueSourceCounts = useMemo(
     () => countEngineWorkQueueSourceTypes(moveQueueItems),
     [moveQueueItems],
@@ -242,6 +255,8 @@ export function useEngineRebuilt(workspaceId: string) {
     workspaces,
     recommendations,
     cockpitRecs,
+    activeRecs,
+    historyRecs,
     lifecycleActions,
     issueBulkSend,
     strategyPov,

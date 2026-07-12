@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { cannibalizationUrlSetKey } from '../../../shared/page-address-utils';
 import { ENGINE_LEADS_MAX, ENGINE_LEADS_PAGE, type useEngineRebuilt } from '../../hooks/admin/useEngineRebuilt';
 import { adminPath } from '../../routes';
+import { ErrorBoundary } from '../ErrorBoundary';
+import { BriefingReviewQueue } from '../admin/BriefingReviewQueue';
+import { FeatureFlag } from '../ui/FeatureFlag';
+import { SeoChangeImpact } from '../workspace-home/SeoChangeImpact';
 import {
   Button,
   ClickableRow,
@@ -19,6 +23,7 @@ import { TrustLadderPanel } from '../strategy/issue/TrustLadderPanel';
 import { AdminLeadsReadout } from '../strategy/issue/AdminLeadsReadout';
 import { cannibalizationKeeperPath, CannibalizationTriage } from '../strategy/CannibalizationTriage';
 import { KeeperSelector } from '../strategy/issue/KeeperSelector';
+import { EngineRecommendationHistory } from './EngineRecommendationHistory';
 
 type EngineModel = ReturnType<typeof useEngineRebuilt>;
 
@@ -111,6 +116,49 @@ export function EngineOperations({
 
   return (
     <div className="space-y-4" data-testid="engine-lens-operations">
+      <FeatureFlag flag="client-briefing-v2">
+        <ErrorBoundary label="Weekly Briefings">
+          <GroupBlock
+            title="Weekly Briefings"
+            meta="Review, approve, publish, or skip the current briefing draft"
+            collapsible
+            defaultOpen={false}
+          >
+            <BriefingReviewQueue workspaceId={workspaceId} />
+          </GroupBlock>
+        </ErrorBoundary>
+      </FeatureFlag>
+
+      <ErrorBoundary label="Recommendation history">
+        <GroupBlock
+          title="Recommendation history"
+          meta="Completed, suppressed, and client-resolved recommendations with full value detail"
+          collapsible
+          defaultOpen={false}
+          stats={[{ label: 'history', value: engine.historyRecs.length }]}
+        >
+          <EngineRecommendationHistory
+            workspaceId={workspaceId}
+            recommendations={engine.historyRecs}
+          />
+        </GroupBlock>
+      </ErrorBoundary>
+
+      <ErrorBoundary label="SEO Change Impact">
+        <GroupBlock
+          title="SEO Change Impact"
+          meta="Review tracked SEO changes and compare their Search Console effect"
+          collapsible
+          defaultOpen={false}
+        >
+          <SeoChangeImpact
+            workspaceId={workspaceId}
+            hasGsc={!!engine.workspace?.gscPropertyUrl}
+            embedded
+          />
+        </GroupBlock>
+      </ErrorBoundary>
+
       <GroupBlock
         title="Setup and handoffs"
         meta="Outcome capture, trust, and the tools that own execution"

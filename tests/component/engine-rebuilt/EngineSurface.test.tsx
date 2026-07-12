@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   sendIssue: vi.fn(),
   refetchHome: vi.fn(),
   refetchStrategy: vi.fn(),
+  undismissRecommendation: vi.fn(),
 }));
 
 vi.mock('../../../src/api/misc', async () => {
@@ -38,6 +39,26 @@ vi.mock('../../../src/hooks/admin/useEngineRebuilt', () => ({
     if (!mocks.engineState) throw new Error('Engine test state was not initialized');
     return mocks.engineState;
   },
+}));
+
+vi.mock('../../../src/hooks/admin/useAdminRecommendations', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/hooks/admin/useAdminRecommendations')>(
+    '../../../src/hooks/admin/useAdminRecommendations',
+  );
+  return {
+    ...actual,
+    useAdminUndismissRecommendation: () => ({ mutate: mocks.undismissRecommendation }),
+  };
+});
+
+vi.mock('../../../src/components/admin/BriefingReviewQueue', () => ({
+  BriefingReviewQueue: () => <div data-testid="engine-weekly-briefings">Weekly briefing workflow</div>,
+}));
+
+vi.mock('../../../src/components/workspace-home/SeoChangeImpact', () => ({
+  SeoChangeImpact: ({ hasGsc }: { hasGsc: boolean }) => (
+    <div data-testid="engine-seo-change-impact" data-has-gsc={hasGsc}>SEO change impact workflow</div>
+  ),
 }));
 
 vi.mock('../../../src/components/strategy', () => ({
@@ -135,12 +156,14 @@ vi.mock('../../../src/components/strategy/issue/BackingMovesQueue', () => ({
   BackingMovesQueue: ({
     onAddRec,
     onOpenDetails,
+    recs,
     subtitle,
     shortlistCap,
     presentation,
   }: {
     onAddRec: () => void;
     onOpenDetails: (recId: string) => void;
+    recs: Recommendation[];
     subtitle?: string;
     shortlistCap?: number;
     presentation?: 'default' | 'engine-spine';
@@ -150,6 +173,7 @@ vi.mock('../../../src/components/strategy/issue/BackingMovesQueue', () => ({
       data-subtitle={subtitle}
       data-shortlist-cap={shortlistCap}
       data-presentation={presentation}
+      data-rec-ids={recs.map((rec) => rec.id).join(',')}
     >
       Backing moves
       <button type="button" onClick={onAddRec}>Add a recommendation</button>
@@ -171,8 +195,20 @@ vi.mock('../../../src/components/strategy/CurationMeter', () => ({
 }));
 
 vi.mock('../../../src/components/strategy/NeedsAttentionStrip', () => ({
-  NeedsAttentionStrip: ({ presentation }: { presentation?: 'default' | 'engine-spine' }) => (
-    <div data-testid="needs-attention-strip" data-presentation={presentation}>Needs attention</div>
+  NeedsAttentionStrip: ({
+    items,
+    presentation,
+  }: {
+    items: Array<{ recId: string; kind: string }>;
+    presentation?: 'default' | 'engine-spine';
+  }) => (
+    <div
+      data-testid="needs-attention-strip"
+      data-presentation={presentation}
+      data-item-kinds={items.map((item) => `${item.recId}:${item.kind}`).join(',')}
+    >
+      Needs attention
+    </div>
   ),
 }));
 
@@ -444,6 +480,8 @@ function makeEngineState(overrides: Partial<EngineState> = {}): EngineState {
     workspaces: { data: [] },
     recommendations: { data: { workspaceId, generatedAt: '2026-07-07T12:00:00.000Z', recommendations: [baseRec], summary: { fixNow: 1, fixSoon: 0, fixLater: 0, ongoing: 0, totalImpactScore: 88, trafficAtRisk: 120, topRecommendationId: 'rec-1' } } },
     cockpitRecs: [baseRec],
+    activeRecs: [baseRec],
+    historyRecs: [],
     lifecycleActions: {
       send: vi.fn(),
       strike: vi.fn(),
@@ -474,6 +512,7 @@ function makeEngineState(overrides: Partial<EngineState> = {}): EngineState {
       isGenerating: false,
       generateError: null,
       wasUnchanged: false,
+      refreshAvailable: false,
     },
     operatorSteering: {
       wording: {},
@@ -745,17 +784,275 @@ describe('EngineSurface rebuilt', () => {
     expect(screen.queryByTestId('engine-move-support-row')).not.toBeInTheDocument();
   });
 
+  it('keeps sent recommendations in attention classification while Backing Moves remains active-only', async () => {
+    const superseded = {
+      ...baseRec,
+      id: 'stale-sent-superseded',
+      title: 'Old implant recommendation',
+      clientStatus: 'sent' as const,
+      sentAt: '2026-05-01T00:00:00.000Z',
+      createdAt: '2026-04-01T00:00:00.000Z',
+    };
+    const stale = {
+      ...baseRec,
+      id: 'stale-sent-alone',
+      title: 'Old services recommendation',
+      clientStatus: 'sent' as const,
+      sentAt: '2026-05-01T00:00:00.000Z',
+      createdAt: '2026-04-01T00:00:00.000Z',
+      affectedPages: ['/services'],
+    };
+    mocks.engineState = makeEngineState({
+      cockpitRecs: [baseRec, superseded, stale],
+      activeRecs: [baseRec],
+      historyRecs: [superseded, stale],
+    } as Partial<EngineState>);
+
+    renderSurface();
+
+    const queue = await screen.findByTestId('backing-moves-queue');
+    expect(queue).toHaveAttribute('data-rec-ids', 'rec-1');
+    expect(screen.getByTestId('needs-attention-strip')).toHaveAttribute(
+      'data-item-kinds',
+      'stale-sent-superseded:superseded,stale-sent-alone:stale_sent',
+    );
+  });
+
   it('keeps the stale-POV warning directly adjacent to the compact POV summary', async () => {
-    mocks.engineState = makeEngineState({ struckRecIds: ['rec-1'] });
+    const engineState = makeEngineState();
+    mocks.engineState = makeEngineState({
+      strategyPov: {
+        ...engineState.strategyPov,
+        refreshAvailable: true,
+        pov: {
+          ...engineState.strategyPov.pov!,
+          editedAt: '2026-07-07T12:10:00.000Z',
+        },
+      },
+      struckRecIds: ['rec-1'],
+      operatorSteering: {
+        ...engineState.operatorSteering,
+        wording: { 'rec-1': { title: 'Locally edited wording' } },
+      },
+    });
     renderSurface();
 
     const povSection = await screen.findByTestId('engine-section-pov');
     const summary = within(povSection).getByTestId('drafted-pov-editor');
-    const warning = within(povSection).getByText('Point of view may be out of date').closest('[role="status"]')
-      ?? within(povSection).getByText('Point of view may be out of date').parentElement;
+    const warning = within(povSection).getByText('Point of view refresh available').closest('[role="status"]')
+      ?? within(povSection).getByText('Point of view refresh available').parentElement;
     expect(warning).not.toBeNull();
     expect(summary.compareDocumentPosition(warning!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(povSection).getByText(/evidence or brand voice changed/i)).toBeInTheDocument();
+    expect(within(povSection).getByText(/saved wording was preserved/i)).toBeInTheDocument();
+    expect(within(povSection).getAllByRole('button', { name: 'Regenerate' })).toHaveLength(1);
     expect(within(povSection).getAllByRole('button', { name: 'Edit POV' })).toHaveLength(1);
+  });
+
+  it('uses neutral refresh copy for an unedited generated POV', async () => {
+    const engineState = makeEngineState();
+    mocks.engineState = makeEngineState({
+      strategyPov: {
+        ...engineState.strategyPov,
+        refreshAvailable: true,
+        pov: { ...engineState.strategyPov.pov!, editedAt: null },
+      },
+    });
+
+    renderSurface();
+
+    const povSection = await screen.findByTestId('engine-section-pov');
+    expect(within(povSection).getByText(/evidence or brand voice changed since this point of view was generated/i))
+      .toBeInTheDocument();
+    expect(within(povSection).queryByText(/saved wording was preserved/i)).not.toBeInTheDocument();
+    expect(within(povSection).getByRole('button', { name: 'Regenerate' })).toBeInTheDocument();
+  });
+
+  it('shows regenerate failures beside the POV controls with empathetic feedback', async () => {
+    const engineState = makeEngineState();
+    mocks.engineState = makeEngineState({
+      strategyPov: {
+        ...engineState.strategyPov,
+        generateError: new Error('Regeneration service is temporarily unavailable'),
+      },
+    });
+
+    renderSurface();
+
+    const povSection = await screen.findByTestId('engine-section-pov');
+    expect(within(povSection).getByText('Point of view update failed')).toBeInTheDocument();
+    expect(within(povSection).getByText(/temporarily unavailable/i)).toBeInTheDocument();
+  });
+
+  it('does not infer POV staleness from local cut or wording state when the server reports fresh', async () => {
+    const engineState = makeEngineState();
+    mocks.engineState = makeEngineState({
+      strategyPov: { ...engineState.strategyPov, refreshAvailable: false },
+      struckRecIds: ['rec-1'],
+      operatorSteering: {
+        ...engineState.operatorSteering,
+        wording: { 'rec-1': { title: 'Locally edited wording' } },
+      },
+    });
+
+    renderSurface();
+
+    await screen.findByTestId('engine-section-pov');
+    expect(screen.queryByText('Point of view refresh available')).not.toBeInTheDocument();
+    expect(screen.queryByText('Point of view may be out of date')).not.toBeInTheDocument();
+  });
+
+  it('keeps Backing Moves canonical-active-only and renders every history complement row once with full review controls', async () => {
+    const completed = {
+      ...baseRec,
+      id: 'completed-rec',
+      title: 'Completed recommendation',
+      status: 'completed' as const,
+      opportunity: {
+        value: 91,
+        emvPerWeek: 1250,
+        predictedEmv: 5000,
+        roiPerEffortDay: 625,
+        confidence: 0.8,
+        calibration: 1,
+        groundedSpine: 'computed' as const,
+        components: [{
+          dimension: 'demand' as const,
+          rawValue: 2400,
+          normalized: 0.9,
+          weight: 0.3,
+          contribution: 0.27,
+          evidence: '2,400 grounded impressions',
+        }],
+        calibrationVersion: 'test-v1',
+        modelVersion: 'ov-1',
+      },
+    };
+    const dismissed = {
+      ...baseRec,
+      id: 'dismissed-rec',
+      title: 'Dismissed recommendation',
+      status: 'dismissed' as const,
+      lifecycle: 'struck' as const,
+    };
+    const struck = { ...baseRec, id: 'struck-rec', title: 'Struck recommendation', lifecycle: 'struck' as const };
+    const throttled = {
+      ...baseRec,
+      id: 'throttled-rec',
+      title: 'Throttled recommendation',
+      lifecycle: 'throttled' as const,
+      throttledUntil: '2099-01-01T00:00:00.000Z',
+    };
+    const sent = { ...baseRec, id: 'sent-rec', title: 'Sent recommendation', clientStatus: 'sent' as const };
+    const approved = { ...baseRec, id: 'approved-rec', title: 'Approved recommendation', clientStatus: 'approved' as const };
+    const declined = { ...baseRec, id: 'declined-rec', title: 'Declined recommendation', clientStatus: 'declined' as const };
+    const discussing = { ...baseRec, id: 'discussing-rec', title: 'Discussing active recommendation', clientStatus: 'discussing' as const };
+    const activeRecs = [baseRec, discussing];
+    const historyRecs = [completed, dismissed, struck, throttled, sent, approved, declined];
+    mocks.engineState = makeEngineState({
+      cockpitRecs: [...activeRecs, ...historyRecs],
+      activeRecs,
+      historyRecs,
+    } as Partial<EngineState>);
+
+    renderSurface('/ws/ws-engine/seo-strategy?lens=operations');
+
+    const queue = await screen.findByTestId('backing-moves-queue');
+    expect(queue).toHaveAttribute('data-rec-ids', 'rec-1,discussing-rec');
+    const historyToggle = screen.getByRole('button', { name: /Recommendation history/ });
+    expect(screen.queryByText('Completed recommendation')).not.toBeInTheDocument();
+    fireEvent.click(historyToggle);
+
+    for (const rec of historyRecs) {
+      expect(screen.getAllByText(rec.title)).toHaveLength(1);
+    }
+    expect(screen.getByText('Dismissed (1)')).toBeInTheDocument();
+    expect(screen.getByText('Struck (1)')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Completed recommendation').closest('button')!);
+    expect(screen.getByText('OV breakdown')).toBeInTheDocument();
+    expect(screen.getByText('2,400 grounded impressions')).toBeInTheDocument();
+    expect(screen.getByText('EMV/wk (admin)')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Dismissed recommendation').closest('button')!);
+    fireEvent.click(screen.getByRole('button', { name: 'Un-dismiss' }));
+    expect(mocks.undismissRecommendation).toHaveBeenCalledWith('dismissed-rec');
+  });
+
+  it('uses the full recommendation set as the client-preview ratio denominator', async () => {
+    const sentRecs = Array.from({ length: 5 }, (_, index) => ({
+      ...baseRec,
+      id: `sent-${index}`,
+      title: `Sent ${index}`,
+      clientStatus: 'sent' as const,
+    }));
+    const activeRecs = [
+      { ...baseRec, id: 'active-1' },
+      { ...baseRec, id: 'active-2' },
+    ];
+    mocks.engineState = makeEngineState({
+      cockpitRecs: [...activeRecs, ...sentRecs],
+      activeRecs,
+      historyRecs: sentRecs,
+      curatedCount: 5,
+    } as Partial<EngineState>);
+
+    const first = renderSurface();
+    const preview = await screen.findByTestId('engine-trust-spine-preview');
+    expect(within(preview).getByText('5 / 7')).toBeInTheDocument();
+    expect(within(preview).queryByText('5 / 2')).not.toBeInTheDocument();
+
+    first.unmount();
+    mocks.engineState = makeEngineState({
+      cockpitRecs: sentRecs,
+      activeRecs: [],
+      historyRecs: sentRecs,
+      curatedCount: 5,
+    } as Partial<EngineState>);
+    renderSurface();
+    expect(within(await screen.findByTestId('engine-trust-spine-preview')).getByText('5 / 5')).toBeInTheDocument();
+  });
+
+  it('lazy-mounts each owner-approved Operations home once and passes real GSC connection state', async () => {
+    mocks.featureFlagsList.mockResolvedValue({
+      'ui-rebuild-shell': true,
+      'client-briefing-v2': true,
+    });
+    const engineState = makeEngineState();
+    mocks.engineState = makeEngineState({
+      workspace: { ...engineState.workspace!, gscPropertyUrl: 'sc-domain:acme.example' },
+    });
+    renderSurface('/ws/ws-engine/seo-strategy?lens=operations');
+
+    const briefingToggle = await screen.findByRole('button', { name: /Weekly Briefings/ });
+    const historyToggle = screen.getByRole('button', { name: /Recommendation history/ });
+    const impactToggle = screen.getByRole('button', { name: /SEO Change Impact/ });
+    expect(screen.queryByTestId('engine-weekly-briefings')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('engine-recommendation-history')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('engine-seo-change-impact')).not.toBeInTheDocument();
+
+    fireEvent.click(briefingToggle);
+    fireEvent.click(historyToggle);
+    fireEvent.click(impactToggle);
+
+    expect(screen.getAllByTestId('engine-weekly-briefings')).toHaveLength(1);
+    expect(screen.getAllByTestId('engine-recommendation-history')).toHaveLength(1);
+    expect(screen.getAllByTestId('engine-seo-change-impact')).toHaveLength(1);
+    expect(screen.getByTestId('engine-seo-change-impact')).toHaveAttribute('data-has-gsc', 'true');
+  });
+
+  it('keeps the Weekly Briefings Operations home behind client-briefing-v2', async () => {
+    mocks.featureFlagsList.mockResolvedValue({
+      'ui-rebuild-shell': true,
+      'client-briefing-v2': false,
+    });
+    renderSurface('/ws/ws-engine/seo-strategy?lens=operations');
+
+    await screen.findByTestId('engine-section-operations');
+    await waitFor(() => expect(mocks.featureFlagsList).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: /Weekly Briefings/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Recommendation history/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /SEO Change Impact/ })).toBeInTheDocument();
   });
 
   it('keeps operational tools collapsed until requested, while the operations deep link opens them', async () => {

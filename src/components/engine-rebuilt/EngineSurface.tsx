@@ -291,13 +291,6 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
   );
   const attentionItems = useMemo(() => buildAttentionItems(engine.cockpitRecs), [engine.cockpitRecs]);
   const sentThisCycle = useMemo(() => countSentThisCycle(engine.cockpitRecs), [engine.cockpitRecs]);
-  const hasWordingOverride = Object.values(engine.operatorSteering.wording).some(
-    (override) => !!override && (!!override.title || !!override.insight),
-  );
-  const povMayBeStale =
-    !!engine.strategyPov.pov &&
-    !!engine.strategyPov.pov.generatedAt &&
-    (engine.struckRecIds.length > 0 || hasWordingOverride);
   const headerSubtitle = !engine.isRealStrategy
     ? 'Operator command surface for strategy generation, curation, and evidence.'
     : `Generated ${formatDate(strategy?.generatedAt)} · ${strategy?.pageMap?.length ?? 0} pages mapped`;
@@ -597,7 +590,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
             />
             <MetricTile
               label="Backing moves live"
-              value={engine.cockpitRecs.length || '—'}
+              value={engine.activeRecs.length || '—'}
               sub={`${engine.stagedCount} staged · ${engine.curatedCount} with client`}
               accent="var(--blue)"
               icon={Network}
@@ -670,22 +663,39 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
                 stagedCount={engine.stagedCount}
                 onOpenEditor={() => setPovEditorOpen(true)}
               />
-              {povMayBeStale && (
+              {engine.strategyPov.refreshAvailable && (
                 <InlineBanner
                   tone="warning"
-                  title="Point of view may be out of date"
-                  message="Cut or edited backing moves can make the drafted point of view stale."
+                  title="Point of view refresh available"
                 >
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => engine.strategyPov.regenerate()}
-                    loading={engine.strategyPov.isGenerating}
-                    disabled={engine.strategyPov.isGenerating}
-                  >
-                    Regenerate
-                  </Button>
+                  <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <span>
+                      {engine.strategyPov.pov?.editedAt
+                        ? 'Evidence or brand voice changed after your edits. Your saved wording was preserved; regenerate only when you are ready to replace it.'
+                        : 'Evidence or brand voice changed since this point of view was generated. Regenerate when you are ready to replace it with a current draft.'}
+                    </span>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => engine.strategyPov.regenerate()}
+                      loading={engine.strategyPov.isGenerating}
+                      disabled={engine.strategyPov.isGenerating}
+                      className="flex-shrink-0"
+                    >
+                      Regenerate
+                    </Button>
+                  </div>
                 </InlineBanner>
+              )}
+              {engine.strategyPov.generateError != null && (
+                <InlineBanner
+                  tone="error"
+                  title="Point of view update failed"
+                  message={mutationErrorMessage(
+                    engine.strategyPov.generateError,
+                    'The current point of view is still safe. Try regenerating again in a moment.',
+                  )}
+                />
               )}
             </section>
 
@@ -702,7 +712,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
                 titleIcon={<Icon name="filter" size="md" className="text-[var(--teal)]" />}
                 iconChip
               >
-                <StanceBar recs={engine.cockpitRecs} />
+                <StanceBar recs={engine.activeRecs} />
               </SectionCard>
             </section>
 
@@ -745,7 +755,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
               )}
               <BackingMovesQueue
                 workspaceId={workspaceId}
-                recs={engine.cockpitRecs}
+                recs={engine.activeRecs}
                 actions={engine.lifecycleActions}
                 onCut={engine.markCut}
                 shortlistCap={1}
