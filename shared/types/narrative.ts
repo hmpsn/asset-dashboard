@@ -22,7 +22,7 @@ export interface MonthlyDigestData {
   availability: MonthlyDigestAvailability;
   month: string;             // "March 2026"
   period: { start: string; end: string };
-  summary: string;           // AI-generated when evidence exists; deterministic honest copy for no_data/fallback
+  summary: string;           // Server-authored evidence clauses; AI may select/order them, with deterministic fallback/no-data copy
   wins: DigestItem[];
   issuesAddressed: DigestItem[];
   metrics: {

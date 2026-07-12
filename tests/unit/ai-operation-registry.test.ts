@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { getAIOperationPolicyMetadata, getAIOperationRuntimeDefaults, isAIOperationId } from '../../server/ai-operation-registry.js';
 
 const structuredOperationIds = [
+  'brandscript-import',
+  'brandscript-complete',
+  'voice-calibration',
+  'voice-refinement',
+  'discovery-extraction',
+  'monthly-digest',
   'content-post-seo-meta',
   'content-post-unify',
   'voice-scoring',
@@ -13,7 +19,7 @@ const structuredOperationIds = [
 ] as const;
 
 describe('AI operation registry', () => {
-  it('registers the PR6 structured-output operations', () => {
+  it('registers named structured-output operations with JSON defaults', () => {
     for (const id of structuredOperationIds) {
       expect(isAIOperationId(id)).toBe(true);
       const policy = getAIOperationPolicyMetadata(id);
@@ -28,6 +34,23 @@ describe('AI operation registry', () => {
   it('marks research-required operations explicitly', () => {
     expect(getAIOperationPolicyMetadata('content-post-unify').researchMode).toBe('required');
     expect(getAIOperationPolicyMetadata('content-post-seo-meta').researchMode).toBe('forbidden');
+  });
+
+  it('registers Monthly Digest as a closed-world clause-selection operation', () => {
+    expect(isAIOperationId('monthly-digest')).toBe(true);
+    expect(getAIOperationPolicyMetadata('monthly-digest')).toMatchObject({
+      domain: 'analytics-intelligence',
+      outputMode: 'json',
+      parserExpectation: 'parseStructuredAIOutput(monthly-digest-clause-selection)',
+      researchMode: 'forbidden',
+      executionMode: 'sync-only',
+    });
+    expect(getAIOperationRuntimeDefaults('monthly-digest')).toMatchObject({
+      feature: 'monthly-digest',
+      defaultProvider: 'openai',
+      defaultModel: 'gpt-5.4-nano',
+      defaultResponseFormat: { type: 'json_object' },
+    });
   });
 
   it('separates dispatcher runtime defaults from policy metadata', () => {
