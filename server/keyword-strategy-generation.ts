@@ -5,7 +5,7 @@
  */
 import { DEFAULT_SEO_DATA_PROVIDER, getConfiguredProvider, normalizeRuntimeSeoDataProvider, type ProviderName } from './seo-data-provider.js';
 import { incrementIfAllowed, decrementUsage } from './usage-tracking.js';
-import { updateWorkspace, getWorkspace, getTokenForSite } from './workspaces.js';
+import { computeEffectiveTier, updateWorkspace, getWorkspace, getTokenForSite } from './workspaces.js';
 import { createLogger } from './logger.js';
 import type { PageKeywordMap, KeywordStrategy, SeoDataStatus } from '../shared/types/workspace.js';
 import { fetchAndCacheKeywordStrategySeoData } from './keyword-strategy-seo-data.js';
@@ -151,8 +151,8 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
   }
 
   // Atomically reserve a usage slot before the async AI work begins (closes TOCTOU race).
-  const tier = ws.tier || 'free';
-  if (!incrementIfAllowed(ws.id, tier, 'strategy_generations')) {
+  const effectiveTier = computeEffectiveTier(ws);
+  if (!incrementIfAllowed(ws.id, effectiveTier, 'strategy_generations')) {
     throw new KeywordStrategyGenerationError(429, {
       error: 'Strategy generation limit reached',
       message: `You've reached your monthly strategy generation limit. Upgrade for more.`,

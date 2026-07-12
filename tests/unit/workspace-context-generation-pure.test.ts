@@ -93,9 +93,13 @@ describe('startWorkspaceContextGenerationJob — unknown type guard', () => {
 // ── Mocked-workspace tests ──
 // Use vi.mock at top level to intercept workspaces.js before any dynamic import.
 
-vi.mock('../../server/workspaces.js', () => ({
-  getWorkspace: vi.fn(),
-}));
+vi.mock('../../server/workspaces.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/workspaces.js')>();
+  return {
+    ...actual,
+    getWorkspace: vi.fn(),
+  };
+});
 
 vi.mock('../../server/jobs.js', () => ({
   createJob: vi.fn().mockReturnValue({ id: 'new-job-id' }),
