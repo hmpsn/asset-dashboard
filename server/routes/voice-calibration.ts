@@ -16,13 +16,35 @@ import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.
 import { aiLimiter } from '../middleware.js';
 import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 import { sanitizeErrorMessage } from '../utils/text.js';
-import { getWorkspace } from '../workspaces.js';
+import { computeEffectiveTier, getWorkspace } from '../workspaces.js';
 import {
   createVoiceProfileSchema,
   saveVariationFeedbackSchema,
 } from '../schemas/voice-calibration.js';
+import { createLogger } from '../logger.js';
 
 const router = Router();
+const log = createLogger('voice-calibration-routes');
+
+function runVoicePostCommitEffect(
+  workspaceId: string,
+  effect: 'activity' | 'broadcast' | 'intelligence-cache',
+  run: () => void,
+): void {
+  try {
+    run();
+  } catch (err) {
+    log.warn({ err, workspaceId, effect }, 'voice calibration post-commit effect failed');
+  }
+}
+
+function refundVoiceUsage(workspaceId: string): void {
+  try {
+    decrementUsage(workspaceId, 'voice_calibrations');
+  } catch (err) {
+    log.warn({ err, workspaceId }, 'failed to refund voice calibration usage');
+  }
+}
 
 // ── Zod schemas ─────────────────────────────────────────────────────────────
 
@@ -171,25 +193,33 @@ router.post('/api/voice/:workspaceId/calibrate',
   async (req, res) => {
     const { promptType, steeringNotes } = req.body;
     const ws = getWorkspace(req.params.workspaceId);
-    const tier = (ws?.tier ?? 'free') as string;
-    let incremented = false;
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    const tier = computeEffectiveTier(ws);
+    if (!incrementIfAllowed(req.params.workspaceId, tier, 'voice_calibrations')) {
+      return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
+    }
+
+    let session: Awaited<ReturnType<typeof generateCalibrationVariations>>;
     try {
-      if (!incrementIfAllowed(req.params.workspaceId, tier, 'voice_calibrations')) {
-        return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
-      }
-      incremented = true;
-      const session = await generateCalibrationVariations(req.params.workspaceId, promptType, steeringNotes);
-      addActivity(req.params.workspaceId, 'voice_calibrated', `Generated voice calibration variations for ${promptType}`);
-      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId: session.id });
-      invalidateIntelligenceCache(req.params.workspaceId);
-      res.json(session);
+      session = await generateCalibrationVariations(req.params.workspaceId, promptType, steeringNotes);
     } catch (err) {
-      if (incremented) { try { decrementUsage(req.params.workspaceId, 'voice_calibrations'); } catch { /* best-effort */ } }
+      refundVoiceUsage(req.params.workspaceId);
       if (err instanceof Error && err.message === 'No voice profile exists for this workspace') {
         return res.status(404).json({ error: 'Voice profile not found. Create one first via POST /api/voice/:workspaceId' });
       }
-      res.status(500).json({ error: sanitizeErrorMessage(err, 'Calibration failed') });
+      return res.status(500).json({ error: sanitizeErrorMessage(err, 'Calibration failed') });
     }
+
+    runVoicePostCommitEffect(req.params.workspaceId, 'activity', () => {
+      addActivity(req.params.workspaceId, 'voice_calibrated', `Generated voice calibration variations for ${promptType}`);
+    });
+    runVoicePostCommitEffect(req.params.workspaceId, 'broadcast', () => {
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId: session.id });
+    });
+    runVoicePostCommitEffect(req.params.workspaceId, 'intelligence-cache', () => {
+      invalidateIntelligenceCache(req.params.workspaceId);
+    });
+    return res.json(session);
   },
 );
 
@@ -201,29 +231,37 @@ router.post('/api/voice/:workspaceId/calibrate/:sessionId/refine',
   async (req, res) => {
     const { variationIndex, direction } = req.body;
     const ws = getWorkspace(req.params.workspaceId);
-    const tier = (ws?.tier ?? 'free') as string;
-    let incremented = false;
+    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+    const tier = computeEffectiveTier(ws);
+    if (!incrementIfAllowed(req.params.workspaceId, tier, 'voice_calibrations')) {
+      return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
+    }
+
+    let session: Awaited<ReturnType<typeof refineVariation>>;
     try {
-      if (!incrementIfAllowed(req.params.workspaceId, tier, 'voice_calibrations')) {
-        return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
-      }
-      incremented = true;
-      const session = await refineVariation(req.params.workspaceId, req.params.sessionId, variationIndex, direction);
-      if (!session) {
-        try { decrementUsage(req.params.workspaceId, 'voice_calibrations'); } catch { /* best-effort */ }
-        return res.status(404).json({ error: 'Session or variation not found' });
-      }
-      addActivity(req.params.workspaceId, 'voice_refined', `Refined voice calibration variation for ${session.promptType}`);
-      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId: req.params.sessionId });
-      invalidateIntelligenceCache(req.params.workspaceId);
-      res.json(session);
+      session = await refineVariation(req.params.workspaceId, req.params.sessionId, variationIndex, direction);
     } catch (err) {
-      if (incremented) { try { decrementUsage(req.params.workspaceId, 'voice_calibrations'); } catch { /* best-effort */ } }
+      refundVoiceUsage(req.params.workspaceId);
       if (err instanceof Error && err.message === 'No voice profile exists for this workspace') {
         return res.status(404).json({ error: 'Voice profile not found. Create one first via POST /api/voice/:workspaceId' });
       }
-      res.status(500).json({ error: sanitizeErrorMessage(err, 'Refinement failed') });
+      return res.status(500).json({ error: sanitizeErrorMessage(err, 'Refinement failed') });
     }
+    if (!session) {
+      refundVoiceUsage(req.params.workspaceId);
+      return res.status(404).json({ error: 'Session or variation not found' });
+    }
+
+    runVoicePostCommitEffect(req.params.workspaceId, 'activity', () => {
+      addActivity(req.params.workspaceId, 'voice_refined', `Refined voice calibration variation for ${session.promptType}`);
+    });
+    runVoicePostCommitEffect(req.params.workspaceId, 'broadcast', () => {
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId: req.params.sessionId });
+    });
+    runVoicePostCommitEffect(req.params.workspaceId, 'intelligence-cache', () => {
+      invalidateIntelligenceCache(req.params.workspaceId);
+    });
+    return res.json(session);
   },
 );
 

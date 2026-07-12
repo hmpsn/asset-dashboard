@@ -5,6 +5,10 @@ import { callCreativeAI } from './content-posts-ai.js';
 import { buildIntelPrompt } from './workspace-intelligence.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import {
+  parseBrandscriptCompletionOutput,
+  parseBrandscriptImportOutput,
+} from './schemas/ai-brand-engine.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
 import { getWorkspace } from './workspaces.js';
@@ -36,8 +40,21 @@ const stmts = createStmtCache(() => ({
   insertSection: db.prepare(`INSERT INTO brandscript_sections (id, brandscript_id, title, purpose, content, sort_order, created_at) VALUES (@id, @brandscript_id, @title, @purpose, @content, @sort_order, @created_at)`),
   // Section updates are intentionally implemented as delete-all + re-insert inside
   // `updateBrandscriptSections` (simpler than per-field upserts for a batch UI).
-  // No single-section update/delete statement is needed.
   deleteSectionsByBrandscript: db.prepare(`DELETE FROM brandscript_sections WHERE brandscript_id = ?`),
+  applyCompletionDraft: db.prepare(`
+    UPDATE brandscript_sections
+    SET content = @content
+    WHERE id = @id
+      AND brandscript_id = @brandscript_id
+      AND (content IS NULL OR TRIM(content) = '')
+      AND title = @title
+      AND COALESCE(TRIM(purpose), '') = @purpose
+      AND EXISTS (
+        SELECT 1 FROM brandscripts
+        WHERE id = @brandscript_id AND workspace_id = @workspace_id
+      )
+  `),
+  touchById: db.prepare(`UPDATE brandscripts SET updated_at = MAX(updated_at, ?) WHERE id = ? AND workspace_id = ?`),
   listTemplates: db.prepare(`SELECT * FROM brandscript_templates ORDER BY name`),
   getTemplate: db.prepare(`SELECT * FROM brandscript_templates WHERE id = ?`),
   insertTemplate: db.prepare(`INSERT INTO brandscript_templates (id, name, description, sections_json, created_at) VALUES (@id, @name, @description, @sections_json, @created_at)`),
@@ -195,31 +212,42 @@ ${rawText}`;
 
   log.info({ workspaceId }, 'importing brandscript from text');
   const result = await callAI({
-    model: 'gpt-5.4-mini',
+    operation: 'brandscript-import',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 4000,
     temperature: 0,
-    responseFormat: { type: 'json_object' },
-    feature: 'brandscript-import',
     workspaceId,
   });
 
-  const parsed = parseJsonFallback<{ frameworkType: string; sections: { title: string; purpose: string; content: string }[] }>(result.text, { frameworkType: 'custom', sections: [] });
-  return createBrandscript(workspaceId, name, parsed.frameworkType || 'custom', parsed.sections || []);
+  const parsed = parseBrandscriptImportOutput(result.text);
+  return createBrandscript(workspaceId, name, parsed.frameworkType, parsed.sections);
+}
+
+export interface BrandscriptCompletionResult {
+  brandscript: Brandscript | null;
+  generated: boolean;
+  appliedSectionCount: number;
+}
+
+function normalizeSectionPurpose(purpose: string | undefined): string {
+  return purpose?.trim() ?? '';
 }
 
 export async function completeBrandscript(
   workspaceId: string,
   brandscriptId: string,
-): Promise<Brandscript | null> {
+): Promise<BrandscriptCompletionResult> {
   const bs = getBrandscript(workspaceId, brandscriptId);
-  if (!bs) return null;
+  if (!bs) return { brandscript: null, generated: false, appliedSectionCount: 0 };
 
-  const fullContext = await buildIntelPrompt(workspaceId, ['seoContext']);
   const filledSections = bs.sections.filter(sec => sec.content?.trim());
   const emptySections = bs.sections.filter(sec => !sec.content?.trim());
 
-  if (emptySections.length === 0) return bs;
+  if (emptySections.length === 0) {
+    return { brandscript: bs, generated: false, appliedSectionCount: 0 };
+  }
+
+  const fullContext = await buildIntelPrompt(workspaceId, ['seoContext']);
 
   const filledContext = filledSections.map(sec =>
     `## ${sec.title}\n${sec.purpose ? `Purpose: ${sec.purpose}\n` : ''}${sec.content}`
@@ -236,29 +264,78 @@ ${fullContext}
 SECTIONS TO COMPLETE:
 ${emptySections.map(sec => `- "${sec.title}" (purpose: ${sec.purpose || 'not specified'})`).join('\n')}
 
-Return valid JSON: { "sections": [{ "title": "exact title from above", "content": "your draft content" }] }`;
+Return valid JSON with one entry for every requested section, in the same order shown above:
+{ "sections": [{ "title": "exact title from above", "content": "your draft content" }] }`;
 
   const system = buildSystemPrompt(workspaceId, 'You are a brand strategist completing a brandscript. Write in a natural, compelling voice. Return only valid JSON as instructed.');
 
   log.info({ workspaceId, brandscriptId, emptySections: emptySections.length }, 'completing brandscript with AI');
   const text = await callCreativeAI({
+    operation: 'brandscript-complete',
     systemPrompt: system,
     userPrompt,
     maxTokens: 4000,
     temperature: 0.6,
-    feature: 'brandscript-complete',
     workspaceId,
     json: true,
   });
 
-  const parsed = parseJsonFallback<{ sections: { title: string; content: string }[] }>(text, { sections: [] });
-  const updatedSections = bs.sections.map(sec => {
-    if (sec.content?.trim()) return sec;
-    const drafted = parsed.sections.find(d => d.title === sec.title);
-    return { ...sec, content: drafted?.content || sec.content };
+  const parsed = parseBrandscriptCompletionOutput(text, emptySections.map(section => section.title));
+  const draftSnapshotsBySectionId = new Map(
+    emptySections.map((section, index) => [section.id, {
+      title: section.title,
+      purpose: normalizeSectionPurpose(section.purpose),
+      content: parsed.sections[index].content,
+    }]),
+  );
+
+  // The AI request can be slow enough for an operator to edit this brandscript in
+  // another session. Re-read after parsing, then patch only the originally-empty
+  // section IDs whose title and normalized purpose still match the prompt snapshot.
+  // The conditional UPDATE repeats every guard so a manual edit that lands after
+  // this read still wins.
+  const current = getBrandscript(workspaceId, brandscriptId);
+  if (!current) {
+    return { brandscript: null, generated: true, appliedSectionCount: 0 };
+  }
+
+  const eligibleSections = current.sections.filter(section => {
+    const snapshot = draftSnapshotsBySectionId.get(section.id);
+    return Boolean(
+      snapshot
+      && !section.content?.trim()
+      && section.title === snapshot.title
+      && normalizeSectionPurpose(section.purpose) === snapshot.purpose
+    );
+  });
+  const applyDrafts = db.transaction(() => {
+    const now = new Date().toISOString();
+    let appliedSectionCount = 0;
+    for (const section of eligibleSections) {
+      const snapshot = draftSnapshotsBySectionId.get(section.id);
+      if (!snapshot) continue;
+      const result = stmts().applyCompletionDraft.run({
+        id: section.id,
+        brandscript_id: brandscriptId,
+        workspace_id: workspaceId,
+        title: snapshot.title,
+        purpose: snapshot.purpose,
+        content: snapshot.content,
+      });
+      appliedSectionCount += result.changes;
+    }
+    if (appliedSectionCount > 0) {
+      stmts().touchById.run(now, brandscriptId, workspaceId);
+    }
+    return appliedSectionCount;
   });
 
-  return updateBrandscriptSections(workspaceId, brandscriptId, updatedSections);
+  const appliedSectionCount = applyDrafts.immediate();
+  return {
+    brandscript: getBrandscript(workspaceId, brandscriptId),
+    generated: true,
+    appliedSectionCount,
+  };
 }
 
 // ── Questionnaire → Brandscript auto-population ────────────────────────

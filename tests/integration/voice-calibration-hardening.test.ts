@@ -26,6 +26,10 @@ beforeAll(async () => {
   // Free-tier workspace for rate-limit tests
   const freeWs = createWorkspace('Voice Hardening Free Workspace');
   freeWsId = freeWs.id;
+  // createWorkspace starts a Growth trial; expire it so this fixture represents
+  // a genuinely free effective tier under the canonical resolver.
+  db.prepare('UPDATE workspaces SET tier = ?, trial_ends_at = ? WHERE id = ?')
+    .run('free', '2020-01-01T00:00:00.000Z', freeWsId);
 }, 30_000);
 
 afterAll(async () => {

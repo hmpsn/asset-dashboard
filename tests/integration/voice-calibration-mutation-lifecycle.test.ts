@@ -53,23 +53,22 @@ vi.mock('../../server/content-posts-ai.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../server/content-posts-ai.js')>();
   return {
     ...original,
-    callCreativeAI: vi.fn(async (opts: { json?: boolean }) => {
+    callCreativeAI: vi.fn(async (opts: { json?: boolean; operation?: string }) => {
       if (aiState.shouldFail) {
         throw new Error('Simulated AI failure');
       }
-      // The route passes json:true — return an appropriate response based on
-      // whether this is a generate or refine call (distinguished by a best-effort
-      // heuristic: refine calls include a "DIRECTION:" in the user prompt but we
-      // cannot inspect opts here, so we return a shape that covers both).
-      const payload = {
+      // Named operations make the structured response contract explicit; each
+      // strict schema receives only the fields it owns.
+      if (opts.operation === 'voice-refinement') {
+        return JSON.stringify({ refined: aiState.refineText });
+      }
+      return JSON.stringify({
         variations: [
           'Bold brands don\'t blend in — they ignite.',
           'Your audience is already searching. Be impossible to miss.',
           'Three words: clarity, confidence, conviction.',
         ],
-        refined: aiState.refineText,
-      };
-      return JSON.stringify(payload);
+      });
     }),
   };
 });

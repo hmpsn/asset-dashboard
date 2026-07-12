@@ -21,13 +21,11 @@ const migratedGeneralGenerationFiles: Array<{ path: string; aiImport: string }> 
 ];
 
 const migratedJsonGenerationFiles: Array<{ path: string; aiImport: string }> = [
-  { path: 'server/brandscript.ts', aiImport: "from './ai.js'" },
   { path: 'server/aeo-page-review.ts', aiImport: "from './ai.js'" },
   { path: 'server/content-brief.ts', aiImport: "from './ai.js'" },
   { path: 'server/copy-intelligence.ts', aiImport: "from './ai.js'" },
   { path: 'server/copy-refresh.ts', aiImport: "from './ai.js'" },
   { path: 'server/diagnostic-orchestrator.ts', aiImport: "from './ai.js'" },
-  { path: 'server/discovery-ingestion.ts', aiImport: "from './ai.js'" },
   { path: 'server/schema-plan.ts', aiImport: "from './ai.js'" },
   { path: 'server/content-posts-ai-jobs.ts', aiImport: "from './ai.js'" },
   { path: 'server/routes/content-publish.ts', aiImport: "from '../ai.js'" },
@@ -39,6 +37,9 @@ const migratedOperationBackedStructuredFiles: Array<{
   operations: string[];
   callPattern?: string;
 }> = [
+  { path: 'server/brandscript.ts', aiImport: "from './ai.js'", operations: ['brandscript-import'] },
+  { path: 'server/brandscript.ts', aiImport: "from './content-posts-ai.js'", operations: ['brandscript-complete'], callPattern: 'callCreativeAI({' },
+  { path: 'server/discovery-ingestion.ts', aiImport: "from './ai.js'", operations: ['discovery-extraction'] },
   { path: 'server/content-posts-ai.ts', aiImport: "from './ai.js'", operations: ['content-post-seo-meta', 'content-post-unify', 'voice-scoring'] },
   { path: 'server/strategy-pov-generator.ts', aiImport: "from './narrative-ai.js'", operations: ['strategy-pov'], callPattern: 'callNarrativeAI({' },
   { path: 'server/routes/workspaces.ts', aiImport: "from '../ai.js'", operations: ['intelligence-profile-autofill'] },

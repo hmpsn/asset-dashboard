@@ -22,7 +22,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ── Mock heavy async deps before importing the module ──────────────────────
-vi.mock('../../server/openai-helpers.js', () => ({
+vi.mock('../../server/openai-helpers.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../server/openai-helpers.js')>(),
   callOpenAI: vi.fn(),
 }));
 vi.mock('../../server/workspace-intelligence.js', () => ({
