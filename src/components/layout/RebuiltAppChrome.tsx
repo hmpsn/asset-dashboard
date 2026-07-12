@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import type { Page } from '../../routes';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import type { Workspace } from '../WorkspaceSelector';
-import { AppShell, Drawer, PageContainer } from '../ui';
+import { AppShell, Button, Drawer, Icon, PageContainer } from '../ui';
 import { RebuiltBreadcrumb } from './RebuiltBreadcrumb';
 import { RebuiltConnectionHealth, type RebuiltConnectionHealthState } from './RebuiltConnectionHealth';
 import { RebuiltSidebar } from './RebuiltSidebar';
@@ -102,6 +102,14 @@ function useNarrowViewportRail(): boolean {
   }, []);
 
   return isNarrow;
+}
+
+function openCommandPalette(): void {
+  window.dispatchEvent(new KeyboardEvent('keydown', {
+    key: 'k',
+    metaKey: true,
+    bubbles: true,
+  }));
 }
 
 export function RebuiltAppChrome({
@@ -203,6 +211,20 @@ export function RebuiltAppChrome({
                 data-testid="rebuilt-topbar-action-host"
                 className="ml-auto flex min-w-max flex-none items-center gap-2"
               />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={openCommandPalette}
+                aria-label="Command Palette"
+                title="Command Palette (⌘K)"
+                className="flex-none rounded-[var(--radius-lg)] text-[var(--brand-text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--brand-text-bright)]"
+              >
+                <Icon name="search" size="sm" aria-hidden="true" />
+                <span className="hidden md:inline">Command</span>
+                <kbd className="hidden rounded-[var(--radius-sm)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-1.5 py-0.5 font-mono t-micro text-[var(--brand-text-dim)] lg:inline">
+                  ⌘K
+                </kbd>
+              </Button>
             </div>
           )}
         >

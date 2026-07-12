@@ -230,7 +230,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         sub: 'Open the content planner',
         icon: LayoutTemplate,
         type: 'action',
-        action: () => { navigate(adminPath(selectedWorkspace!.id, 'content-pipeline')); addRecent('action:create-template'); },
+        action: () => { navigate(`${adminPath(selectedWorkspace!.id, 'content-pipeline')}?tab=planner`); addRecent('action:create-template'); },
       });
       result.push({
         id: 'action:build-matrix',
@@ -238,7 +238,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         sub: 'Plan content at scale',
         icon: Grid3X3,
         type: 'action',
-        action: () => { navigate(adminPath(selectedWorkspace!.id, 'content-pipeline')); addRecent('action:build-matrix'); },
+        action: () => { navigate(`${adminPath(selectedWorkspace!.id, 'content-pipeline')}?tab=planner`); addRecent('action:build-matrix'); },
       });
       result.push({
         id: 'action:view-content-plan',

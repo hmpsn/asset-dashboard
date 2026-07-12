@@ -276,6 +276,23 @@ describe('CommandPalette', () => {
     });
   });
 
+  describe('content planner quick actions', () => {
+    it.each([
+      ['Create Content Template', 'action:create-template'],
+      ['Build Content Matrix', 'action:build-matrix'],
+    ])('routes %s to the Planner and preserves recent-action tracking', (label, recentId) => {
+      render(<CommandPalette workspaces={[ws]} selectedWorkspace={ws} onSelectWorkspace={vi.fn()} />);
+      fireEvent.keyDown(window, { key: 'k', metaKey: true });
+
+      const input = screen.getByPlaceholderText('Search tools, workspaces, actions...');
+      fireEvent.change(input, { target: { value: label } });
+      fireEvent.click(screen.getByText(label));
+
+      expect(navigateMock).toHaveBeenCalledWith(`${adminPath(ws.id, 'content-pipeline')}?tab=planner`);
+      expect(JSON.parse(localStorage.getItem('admin-palette-recent') ?? '[]')).toContain(recentId);
+    });
+  });
+
   describe('Local Presence nav', () => {
     function open() {
       render(<CommandPalette workspaces={[wsWithSite]} selectedWorkspace={wsWithSite} onSelectWorkspace={vi.fn()} />);

@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -141,6 +141,22 @@ function renderControlledFocusShell() {
   );
 }
 
+function renderChrome(
+  overrides: Partial<ComponentProps<typeof RebuiltAppChrome>> = {},
+  initialEntry = '/ws/ws-1/seo-keywords',
+) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <RebuiltAppChrome {...chromeProps} {...overrides}>
+          <h1>Rebuilt chrome body</h1>
+        </RebuiltAppChrome>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 describe('RebuiltAppChrome', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -175,6 +191,50 @@ describe('RebuiltAppChrome', () => {
     expect(health).toHaveTextContent('1 workspace');
     expect(within(health).queryByRole('button')).not.toBeInTheDocument();
     expect(within(health).queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('opens the canonical global Command Palette interaction from its visible topbar trigger', () => {
+    renderChrome();
+    const observedKeydowns: KeyboardEvent[] = [];
+    const recordKeydown = (event: KeyboardEvent) => observedKeydowns.push(event);
+    window.addEventListener('keydown', recordKeydown);
+
+    try {
+      const trigger = screen.getByRole('button', { name: 'Command Palette' });
+      expect(trigger).toBeVisible();
+      fireEvent.click(trigger);
+
+      expect(observedKeydowns).toHaveLength(1);
+      expect(observedKeydowns[0]).toMatchObject({ key: 'k', metaKey: true, bubbles: true });
+    } finally {
+      window.removeEventListener('keydown', recordKeydown);
+    }
+  });
+
+  it.each([
+    {
+      shellState: 'a narrow workspace route',
+      narrow: true,
+      overrides: {},
+      initialEntry: '/ws/ws-1/seo-keywords',
+    },
+    {
+      shellState: 'focus mode',
+      narrow: false,
+      overrides: { focusMode: true, onFocusModeChange: vi.fn() },
+      initialEntry: '/ws/ws-1/rewrite',
+    },
+    {
+      shellState: 'a global route',
+      narrow: false,
+      overrides: { selected: null, tab: 'settings' as const },
+      initialEntry: '/settings',
+    },
+  ])('keeps exactly one Command Palette trigger on $shellState', ({ narrow, overrides, initialEntry }) => {
+    mockMatchMedia(narrow);
+    renderChrome(overrides, initialEntry);
+
+    expect(screen.getAllByRole('button', { name: 'Command Palette' })).toHaveLength(1);
   });
 
   it('forces the sidebar rail on narrow viewports and opens mobile navigation without changing the saved desktop preference', async () => {
