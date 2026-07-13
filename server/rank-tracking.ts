@@ -451,9 +451,14 @@ export function getRankHistory(
 
 export type RankEntry = LatestRank;
 
-function buildLatestRanks(workspaceId: string, options: { includeUntracked?: boolean } = {}): LatestRank[] {
+export interface LatestSnapshotRanks {
+  ranks: LatestRank[];
+  snapshotDate: string | null;
+}
+
+function buildLatestRanks(workspaceId: string, options: { includeUntracked?: boolean } = {}): LatestSnapshotRanks {
   const snapshots = readRecentSnapshots(workspaceId, 2);
-  if (snapshots.length === 0) return [];
+  if (snapshots.length === 0) return { ranks: [], snapshotDate: null };
   const latest = snapshots[snapshots.length - 1];
   const prev = snapshots.length >= 2 ? snapshots[snapshots.length - 2] : null;
   const previousByQuery = new Map(
@@ -471,7 +476,7 @@ function buildLatestRanks(workspaceId: string, options: { includeUntracked?: boo
 
   // If a workspace only has retired lifecycle rows, do not fall back to all
   // snapshot queries; active rank views should reflect active tracked keywords.
-  return latest.queries
+  const ranks = latest.queries
     .filter(q => options.includeUntracked || !hasConfiguredKeywords || trackedEntries.has(normalizeQuery(q.query)))
     .map(q => {
       const normalizedQuery = normalizeQuery(q.query);
@@ -490,12 +495,20 @@ function buildLatestRanks(workspaceId: string, options: { includeUntracked?: boo
       };
     })
     .sort((a, b) => a.position - b.position);
+  return {
+    ranks,
+    snapshotDate: new Date(`${latest.date}T00:00:00.000Z`).toISOString(),
+  };
 }
 
 export function getLatestRanks(workspaceId: string): LatestRank[] {
-  return buildLatestRanks(workspaceId);
+  return buildLatestRanks(workspaceId).ranks;
 }
 
 export function getLatestSnapshotRanks(workspaceId: string): LatestRank[] {
+  return buildLatestRanks(workspaceId, { includeUntracked: true }).ranks;
+}
+
+export function getLatestSnapshotRanksWithDate(workspaceId: string): LatestSnapshotRanks {
   return buildLatestRanks(workspaceId, { includeUntracked: true });
 }

@@ -8,11 +8,7 @@ import { LOCAL_SEO_VISIBILITY_POSTURE } from '../../../shared/types/local-seo.js
 import { TRACKED_KEYWORD_STATUS } from '../../../shared/types/rank-tracking.js';
 import { isSuspiciousPlannerGroupedVolume } from '../../keyword-strategy-helpers.js';
 import { countLocalSeoKeywordCandidates } from '../local-seo/candidate-service.js';
-import { getPrimaryMarketLocationCode } from '../local-seo/configuration-service.js';
 import { createLogger } from '../../logger.js';
-import { listCannibalizationIssues } from '../../cannibalization-issues.js';
-import { computeOrganicTrafficValue } from '../../roi.js';
-import { listTopicClusters } from '../../topic-clusters.js';
 import {
   UNIVERSE_SAFETY_CEILING,
   selectRankEvidence,
@@ -36,6 +32,7 @@ export async function buildKeywordCommandCenterSummary(
   const startedAt = Date.now();
   const snapshot = options.sourceSnapshot ?? buildKeywordCommandCenterSourceSnapshot(workspaceId, {
     includeLocalSeo: options.includeLocalSeo,
+    includeSummary: true,
   });
   if (!snapshot) return null;
   const { workspace } = snapshot;
@@ -225,34 +222,6 @@ export async function buildKeywordCommandCenterSummary(
     finalHeapMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
   }, 'keyword command center summary built');
 
-  let geoLabel: string | undefined;
-  try {
-    geoLabel = getPrimaryMarketLocationCode(workspace.id)?.label;
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'KCC summary geo label lookup failed; omitting');
-  }
-
-  let trafficValueMonthly: number | null = null;
-  try {
-    trafficValueMonthly = computeOrganicTrafficValue(workspace.id);
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'KCC summary traffic value lookup failed; omitting');
-  }
-
-  let topicClusters: KeywordCommandCenterSummaryResponse['topicClusters'] | undefined;
-  try {
-    topicClusters = listTopicClusters(workspace.id);
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'KCC summary topic cluster lookup failed; omitting');
-  }
-
-  let cannibalization: KeywordCommandCenterSummaryResponse['cannibalization'] | undefined;
-  try {
-    cannibalization = listCannibalizationIssues(workspace.id);
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'KCC summary cannibalization lookup failed; omitting');
-  }
-
   const droppedRankEvidenceTail = Math.max(0, rankEvidenceTotal - rankEvidence.selected.length);
   const rawEvidenceReturnedCap = UNIVERSE_SAFETY_CEILING;
 
@@ -263,9 +232,10 @@ export async function buildKeywordCommandCenterSummary(
     rawEvidenceReturned: Math.min(counts.evidence, rawEvidenceReturnedCap),
     generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
     summarizedAt: new Date().toISOString(),
-    geoLabel,
-    trafficValueMonthly,
-    topicClusters,
-    cannibalization,
+    geoLabel: snapshot.geoLabel,
+    trafficValueMonthly: snapshot.trafficValueMonthly ?? null,
+    topicClusters: snapshot.topicClusters,
+    cannibalization: snapshot.cannibalization,
+    rankFreshness: snapshot.rankFreshness,
   };
 }

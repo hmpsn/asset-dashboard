@@ -30,9 +30,15 @@ export function useKeywordCommandCenterInitialView(
   options: { enabled?: boolean } = {},
 ) {
   const enabled = options.enabled ?? true;
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: queryKeys.admin.keywordCommandCenterInitial(workspaceId, query),
-    queryFn: () => keywordCommandCenter.initial(workspaceId, query),
+    queryFn: async () => {
+      const initial = await keywordCommandCenter.initial(workspaceId, query);
+      queryClient.setQueryData(queryKeys.admin.keywordCommandCenterSummary(workspaceId), initial.summary);
+      queryClient.setQueryData(queryKeys.admin.keywordCommandCenterRows(workspaceId, query), initial.rows);
+      return initial;
+    },
     enabled: !!workspaceId && enabled,
     staleTime: 2 * 60 * 1000,
   });

@@ -115,8 +115,8 @@ afterEach(() => {
   workspaceId = '';
 });
 
-describe('Task 7 — assemble-once-per-request guard', () => {
-  it('GET /rows (skinny, filter=all) calls assembleStoredKeywordStrategy at most once', async () => {
+describe('K2 — KCC-owned read projection guard', () => {
+  it('GET /rows (skinny, filter=all) never calls the full strategy assembler', async () => {
     const spy = vi.spyOn(assemblerModule, 'assembleStoredKeywordStrategy');
     const payload = await buildKeywordCommandCenterRows(workspaceId, {
       filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
@@ -124,21 +124,21 @@ describe('Task 7 — assemble-once-per-request guard', () => {
       pageSize: 50,
     });
     expect(payload).not.toBeNull();
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).not.toHaveBeenCalled();
   });
 
-  it('GET /summary calls assembleStoredKeywordStrategy at most once', async () => {
+  it('GET /summary never calls the full strategy assembler', async () => {
     const spy = vi.spyOn(assemblerModule, 'assembleStoredKeywordStrategy');
     const summary = await buildKeywordCommandCenterSummary(workspaceId);
     expect(summary).not.toBeNull();
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).not.toHaveBeenCalled();
   });
 
-  it('GET /detail calls assembleStoredKeywordStrategy at most once', async () => {
+  it('GET /detail never calls the full strategy assembler', async () => {
     const spy = vi.spyOn(assemblerModule, 'assembleStoredKeywordStrategy');
     const detail = await buildKeywordCommandCenterDetail(workspaceId, 'cosmetic dentist austin');
     expect(detail).not.toBeNull();
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('GET /initial builds summary and first rows from one source snapshot', async () => {
@@ -151,7 +151,12 @@ describe('Task 7 — assemble-once-per-request guard', () => {
     expect(payload).not.toBeNull();
     expect(payload!.summary.counts.total).toBeGreaterThan(0);
     expect(payload!.rows.rows.length).toBeGreaterThan(0);
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).not.toHaveBeenCalled();
+    expect(payload!.summary.rankFreshness).toMatchObject({
+      snapshotDate: '2026-05-20T00:00:00.000Z',
+      status: 'stale',
+    });
+    expect(payload!.summary.rankFreshness.ageDays).toBeGreaterThanOrEqual(14);
   });
 });
 

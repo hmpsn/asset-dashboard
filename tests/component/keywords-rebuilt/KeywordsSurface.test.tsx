@@ -663,16 +663,19 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     renderSurface('/ws/ws-1/seo-keywords');
 
     expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'rank', direction: 'asc' });
+    const firstPaintQuery = initialHookMock.mock.calls.at(-1)?.[1];
 
     fireEvent.click(screen.getByRole('button', { name: 'Clicks' }));
     await waitFor(() => {
-      expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'clicks', direction: 'asc' });
+      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'clicks', direction: 'asc' });
     });
+    expect(initialHookMock.mock.calls.at(-1)?.[1]).toEqual(firstPaintQuery);
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => {
-      expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ page: 2 });
+      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ page: 2 });
     });
+    expect(initialHookMock.mock.calls.at(-1)?.[1]).toEqual(firstPaintQuery);
   });
 
   it('supports manual add, advanced filters, select-visible, and client feedback actions', async () => {
@@ -685,7 +688,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
 
     fireEvent.change(screen.getByLabelText('Advanced keyword filter'), { target: { value: 'requested' } });
     await waitFor(() => {
-      expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: 'requested' });
+      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: 'requested' });
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Select visible 2' }));
@@ -711,7 +714,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
 
     fireEvent.click(screen.getByRole('radio', { name: /Opportunities/ }));
     await waitFor(() => {
-      expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'opportunity', direction: 'desc' });
+      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'opportunity', direction: 'desc' });
     });
     await expectNoA11yViolations(container);
 

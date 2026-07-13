@@ -352,6 +352,7 @@ export interface KeywordCommandCenterSummaryResponse {
   topicClusters?: TopicCluster[];
   /** Cannibalization rows from the normalized cannibalization_issues table for rebuilt grouping flags. */
   cannibalization?: CannibalizationItem[];
+  rankFreshness: KeywordRankFreshness;
 }
 
 export interface KeywordCommandCenterRowsQuery {
@@ -377,6 +378,23 @@ export interface KeywordCommandCenterRowsResponse {
   rows: KeywordCommandCenterRow[];
   pageInfo: KeywordCommandCenterPageInfo;
   generatedAt?: string | null;
+  rankFreshness?: KeywordRankFreshness;
+}
+
+export const KEYWORD_RANK_FRESHNESS_STATUS = {
+  FRESH: 'fresh',
+  STALE: 'stale',
+  MISSING: 'missing',
+} as const;
+
+export type KeywordRankFreshnessStatus = typeof KEYWORD_RANK_FRESHNESS_STATUS[keyof typeof KEYWORD_RANK_FRESHNESS_STATUS];
+
+export interface KeywordRankFreshness {
+  /** ISO timestamp derived from the authoritative rank snapshot date, never request time. */
+  snapshotDate: string | null;
+  /** Whole UTC days since the authoritative snapshot; null when no snapshot exists. */
+  ageDays: number | null;
+  status: KeywordRankFreshnessStatus;
 }
 
 export interface KeywordCommandCenterInitialViewResponse {

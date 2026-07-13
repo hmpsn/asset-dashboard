@@ -17,7 +17,6 @@ import {
   ensureLocalVisibilityRows,
   finalizeDraftRow,
   populateDraftRows,
-  safeLostVisibilityKeys,
 } from './read-model.js';
 import type { DraftRow } from './types.js';
 import {
@@ -100,7 +99,7 @@ export async function buildKeywordCommandCenterDetail(
       workspaceId: workspace.id,
       localVisibilityByKeyword,
       activeLocalMarketCount,
-      lostVisibilityKeys: safeLostVisibilityKeys(workspace.id),
+      lostVisibilityKeys: new Set(snapshot.lostVisibilityRows.map(item => keywordComparisonKey(item.query)).filter(Boolean)),
       publishedPagePaths,
       // P1 dark-loop fix: the rows/model path passes valueScoring so
       // finalizeDraftRow computes valueReasons, but the detail path omitted it —

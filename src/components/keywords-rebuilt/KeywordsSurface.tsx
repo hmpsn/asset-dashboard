@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { Suspense, useCallback, useMemo, useState } from 'react';
+import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { BarChart3, Clock, FileText, Network, Target, type LucideIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
@@ -189,23 +189,25 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const state = useKeywordsSurfaceState();
-  const canUseInitialView = state.rowsQuery.filter !== KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES;
-  const initialView = useKeywordCommandCenterInitialView(workspaceId, state.rowsQuery, {
+  const initialRowsQueryRef = useRef(state.rowsQuery);
+  const canUseInitialView = initialRowsQueryRef.current.filter !== KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES;
+  const initialView = useKeywordCommandCenterInitialView(workspaceId, initialRowsQueryRef.current, {
     enabled: canUseInitialView,
   });
+  const viewingInitialRows = JSON.stringify(state.rowsQuery) === JSON.stringify(initialRowsQueryRef.current);
   const summaryFallback = useKeywordCommandCenterSummary(workspaceId, {
-    enabled: !canUseInitialView,
+    enabled: !canUseInitialView || initialView.isError,
   });
   const addKeyword = useRankTrackingAddKeyword(workspaceId);
   const feedback = useKeywordFeedback(workspaceId);
   const feedbackAction = useKeywordCommandCenterAction(workspaceId);
   const [addKeywordValue, setAddKeywordValue] = useState('');
-  const summary = canUseInitialView ? initialView.data?.summary : summaryFallback.data;
-  const summaryIsLoading = canUseInitialView ? initialView.isLoading : summaryFallback.isLoading;
-  const summaryIsError = canUseInitialView ? initialView.isError : summaryFallback.isError;
-  const summaryError = canUseInitialView ? initialView.error : summaryFallback.error;
-  const refetchSummary = canUseInitialView ? initialView.refetch : summaryFallback.refetch;
-  const initialRowsResult: KeywordRowsQueryResult | undefined = canUseInitialView ? {
+  const summary = initialView.data?.summary ?? summaryFallback.data;
+  const summaryIsLoading = canUseInitialView ? initialView.isLoading && !summary : summaryFallback.isLoading;
+  const summaryIsError = canUseInitialView ? initialView.isError && summaryFallback.isError : summaryFallback.isError;
+  const summaryError = initialView.error ?? summaryFallback.error;
+  const refetchSummary = initialView.data ? initialView.refetch : summaryFallback.refetch;
+  const initialRowsResult: KeywordRowsQueryResult | undefined = canUseInitialView && viewingInitialRows ? {
     data: initialView.data?.rows,
     isLoading: initialView.isLoading,
     isError: initialView.isError,

@@ -29,7 +29,6 @@ import {
   ensureLocalVisibilityRows,
   finalizeDraftRows,
   populateDraftRows,
-  safeLostVisibilityKeys,
 } from './read-model.js';
 import {
   filterNeedsLocalCandidates,
@@ -185,7 +184,7 @@ async function buildKeywordCommandCenterLocalCandidateRows(
   });
   const cappedBundle = filterBundleToKeys({ ...baseBundle, localCandidates }, candidateKeys);
   const valueScoring = buildValueScoringConfig(workspace);
-  const lostVisibilityKeys = safeLostVisibilityKeys(workspace.id);
+  const lostVisibilityKeys = new Set(snapshot.lostVisibilityRows.map(row => keywordComparisonKey(row.query)).filter(Boolean));
   const publishedPagePaths = listPublishedPostPagePaths(workspace.id);
   const rows = new Map<string, DraftRow>();
   await populateDraftRows(rows, cappedBundle);
@@ -226,7 +225,8 @@ async function buildKeywordCommandCenterLocalCandidateRows(
       hasNextPage: page.hasNextPage,
       hasPreviousPage: page.hasPreviousPage,
     },
-    generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
+      generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
+      rankFreshness: snapshot.rankFreshness,
   };
 }
 
@@ -269,7 +269,7 @@ async function buildKeywordCommandCenterRowsSkinny(
   const pageSelection = rowCandidateKeysForQuery(candidateBundle, localVisibilityByKeyword, query, valueScoring);
   const pagedBundle = filterBundleToKeys(bundle, pageSelection.keys);
   const pagedLocalVisibility = filterMapByKeys(localVisibilityByKeyword, pageSelection.keys);
-  const lostVisibilityKeys = safeLostVisibilityKeys(workspace.id);
+  const lostVisibilityKeys = new Set(snapshot.lostVisibilityRows.map(row => keywordComparisonKey(row.query)).filter(Boolean));
   const publishedPagePaths = listPublishedPostPagePaths(workspace.id);
   const rows = new Map<string, DraftRow>();
   await populateDraftRows(rows, pagedBundle);
@@ -312,6 +312,7 @@ async function buildKeywordCommandCenterRowsSkinny(
       hasPreviousPage: pageSelection.page > 1,
     },
     generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
+    rankFreshness: snapshot.rankFreshness,
   };
 }
 
