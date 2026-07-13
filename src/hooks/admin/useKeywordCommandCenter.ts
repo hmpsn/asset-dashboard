@@ -40,7 +40,10 @@ export function useKeywordCommandCenterInitialView(
       return initial;
     },
     enabled: !!workspaceId && enabled,
-    staleTime: 2 * 60 * 1000,
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
   });
 }
 

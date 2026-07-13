@@ -238,21 +238,22 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   const initialRowsQueryRef = useRef(rowsQuery);
   const initialView = useKeywordCommandCenterInitialView(workspaceId, initialRowsQueryRef.current);
   const viewingInitialRows = rowsQuerySignature(rowsQuery) === rowsQuerySignature(initialRowsQueryRef.current);
+  const initialTransportSettled = initialView.data != null || initialView.isError;
   const summary = useKeywordCommandCenterSummary(workspaceId, {
-    enabled: initialView.isError,
+    enabled: initialTransportSettled,
   });
   const rowsResult = useKeywordCommandCenterRows(workspaceId, rowsQuery, {
-    enabled: !viewingInitialRows || initialView.isError,
+    enabled: !viewingInitialRows || initialTransportSettled,
   });
-  const summaryData = initialView.data?.summary ?? summary.data;
-  const rowsData = viewingInitialRows ? initialView.data?.rows ?? rowsResult.data : rowsResult.data;
+  const summaryData = summary.data;
+  const rowsData = rowsResult.data;
   const rowsError = rowsData || rowsResult.isLoading
     ? null
-    : viewingInitialRows ? rowsResult.error ?? initialView.error : rowsResult.error;
+    : rowsResult.error ?? (viewingInitialRows ? initialView.error : null);
   const counts = summaryData?.counts;
   const filterMetas = summaryData?.filters ?? [];
-  const summaryLoading = initialView.isLoading || summary.isLoading;
-  const rowsLoading = viewingInitialRows ? initialView.isLoading || rowsResult.isLoading : rowsResult.isLoading;
+  const summaryLoading = !initialTransportSettled || summary.isLoading;
+  const rowsLoading = viewingInitialRows && !initialTransportSettled ? true : rowsResult.isLoading;
   const rows = rowsData?.rows ?? [];
   const pageInfo = rowsData?.pageInfo;
 

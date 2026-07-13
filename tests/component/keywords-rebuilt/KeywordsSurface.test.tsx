@@ -395,6 +395,7 @@ function setupKeywordHooks() {
     isLoading: false,
     isError: false,
     error: null,
+    refetch: vi.fn(),
   });
   const rowsResponse = (query: KeywordCommandCenterRowsQuery): KeywordCommandCenterRowsResponse => {
     const page = query.page ?? 1;
@@ -906,19 +907,16 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
 
   it('renders row errors inline while preserving stale row data and retry', () => {
     const refetch = vi.fn();
-    initialHookMock.mockImplementation((_workspaceId: string, query: KeywordCommandCenterRowsQuery) => ({
+    rowsHookMock.mockImplementation((_workspaceId: string, query: KeywordCommandCenterRowsQuery) => ({
       data: {
-        summary: summaryPayload,
-        rows: {
-          rows,
-          pageInfo: {
-            page: query.page ?? 1,
-            pageSize: query.pageSize ?? 50,
-            totalRows: rows.length,
-            totalPages: 1,
-            hasNextPage: false,
-            hasPreviousPage: false,
-          },
+        rows,
+        pageInfo: {
+          page: query.page ?? 1,
+          pageSize: query.pageSize ?? 50,
+          totalRows: rows.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPreviousPage: false,
         },
       },
       isLoading: false,
@@ -933,6 +931,36 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByText('cosmetic dentistry')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(refetch).toHaveBeenCalled();
+  });
+
+  it('renders canonical caches after hydration and retries summary without replaying initial transport', () => {
+    const initialRefetch = vi.fn();
+    const summaryRefetch = vi.fn();
+    initialHookMock.mockReturnValue({
+      data: {
+        summary: { ...summaryPayload, counts: { ...summaryPayload.counts, total: 999 } },
+        rows: { rows: [], pageInfo: { page: 1, pageSize: 50, totalRows: 0, totalPages: 0, hasNextPage: false, hasPreviousPage: false } },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: initialRefetch,
+    });
+    summaryHookMock.mockReturnValue({
+      data: summaryPayload,
+      isLoading: false,
+      isError: true,
+      error: new Error('summary refresh failed'),
+      refetch: summaryRefetch,
+    });
+
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    expect(screen.getByText('cosmetic dentistry')).toBeInTheDocument();
+    expect(screen.queryByText('999')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry summary' }));
+    expect(summaryRefetch).toHaveBeenCalledTimes(1);
+    expect(initialRefetch).not.toHaveBeenCalled();
   });
 
   it('falls back to the rows endpoint when first-paint hydration fails without cached data', () => {

@@ -25,7 +25,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setBroadcast } from '../../server/broadcast.js';
-import db from '../../server/db/index.js';
+import db, { measureSqlExecutionsForTest } from '../../server/db/index.js';
 import {
   buildKeywordCommandCenterDetail,
   buildKeywordCommandCenterInitialView,
@@ -47,8 +47,13 @@ import { addTrackedKeyword, storeRankSnapshot } from '../../server/rank-tracking
 import { createWorkspace, deleteWorkspace, getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { KEYWORD_COMMAND_CENTER_FILTERS } from '../../shared/types/keyword-command-center.js';
 import type { KeywordStrategy } from '../../shared/types/workspace.js';
+import { PERFORMANCE_BUDGET_REGISTRY } from '../../scripts/performance-budgets.js';
 
 let workspaceId = '';
+const KCC_PERFORMANCE_BUDGET = PERFORMANCE_BUDGET_REGISTRY.find(entry => (
+  entry.id === 'keyword-command-center-read-path'
+));
+if (!KCC_PERFORMANCE_BUDGET) throw new Error('KCC performance budget registry entry is missing');
 
 beforeEach(() => {
   setBroadcast(vi.fn(), vi.fn());
@@ -295,6 +300,40 @@ describe('Task 7 — determinism / self-parity (no output drift)', () => {
 });
 
 describe('K2 — measured read-path budget', () => {
+  it('scopes SQL measurement to executions and releases the counter after failure', async () => {
+    await expect(measureSqlExecutionsForTest(() => {
+      db.prepare('SELECT 1 AS value').get();
+      throw new Error('measurement probe');
+    })).rejects.toThrow('measurement probe');
+
+    const measurement = await measureSqlExecutionsForTest(() => db.prepare('SELECT 1 AS value').get());
+    expect(measurement.count).toBe(1);
+  });
+
+  it('hard-gates initial-view executed SQL at the registered 22-query budget', async () => {
+    const measurement = await measureSqlExecutionsForTest(() => buildKeywordCommandCenterInitialView(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      sort: 'rank',
+      page: 1,
+      pageSize: 50,
+    }));
+    expect(measurement.result).not.toBeNull();
+    expect(measurement.count).toBeGreaterThan(0);
+    expect(measurement.count).toBeLessThanOrEqual(KCC_PERFORMANCE_BUDGET.queryCountBudget);
+  });
+
+  it('hard-gates rows executed SQL at the registered 22-query budget', async () => {
+    const measurement = await measureSqlExecutionsForTest(() => buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      sort: 'rank',
+      page: 1,
+      pageSize: 50,
+    }));
+    expect(measurement.result).not.toBeNull();
+    expect(measurement.count).toBeGreaterThan(0);
+    expect(measurement.count).toBeLessThanOrEqual(KCC_PERFORMANCE_BUDGET.queryCountBudget);
+  });
+
   it('records first-paint p50/p95 against the deterministic fixture', async () => {
     const samples: number[] = [];
     const query = { filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL, page: 1, pageSize: 50 };

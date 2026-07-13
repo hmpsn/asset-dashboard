@@ -99,12 +99,12 @@ export const PERFORMANCE_BUDGET_REGISTRY: PerformanceBudgetEntry[] = [
     cacheExpectation: 'react-query-event-invalidation',
     escalation: {
       level: 'release-block',
-      trigger: 'The full strategy assembler is called, a normalized projection source is read more than once, or seeded p95 exceeds 250ms.',
+      trigger: 'The full strategy assembler is called, executed SQL exceeds 22 statements, a normalized source is read more than once, or production-observed p95 exceeds 250ms.',
       action: 'Block release, profile the KCC projection/read fanout, and restore rows-only interactions before widening the source model.',
     },
     evidence: [
       'server/domains/keyword-command-center/read-projection.ts (KCC-owned normalized source projection)',
-      'src/hooks/admin/useKeywordCommandCenter.ts (first-paint cache seeding + previous row data)',
+      'src/hooks/admin/useKeywordCommandCenter.ts (one-shot first-paint cache seeding + canonical refresh)',
     ],
     testEvidence: [
       'tests/unit/keyword-command-center-perf.test.ts',

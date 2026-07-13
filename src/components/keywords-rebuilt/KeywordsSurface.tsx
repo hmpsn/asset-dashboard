@@ -6,6 +6,7 @@ import { ApiError } from '../../api/client';
 import {
   useKeywordCommandCenterAction,
   useKeywordCommandCenterInitialView,
+  useKeywordCommandCenterRows,
   useKeywordCommandCenterSummary,
   useRankTrackingAddKeyword,
 } from '../../hooks/admin/useKeywordCommandCenter';
@@ -209,27 +210,29 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
     enabled: canUseInitialView,
   });
   const viewingInitialRows = JSON.stringify(state.rowsQuery) === JSON.stringify(initialRowsQueryRef.current);
-  const summaryFallback = useKeywordCommandCenterSummary(workspaceId, {
-    enabled: !canUseInitialView || initialView.isError,
+  const initialTransportSettled = !canUseInitialView || initialView.data != null || initialView.isError;
+  const summaryResult = useKeywordCommandCenterSummary(workspaceId, {
+    enabled: initialTransportSettled,
+  });
+  const rowsResult = useKeywordCommandCenterRows(workspaceId, state.rowsQuery, {
+    enabled: !viewingInitialRows || initialTransportSettled,
   });
   const addKeyword = useRankTrackingAddKeyword(workspaceId);
   const feedback = useKeywordFeedback(workspaceId);
   const feedbackAction = useKeywordCommandCenterAction(workspaceId);
   const [addKeywordValue, setAddKeywordValue] = useState('');
-  const summary = initialView.data?.summary ?? summaryFallback.data;
-  const summaryIsLoading = canUseInitialView ? initialView.isLoading && !summary : summaryFallback.isLoading;
-  const summaryIsError = canUseInitialView ? initialView.isError && summaryFallback.isError : summaryFallback.isError;
-  const summaryError = initialView.error ?? summaryFallback.error;
-  const refetchSummary = initialView.data ? initialView.refetch : summaryFallback.refetch;
-  const initialRowsResult: KeywordRowsQueryResult | undefined = canUseInitialView
-    && viewingInitialRows
-    && (initialView.data != null || !initialView.isError) ? {
-    data: initialView.data?.rows,
-    isLoading: initialView.isLoading,
-    isError: initialView.isError,
-    error: initialView.error,
-    refetch: () => initialView.refetch(),
-  } : undefined;
+  const summary = summaryResult.data;
+  const summaryIsLoading = !initialTransportSettled || summaryResult.isLoading;
+  const summaryIsError = summaryResult.isError;
+  const summaryError = summaryResult.error ?? initialView.error;
+  const refetchSummary = summaryResult.refetch;
+  const canonicalRowsResult: KeywordRowsQueryResult = {
+    data: rowsResult.data,
+    isLoading: viewingInitialRows && !initialTransportSettled ? true : rowsResult.isLoading,
+    isError: rowsResult.isError,
+    error: rowsResult.error ?? (viewingInitialRows ? initialView.error : null),
+    refetch: () => rowsResult.refetch(),
+  };
   const counts = summary?.counts;
   const trafficValue = summary?.trafficValueMonthly;
   const advancedFilterOptions = useMemo(() => (
@@ -418,7 +421,7 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
       </div>
 
       <div className="mt-3">
-        <KeywordsLenses workspaceId={workspaceId} state={state} summary={summary} initialRowsResult={initialRowsResult} />
+        <KeywordsLenses workspaceId={workspaceId} state={state} summary={summary} initialRowsResult={canonicalRowsResult} />
       </div>
 
       <div className="mt-4">

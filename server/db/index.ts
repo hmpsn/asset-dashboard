@@ -18,7 +18,43 @@ fs.mkdirSync(dbDir, { recursive: true });
 
 const dbPath = path.join(dbDir, 'dashboard.db');
 
-const db = new Database(dbPath);
+interface ActiveSqlExecutionCounter {
+  count: number;
+}
+
+let activeSqlExecutionCounter: ActiveSqlExecutionCounter | null = null;
+
+const db = process.env.NODE_ENV === 'test'
+  ? new Database(dbPath, {
+      verbose: () => {
+        if (activeSqlExecutionCounter) activeSqlExecutionCounter.count += 1;
+      },
+    })
+  : new Database(dbPath);
+
+/**
+ * Test-only executed-SQL measurement. better-sqlite3 invokes `verbose` for each
+ * statement execution (not prepare), so cached statements remain countable.
+ * The production connection has no callback and this helper refuses to run.
+ */
+export async function measureSqlExecutionsForTest<T>(
+  run: () => T | Promise<T>,
+): Promise<{ result: T; count: number }> {
+  if (process.env.NODE_ENV !== 'test') {
+    throw new Error('SQL execution measurement is available only under NODE_ENV=test');
+  }
+  if (activeSqlExecutionCounter) {
+    throw new Error('SQL execution measurement cannot be nested or overlap');
+  }
+  const counter: ActiveSqlExecutionCounter = { count: 0 };
+  activeSqlExecutionCounter = counter;
+  try {
+    const result = await run();
+    return { result, count: counter.count };
+  } finally {
+    activeSqlExecutionCounter = null;
+  }
+}
 
 // Enable WAL mode for better concurrent read performance
 db.pragma('journal_mode = WAL');
