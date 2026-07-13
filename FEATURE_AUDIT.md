@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 678** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 679** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -5112,6 +5112,7 @@ When the user asks to update this document with recent features, follow this pro
 
 ### 144. Template → Schema Template Binding (D2)
 **What it does:** Binds Schema.org types to content templates so matrix cells inherit expected schema types. Adds `schemaTypes?: string[]` to `ContentTemplate` and `expectedSchemaTypes?: string[]` to `MatrixCell`. When a template is created or updated, `schemaTypes` is auto-populated from `PAGE_TYPE_SCHEMA_MAP` based on the template's `pageType` (unless explicitly overridden). When matrix cells are generated, they inherit the template's schema types as `expectedSchemaTypes`. The CellDetailPanel UI displays purple badges for each expected schema type. A new `getSchemaTypesForTemplate()` helper is exported for use by D7 (pre-generation). A DB migration (017) adds the `schema_types` column to `content_templates`.
+**Current limitation (audited 2026-07-13):** `generateCells()` supports inheritance only when `expectedSchemaTypes` is supplied, but the production matrix-create route does not load the selected template or pass its schema types. Route-created cells therefore do not reliably inherit the advertised values. The MCP matrix-generation plan owns the unflagged route/workspace/schema correction before generation starts.
 **Files:** `shared/types/content.ts`, `src/components/matrix/types.ts`, `server/content-matrices.ts` (`getSchemaTypesForTemplate`, `generateCells` schema inheritance), `server/content-templates.ts` (auto-populate on create/update), `src/components/matrix/CellDetailPanel.tsx` (schema badge display), `server/db/migrations/017-template-schema-types.sql`
 
 
@@ -5930,6 +5931,7 @@ Current feature count: **329**. Last updated: May 2026.
 
 ### 307. Brandscript Engine
 **What it does:** Structured brand narrative builder based on the StoryBrand framework (Donald Miller). Stores brand stories as a workspace-scoped `brandscripts` table with child `brandscript_sections` rows. Eight canonical section types: Hook, Character, Problem, Guide, Plan, Call to Action, Failure, Success. Full CRUD API: list, get, create (from template or blank), update name/framework, delete. Section batch-update via delete-all + reinsert with `created_at` / `sort_order` preservation. A seeded `brandscript_templates` table ships with the default StoryBrand template. `generateBrandscript()` uses GPT-4.1 with workspace intelligence context to pre-populate all sections from existing brand knowledge. `questionnaire → brandscript` auto-population maps onboarding questionnaire answers (about, services, differentiators, personas, competitors) into the 8 sections idempotently — returns existing brandscript if one already exists. Admin UI in `BrandscriptTab.tsx` with inline section editing, AI generation trigger, and live preview.
+**Current limitation (audited 2026-07-13):** the `prefillFromQuestionnaire()` helper exists, but no route, UI, API client, or MCP tool calls it. Production onboarding currently flattens answers into workspace text/personas; questionnaire→Brandscript is available code, not a closed runtime flow.
 
 **Files:** `server/brandscript.ts`, `server/routes/brandscript.ts`, `server/db/migrations/053-brandscript-engine.sql`, `shared/types/brand-engine.ts`, `src/components/brand/BrandscriptTab.tsx`
 
@@ -5954,19 +5956,21 @@ Current feature count: **329**. Last updated: May 2026.
 
 ### 309. Voice Calibration
 **What it does:** Voice profile state machine (`draft → calibrating → calibrated`) that codifies a workspace's brand voice into AI-consumable structures. Three data layers: **Voice DNA** (tone dimensions with weights, vocabulary preferences, forbidden phrases, structural preferences), **Guardrails** (tone boundaries, anti-patterns, content rules, brand promises), and **Context Modifiers** (per-context adjustments for headline/body/cta/about copy). Calibration sessions generate 3 AI variations of a given copy type (`promptType` string — e.g., `hero_headline`, `service_cta`, `brand_story`). The agency selects the preferred variation; selection distills the chosen text into voice DNA dimensions via AI analysis using Claude (`callCreativeAI`). Voice samples (with `context_tag` labels: `headline`, `body`, `cta`, `about`) feed calibration context. `buildVoiceCalibrationContext()` assembles samples, DNA, and guardrails for injection into copy generation prompts. `INSERT OR IGNORE` on `voice_profiles(workspace_id)` prevents duplicate profile creation under concurrent requests. Admin UI in `VoiceTab.tsx`.
+**Current limitation (audited 2026-07-13):** variation ratings/selections are not durably finalized through the current UI, DNA and guardrails save independently, and the API can transition to `calibrated` without requiring DNA, guardrails, or approved anchor evidence. A generated variation may log calibration language while the profile remains draft. The brand-generation program must add one real finalization authority before calling voice “locked.”
 
 **Files:** `server/voice-calibration.ts`, `server/voice-dna-render.ts`, `server/prompt-assembly.ts`, `server/routes/voice-calibration.ts`, `server/db/migrations/053-brandscript-engine.sql`, `shared/types/brand-engine.ts`, `src/components/brand/VoiceTab.tsx`
 
-**Agency value:** Replaces ad-hoc brand voice notes with a structured, versionable voice profile that feeds every AI generation in the platform. Once calibrated, every piece of AI-generated copy sounds like the client — not generic marketing language.
+**Agency value:** Replaces ad-hoc brand voice notes with a structured, versionable voice profile for the allow-listed generation paths that consume calibrated voice context. The matrix/brand generation program will route its new paths through one exact-once authority rather than claiming universal wiring.
 
-**Client value:** Their brand voice is encoded, not just described. Generated copy consistently reflects their personality across all content types.
+**Client value:** Their brand voice is encoded, not just described. Generation paths that consume the calibrated profile can reflect their personality instead of generic marketing language.
 
-**Mutual:** A calibrated voice profile is the highest-leverage input in the copy generation stack. It self-improves over time via the Voice Feedback Loop (feature #287).
+**Mutual:** A calibrated voice profile is the highest-leverage input in the copy generation stack. The prior automatic Voice Feedback Loop was removed; improvement currently requires explicit samples, calibration, and operator review.
 
 ---
 
 ### 310. Brand Identity Deliverables
 **What it does:** AI-generated brand identity document suite organized into three tiers — **Essentials** (mission, vision, values, tagline, elevator_pitch), **Professional** (archetypes, personality_traits, voice_guidelines, tone_examples, messaging_pillars, differentiators, positioning_matrix), **Premium** (brand_story, personas, customer_journey, objection_handling, emotional_triggers). 17 deliverable types total. Each deliverable is stored with version history (`brand_identity_versions` table). `generateDeliverable()` uses Claude (`callCreativeAI`) with full intelligence context (workspace intel + voice calibration context + brandscript sections + discovery extractions). Approved copy auto-adds a voice sample via `addVoiceSample()` so each approval strengthens the voice profile. Status machine: `draft → approved`. Steering notes accumulate across regenerations. `broadcastToWorkspace()` fires on every generation/approval for real-time UI sync. Admin UI in `IdentityTab.tsx` with tier grouping, deliverable cards, inline steering, and version history viewer.
+**Current limitation (audited 2026-07-13):** generation is one deliverable at a time, has no structured intake/evidence or MCP start target, and its late AI save is not conditional on the version read before generation. Only approved tagline, elevator-pitch, and tone-example types auto-seed voice samples. Approved identity reaches selected copy/MCP paths, not every downstream generator; page-type allow-listing remains deliberate.
 
 **Files:** `server/brand-identity.ts`, `server/routes/brand-identity.ts`, `server/db/migrations/053-brandscript-engine.sql`, `shared/types/brand-engine.ts`, `src/components/brand/IdentityTab.tsx`
 
@@ -5974,7 +5978,7 @@ Current feature count: **329**. Last updated: May 2026.
 
 **Client value:** A complete brand identity package — not just copy, but archetypes, personas, customer journey maps, and objection handling — all grounded in their actual business data.
 
-**Mutual:** Brand identity deliverables become context for every downstream feature: copy generation, voice calibration, AI chat, and content briefs all reference the approved deliverable suite.
+**Mutual:** Approved brand identity deliverables are available to selected, allow-listed downstream consumers. They do not yet flow through every generator; the matrix/brand program preserves page-type-specific identity selection rather than introducing universal prompt injection.
 
 ---
 
@@ -6064,6 +6068,7 @@ Current feature count: **329**. Last updated: May 2026.
 
 ### 288. Questionnaire → Brandscript Auto-Population
 **What it does:** Maps onboarding questionnaire data to StoryBrand framework brandscript sections. Extracts from workspace knowledge base (about, services, differentiators, competitors), intelligence profile (industry, target audience), and persona definitions (pain points, goals, objections). Maps to 8 StoryBrand sections: Character, Problem, Guide, Plan, CTA, Failure, Success, Unique Value Proposition. Idempotent — returns existing brandscript if one already exists.
+**Current limitation (audited 2026-07-13):** this describes the unwired `prefillFromQuestionnaire()` helper. No production caller currently invokes it, so onboarding submission does not auto-create or prefill a Brandscript.
 
 **Files:** `server/brandscript.ts`
 
@@ -9612,3 +9617,15 @@ From the 2026-06-30 six-screen UX review (WorkspaceOverview / WorkspaceHome / Th
 **Tests:** Unit coverage pins canonical fingerprints, clone-safe one-retry behavior, typed second-conflict failure, storage revision/provenance mapper and CAS semantics, and finalization immutability. Integration seams cover concurrent send, approval, dismissal, strike, manual mint, public provenance omission, and finalized broadcast counts for carried recommendations.
 
 **Files:** `server/db/migrations/181-recommendation-generation-revision.sql`; `server/domains/recommendations/{generation-service,finalization,storage}.ts`; `shared/types/ai-execution.ts`; focused unit/integration/contract tests; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 679. MCP workspace-alias scope hardening 2026-07-13
+
+**Status:** Complete on `codex/mcp-matrix-brand-generation-plan`; not yet merged to staging.
+
+**What it does:** Closes a per-workspace MCP API-key isolation bypass caused by the platform supporting both legacy camel-case `workspaceId` and action-style snake-case `workspace_id` tool schemas. Scope enforcement previously inspected the first raw alias present, while the selected tool's Zod schema could consume the other alias and strip the decoy. A crafted call could therefore pass authorization with the key's workspace in one field and operate on another workspace from the field the handler actually read. Authorization now resolves the one workspace argument declared by the called tool's discovery schema, rejects conflicting non-empty aliases for scoped and master keys, and treats fake workspace fields on global tools as non-authoritative.
+
+**Why it matters:** Per-workspace MCP keys are an external action boundary. The authorization layer and the tool handler must agree on the same canonical workspace before any read, write, or paid job starts.
+
+**Tests:** Expanded `tests/unit/mcp-auth-perkey.test.ts` covers representative camel read, snake write, job start, snake cross-workspace access, global-tool decoys, equal aliases, and master-key conflicts. MCP auth/routing focused run: 24 tests pass; typecheck passes.
+
+**Files:** `server/mcp/server.ts`; `tests/unit/mcp-auth-perkey.test.ts`.

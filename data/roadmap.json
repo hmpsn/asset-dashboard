@@ -1,6 +1,58 @@
 {
   "sprints": [
     {
+      "id": "sprint-mcp-matrix-brand-generation-2026-07-13",
+      "name": "MCP Matrix + Brand Deliverable Generation",
+      "hours": "TBD — phased, staging-first cross-system program",
+      "rationale": "Turn typed brand intake into reviewed brand foundations and explicit content-matrix cells into grounded, locked, audited page drafts through bounded MCP-driven runs. The program closes the stranded service/location matrix flow without bypassing evidence, voice, edit safety, client review, or publication gates. Audit: docs/superpowers/audits/2026-07-13-mcp-matrix-brand-generation-preplan-audit.md. Spec: docs/superpowers/specs/2026-07-13-mcp-matrix-brand-generation-spec.md. Plan: docs/superpowers/plans/2026-07-13-mcp-matrix-brand-generation-plan.md.",
+      "items": [
+        {
+          "id": "mcp-generation-runtime-foundation",
+          "title": "MCP generation runtime foundation — canonical registry, caller attribution, and scoped authorization",
+          "source": "2026-07-13 MCP matrix/brand generation audit",
+          "est": "M",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-07-13",
+          "owner": "platform-foundation",
+          "notes": "Immediate dual workspace-alias scope bypass fix is implemented on the planning branch with read/write/job/global-tool regressions. Remaining R1 work: one canonical discovery/dispatch/schema/workspace-field registry, full tool-category census, stable new-tool error envelope, and authenticated MCP key ID/label threaded into activity and durable run attribution. Closes mcp-key-label-attribution rather than duplicating it. Must land before new generation write tools."
+        },
+        {
+          "id": "mcp-content-matrix-generation",
+          "title": "Content matrix to audited page-set generation — explicit cells, deterministic preflight, durable batch, and MCP",
+          "source": "User-directed IE pSEO/content-matrix flow upgrade, 2026-07-13",
+          "est": "XL — M0-M4 phase PRs",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-07-13",
+          "owner": "content-pipeline",
+          "notes": "Replace the ambiguous keyword-only template bridge with explicit matrix/cell identity and monotonic matrix-definition/template/per-cell revisions; generation projection for one cell cannot stale siblings from the same preview. Resolve the full page block manifest, version-conditionally upgrade legacy templates, reject unsupported page types, and persist normalized run/item/attempt plus cell-evidence ledgers before one-cell brief→post closure. Typed evidence resolution requires durable source refs and fresh preview/audit; deleting placeholder text never clears a requirement. Add deterministic + typed persona/SEO/AEO/CTA item audit, one total bounded revision, post-item set audit, and a resumable cost-bounded matrix job exposed through paged MCP tools. Wire the inert Generate Brief(s) UI only after the domain/MCP path is truthful. Hard dependencies: genq-content-generation-integrity C2 and genq-content-context-v2 C3. Automatic generation stops at ready_for_human_review; explicit approval may advance to ready_to_publish; never auto-approve/send/publish. Final phase makes service/location or collection-blueprint inputs create/link a validated matrix."
+        },
+        {
+          "id": "mcp-brand-deliverable-generation",
+          "title": "Brand intake to reviewed brand suite — durable evidence, voice finalization, generation/audit, MCP, and Inbox",
+          "source": "User-directed Brand & Web Onboarding / IE pre-seed upgrade, 2026-07-13",
+          "est": "XL — B0-B3 phase PRs",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-07-13",
+          "owner": "brand-engine",
+          "notes": "Persist typed immutable intake revisions and make compatibility projection idempotent. Full-suite generation first bootstraps only a provisional voice foundation from intake/authentic samples, then pauses with no running job; an operator must select authentic anchors and explicitly finalize that exact voice version before MCP resume can generate dependent identity/messaging/audience pieces. Exhaustive atomic/preset policies make voice_foundation the sole bootstrap deliverable and full_brand_system the sole bootstrap-then-resume preset; every dependent direct target/other bundle requires the exact finalized voice version. Typed evidence resolution creates a superseding intake revision, never clears from text deletion. Use named structured AI operations, CAS/provenance, hard budgets, bounded audit/revision, and naming as a creative proposal with no clearance claims. Reuse unified ClientDeliverable for grouped per-item review with honest partial state; client approval never finalizes voice. Project approved client-safe brand summary only. Two narrow server flags are planned."
+        },
+        {
+          "id": "mcp-brand-content-onboarding",
+          "title": "Resumable MCP onboarding orchestration — intake → brand review → approved voice/identity → matrix pages",
+          "source": "User-directed one-pipeline onboarding upgrade, 2026-07-13",
+          "est": "L",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-07-13",
+          "owner": "platform-foundation",
+          "notes": "After the independent brand and matrix lanes are staging-verified, add the shared BrandContentOnboardingRun lifecycle, durable versioned record, and MCP start/get/resume surface. The workflow pauses at voice review/finalization, operator review, client review, content authorization, and a distinct page-review gate after content generation; no generic job stays open and no human gate is bypassed. It freezes the approved brand snapshot for the page run. Automatic output stops at ready_for_human_review; every selected page needs version-safe review-only approval that satisfies export/publish preconditions but never invokes auto-publish/CMS, even when configured. Only then may awaiting_content_review advance to ready_to_publish; publication remains separate. Requires both underlying rollout flags rather than a composite flag."
+        }
+      ]
+    },
+    {
       "id": "sprint-generation-quality-performance-2026-07-13",
       "name": "Generation Quality & Performance — integrity before experimentation",
       "hours": "TBD — autonomous phase-per-PR program, staging-first",
@@ -444,11 +496,12 @@
           "source": "PR #1411",
           "est": "M",
           "priority": "P3",
-          "status": "pending",
+          "status": "closed",
           "plannedSprint": "deferred",
           "createdAt": "2026-06-30",
+          "closedAt": "2026-07-13",
           "owner": "integrations",
-          "notes": "Split from mcp-admin-key-minting-ui (its store + scope enforcement + minting UI are done). What remains: attribute delegated MCP write actions to the authenticating key. handleMcpRequest has req.mcpAuth.{label,keyId,scope} but the tool handlers (handleContentTool/handleInsightTool/etc.) receive only (name,args) and call addActivity with source:'mcp-chat' and no key identity. Plumb the auth label/keyId into the handler signatures (or a shared context arg) and into each write tool's addActivity actor/metadata so an operator can see WHICH key drove a mutation. Cross-cutting across the ~6 tool-category files + their tests; ship as its own PR. || [ROADMAP VALUE AUDIT 2026-07-12] KEEP: gap confirmed. req.mcpAuth carries label/keyId, but tool handlers and addActivity metadata still cannot identify which delegated key performed a write."
+          "notes": "CLOSED 2026-07-13 — superseded by mcp-generation-runtime-foundation; no shipment is claimed by this closure. The confirmed attribution gap remains in scope under that canonical P0 foundation item, which owns authenticated MCP key ID/label propagation into write activity and durable generation-run attribution before new generation tools ship."
         },
         {
           "id": "mcp-per-workspace-paid-attribution",
@@ -528,7 +581,7 @@
           "plannedSprint": "deferred",
           "createdAt": "2026-06-29",
           "owner": "workspace-intelligence",
-          "notes": "After P1–P5, brand IDENTITY (mission/values/tagline/positioning) is first-class only on the agent/MCP content path (prepare_brief/post_context inject identityPromptBlock). The in-app server-side generators (admin generate-brief/post via buildIntelPrompt / generation-context-builders) and AdminChat still get brand VOICE but not deliverable IDENTITY. To close: add the 'brand' slice to the shared generation-context builders (server/intelligence/generation-context-builders.ts) and inject identityPromptBlock. NOT behavior-neutral — changes existing in-app generation output, so needs a deliberate before/after review (likely a flag). OPEN DECISION: identity in every server-side generation vs only specific surfaces (about/brand copy). Owner may remove. || [ROADMAP VALUE AUDIT 2026-07-12] OWNER DECISION: do not inject identity into every default generator. Copy generation already consumes approved identity; re-enter only after selecting an explicit surface allow-list for briefs/outlines and AdminChat plus before/after evals."
+          "notes": "After P1–P5, brand IDENTITY (mission/values/tagline/positioning) is first-class only on the agent/MCP content path (prepare_brief/post_context inject identityPromptBlock). The in-app server-side generators (admin generate-brief/post via buildIntelPrompt / generation-context-builders) and AdminChat still get brand VOICE but not deliverable IDENTITY. To close: add the 'brand' slice to the shared generation-context builders (server/intelligence/generation-context-builders.ts) and inject identityPromptBlock. NOT behavior-neutral — changes existing in-app generation output, so needs a deliberate before/after review (likely a flag). OPEN DECISION: identity in every server-side generation vs only specific surfaces (about/brand copy). Owner may remove. || [ROADMAP VALUE AUDIT 2026-07-12] OWNER DECISION: do not inject identity into every default generator. Copy generation already consumes approved identity; re-enter only after selecting an explicit surface allow-list for briefs/outlines and AdminChat plus before/after evals. || [PROGRAM RECONCILIATION 2026-07-13] The new mcp-content-matrix-generation item owns the approved service/landing/location allow-list and evals. This deferred item retains only other server generators/AdminChat; do not duplicate the matrix-page work."
         },
         {
           "id": "voice-sample-deliverable-reapproval-dedup",
@@ -1338,7 +1391,7 @@
           "source": "Connected Intelligence brainstorming",
           "est": "6-8h",
           "priority": "P3",
-          "notes": "Each new workspace requires: connect Webflow, connect GSC, connect GA4, run keyword analysis, run site audit, set up brand voice, configure competitors, set content pricing, enable client portal. Most steps are identical across workspaces. Add: workspace templates (clone config from existing workspace), batch analysis trigger (run audit + keyword analysis + decay analysis in one click), onboarding checklist with progress tracking, default competitor auto-discovery. Separate initiative from intelligence engine — scoped as its own spec. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: Keep as still-relevant, re-scoped to the unbuilt remainder: clone-from-existing-workspace config and a one-click batch-analysis trigger are the two high-leverage pieces for a growing client base (the repetitive-setup pain the item targets). Drop the onboarding-checklist sub-bullet from scope (done). Re-frame the title to 'Workspace cloning + batch setup trigger' to reflect that the checklist half already shipped. || [ROADMAP VALUE AUDIT 2026-07-12] DEFER: checklist onboarding, competitor discovery, workspace creation, and start-job actions ship. Clone/template and batch convenience wait for onboarding volume evidence.",
+          "notes": "Each new workspace requires: connect Webflow, connect GSC, connect GA4, run keyword analysis, run site audit, set up brand voice, configure competitors, set content pricing, enable client portal. Most steps are identical across workspaces. Add: workspace templates (clone config from existing workspace), batch analysis trigger (run audit + keyword analysis + decay analysis in one click), onboarding checklist with progress tracking, default competitor auto-discovery. Separate initiative from intelligence engine — scoped as its own spec. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: Keep as still-relevant, re-scoped to the unbuilt remainder: clone-from-existing-workspace config and a one-click batch-analysis trigger are the two high-leverage pieces for a growing client base (the repetitive-setup pain the item targets). Drop the onboarding-checklist sub-bullet from scope (done). Re-frame the title to 'Workspace cloning + batch setup trigger' to reflect that the checklist half already shipped. || [ROADMAP VALUE AUDIT 2026-07-12] DEFER: checklist onboarding, competitor discovery, workspace creation, and start-job actions ship. Clone/template and batch convenience wait for onboarding volume evidence. || [PROGRAM RECONCILIATION 2026-07-13] Typed intake→brand→content orchestration is now explicitly owned by mcp-brand-deliverable-generation + mcp-brand-content-onboarding. Item 523 stays deferred and owns only workspace cloning/templates plus generic batch setup convenience.",
           "status": "deferred"
         }
       ]
