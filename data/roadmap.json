@@ -65,14 +65,14 @@
         },
         {
           "id": "genq-keyword-synthesis-quality",
-          "title": "Keyword synthesis quality — Unicode normalization plus requested/voted recall and diversity",
+          "title": "Keyword synthesis quality — Unicode identity migration plus requested/voted recall and diversity",
           "source": "2026-07-13 generation quality/performance audit K4/K7/K9",
-          "est": "L — two phase PRs",
+          "est": "XL — four phase PRs",
           "priority": "P1",
           "status": "pending",
           "createdAt": "2026-07-13",
           "owner": "seo-health",
-          "notes": "Wave 2-3. First complete keyword-universe-overhaul Task 5 with NFKC Unicode normalization. Then guarantee requested/voted inclusion plus source/intent/market diversity before the AI cap behind a new per-workspace keyword-synthesis-candidate-recall flag. The semantic phase requires deterministic recall fixtures and a staging canary."
+          "notes": "Wave 2-3, amended 2026-07-13 after the K3 persisted-identity audit. K3a documents the v1 identity census and collision/alias contract. K3b adds versioned v1/v2 helpers, additive dual-read/dual-write compatibility, and a collision-safe TypeScript backfill while canonical behavior remains v1. K3c switches the canonical helper to NFKC + Unicode letters/numbers only after staging verifies zero orphaned feedback/evidence. Raw provider/display values never change; unrecoverable v1-only feedback/SERP identities remain readable aliases. K4 then guarantees requested/voted inclusion plus source/intent/market diversity behind the new per-workspace keyword-synthesis-candidate-recall flag and requires deterministic fixtures plus a staging canary."
         },
         {
           "id": "genq-content-context-v2",

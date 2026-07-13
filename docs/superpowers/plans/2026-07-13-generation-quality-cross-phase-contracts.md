@@ -77,9 +77,11 @@ Names below are the required semantic contracts; the shared-contract task must r
 
 ### K3 exports
 
-- One canonical Unicode-safe keyword normalizer and deterministic equivalence policy.
+- K3a: a persisted-identity census, deterministic v2 equivalence policy, collision rules, and a ban on mutating raw provider/display values.
+- K3b: versioned v1/v2 identity helpers, additive dual-read/dual-write compatibility, collision-safe backfill, and legacy aliases for identities whose raw spelling is unrecoverable.
+- K3c: one canonical Unicode-safe keyword normalizer after staging verifies the additive backfill.
 
-**Consumed by:** K4 selection identities and any touched keyword producer. No phase introduces a second normalization implementation.
+**Consumed by:** K4 selection identities and any touched keyword producer. No phase introduces an independent normalization implementation or removes legacy aliases without a separate verified retirement PR.
 
 ### C2 exports
 
