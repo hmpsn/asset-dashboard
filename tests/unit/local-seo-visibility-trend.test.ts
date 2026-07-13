@@ -151,6 +151,34 @@ describe('getLocalSeoVisibilityTrend', () => {
     });
   });
 
+  it.each([
+    ['Café', 'Cafe\u0301'],
+    ['Cafe\u0301', 'Café'],
+  ])('merges populated and legacy identities across a high-cardinality legacy page boundary (%s populated)', (populated, legacy) => {
+    const id = ws('Trend High Cardinality Compatibility');
+    const day = new Date().toISOString().slice(0, 10);
+    seed({
+      workspaceId: id, marketId: 'm1', marketLabel: 'Austin, TX', keyword: populated,
+      capturedAt: `${day}T01:00:00.000Z`, visible: true,
+    });
+    for (let i = 0; i < 225; i++) {
+      seed({
+        workspaceId: id, marketId: 'm1', marketLabel: 'Austin, TX', keyword: `legacy filler ${i}`,
+        capturedAt: `${day}T12:00:00.000Z`, visible: false, legacyIdentity: true,
+      });
+    }
+    seed({
+      workspaceId: id, marketId: 'm1', marketLabel: 'Austin, TX', keyword: legacy,
+      capturedAt: `${day}T23:00:00.000Z`, visible: false, legacyIdentity: true,
+    });
+
+    expect(getLocalSeoVisibilityTrend(id)[0].points[0]).toEqual({
+      date: day,
+      visibleCount: 1,
+      checkedCount: 226,
+    });
+  });
+
   it('returns separate series per market, ordered by most-recent activity first', () => {
     const id = ws('Trend Multi Market');
     // m1 last point on 2026-06-01; m2 last point on 2026-06-05 (more recent → first).

@@ -42,6 +42,7 @@ const log = createLogger('local-seo-snapshot-store');
 export const RETENTION_RAW_DAYS = 180;
 export const RETENTION_WEEKLY_MAX_DAYS = 548; // 18 months approx.
 export const RETENTION_PRUNE_BATCH_SIZE = 200;
+const LOCAL_SNAPSHOT_COMPAT_PAGE_SIZE = RETENTION_PRUNE_BATCH_SIZE;
 
 const localResultSchema = z.object({
   title: z.string(),
@@ -105,6 +106,19 @@ interface VisibilityTrendSnapshotRow extends SnapshotIdentityRow {
   business_found: number;
   business_match_confidence: string;
   status: string;
+}
+
+interface VisibilityTrendAggregateRow {
+  market_id: string;
+  market_label: string;
+  captured_date: string;
+  checked_count: number;
+  visible_count: number;
+}
+
+interface PopulatedVisibilityIdentityRow {
+  found: number;
+  visible: number;
 }
 
 interface CompetitorSnapshotRow {
@@ -216,12 +230,22 @@ const stmts = createStmtCache(() => ({
     ORDER BY captured_at DESC, id ASC
     LIMIT ?
   `),
-  retentionRows: db.prepare(`
+  retentionRowsFirstPage: db.prepare(`
     SELECT id, keyword, normalized_keyword, normalized_keyword_v2,
            market_id, captured_at, device, language_code
     FROM local_visibility_snapshots
     WHERE workspace_id = ?
     ORDER BY captured_at DESC, id ASC
+    LIMIT ?
+  `),
+  retentionRowsPage: db.prepare(`
+    SELECT id, keyword, normalized_keyword, normalized_keyword_v2,
+           market_id, captured_at, device, language_code
+    FROM local_visibility_snapshots
+    WHERE workspace_id = ?
+      AND (captured_at < ? OR (captured_at = ? AND id > ?))
+    ORDER BY captured_at DESC, id ASC
+    LIMIT ?
   `),
   deleteSnapshotById: db.prepare(`
     DELETE FROM local_visibility_snapshots WHERE id = ? AND workspace_id = ?
@@ -234,15 +258,69 @@ const stmts = createStmtCache(() => ({
       AND status = 'success'
     ORDER BY captured_at DESC
   `),
-  visibilityTrendRows: db.prepare(`
+  visibilityTrendV2Aggregates: db.prepare(`
+    WITH identity_day AS (
+      SELECT market_id,
+             MAX(market_label) AS market_label,
+             substr(captured_at, 1, 10) AS captured_date,
+             normalized_keyword_v2,
+             device,
+             language_code,
+             MAX(CASE WHEN business_found = 1 AND business_match_confidence = ? THEN 1 ELSE 0 END) AS visible
+      FROM local_visibility_snapshots
+      WHERE workspace_id = ?
+        AND normalized_keyword_v2 IS NOT NULL
+        AND normalized_keyword_v2 <> ''
+        AND status NOT IN (?, ?)
+        AND captured_at >= datetime('now', '-${RETENTION_RAW_DAYS} days')
+      GROUP BY market_id, captured_date, normalized_keyword_v2, device, language_code
+    )
+    SELECT market_id,
+           MAX(market_label) AS market_label,
+           captured_date,
+           COUNT(*) AS checked_count,
+           COALESCE(SUM(visible), 0) AS visible_count
+    FROM identity_day
+    GROUP BY market_id, captured_date
+    ORDER BY market_id ASC, captured_date ASC
+  `),
+  visibilityTrendLegacyFirstPage: db.prepare(`
     SELECT id, keyword, normalized_keyword, normalized_keyword_v2,
            market_id, market_label, captured_at, device, language_code,
            business_found, business_match_confidence, status
     FROM local_visibility_snapshots
     WHERE workspace_id = ?
+      AND (normalized_keyword_v2 IS NULL OR normalized_keyword_v2 = '')
       AND status NOT IN (?, ?)
       AND captured_at >= datetime('now', '-${RETENTION_RAW_DAYS} days')
-    ORDER BY market_id ASC, captured_at ASC, id ASC
+    ORDER BY captured_at ASC, id ASC
+    LIMIT ?
+  `),
+  visibilityTrendLegacyPage: db.prepare(`
+    SELECT id, keyword, normalized_keyword, normalized_keyword_v2,
+           market_id, market_label, captured_at, device, language_code,
+           business_found, business_match_confidence, status
+    FROM local_visibility_snapshots
+    WHERE workspace_id = ?
+      AND (normalized_keyword_v2 IS NULL OR normalized_keyword_v2 = '')
+      AND status NOT IN (?, ?)
+      AND captured_at >= datetime('now', '-${RETENTION_RAW_DAYS} days')
+      AND (captured_at > ? OR (captured_at = ? AND id > ?))
+    ORDER BY captured_at ASC, id ASC
+    LIMIT ?
+  `),
+  populatedVisibilityIdentityForDay: db.prepare(`
+    SELECT COUNT(*) AS found,
+           MAX(CASE WHEN business_found = 1 AND business_match_confidence = ? THEN 1 ELSE 0 END) AS visible
+    FROM local_visibility_snapshots
+    WHERE workspace_id = ?
+      AND normalized_keyword_v2 = ?
+      AND market_id = ?
+      AND device = ?
+      AND language_code = ?
+      AND substr(captured_at, 1, 10) = ?
+      AND status NOT IN (?, ?)
+      AND captured_at >= datetime('now', '-${RETENTION_RAW_DAYS} days')
   `),
   latestSnapshotSummary: db.prepare(`
     SELECT
@@ -622,35 +700,104 @@ function buildLocalSeoVisibilityMap(
 }
 
 export function getLocalSeoVisibilityTrend(workspaceId: string): LocalSeoVisibilityTrendSeries[] {
-  const rows = stmts().visibilityTrendRows.all(
+  const aggregateRows = stmts().visibilityTrendV2Aggregates.all(
+    LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED,
     workspaceId,
     LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
     LOCAL_VISIBILITY_STATUS.DEGRADED,
-  ) as VisibilityTrendSnapshotRow[];
+  ) as VisibilityTrendAggregateRow[];
 
   const byMarketDay = new Map<string, {
     marketId: string;
     marketLabel: string;
     date: string;
-    checked: Set<string>;
-    visible: Set<string>;
+    checkedCount: number;
+    visibleCount: number;
   }>();
-  for (const row of rows) {
-    const date = row.captured_at.slice(0, 10);
-    const bucketKey = `${row.market_id}\u0000${date}`;
-    const bucket = byMarketDay.get(bucketKey) ?? {
+  for (const row of aggregateRows) {
+    const bucketKey = `${row.market_id}\u0000${row.captured_date}`;
+    byMarketDay.set(bucketKey, {
       marketId: row.market_id,
       marketLabel: row.market_label,
-      date,
-      checked: new Set<string>(),
-      visible: new Set<string>(),
-    };
-    const seriesKey = snapshotSeriesKey(row);
-    bucket.checked.add(seriesKey);
-    if (row.business_found === 1 && row.business_match_confidence === LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED) {
-      bucket.visible.add(seriesKey);
+      date: row.captured_date,
+      checkedCount: row.checked_count,
+      visibleCount: row.visible_count,
+    });
+  }
+
+  // SQLite cannot derive NFKC for pre-backfill NULL-v2 rows. Page only that
+  // compatibility subset and merge its derived identities into the SQL aggregate.
+  // A populated-v2 lookup prevents a legacy spelling from double-counting the same
+  // identity/day while still allowing either source to contribute verified evidence.
+  const legacyIdentityState = new Map<string, { visibleCounted: boolean }>();
+  let cursor: { capturedAt: string; id: string } | null = null;
+  while (true) {
+    const rows = cursor === null
+      ? stmts().visibilityTrendLegacyFirstPage.all(
+          workspaceId,
+          LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
+          LOCAL_VISIBILITY_STATUS.DEGRADED,
+          LOCAL_SNAPSHOT_COMPAT_PAGE_SIZE,
+        ) as VisibilityTrendSnapshotRow[]
+      : stmts().visibilityTrendLegacyPage.all(
+          workspaceId,
+          LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
+          LOCAL_VISIBILITY_STATUS.DEGRADED,
+          cursor.capturedAt,
+          cursor.capturedAt,
+          cursor.id,
+          LOCAL_SNAPSHOT_COMPAT_PAGE_SIZE,
+        ) as VisibilityTrendSnapshotRow[];
+    if (rows.length === 0) break;
+
+    for (const row of rows) {
+      const date = row.captured_at.slice(0, 10);
+      const bucketKey = `${row.market_id}\u0000${date}`;
+      const bucket = byMarketDay.get(bucketKey) ?? {
+        marketId: row.market_id,
+        marketLabel: row.market_label,
+        date,
+        checkedCount: 0,
+        visibleCount: 0,
+      };
+      const identityKey = `${snapshotSeriesKey(row)}\u0000${date}`;
+      const isVisible = row.business_found === 1
+        && row.business_match_confidence === LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED;
+      const existingState = legacyIdentityState.get(identityKey);
+      if (existingState) {
+        if (isVisible && !existingState.visibleCounted) {
+          bucket.visibleCount += 1;
+          existingState.visibleCounted = true;
+        }
+      } else {
+        const derivedV2 = keywordIdentityKeyV2(row.keyword);
+        const populated = derivedV2
+          ? stmts().populatedVisibilityIdentityForDay.get(
+              LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED,
+              workspaceId,
+              derivedV2,
+              row.market_id,
+              row.device,
+              row.language_code,
+              date,
+              LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
+              LOCAL_VISIBILITY_STATUS.DEGRADED,
+            ) as PopulatedVisibilityIdentityRow
+          : { found: 0, visible: 0 };
+        const hasPopulatedIdentity = populated.found > 0;
+        const populatedVisible = populated.visible === 1;
+        if (!hasPopulatedIdentity) bucket.checkedCount += 1;
+        if (isVisible && !populatedVisible) bucket.visibleCount += 1;
+        legacyIdentityState.set(identityKey, {
+          visibleCounted: populatedVisible || isVisible,
+        });
+      }
+      byMarketDay.set(bucketKey, bucket);
     }
-    byMarketDay.set(bucketKey, bucket);
+
+    const last = rows[rows.length - 1];
+    cursor = { capturedAt: last.captured_at, id: last.id };
+    if (rows.length < LOCAL_SNAPSHOT_COMPAT_PAGE_SIZE) break;
   }
 
   const byMarket = new Map<string, LocalSeoVisibilityTrendSeries>();
@@ -662,8 +809,8 @@ export function getLocalSeoVisibilityTrend(workspaceId: string): LocalSeoVisibil
     };
     series.points.push({
       date: bucket.date,
-      visibleCount: bucket.visible.size,
-      checkedCount: bucket.checked.size,
+      visibleCount: bucket.visibleCount,
+      checkedCount: bucket.checkedCount,
     });
     byMarket.set(bucket.marketId, series);
   }
@@ -751,42 +898,74 @@ export function updateLocalVisibilitySnapshotMatches(inputs: LocalVisibilitySnap
 
 export function runSnapshotRetentionPrune(workspaceId: string): { pruned: number } {
   let totalPruned = 0;
-  const rows = stmts().retentionRows.all(workspaceId) as SnapshotIdentityRow[];
   const latestIdBySeries = new Map<string, string>();
-  for (const row of rows) {
-    const key = snapshotSeriesKey(row);
-    if (!latestIdBySeries.has(key)) latestIdBySeries.set(key, row.id);
-  }
-
   const rawCutoff = Date.now() - RETENTION_RAW_DAYS * 24 * 60 * 60 * 1000;
   const hardCutoff = Date.now() - RETENTION_WEEKLY_MAX_DAYS * 24 * 60 * 60 * 1000;
   const weeklyWinner = new Map<string, string>();
-  for (const row of rows) {
-    const capturedAt = Date.parse(row.captured_at);
-    if (!Number.isFinite(capturedAt) || capturedAt >= rawCutoff || capturedAt < hardCutoff) continue;
-    const weekKey = `${snapshotSeriesKey(row)}\u0000${sundayWeekStart(row.captured_at)}`;
-    if (!weeklyWinner.has(weekKey)) weeklyWinner.set(weekKey, row.id);
-  }
-  const deleteIds: string[] = [];
-  for (const row of rows) {
-    if (latestIdBySeries.get(snapshotSeriesKey(row)) === row.id) continue;
-    const capturedAt = Date.parse(row.captured_at);
-    if (!Number.isFinite(capturedAt) || capturedAt >= rawCutoff) continue;
-    if (capturedAt < hardCutoff) {
-      deleteIds.push(row.id);
-      continue;
+  let cursor: { capturedAt: string; id: string } | null = null;
+  while (true) {
+    const rows = cursor === null
+      ? stmts().retentionRowsFirstPage.all(workspaceId, LOCAL_SNAPSHOT_COMPAT_PAGE_SIZE) as SnapshotIdentityRow[]
+      : stmts().retentionRowsPage.all(
+          workspaceId,
+          cursor.capturedAt,
+          cursor.capturedAt,
+          cursor.id,
+          LOCAL_SNAPSHOT_COMPAT_PAGE_SIZE,
+        ) as SnapshotIdentityRow[];
+    if (rows.length === 0) break;
+    for (const row of rows) {
+      const key = snapshotSeriesKey(row);
+      if (!latestIdBySeries.has(key)) latestIdBySeries.set(key, row.id);
+      const capturedAt = Date.parse(row.captured_at);
+      if (!Number.isFinite(capturedAt) || capturedAt >= rawCutoff || capturedAt < hardCutoff) continue;
+      const weekKey = `${key}\u0000${sundayWeekStart(row.captured_at)}`;
+      if (!weeklyWinner.has(weekKey)) weeklyWinner.set(weekKey, row.id);
     }
-    const weekKey = `${snapshotSeriesKey(row)}\u0000${sundayWeekStart(row.captured_at)}`;
-    if (weeklyWinner.get(weekKey) !== row.id) deleteIds.push(row.id);
+    const last = rows[rows.length - 1];
+    cursor = { capturedAt: last.captured_at, id: last.id };
+    if (rows.length < LOCAL_SNAPSHOT_COMPAT_PAGE_SIZE) break;
   }
 
-  for (let offset = 0; offset < deleteIds.length; offset += RETENTION_PRUNE_BATCH_SIZE) {
-    const batch = deleteIds.slice(offset, offset + RETENTION_PRUNE_BATCH_SIZE);
+  const deleteBatch: string[] = [];
+  const flushDeleteBatch = () => {
+    if (deleteBatch.length === 0) return;
     db.transaction(() => {
-      for (const id of batch) stmts().deleteSnapshotById.run(id, workspaceId);
+      for (const id of deleteBatch) stmts().deleteSnapshotById.run(id, workspaceId);
     })();
-    totalPruned += batch.length;
+    totalPruned += deleteBatch.length;
+    deleteBatch.length = 0;
+  };
+
+  cursor = null;
+  while (true) {
+    const rows = cursor === null
+      ? stmts().retentionRowsFirstPage.all(workspaceId, LOCAL_SNAPSHOT_COMPAT_PAGE_SIZE) as SnapshotIdentityRow[]
+      : stmts().retentionRowsPage.all(
+          workspaceId,
+          cursor.capturedAt,
+          cursor.capturedAt,
+          cursor.id,
+          LOCAL_SNAPSHOT_COMPAT_PAGE_SIZE,
+        ) as SnapshotIdentityRow[];
+    if (rows.length === 0) break;
+    for (const row of rows) {
+      const seriesKey = snapshotSeriesKey(row);
+      if (latestIdBySeries.get(seriesKey) === row.id) continue;
+      const capturedAt = Date.parse(row.captured_at);
+      if (!Number.isFinite(capturedAt) || capturedAt >= rawCutoff) continue;
+      const shouldDelete = capturedAt < hardCutoff
+        || weeklyWinner.get(`${seriesKey}\u0000${sundayWeekStart(row.captured_at)}`) !== row.id;
+      if (shouldDelete) {
+        deleteBatch.push(row.id);
+        if (deleteBatch.length === RETENTION_PRUNE_BATCH_SIZE) flushDeleteBatch();
+      }
+    }
+    const last = rows[rows.length - 1];
+    cursor = { capturedAt: last.captured_at, id: last.id };
+    if (rows.length < LOCAL_SNAPSHOT_COMPAT_PAGE_SIZE) break;
   }
+  flushDeleteBatch();
 
   if (totalPruned > 0) {
     log.info({ workspaceId, pruned: totalPruned }, 'local visibility snapshot retention prune complete');

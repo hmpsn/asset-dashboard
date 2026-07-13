@@ -198,16 +198,17 @@ function insertRawSnapshotWithVariant(opts: {
   languageCode: string;
   id?: string;
   status?: string;
+  persistedV2?: boolean;
 }): string {
   const id = opts.id ?? randomUUID();
   db.prepare(`
     INSERT INTO local_visibility_snapshots (
-      id, workspace_id, keyword, normalized_keyword, market_id, market_label,
+      id, workspace_id, keyword, normalized_keyword, normalized_keyword_v2, market_id, market_label,
       captured_at, local_pack_present, business_found, business_match_confidence,
       local_rank, top_competitors, source_endpoint, provider, device, language_code,
       status, raw_results
     ) VALUES (
-      ?, ?, ?, ?, ?, 'Test Market',
+      ?, ?, ?, ?, ?, ?, 'Test Market',
       ?, 0, 0, 'not_found',
       NULL, '[]', 'google_organic_serp', 'dataforseo', ?, ?,
       ?, '[]'
@@ -217,6 +218,7 @@ function insertRawSnapshotWithVariant(opts: {
     opts.workspaceId,
     opts.keyword,
     opts.keyword,
+    opts.persistedV2 ? keywordIdentityKeyV2(opts.keyword) : null,
     opts.marketId,
     opts.capturedAt,
     opts.device,
@@ -521,6 +523,25 @@ describe('Bug 3 — Snapshot retention prune', () => {
     expect(pruned).toBe(batchSize);
     expect(snapshotCount(ws.id)).toBe(1);
   });
+
+  it('pages a high-cardinality census and flushes more than one deletion batch', () => {
+    const ws = createWorkspace('Retention High Cardinality Paging Test');
+    cleanupWorkspaceIds.add(ws.id);
+    const seriesCount = RETENTION_PRUNE_BATCH_SIZE + 17;
+
+    for (let i = 0; i < seriesCount; i++) {
+      seedHistory({
+        workspaceId: ws.id,
+        marketId: `market-${i}`,
+        keyword: `legacy keyword ${i}`,
+        daysAgoList: [600, 700],
+      });
+    }
+
+    const { pruned } = runSnapshotRetentionPrune(ws.id);
+    expect(pruned).toBe(seriesCount);
+    expect(snapshotCount(ws.id)).toBe(seriesCount);
+  });
 });
 
 // ─── W2.4: per-device / per-language retention granularity ────────────────────
@@ -541,6 +562,7 @@ describe('W2.4 — retention prune preserves per-device / per-language series', 
     insertRawSnapshotWithVariant({
       workspaceId: ws.id, marketId: 'mkt-1', keyword: first,
       capturedAt: makeIsoTimestamp(200), device: 'desktop', languageCode: 'en', id: firstId,
+      persistedV2: true,
     });
     insertRawSnapshotWithVariant({
       workspaceId: ws.id, marketId: 'mkt-1', keyword: second,
