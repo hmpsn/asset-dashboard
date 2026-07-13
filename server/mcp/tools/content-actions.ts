@@ -929,7 +929,10 @@ async function handleSavePost(
     );
   }
   const sourceBrief = getBrief(workspaceId, payload.briefId);
-  if (sourceBrief && Array.isArray(sourceBrief.outline) && post.sections.length !== sourceBrief.outline.length) {
+  if (!sourceBrief || !Array.isArray(sourceBrief.outline)) {
+    return mcpError(`Source brief is unavailable: ${payload.briefId}`);
+  }
+  if (post.sections.length !== sourceBrief.outline.length) {
     return mcpError(
       `Post section count (${post.sections.length}) does not match source brief outline (${sourceBrief.outline.length})`,
     );

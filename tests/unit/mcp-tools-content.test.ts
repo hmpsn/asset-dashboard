@@ -1003,6 +1003,52 @@ describe('mcp content action tools', () => {
     expect(broadcastToWorkspace).not.toHaveBeenCalled();
   });
 
+  it('save_post rejects when the prepared source brief is unavailable at save time', async () => {
+    (getBrief as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce({
+        id: 'brief_1',
+        workspaceId: 'ws-1',
+        targetKeyword: 'hvac',
+        outline: [{ heading: 'H2' }],
+      })
+      .mockReturnValueOnce(undefined);
+    const prepared = await handleContentActionTool('prepare_post_context', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+    });
+    const preparedPayload = JSON.parse(prepared.content[0].text) as { post_request_handle: string };
+
+    const result = await handleContentActionTool('save_post', {
+      workspace_id: 'ws-1',
+      post_request_handle: preparedPayload.post_request_handle,
+      content: {
+        briefId: 'brief_1',
+        targetKeyword: 'hvac',
+        title: 'Post title',
+        metaDescription: 'Meta',
+        introduction: '<p>Intro</p>',
+        sections: [{
+          index: 0,
+          heading: 'H2',
+          content: '<p>Body</p>',
+          wordCount: 1,
+          targetWordCount: 120,
+          keywords: ['hvac'],
+          status: 'done',
+        }],
+        conclusion: '<p>End</p>',
+        totalWordCount: 3,
+        targetWordCount: 1200,
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/Source brief is unavailable/);
+    expect(savePost).not.toHaveBeenCalled();
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(addActivity).not.toHaveBeenCalled();
+  });
+
   it('save_post rejects brief mismatch between handle and content payload', async () => {
     (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
       id: 'brief_1',
@@ -1050,6 +1096,7 @@ describe('mcp content action tools', () => {
       id: 'brief_1',
       workspaceId: 'ws-1',
       targetKeyword: 'hvac',
+      outline: [{ heading: 'H2' }],
     });
     const prepared = await handleContentActionTool('prepare_post_context', {
       workspace_id: 'ws-1',
@@ -1365,6 +1412,7 @@ describe('mcp content action tools', () => {
       id: 'brief_1',
       workspaceId: 'ws-1',
       targetKeyword: 'hvac',
+      outline: [{ heading: 'H2' }],
     });
     const preparedPost = await handleContentActionTool('prepare_post_context', {
       workspace_id: 'ws-1',
@@ -1632,6 +1680,7 @@ describe('mcp content action tools', () => {
       id: 'brief_1',
       workspaceId: 'ws-1',
       targetKeyword: 'hvac',
+      outline: [{ heading: 'H2' }],
     });
     const preparedPost = await handleContentActionTool('prepare_post_context', {
       workspace_id: 'ws-1',
@@ -1711,6 +1760,7 @@ describe('mcp content action tools', () => {
       id: 'brief_1',
       workspaceId: 'ws-1',
       targetKeyword: 'hvac',
+      outline: [{ heading: 'H2' }],
     });
     const preparedPost = await handleContentActionTool('prepare_post_context', {
       workspace_id: 'ws-1',
