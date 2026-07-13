@@ -13,6 +13,7 @@
 
 import { createLogger } from './logger.js';
 import crypto from 'crypto';
+import type { AICacheOutcome, AICachePolicy } from '../shared/types/ai-execution.js';
 
 const log = createLogger('ai-deduplication');
 
@@ -37,9 +38,45 @@ class AIRequestDeduplicator {
   private cache = new Map<string, CachedResult<unknown>>();
   
   // Configuration
-  private readonly maxPendingAge = 120 * 1000; // 120 seconds (must exceed API timeout + retry budget)
   private readonly defaultCacheTtl = 5 * 60 * 1000; // 5 minutes
   private readonly maxCacheSize = 1000; // Prevent memory bloat
+  private counters = { requests: 0, misses: 0, cacheHits: 0, inflightJoins: 0, bypasses: 0, evictions: 0 };
+
+  async execute<T>(
+    key: string,
+    fetcher: () => Promise<T>,
+    policy: AICachePolicy,
+  ): Promise<{ value: T; cacheOutcome: AICacheOutcome }> {
+    this.counters.requests++;
+    if (policy.mode === 'none') {
+      this.counters.bypasses++;
+      return { value: await fetcher(), cacheOutcome: 'bypass' };
+    }
+
+    if (policy.mode === 'ttl') {
+      const cached = this.getFromCache<T>(key);
+      if (cached !== null) {
+        this.counters.cacheHits++;
+        return { value: cached, cacheOutcome: 'hit' };
+      }
+    }
+
+    const existing = this.getPendingRequest<T>(key);
+    if (existing) {
+      this.counters.inflightJoins++;
+      return { value: await existing, cacheOutcome: 'inflight' };
+    }
+
+    this.counters.misses++;
+    const promise = this.createPendingRequest<T>(key, fetcher);
+    try {
+      const value = await promise;
+      if (policy.mode === 'ttl') this.setCache(key, value, policy.ttlMs);
+      return { value, cacheOutcome: 'miss' };
+    } finally {
+      this.pending.delete(key);
+    }
+  }
   
   /**
    * Execute an AI request with deduplication
@@ -56,44 +93,14 @@ class AIRequestDeduplicator {
       skipCache?: boolean;
     }
   ): Promise<T> {
-    const cacheTtlMs = options?.cacheTtlMs ?? this.defaultCacheTtl;
-    
-    // Check cache first (unless skipped)
-    if (!options?.skipCache) {
-      const cached = this.getFromCache<T>(key);
-      if (cached) {
-        log.debug({ key }, 'AI request cache hit');
-        return cached;
-      }
-    }
-    
-    // Check if same request is already in flight
-    const existing = this.getPendingRequest<T>(key);
-    if (existing) {
-      log.debug({ key }, 'AI request deduplication hit (in-flight)');
-      return existing;
-    }
-    
-    // Create new request
-    const promise = this.createPendingRequest<T>(key, fetcher);
-    
+    const policy: AICachePolicy = options?.skipCache
+      ? { mode: 'inflight' }
+      : { mode: 'ttl', ttlMs: options?.cacheTtlMs ?? this.defaultCacheTtl };
     try {
-      const result = await promise;
-      
-      // Cache successful result
-      if (!options?.skipCache) {
-        this.setCache(key, result, cacheTtlMs);
-      }
-      
-      log.debug({ key }, 'AI request completed and cached');
-      return result;
-      
+      return (await this.execute(key, fetcher, policy)).value;
     } catch (error) {
       log.warn({ key, error: error instanceof Error ? error.message : String(error) }, 'AI request failed');
       throw error;
-    } finally {
-      // Clean up pending request
-      this.pending.delete(key);
     }
   }
   
@@ -137,6 +144,7 @@ class AIRequestDeduplicator {
       cacheSize: this.cache.size,
       oldestPending: this.getOldestPendingAge(),
       oldestCache: this.getOldestCacheAge(),
+      ...this.counters,
     };
   }
   
@@ -146,18 +154,11 @@ class AIRequestDeduplicator {
   cleanup() {
     const now = Date.now();
     
-    // Clean up expired pending requests
-    for (const [key, pending] of this.pending.entries()) {
-      if (now - pending.timestamp > this.maxPendingAge) {
-        pending.reject(new Error('Request timed out'));
-        this.pending.delete(key);
-      }
-    }
-    
     // Clean up expired cache entries
     for (const [key, cached] of this.cache.entries()) {
       if (now > cached.expiry) {
         this.cache.delete(key);
+        this.counters.evictions++;
       }
     }
     
@@ -170,6 +171,7 @@ class AIRequestDeduplicator {
       const toRemove = Math.floor(entries.length * 0.25);
       for (let i = 0; i < toRemove; i++) {
         this.cache.delete(entries[i][0]);
+        this.counters.evictions++;
       }
     }
   }
@@ -191,13 +193,6 @@ class AIRequestDeduplicator {
   private getPendingRequest<T>(key: string): Promise<T> | null {
     const pending = this.pending.get(key) as PendingRequest<T> | undefined;
     if (!pending) return null;
-    
-    // Clean up stale pending requests
-    if (Date.now() - pending.timestamp > this.maxPendingAge) {
-      pending.reject(new Error('Request timed out'));
-      this.pending.delete(key);
-      return null;
-    }
     
     return pending.promise as Promise<T>;
   }

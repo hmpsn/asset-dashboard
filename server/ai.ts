@@ -9,6 +9,8 @@
 import { callOpenAI } from './openai-helpers.js';
 import { callAnthropic } from './anthropic-helpers.js';
 import { getAIOperationRuntimeDefaults, type AIOperationId } from './ai-operation-registry.js';
+import { randomUUID } from 'crypto';
+import type { AIExecutionMetadata } from '../shared/types/ai-execution.js';
 
 export interface AICallOptions {
   /** Registry operation id for auditable operation contracts. */
@@ -44,6 +46,7 @@ export interface AICallOptions {
 export interface AICallResult {
   text: string;
   tokens: { prompt: number; completion: number; total: number };
+  execution: AIExecutionMetadata;
 }
 
 export const RESEARCH_MODE_INSTRUCTIONS = `RESEARCH MODE:
@@ -66,6 +69,9 @@ function applyResearchMode(system: string | undefined, enabled: boolean | undefi
  * Dispatches to OpenAI or Anthropic based on opts.provider.
  */
 export async function callAI(opts: AICallOptions): Promise<AICallResult> {
+  const startedAt = new Date();
+  const startedMs = Date.now();
+  const runId = randomUUID();
   const operationDefaults = opts.operation ? getAIOperationRuntimeDefaults(opts.operation) : undefined;
   const provider = opts.provider ?? operationDefaults?.defaultProvider ?? 'openai';
   const model = opts.model ?? operationDefaults?.defaultModel;
@@ -77,6 +83,8 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
   const responseFormat = opts.responseFormat ?? operationDefaults?.defaultResponseFormat;
   const researchMode = opts.researchMode ?? operationDefaults?.defaultResearchMode ?? false;
   const effectiveSystem = applyResearchMode(opts.system, researchMode);
+  const operation = opts.operation ?? feature;
+  const cachePolicy = opts.signal ? { mode: 'none' } as const : (operationDefaults?.cachePolicy ?? { mode: 'inflight' } as const);
 
   if (provider === 'anthropic') {
     const result = await callAnthropic({
@@ -90,10 +98,26 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
       maxRetries,
       timeoutMs,
       signal: opts.signal,
+      cachePolicy,
+      runId,
+      operation,
     });
+    const completedAt = new Date();
     return {
       text: result.text,
       tokens: { prompt: result.promptTokens, completion: result.completionTokens, total: result.totalTokens },
+      execution: {
+        runId,
+        operation,
+        provider,
+        model: model ?? 'claude-sonnet-4-6',
+        attempts: result.execution?.attempts ?? 1,
+        fallbackUsed: false,
+        cacheOutcome: result.execution?.cacheOutcome ?? 'miss',
+        startedAt: startedAt.toISOString(),
+        completedAt: completedAt.toISOString(),
+        durationMs: Date.now() - startedMs,
+      },
     };
   }
 
@@ -113,10 +137,26 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
     timeoutMs,
     signal: opts.signal,
     responseFormat,
+    cachePolicy,
+    runId,
+    operation,
   });
+  const completedAt = new Date();
 
   return {
     text: result.text,
     tokens: { prompt: result.promptTokens, completion: result.completionTokens, total: result.totalTokens },
+    execution: {
+      runId,
+      operation,
+      provider,
+      model: model ?? 'gpt-5.4-mini',
+      attempts: result.execution?.attempts ?? 1,
+      fallbackUsed: false,
+      cacheOutcome: result.execution?.cacheOutcome ?? 'miss',
+      startedAt: startedAt.toISOString(),
+      completedAt: completedAt.toISOString(),
+      durationMs: Date.now() - startedMs,
+    },
   };
 }

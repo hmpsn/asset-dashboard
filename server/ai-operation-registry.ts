@@ -1,3 +1,5 @@
+import type { AICachePolicy } from '../shared/types/ai-execution.js';
+
 export type AIOperationProvider = 'openai' | 'anthropic';
 export type AIOperationOutputMode = 'prose' | 'json';
 export type AIOperationResearchMode = 'required' | 'optional' | 'forbidden';
@@ -25,16 +27,16 @@ export interface AIOperationContract {
   defaultResearchMode?: boolean;
 }
 
-export type AIOperationRuntimeDefaults = Pick<
-  AIOperationContract,
-  | 'feature'
-  | 'defaultProvider'
-  | 'defaultModel'
-  | 'defaultResponseFormat'
-  | 'defaultMaxRetries'
-  | 'defaultTimeoutMs'
-  | 'defaultResearchMode'
->;
+export interface AIOperationRuntimeDefaults {
+  feature: string;
+  defaultProvider?: AIOperationProvider;
+  defaultModel?: string;
+  defaultResponseFormat?: { type: 'json_object' };
+  defaultMaxRetries?: number;
+  defaultTimeoutMs?: number;
+  defaultResearchMode?: boolean;
+  cachePolicy: AICachePolicy;
+}
 
 export type AIOperationPolicyMetadata = Pick<
   AIOperationContract,
@@ -754,6 +756,15 @@ export const AI_OPERATION_REGISTRY = {
 
 export type AIOperationId = keyof typeof AI_OPERATION_REGISTRY;
 
+const AI_OPERATION_CACHE_POLICY_OVERRIDES: Partial<Record<AIOperationId, AICachePolicy>> = {
+  'schema-plan': { mode: 'ttl', ttlMs: 5 * 60 * 1000 },
+  'content-post-feedback-fix': { mode: 'none' },
+};
+
+export function getAIOperationCachePolicy(operationId: AIOperationId): AICachePolicy {
+  return AI_OPERATION_CACHE_POLICY_OVERRIDES[operationId] ?? { mode: 'inflight' };
+}
+
 export function isAIOperationId(value: string): value is AIOperationId {
   return Object.prototype.hasOwnProperty.call(AI_OPERATION_REGISTRY, value);
 }
@@ -772,6 +783,7 @@ export function getAIOperationRuntimeDefaults(operationId: AIOperationId): AIOpe
     defaultMaxRetries: contract.defaultMaxRetries,
     defaultTimeoutMs: contract.defaultTimeoutMs,
     defaultResearchMode: contract.defaultResearchMode,
+    cachePolicy: getAIOperationCachePolicy(operationId),
   };
 }
 

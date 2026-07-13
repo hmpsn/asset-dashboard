@@ -13,6 +13,17 @@ import { aiDeduplicator } from '../ai-deduplication.js';
 const log = createLogger('ai-stats');
 const router = Router();
 
+export function resolveUsageSince(since: string | undefined, days: string | undefined, now = new Date()): string {
+  if (since) return since;
+  const parsedDays = Number.parseInt(days ?? '30', 10);
+  const safeDays = Number.isFinite(parsedDays) && parsedDays > 0 ? parsedDays : 30;
+  return new Date(now.getTime() - safeDays * 24 * 60 * 60 * 1000).toISOString();
+}
+
+export function calculateCacheHitRate(stats: { requests: number; cacheHits: number }): number {
+  return stats.requests > 0 ? stats.cacheHits / stats.requests : 0;
+}
+
 /**
  * Get AI deduplication statistics
  * GET /api/ai-stats/deduplication
@@ -25,6 +36,12 @@ router.get('/deduplication', (_req, res) => {
       cacheSize: stats.cacheSize,
       oldestPendingAge: stats.oldestPending,
       oldestCacheAge: stats.oldestCache,
+      requests: stats.requests,
+      misses: stats.misses,
+      cacheHits: stats.cacheHits,
+      inflightJoins: stats.inflightJoins,
+      bypasses: stats.bypasses,
+      evictions: stats.evictions,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
@@ -41,9 +58,10 @@ router.get('/usage', (req, res) => {
   try {
     const { workspaceId, since, days = 30 } = req.query; // workspace-scope-from-request-ok: router is mounted behind an HMAC-only gate in app.ts (no JWT member can reach it)
     
+    const effectiveSince = resolveUsageSince(since as string | undefined, days as string | undefined);
     const usage = getTokenUsage(
       workspaceId as string,
-      since as string
+      effectiveSince,
     );
     
     res.json({
@@ -76,8 +94,7 @@ router.get('/summary', (req, res) => {
     );
     
     // Calculate efficiency metrics
-    const cacheHitRate = dedupeStats.cacheSize > 0 ? 
-      (dedupeStats.cacheSize / (dedupeStats.cacheSize + dedupeStats.pendingRequests)) : 0;
+    const cacheHitRate = calculateCacheHitRate(dedupeStats);
     
     const avgTokensPerCall = usage.entries.length > 0 ?
       usage.totalTokens / usage.entries.length : 0;

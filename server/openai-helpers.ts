@@ -13,6 +13,7 @@ import { composeTimeoutSignal, throwIfSignalAborted } from './abort-helpers.js';
 import { buildProviderRetryDelayMs, RetryableProviderError, withProviderRetry } from './ai-provider-retry.js';
 import { recordOperationTrace } from './platform-observability.js';
 import { isLocalFakeProviderModeEnabled } from './local-provider-mode.js';
+import type { AICacheOutcome, AICachePolicy } from '../shared/types/ai-execution.js';
 
 const log = createLogger('openai');
 const AI_REQUEST_CANCELLED_MESSAGE = 'AI request cancelled';
@@ -28,6 +29,12 @@ export interface TokenUsage {
   workspaceId?: string;
   timestamp: string;
   durationMs?: number;
+  runId?: string;
+  operation?: string;
+  executionCacheOutcome?: AICacheOutcome;
+  provider?: 'openai' | 'anthropic';
+  attempts?: number;
+  cacheOutcome?: AICacheOutcome;
 }
 
 const USAGE_DIR = getDataDir('ai-usage');
@@ -260,6 +267,10 @@ interface OpenAIChatOptions {
   timeoutMs?: number;
   /** Optional caller cancellation signal. Composed with timeoutMs. */
   signal?: AbortSignal;
+  cachePolicy?: AICachePolicy;
+  runId?: string;
+  operation?: string;
+  executionCacheOutcome?: AICacheOutcome;
 }
 
 interface OpenAIChatResult {
@@ -267,6 +278,7 @@ interface OpenAIChatResult {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  execution?: { attempts: number; cacheOutcome: AICacheOutcome };
 }
 
 /**
@@ -285,11 +297,15 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     maxRetries = 3,
     timeoutMs = 60_000,
     signal,
+    cachePolicy = { mode: 'inflight' },
+    runId,
+    operation = feature,
   } = opts;
 
   if (signal) {
     // Cancellable requests are per-job work; sharing a deduped promise would let one job abort another.
-    return executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal });
+    const value = await executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal, runId, operation, executionCacheOutcome: 'bypass' });
+    return { ...value, execution: { attempts: value.execution?.attempts ?? 1, cacheOutcome: 'bypass' } };
   }
 
   // Create deduplication key from request parameters
@@ -304,18 +320,12 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     feature,
   });
 
-  // Use deduplication with 5-minute cache for most requests
-  // Skip cache for one-time operations like content generation
-  const shouldSkipCache = ['content-brief', 'content-post'].includes(feature);
-
-  return aiDeduplicator.deduplicate(
+  const deduped = await aiDeduplicator.execute(
     dedupeKey,
-    () => executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal }),
-    {
-      cacheTtlMs: 5 * 60 * 1000, // 5 minutes
-      skipCache: shouldSkipCache,
-    }
+    () => executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal, runId, operation, executionCacheOutcome: cachePolicy.mode === 'none' ? 'bypass' : 'miss' }),
+    cachePolicy,
   );
+  return { ...deduped.value, execution: { attempts: deduped.value.execution?.attempts ?? 1, cacheOutcome: deduped.cacheOutcome } };
 }
 
 /**
@@ -333,6 +343,9 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     maxRetries = 3,
     timeoutMs = 60_000,
     signal,
+    runId,
+    operation = feature,
+    executionCacheOutcome = 'miss',
   } = opts;
 
   if (isLocalFakeProviderModeEnabled()) {
@@ -347,8 +360,8 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     const promptTokens = Math.max(1, Math.round(messages.length * 9));
     const completionTokens = Math.max(1, Math.round(fallbackText.length / 6));
     const totalTokens = promptTokens + completionTokens;
-    logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs: 1 });
-    return { text: fallbackText, promptTokens, completionTokens, totalTokens };
+    logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs: 1, runId, operation, provider: 'openai', attempts: 1, cacheOutcome: executionCacheOutcome });
+    return { text: fallbackText, promptTokens, completionTokens, totalTokens, execution: { attempts: 1, cacheOutcome: executionCacheOutcome } };
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
@@ -367,6 +380,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
   });
 
   const callStartMs = Date.now();
+  let attempts = 0;
   try {
     const result = await withProviderRetry({
       feature,
@@ -376,6 +390,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
       signal,
       cancelMessage: AI_REQUEST_CANCELLED_MESSAGE,
       run: async (attempt) => {
+        attempts = attempt + 1;
         throwIfSignalAborted(signal, AI_REQUEST_CANCELLED_MESSAGE);
         const res = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -432,24 +447,29 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
       feature,
       workspaceId,
       durationMs,
+      runId,
+      operation,
+      provider: 'openai',
+      attempts,
+      cacheOutcome: executionCacheOutcome,
     });
     recordOperationTrace({
       source: 'ai',
-      operation: feature,
+      operation,
       status: 'success',
       durationMs,
       workspaceId,
       message: `${model} call completed`,
     });
 
-    return result;
+    return { ...result, execution: { attempts, cacheOutcome: executionCacheOutcome } };
   } catch (err) {
     if (signal?.aborted || (err instanceof Error && err.message === AI_REQUEST_CANCELLED_MESSAGE)) {
       throw err;
     }
     recordOperationTrace({
       source: 'ai',
-      operation: feature,
+      operation,
       status: 'error',
       durationMs: Date.now() - callStartMs,
       workspaceId,

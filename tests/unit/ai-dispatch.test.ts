@@ -89,6 +89,7 @@ describe('callAI', () => {
       maxRetries: 1,
       timeoutMs: 12_000,
       signal: controller.signal,
+      cachePolicy: { mode: 'none' },
     }));
   });
 
@@ -165,6 +166,7 @@ describe('callAI', () => {
       maxRetries: 2,
       timeoutMs: 45_000,
       signal: controller.signal,
+      cachePolicy: { mode: 'none' },
     }));
   });
 
@@ -188,6 +190,43 @@ describe('callAI', () => {
       maxRetries: 3,
       timeoutMs: 90_000,
       responseFormat: { type: 'json_object' },
+      cachePolicy: { mode: 'ttl', ttlMs: 300_000 },
+      runId: expect.any(String),
+      operation: 'schema-plan',
+    }));
+  });
+
+  it('preserves the result shape and adds safe execution metadata', async () => {
+    mocks.callAnthropic.mockResolvedValue({
+      text: 'ok', promptTokens: 9, completionTokens: 3, totalTokens: 12,
+      execution: { attempts: 1, cacheOutcome: 'miss' },
+    });
+
+    const result = await callAI({
+      operation: 'copy-generation',
+      messages: [{ role: 'user', content: 'Draft.' }],
+      workspaceId: 'ws_metadata',
+    });
+
+    expect(result).toMatchObject({
+      text: 'ok',
+      tokens: { prompt: 9, completion: 3, total: 12 },
+      execution: {
+        runId: expect.any(String),
+        operation: 'copy-generation',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-6',
+        attempts: 1,
+        cacheOutcome: 'miss',
+        startedAt: expect.any(String),
+        completedAt: expect.any(String),
+        durationMs: expect.any(Number),
+      },
+    });
+    expect(mocks.callAnthropic).toHaveBeenCalledWith(expect.objectContaining({
+      cachePolicy: { mode: 'inflight' },
+      runId: expect.any(String),
+      operation: 'copy-generation',
     }));
   });
 
@@ -212,6 +251,8 @@ describe('callAI', () => {
     expect(mocks.callOpenAI).toHaveBeenCalledWith(expect.objectContaining({
       model: 'gpt-5.4',
       feature: 'schema-plan-override',
+      operation: 'schema-plan',
+      cachePolicy: { mode: 'ttl', ttlMs: 300_000 },
       maxRetries: 1,
       timeoutMs: 12_000,
     }));
@@ -221,5 +262,14 @@ describe('callAI', () => {
     await expect(callAI({
       messages: [{ role: 'user', content: 'missing metadata' }],
     })).rejects.toThrow('callAI requires either feature or operation');
+  });
+
+  it('defaults unregistered feature calls to inflight-only caching', async () => {
+    mocks.callOpenAI.mockResolvedValue({ text: 'ok', promptTokens: 1, completionTokens: 1, totalTokens: 2 });
+    await callAI({ feature: 'legacy-generation', messages: [{ role: 'user', content: 'Generate.' }] });
+    expect(mocks.callOpenAI).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'legacy-generation',
+      cachePolicy: { mode: 'inflight' },
+    }));
   });
 });

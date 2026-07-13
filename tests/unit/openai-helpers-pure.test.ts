@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   getDataDir: vi.fn(() => '/fake/ai-usage'),
   createLogger: vi.fn(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() })),
   AIRequestDeduplicator: { createKey: vi.fn(() => 'dedupe-key') },
-  aiDeduplicator: { deduplicate: vi.fn((_key: string, fn: () => unknown) => fn()) },
+  aiDeduplicator: { execute: vi.fn(async (_key: string, fn: () => unknown) => ({ value: await fn(), cacheOutcome: 'miss' })) },
   stripCodeFences: vi.fn((s: string) => s),
   abortableDelay: vi.fn(),
   composeTimeoutSignal: vi.fn(() => undefined),

@@ -241,6 +241,53 @@ describe('AIRequestDeduplicator.getStats', () => {
   });
 });
 
+describe('AIRequestDeduplicator — policy outcomes and counters', () => {
+  it('distinguishes misses, completed cache hits, and inflight coalesces', async () => {
+    const dedup = new AIRequestDeduplicator();
+    let resolve!: (value: string) => void;
+    const fetcher = vi.fn(() => new Promise<string>(r => { resolve = r; }));
+
+    const first = dedup.execute('policy-key', fetcher, { mode: 'ttl', ttlMs: 60_000 });
+    const joined = dedup.execute('policy-key', fetcher, { mode: 'ttl', ttlMs: 60_000 });
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+    resolve('value');
+
+    expect(await first).toEqual({ value: 'value', cacheOutcome: 'miss' });
+    expect(await joined).toEqual({ value: 'value', cacheOutcome: 'inflight' });
+    expect(await dedup.execute('policy-key', fetcher, { mode: 'ttl', ttlMs: 60_000 }))
+      .toEqual({ value: 'value', cacheOutcome: 'hit' });
+    expect(dedup.getStats()).toMatchObject({ requests: 3, misses: 1, cacheHits: 1, inflightJoins: 1 });
+  });
+
+  it('none executes every request while inflight never replays completion', async () => {
+    const dedup = new AIRequestDeduplicator();
+    const fetcher = vi.fn(async () => 'value');
+    await dedup.execute('none-key', fetcher, { mode: 'none' });
+    await dedup.execute('none-key', fetcher, { mode: 'none' });
+    await dedup.execute('inflight-key-2', fetcher, { mode: 'inflight' });
+    await dedup.execute('inflight-key-2', fetcher, { mode: 'inflight' });
+    expect(fetcher).toHaveBeenCalledTimes(4);
+  });
+
+  it('never expires a live in-flight request into duplicate provider work', async () => {
+    vi.useFakeTimers();
+    const dedup = new AIRequestDeduplicator();
+    let resolve!: (value: string) => void;
+    const fetcher = vi.fn(() => new Promise<string>(r => { resolve = r; }));
+    const first = dedup.execute('long-running', fetcher, { mode: 'inflight' });
+    vi.advanceTimersByTime(10 * 60 * 1000);
+    dedup.cleanup();
+    const joined = dedup.execute('long-running', fetcher, { mode: 'inflight' });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    resolve('done');
+    await expect(Promise.all([first, joined])).resolves.toEqual([
+      { value: 'done', cacheOutcome: 'miss' },
+      { value: 'done', cacheOutcome: 'inflight' },
+    ]);
+    vi.useRealTimers();
+  });
+});
+
 // ── cleanup() ────────────────────────────────────────────────────────────────
 
 describe('AIRequestDeduplicator.cleanup', () => {
