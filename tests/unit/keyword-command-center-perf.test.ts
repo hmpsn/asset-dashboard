@@ -33,12 +33,18 @@ import {
   buildKeywordCommandCenterSummary,
 } from '../../server/keyword-command-center.js';
 import * as assemblerModule from '../../server/keyword-strategy-assembler.js';
+import * as contentGapsModule from '../../server/content-gaps.js';
+import * as keywordGapsModule from '../../server/keyword-gaps.js';
+import * as pageKeywordsModule from '../../server/page-keywords.js';
+import * as siteMetricsModule from '../../server/site-keyword-metrics.js';
+import * as trackedStoreModule from '../../server/tracked-keywords-store.js';
+import * as localSnapshotModule from '../../server/domains/local-seo/snapshot-store.js';
 import { replaceAllContentGaps } from '../../server/content-gaps.js';
 import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
 import { replaceAllSiteKeywordMetrics } from '../../server/site-keyword-metrics.js';
 import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { addTrackedKeyword, storeRankSnapshot } from '../../server/rank-tracking.js';
-import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
+import { createWorkspace, deleteWorkspace, getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { KEYWORD_COMMAND_CENTER_FILTERS } from '../../shared/types/keyword-command-center.js';
 import type { KeywordStrategy } from '../../shared/types/workspace.js';
 
@@ -158,6 +164,81 @@ describe('K2 — KCC-owned read projection guard', () => {
     });
     expect(payload!.summary.rankFreshness.ageDays).toBeGreaterThanOrEqual(14);
   });
+
+  it('reads each normalized KCC projection source exactly once for first paint', async () => {
+    const pageMap = vi.spyOn(pageKeywordsModule, 'listPageKeywordsLite');
+    const contentGaps = vi.spyOn(contentGapsModule, 'listContentGaps');
+    const keywordGaps = vi.spyOn(keywordGapsModule, 'listKeywordGaps');
+    const siteMetrics = vi.spyOn(siteMetricsModule, 'resolveSiteKeywordMetrics');
+    const trackedRows = vi.spyOn(trackedStoreModule, 'listTrackedKeywordRows');
+
+    const payload = await buildKeywordCommandCenterInitialView(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      page: 1,
+      pageSize: 50,
+    });
+
+    expect(payload).not.toBeNull();
+    expect({
+      pageMap: pageMap.mock.calls.length,
+      contentGaps: contentGaps.mock.calls.length,
+      keywordGaps: keywordGaps.mock.calls.length,
+      siteMetrics: siteMetrics.mock.calls.length,
+      trackedRows: trackedRows.mock.calls.length,
+    }).toEqual({ pageMap: 1, contentGaps: 1, keywordGaps: 1, siteMetrics: 1, trackedRows: 1 });
+  });
+
+  it('skips local-visibility snapshot reads when the caller excludes local SEO', async () => {
+    const localVisibility = vi.spyOn(localSnapshotModule, 'buildLocalSeoKeywordVisibilitySummaryByKey');
+    const payload = await buildKeywordCommandCenterRows(
+      workspaceId,
+      { filter: KEYWORD_COMMAND_CENTER_FILTERS.TRACKED },
+      { includeLocalSeo: false },
+    );
+    expect(payload).not.toBeNull();
+    expect(localVisibility).not.toHaveBeenCalled();
+  });
+
+  it('reports missing and fresh rank snapshots honestly', async () => {
+    db.prepare('DELETE FROM rank_snapshots WHERE workspace_id = ?').run(workspaceId);
+    const missing = await buildKeywordCommandCenterSummary(workspaceId);
+    expect(missing?.rankFreshness).toEqual({ snapshotDate: null, ageDays: null, status: 'missing' });
+
+    const today = new Date().toISOString().slice(0, 10);
+    storeRankSnapshot(workspaceId, today, [
+      { query: 'cosmetic dentist austin', position: 5, clicks: 10, impressions: 200, ctr: 0.05 },
+    ]);
+    const fresh = await buildKeywordCommandCenterSummary(workspaceId);
+    expect(fresh?.rankFreshness).toEqual({
+      snapshotDate: `${today}T00:00:00.000Z`,
+      ageDays: 0,
+      status: 'fresh',
+    });
+  });
+
+  it('preserves table-first and legacy blob-fallback fields and ordering', async () => {
+    replaceAllContentGaps(workspaceId, []);
+    replaceAllKeywordGaps(workspaceId, []);
+    const strategy = structuredClone(getWorkspace(workspaceId)?.keywordStrategy) as KeywordStrategy;
+    strategy.contentGaps = [
+      { topic: 'Legacy A', targetKeyword: 'legacy alpha', intent: 'commercial', priority: 'high', rationale: 'Legacy first' },
+      { topic: 'Legacy B', targetKeyword: 'legacy beta', intent: 'informational', priority: 'low', rationale: 'Legacy second' },
+    ];
+    strategy.keywordGaps = [
+      { keyword: 'legacy competitor', volume: 100, difficulty: 20, competitorPosition: 3, competitorDomain: 'example.com' },
+    ];
+    updateWorkspace(workspaceId, { keywordStrategy: strategy });
+
+    const rows = await buildKeywordCommandCenterRows(workspaceId, { sort: 'keyword', direction: 'asc', pageSize: 100 });
+    const summary = await buildKeywordCommandCenterSummary(workspaceId);
+    expect(rows?.rows.map(row => row.keyword)).toEqual(expect.arrayContaining([
+      'legacy alpha',
+      'legacy beta',
+      'legacy competitor',
+    ]));
+    expect(summary?.counts.total).toBeGreaterThanOrEqual(rows?.pageInfo.totalRows ?? 0);
+    expect(summary?.rawEvidenceTotal).toBeGreaterThanOrEqual(1);
+  });
 });
 
 describe('Task 7 — determinism / self-parity (no output drift)', () => {
@@ -210,5 +291,68 @@ describe('Task 7 — determinism / self-parity (no output drift)', () => {
     await expect(buildKeywordCommandCenterInitialView(workspaceId, {
       filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES,
     })).rejects.toThrow('initial view does not support local_candidates');
+  });
+});
+
+describe('K2 — measured read-path budget', () => {
+  it('records first-paint p50/p95 against the deterministic fixture', async () => {
+    const samples: number[] = [];
+    const query = { filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL, page: 1, pageSize: 50 };
+    await buildKeywordCommandCenterInitialView(workspaceId, query);
+    for (let index = 0; index < 30; index++) {
+      const startedAt = performance.now();
+      await buildKeywordCommandCenterInitialView(workspaceId, query);
+      samples.push(performance.now() - startedAt);
+    }
+    samples.sort((a, b) => a - b);
+    const percentile = (fraction: number) => samples[Math.ceil(samples.length * fraction) - 1] ?? 0;
+    const measurement = {
+      samples: samples.length,
+      p50Ms: Number(percentile(0.5).toFixed(2)),
+      p95Ms: Number(percentile(0.95).toFixed(2)),
+    };
+    console.info('K2_KCC_INITIAL_PERF', JSON.stringify(measurement));
+    expect(measurement.samples).toBe(30);
+    expect(Number.isFinite(measurement.p95Ms)).toBe(true);
+  });
+  it('records rows-only interaction p50/p95 against the deterministic fixture', async () => {
+    for (let pageIndex = 0; pageIndex < 400; pageIndex++) {
+      upsertPageKeyword(workspaceId, {
+        pagePath: `/benchmark/${pageIndex}`,
+        pageTitle: `Benchmark page ${pageIndex}`,
+        primaryKeyword: `benchmark dentist keyword ${pageIndex}`,
+        secondaryKeywords: Array.from({ length: 8 }, (_, index) => `secondary ${pageIndex} ${index}`),
+        searchIntent: 'commercial',
+        currentPosition: 8 + (pageIndex % 20),
+        impressions: 500 + pageIndex,
+        clicks: 20 + (pageIndex % 30),
+        volume: 700 + pageIndex,
+        difficulty: 35,
+        cpc: 4.25,
+        optimizationIssues: Array.from({ length: 12 }, (_, index) => `Issue ${index}`),
+        recommendations: Array.from({ length: 12 }, (_, index) => `Recommendation ${index}`),
+        contentGaps: Array.from({ length: 12 }, (_, index) => `Gap ${index}`),
+        longTailKeywords: Array.from({ length: 12 }, (_, index) => `long tail ${pageIndex} ${index}`),
+        competitorKeywords: Array.from({ length: 12 }, (_, index) => `competitor ${pageIndex} ${index}`),
+      });
+    }
+    const samples: number[] = [];
+    const query = { filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL, search: 'dentist', page: 1, pageSize: 50 };
+    await buildKeywordCommandCenterRows(workspaceId, query);
+    for (let index = 0; index < 30; index++) {
+      const startedAt = performance.now();
+      await buildKeywordCommandCenterRows(workspaceId, query);
+      samples.push(performance.now() - startedAt);
+    }
+    samples.sort((a, b) => a - b);
+    const percentile = (fraction: number) => samples[Math.ceil(samples.length * fraction) - 1] ?? 0;
+    const measurement = {
+      samples: samples.length,
+      p50Ms: Number(percentile(0.5).toFixed(2)),
+      p95Ms: Number(percentile(0.95).toFixed(2)),
+    };
+    console.info('K2_KCC_INTERACTION_PERF', JSON.stringify(measurement));
+    expect(measurement.samples).toBe(30);
+    expect(Number.isFinite(measurement.p95Ms)).toBe(true);
   });
 });

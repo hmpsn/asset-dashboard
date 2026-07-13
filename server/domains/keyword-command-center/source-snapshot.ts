@@ -12,6 +12,8 @@ import { LOCAL_SEO_MARKET_STATUS, type LocalSeoKeywordVisibilitySummary } from '
 import { KEYWORD_RANK_FRESHNESS_STATUS, type KeywordRankFreshness } from '../../../shared/types/keyword-command-center.js';
 import type { Workspace } from '../../../shared/types/workspace.js';
 import type { LatestRank, TrackedKeyword } from '../../../shared/types/rank-tracking.js';
+import { getLocalSeoPosture } from '../../local-seo.js';
+import type { ScoringContext } from '../../scoring/keyword-value-score.js';
 
 export interface KeywordCommandCenterSourceSnapshot {
   workspace: Workspace;
@@ -31,6 +33,7 @@ export interface KeywordCommandCenterSourceSnapshot {
   topicClusters?: import('../../../shared/types/workspace.js').TopicCluster[];
   cannibalization?: import('../../../shared/types/workspace.js').CannibalizationItem[];
   rankFreshness: KeywordRankFreshness;
+  scoringContext?: ScoringContext;
 }
 
 export const KCC_RANK_FRESHNESS_MAX_AGE_DAYS = 14;
@@ -49,7 +52,7 @@ function rankFreshness(snapshotDate: string | null, now = Date.now()): KeywordRa
 
 export function buildKeywordCommandCenterSourceSnapshot(
   workspaceId: string,
-  options: { includeLocalSeo?: boolean; includeSummary?: boolean } = {},
+  options: { includeLocalSeo?: boolean; includeSummary?: boolean; includeScoring?: boolean } = {},
 ): KeywordCommandCenterSourceSnapshot | null {
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return null;
@@ -63,12 +66,17 @@ export function buildKeywordCommandCenterSourceSnapshot(
   const localVisibilityByKeyword = options.includeLocalSeo
     ? buildLocalSeoKeywordVisibilitySummaryByKey(workspace.id)
     : undefined;
-  const localMarkets = options.includeLocalSeo ? listLocalSeoMarkets(workspace.id) : [];
+  const localMarkets = options.includeLocalSeo || options.includeScoring ? listLocalSeoMarkets(workspace.id) : [];
   const activeLocalMarketCount = options.includeLocalSeo
     ? localMarkets.filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE).length
     : undefined;
-  const primaryMarket = localMarkets.find(market => market.isPrimary && market.providerLocationCode != null);
-  const latestSnapshot = getLatestSnapshotRanksWithDate(workspace.id);
+  const primaryMarket = localMarkets.find(market =>
+    market.isPrimary
+    && market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE
+    && market.providerLocationCode != null,
+  );
+  const trackedKeywords = listTrackedKeywordRows(workspace.id);
+  const latestSnapshot = getLatestSnapshotRanksWithDate(workspace.id, { trackedKeywords });
   const lostVisibilityRows = safeLostVisibilityRows(workspace.id);
   return {
     workspace,
@@ -76,7 +84,7 @@ export function buildKeywordCommandCenterSourceSnapshot(
     pageMap: projection.pageMap,
     contentGaps,
     keywordGaps,
-    trackedKeywords: listTrackedKeywordRows(workspace.id),
+    trackedKeywords,
     latestRanks: latestSnapshot.ranks,
     feedback: readFeedback(workspace.id),
     lostVisibilityRows,
@@ -90,5 +98,11 @@ export function buildKeywordCommandCenterSourceSnapshot(
     topicClusters: projection.topicClusters,
     cannibalization: projection.cannibalization,
     rankFreshness: rankFreshness(latestSnapshot.snapshotDate),
+    scoringContext: options.includeScoring ? {
+      posture: getLocalSeoPosture(workspace.id),
+      markets: localMarkets,
+      city: workspace.businessProfile?.address?.city?.toLowerCase(),
+      state: workspace.businessProfile?.address?.state?.toLowerCase(),
+    } : undefined,
   };
 }

@@ -200,6 +200,11 @@ const summaryPayload: KeywordCommandCenterSummaryResponse = {
   rawEvidenceTotal: 120,
   rawEvidenceReturned: 75,
   summarizedAt: '2026-07-05T12:00:00.000Z',
+  rankFreshness: {
+    snapshotDate: '2026-06-01T00:00:00.000Z',
+    ageDays: 34,
+    status: 'stale',
+  },
   trafficValueMonthly: 1234,
   topicClusters: [
     {
@@ -624,6 +629,8 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(lensTray.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(tools).getByRole('searchbox')).toBeInTheDocument();
     expect(within(tools).getByLabelText('Advanced keyword filter')).toBeInTheDocument();
+    expect(screen.getByText('Rank data stale · 34 days old')).toBeInTheDocument();
+    expect(screen.getByText(/Ranks observed/)).toBeInTheDocument();
   });
 
   it('renders keyword rows, provenance, opportunity, and money empty states without fabricating dollars', () => {
@@ -926,6 +933,23 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByText('cosmetic dentistry')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(refetch).toHaveBeenCalled();
+  });
+
+  it('falls back to the rows endpoint when first-paint hydration fails without cached data', () => {
+    initialHookMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('initial view unavailable'),
+      refetch: vi.fn(),
+    });
+
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    expect(rowsHookMock.mock.calls.some((call) => (
+      (call[2] as { enabled?: boolean } | undefined)?.enabled === true
+    ))).toBe(true);
+    expect(screen.getByText('cosmetic dentistry')).toBeInTheDocument();
   });
 
   it('renders locked keyword access as a permission state', () => {

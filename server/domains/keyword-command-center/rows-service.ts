@@ -168,6 +168,7 @@ async function buildKeywordCommandCenterLocalCandidateRows(
   const startedAt = Date.now();
   const snapshot = options.sourceSnapshot ?? buildKeywordCommandCenterSourceSnapshot(workspaceId, {
     includeLocalSeo: options.includeLocalSeo,
+    includeScoring: true,
   });
   if (!snapshot) return null;
   const { workspace } = snapshot;
@@ -183,7 +184,9 @@ async function buildKeywordCommandCenterLocalCandidateRows(
     localVisibility: localVisibilityByKeyword,
   });
   const cappedBundle = filterBundleToKeys({ ...baseBundle, localCandidates }, candidateKeys);
-  const valueScoring = buildValueScoringConfig(workspace);
+  const valueScoring = snapshot.scoringContext
+    ? { on: true, ctx: snapshot.scoringContext }
+    : buildValueScoringConfig(workspace);
   const lostVisibilityKeys = new Set(snapshot.lostVisibilityRows.map(row => keywordComparisonKey(row.query)).filter(Boolean));
   const publishedPagePaths = listPublishedPostPagePaths(workspace.id);
   const rows = new Map<string, DraftRow>();
@@ -238,13 +241,16 @@ async function buildKeywordCommandCenterRowsSkinny(
   const startedAt = Date.now();
   const snapshot = options.sourceSnapshot ?? buildKeywordCommandCenterSourceSnapshot(workspaceId, {
     includeLocalSeo: options.includeLocalSeo,
+    includeScoring: true,
   });
   if (!snapshot) return null;
   const { workspace } = snapshot;
   // Build the ScoringContext ONCE per request. The SAME config is threaded into
   // the candidate merge-back and the row finalize so both stages score identically
   // per key.
-  const valueScoring = buildValueScoringConfig(workspace);
+  const valueScoring = snapshot.scoringContext
+    ? { on: true, ctx: snapshot.scoringContext }
+    : buildValueScoringConfig(workspace);
   const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
   const localVisibilityByKeyword = localVisibilityByFilter(
     workspace.id,

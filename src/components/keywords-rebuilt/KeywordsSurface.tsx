@@ -13,13 +13,13 @@ import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { queryKeys } from '../../lib/queryKeys';
 import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import { WS_EVENTS } from '../../lib/wsEvents';
-import { KEYWORD_COMMAND_CENTER_ACTIONS, KEYWORD_COMMAND_CENTER_FILTERS } from '../../../shared/types/keyword-command-center';
-import type { KeywordCommandCenterSummaryResponse } from '../../../shared/types/keyword-command-center';
+import { KEYWORD_COMMAND_CENTER_ACTIONS, KEYWORD_COMMAND_CENTER_FILTERS, KEYWORD_RANK_FRESHNESS_STATUS } from '../../../shared/types/keyword-command-center';
+import type { KeywordCommandCenterSummaryResponse, KeywordRankFreshness } from '../../../shared/types/keyword-command-center';
 import type { AdminKeywordFeedbackListRow } from '../../../shared/types/keyword-feedback';
 import { useKeywordFeedback } from '../strategy/hooks/useKeywordFeedback';
 import { useToast } from '../Toast';
 import { mutationErrorMessage } from './keywordMutationFeedback';
-import { Badge, Button, Drawer, ErrorState, PageHeader, LensSwitcher, LoadingState, SearchField, Toolbar, ToolbarSpacer, FilterChip, InlineBanner, MetricTile, Skeleton, FormInput, FormSelect, GroupBlock } from '../ui';
+import { Badge, Button, Drawer, ErrorState, FreshnessStamp, PageHeader, LensSwitcher, LoadingState, SearchField, Toolbar, ToolbarSpacer, FilterChip, InlineBanner, MetricTile, Skeleton, FormInput, FormSelect, GroupBlock } from '../ui';
 import { KeywordsLenses } from './KeywordsLenses';
 import type { KeywordRowsQueryResult } from './KeywordsTable';
 import {
@@ -88,6 +88,20 @@ function feedbackGroups(rows: AdminKeywordFeedbackListRow[]) {
     declined: rows.filter((row) => row.status === 'declined'),
     approved: rows.filter((row) => row.status === 'approved'),
   };
+}
+
+function RankFreshness({ freshness }: { freshness: KeywordRankFreshness | undefined }) {
+  if (!freshness || freshness.status === KEYWORD_RANK_FRESHNESS_STATUS.MISSING) {
+    return <Badge tone="zinc" label="Rank data unavailable" />;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {freshness.status === KEYWORD_RANK_FRESHNESS_STATUS.STALE && (
+        <Badge tone="amber" label={`Rank data stale · ${freshness.ageDays ?? 0} days old`} />
+      )}
+      <FreshnessStamp value={freshness.snapshotDate} label="Ranks observed" />
+    </div>
+  );
 }
 
 // Status → accent hue + Badge tone for the client-feedback rows (parity with the
@@ -207,7 +221,9 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
   const summaryIsError = canUseInitialView ? initialView.isError && summaryFallback.isError : summaryFallback.isError;
   const summaryError = initialView.error ?? summaryFallback.error;
   const refetchSummary = initialView.data ? initialView.refetch : summaryFallback.refetch;
-  const initialRowsResult: KeywordRowsQueryResult | undefined = canUseInitialView && viewingInitialRows ? {
+  const initialRowsResult: KeywordRowsQueryResult | undefined = canUseInitialView
+    && viewingInitialRows
+    && (initialView.data != null || !initialView.isError) ? {
     data: initialView.data?.rows,
     isLoading: initialView.isLoading,
     isError: initialView.isError,
@@ -343,6 +359,12 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
               </Button>
             </div>
           </InlineBanner>
+        </div>
+      )}
+
+      {summary && (
+        <div className="mt-3" aria-label="Rank data freshness">
+          <RankFreshness freshness={summary.rankFreshness} />
         </div>
       )}
 

@@ -378,7 +378,7 @@ export interface KeywordCommandCenterRowsResponse {
   rows: KeywordCommandCenterRow[];
   pageInfo: KeywordCommandCenterPageInfo;
   generatedAt?: string | null;
-  rankFreshness?: KeywordRankFreshness;
+  rankFreshness: KeywordRankFreshness;
 }
 
 export const KEYWORD_RANK_FRESHNESS_STATUS = {

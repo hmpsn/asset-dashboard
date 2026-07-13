@@ -456,7 +456,10 @@ export interface LatestSnapshotRanks {
   snapshotDate: string | null;
 }
 
-function buildLatestRanks(workspaceId: string, options: { includeUntracked?: boolean } = {}): LatestSnapshotRanks {
+function buildLatestRanks(
+  workspaceId: string,
+  options: { includeUntracked?: boolean; trackedKeywords?: TrackedKeyword[] } = {},
+): LatestSnapshotRanks {
   const snapshots = readRecentSnapshots(workspaceId, 2);
   if (snapshots.length === 0) return { ranks: [], snapshotDate: null };
   const latest = snapshots[snapshots.length - 1];
@@ -466,7 +469,7 @@ function buildLatestRanks(workspaceId: string, options: { includeUntracked?: boo
   );
   // Wave 3c-iii-b: read tracked keywords through the TABLE-ONLY resolver.
   // Order-safe — the inline active filter + normalizeQuery Map below are unchanged.
-  const trackedKeywords = resolveTrackedKeywords(workspaceId);
+  const trackedKeywords = options.trackedKeywords ?? resolveTrackedKeywords(workspaceId);
   const hasConfiguredKeywords = trackedKeywords.length > 0;
   const trackedEntries = new Map(
     trackedKeywords
@@ -509,6 +512,9 @@ export function getLatestSnapshotRanks(workspaceId: string): LatestRank[] {
   return buildLatestRanks(workspaceId, { includeUntracked: true }).ranks;
 }
 
-export function getLatestSnapshotRanksWithDate(workspaceId: string): LatestSnapshotRanks {
-  return buildLatestRanks(workspaceId, { includeUntracked: true });
+export function getLatestSnapshotRanksWithDate(
+  workspaceId: string,
+  options: { trackedKeywords?: TrackedKeyword[] } = {},
+): LatestSnapshotRanks {
+  return buildLatestRanks(workspaceId, { includeUntracked: true, trackedKeywords: options.trackedKeywords });
 }

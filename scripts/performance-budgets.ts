@@ -86,6 +86,33 @@ function isPositiveInteger(value: number): boolean {
 
 export const PERFORMANCE_BUDGET_REGISTRY: PerformanceBudgetEntry[] = [
   {
+    id: 'keyword-command-center-read-path',
+    title: 'Keyword Command Center first-paint and interaction budget',
+    boundedContext: 'seo-health',
+    owner: 'seo-health',
+    routeOrWorkflow: 'GET /api/webflow/keyword-command-center/:workspaceId/initial and /rows',
+    isBackgroundJob: false,
+    aiCallBudget: 0,
+    externalFetchBudget: 0,
+    routeResponseTargetMs: 250,
+    queryCountBudget: 22,
+    cacheExpectation: 'react-query-event-invalidation',
+    escalation: {
+      level: 'release-block',
+      trigger: 'The full strategy assembler is called, a normalized projection source is read more than once, or seeded p95 exceeds 250ms.',
+      action: 'Block release, profile the KCC projection/read fanout, and restore rows-only interactions before widening the source model.',
+    },
+    evidence: [
+      'server/domains/keyword-command-center/read-projection.ts (KCC-owned normalized source projection)',
+      'src/hooks/admin/useKeywordCommandCenter.ts (first-paint cache seeding + previous row data)',
+    ],
+    testEvidence: [
+      'tests/unit/keyword-command-center-perf.test.ts',
+      'tests/component/useKeywordCommandCenterInitialView.test.tsx',
+      'tests/component/keywords-rebuilt/KeywordsSurface.test.tsx',
+    ],
+  },
+  {
     id: 'jobs-keyword-strategy',
     title: 'Keyword Strategy background workflow budget',
     boundedContext: 'seo-strategy',

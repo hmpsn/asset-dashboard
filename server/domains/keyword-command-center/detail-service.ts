@@ -2,7 +2,6 @@ import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
 import type { KeywordCommandCenterDetailResponse } from '../../../shared/types/keyword-command-center.js';
 import { LOCAL_SEO_MARKET_STATUS, type LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo.js';
 import type { OutcomeReadback } from '../../../shared/types/outcome-tracking.js';
-import { listLocalSeoMarkets } from '../local-seo/configuration-service.js';
 import { buildLocalSeoKeywordVisibilityForKeyword } from '../local-seo/snapshot-store.js';
 import { createLogger } from '../../logger.js';
 import { getScoredOutcomeReadbacks, STRATEGY_PAGE_KEYWORD_SOURCE_TYPE, strategyPageKeywordSourceId } from '../../outcome-tracking.js';
@@ -34,7 +33,9 @@ export async function buildKeywordCommandCenterDetail(
   const startedAt = Date.now();
   const normalized = keywordComparisonKey(keyword);
   if (!normalized) return null;
-  const snapshot = options.sourceSnapshot ?? buildKeywordCommandCenterSourceSnapshot(workspaceId);
+  const snapshot = options.sourceSnapshot ?? buildKeywordCommandCenterSourceSnapshot(workspaceId, {
+    includeScoring: true,
+  });
   if (!snapshot) return null;
   const { workspace } = snapshot;
   const pageMap = snapshot.pageMap.filter(page => pageMatchesKeyword(page, normalized));
@@ -61,7 +62,7 @@ export async function buildKeywordCommandCenterDetail(
     ? new Map([[normalized, localVisibility]])
     : new Map<string, LocalSeoKeywordVisibilitySummary>();
   const activeLocalMarketCount = options.includeLocalSeo
-    ? listLocalSeoMarkets(workspace.id).filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE).length
+    ? snapshot.scoringContext?.markets.filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE).length ?? 0
     : 0;
   const hasStrategyKeyword = Boolean((strategy?.siteKeywords?.length ?? 0) > 0 || (strategy?.siteKeywordMetrics?.length ?? 0) > 0);
   const hasLocalVisibility = localVisibilityByKeyword.has(normalized);
@@ -105,7 +106,9 @@ export async function buildKeywordCommandCenterDetail(
       // finalizeDraftRow computes valueReasons, but the detail path omitted it —
       // KeywordDetailDrawer renders row.valueReasons, so the value-first reason chips
       // were silently absent in the admin drawer. Pass the same per-request config.
-      valueScoring: buildValueScoringConfig(workspace),
+      valueScoring: snapshot.scoringContext
+        ? { on: true, ctx: snapshot.scoringContext }
+        : buildValueScoringConfig(workspace),
     })
     : null;
   if (!row) return null;
