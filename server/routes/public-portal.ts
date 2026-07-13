@@ -37,6 +37,7 @@ import {
   saveBulkKeywordFeedback,
   saveKeywordFeedback,
 } from '../keyword-feedback.js';
+import { clearContentGapVote, listContentGapVotes, setContentGapVote } from '../content-gap-votes.js';
 import { parsePaginationParams } from '../pagination.js';
 import { listKeywordGaps } from '../keyword-gaps.js';
 import { projectCompetitorGaps } from '../competitor-gaps-projection.js';
@@ -60,7 +61,7 @@ import { normalizeSocialProfiles } from '../social-profiles.js';
 import { computeTrialState } from '../billing/trial-state.js';
 import { toPublicWorkspaceView } from '../serializers/client-safe.js';
 import { isFeatureEnabled } from '../feature-flags.js';
-import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
+import { keywordIdentityKeyV2 } from '../../shared/keyword-normalization.js';
 import { getVoiceProfile } from '../voice-calibration.js';
 import { sendSanitizedProviderError } from '../provider-error-sanitizer.js';
 import { buildMatricesExportRows, MATRICES_EXPORT_HEADERS, sendExport } from './data-export.js';
@@ -433,7 +434,7 @@ router.delete('/api/public/keyword-feedback/:workspaceId', ...requireClientStrat
       : typeof req.body?.keyword === 'string'
         ? req.body.keyword
         : '';
-  const keyword = keywordComparisonKey(rawKeyword);
+  const keyword = rawKeyword.trim();
   if (!keyword) return res.status(400).json({ error: 'keyword required' });
   const result = clearKeywordFeedback(ws.id, keyword);
   if (!result.existed) return res.json(result);
@@ -606,34 +607,34 @@ router.post('/api/public/content-gap-vote/:workspaceId', ...requireClientStrateg
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
   const { keyword, vote } = req.body as ContentGapVoteBody;
-  const kw = keywordComparisonKey(keyword);
+  const rawKeyword = keyword.trim();
+  if (!keywordIdentityKeyV2(rawKeyword)) {
+    return res.status(400).json({ error: 'keyword must contain searchable characters' });
+  }
+  let changed = false;
+  db.transaction(() => {
+    changed = vote === 'none'
+      ? clearContentGapVote(wsId, rawKeyword)
+      : setContentGapVote(
+          wsId,
+          rawKeyword,
+          vote,
+          typeof res.locals.clientEmail === 'string' ? res.locals.clientEmail : 'client',
+        ).changed;
+    if (changed) invalidateKeywordStrategyGenerationInputs(wsId);
+  }).immediate();
 
-  // The two write paths below (DELETE for "clear" + INSERT/UPDATE for
-  // "set") are mutually exclusive — only one runs per request — but the
-  // multi-step-txn rule scans by line proximity and can't know that.
-  // Wrapping the if/else in a single db.transaction() satisfies the rule
-  // AND adds defence-in-depth: any future expansion of either branch
-  // (e.g. an audit-log INSERT) inherits atomicity automatically.
-  const recordVote = db.transaction(() => {
-    invalidateKeywordStrategyGenerationInputs(wsId);
-    if (vote === 'none') {
-      db.prepare('DELETE FROM content_gap_votes WHERE workspace_id = ? AND keyword = ?').run(wsId, kw);
-    } else {
-      db.prepare(`
-        INSERT INTO content_gap_votes (workspace_id, keyword, vote, voted_by, updated_at)
-        VALUES (?, ?, ?, ?, datetime('now'))
-        ON CONFLICT(workspace_id, keyword) DO UPDATE SET
-          vote = excluded.vote,
-          voted_by = excluded.voted_by,
-          updated_at = datetime('now')
-      `).run(wsId, kw, vote, typeof res.locals.clientEmail === 'string' ? res.locals.clientEmail : 'client');
-    }
+  if (!changed) return res.json({ ok: true });
+
+  invalidateIntelligenceCache(wsId);
+  broadcastToWorkspace(wsId, WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED, {
+    workspaceId: wsId,
+    reason: 'content_gap_vote',
+    updatedAt: new Date().toISOString(),
   });
-  recordVote();
-
-  broadcastToWorkspace(wsId, WS_EVENTS.STRATEGY_UPDATED, { keyword: kw, vote });
+  broadcastToWorkspace(wsId, WS_EVENTS.STRATEGY_UPDATED, { keyword: rawKeyword, vote });
   // client-visibility-ok: this activity is for internal audit history, not client timeline display.
-  addActivity(wsId, 'client_content_gap_vote', `Client voted ${vote} on keyword: ${kw}`, 'Via client portal');
+  addActivity(wsId, 'client_content_gap_vote', `Client voted ${vote} on keyword: ${rawKeyword}`, 'Via client portal');
   res.json({ ok: true });
 });
 
@@ -642,9 +643,8 @@ router.get('/api/public/content-gap-votes/:workspaceId', requireClientPortalAuth
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const rows = db.prepare('SELECT keyword, vote FROM content_gap_votes WHERE workspace_id = ?').all(wsId) as { keyword: string; vote: string }[];
-  const votes: Record<string, string> = {};
-  for (const r of rows) votes[r.keyword] = r.vote;
+  const votes = Object.create(null) as Record<string, string>;
+  for (const row of listContentGapVotes(wsId)) votes[row.keyword] = row.vote;
   res.json({ votes });
 });
 

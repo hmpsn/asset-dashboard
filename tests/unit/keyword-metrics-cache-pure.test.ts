@@ -18,7 +18,8 @@ import {
   cleanupStaleEntries,
   type CachedKeywordMetrics,
 } from '../../server/keyword-metrics-cache.js';
-import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
+import { keywordIdentityKeyV2 } from '../../shared/keyword-normalization.js';
+import { KEYWORD_IDENTITY_VERSIONS } from '../../shared/types/keyword-identity.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -42,11 +43,11 @@ function makeMetrics(keyword: string, overrides: Partial<CachedKeywordMetrics> =
  */
 function insertWithTimestamp(metrics: CachedKeywordMetrics, database: string, cachedAt: string): void {
   db.prepare(`
-    INSERT INTO keyword_metrics_cache
-      (keyword, database_region, volume, difficulty, cpc, competition, results, trend, cached_at)
+    INSERT INTO keyword_metrics_cache_v2
+      (identity_version, identity_key, raw_keyword, database_region, volume, difficulty, cpc, competition, results, trend, cached_at)
     VALUES
-      (@keyword, @database_region, @volume, @difficulty, @cpc, @competition, @results, @trend, @cached_at)
-    ON CONFLICT(keyword, database_region) DO UPDATE SET
+      (@identity_version, @identity_key, @raw_keyword, @database_region, @volume, @difficulty, @cpc, @competition, @results, @trend, @cached_at)
+    ON CONFLICT(identity_version, identity_key, database_region) DO UPDATE SET
       volume = excluded.volume,
       difficulty = excluded.difficulty,
       cpc = excluded.cpc,
@@ -55,7 +56,9 @@ function insertWithTimestamp(metrics: CachedKeywordMetrics, database: string, ca
       trend = excluded.trend,
       cached_at = excluded.cached_at
   `).run({
-    keyword: keywordComparisonKey(metrics.keyword),
+    identity_version: KEYWORD_IDENTITY_VERSIONS.V2,
+    identity_key: keywordIdentityKeyV2(metrics.keyword),
+    raw_keyword: metrics.keyword,
     database_region: database,
     volume: metrics.volume,
     difficulty: metrics.difficulty,
@@ -70,10 +73,10 @@ function insertWithTimestamp(metrics: CachedKeywordMetrics, database: string, ca
 /** Remove all test keywords so tests don't pollute the shared DB. */
 function deleteTestKeywords(keywords: string[], database = 'us'): void {
   const stmt = db.prepare(
-    `DELETE FROM keyword_metrics_cache WHERE keyword = ? AND database_region = ?`
+    `DELETE FROM keyword_metrics_cache_v2 WHERE identity_version = ? AND identity_key = ? AND database_region = ?`
   );
   for (const kw of keywords) {
-    stmt.run(keywordComparisonKey(kw), database);
+    stmt.run(KEYWORD_IDENTITY_VERSIONS.V2, keywordIdentityKeyV2(kw), database);
   }
 }
 
@@ -91,8 +94,10 @@ function trackKw(kw: string): string {
 
 beforeAll(() => {
   // Ensure table exists (migrations run on DB import, but be explicit)
-  db.prepare(`CREATE TABLE IF NOT EXISTS keyword_metrics_cache (
-    keyword TEXT NOT NULL,
+  db.prepare(`CREATE TABLE IF NOT EXISTS keyword_metrics_cache_v2 (
+    identity_version TEXT NOT NULL,
+    identity_key TEXT NOT NULL,
+    raw_keyword TEXT NOT NULL,
     database_region TEXT NOT NULL DEFAULT 'us',
     volume INTEGER NOT NULL DEFAULT 0,
     difficulty REAL NOT NULL DEFAULT 0,
@@ -101,7 +106,7 @@ beforeAll(() => {
     results INTEGER NOT NULL DEFAULT 0,
     trend TEXT NOT NULL DEFAULT '[]',
     cached_at TEXT NOT NULL,
-    PRIMARY KEY (keyword, database_region)
+    PRIMARY KEY (identity_version, identity_key, database_region)
   )`).run();
 });
 
@@ -336,20 +341,20 @@ describe('getCachedMetricsBatch', () => {
 
   it('maps normalized comparison key → metrics for kwA', () => {
     const result = getCachedMetricsBatch([kwA], DB_US);
-    const entry = result.get(keywordComparisonKey(kwA));
+    const entry = result.get(keywordIdentityKeyV2(kwA));
     expect(entry?.volume).toBe(111);
   });
 
   it('maps normalized comparison key → metrics for kwB', () => {
     const result = getCachedMetricsBatch([kwB], DB_US);
-    const entry = result.get(keywordComparisonKey(kwB));
+    const entry = result.get(keywordIdentityKeyV2(kwB));
     expect(entry?.volume).toBe(222);
   });
 
   it('silently skips keywords not in cache (no entry in map)', () => {
     const result = getCachedMetricsBatch([kwA, kwMissing], DB_US);
     expect(result.size).toBe(1);
-    expect(result.has(keywordComparisonKey(kwMissing))).toBe(false);
+    expect(result.has(keywordIdentityKeyV2(kwMissing))).toBe(false);
   });
 
   it('skips stale batch entries', () => {
@@ -358,7 +363,7 @@ describe('getCachedMetricsBatch', () => {
     insertWithTimestamp(makeMetrics(kwStale, { volume: 333 }), DB_US, oldDate);
 
     const result = getCachedMetricsBatch([kwStale], DB_US, 720);
-    expect(result.has(keywordComparisonKey(kwStale))).toBe(false);
+    expect(result.has(keywordIdentityKeyV2(kwStale))).toBe(false);
   });
 
   it('does not throw for a single unknown keyword', () => {
@@ -436,8 +441,8 @@ describe('cleanupStaleEntries', () => {
     // The old keyword should now be gone
     // (getCachedMetrics has its own maxAgeHours check, so use a raw DB query)
     const row = db.prepare(
-      `SELECT * FROM keyword_metrics_cache WHERE keyword = ? AND database_region = ?`
-    ).get(keywordComparisonKey(kwOld), DB_US);
+      `SELECT * FROM keyword_metrics_cache_v2 WHERE identity_version = ? AND identity_key = ? AND database_region = ?`
+    ).get(KEYWORD_IDENTITY_VERSIONS.V2, keywordIdentityKeyV2(kwOld), DB_US);
     expect(row).toBeUndefined();
   });
 
@@ -450,6 +455,49 @@ describe('cleanupStaleEntries', () => {
 // ── Edge cases ────────────────────────────────────────────────────────────────
 
 describe('edge cases', () => {
+  it('keeps C, C#, C++, F#, and .NET cache identities isolated', () => {
+    const variants = ['C', 'C#', 'C++', 'F#', '.NET'].map(trackKw);
+    variants.forEach((keyword, index) => {
+      cacheMetrics(makeMetrics(keyword, { volume: 100 + index }), DB_US);
+    });
+
+    expect(variants.map(keyword => getCachedMetrics(keyword, DB_US)?.volume)).toEqual([
+      100, 101, 102, 103, 104,
+    ]);
+  });
+
+  it('coalesces composed and decomposed Unicode while returning caller-owned raw text', () => {
+    const composed = trackKw('café strategy');
+    const decomposed = trackKw('cafe\u0301 strategy');
+    cacheMetrics(makeMetrics(composed, { volume: 777 }), DB_US);
+
+    const result = getCachedMetrics(decomposed, DB_US);
+    expect(result).toEqual(expect.objectContaining({ keyword: decomposed, volume: 777 }));
+  });
+
+  it('preserves non-Latin identities and skips blank writes', () => {
+    const japanese = trackKw('東京 マーケティング');
+    cacheMetrics(makeMetrics(japanese, { volume: 456 }), DB_US);
+    cacheMetrics(makeMetrics('   ', { volume: 999 }), DB_US);
+
+    expect(getCachedMetrics(japanese, DB_US)?.volume).toBe(456);
+    expect(getCachedMetrics('   ', DB_US)).toBeNull();
+  });
+
+  it('never reads a rollback-only v1 metrics-cache row forward', () => {
+    const keyword = trackKw('rollback only metrics row');
+    db.prepare(`
+      INSERT INTO keyword_metrics_cache (
+        keyword, database_region, volume, difficulty, cpc, competition, results, trend, cached_at
+      ) VALUES (?, ?, 9999, 1, 1, 1, 1, '[]', datetime('now'))
+      ON CONFLICT(keyword, database_region) DO UPDATE SET volume = excluded.volume, cached_at = excluded.cached_at
+    `).run('rollback only metrics row', DB_US);
+
+    expect(getCachedMetrics(keyword, DB_US)).toBeNull();
+    db.prepare('DELETE FROM keyword_metrics_cache WHERE keyword = ? AND database_region = ?')
+      .run('rollback only metrics row', DB_US);
+  });
+
   it('handles numeric zero values correctly (not treated as missing)', () => {
     const kw = trackKw('zero values edge case keyword test');
     cacheMetrics(makeMetrics(kw, { volume: 0, difficulty: 0, cpc: 0, competition: 0, results: 0 }), DB_US);
@@ -477,7 +525,7 @@ describe('edge cases', () => {
     const kw = trackKw("what's the best seo? special chars test!");
     cacheMetrics(makeMetrics(kw, { volume: 123 }), DB_US);
 
-    // keywordComparisonKey strips punctuation; both should resolve same key
+    // The Unicode-safe identity retains meaningful syntax while normalizing case.
     const result = getCachedMetrics(kw, DB_US);
     expect(result?.volume).toBe(123);
   });

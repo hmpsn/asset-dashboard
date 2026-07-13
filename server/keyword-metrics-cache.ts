@@ -9,7 +9,8 @@
 import db from './db/index.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
-import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import { keywordIdentityKeyV2 } from '../shared/keyword-normalization.js';
+import { KEYWORD_IDENTITY_VERSIONS } from '../shared/types/keyword-identity.js';
 
 const log = createLogger('keyword-metrics-cache');
 
@@ -24,7 +25,9 @@ export interface CachedKeywordMetrics {
 }
 
 interface MetricRow {
-  keyword: string;
+  identity_version: string;
+  identity_key: string;
+  raw_keyword: string;
   database_region: string;
   volume: number;
   difficulty: number;
@@ -40,16 +43,27 @@ interface MetricRow {
 let _getOne: ReturnType<typeof db.prepare> | null = null;
 function getOneStmt() {
   return (_getOne ??= db.prepare(
-    `SELECT * FROM keyword_metrics_cache WHERE keyword = ? AND database_region = ?`
+    `SELECT * FROM keyword_metrics_cache_v2
+     WHERE identity_version = ? AND identity_key = ? AND database_region = ?`
   ));
 }
 
 let _upsert: ReturnType<typeof db.prepare> | null = null;
 function upsertStmt() {
   return (_upsert ??= db.prepare(`
-    INSERT INTO keyword_metrics_cache (keyword, database_region, volume, difficulty, cpc, competition, results, trend, cached_at)
-    VALUES (@keyword, @database_region, @volume, @difficulty, @cpc, @competition, @results, @trend, @cached_at)
-    ON CONFLICT(keyword, database_region) DO UPDATE SET
+    INSERT INTO keyword_metrics_cache_v2 (
+      identity_version, identity_key, raw_keyword, database_region,
+      volume, difficulty, cpc, competition, results, trend, cached_at
+    ) VALUES (
+      @identity_version, @identity_key, @raw_keyword, @database_region,
+      @volume, @difficulty, @cpc, @competition, @results, @trend, @cached_at
+    )
+    ON CONFLICT(identity_version, identity_key, database_region) DO UPDATE SET
+      raw_keyword = CASE
+        WHEN excluded.raw_keyword < keyword_metrics_cache_v2.raw_keyword COLLATE BINARY
+          THEN excluded.raw_keyword
+        ELSE keyword_metrics_cache_v2.raw_keyword
+      END,
       volume = excluded.volume,
       difficulty = excluded.difficulty,
       cpc = excluded.cpc,
@@ -63,15 +77,15 @@ function upsertStmt() {
 let _cleanup: ReturnType<typeof db.prepare> | null = null;
 function cleanupStmt() {
   return (_cleanup ??= db.prepare(
-    `DELETE FROM keyword_metrics_cache WHERE cached_at < ?`
+    `DELETE FROM keyword_metrics_cache_v2 WHERE cached_at < ?`
   ));
 }
 
 // ── Helpers ──
 
-function rowToMetrics(r: MetricRow): CachedKeywordMetrics {
+function rowToMetrics(r: MetricRow, requestedKeyword: string): CachedKeywordMetrics {
   return {
-    keyword: r.keyword,
+    keyword: requestedKeyword,
     volume: r.volume,
     difficulty: r.difficulty,
     cpc: r.cpc,
@@ -97,15 +111,17 @@ export function getCachedMetrics(
   database = 'us',
   maxAgeHours = 720 // 30 days
 ): CachedKeywordMetrics | null {
-  const row = getOneStmt().get(keywordComparisonKey(keyword), database) as MetricRow | undefined;
+  const identityKey = keywordIdentityKeyV2(keyword);
+  if (!identityKey) return null;
+  const row = getOneStmt().get(KEYWORD_IDENTITY_VERSIONS.V2, identityKey, database) as MetricRow | undefined;
   if (!row) return null;
   if (isStale(row.cached_at, maxAgeHours)) return null;
-  return rowToMetrics(row);
+  return rowToMetrics(row, keyword);
 }
 
 /**
  * Look up multiple keywords in the global cache.
- * Returns a Map of keyword comparison key → metrics for found/fresh entries.
+ * Returns a Map of explicit v2 identity key → metrics for found/fresh entries.
  */
 export function getCachedMetricsBatch(
   keywords: string[],
@@ -118,10 +134,11 @@ export function getCachedMetricsBatch(
   // Use individual lookups (SQLite prepared statements are fast, avoids dynamic IN clause)
   const stmt = getOneStmt();
   for (const kw of keywords) {
-    const key = keywordComparisonKey(kw);
-    const row = stmt.get(key, database) as MetricRow | undefined;
+    const key = keywordIdentityKeyV2(kw);
+    if (!key) continue;
+    const row = stmt.get(KEYWORD_IDENTITY_VERSIONS.V2, key, database) as MetricRow | undefined;
     if (row && !isStale(row.cached_at, maxAgeHours)) {
-      result.set(key, rowToMetrics(row));
+      result.set(key, rowToMetrics(row, kw));
     }
   }
   return result;
@@ -134,8 +151,12 @@ export function cacheMetrics(
   metrics: CachedKeywordMetrics,
   database = 'us'
 ): void {
+  const identityKey = keywordIdentityKeyV2(metrics.keyword);
+  if (!identityKey) return;
   upsertStmt().run({
-    keyword: keywordComparisonKey(metrics.keyword),
+    identity_version: KEYWORD_IDENTITY_VERSIONS.V2,
+    identity_key: identityKey,
+    raw_keyword: metrics.keyword,
     database_region: database,
     volume: metrics.volume,
     difficulty: metrics.difficulty,
@@ -159,8 +180,12 @@ export function cacheMetricsBatch(
     const stmt = upsertStmt();
     const now = new Date().toISOString();
     for (const m of items) {
+      const identityKey = keywordIdentityKeyV2(m.keyword);
+      if (!identityKey) continue;
       stmt.run({
-        keyword: keywordComparisonKey(m.keyword),
+        identity_version: KEYWORD_IDENTITY_VERSIONS.V2,
+        identity_key: identityKey,
+        raw_keyword: m.keyword,
         database_region: database,
         volume: m.volume,
         difficulty: m.difficulty,

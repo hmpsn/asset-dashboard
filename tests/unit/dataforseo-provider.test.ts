@@ -48,6 +48,7 @@ process.env.DATAFORSEO_PASSWORD = 'test-password';
 import fs from 'fs';
 import { DataForSeoProvider, flushCreditsToDisk } from '../../server/providers/dataforseo-provider.js';
 import { getCachedMetricsBatch, cacheMetricsBatch } from '../../server/keyword-metrics-cache.js';
+import { keywordIdentityKeyV2 } from '../../shared/keyword-normalization.js';
 
 beforeEach(() => {
   loggerMocks.info.mockReset();
@@ -320,7 +321,7 @@ describe('DataForSeoProvider — getReferringDomains lastSeen', () => {
 describe('DataForSeoProvider — keyword difficulty endpoint', () => {
   beforeEach(() => {
     reapplyFsMocks();
-    vi.mocked(getCachedMetricsBatch).mockReturnValue(new Map());
+    vi.mocked(getCachedMetricsBatch).mockReset().mockReturnValue(new Map());
     vi.mocked(cacheMetricsBatch).mockReset();
   });
 
@@ -391,8 +392,12 @@ describe('DataForSeoProvider — keyword difficulty endpoint', () => {
     const difficultyPayload = JSON.parse((fetchSpy.mock.calls[1][1] as RequestInit).body as string);
     expect(volumePayload[0].location_code).toBe(1022162);
     expect(difficultyPayload[0].location_code).toBe(1022162);
-    // P1: cache region is versioned + language-aware (v2:<locationCode>:<lang>).
-    expect(getCachedMetricsBatch).toHaveBeenCalledWith(['teeth whitening'], 'v2:1022162:en', expect.any(Number));
+    // K3b: cache region is language-aware and tied to keyword identity v2.
+    expect(getCachedMetricsBatch).toHaveBeenCalledWith(
+      ['teeth whitening'],
+      'v3:kid-v2:1022162:en',
+      expect.any(Number),
+    );
   });
 
   it('uses keyword_difficulty from keyword_info in getRelatedKeywords', async () => {
@@ -420,6 +425,7 @@ describe('DataForSeoProvider — keyword difficulty endpoint', () => {
     ];
     vi.spyOn(fs, 'existsSync').mockImplementation(pathLike => String(pathLike).includes('.dataforseo-cache'));
     vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined as never);
+    vi.spyOn(fs, 'writeFileSync').mockReturnValue(undefined);
     vi.spyOn(fs, 'readFileSync').mockImplementation(() => JSON.stringify({
       cachedAt: new Date().toISOString(),
       data: cached,
@@ -552,30 +558,106 @@ describe('DataForSeoProvider — L1 global SQLite cache', () => {
     expect(results[0].difficulty).toBe(42);
   });
 
-  it('falls back to legacy national L1 cache keys before making an API call', async () => {
-    vi.mocked(getCachedMetricsBatch).mockClear();
-    vi.mocked(getCachedMetricsBatch)
-      .mockReturnValueOnce(new Map())
-      .mockReturnValueOnce(new Map([
-        ['legacy keyword', { keyword: 'legacy keyword', volume: 1200, difficulty: 35, cpc: 1.1, competition: 0.2, results: 0, trend: [] }],
-      ]));
-
+  it('returns each caller raw spelling from an equivalent L1 cache hit', async () => {
+    const requested = 'cafe\u0301 metrics';
+    vi.mocked(getCachedMetricsBatch).mockReturnValueOnce(new Map([
+      [keywordIdentityKeyV2(requested), {
+        keyword: 'caf\u00e9 metrics',
+        volume: 777,
+        difficulty: 31,
+        cpc: 1,
+        competition: 0.2,
+        results: 0,
+        trend: [],
+      }],
+    ]));
     const fetchSpy = vi.spyOn(global, 'fetch');
+
+    const results = await new DataForSeoProvider().getKeywordMetrics([requested], 'ws-l1-raw', 'us');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(results).toEqual([expect.objectContaining({ keyword: requested, volume: 777 })]);
+  });
+
+  it('returns caller raw spelling from an equivalent per-workspace L2 cache hit', async () => {
+    const requested = 'cafe\u0301 metrics';
+    const globalCallsBefore = vi.mocked(getCachedMetricsBatch).mock.calls.length;
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined as never);
+    vi.spyOn(fs, 'readFileSync').mockImplementation(() => JSON.stringify({
+      cachedAt: new Date().toISOString(),
+      data: {
+        keyword: 'caf\u00e9 metrics',
+        volume: 888,
+        difficulty: 32,
+        cpc: 1,
+        competition: 0.2,
+        results: 0,
+        trend: [],
+      },
+    }));
+    const fetchSpy = vi.spyOn(global, 'fetch');
+
+    const results = await new DataForSeoProvider().getKeywordMetrics([requested], 'ws-l2-raw', 'us');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(getCachedMetricsBatch).toHaveBeenCalledTimes(globalCallsBefore);
+    expect(results).toEqual([expect.objectContaining({ keyword: requested, volume: 888 })]);
+  });
+
+  it('skips punctuation-only identities before cache or provider calls', async () => {
+    const globalCallsBefore = vi.mocked(getCachedMetricsBatch).mock.calls.length;
+    const fetchSpy = vi.spyOn(global, 'fetch');
+
+    const results = await new DataForSeoProvider().getKeywordMetrics(['!!!', '   '], 'ws-blank-v2', 'us');
+
+    expect(results).toEqual([]);
+    expect(getCachedMetricsBatch).toHaveBeenCalledTimes(globalCallsBefore);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('joins composed and decomposed provider difficulty results by v2 identity', async () => {
+    const requested = 'cafe\u0301 metrics';
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => dfsTaskResponse([{
+          keyword: requested,
+          search_volume: 500,
+          competition_index: 12,
+          cpc: 1,
+          competition: 0.2,
+          monthly_searches: [],
+        }]),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => dfsTaskResponse([{ keyword: 'caf\u00e9 metrics', keyword_difficulty: 73 }]),
+      } as Response);
+
+    const results = await new DataForSeoProvider().getKeywordMetrics([requested], 'ws-kd-v2-join', 'us');
+
+    expect(results).toEqual([expect.objectContaining({ keyword: requested, difficulty: 73 })]);
+  });
+
+  it('does not read rollback-only legacy national L1 cache keys', async () => {
+    vi.mocked(getCachedMetricsBatch).mockClear();
+    vi.mocked(getCachedMetricsBatch).mockReturnValue(new Map());
+
+    const fetchSpy = vi.spyOn(global, 'fetch').mockRejectedValue(new Error('provider unavailable'));
 
     const provider = new DataForSeoProvider();
     const results = await provider.getKeywordMetrics(['legacy keyword'], 'ws-legacy-cache', 'us');
 
-    expect(fetchSpy).not.toHaveBeenCalled();
-    // P1: primary lookup is the versioned/language-aware region; the legacy
-    // fallback now reads the pre-version language-blind geo region (2840) so an
-    // 'en' caller's already-warmed rows stay reachable.
-    expect(getCachedMetricsBatch).toHaveBeenNthCalledWith(1, ['legacy keyword'], 'v2:2840:en', expect.any(Number));
-    expect(getCachedMetricsBatch).toHaveBeenNthCalledWith(2, ['legacy keyword'], '2840', expect.any(Number));
-    expect(cacheMetricsBatch).toHaveBeenCalledWith(
-      expect.arrayContaining([expect.objectContaining({ keyword: 'legacy keyword', volume: 1200 })]),
-      'v2:2840:en',
+    expect(fetchSpy).toHaveBeenCalled();
+    expect(getCachedMetricsBatch).toHaveBeenCalledTimes(1);
+    expect(getCachedMetricsBatch).toHaveBeenCalledWith(
+      ['legacy keyword'],
+      'v3:kid-v2:2840:en',
+      expect.any(Number),
     );
-    expect(results[0].volume).toBe(1200);
+    expect(cacheMetricsBatch).not.toHaveBeenCalled();
+    expect(results).toEqual([]);
   });
 
   it('writes API results to L1 cache after fetching', async () => {
@@ -605,7 +687,7 @@ describe('DataForSeoProvider — L1 global SQLite cache', () => {
     expect(global.fetch).toHaveBeenCalled();
     expect(cacheSpy).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ keyword: 'l1-write-test-kw', volume: 5000 })]),
-      'v2:2840:en'
+      'v3:kid-v2:2840:en'
     );
   });
 });
@@ -781,6 +863,7 @@ describe('DataForSeoProvider — keyword discovery endpoints', () => {
     }];
     vi.spyOn(fs, 'existsSync').mockImplementation(pathLike => String(pathLike).includes('.dataforseo-cache'));
     vi.spyOn(fs, 'mkdirSync').mockReturnValue(undefined as never);
+    vi.spyOn(fs, 'writeFileSync').mockReturnValue(undefined);
     vi.spyOn(fs, 'readFileSync').mockImplementation(() => JSON.stringify({
       cachedAt: new Date().toISOString(),
       data: cached,
@@ -1291,7 +1374,7 @@ describe('DataForSeoProvider — P4 domain-method geo threading', () => {
     flushCreditsToDisk();
   });
 
-  it('versions the flag-ON cache key on v2:<locationCode>:<language> (geo isolation)', async () => {
+  it('keeps non-metrics cache keys on v2:<locationCode>:<language> (geo isolation)', async () => {
     reapplyFsMocks();
     const writeSpy = vi.spyOn(fs, 'writeFileSync');
     const provider = new DataForSeoProvider();
@@ -1299,7 +1382,7 @@ describe('DataForSeoProvider — P4 domain-method geo threading', () => {
     await provider.getDomainKeywords('example.com', 'ws-p4-cache-on', 100, undefined, 2826, 'en');
     const domainWrite = writeSpy.mock.calls.find(c => String(c[0]).includes('domain_ranked'));
     expect(domainWrite).toBeDefined();
-    // getCachePath sanitizes ':' → '_', so the v2:2826:en token lands as v2_2826_en.
+    // getCachePath sanitizes ':' → '_'.
     expect(String(domainWrite![0])).toContain('domain_ranked_v2_2826_en_');
     flushCreditsToDisk();
   });

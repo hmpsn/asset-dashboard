@@ -28,7 +28,9 @@ vi.mock('../../server/db/json-validation.js', () => ({
 
 function makeMetricRow(overrides: Record<string, unknown> = {}) {
   return {
-    keyword: 'emergency plumber austin',
+    identity_version: 'v2',
+    identity_key: 'emergency plumber austin',
+    raw_keyword: 'emergency plumber austin',
     database_region: 'us',
     volume: 320,
     difficulty: 42,
@@ -105,7 +107,7 @@ describe('getCachedMetrics', () => {
     const { getCachedMetrics } = await import('../../server/keyword-metrics-cache.js');
     getCachedMetrics('emergency plumber austin');
     // The get call should have been made with the normalized key and 'us'
-    expect(mockGet).toHaveBeenCalledWith(expect.any(String), 'us');
+    expect(mockGet).toHaveBeenCalledWith('v2', expect.any(String), 'us');
   });
 });
 
@@ -126,7 +128,7 @@ describe('getCachedMetricsBatch', () => {
     const freshRow = makeMetricRow({ keyword: 'pipe repair austin' });
     const staleRow = makeMetricRow({ keyword: 'cheap plumber', cached_at: new Date(Date.now() - 800 * 60 * 60 * 1000).toISOString() });
 
-    mockGet.mockImplementation((_key: string, _db: string) => {
+    mockGet.mockImplementation((_version: string, _key: string, _db: string) => {
       if (_key === 'pipe repair austin') return freshRow;
       if (_key === 'cheap plumber') return staleRow;
       return undefined;
@@ -154,7 +156,9 @@ describe('cacheMetrics', () => {
 
     expect(mockRun).toHaveBeenCalledWith(
       expect.objectContaining({
-        keyword: 'emergency plumber austin', // keywordComparisonKey normalizes to lowercase
+        identity_version: 'v2',
+        identity_key: 'emergency plumber austin',
+        raw_keyword: 'emergency plumber austin',
         database_region: 'us',
         volume: 320,
         difficulty: 42,
