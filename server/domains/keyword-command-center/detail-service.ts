@@ -1,4 +1,7 @@
-import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
+import {
+  keywordComparisonKey,
+  keywordIdentityKeyV2,
+} from '../../../shared/keyword-normalization.js';
 import type { KeywordCommandCenterDetailResponse } from '../../../shared/types/keyword-command-center.js';
 import { LOCAL_SEO_MARKET_STATUS, type LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo.js';
 import type { OutcomeReadback } from '../../../shared/types/outcome-tracking.js';
@@ -6,11 +9,6 @@ import { buildLocalSeoKeywordVisibilityForKeyword } from '../local-seo/snapshot-
 import { createLogger } from '../../logger.js';
 import { getScoredOutcomeReadbacks, STRATEGY_PAGE_KEYWORD_SOURCE_TYPE, strategyPageKeywordSourceId } from '../../outcome-tracking.js';
 import { listPublishedPostPagePaths } from '../../content-posts-db.js';
-import {
-  filterMapByKeys,
-  filterStrategyForSingleKeyword,
-  pageMatchesKeyword,
-} from './bundle-filters.js';
 import {
   buildValueScoringConfig,
   ensureLocalVisibilityRows,
@@ -25,6 +23,16 @@ import {
 
 const log = createLogger('keyword-command-center');
 
+function selectExactIdentity<T>(items: T[], query: string, value: (item: T) => string): T[] {
+  const queryV2 = keywordIdentityKeyV2(query);
+  const exact = queryV2
+    ? items.filter(item => keywordIdentityKeyV2(value(item)) === queryV2)
+    : [];
+  if (exact.length > 0) return exact;
+  const queryV1 = keywordComparisonKey(query);
+  return items.filter(item => keywordComparisonKey(value(item)) === queryV1);
+}
+
 export async function buildKeywordCommandCenterDetail(
   workspaceId: string,
   keyword: string,
@@ -32,40 +40,62 @@ export async function buildKeywordCommandCenterDetail(
 ): Promise<KeywordCommandCenterDetailResponse | null> {
   const startedAt = Date.now();
   const normalized = keywordComparisonKey(keyword);
-  if (!normalized) return null;
+  const identityV2 = keywordIdentityKeyV2(keyword);
+  if (!normalized || !identityV2) return null;
   const snapshot = options.sourceSnapshot ?? buildKeywordCommandCenterSourceSnapshot(workspaceId, {
     includeScoring: true,
   });
   if (!snapshot) return null;
   const { workspace } = snapshot;
-  const pageMap = snapshot.pageMap.filter(page => pageMatchesKeyword(page, normalized));
-  const contentGaps = snapshot.contentGaps.filter(gap => keywordComparisonKey(gap.targetKeyword) === normalized);
-  const keywordGaps = snapshot.keywordGaps.filter(gap => keywordComparisonKey(gap.keyword) === normalized);
-  const trackedKeywords = snapshot.trackedKeywords.filter(entry => keywordComparisonKey(entry.query) === normalized);
+  const pageKeywordEntries = snapshot.pageMap.flatMap(page =>
+    [page.primaryKeyword, ...(page.secondaryKeywords ?? [])].map(pageKeyword => ({ page, pageKeyword })),
+  );
+  const selectedPageEntries = selectExactIdentity(pageKeywordEntries, keyword, entry => entry.pageKeyword);
+  const pageMap = [...new Set(selectedPageEntries.map(entry => entry.page))].map(page => {
+    const selected = selectedPageEntries
+      .filter(entry => entry.page === page)
+      .map(entry => entry.pageKeyword);
+    const primarySelected = selected.includes(page.primaryKeyword);
+    if (primarySelected) {
+      return { ...page, secondaryKeywords: (page.secondaryKeywords ?? []).filter(item => selected.includes(item)) };
+    }
+    const [primaryKeyword, ...secondaryKeywords] = selected;
+    return { ...page, primaryKeyword, secondaryKeywords };
+  });
+  const contentGaps = selectExactIdentity(snapshot.contentGaps, keyword, gap => gap.targetKeyword);
+  const keywordGaps = selectExactIdentity(snapshot.keywordGaps, keyword, gap => gap.keyword);
+  const trackedKeywords = selectExactIdentity(snapshot.trackedKeywords, keyword, entry => entry.query);
   // Load all ranks for variant aggregation — populateDraftRows uses variantParentMap to
   // cluster GSC query variants (e.g. "teeth whitening san antonio") under their canonical
   // keyword. Filtering to exact matches here would prevent variant metrics from rolling up.
   // Use the filtered set only for the hasBaseSource check below.
   const allLatestRanks = snapshot.latestRanks;
-  const latestRanks = allLatestRanks.filter(rank => keywordComparisonKey(rank.query) === normalized);
-  const feedback = filterMapByKeys(snapshot.feedback, new Set([normalized]));
-  const lostVisibilityRows = snapshot.lostVisibilityRows.filter(row => keywordComparisonKey(row.query) === normalized);
+  const latestRanks = selectExactIdentity(allLatestRanks, keyword, rank => rank.query);
+  const selectedFeedback = selectExactIdentity([...snapshot.feedback.values()], keyword, row => row.keyword);
+  const feedback = new Map(selectedFeedback.map(row => [
+    row.keyword_v2 ?? row.keyword_v1 ?? keywordComparisonKey(row.keyword),
+    row,
+  ] as const));
+  const lostVisibilityRows = selectExactIdentity(snapshot.lostVisibilityRows, keyword, row => row.query);
   // #19b: resolve siteKeywordMetrics table-first (blob fallback) before filtering.
-  const strategy = filterStrategyForSingleKeyword(
-    snapshot.strategy,
-    normalized,
-  );
+  const strategy = snapshot.strategy
+    ? {
+      ...snapshot.strategy,
+      siteKeywords: selectExactIdentity(snapshot.strategy.siteKeywords ?? [], keyword, item => item),
+      siteKeywordMetrics: selectExactIdentity(snapshot.strategy.siteKeywordMetrics ?? [], keyword, item => item.keyword),
+    }
+    : snapshot.strategy;
   const localVisibility = options.includeLocalSeo
-    ? buildLocalSeoKeywordVisibilityForKeyword(workspace.id, normalized)
+    ? buildLocalSeoKeywordVisibilityForKeyword(workspace.id, keyword)
     : undefined;
   const localVisibilityByKeyword = localVisibility
-    ? new Map([[normalized, localVisibility]])
+    ? new Map([[identityV2, localVisibility]])
     : new Map<string, LocalSeoKeywordVisibilitySummary>();
   const activeLocalMarketCount = options.includeLocalSeo
     ? snapshot.scoringContext?.markets.filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE).length ?? 0
     : 0;
   const hasStrategyKeyword = Boolean((strategy?.siteKeywords?.length ?? 0) > 0 || (strategy?.siteKeywordMetrics?.length ?? 0) > 0);
-  const hasLocalVisibility = localVisibilityByKeyword.has(normalized);
+  const hasLocalVisibility = localVisibilityByKeyword.has(identityV2);
   const hasBaseSource = hasStrategyKeyword
     || pageMap.length > 0
     || contentGaps.length > 0
@@ -95,8 +125,10 @@ export async function buildKeywordCommandCenterDetail(
   });
   ensureLocalVisibilityRows(rows, localVisibilityByKeyword);
   const publishedPagePaths = listPublishedPostPagePaths(workspace.id);
-  const row = rows.get(normalized)
-    ? finalizeDraftRow(rows.get(normalized)!, {
+  const detailRow = [...new Set(rows.values())].find(item => keywordIdentityKeyV2(item.keyword) === identityV2)
+    ?? [...new Set(rows.values())].find(item => keywordComparisonKey(item.keyword) === normalized);
+  const row = detailRow
+    ? finalizeDraftRow(detailRow, {
       workspaceId: workspace.id,
       localVisibilityByKeyword,
       activeLocalMarketCount,

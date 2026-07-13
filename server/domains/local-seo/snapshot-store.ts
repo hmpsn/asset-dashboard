@@ -5,7 +5,11 @@ import db from '../../db/index.js';
 import { parseJsonSafeArray } from '../../db/json-validation.js';
 import { createStmtCache } from '../../db/stmt-cache.js';
 import { createLogger } from '../../logger.js';
-import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
+import {
+  keywordComparisonKey,
+  keywordIdentityKeyV1,
+  keywordIdentityKeyV2,
+} from '../../../shared/keyword-normalization.js';
 import {
   LOCAL_SEO_MAX_RESULTS,
   evaluateLocalBusinessMatch,
@@ -26,7 +30,6 @@ import {
   type LocalSeoKeywordVisibility,
   type LocalSeoKeywordVisibilitySummary,
   type LocalSeoMarket,
-  type LocalSeoVisibilityTrendPoint,
   type LocalSeoVisibilityTrendSeries,
   type LocalVisibilityBusinessResult,
   type LocalVisibilityProviderResult,
@@ -55,6 +58,7 @@ interface SnapshotRow {
   workspace_id: string;
   keyword: string;
   normalized_keyword: string;
+  normalized_keyword_v2: string | null;
   market_id: string;
   market_label: string;
   captured_at: string;
@@ -76,8 +80,10 @@ interface SnapshotRow {
 }
 
 export interface SnapshotSummaryRow {
+  id: string;
   keyword: string;
   normalized_keyword: string;
+  normalized_keyword_v2?: string | null;
   market_id: string;
   market_label: string;
   captured_at: string;
@@ -88,16 +94,17 @@ export interface SnapshotSummaryRow {
   local_rank: number | null;
   source_endpoint: string;
   provider: string;
+  device: string;
+  language_code: string;
   status: string;
   degraded_reason: string | null;
 }
 
-interface VisibilityTrendRow {
-  market_id: string;
+interface VisibilityTrendSnapshotRow extends SnapshotIdentityRow {
   market_label: string;
-  day: string;
-  visible_count: number;
-  checked_count: number;
+  business_found: number;
+  business_match_confidence: string;
+  status: string;
 }
 
 interface CompetitorSnapshotRow {
@@ -142,12 +149,12 @@ export interface LocalVisibilitySnapshotMatchUpdate {
 const stmts = createStmtCache(() => ({
   insertSnapshot: db.prepare(`
     INSERT INTO local_visibility_snapshots (
-      id, workspace_id, keyword, normalized_keyword, market_id, market_label, captured_at,
+      id, workspace_id, keyword, normalized_keyword, normalized_keyword_v2, market_id, market_label, captured_at,
       local_pack_present, business_found, business_match_confidence, business_match_reason,
       local_rank, top_competitors, source_endpoint, provider, device, language_code, status,
       degraded_reason, matched_location_id, matched_location_name, raw_results
     ) VALUES (
-      @id, @workspace_id, @keyword, @normalized_keyword, @market_id, @market_label, @captured_at,
+      @id, @workspace_id, @keyword, @normalized_keyword, @normalized_keyword_v2, @market_id, @market_label, @captured_at,
       @local_pack_present, @business_found, @business_match_confidence, @business_match_reason,
       @local_rank, @top_competitors, @source_endpoint, @provider, @device, @language_code, @status,
       @degraded_reason, @matched_location_id, @matched_location_name, @raw_results
@@ -174,38 +181,27 @@ const stmts = createStmtCache(() => ({
     WHERE workspace_id = ? AND status != ?
   `),
   latestSnapshots: db.prepare(`
-    SELECT s.*
-    FROM local_visibility_snapshots s
-    WHERE s.workspace_id = ?
-      AND s.id IN (
-        SELECT MIN(id)
-        FROM local_visibility_snapshots
-        WHERE workspace_id = ?
-          AND (market_id, normalized_keyword, device, language_code, captured_at) IN (
-            SELECT market_id, normalized_keyword, device, language_code, MAX(captured_at)
-            FROM local_visibility_snapshots
-            WHERE workspace_id = ?
-            GROUP BY market_id, normalized_keyword, device, language_code
-          )
-        GROUP BY market_id, normalized_keyword, device, language_code
-      )
+    SELECT * FROM (
+      SELECT s.*, ROW_NUMBER() OVER (
+        PARTITION BY market_id,
+          CASE WHEN normalized_keyword_v2 IS NOT NULL AND normalized_keyword_v2 <> ''
+            THEN 'v2:' || normalized_keyword_v2 ELSE 'raw:' || keyword END,
+          device, language_code
+        ORDER BY captured_at DESC, id ASC
+      ) AS identity_rank
+      FROM local_visibility_snapshots s
+      WHERE workspace_id = ?
+    ) WHERE identity_rank = 1
   `),
-  latestSnapshotsByKeyword: db.prepare(`
-    SELECT s.*
-    FROM local_visibility_snapshots s
-    WHERE s.workspace_id = ? AND s.normalized_keyword = ?
-      AND s.id IN (
-        SELECT MIN(id)
-        FROM local_visibility_snapshots
-        WHERE workspace_id = ? AND normalized_keyword = ?
-          AND (market_id, normalized_keyword, device, language_code, captured_at) IN (
-            SELECT market_id, normalized_keyword, device, language_code, MAX(captured_at)
-            FROM local_visibility_snapshots
-            WHERE workspace_id = ? AND normalized_keyword = ?
-            GROUP BY market_id, normalized_keyword, device, language_code
-          )
-        GROUP BY market_id, normalized_keyword, device, language_code
-      )
+  latestSnapshotsByKeywordV2: db.prepare(`
+    SELECT * FROM (
+      SELECT s.*, ROW_NUMBER() OVER (
+        PARTITION BY market_id, normalized_keyword_v2, device, language_code
+        ORDER BY captured_at DESC, id ASC
+      ) AS identity_rank
+      FROM local_visibility_snapshots s
+      WHERE workspace_id = ? AND normalized_keyword_v2 = ?
+    ) WHERE identity_rank = 1
   `),
   listSnapshotsPageForBackfill: db.prepare(`
     SELECT * FROM local_visibility_snapshots
@@ -220,75 +216,12 @@ const stmts = createStmtCache(() => ({
     ORDER BY captured_at DESC, id ASC
     LIMIT ?
   `),
-  pruneWeeklyThinIds: db.prepare(`
-    SELECT s.id
-    FROM local_visibility_snapshots s
-    JOIN (
-      SELECT outer_k.market_id, outer_k.normalized_keyword, outer_k.device,
-             outer_k.language_code, top.week_start,
-             MIN(outer_k.id) AS keep_id
-      FROM local_visibility_snapshots outer_k
-      JOIN (
-        SELECT market_id, normalized_keyword, device, language_code,
-               date(captured_at, '-' || strftime('%w', captured_at) || ' days') AS week_start,
-               MAX(captured_at) AS max_captured_at
-        FROM local_visibility_snapshots
-        WHERE workspace_id = ?
-          AND captured_at < datetime('now', '-' || ? || ' days')
-          AND captured_at >= datetime('now', '-' || ? || ' days')
-        GROUP BY market_id, normalized_keyword, device, language_code, week_start
-      ) top ON outer_k.market_id = top.market_id
-           AND outer_k.normalized_keyword = top.normalized_keyword
-           AND outer_k.device = top.device
-           AND outer_k.language_code = top.language_code
-           AND date(outer_k.captured_at, '-' || strftime('%w', outer_k.captured_at) || ' days') = top.week_start
-           AND outer_k.captured_at = top.max_captured_at
-      WHERE outer_k.workspace_id = ?
-        AND outer_k.captured_at < datetime('now', '-' || ? || ' days')
-        AND outer_k.captured_at >= datetime('now', '-' || ? || ' days')
-      GROUP BY outer_k.market_id, outer_k.normalized_keyword, outer_k.device,
-               outer_k.language_code, top.week_start
-    ) keepers ON keepers.market_id = s.market_id
-             AND keepers.normalized_keyword = s.normalized_keyword
-             AND keepers.device = s.device
-             AND keepers.language_code = s.language_code
-             AND date(s.captured_at, '-' || strftime('%w', s.captured_at) || ' days') = keepers.week_start
-    WHERE s.workspace_id = ?
-      AND s.captured_at < datetime('now', '-' || ? || ' days')
-      AND s.captured_at >= datetime('now', '-' || ? || ' days')
-      AND s.id != keepers.keep_id
-      AND s.id NOT IN (
-        SELECT MIN(id)
-        FROM local_visibility_snapshots
-        WHERE workspace_id = ?
-          AND (captured_at, market_id, normalized_keyword, device, language_code) IN (
-            SELECT MAX(captured_at), market_id, normalized_keyword, device, language_code
-            FROM local_visibility_snapshots
-            WHERE workspace_id = ?
-            GROUP BY market_id, normalized_keyword, device, language_code
-          )
-        GROUP BY market_id, normalized_keyword, device, language_code
-      )
-    LIMIT ?
-  `),
-  pruneHardCutoffIds: db.prepare(`
-    SELECT s.id
-    FROM local_visibility_snapshots s
-    WHERE s.workspace_id = ?
-      AND s.captured_at < datetime('now', '-' || ? || ' days')
-      AND s.id NOT IN (
-        SELECT MIN(id)
-        FROM local_visibility_snapshots
-        WHERE workspace_id = ?
-          AND (captured_at, market_id, normalized_keyword, device, language_code) IN (
-            SELECT MAX(captured_at), market_id, normalized_keyword, device, language_code
-            FROM local_visibility_snapshots
-            WHERE workspace_id = ?
-            GROUP BY market_id, normalized_keyword, device, language_code
-          )
-        GROUP BY market_id, normalized_keyword, device, language_code
-      )
-    LIMIT ?
+  retentionRows: db.prepare(`
+    SELECT id, keyword, normalized_keyword, normalized_keyword_v2,
+           market_id, captured_at, device, language_code
+    FROM local_visibility_snapshots
+    WHERE workspace_id = ?
+    ORDER BY captured_at DESC, id ASC
   `),
   deleteSnapshotById: db.prepare(`
     DELETE FROM local_visibility_snapshots WHERE id = ? AND workspace_id = ?
@@ -301,27 +234,22 @@ const stmts = createStmtCache(() => ({
       AND status = 'success'
     ORDER BY captured_at DESC
   `),
-  visibilityTrend: db.prepare(`
-    SELECT
-      s.market_id AS market_id,
-      s.market_label AS market_label,
-      date(s.captured_at) AS day,
-      COUNT(DISTINCT CASE
-        WHEN s.business_found = 1 AND s.business_match_confidence = ?
-        THEN s.normalized_keyword || '::' || s.device || '::' || s.language_code
-      END) AS visible_count,
-      COUNT(DISTINCT s.normalized_keyword || '::' || s.device || '::' || s.language_code) AS checked_count
-    FROM local_visibility_snapshots s
-    WHERE s.workspace_id = ?
-      AND s.status NOT IN (?, ?)
-      AND s.captured_at >= datetime('now', '-${RETENTION_RAW_DAYS} days')
-    GROUP BY s.market_id, s.market_label, day
-    ORDER BY s.market_id ASC, day ASC
+  visibilityTrendRows: db.prepare(`
+    SELECT id, keyword, normalized_keyword, normalized_keyword_v2,
+           market_id, market_label, captured_at, device, language_code,
+           business_found, business_match_confidence, status
+    FROM local_visibility_snapshots
+    WHERE workspace_id = ?
+      AND status NOT IN (?, ?)
+      AND captured_at >= datetime('now', '-${RETENTION_RAW_DAYS} days')
+    ORDER BY market_id ASC, captured_at ASC, id ASC
   `),
   latestSnapshotSummary: db.prepare(`
     SELECT
+      s.id,
       s.keyword,
       s.normalized_keyword,
+      s.normalized_keyword_v2,
       s.market_id,
       s.market_label,
       s.captured_at,
@@ -332,22 +260,22 @@ const stmts = createStmtCache(() => ({
       s.local_rank,
       s.source_endpoint,
       s.provider,
+      s.device,
+      s.language_code,
       s.status,
       s.degraded_reason
-    FROM local_visibility_snapshots s
-    WHERE s.workspace_id = ? AND s.status != ?
-      AND s.id IN (
-        SELECT MIN(id)
-        FROM local_visibility_snapshots
-        WHERE workspace_id = ? AND status != ?
-          AND (market_id, normalized_keyword, device, language_code, captured_at) IN (
-            SELECT market_id, normalized_keyword, device, language_code, MAX(captured_at)
-            FROM local_visibility_snapshots
-            WHERE workspace_id = ? AND status != ?
-            GROUP BY market_id, normalized_keyword, device, language_code
-          )
-        GROUP BY market_id, normalized_keyword, device, language_code
-      )
+    FROM (
+      SELECT source.*, ROW_NUMBER() OVER (
+        PARTITION BY market_id,
+          CASE WHEN normalized_keyword_v2 IS NOT NULL AND normalized_keyword_v2 <> ''
+            THEN 'v2:' || normalized_keyword_v2 ELSE 'raw:' || keyword END,
+          device, language_code
+        ORDER BY captured_at DESC, id ASC
+      ) AS identity_rank
+      FROM local_visibility_snapshots source
+      WHERE workspace_id = ? AND status != ?
+    ) s
+    WHERE s.identity_rank = 1
   `),
 }));
 
@@ -364,7 +292,7 @@ function rowToSnapshot(row: SnapshotRow): LocalVisibilitySnapshot {
     id: row.id,
     workspaceId: row.workspace_id,
     keyword: row.keyword,
-    normalizedKeyword: row.normalized_keyword,
+    normalizedKeyword: row.normalized_keyword_v2 || keywordIdentityKeyV2(row.keyword) || row.normalized_keyword,
     marketId: row.market_id,
     marketLabel: row.market_label,
     capturedAt: row.captured_at,
@@ -446,7 +374,8 @@ export function storeLocalVisibilitySnapshot(
     id: snapshot.id,
     workspace_id: snapshot.workspaceId,
     keyword: snapshot.keyword,
-    normalized_keyword: snapshot.normalizedKeyword,
+    normalized_keyword: keywordIdentityKeyV1(snapshot.keyword),
+    normalized_keyword_v2: keywordIdentityKeyV2(snapshot.keyword),
     market_id: snapshot.marketId,
     market_label: snapshot.marketLabel,
     captured_at: snapshot.capturedAt,
@@ -469,31 +398,81 @@ export function storeLocalVisibilitySnapshot(
 }
 
 export function listLatestLocalVisibilitySnapshots(workspaceId: string): LocalVisibilitySnapshot[] {
-  const rows = stmts().latestSnapshots.all(workspaceId, workspaceId, workspaceId) as SnapshotRow[];
-  return rows.map(rowToSnapshot);
+  const rows = stmts().latestSnapshots.all(workspaceId) as SnapshotRow[];
+  return dedupeLatestSnapshotRows(rows).map(rowToSnapshot);
 }
 
 export function listLatestLocalVisibilitySnapshotsForKeyword(
   workspaceId: string,
-  normalizedKeyword: string,
+  keyword: string,
 ): LocalVisibilitySnapshot[] {
-  const rows = stmts().latestSnapshotsByKeyword.all(
-    workspaceId, normalizedKeyword,
-    workspaceId, normalizedKeyword,
-    workspaceId, normalizedKeyword,
-  ) as SnapshotRow[];
-  return rows.map(rowToSnapshot);
+  const keywordV2 = keywordIdentityKeyV2(keyword);
+  if (!keywordV2) return [];
+  const v2Rows = stmts().latestSnapshotsByKeywordV2.all(workspaceId, keywordV2) as SnapshotRow[];
+  if (v2Rows.length > 0) return dedupeLatestSnapshotRows(v2Rows).map(rowToSnapshot);
+  // Pre-backfill raw spellings can have different v1 keys while converging under
+  // NFKC (Café vs Cafe + combining mark), so a v1 predicate cannot be complete.
+  const rows = stmts().latestSnapshots.all(workspaceId) as SnapshotRow[];
+  const exactRecoverableRows = rows.filter(row => keywordIdentityKeyV2(row.keyword) === keywordV2);
+  return dedupeLatestSnapshotRows(exactRecoverableRows)
+    .map(rowToSnapshot);
 }
 
 export function listLatestLocalVisibilitySnapshotSummaryRows(workspaceId: string): SnapshotSummaryRow[] {
-  return stmts().latestSnapshotSummary.all(
-    workspaceId,
-    LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
-    workspaceId,
-    LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
+  const rows = stmts().latestSnapshotSummary.all(
     workspaceId,
     LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
   ) as SnapshotSummaryRow[];
+  return dedupeLatestSnapshotRows(rows);
+}
+
+type SnapshotIdentityRow = {
+  id: string;
+  keyword: string;
+  normalized_keyword: string;
+  normalized_keyword_v2?: string | null;
+  market_id: string;
+  captured_at: string;
+  device: string;
+  language_code: string;
+};
+
+/**
+ * SQLite cannot derive NFKC identities for pre-backfill rows. The SQL queries
+ * first bound each recoverable raw series, then this compatibility pass merges
+ * canonically equivalent spellings without collapsing meaning-distinct v2 keys.
+ */
+function dedupeLatestSnapshotRows<T extends SnapshotIdentityRow>(rows: T[]): T[] {
+  const latestBySeries = new Map<string, T>();
+  for (const row of rows) {
+    const identity = row.normalized_keyword_v2
+      || keywordIdentityKeyV2(row.keyword)
+      || `v1:${row.normalized_keyword}`;
+    const seriesKey = [row.market_id, identity, row.device, row.language_code].join('\u0000');
+    const current = latestBySeries.get(seriesKey);
+    if (
+      !current
+      || row.captured_at > current.captured_at
+      || (row.captured_at === current.captured_at && row.id < current.id)
+    ) {
+      latestBySeries.set(seriesKey, row);
+    }
+  }
+  return [...latestBySeries.values()];
+}
+
+function snapshotSeriesKey(row: SnapshotIdentityRow): string {
+  const identity = row.normalized_keyword_v2
+    || keywordIdentityKeyV2(row.keyword)
+    || `v1:${row.normalized_keyword}`;
+  return [row.market_id, identity, row.device, row.language_code].join('\u0000');
+}
+
+function sundayWeekStart(capturedAt: string): string {
+  const date = new Date(capturedAt);
+  if (!Number.isFinite(date.getTime())) return capturedAt.slice(0, 10);
+  date.setUTCDate(date.getUTCDate() - date.getUTCDay());
+  return date.toISOString().slice(0, 10);
 }
 
 function postureFromSummaryRow(row: SnapshotSummaryRow) {
@@ -526,7 +505,7 @@ function visibilityFromSummaryRow(row: SnapshotSummaryRow): LocalSeoKeywordVisib
     : LOCAL_VISIBILITY_SOURCE_ENDPOINT.GOOGLE_ORGANIC_SERP;
   const base = {
     keyword: row.keyword,
-    normalizedKeyword: row.normalized_keyword,
+    normalizedKeyword: row.normalized_keyword_v2 || keywordIdentityKeyV2(row.keyword) || row.normalized_keyword,
     marketId: row.market_id,
     marketLabel: row.market_label,
     capturedAt: row.captured_at,
@@ -582,10 +561,11 @@ function visibilityFromSummaryRow(row: SnapshotSummaryRow): LocalSeoKeywordVisib
 export function buildLocalSeoKeywordVisibilitySummaryByKey(workspaceId: string): Map<string, LocalSeoKeywordVisibilitySummary> {
   const grouped = new Map<string, LocalSeoKeywordVisibility[]>();
   for (const row of listLatestLocalVisibilitySnapshotSummaryRows(workspaceId)) {
-    if (!row.normalized_keyword) continue;
-    const current = grouped.get(row.normalized_keyword) ?? [];
+    const identity = row.normalized_keyword_v2 || keywordIdentityKeyV2(row.keyword) || row.normalized_keyword;
+    if (!identity) continue;
+    const current = grouped.get(identity) ?? [];
     current.push(visibilityFromSummaryRow(row));
-    grouped.set(row.normalized_keyword, current);
+    grouped.set(identity, current);
   }
   const summaries = new Map<string, LocalSeoKeywordVisibilitySummary>();
   for (const [key, visibility] of grouped) {
@@ -614,10 +594,10 @@ export function buildLocalSeoKeywordVisibilityByKey(workspaceId: string): Map<st
 
 export function buildLocalSeoKeywordVisibilityForKeyword(
   workspaceId: string,
-  normalizedKeyword: string,
+  keyword: string,
 ): LocalSeoKeywordVisibilitySummary | undefined {
   return localSeoKeywordVisibilitySummaryFromSnapshots(
-    listLatestLocalVisibilitySnapshotsForKeyword(workspaceId, normalizedKeyword),
+    listLatestLocalVisibilitySnapshotsForKeyword(workspaceId, keyword),
   );
 }
 
@@ -642,28 +622,53 @@ function buildLocalSeoVisibilityMap(
 }
 
 export function getLocalSeoVisibilityTrend(workspaceId: string): LocalSeoVisibilityTrendSeries[] {
-  const rows = stmts().visibilityTrend.all(
-    LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED,
+  const rows = stmts().visibilityTrendRows.all(
     workspaceId,
     LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
     LOCAL_VISIBILITY_STATUS.DEGRADED,
-  ) as VisibilityTrendRow[];
+  ) as VisibilityTrendSnapshotRow[];
 
-  const byMarket = new Map<string, LocalSeoVisibilityTrendSeries>();
+  const byMarketDay = new Map<string, {
+    marketId: string;
+    marketLabel: string;
+    date: string;
+    checked: Set<string>;
+    visible: Set<string>;
+  }>();
   for (const row of rows) {
-    let series = byMarket.get(row.market_id);
-    if (!series) {
-      series = { marketId: row.market_id, marketLabel: row.market_label, points: [] };
-      byMarket.set(row.market_id, series);
-    }
-    const point: LocalSeoVisibilityTrendPoint = {
-      date: row.day,
-      visibleCount: row.visible_count,
-      checkedCount: row.checked_count,
+    const date = row.captured_at.slice(0, 10);
+    const bucketKey = `${row.market_id}\u0000${date}`;
+    const bucket = byMarketDay.get(bucketKey) ?? {
+      marketId: row.market_id,
+      marketLabel: row.market_label,
+      date,
+      checked: new Set<string>(),
+      visible: new Set<string>(),
     };
-    series.points.push(point);
+    const seriesKey = snapshotSeriesKey(row);
+    bucket.checked.add(seriesKey);
+    if (row.business_found === 1 && row.business_match_confidence === LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED) {
+      bucket.visible.add(seriesKey);
+    }
+    byMarketDay.set(bucketKey, bucket);
   }
 
+  const byMarket = new Map<string, LocalSeoVisibilityTrendSeries>();
+  for (const bucket of byMarketDay.values()) {
+    const series = byMarket.get(bucket.marketId) ?? {
+      marketId: bucket.marketId,
+      marketLabel: bucket.marketLabel,
+      points: [],
+    };
+    series.points.push({
+      date: bucket.date,
+      visibleCount: bucket.visible.size,
+      checkedCount: bucket.checked.size,
+    });
+    byMarket.set(bucket.marketId, series);
+  }
+
+  for (const series of byMarket.values()) series.points.sort((a, b) => a.date.localeCompare(b.date));
   return [...byMarket.values()].sort((a, b) => {
     const aLast = a.points[a.points.length - 1]?.date ?? '';
     const bLast = b.points[b.points.length - 1]?.date ?? '';
@@ -746,50 +751,42 @@ export function updateLocalVisibilitySnapshotMatches(inputs: LocalVisibilitySnap
 
 export function runSnapshotRetentionPrune(workspaceId: string): { pruned: number } {
   let totalPruned = 0;
+  const rows = stmts().retentionRows.all(workspaceId) as SnapshotIdentityRow[];
+  const latestIdBySeries = new Map<string, string>();
+  for (const row of rows) {
+    const key = snapshotSeriesKey(row);
+    if (!latestIdBySeries.has(key)) latestIdBySeries.set(key, row.id);
+  }
 
-  let batch: Array<{ id: string }>;
-  do {
-    batch = stmts().pruneWeeklyThinIds.all(
-      workspaceId,
-      RETENTION_RAW_DAYS,
-      RETENTION_WEEKLY_MAX_DAYS,
-      workspaceId,
-      RETENTION_RAW_DAYS,
-      RETENTION_WEEKLY_MAX_DAYS,
-      workspaceId,
-      RETENTION_RAW_DAYS,
-      RETENTION_WEEKLY_MAX_DAYS,
-      workspaceId,
-      workspaceId,
-      RETENTION_PRUNE_BATCH_SIZE,
-    ) as Array<{ id: string }>;
-    if (batch.length > 0) {
-      db.transaction(() => {
-        for (const row of batch) {
-          stmts().deleteSnapshotById.run(row.id, workspaceId);
-        }
-      })();
-      totalPruned += batch.length;
+  const rawCutoff = Date.now() - RETENTION_RAW_DAYS * 24 * 60 * 60 * 1000;
+  const hardCutoff = Date.now() - RETENTION_WEEKLY_MAX_DAYS * 24 * 60 * 60 * 1000;
+  const weeklyWinner = new Map<string, string>();
+  for (const row of rows) {
+    const capturedAt = Date.parse(row.captured_at);
+    if (!Number.isFinite(capturedAt) || capturedAt >= rawCutoff || capturedAt < hardCutoff) continue;
+    const weekKey = `${snapshotSeriesKey(row)}\u0000${sundayWeekStart(row.captured_at)}`;
+    if (!weeklyWinner.has(weekKey)) weeklyWinner.set(weekKey, row.id);
+  }
+  const deleteIds: string[] = [];
+  for (const row of rows) {
+    if (latestIdBySeries.get(snapshotSeriesKey(row)) === row.id) continue;
+    const capturedAt = Date.parse(row.captured_at);
+    if (!Number.isFinite(capturedAt) || capturedAt >= rawCutoff) continue;
+    if (capturedAt < hardCutoff) {
+      deleteIds.push(row.id);
+      continue;
     }
-  } while (batch.length === RETENTION_PRUNE_BATCH_SIZE);
+    const weekKey = `${snapshotSeriesKey(row)}\u0000${sundayWeekStart(row.captured_at)}`;
+    if (weeklyWinner.get(weekKey) !== row.id) deleteIds.push(row.id);
+  }
 
-  do {
-    batch = stmts().pruneHardCutoffIds.all(
-      workspaceId,
-      RETENTION_WEEKLY_MAX_DAYS,
-      workspaceId,
-      workspaceId,
-      RETENTION_PRUNE_BATCH_SIZE,
-    ) as Array<{ id: string }>;
-    if (batch.length > 0) {
-      db.transaction(() => {
-        for (const row of batch) {
-          stmts().deleteSnapshotById.run(row.id, workspaceId);
-        }
-      })();
-      totalPruned += batch.length;
-    }
-  } while (batch.length === RETENTION_PRUNE_BATCH_SIZE);
+  for (let offset = 0; offset < deleteIds.length; offset += RETENTION_PRUNE_BATCH_SIZE) {
+    const batch = deleteIds.slice(offset, offset + RETENTION_PRUNE_BATCH_SIZE);
+    db.transaction(() => {
+      for (const id of batch) stmts().deleteSnapshotById.run(id, workspaceId);
+    })();
+    totalPruned += batch.length;
+  }
 
   if (totalPruned > 0) {
     log.info({ workspaceId, pruned: totalPruned }, 'local visibility snapshot retention prune complete');

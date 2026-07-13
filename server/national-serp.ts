@@ -168,6 +168,7 @@ export async function runNationalSerpRefreshJob(workspaceId: string, jobId: stri
         if (result.aiOverviewCited === true) aiOverviewsCited++;
         snapshots.push({
           query: keyword,
+          observedAt: new Date().toISOString(),
           position: result.position,
           matchedUrl: result.matchedUrl,
           features: result.features,

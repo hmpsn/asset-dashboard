@@ -1,4 +1,9 @@
-import { keywordComparisonKey, findBestParent } from '../../../shared/keyword-normalization.js';
+import {
+  keywordComparisonKey,
+  keywordIdentityKeyV1,
+  keywordIdentityKeyV2,
+  findBestParent,
+} from '../../../shared/keyword-normalization.js';
 import {
   type KeywordCommandCenterMetrics,
   type KeywordCommandCenterRow,
@@ -82,6 +87,33 @@ function addSource(row: DraftRow, source: KeywordCommandCenterSourceLabel): void
 
 function mergeMetrics(row: DraftRow, metrics: KeywordCommandCenterMetrics): void {
   row.metrics = mergeMetricsInto(row.keyword, row.metrics, metrics);
+}
+
+function distinctDraftRows(rows: Map<string, DraftRow>): DraftRow[] {
+  return [...new Set(rows.values())];
+}
+
+/**
+ * K3b keeps the public v1 comparison field stable while allowing recoverable
+ * v2 identities that collide under v1 to occupy distinct internal map slots.
+ */
+function ensureV2CompatibilityRow(rows: Map<string, DraftRow>, keyword: string): DraftRow | null {
+  const keywordV2 = keywordIdentityKeyV2(keyword);
+  if (!keywordV2) return ensureRow(rows, keyword);
+  const existing = distinctDraftRows(rows)
+    .find(row => keywordIdentityKeyV2(row.keyword) === keywordV2);
+  if (existing) return existing;
+
+  const keywordV1 = keywordIdentityKeyV1(keyword);
+  const row: DraftRow = {
+    keyword: keyword.trim(),
+    normalizedKeyword: keywordV1 || keywordV2,
+    sourceLabels: [],
+    metrics: {},
+  };
+  const standardKeyAvailable = keywordV1 && !rows.has(keywordV1);
+  rows.set(standardKeyAvailable ? keywordV1 : `compat-v2:${keywordV2}`, row);
+  return row;
 }
 
 export function safeLostVisibilityKeys(workspaceId: string): Set<string> {
@@ -209,7 +241,7 @@ export async function populateDraftRows(rows: Map<string, DraftRow>, bundle: Com
   }
 
   for (const keyword of bundle.trackedKeywords) {
-    const row = ensureRow(rows, keyword.query);
+    const row = ensureV2CompatibilityRow(rows, keyword.query);
     if (!row) continue;
     row.tracking = keyword;
     addSource(row, {
@@ -228,8 +260,8 @@ export async function populateDraftRows(rows: Map<string, DraftRow>, bundle: Com
     });
   }
 
-  for (const [normalized, row] of bundle.feedback) {
-    const draft = ensureRow(rows, row.keyword);
+  for (const row of bundle.feedback.values()) {
+    const draft = ensureV2CompatibilityRow(rows, row.keyword);
     if (!draft) continue;
     draft.feedback = feedbackState(row);
     addSource(draft, {
@@ -237,7 +269,6 @@ export async function populateDraftRows(rows: Map<string, DraftRow>, bundle: Com
       label: row.status === 'requested' ? 'Requested keyword' : 'Keyword feedback',
       detail: row.status,
     });
-    if (draft.normalizedKeyword !== normalized) rows.set(normalized, draft);
   }
 
   for (const lost of bundle.lostVisibilityRows ?? []) {
@@ -299,9 +330,39 @@ export async function populateDraftRows(rows: Map<string, DraftRow>, bundle: Com
   }
 
   if (isFeatureEnabled('national-serp-tracking', bundle.workspaceId)) {
-    for (const snap of getLatestSerpSnapshots(bundle.workspaceId)) {
-      const row = rows.get(keywordComparisonKey(snap.query));
+    const rowsByV2 = new Map(
+      distinctDraftRows(rows).map(row => [keywordIdentityKeyV2(row.keyword), row] as const),
+    );
+    const uniqueRowsByV1 = new Map<string, DraftRow>();
+    const ambiguousV1Keys = new Set<string>();
+    for (const row of distinctDraftRows(rows)) {
+      const keywordV1 = keywordIdentityKeyV1(row.keyword);
+      if (!keywordV1 || ambiguousV1Keys.has(keywordV1)) continue;
+      const existing = uniqueRowsByV1.get(keywordV1);
+      if (existing && existing !== row) {
+        uniqueRowsByV1.delete(keywordV1);
+        ambiguousV1Keys.add(keywordV1);
+      } else {
+        uniqueRowsByV1.set(keywordV1, row);
+      }
+    }
+    const snapshots = getLatestSerpSnapshots(bundle.workspaceId);
+    const v2ResolvedRows = new Set<DraftRow>();
+    for (const snap of snapshots.filter(snapshot => snapshot.identityVersion === 'v2')) {
+      const row = rowsByV2.get(keywordIdentityKeyV2(snap.query));
       if (!row) continue;
+      mergeMetrics(row, {
+        nationalPosition: snap.position,
+        matchedUrl: snap.matchedUrl,
+        serpFeatures: snap.features,
+        aiOverviewCited: snap.aiOverviewCited,
+        aiOverviewPresent: snap.aiOverviewPresent,
+      });
+      v2ResolvedRows.add(row);
+    }
+    for (const snap of snapshots.filter(snapshot => snapshot.identityVersion !== 'v2')) {
+      const row = uniqueRowsByV1.get(keywordIdentityKeyV1(snap.query));
+      if (!row || v2ResolvedRows.has(row)) continue;
       mergeMetrics(row, {
         nationalPosition: snap.position,
         matchedUrl: snap.matchedUrl,
@@ -352,7 +413,8 @@ export function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): Ke
   const protection = protectedReason(row.tracking);
   const explanationRole = row.explanation?.role;
   const isProtected = Boolean(protection);
-  const localSeo = context.localVisibilityByKeyword.get(row.normalizedKeyword);
+  const localSeo = context.localVisibilityByKeyword.get(keywordIdentityKeyV2(row.keyword))
+    ?? context.localVisibilityByKeyword.get(row.normalizedKeyword);
   const localSeoState = buildLocalSeoState(row, status, localSeo, context.activeLocalMarketCount);
   const finalized: KeywordCommandCenterRow = {
     keyword: row.keyword,
@@ -448,7 +510,8 @@ export function finalizeDraftRow(row: DraftRow, context: RowFinalizeContext): Ke
 }
 
 export function finalizeDraftRows(rows: Map<string, DraftRow>, context: RowFinalizeContext): FinalizedRows {
-  const rawEvidenceRows = [...rows.values()].filter(row => row.rawEvidenceOnly && !row.tracking && !row.feedback && !row.localCandidate);
+  const distinctRows = distinctDraftRows(rows);
+  const rawEvidenceRows = distinctRows.filter(row => row.rawEvidenceOnly && !row.tracking && !row.feedback && !row.localCandidate);
   const allowedRawEvidence = new Set(
     rawEvidenceRows
       .sort((a, b) => (b.metrics.volume ?? 0) - (a.metrics.volume ?? 0))
@@ -456,7 +519,7 @@ export function finalizeDraftRows(rows: Map<string, DraftRow>, context: RowFinal
       .map(row => row.normalizedKeyword),
   );
 
-  const finalRows = [...rows.values()]
+  const finalRows = distinctRows
     .filter(row => !row.rawEvidenceOnly || row.tracking || row.feedback || row.localCandidate || allowedRawEvidence.has(row.normalizedKeyword))
     .map(row => finalizeDraftRow(row, context))
     .sort(sortRows);
@@ -472,10 +535,9 @@ export function ensureLocalVisibilityRows(
   rows: Map<string, DraftRow>,
   localVisibilityByKeyword: Map<string, LocalSeoKeywordVisibilitySummary>,
 ): void {
-  for (const [normalizedKeyword, visibility] of localVisibilityByKeyword) {
-    const row = ensureRow(rows, visibility.keyword);
+  for (const visibility of localVisibilityByKeyword.values()) {
+    const row = ensureV2CompatibilityRow(rows, visibility.keyword);
     if (!row) continue;
-    if (row.normalizedKeyword !== normalizedKeyword) rows.set(normalizedKeyword, row);
     addSource(row, {
       kind: 'local_visibility',
       label: 'Local visibility',
