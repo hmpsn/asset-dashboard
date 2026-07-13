@@ -461,11 +461,10 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
       if (poolHit && poolHit.volume > 0 && poolHit.source !== 'gsc') {
         cg.volume = poolHit.volume;
         cg.difficulty = poolHit.difficulty;
-        if (poolHit.cpc != null) cg.cpc = poolHit.cpc;
-        if (poolHit.intent === 'informational' || poolHit.intent === 'commercial'
-          || poolHit.intent === 'transactional' || poolHit.intent === 'navigational') {
-          cg.intent = poolHit.intent;
-        }
+        cg.cpc = poolHit.cpc;
+        cg.cpcSource = poolHit.cpcSource;
+        cg.intent = poolHit.intent ?? cg.intent;
+        cg.intentSource = poolHit.intent ? poolHit.intentSource : cg.intentSource;
         poolEnriched++;
         continue;
       }
@@ -475,6 +474,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
         cg.volume = domainHit.volume;
         cg.difficulty = domainHit.difficulty;
         cg.cpc = domainHit.cpc;
+        cg.cpcSource = domainHit.cpc > 0 ? 'domain' : undefined;
         continue;
       }
       missingCgKws.push(cg.targetKeyword);

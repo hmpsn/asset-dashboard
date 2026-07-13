@@ -1,5 +1,5 @@
 // ── Workspace domain types ──────────────────────────────────────
-import type { MetricsSource, PageOptimizationScoreSnapshot, UrlLevelKeyword } from './keywords.ts';
+import type { KeywordSearchIntent, MetricsSource, PageOptimizationScoreSnapshot, UrlLevelKeyword } from './keywords.ts';
 import type { EeatAssetRecommendation, MissingTrustSignal } from './eeat-assets.ts';
 import type { ImpactBand } from './impact-band.ts';
 import type { OutcomeType } from './the-issue.ts';
@@ -78,7 +78,8 @@ export interface PageKeywordMap {
   pageTitle: string;
   primaryKeyword: string;
   secondaryKeywords: string[];
-  searchIntent?: string;
+  searchIntent?: KeywordSearchIntent;
+  intentSource?: string;
   currentPosition?: number;
   previousPosition?: number;
   impressions?: number;
@@ -89,6 +90,7 @@ export interface PageKeywordMap {
   volume?: number;
   difficulty?: number;
   cpc?: number;
+  cpcSource?: string;
   secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
   metricsSource?: MetricsSource;
   validated?: boolean;
@@ -154,7 +156,8 @@ export interface KeywordGapItem {
 export interface ContentGap {
   topic: string;           // suggested content topic
   targetKeyword: string;   // primary keyword to target
-  intent: 'informational' | 'commercial' | 'transactional' | 'navigational';
+  intent: KeywordSearchIntent;
+  intentSource?: string;
   priority: 'high' | 'medium' | 'low';
   rationale: string;       // why this content should be created
   suggestedPageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
@@ -173,6 +176,7 @@ export interface ContentGap {
   serpTargeting?: string[];
   // Cost-per-click from SEO provider (feeds commercialValue in the value scorer)
   cpc?: number;
+  cpcSource?: string;
   // Composite opportunity score (0–100): volume × ease × GSC signal × trend
   opportunityScore?: number;
   /**

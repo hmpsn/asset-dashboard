@@ -1,12 +1,14 @@
 import type { KeywordPoolCandidate } from '../keyword-strategy-helpers.js';
+import type { KeywordSearchIntent } from '../../shared/types/keywords.js';
 
 export interface StrategyPageMapEntry {
   pagePath: string;
   pageTitle?: string;
   primaryKeyword: string;
   secondaryKeywords?: string[];
-  intent?: string;
-  searchIntent?: string;
+  intent?: KeywordSearchIntent;
+  searchIntent?: KeywordSearchIntent;
+  intentSource?: string;
   rationale?: string;
   impressions?: number;
   clicks?: number;
@@ -20,6 +22,7 @@ export interface StrategyPageMapEntry {
   volume?: number;
   difficulty?: number;
   cpc?: number;
+  cpcSource?: string;
   metricsSource?: string;
   urlLevelKeywords?: { keyword: string; position: number; volume: number; difficulty: number; cpc: number; traffic?: number; url?: string }[];
   urlLevelKeywordSource?: 'semrush' | 'dataforseo';
@@ -31,7 +34,7 @@ export interface StrategyPageMapEntry {
 export interface StrategyContentGap {
   topic?: string;
   targetKeyword: string;
-  intent?: string;
+  intent?: KeywordSearchIntent;
   priority?: string;
   rationale?: string;
   suggestedPageType?: string;
@@ -46,6 +49,8 @@ export interface StrategyContentGap {
   opportunityScore?: number;
   /** Cost-per-click from SEO provider; feeds commercial value in downstream scoring. */
   cpc?: number;
+  cpcSource?: string;
+  intentSource?: string;
   /** SEO Generation Quality P2: re-admitted by the deterministic backfill floor. */
   backfilled?: boolean;
   /**
@@ -84,7 +89,8 @@ export interface PageMapping {
   pageTitle: string;
   primaryKeyword: string;
   secondaryKeywords: string[];
-  searchIntent: string;
+  searchIntent: KeywordSearchIntent;
+  intentSource?: string;
   currentPosition?: number;
   previousPosition?: number;
   impressions?: number;
@@ -93,6 +99,7 @@ export interface PageMapping {
   volume?: number;
   difficulty?: number;
   cpc?: number;
+  cpcSource?: string;
   metricsSource?: string;
   urlLevelKeywords?: { keyword: string; position: number; volume: number; difficulty: number; cpc: number; traffic?: number; url?: string }[];
   urlLevelKeywordSource?: 'semrush' | 'dataforseo';

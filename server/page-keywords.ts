@@ -9,6 +9,7 @@ import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import type { PageKeywordMap } from '../shared/types/workspace.ts';
 import type { MetricsSource, PageOptimizationScoreSnapshot, UrlLevelKeyword } from '../shared/types/keywords.js';
+import { isKeywordSearchIntent } from '../shared/types/keywords.js';
 import {
   EEAT_ASSET_TYPE,
   EEAT_RECOMMENDATION_SURFACE,
@@ -41,6 +42,8 @@ interface PageKeywordRow {
   volume: number | null;
   difficulty: number | null;
   cpc: number | null;
+  cpc_source: string | null;
+  intent_source: string | null;
   secondary_metrics: string | null;
   metrics_source: string | null;
   validated: number | null;
@@ -77,6 +80,8 @@ interface PageKeywordLiteRow {
   volume: number | null;
   difficulty: number | null;
   cpc: number | null;
+  cpc_source: string | null;
+  intent_source: string | null;
   topic_cluster: string | null;
 }
 
@@ -157,7 +162,7 @@ function rowToModel(r: PageKeywordRow, optimizationScoreHistory: PageOptimizatio
     pageTitle: r.page_title,
     primaryKeyword: r.primary_keyword,
     secondaryKeywords: parseJsonSafeArray(r.secondary_keywords, z.string(), { table: 'page_keywords', field: 'secondary_keywords' }),
-    searchIntent: r.search_intent ?? undefined,
+    searchIntent: isKeywordSearchIntent(r.search_intent) ? r.search_intent : undefined,
   };
   if (r.current_position != null) m.currentPosition = r.current_position;
   if (r.previous_position != null) m.previousPosition = r.previous_position;
@@ -167,6 +172,8 @@ function rowToModel(r: PageKeywordRow, optimizationScoreHistory: PageOptimizatio
   if (r.volume != null) m.volume = r.volume;
   if (r.difficulty != null) m.difficulty = r.difficulty;
   if (r.cpc != null) m.cpc = r.cpc;
+  if (r.cpc_source) m.cpcSource = r.cpc_source;
+  if (r.intent_source) m.intentSource = r.intent_source;
   if (r.secondary_metrics) m.secondaryMetrics = parseJsonFallback(r.secondary_metrics, undefined);
   if (r.metrics_source) m.metricsSource = r.metrics_source as MetricsSource;
   if (r.validated != null) m.validated = !!r.validated;
@@ -218,7 +225,8 @@ function modelToParams(
     page_title: m.pageTitle || '',
     primary_keyword: m.primaryKeyword || '',
     secondary_keywords: JSON.stringify(m.secondaryKeywords || []),
-    search_intent: m.searchIntent ?? null,
+    search_intent: isKeywordSearchIntent(m.searchIntent) ? m.searchIntent : null,
+    intent_source: isKeywordSearchIntent(m.searchIntent) ? (m.intentSource ?? null) : null,
     current_position: m.currentPosition ?? null,
     previous_position: m.previousPosition ?? null,
     impressions: m.impressions ?? null,
@@ -226,7 +234,8 @@ function modelToParams(
     gsc_keywords: m.gscKeywords ? JSON.stringify(m.gscKeywords) : null,
     volume: m.volume ?? null,
     difficulty: m.difficulty ?? null,
-    cpc: m.cpc ?? null,
+    cpc: m.cpc != null && Number.isFinite(m.cpc) && m.cpc > 0 ? m.cpc : null,
+    cpc_source: m.cpc != null && Number.isFinite(m.cpc) && m.cpc > 0 ? (m.cpcSource ?? null) : null,
     secondary_metrics: m.secondaryMetrics ? JSON.stringify(m.secondaryMetrics) : null,
     metrics_source: m.metricsSource ?? null,
     validated: m.validated != null ? (m.validated ? 1 : 0) : null,
@@ -278,6 +287,8 @@ const stmts = createStmtCache(() => ({
       volume,
       difficulty,
       cpc,
+      cpc_source,
+      intent_source,
       topic_cluster
     FROM page_keywords
     WHERE workspace_id = ?
@@ -289,7 +300,7 @@ const stmts = createStmtCache(() => ({
     INSERT INTO page_keywords (
       workspace_id, page_path, page_title, primary_keyword, secondary_keywords,
       search_intent, current_position, previous_position, impressions, clicks,
-      gsc_keywords, volume, difficulty, cpc, secondary_metrics, metrics_source, validated,
+      gsc_keywords, volume, difficulty, cpc, cpc_source, intent_source, secondary_metrics, metrics_source, validated,
       url_level_keywords, url_level_keyword_source,
       optimization_score, analysis_generated_at, optimization_issues, recommendations,
       content_gaps, primary_keyword_presence, long_tail_keywords, competitor_keywords,
@@ -298,7 +309,7 @@ const stmts = createStmtCache(() => ({
     ) VALUES (
       @workspace_id, @page_path, @page_title, @primary_keyword, @secondary_keywords,
       @search_intent, @current_position, @previous_position, @impressions, @clicks,
-      @gsc_keywords, @volume, @difficulty, @cpc, @secondary_metrics, @metrics_source, @validated,
+      @gsc_keywords, @volume, @difficulty, @cpc, @cpc_source, @intent_source, @secondary_metrics, @metrics_source, @validated,
       @url_level_keywords, @url_level_keyword_source,
       @optimization_score, @analysis_generated_at, @optimization_issues, @recommendations,
       @content_gaps, @primary_keyword_presence, @long_tail_keywords, @competitor_keywords,
@@ -333,6 +344,8 @@ const stmts = createStmtCache(() => ({
       gsc_keywords = excluded.gsc_keywords,
       volume = excluded.volume,
       difficulty = excluded.difficulty,
+      cpc_source = excluded.cpc_source,
+      intent_source = excluded.intent_source,
       cpc = excluded.cpc,
       secondary_metrics = excluded.secondary_metrics,
       metrics_source = excluded.metrics_source,
@@ -546,13 +559,15 @@ function rowToLiteModel(row: PageKeywordLiteRow): PageKeywordMap {
     secondaryKeywords: parseJsonSafeArray(row.secondary_keywords, z.string(), { table: 'page_keywords', field: 'secondary_keywords' }),
   };
   if (row.current_position != null) model.currentPosition = row.current_position;
-  if (row.search_intent) model.searchIntent = row.search_intent;
+  if (isKeywordSearchIntent(row.search_intent)) model.searchIntent = row.search_intent;
   if (row.impressions != null) model.impressions = row.impressions;
   if (row.clicks != null) model.clicks = row.clicks;
   if (row.volume != null) model.volume = row.volume;
   if (row.difficulty != null) model.difficulty = row.difficulty;
   // Task 3.2: cpc is the realized-$ input the Keyword Hub + strategy drawer need.
   if (row.cpc != null) model.cpc = row.cpc;
+  if (row.cpc_source) model.cpcSource = row.cpc_source;
+  if (row.intent_source) model.intentSource = row.intent_source;
   if (row.topic_cluster) model.topicCluster = row.topic_cluster;
   return model;
 }

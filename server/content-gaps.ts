@@ -12,6 +12,7 @@
 import { z } from 'zod';
 import db from './db/index.js';
 import type { ContentGap } from '../shared/types/workspace.ts';
+import { isKeywordSearchIntent } from '../shared/types/keywords.js';
 import { createLogger } from './logger.js';
 import { parseJsonSafeArray, parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
@@ -38,11 +39,12 @@ interface ContentGapRow {
   serp_targeting: string | null;
   opportunity_score: number | null;
   cpc: number | null;
+  cpc_source: string | null;
+  intent_source: string | null;
   // SEO Generation Quality P2 — re-admitted by the deterministic backfill floor (0/1, migration 115).
   backfilled: number | null;
 }
 
-const intentValues: ContentGap['intent'][] = ['informational', 'commercial', 'transactional', 'navigational'];
 const priorityValues: ContentGap['priority'][] = ['high', 'medium', 'low'];
 const pageTypeValues: NonNullable<ContentGap['suggestedPageType']>[] = ['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'];
 const trendValues: NonNullable<ContentGap['trendDirection']>[] = ['rising', 'declining', 'stable'];
@@ -51,7 +53,7 @@ function rowToModel(r: ContentGapRow): ContentGap {
   const m: ContentGap = {
     topic: r.topic,
     targetKeyword: r.target_keyword,
-    intent: (intentValues as readonly string[]).includes(r.intent) ? (r.intent as ContentGap['intent']) : 'informational',
+    intent: isKeywordSearchIntent(r.intent) ? r.intent : 'informational',
     priority: (priorityValues as readonly string[]).includes(r.priority) ? (r.priority as ContentGap['priority']) : 'medium',
     rationale: r.rationale,
   };
@@ -69,6 +71,8 @@ function rowToModel(r: ContentGapRow): ContentGap {
   if (r.question_keywords) m.questionKeywords = parseJsonSafeArray(r.question_keywords, z.string(), { table: 'content_gaps', field: 'question_keywords' });
   if (r.serp_targeting) m.serpTargeting = parseJsonSafeArray(r.serp_targeting, z.string(), { table: 'content_gaps', field: 'serp_targeting' });
   if (r.cpc != null) m.cpc = r.cpc;
+  if (r.cpc_source) m.cpcSource = r.cpc_source;
+  if (r.intent_source) m.intentSource = r.intent_source;
   if (r.opportunity_score != null) m.opportunityScore = r.opportunity_score;
   // SEO Generation Quality P2 — only surface the flag when set, mirroring the other
   // optional fields (keeps non-backfilled gaps byte-identical to pre-P2 shape).
@@ -81,7 +85,8 @@ function modelToParams(workspaceId: string, m: ContentGap) {
     workspace_id: workspaceId,
     target_keyword: m.targetKeyword,
     topic: m.topic,
-    intent: m.intent,
+    intent: isKeywordSearchIntent(m.intent) ? m.intent : 'informational',
+    intent_source: isKeywordSearchIntent(m.intent) ? (m.intentSource ?? null) : null,
     priority: m.priority,
     rationale: m.rationale,
     suggested_page_type: m.suggestedPageType ?? null,
@@ -94,7 +99,8 @@ function modelToParams(workspaceId: string, m: ContentGap) {
     question_keywords: m.questionKeywords ? JSON.stringify(m.questionKeywords) : null,
     serp_targeting: m.serpTargeting ? JSON.stringify(m.serpTargeting) : null,
     opportunity_score: m.opportunityScore ?? null,
-    cpc: m.cpc ?? null,
+    cpc: m.cpc != null && Number.isFinite(m.cpc) && m.cpc > 0 ? m.cpc : null,
+    cpc_source: m.cpc != null && Number.isFinite(m.cpc) && m.cpc > 0 ? (m.cpcSource ?? null) : null,
     backfilled: m.backfilled ? 1 : 0,
   };
 }
@@ -113,12 +119,12 @@ const stmts = createStmtCache(() => ({
       workspace_id, target_keyword, topic, intent, priority, rationale,
       suggested_page_type, volume, difficulty, trend_direction, serp_features,
       impressions, competitor_proof, question_keywords, serp_targeting, opportunity_score,
-      cpc, backfilled
+      cpc, cpc_source, intent_source, backfilled
     ) VALUES (
       @workspace_id, @target_keyword, @topic, @intent, @priority, @rationale,
       @suggested_page_type, @volume, @difficulty, @trend_direction, @serp_features,
       @impressions, @competitor_proof, @question_keywords, @serp_targeting, @opportunity_score,
-      @cpc, @backfilled
+      @cpc, @cpc_source, @intent_source, @backfilled
     )
     ON CONFLICT(workspace_id, target_keyword) DO UPDATE SET
       topic = excluded.topic,
@@ -136,6 +142,8 @@ const stmts = createStmtCache(() => ({
       serp_targeting = excluded.serp_targeting,
       opportunity_score = excluded.opportunity_score,
       cpc = excluded.cpc,
+      cpc_source = excluded.cpc_source,
+      intent_source = excluded.intent_source,
       backfilled = excluded.backfilled
   `),
   deleteOne: db.prepare<[workspaceId: string, targetKeyword: string]>(

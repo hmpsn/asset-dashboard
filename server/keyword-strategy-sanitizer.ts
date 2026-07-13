@@ -151,7 +151,9 @@ function sanitizePageMap(
           pageCopy.volume = fallbackEvidence.volume;
           pageCopy.difficulty = fallbackEvidence.difficulty;
           pageCopy.cpc = fallbackEvidence.cpc;
+          pageCopy.cpcSource = fallbackEvidence.cpcSource;
           pageCopy.searchIntent = fallbackEvidence.intent;
+          pageCopy.intentSource = fallbackEvidence.intentSource;
         } else {
           delete pageCopy.volume;
           delete pageCopy.difficulty;
@@ -170,6 +172,9 @@ function sanitizePageMap(
         delete pageCopy.volume;
         delete pageCopy.difficulty;
         delete pageCopy.cpc;
+        delete pageCopy.cpcSource;
+        delete pageCopy.searchIntent;
+        delete pageCopy.intentSource;
         delete pageCopy.currentPosition;
         delete pageCopy.metricsSource;
         delete pageCopy.serpFeatures;

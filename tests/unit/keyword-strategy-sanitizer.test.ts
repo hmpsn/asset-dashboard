@@ -137,7 +137,10 @@ describe('sanitizeKeywordStrategyOutput', () => {
       workspaceId: 'ws_test',
       strategy: {
         pageMap: [
-          { pagePath: '/services/content-strategy', pageTitle: 'Content Strategy', primaryKeyword: 'paper tiger', secondaryKeywords: [] },
+          {
+            pagePath: '/services/content-strategy', pageTitle: 'Content Strategy', primaryKeyword: 'paper tiger', secondaryKeywords: [],
+            searchIntent: 'commercial', intentSource: 'stale-provider', cpc: 4, cpcSource: 'stale-provider',
+          },
         ],
         siteKeywords: [],
         contentGaps: [],
@@ -156,6 +159,8 @@ describe('sanitizeKeywordStrategyOutput', () => {
       validated: false,
     }));
     expect(result.repaired).toEqual([]);
+    expect(result.strategy.pageMap?.[0]).not.toHaveProperty('searchIntent');
+    expect(result.strategy.pageMap?.[0]).not.toHaveProperty('intentSource');
     expect(result.removed.pageMappings).toEqual([]);
   });
 

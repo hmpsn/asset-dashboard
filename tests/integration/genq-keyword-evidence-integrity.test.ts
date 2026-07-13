@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { replaceAllContentGaps } from '../../server/content-gaps.js';
+import { listContentGaps, replaceAllContentGaps } from '../../server/content-gaps.js';
 import { appendStrategyRecommendations } from '../../server/domains/recommendations/strategy-producers.js';
 import type { StrategyRecommendationProducerContext } from '../../server/domains/recommendations/producer-contexts.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
@@ -41,6 +41,7 @@ function producerContext(workspaceId: string): StrategyRecommendationProducerCon
 describe('generation-quality keyword evidence integrity', () => {
   it('feeds persisted content-gap CPC into the recommendation Opportunity Value consumer', () => {
     const workspaceId = createTestWorkspace('Recommendation persisted evidence');
+    const controlWorkspaceId = createTestWorkspace('Recommendation no CPC control');
     replaceAllContentGaps(workspaceId, [{
       topic: 'Emergency Dentist Landing Page',
       targetKeyword: 'emergency dentist near me',
@@ -51,16 +52,30 @@ describe('generation-quality keyword evidence integrity', () => {
       volume: 720,
       difficulty: 29,
       cpc: 12.75,
+      cpcSource: 'dataforseo',
+      intentSource: 'discovery:keyword_ideas',
       opportunityScore: 82,
     }]);
+    replaceAllContentGaps(controlWorkspaceId, [{
+      topic: 'Emergency Dentist Landing Page', targetKeyword: 'emergency dentist near me',
+      intent: 'transactional', priority: 'high', rationale: 'High-intent local service demand.',
+      suggestedPageType: 'service', volume: 720, difficulty: 29, opportunityScore: 82,
+    }]);
+
+    expect(listContentGaps(workspaceId)[0]).toEqual(expect.objectContaining({
+      cpc: 12.75, cpcSource: 'dataforseo', intent: 'transactional', intentSource: 'discovery:keyword_ideas',
+    }));
 
     const recommendations: Recommendation[] = [];
+    const controls: Recommendation[] = [];
     appendStrategyRecommendations(recommendations, producerContext(workspaceId));
+    appendStrategyRecommendations(controls, producerContext(controlWorkspaceId));
     const recommendation = recommendations.find(item => item.source === 'strategy:content-gap');
+    const control = controls.find(item => item.source === 'strategy:content-gap');
 
     expect(recommendation).toBeDefined();
     expect(recommendation?.targetKeyword).toBe('emergency dentist near me');
-    expect(recommendation?.opportunity?.emvPerWeek).toBeGreaterThan(100);
+    expect(recommendation?.opportunity?.emvPerWeek).toBeGreaterThan(control?.opportunity?.emvPerWeek ?? Infinity);
     expect(recommendation?.opportunity?.components).toEqual(expect.arrayContaining([
       expect.objectContaining({ dimension: 'intent', rawValue: 'transactional' }),
     ]));
