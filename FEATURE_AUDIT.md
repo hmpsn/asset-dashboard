@@ -1,10 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 676** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 677** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
+
+### 677. Keyword Command Center first-paint and skinny-read performance 2026-07-13
+
+**What it does:** Makes `/initial` a one-shot first-paint transport that seeds independent canonical summary and row caches, then routes filtering, sorting, pagination, and refreshes through `/rows` without repeating full hydration. The server replaces the full keyword-strategy assembler on KCC reads with a context-owned projection over only the required keyword, local-market, vote, and rank inputs. Summary and row responses expose authoritative rank freshness, while local-candidate counts retain the same canonical market-identity and raw content-gap semantics as the prior path.
+
+**Why it matters:** Keyword workspaces become responsive sooner and avoid repeatedly assembling unrelated strategy data as operators interact with the table. The optimization preserves displayed counts and freshness truth rather than trading correctness for speed, and it establishes measurable query-count and latency budgets that future changes must respect.
+
+**Performance contract:** Production-path tests count actual SQLite statement executions and enforce a hard KCC query cap, including the local-SEO posture. The shared performance registry records the KCC query budget and an advisory external-log p95 target; cache keys and invalidation target the canonical summary/row observers, while the one-shot transport key remains isolated from routine refreshes.
+
+**Tests:** Component coverage pins one-shot initial hydration, cache seeding, canonical invalidation, and legacy retry behavior. Unit and contract coverage pins production projection parity, rank freshness, local-candidate market identity, real SQL execution counts, registered performance budgets, query-key coverage, and the keyword-command-center bounded-context boundary.
+
+**Files:** `server/domains/keyword-command-center/*`; `server/domains/local-seo/{candidate-service,configuration-service}.ts`; `server/rank-tracking.ts`; `server/db/index.ts`; `shared/types/keyword-command-center.ts`; keyword hooks and legacy/rebuilt surfaces; `scripts/performance-budgets.ts`; `docs/rules/keyword-hub.md`; focused unit, component, and contract tests; `data/roadmap.json`; `FEATURE_AUDIT.md`.
 
 ### 676. Truthful content-generation artifacts and delivery gates 2026-07-13
 

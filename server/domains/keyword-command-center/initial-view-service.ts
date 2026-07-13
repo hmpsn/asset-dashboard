@@ -21,6 +21,8 @@ export async function buildKeywordCommandCenterInitialView(
   }
   const sourceSnapshot = buildKeywordCommandCenterSourceSnapshot(workspaceId, {
     includeLocalSeo: options.includeLocalSeo,
+    includeSummary: true,
+    includeScoring: true,
   });
   if (!sourceSnapshot) return null;
   const summary = await buildKeywordCommandCenterSummary(workspaceId, {

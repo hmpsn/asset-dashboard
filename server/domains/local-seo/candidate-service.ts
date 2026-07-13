@@ -8,12 +8,14 @@ import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
 import {
   LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
   LOCAL_SEO_DEVICE,
+  LOCAL_SEO_MARKET_STATUS,
   type LocalSeoDevice,
   type LocalSeoMarket,
+  type LocalSeoPosture,
   type LocalSeoRefreshRequest,
 } from '../../../shared/types/local-seo.js';
-import { TRACKED_KEYWORD_STATUS } from '../../../shared/types/rank-tracking.js';
-import type { Workspace } from '../../../shared/types/workspace.js';
+import { TRACKED_KEYWORD_STATUS, type TrackedKeyword } from '../../../shared/types/rank-tracking.js';
+import type { ContentGap, PageKeywordMap, Workspace } from '../../../shared/types/workspace.js';
 import {
   buildLocalSeoKeywordCandidatesEvaluatedFromContext,
   buildLocalSeoKeywordCandidatesFromContext,
@@ -25,6 +27,7 @@ import {
   LOCAL_SEO_MAX_MARKETS,
   activeLocalSeoMarkets,
   getEffectiveKeywordsPerRefresh,
+  localSeoMarketHasProviderLocationIdentity,
   readLocalSeoSettings,
 } from './configuration-service.js';
 import { applySourcePageCap, classifyLocalKeywordIntent, cleanKeywordDisplay } from './keyword-intent.js';
@@ -34,6 +37,16 @@ import type { LocalSeoKeywordCandidate } from './types.js';
 const log = createLogger('local-seo/candidate-service');
 
 const LOCAL_CANDIDATE_HARD_CAP = 1000;
+
+export interface LocalSeoKeywordCandidateLoadedContext {
+  workspace: Workspace;
+  markets: LocalSeoMarket[];
+  trackedKeywords: TrackedKeyword[];
+  contentGaps: ContentGap[];
+  pageMap: PageKeywordMap[];
+  declinedKeywords: string[];
+  settingsPosture?: LocalSeoPosture;
+}
 
 function buildCandidateContext(workspace: Workspace) {
   const contentGaps = listContentGaps(workspace.id);
@@ -117,6 +130,33 @@ function warnLocalSeoCandidateHardCap(workspaceId: string): void {
   log.warn({ workspaceId, cap: LOCAL_CANDIDATE_HARD_CAP }, 'local SEO candidate hard cap reached; output truncated');
 }
 
+function candidateIterationContextFromLoadedContext(
+  input: LocalSeoKeywordCandidateLoadedContext,
+): CandidateIterationContext | null {
+  const markets = input.markets
+    .filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE)
+    .filter(localSeoMarketHasProviderLocationIdentity)
+    .slice(0, LOCAL_SEO_MAX_MARKETS);
+  if (markets.length === 0) return null;
+  return {
+    workspace: input.workspace,
+    markets,
+    declined: new Set(input.declinedKeywords.map(keywordComparisonKey)),
+    inactiveTracked: new Set(input.trackedKeywords
+      .filter(tracked => (tracked.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE)
+      .map(tracked => keywordComparisonKey(tracked.query))),
+    trackedKeywords: input.trackedKeywords,
+    contentGaps: input.contentGaps,
+    pageMap: input.pageMap,
+    explicitKeywords: [],
+    settingsPosture: input.settingsPosture,
+    classifiers: {
+      geoTermRegex: buildWorkspaceGeoRegex(input.workspace, markets) ?? /\bnear me\b|\/location\//i,
+      serviceTermRegex: buildWorkspaceServiceTermRegex(input.workspace),
+    },
+  };
+}
+
 /**
  * Cheap default local SEO candidate builder.
  */
@@ -129,6 +169,18 @@ export function buildLocalSeoKeywordCandidates(
   return buildLocalSeoKeywordCandidatesFromContext(ctx, {
     hardCap: LOCAL_CANDIDATE_HARD_CAP,
     onHardCapReached: () => warnLocalSeoCandidateHardCap(workspaceId),
+  });
+}
+
+/** Build canonical candidates from KCC sources that have already been loaded. */
+export function buildLocalSeoKeywordCandidatesFromLoadedContext(
+  input: LocalSeoKeywordCandidateLoadedContext,
+): LocalSeoKeywordCandidate[] {
+  const ctx = candidateIterationContextFromLoadedContext(input);
+  if (!ctx) return [];
+  return buildLocalSeoKeywordCandidatesFromContext(ctx, {
+    hardCap: LOCAL_CANDIDATE_HARD_CAP,
+    onHardCapReached: () => warnLocalSeoCandidateHardCap(input.workspace.id),
   });
 }
 
@@ -153,6 +205,15 @@ export function buildLocalSeoKeywordCandidatesEvaluated(
 export function countLocalSeoKeywordCandidates(workspaceId: string): number {
   const ctx = loadCandidateIterationContext(workspaceId, []);
   if (!ctx || ctx.markets.length === 0) return 0;
+  return countLocalSeoKeywordCandidatesFromContext(ctx, { hardCap: LOCAL_CANDIDATE_HARD_CAP });
+}
+
+/** Count candidates from an already-loaded workspace read projection. */
+export function countLocalSeoKeywordCandidatesFromLoadedContext(
+  input: LocalSeoKeywordCandidateLoadedContext,
+): number {
+  const ctx = candidateIterationContextFromLoadedContext(input);
+  if (!ctx) return 0;
   return countLocalSeoKeywordCandidatesFromContext(ctx, { hardCap: LOCAL_CANDIDATE_HARD_CAP });
 }
 

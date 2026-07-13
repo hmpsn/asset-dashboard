@@ -151,6 +151,12 @@ describe('queryKeys.admin SEO keys', () => {
     expect(detail.slice(0, summary.length - 1)).toEqual(summary.slice(0, -1));
   });
 
+  it('keeps the one-shot initial transport outside canonical KCC invalidation', () => {
+    const canonical = queryKeys.admin.keywordCommandCenter(WS);
+    const initial = queryKeys.admin.keywordCommandCenterInitial(WS, { page: 1 });
+    expect(initial.slice(0, canonical.length)).not.toEqual([...canonical]);
+  });
+
   it('localSeoVariant uses the legacy summary and snapshot suffixes', () => {
     const all = queryKeys.admin.localSeo(WS);
     const summary = queryKeys.admin.localSeoVariant(WS, false);

@@ -83,6 +83,7 @@ interface PageKeywordLiteRow {
   cpc_source: string | null;
   intent_source: string | null;
   topic_cluster: string | null;
+  serp_features: string | null;
 }
 
 interface PageKeywordScoreHistoryRow {
@@ -289,9 +290,11 @@ const stmts = createStmtCache(() => ({
       cpc,
       cpc_source,
       intent_source,
-      topic_cluster
+      topic_cluster,
+      serp_features
     FROM page_keywords
     WHERE workspace_id = ?
+    ORDER BY page_path ASC
   `),
   getOne: db.prepare<[workspaceId: string, pagePath: string]>(
     'SELECT * FROM page_keywords WHERE workspace_id = ? AND page_path = ?',
@@ -569,6 +572,12 @@ function rowToLiteModel(row: PageKeywordLiteRow): PageKeywordMap {
   if (row.cpc_source) model.cpcSource = row.cpc_source;
   if (row.intent_source) model.intentSource = row.intent_source;
   if (row.topic_cluster) model.topicCluster = row.topic_cluster;
+  if (row.serp_features) {
+    model.serpFeatures = parseJsonSafeArray(row.serp_features, z.string(), {
+      table: 'page_keywords',
+      field: 'serp_features',
+    });
+  }
   return model;
 }
 

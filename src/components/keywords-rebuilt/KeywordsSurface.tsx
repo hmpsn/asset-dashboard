@@ -1,11 +1,12 @@
 // @ds-rebuilt
-import { Suspense, useCallback, useMemo, useState } from 'react';
+import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { BarChart3, Clock, FileText, Network, Target, type LucideIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
 import {
   useKeywordCommandCenterAction,
   useKeywordCommandCenterInitialView,
+  useKeywordCommandCenterRows,
   useKeywordCommandCenterSummary,
   useRankTrackingAddKeyword,
 } from '../../hooks/admin/useKeywordCommandCenter';
@@ -13,13 +14,13 @@ import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
 import { queryKeys } from '../../lib/queryKeys';
 import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import { WS_EVENTS } from '../../lib/wsEvents';
-import { KEYWORD_COMMAND_CENTER_ACTIONS, KEYWORD_COMMAND_CENTER_FILTERS } from '../../../shared/types/keyword-command-center';
-import type { KeywordCommandCenterSummaryResponse } from '../../../shared/types/keyword-command-center';
+import { KEYWORD_COMMAND_CENTER_ACTIONS, KEYWORD_COMMAND_CENTER_FILTERS, KEYWORD_RANK_FRESHNESS_STATUS } from '../../../shared/types/keyword-command-center';
+import type { KeywordCommandCenterSummaryResponse, KeywordRankFreshness } from '../../../shared/types/keyword-command-center';
 import type { AdminKeywordFeedbackListRow } from '../../../shared/types/keyword-feedback';
 import { useKeywordFeedback } from '../strategy/hooks/useKeywordFeedback';
 import { useToast } from '../Toast';
 import { mutationErrorMessage } from './keywordMutationFeedback';
-import { Badge, Button, Drawer, ErrorState, PageHeader, LensSwitcher, LoadingState, SearchField, Toolbar, ToolbarSpacer, FilterChip, InlineBanner, MetricTile, Skeleton, FormInput, FormSelect, GroupBlock } from '../ui';
+import { Badge, Button, Drawer, ErrorState, FreshnessStamp, PageHeader, LensSwitcher, LoadingState, SearchField, Toolbar, ToolbarSpacer, FilterChip, InlineBanner, MetricTile, Skeleton, FormInput, FormSelect, GroupBlock } from '../ui';
 import { KeywordsLenses } from './KeywordsLenses';
 import type { KeywordRowsQueryResult } from './KeywordsTable';
 import {
@@ -88,6 +89,20 @@ function feedbackGroups(rows: AdminKeywordFeedbackListRow[]) {
     declined: rows.filter((row) => row.status === 'declined'),
     approved: rows.filter((row) => row.status === 'approved'),
   };
+}
+
+function RankFreshness({ freshness }: { freshness: KeywordRankFreshness | undefined }) {
+  if (!freshness || freshness.status === KEYWORD_RANK_FRESHNESS_STATUS.MISSING) {
+    return <Badge tone="zinc" label="Rank data unavailable" />;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {freshness.status === KEYWORD_RANK_FRESHNESS_STATUS.STALE && (
+        <Badge tone="amber" label={`Rank data stale · ${freshness.ageDays ?? 0} days old`} />
+      )}
+      <FreshnessStamp value={freshness.snapshotDate} label="Ranks observed" />
+    </div>
+  );
 }
 
 // Status → accent hue + Badge tone for the client-feedback rows (parity with the
@@ -189,29 +204,35 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const state = useKeywordsSurfaceState();
-  const canUseInitialView = state.rowsQuery.filter !== KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES;
-  const initialView = useKeywordCommandCenterInitialView(workspaceId, state.rowsQuery, {
+  const initialRowsQueryRef = useRef(state.rowsQuery);
+  const canUseInitialView = initialRowsQueryRef.current.filter !== KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES;
+  const initialView = useKeywordCommandCenterInitialView(workspaceId, initialRowsQueryRef.current, {
     enabled: canUseInitialView,
   });
-  const summaryFallback = useKeywordCommandCenterSummary(workspaceId, {
-    enabled: !canUseInitialView,
+  const viewingInitialRows = JSON.stringify(state.rowsQuery) === JSON.stringify(initialRowsQueryRef.current);
+  const initialTransportSettled = !canUseInitialView || initialView.data != null || initialView.isError;
+  const summaryResult = useKeywordCommandCenterSummary(workspaceId, {
+    enabled: initialTransportSettled,
+  });
+  const rowsResult = useKeywordCommandCenterRows(workspaceId, state.rowsQuery, {
+    enabled: !viewingInitialRows || initialTransportSettled,
   });
   const addKeyword = useRankTrackingAddKeyword(workspaceId);
   const feedback = useKeywordFeedback(workspaceId);
   const feedbackAction = useKeywordCommandCenterAction(workspaceId);
   const [addKeywordValue, setAddKeywordValue] = useState('');
-  const summary = canUseInitialView ? initialView.data?.summary : summaryFallback.data;
-  const summaryIsLoading = canUseInitialView ? initialView.isLoading : summaryFallback.isLoading;
-  const summaryIsError = canUseInitialView ? initialView.isError : summaryFallback.isError;
-  const summaryError = canUseInitialView ? initialView.error : summaryFallback.error;
-  const refetchSummary = canUseInitialView ? initialView.refetch : summaryFallback.refetch;
-  const initialRowsResult: KeywordRowsQueryResult | undefined = canUseInitialView ? {
-    data: initialView.data?.rows,
-    isLoading: initialView.isLoading,
-    isError: initialView.isError,
-    error: initialView.error,
-    refetch: () => initialView.refetch(),
-  } : undefined;
+  const summary = summaryResult.data;
+  const summaryIsLoading = !initialTransportSettled || summaryResult.isLoading;
+  const summaryIsError = summaryResult.isError;
+  const summaryError = summaryResult.error ?? initialView.error;
+  const refetchSummary = summaryResult.refetch;
+  const canonicalRowsResult: KeywordRowsQueryResult = {
+    data: rowsResult.data,
+    isLoading: viewingInitialRows && !initialTransportSettled ? true : rowsResult.isLoading,
+    isError: rowsResult.isError,
+    error: rowsResult.error ?? (viewingInitialRows ? initialView.error : null),
+    refetch: () => rowsResult.refetch(),
+  };
   const counts = summary?.counts;
   const trafficValue = summary?.trafficValueMonthly;
   const advancedFilterOptions = useMemo(() => (
@@ -344,6 +365,12 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
         </div>
       )}
 
+      {summary && (
+        <div className="mt-3" aria-label="Rank data freshness">
+          <RankFreshness freshness={summary.rankFreshness} />
+        </div>
+      )}
+
       <div data-testid="keywords-lens-tray" className="mt-4 w-fit max-w-full overflow-x-auto rounded-[var(--radius-lg)]">
         <LensSwitcher
           id="keywords-rebuilt-lens"
@@ -394,7 +421,7 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
       </div>
 
       <div className="mt-3">
-        <KeywordsLenses workspaceId={workspaceId} state={state} summary={summary} initialRowsResult={initialRowsResult} />
+        <KeywordsLenses workspaceId={workspaceId} state={state} summary={summary} initialRowsResult={canonicalRowsResult} />
       </div>
 
       <div className="mt-4">

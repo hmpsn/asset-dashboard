@@ -224,9 +224,8 @@ export function getEffectiveKeywordsPerRefresh(workspaceId: string): number {
 }
 
 export function getLocalSeoPosture(workspaceId: string): LocalSeoPosture {
-  const workspace = getWorkspace(workspaceId);
-  if (!workspace) return LOCAL_SEO_POSTURE.UNKNOWN;
-  return readLocalSeoSettings(workspace).posture;
+  const row = stmts().getSettings.get(workspaceId) as SettingsRow | undefined;
+  return row ? rowToSettings(row).posture : LOCAL_SEO_POSTURE.UNKNOWN;
 }
 
 export function readLocalSeoSettings(workspace: Workspace): LocalSeoWorkspaceSettings {

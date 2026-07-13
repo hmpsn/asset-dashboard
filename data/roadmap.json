@@ -58,10 +58,11 @@
           "source": "2026-07-13 generation quality/performance audit K1/K2/K8",
           "est": "M",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-07-13",
           "owner": "seo-health",
-          "notes": "Wave 2. Use /initial only for first paint, seed independent summary/row caches, move interactions to /rows, replace the full strategy assembler with a KCC-owned projection, and expose rank freshness. Behavior-parity performance PR and required closeout phase for keyword-hub-wave4."
+          "notes": "Complete 2026-07-13. First paint now uses /initial exactly once to seed independent canonical summary and row caches; subsequent interactions use /rows without re-running full hydration. KCC reads use a context-owned skinny projection instead of the full strategy assembler, rank freshness is explicit, local-candidate counts preserve market-identity parity, and production query-count and p95 budgets are registered and pinned with real SQL execution instrumentation. This closes the remaining keyword-hub-wave4 read-path work.",
+          "shippedAt": "2026-07-13"
         },
         {
           "id": "genq-keyword-synthesis-quality",

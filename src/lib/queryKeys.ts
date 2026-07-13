@@ -112,7 +112,13 @@ export const queryKeys = {
     backlinkProfile: (wsId: string) => ['admin-backlink-profile', wsId] as const,
     keywordFeedback: (wsId: string) => ['admin-keyword-feedback', wsId] as const,
     keywordCommandCenter: (wsId: string) => ['admin-keyword-command-center', wsId] as const,
-    keywordCommandCenterInitial: (wsId: string, query: unknown) => ['admin-keyword-command-center', wsId, 'initial', query] as const,
+    /** One-shot first-paint transport. Deliberately outside the canonical KCC prefix so
+     * mutations and workspace events refresh summary/rows/detail without replaying it. */
+    keywordCommandCenterInitial: (wsId: string, query: unknown) => ['admin-keyword-command-center-initial', wsId, query] as const,
+    /** In-flight /initial hydration guard. It deliberately lives under the canonical
+     * KCC prefix so any mutation/event invalidation marks the request stale without
+     * causing the isolated one-shot transport itself to replay. */
+    keywordCommandCenterInitialGuard: (wsId: string) => ['admin-keyword-command-center', wsId, 'initial-guard'] as const,
     keywordCommandCenterSummary: (wsId: string) => ['admin-keyword-command-center', wsId, 'summary'] as const,
     keywordCommandCenterRows: (wsId: string, query: unknown) => ['admin-keyword-command-center', wsId, 'rows', query] as const,
     keywordCommandCenterDetail: (wsId: string, keyword: string) => ['admin-keyword-command-center', wsId, 'detail', keyword] as const,

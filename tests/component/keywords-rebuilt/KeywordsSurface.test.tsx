@@ -200,6 +200,11 @@ const summaryPayload: KeywordCommandCenterSummaryResponse = {
   rawEvidenceTotal: 120,
   rawEvidenceReturned: 75,
   summarizedAt: '2026-07-05T12:00:00.000Z',
+  rankFreshness: {
+    snapshotDate: '2026-06-01T00:00:00.000Z',
+    ageDays: 34,
+    status: 'stale',
+  },
   trafficValueMonthly: 1234,
   topicClusters: [
     {
@@ -390,6 +395,7 @@ function setupKeywordHooks() {
     isLoading: false,
     isError: false,
     error: null,
+    refetch: vi.fn(),
   });
   const rowsResponse = (query: KeywordCommandCenterRowsQuery): KeywordCommandCenterRowsResponse => {
     const page = query.page ?? 1;
@@ -624,6 +630,8 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(lensTray.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(tools).getByRole('searchbox')).toBeInTheDocument();
     expect(within(tools).getByLabelText('Advanced keyword filter')).toBeInTheDocument();
+    expect(screen.getByText('Rank data stale · 34 days old')).toBeInTheDocument();
+    expect(screen.getByText(/Ranks observed/)).toBeInTheDocument();
   });
 
   it('renders keyword rows, provenance, opportunity, and money empty states without fabricating dollars', () => {
@@ -663,16 +671,19 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     renderSurface('/ws/ws-1/seo-keywords');
 
     expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'rank', direction: 'asc' });
+    const firstPaintQuery = initialHookMock.mock.calls.at(-1)?.[1];
 
     fireEvent.click(screen.getByRole('button', { name: 'Clicks' }));
     await waitFor(() => {
-      expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'clicks', direction: 'asc' });
+      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'clicks', direction: 'asc' });
     });
+    expect(initialHookMock.mock.calls.at(-1)?.[1]).toEqual(firstPaintQuery);
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => {
-      expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ page: 2 });
+      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ page: 2 });
     });
+    expect(initialHookMock.mock.calls.at(-1)?.[1]).toEqual(firstPaintQuery);
   });
 
   it('supports manual add, advanced filters, select-visible, and client feedback actions', async () => {
@@ -685,7 +696,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
 
     fireEvent.change(screen.getByLabelText('Advanced keyword filter'), { target: { value: 'requested' } });
     await waitFor(() => {
-      expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: 'requested' });
+      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: 'requested' });
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Select visible 2' }));
@@ -711,7 +722,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
 
     fireEvent.click(screen.getByRole('radio', { name: /Opportunities/ }));
     await waitFor(() => {
-      expect(initialHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'opportunity', direction: 'desc' });
+      expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'opportunity', direction: 'desc' });
     });
     await expectNoA11yViolations(container);
 
@@ -896,19 +907,16 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
 
   it('renders row errors inline while preserving stale row data and retry', () => {
     const refetch = vi.fn();
-    initialHookMock.mockImplementation((_workspaceId: string, query: KeywordCommandCenterRowsQuery) => ({
+    rowsHookMock.mockImplementation((_workspaceId: string, query: KeywordCommandCenterRowsQuery) => ({
       data: {
-        summary: summaryPayload,
-        rows: {
-          rows,
-          pageInfo: {
-            page: query.page ?? 1,
-            pageSize: query.pageSize ?? 50,
-            totalRows: rows.length,
-            totalPages: 1,
-            hasNextPage: false,
-            hasPreviousPage: false,
-          },
+        rows,
+        pageInfo: {
+          page: query.page ?? 1,
+          pageSize: query.pageSize ?? 50,
+          totalRows: rows.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPreviousPage: false,
         },
       },
       isLoading: false,
@@ -923,6 +931,53 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByText('cosmetic dentistry')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(refetch).toHaveBeenCalled();
+  });
+
+  it('renders canonical caches after hydration and retries summary without replaying initial transport', () => {
+    const initialRefetch = vi.fn();
+    const summaryRefetch = vi.fn();
+    initialHookMock.mockReturnValue({
+      data: {
+        summary: { ...summaryPayload, counts: { ...summaryPayload.counts, total: 999 } },
+        rows: { rows: [], pageInfo: { page: 1, pageSize: 50, totalRows: 0, totalPages: 0, hasNextPage: false, hasPreviousPage: false } },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: initialRefetch,
+    });
+    summaryHookMock.mockReturnValue({
+      data: summaryPayload,
+      isLoading: false,
+      isError: true,
+      error: new Error('summary refresh failed'),
+      refetch: summaryRefetch,
+    });
+
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    expect(screen.getByText('cosmetic dentistry')).toBeInTheDocument();
+    expect(screen.queryByText('999')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry summary' }));
+    expect(summaryRefetch).toHaveBeenCalledTimes(1);
+    expect(initialRefetch).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the rows endpoint when first-paint hydration fails without cached data', () => {
+    initialHookMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('initial view unavailable'),
+      refetch: vi.fn(),
+    });
+
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    expect(rowsHookMock.mock.calls.some((call) => (
+      (call[2] as { enabled?: boolean } | undefined)?.enabled === true
+    ))).toBe(true);
+    expect(screen.getByText('cosmetic dentistry')).toBeInTheDocument();
   });
 
   it('renders locked keyword access as a permission state', () => {
