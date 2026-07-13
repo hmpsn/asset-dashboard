@@ -28,6 +28,7 @@ const DELIVERABLE_LABELS: Record<BrandDeliverableType, string> = {
   customer_journey: 'Customer Journey',
   objection_handling: 'Objection Handling',
   emotional_triggers: 'Emotional Triggers',
+  naming: 'Naming',
 };
 
 const TIER_ORDER: DeliverableTier[] = ['essentials', 'professional', 'premium'];

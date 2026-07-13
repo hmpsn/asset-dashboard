@@ -106,7 +106,8 @@ M0 returns this structural target without claiming generation readiness.
 
 - identity/voice snapshot IDs and readiness;
 - evidence captured/freshness times;
-- expected brief/post generation revisions;
+- exact expected brief and post generation revisions (one of each, never a
+  generic artifact array);
 - canonical effective-input fingerprint and blocking requirements.
 
 M1 is the first phase allowed to return this generation-ready target.
@@ -118,6 +119,8 @@ for legacy standalone generation but is forbidden in matrix-run code.
 `system:introduction`, ordered template/outline blocks, and
 `system:conclusion`. Each block has stable ID, source (`system|template`),
 generation role, heading contract, and AEO/CTA requirements.
+The manifest is a tuple with exactly one introduction first and one conclusion
+last; template blocks cannot use either reserved system ID.
 
 ### Evidence requirement
 
@@ -151,6 +154,10 @@ fresh preview plus explicit retry/audit. Brand resolutions create/reuse a
 superseding immutable intake revision, making the older run stale.
 Content resolution is addressed by matrix/cell/requirement plus the full source
 revision; it never depends on a run/item that a preflight blocker may prevent.
+`ResolveMatrixGenerationEvidenceRequest` carries that owner identity directly.
+`RetryMatrixGenerationRequest` requires a non-empty item selection plus the
+run/item/source/artifact revisions. Replacement additionally requires explicit
+operator authorization; resume cannot carry replacement authorization.
 
 ### Audit report
 
@@ -182,6 +189,14 @@ Generic `BackgroundJobStatus` does not expand; it remains
 `{runId, counts, terminalStatus}` where `terminalStatus` is the rich domain-run
 status.
 
+P0 registers these shared status vocabularies but does not add lifecycle
+transition tables before their persisted writers exist. M0 adds matrix run/item
+tables and transitions together, B2 does the same for brand run/items, and O1
+owns onboarding transitions including conditional recovery from
+`needs_attention`. The brand voice pause is stage
+`awaiting_voice_finalization` while the run's truthful status is
+`awaiting_review`; it is not a tenth generic run outcome.
+
 ### Brand/content onboarding run
 
 `BrandContentOnboardingRun` and `BrandContentOnboardingStatus` live in
@@ -208,6 +223,9 @@ have this evidence before the set advances.
 The run carries a monotonic revision, immutable intake/brand/voice/matrix source
 refs, child brand/page-review IDs, idempotency key, and durable gate evidence. Its
 idempotency scope is `(workspaceId, intakeRevisionId, idempotencyKey)`.
+Gate evidence is discriminated by gate. Voice proof contains the finalized
+snapshot; page proof maps every approval to matrix run/item/cell and post
+revisions. A generic string ID cannot satisfy a different gate.
 
 ## Template and pSEO contracts
 
@@ -268,11 +286,19 @@ idempotency scope is `(workspaceId, intakeRevisionId, idempotencyKey)`.
   bundles separately; `full_brand_system` alone is `bootstrap_then_resume` and
   may start only its foundation before finalization. Other presets require
   finalized voice at start. There is no direct/bundle bypass or deadlock.
+- Direct atomic selection contains exactly one `target`; arrays, empty
+  selections, duplicates, and mixed foundation/dependent starts are not valid
+  shared shapes. Preset policy separately freezes `initialTargets` and
+  `resumeTargets`, so full-suite initial dispatch is foundation-only.
+- A finalized voice snapshot requires a non-empty authentic-anchor evidence
+  tuple. Approved identity refs freeze approval time plus content/approval
+  fingerprints, not only the mutable source-row version.
 - Real finalization requires non-empty DNA, guardrails, and selected anchor
   evidence, uses the voice state machine, and records calibration activity only
   after commit.
-- `naming` output is a creative proposal. It never claims trademark, domain,
-  legal, or cultural clearance without verified external evidence.
+- `naming` and `tagline` output are creative proposals. Naming never claims
+  trademark, domain, legal, or cultural clearance without verified external
+  evidence.
 - Brand generation/refinement uses named structured operations and conditional
   saves against the version read before the paid call.
 - Existing `update_brand_deliverable.expectedVersion` stays optional for wire

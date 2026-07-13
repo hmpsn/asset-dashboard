@@ -520,6 +520,30 @@ export interface TemplateVariable {
   description?: string;
 }
 
+/** Explicit role used by locked page-generation manifests. */
+export const TEMPLATE_SECTION_GENERATION_ROLES = [
+  'body',
+  'answer_first',
+  'definition',
+  'proof',
+  'process',
+  'faq',
+  'cta',
+] as const;
+
+export type TemplateSectionGenerationRole =
+  (typeof TEMPLATE_SECTION_GENERATION_ROLES)[number];
+
+export interface TemplateAeoContract {
+  modes: Array<'answer_first' | 'definition' | 'faq' | 'paa'>;
+  required: boolean;
+}
+
+export interface TemplateCtaContract {
+  role: 'none' | 'primary' | 'secondary';
+  required: boolean;
+}
+
 export interface TemplateSection {
   id: string;
   name: string;
@@ -531,6 +555,12 @@ export interface TemplateSection {
   narrativeRole?: string;   // StoryBrand or custom narrative role
   brandNote?: string;        // one-line brand purpose
   seoNote?: string;          // one-line SEO purpose
+  /** Absent on legacy templates until an explicit generation upgrade is accepted. */
+  generationRole?: TemplateSectionGenerationRole;
+  /** Absent on legacy templates until an explicit generation upgrade is accepted. */
+  aeoContract?: TemplateAeoContract;
+  /** Absent on legacy templates until an explicit generation upgrade is accepted. */
+  ctaContract?: TemplateCtaContract;
 }
 
 export type ContentPageType =
@@ -553,6 +583,10 @@ export interface ContentTemplate {
   cmsFieldMap?: Record<string, string>;
   toneAndStyle?: string;
   schemaTypes?: string[];  // e.g. ['BlogPosting', 'BreadcrumbList'] — auto-populated from pageType via PAGE_TYPE_SCHEMA_MAP
+  /** Monotonic source revision; legacy rows read as 0 until M0 persists the column. */
+  revision?: number;
+  /** Absent on legacy templates until an explicit generation upgrade is accepted. */
+  generationContractVersion?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -620,6 +654,8 @@ export interface StatusHistoryEntry {
 
 export interface MatrixCell {
   id: string;
+  /** Monotonic cell-scoped source revision; legacy JSON absence is interpreted as 0. */
+  revision?: number;
   variableValues: Record<string, string>;
   targetKeyword: string;
   customKeyword?: string;
@@ -644,6 +680,8 @@ export interface MatrixCell {
 export interface ContentMatrix {
   id: string;
   workspaceId: string;
+  /** Monotonic definition/selection revision; legacy rows read as 0 until M0. */
+  revision?: number;
   name: string;
   templateId: string;
   dimensions: MatrixDimension[];

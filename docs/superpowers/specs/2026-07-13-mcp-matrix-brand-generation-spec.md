@@ -239,6 +239,10 @@ which contains the structural target and additionally snapshots:
 
 A batch start presents one `MatrixSourceRevision` per selected cell, not one
 matrix-only revision. Every item commits against its own frozen envelope.
+The manifest tuple fixes exactly one introduction first and one conclusion
+last. Generation-ready preview also carries an exact brief/post revision
+envelope; unrelated, duplicate, or missing artifact expectations are not a
+valid shared shape.
 
 Resolving a content requirement is a free, conditional mutation. It persists a
 typed value/source ref, advances that cell revision, marks prior previews stale,
@@ -335,6 +339,11 @@ not a calibrated claim. After review, an operator selects authentic anchors and
 calls `finalize_brand_voice`; `resume_brand_deliverable_generation` verifies the
 durable finalization/version and only then starts identity/messaging/audience.
 
+`voice_foundation` is an atomic bootstrap target, not a normal preset. The
+pause is persisted as brand-generation stage `awaiting_voice_finalization`
+under the shared truthful run status `awaiting_review`; the common run-outcome
+vocabulary does not grow a workflow-specific tenth status.
+
 `BrandGenerationAtomicTarget` is the exact union
 `'voice_foundation' | BrandDeliverableType`.
 `BRAND_DELIVERABLE_TARGET_POLICY` is completeness-checked over that union:
@@ -347,6 +356,11 @@ final voice authority. `BRAND_GENERATION_PRESET_POLICY` separately maps every pr
 create only its foundation and pause; identity/messaging/audience cannot dispatch
 until finalized-version resume. Other presets require finalized voice at start.
 Unknown/unmapped values fail the contract test and cannot dispatch.
+Direct atomic selection is singular. Full-suite preset policy stores
+foundation-only `initialTargets` and durable `resumeTargets`, preventing mixed
+bootstrap/dependent dispatch. Finalized voice snapshots require at least one
+authentic anchor, and approved identity snapshots freeze approval/content
+fingerprints so a mutable row version alone cannot stand in for authority.
 
 Structured output contains content, creative/factual claim classification,
 evidence refs, unresolved requirements, audit findings, effective-input
