@@ -4,6 +4,7 @@ import {
   LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP,
 } from './local-seo.js';
 import { CONTENT_GENERATION_STYLES } from './content.js';
+import { hasVisibleHtmlContent } from '../content-post-integrity.js';
 
 // --- Shared building blocks -------------------------------------------------
 
@@ -249,26 +250,41 @@ export const preparePostContextInputSchema = z.object({
     .describe('The id of the saved brief to draft a post from. Returns structured drafting context plus a handle for save_post.'),
 });
 
+const visiblePostHtmlSchema = z.string().refine(
+  hasVisibleHtmlContent,
+  'must contain visible content',
+);
+
 const postContentSchema = z.object({
   briefId: z.string().min(1),
   targetKeyword: z.string().min(1),
   title: z.string().min(1),
   metaDescription: z.string().min(1),
-  introduction: z.string().trim().min(1),
+  introduction: visiblePostHtmlSchema,
   sections: z.array(z.object({
     index: z.number().int().nonnegative(),
     heading: z.string().trim().min(1),
-    content: z.string().trim().min(1),
+    content: visiblePostHtmlSchema,
     wordCount: z.number().int().nonnegative(),
     targetWordCount: z.number().int().positive(),
     keywords: z.array(z.string()),
     status: z.literal('done'),
     error: z.string().optional(),
   })).min(1),
-  conclusion: z.string().trim().min(1),
+  conclusion: visiblePostHtmlSchema,
   totalWordCount: z.number().int().nonnegative(),
   targetWordCount: z.number().int().positive(),
-}).passthrough();
+}).passthrough().superRefine((content, ctx) => {
+  const indexes = content.sections.map(section => section.index);
+  const expectedIndexes = content.sections.map((_, index) => index);
+  if (indexes.some((index, position) => index !== expectedIndexes[position])) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['sections'],
+      message: 'section indexes must be unique, contiguous, ordered, and start at 0',
+    });
+  }
+});
 
 export const savePostInputSchema = z.object({
   workspace_id: workspaceIdSchema,

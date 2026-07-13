@@ -201,9 +201,16 @@ describe('mcp-action-schemas', () => {
 
     it.each([
       { introduction: '' },
+      { introduction: '<p></p>' },
+      { introduction: '<p>&nbsp;</p>' },
       { conclusion: '' },
+      { conclusion: '<span>&nbsp;</span>' },
       { sections: [] },
+      { sections: [{ ...validContent.sections[0], content: '<div></div>' }] },
       { sections: [{ ...validContent.sections[0], status: 'error' }] },
+      { sections: [validContent.sections[0], { ...validContent.sections[0] }] },
+      { sections: [{ ...validContent.sections[0], index: 1 }] },
+      { sections: [validContent.sections[0], { ...validContent.sections[0], index: 2 }] },
     ])('rejects an incomplete post artifact', (contentOverride) => {
       expect(savePostInputSchema.safeParse({
         workspace_id: 'ws-1',

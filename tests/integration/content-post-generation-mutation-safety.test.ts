@@ -10,7 +10,7 @@ const generationState = vi.hoisted(() => ({
   failVoiceContext: false,
   failStage: null as 'introduction' | 'section' | 'conclusion' | 'all' | null,
   emptyStage: null as 'introduction' | 'section' | 'conclusion' | null,
-  emptyUnification: false,
+  unificationResult: 'none' as 'none' | 'empty' | 'mixed-invalid' | 'wrong-size',
 }));
 
 vi.mock('../../server/broadcast.js', () => ({
@@ -54,9 +54,27 @@ vi.mock('../../server/content-posts-ai.js', async importOriginal => {
       if (generationState.emptyStage === 'conclusion') return '<p>&nbsp;</p>';
       return '<p>Draft conclusion with a clear next step.</p>';
     }),
-    unifyPost: vi.fn(async () => generationState.emptyUnification
-      ? { introduction: '<p></p>', sections: ['<div>&nbsp;</div>'], conclusion: '<span></span>' }
-      : null),
+    unifyPost: vi.fn(async () => {
+      if (generationState.unificationResult === 'empty') {
+        return { introduction: '<p></p>', sections: ['<div>&nbsp;</div>'], conclusion: '<span></span>' };
+      }
+      if (generationState.unificationResult === 'mixed-invalid') {
+        return {
+          introduction: '<p>Rewritten introduction that must not persist.</p>',
+          sections: ['<div>&nbsp;</div>'],
+          conclusion: '<p>Rewritten conclusion that must not persist.</p>',
+        };
+      }
+      if (generationState.unificationResult === 'wrong-size') {
+        return {
+          introduction: '<p>Rewritten introduction that must not persist.</p>',
+          sections: ['<p>First rewrite</p>', '<p>Unexpected extra rewrite</p>'],
+          conclusion: '<p>Rewritten conclusion that must not persist.</p>',
+          invalidReason: 'section_census_mismatch' as const,
+        };
+      }
+      return null;
+    }),
     generateSeoMeta: vi.fn(async () => ({
       seoTitle: 'Generated SEO Title',
       seoMetaDescription: 'Generated SEO meta description for the drafted post.',
@@ -235,7 +253,7 @@ beforeEach(() => {
   generationState.failVoiceContext = false;
   generationState.failStage = null;
   generationState.emptyStage = null;
-  generationState.emptyUnification = false;
+  generationState.unificationResult = 'none';
 });
 
 afterAll(async () => {
@@ -395,7 +413,7 @@ describe('content post generation mutation safety', () => {
   it('retains every valid pre-unification stage when the unifier returns markup-only replacements', async () => {
     const briefId = 'brief-empty-unifier';
     seedBrief(briefId);
-    generationState.emptyUnification = true;
+    generationState.unificationResult = 'empty';
 
     const startRes = await postJson(`/api/content-posts/${workspaceId}/generate`, { briefId });
     const started = await startRes.json() as { id: string; jobId: string };
@@ -411,6 +429,33 @@ describe('content post generation mutation safety', () => {
     });
     expect(post?.sections[0].content).toContain('practical guidance');
   });
+
+  it.each(['mixed-invalid', 'wrong-size'] as const)(
+    'applies unification atomically when the candidate is %s',
+    async (unificationResult) => {
+      const briefId = `brief-unifier-${unificationResult}`;
+      seedBrief(briefId);
+      generationState.unificationResult = unificationResult;
+
+      const startRes = await postJson(`/api/content-posts/${workspaceId}/generate`, { briefId });
+      const started = await startRes.json() as { id: string; jobId: string };
+      const job = await waitForJob(started.jobId);
+      const post = getPost(workspaceId, started.id);
+
+      expect(job.status).toBe('done');
+      expect(post).toMatchObject({
+        status: 'draft',
+        introduction: '<p>Draft introduction for the generated post.</p>',
+        conclusion: '<p>Draft conclusion with a clear next step.</p>',
+        unificationStatus: 'failed',
+        unificationNote: 'Unification returned unusable replacement content; the valid pre-unification draft was retained.',
+      });
+      expect(post?.sections).toHaveLength(1);
+      expect(post?.sections[0].content).toContain('practical guidance');
+      expect(post?.introduction).not.toContain('Rewritten');
+      expect(post?.conclusion).not.toContain('Rewritten');
+    },
+  );
 
   it('persists an unusable initial generation as error without success semantics', async () => {
     const briefId = 'brief-unusable';

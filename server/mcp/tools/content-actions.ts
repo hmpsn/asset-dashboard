@@ -928,6 +928,12 @@ async function handleSavePost(
       `Post briefId (${post.briefId}) does not match prepared request briefId (${payload.briefId})`,
     );
   }
+  const sourceBrief = getBrief(workspaceId, payload.briefId);
+  if (sourceBrief && Array.isArray(sourceBrief.outline) && post.sections.length !== sourceBrief.outline.length) {
+    return mcpError(
+      `Post section count (${post.sections.length}) does not match source brief outline (${sourceBrief.outline.length})`,
+    );
+  }
   savePost(workspaceId, post);
   invalidateContentPipelineIntelligence(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, {

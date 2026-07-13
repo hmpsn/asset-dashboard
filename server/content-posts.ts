@@ -551,7 +551,7 @@ export async function generatePost(
     const preUnifyWords = countHtmlWords(post.introduction) + post.sections.reduce((s, sec) => s + sec.wordCount, 0) + countHtmlWords(post.conclusion);
     const unified = await unifyPost(post, brief, voiceCtx, workspaceId, { signal: options.signal });
     if (unified) {
-      let invalidReplacement = false;
+      let invalidReplacement = unified.invalidReason !== undefined;
       let replacementCount = 0;
       let nextIntroduction = post.introduction;
       let nextConclusion = post.conclusion;
@@ -587,9 +587,11 @@ export async function generatePost(
         } else invalidReplacement = true;
       }
 
-      post.introduction = nextIntroduction;
-      post.sections = nextSections;
-      post.conclusion = nextConclusion;
+      if (!invalidReplacement) {
+        post.introduction = nextIntroduction;
+        post.sections = nextSections;
+        post.conclusion = nextConclusion;
+      }
       const postUnifyWords = countHtmlWords(post.introduction) + post.sections.reduce((s, sec) => s + sec.wordCount, 0) + countHtmlWords(post.conclusion);
       post.unificationStatus = invalidReplacement ? 'failed' : replacementCount > 0 ? 'success' : 'skipped';
       post.unificationNote = invalidReplacement

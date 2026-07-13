@@ -536,6 +536,7 @@ describe('mcp content action tools', () => {
       id: 'brief_1',
       workspaceId: 'ws-1',
       targetKeyword: 'hvac',
+      outline: [{ heading: 'H2' }],
       suggestedTitle: 'HVAC brief',
       createdAt: '2026-01-01T00:00:00.000Z',
     });
@@ -916,6 +917,7 @@ describe('mcp content action tools', () => {
       id: 'brief_1',
       workspaceId: 'ws-1',
       targetKeyword: 'hvac',
+      outline: [{ heading: 'H2' }],
     });
     const prepared = await handleContentActionTool('prepare_post_context', {
       workspace_id: 'ws-1',
@@ -954,6 +956,51 @@ describe('mcp content action tools', () => {
       'post:updated',
       expect.objectContaining({ action: 'mcp_post_saved' }),
     );
+  });
+
+  it.each([
+    { label: 'missing', outlineCount: 2, sectionCount: 1 },
+    { label: 'extra', outlineCount: 1, sectionCount: 2 },
+  ])('save_post rejects $label sections relative to the source brief outline', async ({ outlineCount, sectionCount }) => {
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac',
+      outline: Array.from({ length: outlineCount }, (_, index) => ({ heading: `H${index + 2}` })),
+    });
+    const prepared = await handleContentActionTool('prepare_post_context', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+    });
+    const preparedPayload = JSON.parse(prepared.content[0].text) as { post_request_handle: string };
+    const result = await handleContentActionTool('save_post', {
+      workspace_id: 'ws-1',
+      post_request_handle: preparedPayload.post_request_handle,
+      content: {
+        briefId: 'brief_1',
+        targetKeyword: 'hvac',
+        title: 'Post title',
+        metaDescription: 'Meta',
+        introduction: '<p>Intro</p>',
+        sections: Array.from({ length: sectionCount }, (_, index) => ({
+          index,
+          heading: `H${index + 2}`,
+          content: `<p>Body ${index + 1}</p>`,
+          wordCount: 2,
+          targetWordCount: 120,
+          keywords: ['hvac'],
+          status: 'done',
+        })),
+        conclusion: '<p>End</p>',
+        totalWordCount: 1000,
+        targetWordCount: 1200,
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/does not match source brief outline/);
+    expect(savePost).not.toHaveBeenCalled();
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
   });
 
   it('save_post rejects brief mismatch between handle and content payload', async () => {
@@ -1043,6 +1090,10 @@ describe('mcp content action tools', () => {
       briefId: 'brief_1',
       targetKeyword: 'hvac',
       title: 'Post title',
+      status: 'draft',
+      introduction: '<p>Intro</p>',
+      sections: [{ status: 'done', content: '<p>Body</p>' }],
+      conclusion: '<p>End</p>',
     });
     (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValueOnce({ id: 'cr_parent_post' });
 
@@ -1699,6 +1750,10 @@ describe('mcp content action tools', () => {
       briefId: 'brief_1',
       targetKeyword: 'hvac',
       title: 'Post title',
+      status: 'draft',
+      introduction: '<p>Intro</p>',
+      sections: [{ status: 'done', content: '<p>Body</p>' }],
+      conclusion: '<p>End</p>',
     });
     (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const sent = await handleContentActionTool('send_to_client', {

@@ -46,6 +46,13 @@ const unifyResponseSchema = z.object({
   conclusion: z.string().optional(),
 });
 
+export interface UnifiedPostCandidate {
+  introduction?: string;
+  sections?: string[];
+  conclusion?: string;
+  invalidReason?: 'section_census_mismatch';
+}
+
 const voiceScoringResponseSchema = z.object({
   voiceScore: z.number().finite(),
   voiceFeedback: z.string().optional(),
@@ -663,7 +670,7 @@ export async function unifyPost(
   voiceCtx: string,
   workspaceId: string,
   options: ContentAIGenerationOptions = {},
-): Promise<{ introduction?: string; sections?: string[]; conclusion?: string } | null> {
+): Promise<UnifiedPostCandidate | null> {
   const pageType = brief.pageType || 'blog';
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
   const targetTotal = brief.wordCountTarget || 1800;
@@ -771,10 +778,12 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
 
   try {
     const parsed = parseStructuredAIOutput(rawResult, unifyResponseSchema, 'content-post-unify');
-    // Validate sections count matches
+    // Preserve the invalid candidate signal so the caller can reject the whole
+    // unification result atomically. Never hide a wrong-size sections array by
+    // converting it to an omitted field.
     if (parsed.sections && parsed.sections.length !== post.sections.length) {
-      log.warn(`Unification returned ${parsed.sections.length} sections but expected ${post.sections.length} — skipping section updates`);
-      parsed.sections = undefined;
+      log.warn(`Unification returned ${parsed.sections.length} sections but expected ${post.sections.length} — rejecting candidate`);
+      return { ...parsed, invalidReason: 'section_census_mismatch' };
     }
     return parsed;
   } catch (err) {
