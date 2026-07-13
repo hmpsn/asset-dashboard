@@ -108,6 +108,8 @@ class AIRequestDeduplicator {
    * Create a cache key from request parameters
    */
   static createKey(params: {
+    provider?: 'openai' | 'anthropic';
+    operation?: string;
     model: string;
     messages: Array<{ role: string; content: string }>;
     temperature?: number;
@@ -117,6 +119,8 @@ class AIRequestDeduplicator {
     feature?: string;
   }): string {
     const keyData = {
+      provider: params.provider,
+      operation: params.operation,
       model: params.model,
       messages: params.messages,
       temperature: params.temperature ?? 0.7,
@@ -184,6 +188,7 @@ class AIRequestDeduplicator {
     
     if (Date.now() > cached.expiry) {
       this.cache.delete(key);
+      this.counters.evictions++;
       return null;
     }
     

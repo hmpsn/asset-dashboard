@@ -278,7 +278,7 @@ interface OpenAIChatResult {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
-  execution?: { attempts: number; cacheOutcome: AICacheOutcome };
+  execution?: { attempts: number; cacheOutcome: AICacheOutcome; originRunId?: string };
 }
 
 /**
@@ -302,15 +302,15 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     operation = feature,
   } = opts;
 
-  if (signal) {
-    // Cancellable requests are per-job work; sharing a deduped promise would let one job abort another.
-    const value = await executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal, runId, operation, executionCacheOutcome: 'bypass' });
-    return { ...value, execution: { attempts: value.execution?.attempts ?? 1, cacheOutcome: 'bypass' } };
-  }
+  // Cancellable requests are per-job work; counting them as explicit bypasses keeps
+  // governance telemetry truthful without sharing an abortable promise.
+  const effectivePolicy: AICachePolicy = signal ? { mode: 'none' } : cachePolicy;
 
   // Create deduplication key from request parameters
   const { AIRequestDeduplicator }: typeof AiDeduplication = await import('./ai-deduplication.js'); // dynamic-import-ok
   const dedupeKey = AIRequestDeduplicator.createKey({
+    provider: 'openai',
+    operation,
     model,
     messages: messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) })),
     temperature,
@@ -322,10 +322,10 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
 
   const deduped = await aiDeduplicator.execute(
     dedupeKey,
-    () => executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal, runId, operation, executionCacheOutcome: cachePolicy.mode === 'none' ? 'bypass' : 'miss' }),
-    cachePolicy,
+    () => executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal, runId, operation, executionCacheOutcome: effectivePolicy.mode === 'none' ? 'bypass' : 'miss' }),
+    effectivePolicy,
   );
-  return { ...deduped.value, execution: { attempts: deduped.value.execution?.attempts ?? 1, cacheOutcome: deduped.cacheOutcome } };
+  return { ...deduped.value, execution: { attempts: deduped.value.execution?.attempts ?? 1, cacheOutcome: deduped.cacheOutcome, originRunId: deduped.value.execution?.originRunId } };
 }
 
 /**
@@ -347,6 +347,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     operation = feature,
     executionCacheOutcome = 'miss',
   } = opts;
+  const callStartMs = Date.now();
 
   if (isLocalFakeProviderModeEnabled()) {
     const fallbackText = responseFormat?.type === 'json_object'
@@ -361,11 +362,15 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     const completionTokens = Math.max(1, Math.round(fallbackText.length / 6));
     const totalTokens = promptTokens + completionTokens;
     logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs: 1, runId, operation, provider: 'openai', attempts: 1, cacheOutcome: executionCacheOutcome });
-    return { text: fallbackText, promptTokens, completionTokens, totalTokens, execution: { attempts: 1, cacheOutcome: executionCacheOutcome } };
+    recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - callStartMs, workspaceId, message: `${model} local fake call completed`, runId, provider: 'openai', model, attempts: 1, cacheOutcome: executionCacheOutcome });
+    return { text: fallbackText, promptTokens, completionTokens, totalTokens, execution: { attempts: 1, cacheOutcome: executionCacheOutcome, originRunId: runId } };
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
+  if (!apiKey) {
+    recordOperationTrace({ source: 'ai', operation, status: 'error', durationMs: Date.now() - callStartMs, workspaceId, message: 'OpenAI API key not configured', runId, provider: 'openai', model, attempts: 0, cacheOutcome: executionCacheOutcome });
+    throw new Error('OPENAI_API_KEY not configured');
+  }
 
   const tokenLimit = usesMaxCompletionTokens(model)
     ? { max_completion_tokens: maxTokens }
@@ -379,7 +384,6 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     ...(responseFormat && { response_format: responseFormat }),
   });
 
-  const callStartMs = Date.now();
   let attempts = 0;
   try {
     const result = await withProviderRetry({
@@ -460,9 +464,10 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
       durationMs,
       workspaceId,
       message: `${model} call completed`,
+      runId, provider: 'openai', model, attempts, cacheOutcome: executionCacheOutcome,
     });
 
-    return { ...result, execution: { attempts, cacheOutcome: executionCacheOutcome } };
+    return { ...result, execution: { attempts, cacheOutcome: executionCacheOutcome, originRunId: runId } };
   } catch (err) {
     if (signal?.aborted || (err instanceof Error && err.message === AI_REQUEST_CANCELLED_MESSAGE)) {
       throw err;
@@ -473,6 +478,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
       status: 'error',
       durationMs: Date.now() - callStartMs,
       workspaceId,
+      runId, provider: 'openai', model, attempts, cacheOutcome: executionCacheOutcome,
       message: err instanceof Error ? err.message : String(err),
     });
     throw err;

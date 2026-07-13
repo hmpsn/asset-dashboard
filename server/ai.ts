@@ -11,6 +11,7 @@ import { callAnthropic } from './anthropic-helpers.js';
 import { getAIOperationRuntimeDefaults, type AIOperationId } from './ai-operation-registry.js';
 import { randomUUID } from 'crypto';
 import type { AIExecutionMetadata } from '../shared/types/ai-execution.js';
+import { recordOperationTrace } from './platform-observability.js';
 
 export interface AICallOptions {
   /** Registry operation id for auditable operation contracts. */
@@ -103,6 +104,9 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
       operation,
     });
     const completedAt = new Date();
+    const cacheOutcome = result.execution?.cacheOutcome ?? 'miss';
+    const originRunId = result.execution?.originRunId;
+    if (cacheOutcome === 'hit' || cacheOutcome === 'inflight') recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - startedMs, workspaceId: opts.workspaceId, message: `${model ?? 'claude-sonnet-4-6'} reused ${cacheOutcome} result`, runId, originRunId, provider, model: model ?? 'claude-sonnet-4-6', attempts: result.execution?.attempts ?? 1, cacheOutcome });
     return {
       text: result.text,
       tokens: { prompt: result.promptTokens, completion: result.completionTokens, total: result.totalTokens },
@@ -112,8 +116,8 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
         provider,
         model: model ?? 'claude-sonnet-4-6',
         attempts: result.execution?.attempts ?? 1,
-        fallbackUsed: false,
-        cacheOutcome: result.execution?.cacheOutcome ?? 'miss',
+        ...(originRunId && originRunId !== runId ? { originRunId } : {}),
+        cacheOutcome,
         startedAt: startedAt.toISOString(),
         completedAt: completedAt.toISOString(),
         durationMs: Date.now() - startedMs,
@@ -142,6 +146,9 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
     operation,
   });
   const completedAt = new Date();
+  const cacheOutcome = result.execution?.cacheOutcome ?? 'miss';
+  const originRunId = result.execution?.originRunId;
+  if (cacheOutcome === 'hit' || cacheOutcome === 'inflight') recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - startedMs, workspaceId: opts.workspaceId, message: `${model ?? 'gpt-5.4-mini'} reused ${cacheOutcome} result`, runId, originRunId, provider, model: model ?? 'gpt-5.4-mini', attempts: result.execution?.attempts ?? 1, cacheOutcome });
 
   return {
     text: result.text,
@@ -152,8 +159,8 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
       provider,
       model: model ?? 'gpt-5.4-mini',
       attempts: result.execution?.attempts ?? 1,
-      fallbackUsed: false,
-      cacheOutcome: result.execution?.cacheOutcome ?? 'miss',
+      ...(originRunId && originRunId !== runId ? { originRunId } : {}),
+      cacheOutcome,
       startedAt: startedAt.toISOString(),
       completedAt: completedAt.toISOString(),
       durationMs: Date.now() - startedMs,

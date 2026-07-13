@@ -350,6 +350,7 @@ describe('callOpenAI retry behavior', () => {
     mocks.composeTimeoutSignal.mockReturnValue(undefined);
     mocks.throwIfSignalAborted.mockReset();
     mocks.recordOperationTrace.mockReset();
+    mocks.aiDeduplicator.execute.mockClear();
   });
 
   afterEach(() => {
@@ -402,9 +403,23 @@ describe('callOpenAI retry behavior', () => {
       signal: controller.signal,
     })).rejects.toThrow('AI request cancelled');
 
+    expect(mocks.aiDeduplicator.execute).toHaveBeenCalledWith(
+      'dedupe-key', expect.any(Function), { mode: 'none' },
+    );
+
     expect(mocks.recordOperationTrace).not.toHaveBeenCalledWith(expect.objectContaining({
       operation: 'openai-cancel-test',
       status: 'error',
     }));
+  });
+
+  it('traces a missing API key without exposing request content', async () => {
+    delete process.env.OPENAI_API_KEY;
+    await expect(callOpenAI({ messages: [{ role: 'user', content: 'secret prompt' }], feature: 'missing-key', runId: 'run-missing' }))
+      .rejects.toThrow('OPENAI_API_KEY not configured');
+    expect(mocks.recordOperationTrace).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'error', operation: 'missing-key', runId: 'run-missing', provider: 'openai', attempts: 0,
+    }));
+    expect(JSON.stringify(mocks.recordOperationTrace.mock.calls)).not.toContain('secret prompt');
   });
 });

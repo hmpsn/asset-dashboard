@@ -7,11 +7,14 @@ export type AICacheOutcome = 'bypass' | 'miss' | 'inflight' | 'hit';
 
 export interface AIExecutionMetadata {
   runId: string;
+  /** Run that performed the provider call when this request reused work. */
+  originRunId?: string;
   operation: string;
   provider: 'openai' | 'anthropic';
   model: string;
   attempts: number;
-  fallbackUsed: boolean;
+  /** Present only when a dispatcher can prove whether provider fallback occurred. */
+  fallbackUsed?: boolean;
   cacheOutcome: AICacheOutcome;
   startedAt: string;
   completedAt: string;

@@ -52,7 +52,7 @@ interface AnthropicChatResult {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
-  execution?: { attempts: number; cacheOutcome: AICacheOutcome };
+  execution?: { attempts: number; cacheOutcome: AICacheOutcome; originRunId?: string };
 }
 
 /**
@@ -63,6 +63,8 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
   const model = opts.model ?? 'claude-sonnet-4-6';
   const cachePolicy = opts.signal ? { mode: 'none' } as const : (opts.cachePolicy ?? { mode: 'inflight' } as const);
   const key = AIRequestDeduplicator.createKey({
+    provider: 'anthropic',
+    operation: opts.operation ?? opts.feature,
     model,
     messages: [
       ...(opts.system ? [{ role: 'system', content: opts.system }] : []),
@@ -83,6 +85,7 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
     execution: {
       attempts: deduped.value.execution?.attempts ?? 1,
       cacheOutcome: deduped.cacheOutcome,
+      originRunId: deduped.value.execution?.originRunId,
     },
   };
 }
@@ -103,6 +106,7 @@ async function executeAnthropicCall(opts: AnthropicChatOptions): Promise<Anthrop
     operation = feature,
     executionCacheOutcome = 'miss',
   } = opts;
+  const callStartMs = Date.now();
 
   if (isLocalFakeProviderModeEnabled()) {
     const text = `[local-fake-providers] Synthetic Anthropic response for "${feature}".`;
@@ -110,11 +114,15 @@ async function executeAnthropicCall(opts: AnthropicChatOptions): Promise<Anthrop
     const completionTokens = Math.max(1, Math.round(text.length / 7));
     const totalTokens = promptTokens + completionTokens;
     logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs: 1, runId, operation, provider: 'anthropic', attempts: 1, cacheOutcome: executionCacheOutcome });
-    return { text, promptTokens, completionTokens, totalTokens, execution: { attempts: 1, cacheOutcome: executionCacheOutcome } };
+    recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - callStartMs, workspaceId, message: `${model} local fake call completed`, runId, provider: 'anthropic', model, attempts: 1, cacheOutcome: executionCacheOutcome });
+    return { text, promptTokens, completionTokens, totalTokens, execution: { attempts: 1, cacheOutcome: executionCacheOutcome, originRunId: runId } };
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
+  if (!apiKey) {
+    recordOperationTrace({ source: 'ai', operation, status: 'error', durationMs: Date.now() - callStartMs, workspaceId, message: 'Anthropic API key not configured', runId, provider: 'anthropic', model, attempts: 0, cacheOutcome: executionCacheOutcome });
+    throw new Error('ANTHROPIC_API_KEY not configured');
+  }
 
   const bodyObj: Record<string, unknown> = {
     model,
@@ -126,7 +134,6 @@ async function executeAnthropicCall(opts: AnthropicChatOptions): Promise<Anthrop
 
   const body = JSON.stringify(bodyObj);
 
-  const callStartMs = Date.now();
   let attempts = 0;
   try {
     const result = await withProviderRetry({
@@ -195,12 +202,12 @@ async function executeAnthropicCall(opts: AnthropicChatOptions): Promise<Anthrop
       attempts,
       cacheOutcome: executionCacheOutcome,
     });
-    recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs, workspaceId, message: `${model} call completed` });
+    recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs, workspaceId, message: `${model} call completed`, runId, provider: 'anthropic', model, attempts, cacheOutcome: executionCacheOutcome });
 
-    return { ...result, execution: { attempts, cacheOutcome: executionCacheOutcome } };
+    return { ...result, execution: { attempts, cacheOutcome: executionCacheOutcome, originRunId: runId } };
   } catch (err) {
     if (!(signal?.aborted || (err instanceof Error && err.message === AI_REQUEST_CANCELLED_MESSAGE))) {
-      recordOperationTrace({ source: 'ai', operation, status: 'error', durationMs: Date.now() - callStartMs, workspaceId, message: err instanceof Error ? err.message : String(err) });
+      recordOperationTrace({ source: 'ai', operation, status: 'error', durationMs: Date.now() - callStartMs, workspaceId, message: err instanceof Error ? err.message : String(err), runId, provider: 'anthropic', model, attempts, cacheOutcome: executionCacheOutcome });
     }
     throw err;
   }
@@ -233,6 +240,8 @@ export interface AnthropicToolUseResult {
  * Call Anthropic Messages API with tool_use (structured output).
  * Forces the model to respond with the named tool's input_schema shape.
  * Returns the tool_use input block — guaranteed structured JSON.
+ * This legacy tool path is intentionally cache-none and outside callAI governance;
+ * production callers must migrate to a registered structured-output operation.
  */
 export async function callAnthropicWithTools(opts: {
   model?: string;

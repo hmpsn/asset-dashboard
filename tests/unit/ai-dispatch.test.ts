@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   callOpenAI: vi.fn(),
   callAnthropic: vi.fn(),
+  recordOperationTrace: vi.fn(),
 }));
 
 vi.mock('../../server/openai-helpers.js', () => ({
@@ -12,6 +13,7 @@ vi.mock('../../server/openai-helpers.js', () => ({
 vi.mock('../../server/anthropic-helpers.js', () => ({
   callAnthropic: mocks.callAnthropic,
 }));
+vi.mock('../../server/platform-observability.js', () => ({ recordOperationTrace: mocks.recordOperationTrace }));
 
 import { callAI } from '../../server/ai.js';
 
@@ -19,6 +21,7 @@ describe('callAI', () => {
   beforeEach(() => {
     mocks.callOpenAI.mockReset();
     mocks.callAnthropic.mockReset();
+    mocks.recordOperationTrace.mockReset();
   });
 
   it('passes OpenAI JSON response format through the dispatcher', async () => {
@@ -227,6 +230,20 @@ describe('callAI', () => {
       cachePolicy: { mode: 'inflight' },
       runId: expect.any(String),
       operation: 'copy-generation',
+    }));
+    expect(result.execution).not.toHaveProperty('fallbackUsed');
+  });
+
+  it('links a cache consumer run to the provider run that produced the result', async () => {
+    mocks.callOpenAI.mockResolvedValue({
+      text: 'cached', promptTokens: 2, completionTokens: 1, totalTokens: 3,
+      execution: { attempts: 1, cacheOutcome: 'hit', originRunId: 'origin-run' },
+    });
+    const result = await callAI({ operation: 'schema-plan', messages: [{ role: 'user', content: 'same' }] });
+    expect(result.execution).toMatchObject({ cacheOutcome: 'hit', originRunId: 'origin-run' });
+    expect(result.execution.runId).not.toBe('origin-run');
+    expect(mocks.recordOperationTrace).toHaveBeenCalledWith(expect.objectContaining({
+      runId: result.execution.runId, originRunId: 'origin-run', cacheOutcome: 'hit', provider: 'openai',
     }));
   });
 

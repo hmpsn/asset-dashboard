@@ -83,6 +83,15 @@ describe('AIRequestDeduplicator.createKey', () => {
     expect(k1).not.toBe(k2);
   });
 
+  it('isolates identical requests by provider and operation', () => {
+    const base = { model: 'shared-model', messages: [{ role: 'user', content: 'q' }] };
+    const openai = AIRequestDeduplicator.createKey({ ...base, provider: 'openai', operation: 'keyword-generation' });
+    const anthropic = AIRequestDeduplicator.createKey({ ...base, provider: 'anthropic', operation: 'keyword-generation' });
+    const strategy = AIRequestDeduplicator.createKey({ ...base, provider: 'openai', operation: 'strategy-generation' });
+    expect(openai).not.toBe(anthropic);
+    expect(openai).not.toBe(strategy);
+  });
+
   it('includes a 16-char hex hash suffix', () => {
     const key = AIRequestDeduplicator.createKey({
       model: 'gpt-4',
@@ -151,6 +160,14 @@ describe('AIRequestDeduplicator — cache hit / miss', () => {
     await dedup.deduplicate('key-3', fetcher, { cacheTtlMs: shortTtl });
 
     expect(callCount).toBe(2);
+  });
+
+  it('counts an expired entry evicted during a read', async () => {
+    const fetcher = vi.fn(async () => 'value');
+    await dedup.execute('expired-read', fetcher, { mode: 'ttl', ttlMs: 10 });
+    vi.advanceTimersByTime(11);
+    await dedup.execute('expired-read', fetcher, { mode: 'ttl', ttlMs: 10 });
+    expect(dedup.getStats()).toMatchObject({ misses: 2, evictions: 1 });
   });
 
   it('different keys get different cached values', async () => {
