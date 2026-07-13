@@ -1,12 +1,12 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 675** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 676** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
 
-### 675. Truthful content-generation artifacts and delivery gates 2026-07-13
+### 676. Truthful content-generation artifacts and delivery gates 2026-07-13
 
 **What it does:** Separates strict initial brief/copy creation from partial update parsing, requires generated copy to match the exact planned-section census, and permits only one bounded repair before failing without durable mutation. Generated posts now distinguish useful but incomplete visible-text output with a canonical `needs_attention` lifecycle state and typed, sanitized stage diagnostics. Markup-only HTML is incomplete. Required-stage failures report job failure without `post_generated` success activity; full and single-section regeneration stage candidates in memory and preserve the exact prior artifact on failure; invalid unifier replacements retain the valid pre-unification content.
 
