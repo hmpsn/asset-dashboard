@@ -1,4 +1,4 @@
-import { listLocalSeoMarkets } from '../local-seo/configuration-service.js';
+import { getLocalSeoPosture, listLocalSeoMarkets } from '../local-seo/configuration-service.js';
 import { buildLocalSeoKeywordVisibilitySummaryByKey } from '../local-seo/snapshot-store.js';
 import { getLatestSnapshotRanksWithDate } from '../../rank-tracking.js';
 import { listTrackedKeywordRows } from '../../tracked-keywords-store.js';
@@ -12,7 +12,6 @@ import { LOCAL_SEO_MARKET_STATUS, type LocalSeoKeywordVisibilitySummary } from '
 import { KEYWORD_RANK_FRESHNESS_STATUS, type KeywordRankFreshness } from '../../../shared/types/keyword-command-center.js';
 import type { Workspace } from '../../../shared/types/workspace.js';
 import type { LatestRank, TrackedKeyword } from '../../../shared/types/rank-tracking.js';
-import { getLocalSeoPosture } from '../../local-seo.js';
 import type { ScoringContext } from '../../scoring/keyword-value-score.js';
 import {
   countLocalSeoKeywordCandidatesFromLoadedContext,
