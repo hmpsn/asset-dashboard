@@ -125,6 +125,32 @@ CREATE TABLE keyword_feedback_v2_aliases (
 CREATE INDEX idx_keyword_feedback_v2_aliases_v1
   ON keyword_feedback_v2_aliases(workspace_id, keyword_v1);
 
+-- Full payload for pre-K3 rows whose raw spelling is unrecoverable. Before a
+-- v1 main-table row is repurposed as a rollback projection, the service copies
+-- it here exactly once. No v2 identity is guessed.
+CREATE TABLE keyword_feedback_v1_legacy_aliases (
+  workspace_id TEXT NOT NULL,
+  keyword_v1   TEXT NOT NULL,
+  legacy_id    INTEGER,
+  status       TEXT NOT NULL CHECK(status IN ('approved', 'declined', 'requested')),
+  reason       TEXT,
+  source       TEXT,
+  declined_by  TEXT,
+  created_at   TEXT,
+  updated_at   TEXT,
+  archived_at  TEXT NOT NULL,
+  PRIMARY KEY (workspace_id, keyword_v1),
+  FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
+
+CREATE TABLE keyword_feedback_v1_projection_keys (
+  workspace_id TEXT NOT NULL,
+  keyword_v1   TEXT NOT NULL CHECK(keyword_v1 <> ''),
+  projected_at TEXT NOT NULL,
+  PRIMARY KEY (workspace_id, keyword_v1),
+  FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
+
 CREATE TABLE content_gap_votes_v2_compat (
   workspace_id TEXT NOT NULL,
   keyword_v2   TEXT NOT NULL CHECK(keyword_v2 <> ''),
@@ -160,6 +186,26 @@ CREATE TABLE content_gap_vote_v2_aliases (
 CREATE INDEX idx_content_gap_vote_v2_aliases_v1
   ON content_gap_vote_v2_aliases(workspace_id, keyword_v1);
 
+CREATE TABLE content_gap_votes_v1_legacy_aliases (
+  workspace_id TEXT NOT NULL,
+  keyword_v1   TEXT NOT NULL,
+  legacy_id    INTEGER,
+  vote         TEXT NOT NULL CHECK(vote IN ('up', 'down')),
+  voted_by     TEXT,
+  updated_at   TEXT NOT NULL,
+  archived_at  TEXT NOT NULL,
+  PRIMARY KEY (workspace_id, keyword_v1),
+  FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
+
+CREATE TABLE content_gap_votes_v1_projection_keys (
+  workspace_id TEXT NOT NULL,
+  keyword_v1   TEXT NOT NULL CHECK(keyword_v1 <> ''),
+  projected_at TEXT NOT NULL,
+  PRIMARY KEY (workspace_id, keyword_v1),
+  FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
+
 CREATE TABLE serp_snapshots_v2_compat (
   workspace_id        TEXT NOT NULL,
   date                TEXT NOT NULL,
@@ -180,6 +226,32 @@ CREATE INDEX idx_serp_snapshots_v2_query
   ON serp_snapshots_v2_compat(workspace_id, query_v2, date DESC, observed_at DESC);
 CREATE INDEX idx_serp_snapshots_v2_v1
   ON serp_snapshots_v2_compat(workspace_id, query_v1, date DESC);
+
+CREATE TABLE serp_snapshot_v1_legacy_aliases (
+  workspace_id        TEXT NOT NULL,
+  date                TEXT NOT NULL,
+  query_v1            TEXT NOT NULL,
+  position            INTEGER,
+  matched_url         TEXT,
+  features            TEXT NOT NULL DEFAULT '[]', -- json-array-column-ok: archived full SERP observation remains atomic
+  ai_overview_cited   INTEGER,
+  ai_overview_present INTEGER,
+  archived_at         TEXT NOT NULL,
+  PRIMARY KEY (workspace_id, date, query_v1),
+  FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_serp_snapshot_v1_alias_query
+  ON serp_snapshot_v1_legacy_aliases(workspace_id, query_v1, date DESC);
+
+CREATE TABLE serp_snapshot_v1_projection_keys (
+  workspace_id TEXT NOT NULL,
+  date         TEXT NOT NULL,
+  query_v1     TEXT NOT NULL CHECK(query_v1 <> ''),
+  projected_at TEXT NOT NULL,
+  PRIMARY KEY (workspace_id, date, query_v1),
+  FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
 
 CREATE TABLE keyword_metrics_cache_v2 (
   identity_version TEXT NOT NULL DEFAULT 'v2' CHECK(identity_version = 'v2'),

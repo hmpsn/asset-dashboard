@@ -137,6 +137,7 @@ Names below are the required semantic contracts; the shared-contract task must r
 - K3b never clears or rewrites the v1 metrics cache and never guesses a v2 key from an unrecoverable legacy identity. Its backfill is dry-run-by-default, operator-invoked, per-workspace transactional, and absent from server boot.
 - Nonblank v2 identities with blank v1 keys are sidecar-only and classified as `v2_only`; compatibility code never writes or queries a blank rollback identity.
 - K3b tracked/site stores retain every raw variant with its full payload and mark exactly one canonical variant per v2 identity. Feedback/votes retain one current decision plus every raw spelling. Exact deletes reconcile one v2 identity only. SERP retains every raw observation with its full payload and readers select one coherent row deterministically rather than field-merging.
+- Feedback, vote, and SERP legacy payloads are archived before their main v1 key becomes a rollback projection; projection markers let union readers distinguish historical aliases from generated compatibility rows without guessing raw identity.
 
 ## Feature-Flag Contracts
 
