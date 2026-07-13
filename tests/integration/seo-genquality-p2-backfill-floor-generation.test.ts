@@ -79,6 +79,7 @@ vi.mock('../../server/keyword-strategy-ai-synthesis.js', async importOriginal =>
       businessSection: 'Faros — engineering intelligence platform.',
       keywordEvaluationContext: {},
       suppressedCount: 3,
+      executions: [],
     })),
   };
 });
