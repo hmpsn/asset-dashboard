@@ -7,6 +7,7 @@ describe('client StrategyTab request-flow split', () => {
     const keywordsSectionSrc = readFileSync('src/components/client/strategy/StrategyKeywordsSection.tsx', 'utf-8'); // readFile-ok - migration guard: strategy keyword add/remove/suggestion controls live in the extracted section component.
     const declinedSectionSrc = readFileSync('src/components/client/strategy/StrategyDeclinedKeywordsSection.tsx', 'utf-8'); // readFile-ok - migration guard: declined keyword restore UI lives in the extracted section component.
     const declineModalSrc = readFileSync('src/components/client/strategy/StrategyDeclineKeywordModal.tsx', 'utf-8'); // readFile-ok - migration guard: decline reason form UI lives in the extracted modal component.
+    const feedbackHookSrc = readFileSync('src/components/client/strategy/useStrategyKeywordFeedback.ts', 'utf-8'); // readFile-ok - migration guard: request/decline state belongs to the focused feedback hook.
 
     expect(strategyTabSrc).toContain("from './strategy/StrategyKeywordsSection'");
     expect(strategyTabSrc).toContain("from './strategy/StrategyDeclinedKeywordsSection'");
@@ -27,9 +28,18 @@ describe('client StrategyTab request-flow split', () => {
     expect(keywordsSectionSrc).toContain('Remove ${row.label} from strategy');
 
     expect(declinedSectionSrc).toContain('export function StrategyDeclinedKeywordsSection');
-    expect(declinedSectionSrc).toContain("status === 'declined'");
+    expect(declinedSectionSrc).toContain('declinedKeywords.map');
+    expect(declinedSectionSrc).not.toContain("status === 'declined'");
     expect(declinedSectionSrc).toContain('Not Relevant Keywords');
     expect(declinedSectionSrc).toContain('undoFeedback(kw)');
+
+    expect(feedbackHookSrc).toContain('export function useStrategyKeywordFeedback');
+    expect(feedbackHookSrc).toContain('kwFeedbackApi.get');
+    expect(feedbackHookSrc).toContain('kwFeedbackApi.submit');
+    expect(feedbackHookSrc).toContain('kwFeedbackApi.remove');
+    expect(feedbackHookSrc).toContain('keywordIdentityKeyV2');
+    expect(feedbackHookSrc).toContain("status === 'declined'");
+    expect(feedbackHookSrc).toContain("status === 'requested'");
 
     expect(declineModalSrc).toContain('export function StrategyDeclineKeywordModal');
     expect(declineModalSrc).toContain('Decline keyword');

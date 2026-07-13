@@ -14,7 +14,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
-import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
+import { keywordIdentityKeyV2 } from '../../shared/keyword-normalization.js';
 
 const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, patchJson } = ctx;
@@ -84,7 +84,7 @@ describe('Rank Tracking — keywords CRUD', () => {
     expect(res.status).toBe(200);
   });
 
-  it('POST dedupes canonical keyword variants', async () => {
+  it('POST dedupes v2-equivalent variants and promotes the explicitly mutated raw spelling', async () => {
     const first = await postJson(`/api/rank-tracking/${testWsId}/keywords`, {
       query: 'Emergency Dentist - Near-Me',
     });
@@ -95,9 +95,11 @@ describe('Rank Tracking — keywords CRUD', () => {
     });
     expect(second.status).toBe(200);
     const body = await second.json();
-    const matches = body.filter((k: { query: string }) => keywordComparisonKey(k.query) === 'emergency dentist near me');
+    const matches = body.filter((k: { query: string }) => (
+      keywordIdentityKeyV2(k.query) === keywordIdentityKeyV2('Emergency Dentist - Near-Me')
+    ));
     expect(matches).toHaveLength(1);
-    expect(matches[0].query).toBe('Emergency Dentist - Near-Me');
+    expect(matches[0].query).toBe('emergency dentist near me');
   });
 });
 

@@ -123,7 +123,7 @@ describe('Keyword Command Center routes', () => {
     expect(track.status).toBe(200);
     await expect(track.json()).resolves.toEqual(expect.objectContaining({
       ok: true,
-      keyword: 'route test keyword',
+      keyword: 'Route Test Keyword',
     }));
 
     const pause = await postJson(`/api/webflow/keyword-command-center/${workspaceId}/actions`, {

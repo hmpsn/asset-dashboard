@@ -92,6 +92,7 @@ vi.mock('../../server/db/index.js', () => ({
     prepare: mockDbPrepare.mockReturnValue({
       get: mockGenerationStateGet,
       run: mockGenerationClaimRun,
+      all: vi.fn(() => []),
     }),
     transaction: mockTransaction,
   },
@@ -191,7 +192,10 @@ describe('persistKeywordStrategy', () => {
       if (sql.includes('keyword_strategy_generation_revision = keyword_strategy_generation_revision + 1')) {
         return { run: mockGenerationClaimRun };
       }
-      return { run: mockRun };
+      if (sql.includes('MAX(write_order)')) {
+        return { get: vi.fn(() => ({ value: 0 })) };
+      }
+      return { run: mockRun, get: vi.fn(), all: vi.fn(() => []) };
     });
     mockNormalizePageUrl.mockImplementation((p: string) => p);
   });

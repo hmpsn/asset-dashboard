@@ -700,7 +700,7 @@ describe('POST /api/webflow/keyword-feedback — single keyword feedback', () =>
     expect(body.status).toBe('requested');
   });
 
-  it('normalizes keyword to lowercase and trims whitespace before storing', async () => {
+  it('preserves trimmed raw display text while maintaining the normalized legacy projection', async () => {
     const wsId = freshWs('POST feedback normalize keyword');
     const res = await ctx.postJson(`/api/webflow/keyword-feedback/${wsId}`, {
       keyword: '  SEO Services  ',
@@ -709,7 +709,7 @@ describe('POST /api/webflow/keyword-feedback — single keyword feedback', () =>
     });
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.keyword).toBe('seo services');
+    expect(body.keyword).toBe('SEO Services');
 
     const row = db.prepare(
       'SELECT keyword FROM keyword_feedback WHERE workspace_id = ?'
@@ -904,11 +904,11 @@ describe('DELETE /api/webflow/keyword-feedback/:wsId/:keyword', () => {
     const wsId = freshWs('DELETE nonexistent keyword');
     cleanFeedback(wsId);
 
-    // keyword never existed — server normalizes the URL param (hyphens → spaces)
+    // The exact raw input is returned when no v2 or legacy row exists.
     const res = await ctx.del(`/api/webflow/keyword-feedback/${wsId}/nonexistent-kw`);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.deleted).toBe('nonexistent kw');
+    expect(body.deleted).toBe('nonexistent-kw');
   });
 
   it('URL-decodes keywords with special characters before deletion', async () => {
