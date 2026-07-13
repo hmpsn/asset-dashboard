@@ -94,7 +94,11 @@ function snakeToCamel(col: string): string {
 // Add explanations for each so future engineers understand why.
 const INTENTIONAL_OMISSIONS: Record<string, Set<string>> = {
   workspaces: new Set([
-    // 'rewrite_playbook' IS mapped → ws.rewritePlaybook; nothing to omit here.
+    // Generation-control fields are internal storage metadata read through
+    // keyword-strategy-generation-store. They must not leak through Workspace.
+    'keyword_strategy_generation_revision',
+    'keyword_strategy_input_fingerprint',
+    'keyword_strategy_generation_provenance',
   ]),
   analytics_insights: new Set([
     // All columns are mapped; no intentional omissions.
