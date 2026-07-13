@@ -356,6 +356,19 @@ generic string ID cannot satisfy a different gate.
 - Matrix run/item/attempt persistence lands with structural resolution before
   one-cell generation. Batch orchestration extends this proven ledger; it does
   not introduce the first durable item store after generation already exists.
+- Structural resolution itself never creates a run. The M0 repository accepts
+  only a non-empty already-previewed `MatrixGenerationSelection`, so no M0 caller
+  may fabricate a preview fingerprint or imply paid readiness.
+- Internal persisted matrix runs carry an explicitly passed
+  `McpToolExecutionContext | null`; public run DTOs omit it. Run uniqueness is
+  `(workspace_id, matrix_id, idempotency_key)`, with a same-fingerprint replay
+  and different-fingerprint conflict. Attempts are unique by item + stage +
+  attempt number. Run snapshots deliberately have no cascading matrix/template
+  foreign key and survive source deletion.
+- Matrix cell evidence is append-only/versioned, not one mutable row per
+  requirement. It snapshots stable requirement identity, exact source revision,
+  typed value/source/resolver attribution, idempotency identity, and
+  current/superseded linkage. M1 owns the first evidence mutation.
 - `brand_content_onboarding_runs` stores the shared orchestration lifecycle,
   monotonic revision, idempotency identity, immutable source refs, child IDs,
   and gate evidence. A waiting human gate never keeps a generic job running.
@@ -392,6 +405,10 @@ generic string ID cannot satisfy a different gate.
 ## MCP boundary contracts
 
 - New tools use snake_case workspace inputs and described top-level schemas.
+- M0 registers a dedicated `content-matrix-actions` family with four `json_v1`
+  tools. Matrix summaries use stable `updated_at DESC, id ASC` cursors bound to
+  the active template filter; cell cursors bind matrix ID + revision. Limits are
+  25 default, 100 maximum, and 25 unique structural selections.
 - Tool discovery, dispatch, unique-name census, input-schema census, and
   declared-workspace-argument census derive from one canonical registry.
 - Registry construction snapshots immutable definitions, and a production

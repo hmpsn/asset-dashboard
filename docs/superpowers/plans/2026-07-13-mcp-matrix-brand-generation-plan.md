@@ -88,7 +88,7 @@ helpers inside its owned directory but may not rename or duplicate a locked seam
 |---|---|---|---|
 | P0 | `MatrixSourceRevision`, `ResolvedMatrixStructuralTarget`, `MatrixGenerationPreviewTarget`, `ResolvedPageBlockManifest`, `MatrixArtifactRevisionExpectations`, `ResolveMatrixGenerationEvidenceRequest`, `RetryMatrixGenerationRequest`, `GenerationEvidenceRequirement`, `GenerationEvidenceResolution`, `BrandGenerationAtomicTarget`, `BRAND_DELIVERABLE_TARGET_POLICY`, `BRAND_GENERATION_PRESET_POLICY`, `MatrixGenerationRun`, `BrandGenerationRun`, `BrandReviewItemDecision`, `BrandContentOnboardingRun` | shared status/policy registries only; transition tables land with each first persisted writer | two OFF flag catalog entries |
 | R1 | `McpToolDefinition`, `McpToolExecutionContext`, `McpToolErrorEnvelope` | `MCP_TOOL_REGISTRY`, `getDeclaredWorkspaceField()`, `executeMcpTool()` | existing `/mcp`; no product tool yet |
-| M0 | revisions on `content_matrices`/`content_templates`; cell `revision`; `content_matrix_generation_runs`, `_items`, `_attempts`; `content_matrix_cell_evidence` | `resolveMatrixStructure()`, `acceptTemplateGenerationUpgrade()`, `createMatrixGenerationRun()`, `listMatrixGenerationItems()` | `POST /api/content-templates/:workspaceId/:templateId/accept-generation-upgrade`; MCP `list_content_matrices`, `get_content_matrix`, `resolve_content_matrix_cells`, `accept_content_template_generation_upgrade` |
+| M0 | `MATRIX_READ_LIMITS`, bounded matrix read/resolve/upgrade DTOs, internal `PersistedMatrixGenerationRun`; revisions on `content_matrices`/`content_templates`; cell `revision`; `content_matrix_generation_runs`, `_items`, `_attempts`; versioned `content_matrix_cell_evidence` | `resolveMatrixStructure()`, `acceptTemplateGenerationUpgrade()`, `createMatrixGenerationRun()`, `listMatrixGenerationItems()` | `POST /api/content-templates/:workspaceId/:templateId/accept-generation-upgrade`; MCP `list_content_matrices`, `get_content_matrix`, `resolve_content_matrix_cells`, `accept_content_template_generation_upgrade` |
 | B0 | `brand_intake_revisions` | `submitBrandIntake()`, `getBrandIntakeRevision()`, `resolveBrandIntakeEvidence()` | existing `POST /api/public/onboarding/:id`; `GET /api/brand-intake/:workspaceId`; `POST /api/brand-intake/:workspaceId/:revisionId/evidence-resolutions`; MCP `get_brand_intake`, `resolve_brand_intake_evidence` |
 | B1 | voice anchor/finalization persistence selected against current migration head | `finalizeBrandVoice()`, `getBrandVoiceReadiness()` | `POST /api/voice/:workspaceId/finalize`; MCP `get_brand_voice`, `finalize_brand_voice` |
 | B2 | `brand_generation_runs`, `_items`, `_attempts` | `startBrandGeneration()`, `resumeBrandGeneration()`, `getBrandGeneration()`, `reviseBrandGenerationItem()` | `/api/brand-generation/:workspaceId/runs[/:runId]`; `/resume`; `/items/:itemId/revisions`; four matching MCP actions |
@@ -283,6 +283,53 @@ prompt assembly, or any paid AI path.
 - Add cursor-paged `list_content_matrices`, `get_content_matrix`, and
   `resolve_content_matrix_cells`. No AI call, final preview, or artifact write in
   M0.
+
+M0 contract lock (pre-implementation amendment):
+
+- Structural reads never create a run and never fabricate a preview fingerprint.
+  `createMatrixGenerationRun()` is the future-ready repository primitive for an
+  already previewed `MatrixGenerationSelection`; M0 lands/tests its normalized
+  storage but exposes no start route or tool.
+- Persisted runs carry an explicitly passed `McpToolExecutionContext | null` in
+  an internal-only provenance field. Public run DTOs, broadcasts, and client
+  activity never serialize it.
+- Revision ownership is exact. Matrix definition revision covers template
+  linkage, dimensions, URL/keyword patterns, and cell identity/set/order; matrix
+  display name does not stale generation. Template revision covers every
+  generation-effective field (page type, variables, sections/roles/AEO/CTA,
+  URL/keyword/title/meta patterns, CMS mapping, tone/style, and schema types);
+  name/description-only edits do not stale. Target cell revision covers variable
+  values, keyword choice/research, planned URL, typed evidence, status, and
+  artifact projection. Generic HTTP PUT no longer accepts a wholesale `cells`
+  replacement without an expected matrix revision; cell writes merge one target
+  into the latest array transactionally.
+- New matrices/templates/cells start at revision `1`; legacy absence reads as
+  `0`. Same-cell concurrent commits have one winner; sibling-cell commits from
+  one source snapshot remain independently valid.
+- Run idempotency is `UNIQUE(workspace_id, matrix_id, idempotency_key)`: same key
+  plus same selection fingerprint replays, while the same key with a different
+  fingerprint conflicts. Attempts are unique by `(item_id, stage,
+  attempt_number)`. Durable run snapshots retain source IDs after source
+  deletion; only workspace deletion cascades the run ledger.
+- Cell evidence is append-only/versioned with stable requirement identity,
+  source revision, typed value/source/resolver snapshots, idempotency identity,
+  and current/superseded markers. M1 owns the first evidence write.
+- Matrix list order is `updated_at DESC, id ASC`; its opaque cursor is bound to
+  the template filter. Cell cursors are bound to matrix ID + matrix revision and
+  conflict after a source edit. Page size defaults to `25`, caps at `100`, and a
+  resolve request caps at `25` unique cell IDs. Matrix list filters by template
+  only; there is no invented matrix-level status.
+- Structural keyword precedence is non-empty `custom` → `target` →
+  `recommended`; retained validation/research evidence is directional SEO
+  evidence, never factual business proof. URL collision scope includes every
+  matrix cell and known workspace page path. Title/meta patterns are required
+  for a resolved target; absence is a blocker, not invented copy.
+- Slugs use deterministic Unicode NFKD normalization, combining-mark removal,
+  lowercase ASCII alphanumerics, and hyphen collapse. A non-empty value that
+  normalizes empty blocks. Full/external URLs, traversal, query/fragment input,
+  unresolved braces, empty segments, and canonical collisions block.
+- The four M0 tools form a dedicated `content-matrix-actions` family, use
+  `json_v1`, and move the production census from 13/61 to 14/65.
 
 Red first: duplicate keyword selects wrong cell; missing/unknown variables,
 unresolved braces, invalid/duplicate URLs, stale matrix/template/cell revision,

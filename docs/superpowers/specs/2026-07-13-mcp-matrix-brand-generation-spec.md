@@ -122,7 +122,7 @@ rejections are intentionally generic and never reflect caller values.
 
 | Tool | Purpose |
 |---|---|
-| `list_content_matrices` | Cursor-paged matrix summaries; filter by status/template |
+| `list_content_matrices` | Cursor-paged matrix summaries ordered by updated time + ID; optional template filter (there is no matrix-level status) |
 | `get_content_matrix` | Matrix metadata plus cursor-paged cells; no giant blob response |
 | `resolve_content_matrix_cells` | Structural-only IDs/revisions/template/URL/block-manifest resolution; no voice, paid estimate, or AI |
 | `accept_content_template_generation_upgrade` | Version-conditionally accept the exact deterministic legacy-template upgrade proposal; never infers ambiguous roles |
@@ -239,6 +239,23 @@ Structural resolution can run before voice/context dependencies. It resolves
 `ResolvedMatrixStructuralTarget` plus a source-only structural fingerprint. It
 does not include voice/identity selection, artifact revisions, final evidence
 freshness, or a paid estimate and cannot claim generation readiness.
+It returns a typed `resolved | upgrade_required | blocked` result per explicitly
+selected cell. Missing title/meta patterns, unsupported page type, malformed or
+unknown variables, ambiguous generation roles, and canonical URL collisions are
+blockers; they never produce fallback marketing copy. Structural reads do not
+create a generation run. M0 only lands the future-ready run repository primitive,
+which accepts an already previewed non-empty paid selection for M1/M3.
+
+Matrix list cursors use stable `updated_at DESC, id ASC` ordering and bind the
+template filter. Cell cursors bind matrix ID plus matrix revision so a changed
+snapshot conflicts rather than mixing pages. The default/max page sizes are
+25/100 and structural resolution accepts at most 25 unique cells. Slug rendering
+uses Unicode NFKD, removes combining marks, lowercases to ASCII alphanumerics,
+collapses hyphens, and blocks values that normalize empty. Query/fragment/full
+URL input, traversal, unresolved braces, empty segments, and collisions against
+other matrix cells or known workspace paths block. Prose substitution preserves
+the supplied value. Keyword selection is custom, then target, then recommended;
+SEO research remains directional evidence and never proves business facts.
 
 Generation-ready preview runs only after finalized voice and the C3 exact-once
 context builder are available. It returns `MatrixGenerationPreviewTarget`,
@@ -302,6 +319,12 @@ queued, preflighted, brief generation, post
 generation, deterministic audit, model audit, optional revision, and a terminal
 ready/needs-attention/blocked/conflict/failed/cancelled state. Cell linkage and
 legal lifecycle projection commit with the artifact/run result.
+Run idempotency is scoped by workspace + matrix + idempotency key; reuse with a
+different selection fingerprint conflicts. Run snapshots retain source IDs after
+matrix/template deletion and persist an explicitly passed internal MCP execution
+context for restart-safe audit. That key identity is never part of public run
+DTOs, broadcasts, or client activity. Cell evidence is append-only/versioned;
+M1 owns the first resolution write.
 
 Human page approval uses `approveMatrixPageForPublishReadiness()` at
 `POST /api/content-matrices/:workspaceId/:matrixId/generation-runs/:runId/items/:itemId/review-approval`.

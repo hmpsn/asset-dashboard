@@ -145,6 +145,16 @@ never sufficient to dispatch paid work.
   leave an honest resumable state.
 - Dedupe is resource-scoped. Independent cells may run concurrently; the same
   source revision and idempotency key may not create duplicate paid work.
+- Free structural matrix reads do not create a generation run. The first run
+  repository accepts only an already-previewed non-empty selection; structural
+  code must never manufacture a preview fingerprint to exercise the ledger.
+- Matrix run uniqueness is workspace + matrix + idempotency key. Replaying the
+  same selection fingerprint returns the existing run; reusing the key for a
+  different fingerprint conflicts. Durable run snapshots survive matrix or
+  template deletion, while workspace deletion may cascade them.
+- Cell evidence is append-only/versioned with exact source revision and
+  current/superseded linkage. Never model evidence as one destructively
+  overwritten row per requirement.
 
 ## 7. Conditional commits and truthful completion
 
@@ -200,6 +210,9 @@ never sufficient to dispatch paid work.
 
 - New action tools use snake_case inputs, stable JSON error codes, authoritative
   IDs, bounded selections, explicit revisions, and idempotency keys.
+- Matrix list/detail cursors bind their filter/source revision and use hard
+  page limits. A changed matrix conflicts instead of mixing two cell snapshots;
+  multi-cell structural resolution rejects duplicate or oversized selections.
 - Workspace authorization is checked against the workspace field declared by
   the called tool schema. Conflicting `workspaceId` and `workspace_id` aliases
   are invalid for every caller.

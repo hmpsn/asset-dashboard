@@ -46,9 +46,14 @@ import {
   type MatrixPageApprovalRef,
 } from '../../shared/types/brand-content-onboarding.js';
 import {
+  MATRIX_GENERATION_CONTRACT_VERSION,
+  MATRIX_GENERATION_ATTEMPT_STATUSES,
   MATRIX_GENERATION_ITEM_STATUSES,
+  MATRIX_READ_LIMITS,
   MATRIX_GENERATION_RUN_STATUSES,
   RESOLVED_SYSTEM_BLOCK_IDS,
+  type AcceptContentTemplateGenerationUpgradeRequest,
+  type CreateMatrixGenerationRunRequest,
   type MatrixArtifactRevisionExpectations,
   type MatrixGenerationInputSelection,
   type MatrixGenerationItem,
@@ -57,11 +62,14 @@ import {
   type MatrixGenerationReplacementAuthorization,
   type MatrixGenerationPreviewTarget,
   type MatrixSourceRevision,
+  type PersistedMatrixGenerationRun,
   type ResolveMatrixGenerationEvidenceRequest,
+  type ResolveMatrixStructuresRequest,
   type RetryMatrixGenerationRequest,
   type ResolvedPageBlockManifest,
   type ResolvedMatrixStructuralTarget,
 } from '../../shared/types/matrix-generation.js';
+import type { McpToolExecutionContext } from '../../shared/types/mcp-runtime.js';
 import {
   AUTHENTIC_VOICE_SAMPLE_SOURCES,
   BRAND_DELIVERABLE_TYPES,
@@ -626,6 +634,7 @@ describe('MCP matrix + brand generation shared contracts', () => {
 
   it('requires non-empty previewed selections before a paid matrix run', () => {
     type RunSelection = MatrixGenerationRun['selections'];
+    type CreateRunSelection = CreateMatrixGenerationRunRequest['selections'];
     type OnboardingSelection = NonNullable<BrandContentOnboardingInputs['matrixSelection']>;
     const runSelectionIsExact: AssertTrue<IsExact<
       RunSelection,
@@ -638,6 +647,10 @@ describe('MCP matrix + brand generation shared contracts', () => {
       RunSelection[number]['previewFingerprint'],
       string
     >> = true;
+    const repositoryAlsoRequiresPreview: AssertTrue<IsExact<
+      CreateRunSelection,
+      MatrixGenerationSelection
+    >> = true;
     const onboardingSelectionIsNonEmpty: AssertTrue<IsExact<
       OnboardingSelection,
       MatrixGenerationInputSelection
@@ -647,12 +660,58 @@ describe('MCP matrix + brand generation shared contracts', () => {
       runSelectionIsExact,
       runSelectionIsNonEmpty,
       runPreviewIsRequired,
+      repositoryAlsoRequiresPreview,
       onboardingSelectionIsNonEmpty,
     }).toEqual({
       runSelectionIsExact: true,
       runSelectionIsNonEmpty: true,
       runPreviewIsRequired: true,
+      repositoryAlsoRequiresPreview: true,
       onboardingSelectionIsNonEmpty: true,
+    });
+  });
+
+  it('locks M0 bounded reads, explicit upgrade decisions, and internal run attribution', () => {
+    type ResolveSelection = ResolveMatrixStructuresRequest['selections'];
+    type UpgradeDecision = AcceptContentTemplateGenerationUpgradeRequest['decision'];
+    type PersistedExecutionContext = PersistedMatrixGenerationRun['mcpExecutionContext'];
+    type PublicRunLeaksExecutionContext = HasKey<MatrixGenerationRun, 'mcpExecutionContext'>;
+
+    const resolveSelectionIsNonEmpty: AssertTrue<
+      ResolveSelection extends readonly [unknown, ...unknown[]] ? true : false
+    > = true;
+    const decisionIsExplicit: AssertTrue<IsExact<
+      UpgradeDecision,
+      'accept' | 'reject'
+    >> = true;
+    const internalContextIsExact: AssertTrue<IsExact<
+      PersistedExecutionContext,
+      McpToolExecutionContext | null
+    >> = true;
+    const publicRunDoesNotLeakContext: AssertFalse<PublicRunLeaksExecutionContext> = false;
+
+    expect(MATRIX_GENERATION_CONTRACT_VERSION).toBe(1);
+    expect(MATRIX_GENERATION_ATTEMPT_STATUSES).toEqual([
+      'running',
+      'completed',
+      'failed',
+      'cancelled',
+    ]);
+    expect(MATRIX_READ_LIMITS).toEqual({
+      defaultPageSize: 25,
+      maxPageSize: 100,
+      maxResolveSelection: 25,
+    });
+    expect({
+      resolveSelectionIsNonEmpty,
+      decisionIsExplicit,
+      internalContextIsExact,
+      publicRunDoesNotLeakContext,
+    }).toEqual({
+      resolveSelectionIsNonEmpty: true,
+      decisionIsExplicit: true,
+      internalContextIsExact: true,
+      publicRunDoesNotLeakContext: false,
     });
   });
 

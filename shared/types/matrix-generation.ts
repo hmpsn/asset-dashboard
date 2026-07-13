@@ -2,10 +2,14 @@ import type { GenerationProvenance } from './ai-execution.js';
 import {
   TEMPLATE_SECTION_GENERATION_ROLES,
   type BriefPageType,
+  type ContentMatrix,
+  type ContentTemplate,
+  type MatrixCell,
   type TemplateAeoContract,
   type TemplateCtaContract,
   type TemplateSectionGenerationRole,
 } from './content.js';
+import type { McpToolExecutionContext } from './mcp-runtime.js';
 import type {
   ApprovedBrandDeliverableRef,
   FinalizedVoiceSnapshotRef,
@@ -29,6 +33,65 @@ export interface MatrixSourceRevision {
   matrixRevision: number;
   templateRevision: number;
   cellRevision: number;
+}
+
+export const MATRIX_GENERATION_CONTRACT_VERSION = 1;
+
+export const MATRIX_READ_LIMITS = {
+  defaultPageSize: 25,
+  maxPageSize: 100,
+  maxResolveSelection: 25,
+} as const;
+
+export interface MatrixCursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+export type ContentMatrixReadMetadata = Omit<ContentMatrix, 'cells'> & {
+  cellCount: number;
+};
+
+export interface ContentMatrixSummary extends ContentMatrixReadMetadata {
+  templateRevision: number;
+}
+
+export interface ListContentMatricesRequest {
+  workspaceId: string;
+  templateId?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export type ListContentMatricesResult = MatrixCursorPage<ContentMatrixSummary>;
+
+export interface GetContentMatrixRequest {
+  workspaceId: string;
+  matrixId: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface GetContentMatrixResult {
+  matrix: ContentMatrixReadMetadata;
+  templateRevision: number;
+  cells: MatrixCursorPage<MatrixCell>;
+}
+
+export interface ResolveMatrixStructureSelection {
+  cellId: string;
+  expectedSourceRevision: MatrixSourceRevision;
+}
+
+export type ResolveMatrixStructureSelections = readonly [
+  ResolveMatrixStructureSelection,
+  ...ResolveMatrixStructureSelection[],
+];
+
+export interface ResolveMatrixStructuresRequest {
+  workspaceId: string;
+  matrixId: string;
+  selections: ResolveMatrixStructureSelections;
 }
 
 export const MATRIX_GENERATION_RUN_STATUSES = GENERATION_RUN_STATUSES;
@@ -184,6 +247,51 @@ export interface ContentTemplateGenerationUpgradeProposal {
   blockers: GenerationEvidenceRequirement[];
 }
 
+interface MatrixStructuralResolutionIdentity {
+  matrixId: string;
+  templateId: string;
+  cellId: string;
+  sourceRevision: MatrixSourceRevision;
+}
+
+export type MatrixStructuralResolutionResult =
+  | (MatrixStructuralResolutionIdentity & {
+      status: 'resolved';
+      target: ResolvedMatrixStructuralTarget;
+    })
+  | (MatrixStructuralResolutionIdentity & {
+      status: 'upgrade_required';
+      proposal: ContentTemplateGenerationUpgradeProposal;
+    })
+  | (MatrixStructuralResolutionIdentity & {
+      status: 'blocked';
+      blockers: GenerationEvidenceRequirement[];
+    });
+
+export interface ResolveMatrixStructuresResult {
+  results: MatrixStructuralResolutionResult[];
+}
+
+export interface AcceptContentTemplateGenerationUpgradeRequest {
+  workspaceId: string;
+  templateId: string;
+  expectedTemplateRevision: number;
+  proposalFingerprint: string;
+  decision: 'accept' | 'reject';
+}
+
+export type AcceptContentTemplateGenerationUpgradeResult =
+  | {
+      status: 'accepted';
+      template: ContentTemplate;
+      proposalFingerprint: string;
+    }
+  | {
+      status: 'rejected';
+      template: ContentTemplate;
+      proposalFingerprint: string;
+    };
+
 export const MATRIX_GENERATION_ITEM_STATUSES = [
   'queued',
   'preflighting',
@@ -213,6 +321,16 @@ export const MATRIX_GENERATION_STAGES = [
 ] as const;
 
 export type MatrixGenerationStage = (typeof MATRIX_GENERATION_STAGES)[number];
+
+export const MATRIX_GENERATION_ATTEMPT_STATUSES = [
+  'running',
+  'completed',
+  'failed',
+  'cancelled',
+] as const;
+
+export type MatrixGenerationAttemptStatus =
+  (typeof MATRIX_GENERATION_ATTEMPT_STATUSES)[number];
 
 export interface MatrixGenerationSelectionItem {
   matrixId: string;
@@ -282,6 +400,29 @@ export interface MatrixGenerationRun {
   completedAt: string | null;
 }
 
+/**
+ * Internal persisted run shape. The execution context is operational evidence
+ * and must be removed from every client/public projection.
+ */
+export interface PersistedMatrixGenerationRun extends MatrixGenerationRun {
+  mcpExecutionContext: McpToolExecutionContext | null;
+}
+
+/**
+ * Repository input reserved by M0 for future M1/M3 paid starts. Structural
+ * reads never create a run and must never fabricate preview fingerprints.
+ */
+export interface CreateMatrixGenerationRunRequest {
+  workspaceId: string;
+  matrixId: string;
+  templateId: string;
+  idempotencyKey: string;
+  selectionFingerprint: string;
+  selections: MatrixGenerationSelection;
+  createdBy: GenerationResolverAttribution;
+  mcpExecutionContext: McpToolExecutionContext | null;
+}
+
 export interface MatrixGenerationItem {
   id: string;
   runId: string;
@@ -309,7 +450,7 @@ export interface MatrixGenerationAttempt {
   itemId: string;
   attemptNumber: number;
   stage: MatrixGenerationStage;
-  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  status: MatrixGenerationAttemptStatus;
   effectiveInputFingerprint: string;
   provenance: GenerationProvenance | null;
   error: GenerationSanitizedError | null;

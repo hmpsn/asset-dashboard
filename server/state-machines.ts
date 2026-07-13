@@ -15,6 +15,11 @@
  */
 
 import { registerLifecycle } from '../shared/types/lifecycle.js';
+import type {
+  MatrixGenerationAttemptStatus,
+  MatrixGenerationItemStatus,
+  MatrixGenerationRunStatus,
+} from '../shared/types/matrix-generation.js';
 
 // ── Approval Item ──
 // pending ↔ approved ↔ applied
@@ -549,6 +554,47 @@ export const CLIENT_LOCATION_TRANSITIONS: Record<string, readonly string[]> = {
 
 export type ClientLocationTransitionStatus = 'needs_review' | 'confirmed';
 
+// ── Content Matrix Generation Run ──
+// M0 lands the durable lifecycle before M1/M3 execute work. Structural reads
+// never create a run; retries reopen only the explicitly resumable states.
+export const MATRIX_GENERATION_RUN_TRANSITIONS = {
+  queued: ['running', 'blocked', 'conflict', 'cancelled', 'failed'],
+  running: ['awaiting_review', 'completed', 'completed_with_errors', 'blocked', 'conflict', 'cancelled', 'failed'],
+  awaiting_review: ['running', 'completed', 'completed_with_errors', 'cancelled'],
+  completed: [],
+  completed_with_errors: ['running'],
+  blocked: ['queued', 'running', 'cancelled', 'failed'],
+  conflict: ['queued', 'running', 'cancelled', 'failed'],
+  cancelled: [],
+  failed: ['queued', 'running', 'cancelled'],
+} as const satisfies Record<MatrixGenerationRunStatus, readonly MatrixGenerationRunStatus[]>;
+
+// ── Content Matrix Generation Item ──
+export const MATRIX_GENERATION_ITEM_TRANSITIONS = {
+  queued: ['preflighting', 'cancelled', 'failed'],
+  preflighting: ['preflighted', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  preflighted: ['generating_brief', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  generating_brief: ['generating_post', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  generating_post: ['auditing_deterministic', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  auditing_deterministic: ['auditing_model', 'revising', 'ready_for_human_review', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  auditing_model: ['revising', 'ready_for_human_review', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  revising: ['auditing_deterministic', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  ready_for_human_review: [],
+  needs_attention: ['queued', 'preflighting', 'cancelled'],
+  blocked_missing_evidence: ['queued', 'preflighting', 'cancelled'],
+  conflict: ['queued', 'preflighting', 'cancelled'],
+  cancelled: [],
+  failed: ['queued', 'preflighting', 'cancelled'],
+} as const satisfies Record<MatrixGenerationItemStatus, readonly MatrixGenerationItemStatus[]>;
+
+// ── Content Matrix Generation Attempt ──
+export const MATRIX_GENERATION_ATTEMPT_TRANSITIONS = {
+  running: ['completed', 'failed', 'cancelled'],
+  completed: [],
+  failed: [],
+  cancelled: [],
+} as const satisfies Record<MatrixGenerationAttemptStatus, readonly MatrixGenerationAttemptStatus[]>;
+
 // ── Lifecycle envelope registration ──
 // A typed VIEW over the transition tables above — never a second source of truth.
 // Each entry's `states` is derived from the table keys, so it can never drift from
@@ -597,6 +643,9 @@ registerTransitionTable('client_signal', CLIENT_SIGNAL_TRANSITIONS);
 registerTransitionTable('blueprint', BLUEPRINT_TRANSITIONS);
 registerTransitionTable('brand_deliverable', BRAND_DELIVERABLE_TRANSITIONS);
 registerTransitionTable('client_location', CLIENT_LOCATION_TRANSITIONS);
+registerTransitionTable('matrix_generation_run', MATRIX_GENERATION_RUN_TRANSITIONS);
+registerTransitionTable('matrix_generation_item', MATRIX_GENERATION_ITEM_TRANSITIONS);
+registerTransitionTable('matrix_generation_attempt', MATRIX_GENERATION_ATTEMPT_TRANSITIONS);
 
 // ── Generic validator ──
 
