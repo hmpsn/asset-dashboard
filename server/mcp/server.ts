@@ -24,23 +24,6 @@ import type { McpAuthContext } from './auth.js';
 
 const log = createLogger('mcp-server');
 
-/**
- * Extract a workspace id from tool arguments, if the tool carries one.
- *
- * Tool schemas in this server use BOTH casings for the same concept:
- *   - `workspaceId` (e.g. get_workspace_overview)
- *   - `workspace_id` (e.g. update_workspace, delete_workspace)
- * Scope enforcement must consider both so a workspace-scoped key cannot reach a
- * sibling workspace through whichever casing a given tool happens to use.
- */
-function extractWorkspaceIdArg(args: Record<string, unknown>): string | undefined {
-  const camel = args.workspaceId;
-  if (typeof camel === 'string' && camel.length > 0) return camel;
-  const snake = args.workspace_id;
-  if (typeof snake === 'string' && snake.length > 0) return snake;
-  return undefined;
-}
-
 const ALL_TOOLS = [
   ...workspaceTools,
   ...intelligenceTools,
@@ -56,6 +39,73 @@ const ALL_TOOLS = [
   ...analyticsReadActionTools,
   ...jobActionTools,
 ];
+
+type WorkspaceArgumentName = 'workspaceId' | 'workspace_id';
+
+interface WorkspaceScopeResolution {
+  workspaceId?: string;
+  conflictingAliases?: {
+    workspaceId: string;
+    workspace_id: string;
+  };
+}
+
+const TOOL_BY_NAME = new Map(
+  ALL_TOOLS.map(tool => [tool.name, tool] as const),
+);
+
+/**
+ * Resolve the workspace field that a tool actually declares and therefore
+ * consumes. Tool schemas use both camelCase and snake_case, so inspecting the
+ * first raw alias present would let an undeclared decoy field authorize a
+ * different declared workspace field.
+ */
+function declaredWorkspaceArgument(toolName: string): WorkspaceArgumentName | undefined {
+  const tool = TOOL_BY_NAME.get(toolName) as {
+    inputSchema?: { properties?: Record<string, unknown> };
+  } | undefined;
+  const properties = tool?.inputSchema?.properties;
+  if (!properties) return undefined;
+
+  const hasCamel = Object.prototype.hasOwnProperty.call(properties, 'workspaceId');
+  const hasSnake = Object.prototype.hasOwnProperty.call(properties, 'workspace_id');
+
+  // No current tool should declare both. Fail closed for scoped keys if a future
+  // schema does, until it defines a single canonical authorization field.
+  if (hasCamel === hasSnake) return undefined;
+  return hasCamel ? 'workspaceId' : 'workspace_id';
+}
+
+function resolveWorkspaceScope(
+  toolName: string,
+  args: Record<string, unknown>,
+): WorkspaceScopeResolution {
+  const camel = typeof args.workspaceId === 'string' && args.workspaceId.length > 0
+    ? args.workspaceId
+    : undefined;
+  const snake = typeof args.workspace_id === 'string' && args.workspace_id.length > 0
+    ? args.workspace_id
+    : undefined;
+
+  if (camel !== undefined && snake !== undefined && camel !== snake) {
+    return {
+      conflictingAliases: {
+        workspaceId: camel,
+        workspace_id: snake,
+      },
+    };
+  }
+
+  const declaredArgument = declaredWorkspaceArgument(toolName);
+  if (!declaredArgument) return {};
+
+  const declaredValue = args[declaredArgument];
+  return {
+    workspaceId: typeof declaredValue === 'string' && declaredValue.length > 0
+      ? declaredValue
+      : undefined,
+  };
+}
 
 // Factory: create a fresh Server + Transport per request.
 // The MCP SDK's stateless transport cannot be reused across requests —
@@ -77,6 +127,28 @@ function createMcpServer(auth: McpAuthContext) {
 
     const safeArgs = args ?? {};
 
+    const workspaceScope = resolveWorkspaceScope(
+      name,
+      safeArgs as Record<string, unknown>,
+    );
+
+    // Conflicting aliases are invalid for every caller, including the master
+    // key. Besides being ambiguous, accepting them would make authorization and
+    // tool validation depend on which layer happens to inspect which alias.
+    if (workspaceScope.conflictingAliases) {
+      log.warn(
+        { tool: name },
+        'MCP tool call supplied conflicting workspace aliases — rejected',
+      );
+      return {
+        isError: true,
+        content: [{
+          type: 'text' as const,
+          text: 'Validation failed: workspaceId and workspace_id must match when both are provided.',
+        }],
+      };
+    }
+
     // ── Workspace-scope enforcement (SECURITY-CRITICAL) ──────────────────────
     // A per-workspace key (auth.scope !== 'all') may only operate on its own
     // workspace. The master key (scope 'all') is unaffected. We enforce HERE,
@@ -87,7 +159,7 @@ function createMcpServer(auth: McpAuthContext) {
     //   - no-workspace_id tools (e.g. list_workspaces) → reject for scoped keys,
     //     because a workspace key must not enumerate/act across all workspaces.
     if (auth.scope !== 'all') {
-      const argWorkspaceId = extractWorkspaceIdArg(safeArgs as Record<string, unknown>);
+      const argWorkspaceId = workspaceScope.workspaceId;
       if (argWorkspaceId === undefined) {
         log.warn({ tool: name, scope: auth.scope }, 'Workspace-scoped key called a tool without a workspace_id argument — rejected');
         return {
