@@ -1,4 +1,7 @@
+import { createHash, randomUUID } from 'crypto';
+
 import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
+import type { GenerationProvenance } from '../../../shared/types/ai-execution.js';
 import { LOCAL_SEO_POSTURE } from '../../../shared/types/local-seo.js';
 import type { ConversionAttributionData } from '../../../shared/types/analytics.js';
 import type { RecSourceCategory } from './rules.js';
@@ -26,7 +29,12 @@ import { resolveOvAuthorityStrength } from '../../workspace-authority.js';
 import { getWorkspace } from '../../workspaces.js';
 import type { Workspace } from '../../workspaces.js';
 import { WS_EVENTS } from '../../ws-events.js';
-import { finalizeRecommendations } from './finalization.js';
+import {
+  captureRecommendationFinalizationSignals,
+  finalizeRecommendations,
+  type FinalizedRecommendationSet,
+  type RecommendationFinalizationContext,
+} from './finalization.js';
 import {
   appendAuditRecommendations,
   appendContentDecayRecommendations,
@@ -38,9 +46,116 @@ import {
 } from './generation-producers.js';
 import { recommendationOutcomeActionType } from './outcome-action-type.js';
 import { getTrafficScore, toPageSlug } from './rules.js';
-import { loadRecommendations, saveRecommendations } from './status-service.js';
+import {
+  commitGeneratedRecommendationSet,
+  loadRecommendationGenerationSnapshot,
+  RecommendationGenerationRevisionConflictError,
+} from './storage.js';
 
 const log = createLogger('recommendations');
+const RECOMMENDATION_GENERATION_OPERATION = 'recommendation-generation';
+const RECOMMENDATION_ENGINE_MODEL = 'recommendation-engine-v1';
+
+type RecommendationGenerationFingerprintContext = Pick<
+  RecommendationFinalizationContext,
+  | 'assignedTo'
+  | 'failedCategories'
+  | 'inFlightContentKeywords'
+  | 'slugToPageId'
+  | 'effectiveBusinessPriorities'
+  | 'outcomeLearnings'
+  | 'strategySignals'
+>;
+
+function canonicalizeGenerationInput(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalizeGenerationInput);
+  if (value instanceof Set) {
+    return [...value]
+      .map(canonicalizeGenerationInput)
+      .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  }
+  if (value instanceof Map) {
+    return [...value.entries()]
+      .map(([key, entryValue]) => [canonicalizeGenerationInput(key), canonicalizeGenerationInput(entryValue)])
+      .sort((a, b) => JSON.stringify(a[0]).localeCompare(JSON.stringify(b[0])));
+  }
+  if (value && typeof value === 'object') {
+    const canonical: { [key: string]: unknown } = {};
+    for (const key of Object.keys(value).sort()) {
+      const entryValue = (value as { [key: string]: unknown })[key];
+      if (entryValue !== undefined && typeof entryValue !== 'function') {
+        canonical[key] = canonicalizeGenerationInput(entryValue);
+      }
+    }
+    return canonical;
+  }
+  return value;
+}
+
+/** Hash exact effective deterministic inputs without volatile row identity or timestamps. */
+export function fingerprintRecommendationGenerationInputs(
+  candidates: Recommendation[],
+  context: RecommendationGenerationFingerprintContext,
+): string {
+  const stableCandidates = candidates.map(candidate => {
+    const {
+      id: _id,
+      workspaceId: _workspaceId,
+      createdAt: _createdAt,
+      updatedAt: _updatedAt,
+      ...effectiveCandidate
+    } = candidate;
+    return effectiveCandidate;
+  });
+  // The finalizer reads only these learning fields. Excluding computedAt, top-win IDs, and other
+  // unused telemetry prevents false fingerprint drift without omitting any score authority.
+  const effectiveContext = {
+    ...context,
+    outcomeLearnings: context.outcomeLearnings
+      ? {
+          availability: context.outcomeLearnings.availability,
+          winRateByActionType: context.outcomeLearnings.winRateByActionType,
+          winRateByDifficultyRange: context.outcomeLearnings.summary?.strategy?.winRateByDifficultyRange,
+        }
+      : null,
+  };
+  return createHash('sha256')
+    .update(JSON.stringify(canonicalizeGenerationInput({ candidates: stableCandidates, context: effectiveContext })))
+    .digest('hex');
+}
+
+interface RecommendationGenerationCommitDependencies {
+  loadSnapshot: typeof loadRecommendationGenerationSnapshot;
+  commit: typeof commitGeneratedRecommendationSet;
+}
+
+/** Commit one paid candidate collection with one lifecycle-aware CAS retry. */
+export function commitRecommendationCandidatesWithRetry(
+  workspaceId: string,
+  initialRevision: number,
+  candidates: Recommendation[],
+  finalize: (existing: RecommendationSet | null, candidates: Recommendation[]) => FinalizedRecommendationSet,
+  provenance: GenerationProvenance | null = null,
+  dependencies: RecommendationGenerationCommitDependencies = {
+    loadSnapshot: loadRecommendationGenerationSnapshot,
+    commit: commitGeneratedRecommendationSet,
+  },
+): FinalizedRecommendationSet {
+  const pristineCandidates = structuredClone(candidates);
+  const commitAttempt = (expectedRevision: number) => dependencies.commit(
+    workspaceId,
+    expectedRevision,
+    existing => finalize(existing, structuredClone(pristineCandidates)),
+    provenance,
+  );
+
+  try {
+    return commitAttempt(initialRevision);
+  } catch (err) {
+    if (!(err instanceof RecommendationGenerationRevisionConflictError)) throw err;
+    return commitAttempt(dependencies.loadSnapshot(workspaceId).revision);
+  }
+}
 
 /** Resolves a workspace's domain-authority bucket once per rec-generation cycle.
  *
@@ -76,8 +191,13 @@ async function resolveDomainStrength(ws: Workspace, workspaceId: string): Promis
 export async function generateRecommendations(workspaceId: string): Promise<RecommendationSet> {
   const ws = getWorkspace(workspaceId);
   if (!ws) throw new Error('Workspace not found');
+  // Snapshot before any provider/context work. Every durable recommendation mutation advances
+  // this revision at the storage choke point, so the final transaction can detect decisions made
+  // while the expensive candidate phase was running.
+  const initialGenerationRevision = loadRecommendationGenerationSnapshot(workspaceId).revision;
 
   const now = new Date().toISOString();
+  const runId = randomUUID();
   const recs: Recommendation[] = [];
   // Opportunity Value scoring is canonical. Local recommendation minting remains
   // posture-gated so non-local workspaces keep the existing non-local source set.
@@ -293,26 +413,60 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
     }
   }
 
-  const { set, autoResolved, autoResolvedPageStateIds } = finalizeRecommendations(recs, {
+  const strategySignals = captureRecommendationFinalizationSignals({
     workspaceId,
     workspaceName: ws.name,
     workspaceBusinessContext: ws.keywordStrategy?.businessContext,
-    now,
+    intelligence: recommendationContext?.intelligence ?? null,
+  });
+  // Snapshot the already-paid candidates and every effective finalization input together. The
+  // CAS retry receives clones of this snapshot; live Maps/Sets cannot drift between attempts.
+  const frozenCandidates = structuredClone(recs);
+  const frozenFinalizationInputs = structuredClone<RecommendationGenerationFingerprintContext>({
     assignedTo,
-    existing: loadRecommendations(workspaceId),
     failedCategories,
     inFlightContentKeywords,
     slugToPageId,
     effectiveBusinessPriorities,
     outcomeLearnings,
+    strategySignals,
+  });
+  const finalizationContext = {
+    workspaceId,
+    workspaceName: ws.name,
+    workspaceBusinessContext: ws.keywordStrategy?.businessContext,
+    now,
+    ...frozenFinalizationInputs,
     intelligence: recommendationContext?.intelligence ?? null,
     actionTypeForRecommendation: recommendationOutcomeActionType,
-  });
+  };
+  const provenance: GenerationProvenance = {
+    runId,
+    operation: RECOMMENDATION_GENERATION_OPERATION,
+    provider: 'deterministic',
+    model: RECOMMENDATION_ENGINE_MODEL,
+    inputFingerprint: fingerprintRecommendationGenerationInputs(frozenCandidates, frozenFinalizationInputs),
+    ...(recommendationContext?.intelligence.assembledAt
+      ? { evidenceCapturedAt: recommendationContext.intelligence.assembledAt }
+      : {}),
+    startedAt: now,
+    completedAt: new Date().toISOString(),
+  };
+  const finalized = commitRecommendationCandidatesWithRetry(
+    workspaceId,
+    initialGenerationRevision,
+    frozenCandidates,
+    (existing, candidates) => finalizeRecommendations(candidates, {
+      ...finalizationContext,
+      existing,
+    }),
+    provenance,
+  );
+  const { set, autoResolved, autoResolvedPageStateIds } = finalized;
 
-  saveRecommendations(set);
   invalidateIntelligenceCache(workspaceId);
   const summary = set.summary;
-  log.info(`Generated ${recs.length} recommendations for ${workspaceId}: ${summary.fixNow} fix-now, ${summary.fixSoon} fix-soon, ${summary.fixLater} fix-later, ${summary.ongoing} ongoing${autoResolved > 0 ? `, ${autoResolved} auto-resolved` : ''}`);
+  log.info(`Generated ${set.recommendations.length} recommendations for ${workspaceId}: ${summary.fixNow} fix-now, ${summary.fixSoon} fix-soon, ${summary.fixLater} fix-later, ${summary.ongoing} ongoing${autoResolved > 0 ? `, ${autoResolved} auto-resolved` : ''}`);
 
   if (autoResolvedPageStateIds.length > 0) {
     broadcastToWorkspace(workspaceId, WS_EVENTS.PAGE_STATE_UPDATED, {
@@ -320,7 +474,7 @@ export async function generateRecommendations(workspaceId: string): Promise<Reco
       source: 'recommendation',
     });
   }
-  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { count: recs.length });
+  broadcastToWorkspace(workspaceId, WS_EVENTS.RECOMMENDATIONS_UPDATED, { count: set.recommendations.length });
 
   return set;
 }

@@ -10,6 +10,8 @@ import { createStmtCache } from '../../db/stmt-cache.js';
 import { createLogger } from '../../logger.js';
 import { recommendationSchema, recommendationSummarySchema } from '../../schemas/workspace-schemas.js';
 import { Sentry, isSentryEnabled } from '../../sentry.js';
+import { z } from 'zod';
+import type { GenerationProvenance } from '../../../shared/types/ai-execution.js';
 import type { Recommendation, RecommendationSet, RecStatus } from '../../../shared/types/recommendations.js';
 
 const backfillLog = createLogger('recommendation-backfill');
@@ -23,6 +25,8 @@ export const storageLog = createLogger('recommendation-storage');
 interface RecSetRow {
   workspace_id: string;
   generated_at: string;
+  generation_revision: number;
+  generation_provenance: string | null;
   // Archive placeholder after the R7 blob→rows cutover: recommendation_items is the sole
   // store. saveRecommendationSet writes '[]' here; loadRecommendationSet never reads it.
   // Still selected by the boot-time backfill sweep (materializeAllRecommendationItems) until
@@ -61,6 +65,17 @@ const emptySummaryFallback: RecommendationSet['summary'] = {
   topRecommendationId: null,
 };
 
+const generationProvenanceSchema = z.object({
+  runId: z.string(),
+  operation: z.string(),
+  provider: z.enum(['openai', 'anthropic', 'deterministic']),
+  model: z.string(),
+  inputFingerprint: z.string(),
+  evidenceCapturedAt: z.string().optional(),
+  startedAt: z.string(),
+  completedAt: z.string(),
+});
+
 const stmts = createStmtCache(() => ({
   selectSet: db.prepare<[workspaceId: string]>(
     `SELECT * FROM recommendation_sets WHERE workspace_id = ?`,
@@ -69,16 +84,38 @@ const stmts = createStmtCache(() => ({
     `SELECT workspace_id FROM recommendation_sets ORDER BY workspace_id ASC`,
   ),
   upsertSet: db.prepare(`
-    INSERT INTO recommendation_sets (workspace_id, generated_at, recommendations, summary)
-    VALUES (@workspace_id, @generated_at, @recommendations, @summary)
+    INSERT INTO recommendation_sets (workspace_id, generated_at, recommendations, summary, generation_revision)
+    VALUES (@workspace_id, @generated_at, @recommendations, @summary, 1)
     ON CONFLICT(workspace_id) DO UPDATE SET
       generated_at = @generated_at,
       recommendations = @recommendations,
-      summary = @summary
+      summary = @summary,
+      generation_revision = recommendation_sets.generation_revision + 1
   `),
   updateSetSummary: db.prepare(`
     UPDATE recommendation_sets
-    SET generated_at = @generated_at, summary = @summary
+    SET generated_at = @generated_at,
+        summary = @summary,
+        generation_revision = generation_revision + 1
+    WHERE workspace_id = @workspace_id
+  `),
+  claimExistingGeneration: db.prepare(`
+    UPDATE recommendation_sets
+    SET generation_revision = generation_revision + 1
+    WHERE workspace_id = ? AND generation_revision = ?
+  `),
+  claimInitialGeneration: db.prepare(`
+    INSERT INTO recommendation_sets (
+      workspace_id, generated_at, recommendations, summary, generation_revision
+    ) VALUES (?, ?, '[]', ?, 1)
+    ON CONFLICT(workspace_id) DO NOTHING
+  `),
+  updateGeneratedSet: db.prepare(`
+    UPDATE recommendation_sets
+    SET generated_at = @generated_at,
+        recommendations = @recommendations,
+        summary = @summary,
+        generation_provenance = @generation_provenance
     WHERE workspace_id = @workspace_id
   `),
   listItems: db.prepare<[workspaceId: string]>(
@@ -231,6 +268,88 @@ function upsertSetRow(set: RecommendationSet): void {
     recommendations: ARCHIVED_BLOB,
     summary: JSON.stringify(set.summary),
   });
+}
+
+function updateGeneratedSetRow(set: RecommendationSet, provenance: GenerationProvenance | null): void {
+  const validatedProvenance = provenance ? generationProvenanceSchema.parse(provenance) : null;
+  stmts().updateGeneratedSet.run({
+    workspace_id: set.workspaceId,
+    generated_at: set.generatedAt,
+    recommendations: ARCHIVED_BLOB,
+    summary: JSON.stringify(set.summary),
+    generation_provenance: validatedProvenance ? JSON.stringify(validatedProvenance) : null,
+  });
+}
+
+export class RecommendationGenerationRevisionConflictError extends Error {
+  readonly workspaceId: string;
+  readonly expectedRevision: number;
+
+  constructor(workspaceId: string, expectedRevision: number) {
+    super('Recommendations changed while generation was in flight');
+    this.name = 'RecommendationGenerationRevisionConflictError';
+    this.workspaceId = workspaceId;
+    this.expectedRevision = expectedRevision;
+  }
+}
+
+export interface RecommendationGenerationSnapshot {
+  revision: number;
+  set: RecommendationSet | null;
+  provenance: GenerationProvenance | null;
+}
+
+export function loadRecommendationGenerationSnapshot(workspaceId: string): RecommendationGenerationSnapshot {
+  const row = stmts().selectSet.get(workspaceId) as RecSetRow | undefined;
+  return {
+    revision: row?.generation_revision ?? 0,
+    set: row ? loadRecommendationSet(workspaceId) : null,
+    provenance: row?.generation_provenance
+      ? parseJsonSafe(
+          row.generation_provenance,
+          generationProvenanceSchema,
+          null,
+          { table: 'recommendation_sets', field: 'generation_provenance', workspaceId },
+        )
+      : null,
+  };
+}
+
+export function commitGeneratedRecommendationSet<T extends { set: RecommendationSet }>(
+  workspaceId: string,
+  expectedRevision: number,
+  finalize: (current: RecommendationSet | null) => T,
+  provenance: GenerationProvenance | null = null,
+): T {
+  const commit = db.transaction((): T => {
+    const currentRow = stmts().selectSet.get(workspaceId) as RecSetRow | undefined;
+    const currentRevision = currentRow?.generation_revision ?? 0;
+    if (currentRevision !== expectedRevision) {
+      throw new RecommendationGenerationRevisionConflictError(workspaceId, expectedRevision);
+    }
+
+    if (currentRow) {
+      const claimed = stmts().claimExistingGeneration.run(workspaceId, expectedRevision).changes === 1;
+      if (!claimed) throw new RecommendationGenerationRevisionConflictError(workspaceId, expectedRevision);
+    } else {
+      const emptySummary = JSON.stringify(emptySummaryFallback);
+      const claimed = stmts().claimInitialGeneration.run(
+        workspaceId,
+        new Date().toISOString(),
+        emptySummary,
+      ).changes === 1;
+      if (!claimed) throw new RecommendationGenerationRevisionConflictError(workspaceId, expectedRevision);
+    }
+
+    const result = finalize(currentRow ? loadRecommendationSet(workspaceId) : null);
+    if (result.set.workspaceId !== workspaceId) {
+      throw new Error('Generated recommendation set workspace mismatch');
+    }
+    updateGeneratedSetRow(result.set, provenance);
+    writeItems(workspaceId, result.set.recommendations);
+    return result;
+  });
+  return commit.immediate();
 }
 
 /**

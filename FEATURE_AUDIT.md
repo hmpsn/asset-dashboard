@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 674** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 675** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -9562,3 +9562,17 @@ From the 2026-06-30 six-screen UX review (WorkspaceOverview / WorkspaceHome / Th
 **Verification:** Focused component, route, public privacy, matrix/request trend, API, and summary tests pass with hooks lint, typecheck, `pr-check`, and diff hygiene. The isolated worktree server/browser proves redirect/nav/empty-state behavior at 1440×900 and 1600×1000 without touching the existing local server. The copied owner workspace has no published items, so populated result-card order and Drawer states remain fixture-covered rather than fabricated. Evidence: `/tmp/asset-dashboard-codex-visual-parity/content-performance/`. That rendered PASS is supporting evidence only; Joshua's explicit combined-bundle approval is the acceptance source.
 
 **Files:** `shared/types/content.ts`; `server/domains/content/content-performance.ts`; `server/routes/content-requests.ts`; `server/routes/public-content.ts`; `src/api/seo.ts`; `src/hooks/admin/useAdminContentPerformance.ts`; `src/components/content-pipeline-rebuilt/{PublishedContentLens,useContentPipelineSurfaceState,ContentPipelineSurface}.tsx`; `src/App.tsx`; `src/components/layout/RebuiltSidebar.tsx`; focused unit/integration/component tests; design/parity records; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 675. Recommendation generation integrity S1 — revision-CAS lifecycle preservation 2026-07-13
+
+**Status:** S1 / Phase A complete on the generation-quality program branch. The broader `genq-recommendation-integrity` roadmap item remains pending for S2 lifecycle reconciliation.
+
+**What it does:** Adds a monotonic generation revision to each recommendation set and commits generated output transactionally only when the expected revision still matches. If an operator or client changes recommendation state during generation, the service reloads the latest set, re-finalizes a fresh clone of the already-generated candidates once, and retries without repeating provider work. A second conflict raises a typed failure instead of overwriting the newer decision. Concurrent sends, approvals, dismissals, strikes, and manual recommendation mints therefore remain authoritative. Durable recommendation generation also records internal run provenance and effective-input fingerprints while public recommendation payloads continue to omit those fields.
+
+**Correctness details:** Finalization no longer mutates the frozen candidate snapshot, so retries receive identical inputs. The committed recommendation count — including carried, manual, signal-derived, and auto-resolved rows introduced during finalization — now drives both the success log and `RECOMMENDATIONS_UPDATED` payload rather than the pre-finalization candidate count. Migration 181 adds the revision column without changing public contracts.
+
+**Why it matters:** Long recommendation runs can overlap real operator and client decisions. Version-conditional commits prevent stale generation from silently undoing those decisions, while the bounded retry preserves useful generated work and avoids another paid/provider pass.
+
+**Tests:** Unit coverage pins canonical fingerprints, clone-safe one-retry behavior, typed second-conflict failure, storage revision/provenance mapper and CAS semantics, and finalization immutability. Integration seams cover concurrent send, approval, dismissal, strike, manual mint, public provenance omission, and finalized broadcast counts for carried recommendations.
+
+**Files:** `server/db/migrations/181-recommendation-generation-revision.sql`; `server/domains/recommendations/{generation-service,finalization,storage}.ts`; `shared/types/ai-execution.ts`; focused unit/integration/contract tests; `data/roadmap.json`; `FEATURE_AUDIT.md`.

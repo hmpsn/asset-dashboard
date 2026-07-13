@@ -9,7 +9,12 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { saveRecommendations } from '../../server/recommendations.js';
+import {
+  commitGeneratedRecommendationSet,
+  loadRecommendationGenerationSnapshot,
+} from '../../server/domains/recommendations/storage.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
+import type { GenerationProvenance } from '../../shared/types/ai-execution.js';
 
 const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api } = ctx;
@@ -45,6 +50,30 @@ afterAll(async () => {
 });
 
 describe('public rec read — allow-list (no admin-only lifecycle key leaks)', () => {
+  it('keeps internal generation provenance out of the public set contract', async () => {
+    seed([rec({ id: 'provenance_omission' })]);
+    const snapshot = loadRecommendationGenerationSnapshot(wsId);
+    const provenance: GenerationProvenance = {
+      runId: 'private-recommendation-run-id',
+      operation: 'recommendation-generation',
+      provider: 'deterministic',
+      model: 'recommendation-engine-v1',
+      inputFingerprint: 'private-effective-input-fingerprint',
+      startedAt: '2026-07-13T00:00:00.000Z',
+      completedAt: '2026-07-13T00:00:01.000Z',
+    };
+    commitGeneratedRecommendationSet(wsId, snapshot.revision, current => ({ set: current! }), provenance);
+    expect(loadRecommendationGenerationSnapshot(wsId).provenance).toEqual(provenance);
+
+    const res = await api(`/api/public/recommendations/${wsId}`);
+    expect(res.status).toBe(200);
+    const raw = await res.text();
+    expect(raw).not.toContain('generationProvenance');
+    expect(raw).not.toContain('inputFingerprint');
+    expect(raw).not.toContain('private-recommendation-run-id');
+    expect(raw).not.toContain('private-effective-input-fingerprint');
+  });
+
   it('flag-ON: a rec with admin-only lifecycle fields exposes NONE of them on the public read', async () => {
     // A curated rec carrying every admin-only lifecycle key.
     seed([rec({

@@ -120,6 +120,7 @@ function baseContext(overrides: Partial<RecommendationFinalizationContext> = {})
     effectiveBusinessPriorities: [],
     outcomeLearnings: null,
     intelligence: null,
+    strategySignals: [],
     actionTypeForRecommendation: (): ActionType => 'audit_fix_applied',
     ...overrides,
   };
