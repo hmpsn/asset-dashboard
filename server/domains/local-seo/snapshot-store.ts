@@ -732,7 +732,7 @@ export function getLocalSeoVisibilityTrend(workspaceId: string): LocalSeoVisibil
   const legacyIdentityState = new Map<string, { visibleCounted: boolean }>();
   let cursor: { capturedAt: string; id: string } | null = null;
   while (true) {
-    const rows = cursor === null
+    const rows: VisibilityTrendSnapshotRow[] = cursor === null
       ? stmts().visibilityTrendLegacyFirstPage.all(
           workspaceId,
           LOCAL_VISIBILITY_STATUS.PROVIDER_FAILED,
@@ -795,7 +795,7 @@ export function getLocalSeoVisibilityTrend(workspaceId: string): LocalSeoVisibil
       byMarketDay.set(bucketKey, bucket);
     }
 
-    const last = rows[rows.length - 1];
+    const last: VisibilityTrendSnapshotRow = rows[rows.length - 1];
     cursor = { capturedAt: last.captured_at, id: last.id };
     if (rows.length < LOCAL_SNAPSHOT_COMPAT_PAGE_SIZE) break;
   }
@@ -904,7 +904,7 @@ export function runSnapshotRetentionPrune(workspaceId: string): { pruned: number
   const weeklyWinner = new Map<string, string>();
   let cursor: { capturedAt: string; id: string } | null = null;
   while (true) {
-    const rows = cursor === null
+    const rows: SnapshotIdentityRow[] = cursor === null
       ? stmts().retentionRowsFirstPage.all(workspaceId, LOCAL_SNAPSHOT_COMPAT_PAGE_SIZE) as SnapshotIdentityRow[]
       : stmts().retentionRowsPage.all(
           workspaceId,
@@ -922,7 +922,7 @@ export function runSnapshotRetentionPrune(workspaceId: string): { pruned: number
       const weekKey = `${key}\u0000${sundayWeekStart(row.captured_at)}`;
       if (!weeklyWinner.has(weekKey)) weeklyWinner.set(weekKey, row.id);
     }
-    const last = rows[rows.length - 1];
+    const last: SnapshotIdentityRow = rows[rows.length - 1];
     cursor = { capturedAt: last.captured_at, id: last.id };
     if (rows.length < LOCAL_SNAPSHOT_COMPAT_PAGE_SIZE) break;
   }
@@ -939,7 +939,7 @@ export function runSnapshotRetentionPrune(workspaceId: string): { pruned: number
 
   cursor = null;
   while (true) {
-    const rows = cursor === null
+    const rows: SnapshotIdentityRow[] = cursor === null
       ? stmts().retentionRowsFirstPage.all(workspaceId, LOCAL_SNAPSHOT_COMPAT_PAGE_SIZE) as SnapshotIdentityRow[]
       : stmts().retentionRowsPage.all(
           workspaceId,
@@ -961,7 +961,7 @@ export function runSnapshotRetentionPrune(workspaceId: string): { pruned: number
         if (deleteBatch.length === RETENTION_PRUNE_BATCH_SIZE) flushDeleteBatch();
       }
     }
-    const last = rows[rows.length - 1];
+    const last: SnapshotIdentityRow = rows[rows.length - 1];
     cursor = { capturedAt: last.captured_at, id: last.id };
     if (rows.length < LOCAL_SNAPSHOT_COMPAT_PAGE_SIZE) break;
   }
