@@ -14,7 +14,7 @@
  * code, not tribal knowledge. `tests/contract/snapshot-envelope-registry.test.ts` reads
  * `sqlite_master` for every `*_snapshots` table and asserts it is BOTH registered here
  * AND workspace-scoped — a new snapshot table that skips registration or skips
- * workspace_id fails that test immediately, rather than silently accumulating as a 14th
+ * workspace_id fails that test immediately, rather than silently accumulating as a 15th
  * unscoped table the way the original three did.
  *
  * `*_orphaned` and `*_r11_old` tables (migration 167's quarantine copies and
@@ -37,7 +37,7 @@ export interface SnapshotTableDescriptor {
   name: string;
   /**
    * True if the table carries a `workspace_id` column that identifies the owning
-   * workspace. All 13 registered tables are `true` post-migration-167 — a `false` entry
+   * workspace. All 14 registered tables are `true` post-migration-167 — a `false` entry
    * here would mean the retrofit is incomplete for that table.
    */
   workspaceScoped: boolean;
@@ -60,7 +60,7 @@ export interface SnapshotTableDescriptor {
 }
 
 /**
- * The full 13-table snapshot census. Order is alphabetical by table name — this list
+ * The full 14-table snapshot census. Order is alphabetical by table name — this list
  * has no semantic ordering dependency, alphabetical just keeps diffs small when a new
  * entry is inserted.
  */
@@ -160,6 +160,14 @@ export const SNAPSHOT_TABLE_REGISTRY: readonly SnapshotTableDescriptor[] = [
     captureColumn: 'date',
     writerModule: 'server/serp-snapshots-store.ts',
     note: 'SEO Decision Engine P6 (migration 153). True national SERP rank + SERP-feature time series, keyed (workspace_id, date, query). Parallel to, never conflated with, rank_snapshots.',
+  },
+  {
+    name: 'serp_snapshots_v2_compat',
+    workspaceScoped: true,
+    hasForeignKeyCascade: true,
+    captureColumn: 'date',
+    writerModule: 'server/serp-snapshots-store.ts',
+    note: 'K3b additive Unicode-identity sidecar (migration 183). Retains one coherent full SERP observation per raw query variant while serp_snapshots remains the v1 rollback/legacy-alias store.',
   },
   {
     name: 'workspace_metrics_snapshots',

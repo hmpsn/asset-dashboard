@@ -3,13 +3,13 @@
  *
  * Verifies that every `*_snapshots` table that exists in the live schema is:
  *   1. Registered in server/db/snapshot-registry.ts (SNAPSHOT_TABLE_REGISTRY), and
- *   2. Workspace-scoped — carries a `workspace_id` column (post-migration-167, all 13
+ *   2. Workspace-scoped — carries a `workspace_id` column (post-migration-167, all 14
  *      known snapshot tables satisfy this; the three legacy tables audit_snapshots,
  *      performance_snapshots, redirect_snapshots were retrofitted by migration
  *      167-audit-snapshots-workspace-id.sql).
  *
  * A snapshot table that is unregistered OR lacks workspace_id fails this test
- * immediately — this is the mechanized backstop against a 14th ad hoc snapshot table
+ * immediately — this is the mechanized backstop against a 15th ad hoc snapshot table
  * silently reintroducing the site_id-only pattern the migration 167 retrofit closed.
  *
  * Also exercises the migration 167 retrofit itself against a live, migrated DB:
@@ -159,15 +159,15 @@ describe('snapshot table registry census', () => {
     expect(missingColumn, `Registry claims these tables are workspace-scoped, but they have no workspace_id column in the live schema: ${missingColumn.join(', ')}`).toEqual([]);
   });
 
-  it('covers exactly the 13 known snapshot tables', () => {
+  it('covers exactly the 14 known snapshot tables', () => {
     // A precise count catches both under-registration (a table silently dropped from
     // the registry) and over-registration (a stale/renamed entry) that the two tests
     // above wouldn't independently catch if they canceled out.
-    expect(SNAPSHOT_TABLE_REGISTRY.length).toBe(13);
+    expect(SNAPSHOT_TABLE_REGISTRY.length).toBe(14);
   });
 
   it('FAILS when a hand-added table simulates an unregistered snapshot table', () => {
-    // Simulate a 14th snapshot table that skipped registration — the census must catch
+    // Simulate a 15th snapshot table that skipped registration — the census must catch
     // it. This is the actual falsifiability check for the "unregistered snapshot table"
     // contract: without this test, "the census fails on missing registration" is an
     // assertion nobody verifies.
