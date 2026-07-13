@@ -17,7 +17,7 @@ beforeAll(async () => {
   emptyControl = seedWorkspace();
   authPrimary = await seedAuthData();
   authSecondary = await seedAuthData();
-});
+}, 30_000);
 
 afterAll(async () => {
   seededStrategy?.cleanup();

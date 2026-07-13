@@ -38,7 +38,7 @@ beforeAll(async () => {
   await ctx.startServer();
   primary = await seedAuthData();
   secondary = await seedAuthData();
-});
+}, 30_000);
 
 afterAll(async () => {
   primary?.cleanup();

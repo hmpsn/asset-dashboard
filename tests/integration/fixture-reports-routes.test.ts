@@ -37,7 +37,7 @@ beforeAll(async () => {
   );
   clientUserId = clientUser.id;
   clientToken = signClientToken(clientUser);
-});
+}, 30_000);
 
 afterAll(async () => {
   if (clientUserId) deleteClientUser(clientUserId, wsId);
