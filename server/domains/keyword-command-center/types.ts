@@ -10,14 +10,9 @@ import type {
 import type { LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo.js';
 import type { LatestRank, TrackedKeyword } from '../../../shared/types/rank-tracking.js';
 import type { KeywordStrategyExplanation } from '../../../shared/types/keyword-strategy-ux.js';
+import type { KeywordFeedbackInternalRow } from '../../keyword-feedback.js';
 
-export interface FeedbackRow {
-  keyword: string;
-  status: string;
-  reason: string | null;
-  source: string | null;
-  updated_at: string | null;
-}
+export type FeedbackRow = KeywordFeedbackInternalRow;
 
 export interface DraftRow {
   keyword: string;

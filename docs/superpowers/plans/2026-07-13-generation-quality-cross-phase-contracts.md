@@ -78,7 +78,7 @@ Names below are the required semantic contracts; the shared-contract task must r
 ### K3 exports
 
 - K3a: a persisted-identity census, deterministic v2 equivalence policy, collision rules, and a ban on mutating raw provider/display values.
-- K3b: versioned v1/v2 identity helpers, additive dual-read/dual-write compatibility, collision-safe backfill, and legacy aliases for identities whose raw spelling is unrecoverable.
+- K3b: versioned v1/v2 identity helpers; full-payload raw-variant stores with one selected canonical variant for tracked/site identities; canonical decision rows plus raw aliases for feedback/votes; full per-raw SERP observations; additive local-snapshot v2 keys; a separate versioned v2 metrics cache; centralized v2-first/v1-alias readers; and an operator-only redacted backfill report. The v1 tables remain readable rollback projections and unrecoverable legacy rows remain v1-only aliases.
 - K3c: one canonical Unicode-safe keyword normalizer after staging verifies the additive backfill.
 
 **Consumed by:** K4 selection identities and any touched keyword producer. No phase introduces an independent normalization implementation or removes legacy aliases without a separate verified retirement PR.
@@ -91,7 +91,7 @@ Names below are the required semantic contracts; the shared-contract task must r
 
 ### S2 exports
 
-- Recommendation-set provenance/revision, stable normalized producer identity, resolved-source retirement, local suppression, priority preservation, and bounded mirror repair.
+- S1-owned recommendation-set provenance/revision remains authoritative. S2 exports stable versioned producer identity, resolved-source retirement, merge-key-local suppression, priority preservation, and bounded mirror repair under a safely transitioned divergence gate.
 
 **Consumed by:** S3, V3, and V4. Recommendation lifecycle remains authoritative; client comments/responses remain preserved mirror data.
 
@@ -134,6 +134,10 @@ Names below are the required semantic contracts; the shared-contract task must r
 - Internal provenance fields are optional for legacy rows and required on newly successful generation after the owning phase ships. Reads degrade legacy rows to “provenance unavailable,” never fabricated metadata.
 - Compare-and-swap updates occur in the same transaction as artifact content/status and provenance. Conflict paths do not partially update activity, mirror, or generation metadata.
 - No destructive table drops are authorized by this program.
+- K3b never clears or rewrites the v1 metrics cache and never guesses a v2 key from an unrecoverable legacy identity. Its backfill is dry-run-by-default, operator-invoked, per-workspace transactional, and absent from server boot.
+- Nonblank v2 identities with blank v1 keys are sidecar-only and classified as `v2_only`; compatibility code never writes or queries a blank rollback identity.
+- K3b tracked/site stores retain every raw variant with its full payload and mark exactly one canonical variant per v2 identity. Feedback/votes retain one current decision plus every raw spelling. Exact deletes reconcile one v2 identity only. SERP retains every raw observation with its full payload and readers select one coherent row deterministically rather than field-merging.
+- Feedback, vote, and SERP legacy payloads are archived before their main v1 key becomes a rollback projection; projection markers let union readers distinguish historical aliases from generated compatibility rows without guessing raw identity.
 
 ## Feature-Flag Contracts
 
@@ -147,7 +151,7 @@ Only these new flags are authorized:
 
 Each catalog entry has owner, purpose, rollout and dated retirement target; its PR includes OFF parity and ON real-path tests. Client UI must not assume a per-workspace server override reaches global `useFeatureFlag`. Production flag changes and flag retirement are outside autonomous authority.
 
-The existing `strategy-divergence-sweep` gate may protect S2 repair during staging observation. It is not renamed or duplicated. Permanent safety-gate behavior remains unchanged.
+The existing `strategy-divergence-sweep` gate may protect S2 repair only after all existing global, workspace, and environment overrides are audited/reset. Its current ON behavior is read-only; unknown ON overrides block deployment of writer semantics. It is not renamed or duplicated. Permanent safety-gate behavior remains unchanged.
 
 ## Job, Event, and Cache Contracts
 

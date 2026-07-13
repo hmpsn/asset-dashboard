@@ -24,9 +24,14 @@ import type {
   KeywordCommandCenterRow,
   KeywordCommandCenterSort,
 } from '../../shared/types/keyword-command-center';
-import { keywordComparisonKey } from '../../shared/keyword-normalization';
+import { keywordComparisonKey, keywordIdentityKeyV2 } from '../../shared/keyword-normalization';
 import { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS, type LatestRank, type TrackedKeyword } from '../../shared/types/rank-tracking';
 import type { LocalSeoKeywordVisibilitySummary } from '../../shared/types/local-seo';
+import {
+  ensureLocalVisibilityRows,
+  finalizeDraftRows,
+} from '../../server/domains/keyword-command-center/read-model';
+import type { DraftRow } from '../../server/domains/keyword-command-center/types';
 
 // ---------------------------------------------------------------------------
 // Fixtures — same five keywords, expressed as both candidates and rows, with
@@ -437,6 +442,30 @@ function localVisibilitySummary(keyword: string): LocalSeoKeywordVisibilitySumma
 }
 
 describe('keyword-command-center — candidate/row VALUE-SCORE parity + key-set equality (Task 1.6)', () => {
+  it('materializes v1-colliding local identities once each and resolves local state by v2', () => {
+    const c = localVisibilitySummary('C');
+    const cSharp = localVisibilitySummary('C#');
+    const visibility = new Map<string, LocalSeoKeywordVisibilitySummary>([
+      [keywordIdentityKeyV2('C'), c],
+      [keywordIdentityKeyV2('C#'), cSharp],
+    ]);
+    const rows = new Map<string, DraftRow>();
+
+    ensureLocalVisibilityRows(rows, visibility);
+    expect(rows.size).toBe(2);
+    expect(new Set(rows.values()).size).toBe(2);
+
+    const finalized = finalizeDraftRows(rows, {
+      workspaceId: 'ws-unicode-local',
+      localVisibilityByKeyword: visibility,
+      activeLocalMarketCount: 1,
+    }).rows;
+    expect(finalized.map(row => row.keyword).sort()).toEqual(['C', 'C#']);
+    expect(finalized).toHaveLength(2);
+    expect(finalized.length).toBeGreaterThan(0);
+    expect(finalized.every(row => row.localSeo?.posture === 'visible')).toBe(true); // every-ok -- exact length asserted above
+  });
+
   it('candidate and row value scores match for every key (no drift); key sets are equal — incl. a localVisibility-only key', async () => {
     const localVisibility = new Map<string, LocalSeoKeywordVisibilitySummary>([
       [keywordComparisonKey('teeth cleaning sarasota'), localVisibilitySummary('teeth cleaning sarasota')],

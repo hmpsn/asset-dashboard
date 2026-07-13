@@ -27,6 +27,7 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import type { Workspace, PageKeywordMap, KeywordStrategy, ContentGap } from '../../shared/types/workspace.js';
 import type { SeoContextSlice } from '../../shared/types/intelligence.js';
+import type { StoredKeywordStrategy } from '../../shared/types/keyword-strategy.js';
 
 // ── vi.mock declarations must come before any real import that loads the
 //    module under test — Vitest hoists vi.mock() calls to the top, which
@@ -95,9 +96,9 @@ vi.mock('../../server/page-keywords.js', () => ({
   listPageKeywords: (...args: unknown[]) => mockListPageKeywords(...args),
 }));
 
-const mockListContentGaps = vi.fn(() => [] as ContentGap[]);
-vi.mock('../../server/content-gaps.js', () => ({
-  listContentGaps: (...args: unknown[]) => mockListContentGaps(...args),
+const mockAssembleStoredKeywordStrategy = vi.fn(() => null as StoredKeywordStrategy | null);
+vi.mock('../../server/keyword-strategy-assembler.js', () => ({
+  assembleStoredKeywordStrategy: (...args: unknown[]) => mockAssembleStoredKeywordStrategy(...args),
 }));
 
 const mockGetTrackedKeywords = vi.fn(() => [] as Array<{ query: string }>);
@@ -208,7 +209,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGetWorkspace.mockReturnValue(undefined);
   mockListPageKeywords.mockReturnValue([]);
-  mockListContentGaps.mockReturnValue([]);
+  mockAssembleStoredKeywordStrategy.mockReturnValue(null);
   mockGetTrackedKeywords.mockReturnValue([]);
   mockGetLatestRanks.mockReturnValue([]);
   mockGetDiscoveredQuerySummary.mockReturnValue({ totalDiscovered: 0, lostVisibilityCount: 0, topLostQueries: [] });
@@ -459,12 +460,15 @@ describe('page map population', () => {
 // ════════════════════════════════════════════════════════════════════════════
 
 describe('content gap population', () => {
-  it('populates contentGaps from listContentGaps when available', async () => {
+  it('populates contentGaps from the assembled table-backed strategy', async () => {
     const gap = makeContentGap('local SEO');
     mockGetWorkspace.mockReturnValue(makeWorkspace({
       keywordStrategy: makeKeywordStrategy(),
     }));
-    mockListContentGaps.mockReturnValue([gap]);
+    mockAssembleStoredKeywordStrategy.mockReturnValue({
+      ...makeKeywordStrategy(),
+      contentGaps: [gap],
+    } as StoredKeywordStrategy);
 
     const result = await assembleSeoContext('ws-gaps');
 
@@ -472,22 +476,25 @@ describe('content gap population', () => {
     expect(result.strategy?.contentGaps?.[0].topic).toBe('local SEO');
   });
 
-  it('contentGaps is empty array when listContentGaps returns nothing', async () => {
+  it('contentGaps is empty array when the assembled strategy has no gaps', async () => {
     mockGetWorkspace.mockReturnValue(makeWorkspace({
       keywordStrategy: makeKeywordStrategy(),
     }));
-    mockListContentGaps.mockReturnValue([]);
+    mockAssembleStoredKeywordStrategy.mockReturnValue({
+      ...makeKeywordStrategy(),
+      contentGaps: [],
+    } as StoredKeywordStrategy);
 
     const result = await assembleSeoContext('ws-no-gaps');
 
     expect(result.strategy?.contentGaps).toEqual([]);
   });
 
-  it('contentGaps is empty array when listContentGaps throws', async () => {
+  it('contentGaps is empty array when strategy assembly throws', async () => {
     mockGetWorkspace.mockReturnValue(makeWorkspace({
       keywordStrategy: makeKeywordStrategy(),
     }));
-    mockListContentGaps.mockImplementation(() => { throw new Error('content_gaps table missing'); });
+    mockAssembleStoredKeywordStrategy.mockImplementation(() => { throw new Error('content_gaps table missing'); });
 
     const result = await assembleSeoContext('ws-gaps-throws');
 
@@ -498,7 +505,7 @@ describe('content gap population', () => {
   it('does not throw even when both page-keywords and content-gaps modules throw', async () => {
     mockGetWorkspace.mockReturnValue(makeWorkspace({ keywordStrategy: makeKeywordStrategy() }));
     mockListPageKeywords.mockImplementation(() => { throw new Error('pk fail'); });
-    mockListContentGaps.mockImplementation(() => { throw new Error('cg fail'); });
+    mockAssembleStoredKeywordStrategy.mockImplementation(() => { throw new Error('cg fail'); });
 
     await expect(assembleSeoContext('ws-both-throws')).resolves.toBeDefined();
   });
@@ -1309,7 +1316,10 @@ describe('full happy path', () => {
       brandVoice: 'Authoritative yet approachable',
     }));
     mockListPageKeywords.mockReturnValue([page]);
-    mockListContentGaps.mockReturnValue([gap]);
+    mockAssembleStoredKeywordStrategy.mockReturnValue({
+      ...makeKeywordStrategy(),
+      contentGaps: [gap],
+    } as StoredKeywordStrategy);
     mockGetTrackedKeywords.mockReturnValue([{ query: 'seo austin' }]);
     mockGetLatestRanks.mockReturnValue([
       { query: 'seo austin', position: 4, clicks: 20, impressions: 200, ctr: 0.1, change: -1 },

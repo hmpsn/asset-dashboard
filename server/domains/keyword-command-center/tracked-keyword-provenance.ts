@@ -1,4 +1,5 @@
-import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
+import { keywordIdentityKeyV2 } from '../../../shared/keyword-normalization.js';
+import type { TrackedKeywordIdentityMetadata } from '../../../shared/types/keyword-identity.js';
 import { TRACKED_KEYWORD_SOURCE, type TrackedKeyword } from '../../../shared/types/rank-tracking.js';
 import type { ContentGap, KeywordStrategy } from '../../../shared/types/workspace.js';
 import { assembleStoredKeywordStrategy } from '../../keyword-strategy-assembler.js';
@@ -44,27 +45,27 @@ export function inferTrackedKeywordSources(
 ): TrackedKeyword[] {
   const siteKeywordMetricKeys = new Set(
     (context.strategy?.siteKeywordMetrics ?? [])
-      .map(m => keywordComparisonKey(m.keyword))
+      .map(m => keywordIdentityKeyV2(m.keyword))
       .filter(Boolean),
   );
   const siteKeywordKeys = new Set(
     (context.strategy?.siteKeywords ?? [])
-      .map(k => keywordComparisonKey(k))
+      .map(k => keywordIdentityKeyV2(k))
       .filter(Boolean),
   );
   const contentGapKeys = new Set(
     (context.contentGaps ?? [])
-      .map(gap => keywordComparisonKey(gap.targetKeyword))
+      .map(gap => keywordIdentityKeyV2(gap.targetKeyword))
       .filter(Boolean),
   );
   return trackedKeywords.map(keyword => {
     const existing = keyword.source ?? TRACKED_KEYWORD_SOURCE.UNKNOWN;
     if (existing !== TRACKED_KEYWORD_SOURCE.UNKNOWN) return keyword;
-    const normalized = keywordComparisonKey(keyword.query);
+    const normalized = keywordIdentityKeyV2(keyword.query);
     if (!normalized) return keyword;
     if (siteKeywordMetricKeys.has(normalized)) return { ...keyword, source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY };
     if (siteKeywordKeys.has(normalized)) return { ...keyword, source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD };
-    const fb = context.feedback?.get(normalized);
+    const fb = context.feedback?.get(keyword.query);
     if (fb?.status === 'requested') return { ...keyword, source: TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED };
     if (contentGapKeys.has(normalized)) return { ...keyword, source: TRACKED_KEYWORD_SOURCE.CONTENT_GAP };
     return keyword;
@@ -74,11 +75,12 @@ export function inferTrackedKeywordSources(
 /**
  * Wave 3d-i/3d-ii ADMIN exposure: getTrackedKeywords STRIPS the TABLE-ONLY fields
  * (sourceGapKey, strategyOwned) so the general/public read path stays byte-identical.
- * KCC is admin-authed, so it may surface them — read from the table
+ * KCC is admin-authed, so it may use them — read from the table
  * (listTrackedKeywordRows, which uses rowToTrackedKeyword directly, NOT the stripping
- * resolver) and merge sourceGapKey + strategyOwned back onto the tracked keywords
+ * resolver) and merge gap provenance + strategyOwned back onto tracked keywords
  * keyed by keywordComparisonKey. strategyOwned is REQUIRED here so KCC's IN_STRATEGY
- * classification sees real ownership instead of undefined -> false.
+ * classification sees real ownership instead of undefined -> false. sourceGapKeyV2
+ * remains internal and is omitted by the explicit final KCC tracking DTO mapper.
  */
 export function mergeTrackedKeywordProvenance(
   workspaceId: string,
@@ -86,21 +88,26 @@ export function mergeTrackedKeywordProvenance(
 ): TrackedKeyword[] {
   if (trackedKeywords.length === 0) return trackedKeywords;
   const gapKeyByQuery = new Map<string, string>();
+  const gapKeyV2ByQuery = new Map<string, string>();
   const ownedByQuery = new Map<string, boolean>();
   for (const row of listTrackedKeywordRows(workspaceId)) {
-    const key = keywordComparisonKey(row.query);
+    const key = keywordIdentityKeyV2(row.query);
     if (row.sourceGapKey) gapKeyByQuery.set(key, row.sourceGapKey);
+    if (row.sourceGapKeyV2) gapKeyV2ByQuery.set(key, row.sourceGapKeyV2);
     // `!== undefined` tri-state guard: `false` is a real value, not "absent".
     if (row.strategyOwned !== undefined) ownedByQuery.set(key, row.strategyOwned);
   }
-  if (gapKeyByQuery.size === 0 && ownedByQuery.size === 0) return trackedKeywords;
+  if (gapKeyByQuery.size === 0 && gapKeyV2ByQuery.size === 0 && ownedByQuery.size === 0) return trackedKeywords;
   return trackedKeywords.map(keyword => {
-    const key = keywordComparisonKey(keyword.query);
+    const key = keywordIdentityKeyV2(keyword.query);
     const gapKey = gapKeyByQuery.get(key);
+    const gapKeyV2 = gapKeyV2ByQuery.get(key);
     const owned = ownedByQuery.get(key);
-    if (gapKey === undefined && owned === undefined) return keyword;
-    const next = { ...keyword };
+    if (gapKey === undefined && gapKeyV2 === undefined && owned === undefined) return keyword;
+    const next: TrackedKeyword & TrackedKeywordIdentityMetadata = { ...keyword };
     if (gapKey !== undefined) next.sourceGapKey = gapKey;
+    // Internal-only: final KCC DTO construction deliberately does not serialize it.
+    if (gapKeyV2 !== undefined) next.sourceGapKeyV2 = gapKeyV2;
     if (owned !== undefined) next.strategyOwned = owned;
     return next;
   });

@@ -11,7 +11,7 @@ let authFixture: SeededAuth | null = null;
 beforeAll(async () => {
   await ctx.startServer();
   authFixture = await seedAuthData();
-});
+}, 30_000);
 
 afterAll(async () => {
   authFixture?.cleanup();

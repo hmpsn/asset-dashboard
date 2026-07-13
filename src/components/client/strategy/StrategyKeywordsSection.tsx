@@ -128,12 +128,12 @@ export function StrategyKeywordsSection({
             <div className="relative">
               <div ref={kwListScrollRef} className="max-h-[420px] overflow-y-auto flex flex-col gap-1">
                 {sortedConfirmed.map(row => {
-                  const isOpen = openKeywordDrawer === row.normalized;
-                  const isRemoving = removingKeyword === row.normalized;
+                  const isOpen = openKeywordDrawer === row.identityKey;
+                  const isRemoving = removingKeyword === row.identityKey;
                   return (
                     // button-ok: row container remains a div because it contains nested action buttons.
                     <div
-                      key={row.normalized}
+                      key={row.identityKey}
                       role="button"
                       tabIndex={0}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] cursor-pointer transition-colors ${
@@ -141,11 +141,11 @@ export function StrategyKeywordsSection({
                           ? 'bg-[var(--surface-3)] border border-teal-500/40 ring-1 ring-teal-500/10'
                           : 'bg-[var(--surface-3)] border border-transparent hover:border-[var(--brand-border)]'
                       }`}
-                      onClick={() => { if (isOpen) closeDrawer(); else openOrSwapDrawer(row.normalized); }}
+                      onClick={() => { if (isOpen) closeDrawer(); else openOrSwapDrawer(row.identityKey); }}
                       onKeyDown={e => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
-                          if (isOpen) closeDrawer(); else openOrSwapDrawer(row.normalized);
+                          if (isOpen) closeDrawer(); else openOrSwapDrawer(row.identityKey);
                         }
                       }}
                     >
@@ -206,15 +206,15 @@ export function StrategyKeywordsSection({
                 {keywordIdeaRows.map(row => (
                   // button-ok: suggestion row contains nested add-action button; wrapper cannot be a button element.
                   <div
-                    key={row.normalized}
+                    key={row.identityKey}
                     role="button"
                   tabIndex={0}
                   className="relative overflow-hidden flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-lg)] bg-teal-500/5 border border-teal-500/20 cursor-pointer hover:border-teal-500/30 transition-colors"
-                  onClick={() => { if (openKeywordDrawer === row.normalized) closeDrawer(); else openOrSwapDrawer(row.normalized); }}
+                  onClick={() => { if (openKeywordDrawer === row.identityKey) closeDrawer(); else openOrSwapDrawer(row.identityKey); }}
                   onKeyDown={e => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      if (openKeywordDrawer === row.normalized) closeDrawer(); else openOrSwapDrawer(row.normalized);
+                      if (openKeywordDrawer === row.identityKey) closeDrawer(); else openOrSwapDrawer(row.identityKey);
                     }
                   }}
                 >

@@ -58,7 +58,7 @@ export function StrategyKeywordDrawer({
   isLoadingFeedback,
 }: StrategyKeywordDrawerProps) {
   const isConfirmed = drawerRow.status === 'client' || drawerRow.status === 'strategy';
-  const isRemoving = removingKeyword === drawerRow.normalized;
+  const isRemoving = removingKeyword === drawerRow.identityKey;
   const unenriched = drawerRow.enrichmentStatus === 'unenriched';
   const explanation = drawerRow.explanation;
   const primaryReason = explanation?.reasons[0] ?? drawerRow.rationale ?? drawerRow.opportunityDetail;

@@ -45,7 +45,7 @@ describe('reconcileStrategyRankTracking', () => {
 
     expect(tracked).toEqual([
       expect.objectContaining({
-        query: 'Emergency Dentist - Near-Me',
+        query: 'emergency dentist near me',
         status: TRACKED_KEYWORD_STATUS.ACTIVE,
       }),
     ]);
@@ -337,7 +337,7 @@ describe('reconcileStrategyRankTracking', () => {
 
     expect(getLatestRanks(workspaceId)).toEqual([
       expect.objectContaining({
-        query: 'Legacy Keyword',
+        query: 'legacy keyword',
         position: 6,
         change: 2,
         pinned: true,
@@ -475,7 +475,7 @@ describe('reconcileStrategyRankTracking', () => {
 
     expect(getTrackedKeywords(workspaceId)).toEqual([
       expect.objectContaining({
-        query: 'strategy duplicate keyword',
+        query: 'Strategy Duplicate Keyword',
         source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
         pagePath: '/strategy-page',
         strategyGeneratedAt: generatedAt,
@@ -496,7 +496,7 @@ describe('reconcileStrategyRankTracking', () => {
     expect(getTrackedKeywords(workspaceId)).toEqual([]);
     expect(getTrackedKeywords(workspaceId, { includeInactive: true })).toEqual([
       expect.objectContaining({
-        query: 'strategy duplicate keyword',
+        query: 'Strategy Duplicate Keyword',
         source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY,
         status: TRACKED_KEYWORD_STATUS.DEPRECATED,
       }),
@@ -616,7 +616,7 @@ describe('reconcileStrategyRankTracking', () => {
 
     expect(getTrackedKeywords(workspaceId)).toEqual([
       expect.objectContaining({
-        query: 'revived keyword',
+        query: 'Revived Keyword',
         source: TRACKED_KEYWORD_SOURCE.MANUAL,
         status: TRACKED_KEYWORD_STATUS.ACTIVE,
       }),

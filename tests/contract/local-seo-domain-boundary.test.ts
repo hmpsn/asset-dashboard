@@ -418,8 +418,11 @@ describe('local SEO domain boundary', () => {
       'rowToSnapshot',
       'rowToRawLocalResults',
       'listSnapshotsPageForBackfill',
-      'pruneWeeklyThinIds',
-      'pruneHardCutoffIds',
+      'retentionRowsFirstPage',
+      'retentionRowsPage',
+      'deleteSnapshotById',
+      'visibilityTrendV2Aggregates',
+      'visibilityTrendLegacyPage',
       'latestSnapshotSummary',
     ]) {
       expect(snapshotStore).toContain(storeDetail);

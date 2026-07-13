@@ -9,6 +9,7 @@ import { normalizeKeyword } from './strategy/strategyKeywordDisplay';
 import { capitalize } from '../../utils/strings';
 import { KeywordMetricCell } from '../shared/KeywordMetricCell';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
+import { keywordIdentityKeyV2 } from '../../../shared/keyword-normalization';
 
 interface GscKeyword {
   query: string;
@@ -246,10 +247,10 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                                   </span>
                                 )}
                                 {/* Inline feedback badge */}
-                                {keywordFeedback?.get(normalizeKeyword(page.primaryKeyword)) === 'approved' && (
+                                {keywordFeedback?.get(keywordIdentityKeyV2(page.primaryKeyword)) === 'approved' && (
                                   <Badge label="Relevant" tone="emerald" variant="outline" icon={ThumbsUp} />
                                 )}
-                                {keywordFeedback?.get(normalizeKeyword(page.primaryKeyword)) === 'declined' && (
+                                {keywordFeedback?.get(keywordIdentityKeyV2(page.primaryKeyword)) === 'declined' && (
                                   <Badge label="Not relevant" tone="red" variant="outline" icon={Ban} />
                                 )}
                               </span>
@@ -335,7 +336,7 @@ export function PageKeywordMapContent({ pageMap, workspaceId, setToast, onConten
                             {/* Keyword feedback controls */}
                             {page.primaryKeyword && onApproveKeyword && onDeclineKeyword && (() => {
                               const kw = page.primaryKeyword!;
-                              const fbStatus = keywordFeedback?.get(normalizeKeyword(kw));
+                              const fbStatus = keywordFeedback?.get(keywordIdentityKeyV2(kw));
                               const loading = isLoadingFeedback?.(kw) ?? false;
                               if (fbStatus === 'declined') return (
                                 <div className="flex items-center gap-2 mt-2 px-2 py-1.5 rounded-[var(--radius-md)] bg-red-500/5 border border-red-500/20">

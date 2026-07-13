@@ -38,7 +38,7 @@ import { replaceAllTopicClusters, deleteAllTopicClusters } from '../../server/to
 import { replaceAllCannibalizationIssues, deleteAllCannibalizationIssues } from '../../server/cannibalization-issues.js';
 import { getTrackedKeywords } from '../../server/rank-tracking.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
-import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
+import { keywordIdentityKeyV2 } from '../../shared/keyword-normalization.js';
 import type { KeywordStrategy, ContentGap, QuickWin, PageKeywordMap, TopicCluster, CannibalizationItem } from '../../shared/types/workspace.js';
 
 // ── Port — unique across all integration tests ─────────────────────────────
@@ -1071,7 +1071,7 @@ describe('POST /api/public/keyword-feedback — submit feedback', () => {
     });
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.keyword).toBe('seo audit tool near me');
+    expect(body.keyword).toBe('SEO Audit Tool - Near-Me');
     expect(body.status).toBe('approved');
 
     // Verify persistence via GET
@@ -1079,8 +1079,11 @@ describe('POST /api/public/keyword-feedback — submit feedback', () => {
     expect(listRes.status).toBe(200);
     const list = await listRes.json();
     expect(list.length).toBeGreaterThan(0);
-    const stored = list.find((r: { keyword: string }) => r.keyword === 'seo audit tool near me');
+    const stored = list.find((r: { keyword: string }) => (
+      keywordIdentityKeyV2(r.keyword) === keywordIdentityKeyV2('SEO Audit Tool - Near-Me')
+    ));
     expect(stored).toBeDefined();
+    expect(stored.keyword).toBe('SEO Audit Tool - Near-Me');
     expect(stored.status).toBe('approved');
 
     const tracked = getTrackedKeywords(feedbackWsId);
@@ -1136,19 +1139,22 @@ describe('POST /api/public/keyword-feedback — submit feedback', () => {
     // Verify only one row exists (no duplicates)
     const listRes = await api(`/api/public/keyword-feedback/${feedbackWsId}`);
     const list = await listRes.json();
-    const matches = list.filter((r: { keyword: string }) => r.keyword === keywordComparisonKey(keyword));
+    const matches = list.filter((r: { keyword: string }) => (
+      keywordIdentityKeyV2(r.keyword) === keywordIdentityKeyV2(keyword)
+    ));
     expect(matches.length).toBe(1);
+    expect(matches[0].keyword).toBe(keyword);
     expect(matches[0].status).toBe('declined');
   });
 
-  it('normalises keyword to lowercase', async () => {
+  it('preserves the trimmed raw keyword for public display', async () => {
     const res = await postJson(`/api/public/keyword-feedback/${feedbackWsId}`, {
       keyword: 'MixedCase Keyword',
       status: 'approved',
     });
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.keyword).toBe('mixedcase keyword');
+    expect(body.keyword).toBe('MixedCase Keyword');
   });
 
   it('broadcasts strategy updates when keyword feedback is deleted', async () => {
@@ -1253,11 +1259,15 @@ describe('POST /api/public/keyword-feedback/bulk — batch feedback', () => {
     const list = await listRes.json();
     expect(list.length).toBeGreaterThan(0);
 
-    const alphaRow = list.find((r: { keyword: string }) => r.keyword === 'bulk keyword alpha near me');
-    const betaRow = list.find((r: { keyword: string }) => r.keyword === 'bulk keyword beta');
-    const gammaRow = list.find((r: { keyword: string }) => r.keyword === 'bulk keyword gamma');
+    const findExactIdentity = (keyword: string) => list.find((r: { keyword: string }) => (
+      keywordIdentityKeyV2(r.keyword) === keywordIdentityKeyV2(keyword)
+    ));
+    const alphaRow = findExactIdentity('Bulk Keyword Alpha - Near-Me');
+    const betaRow = findExactIdentity('bulk keyword beta');
+    const gammaRow = findExactIdentity('bulk keyword gamma');
 
     expect(alphaRow).toBeDefined();
+    expect(alphaRow.keyword).toBe('Bulk Keyword Alpha - Near-Me');
     expect(alphaRow.status).toBe('approved');
 
     expect(betaRow).toBeDefined();

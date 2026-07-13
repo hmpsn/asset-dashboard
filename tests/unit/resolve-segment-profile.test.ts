@@ -6,16 +6,16 @@ import { createClientLocation } from '../../server/client-locations.js';
 
 const ctx = createEphemeralTestContext(import.meta.url);
 let wsId: string;
-let cleanup: () => void;
+let cleanup: (() => void) | undefined;
 
 beforeAll(async () => {
   await ctx.startServer();
   const s = seedWorkspace();
   wsId = s.workspaceId;
   cleanup = s.cleanup;
-});
+}, 30_000);
 afterAll(async () => {
-  cleanup();
+  cleanup?.();
   await ctx.stopServer();
 });
 

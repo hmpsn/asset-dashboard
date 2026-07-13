@@ -7,6 +7,10 @@ import { describe, expect, it } from 'vitest';
 import {
   normalizeKeywordForComparison,
   keywordComparisonKey,
+  keywordIdentityKeyV1,
+  keywordIdentityKeyV2,
+  keywordIdentityKeys,
+  keywordIdentityLookupKeys,
   isVariantOf,
   findBestParent,
   createVariantParentIndex,
@@ -193,6 +197,85 @@ describe('keywordComparisonKey', () => {
 
   it('delegates to normalize — collapses spaces', () => {
     expect(keywordComparisonKey('seo   ppc')).toBe('seo ppc');
+  });
+});
+
+describe('versioned keyword identities', () => {
+  it('keeps the canonical helper byte-identical to v1 during K3b', () => {
+    for (const input of ['C# consulting', 'café', '東京 SEO', '  SEO-agency  ', null, undefined]) {
+      expect(keywordComparisonKey(input)).toBe(keywordIdentityKeyV1(input));
+      expect(normalizeKeywordForComparison(input)).toBe(keywordIdentityKeyV1(input));
+    }
+  });
+
+  it('normalizes composed and decomposed Unicode forms to the same v2 key without accent folding', () => {
+    expect(keywordIdentityKeyV2('café')).toBe('café');
+    expect(keywordIdentityKeyV2('cafe\u0301')).toBe('café');
+    expect(keywordIdentityKeyV2('café')).not.toBe(keywordIdentityKeyV2('cafe'));
+  });
+
+  it('preserves non-Latin letters and Unicode numbers after NFKC', () => {
+    expect(keywordIdentityKeyV2('東京 ＳＥＯ ２０２６')).toBe('東京 seo 2026');
+    expect(keywordIdentityKeyV2('Клиника № ①')).toBe('клиника no 1');
+    expect(keywordIdentityKeyV2('İstanbul')).toBe('i̇stanbul');
+    expect(keywordIdentityKeyV2('दंत चिकित्सा')).toBe('दंत चिकित्सा');
+    expect(keywordIdentityKeyV2('عَرَبِيّ')).toBe('عَرَبِيّ');
+  });
+
+  it('keeps meaning-distinct technology tokens distinct', () => {
+    expect(keywordIdentityKeyV2('C developer')).toBe('c developer');
+    expect(keywordIdentityKeyV2('C# developer')).toBe('c sharp developer');
+    expect(keywordIdentityKeyV2('C++ developer')).toBe('c plus plus developer');
+    expect(keywordIdentityKeyV2('F# developer')).toBe('f sharp developer');
+    expect(keywordIdentityKeyV2('.NET developer')).toBe('dot net developer');
+    expect(new Set(['C', 'C#', 'C++', 'F#', '.NET'].map(keywordIdentityKeyV2)).size).toBe(5);
+  });
+
+  it('preserves attached technology-token versions and ASP.NET identity', () => {
+    expect(keywordIdentityKeyV2('C++17')).toBe('c plus plus 17');
+    expect(keywordIdentityKeyV2('C#8')).toBe('c sharp 8');
+    expect(keywordIdentityKeyV2('F#7')).toBe('f sharp 7');
+    expect(keywordIdentityKeyV2('.NET8')).toBe('dot net 8');
+    expect(keywordIdentityKeyV2('ASP.NET Core')).toBe('asp dot net core');
+    expect(keywordIdentityKeyV2('wasp.net')).toBe('wasp net');
+    expect(keywordIdentityKeyV2('rasp.net')).toBe('rasp net');
+    expect(keywordIdentityKeyV2('.NETwork')).toBe('network');
+    expect(keywordIdentityKeyV2('C++17')).not.toBe(keywordIdentityKeyV2('C 17'));
+  });
+
+  it('does not promote malformed operator runs into semantic technology tokens', () => {
+    expect(keywordIdentityKeyV2('C+++')).toBe('c');
+    expect(keywordIdentityKeyV2('C##')).toBe('c');
+    expect(keywordIdentityKeyV2('C#+')).toBe('c');
+    expect(keywordIdentityKeyV2('F##')).toBe('f');
+  });
+
+  it('rewrites ampersands only between letters or numbers', () => {
+    expect(keywordIdentityKeyV2('research & development')).toBe('research and development');
+    expect(keywordIdentityKeyV2('& research')).toBe('research');
+    expect(keywordIdentityKeyV2('research &')).toBe('research');
+  });
+
+  it('returns an empty key for punctuation-only input', () => {
+    expect(keywordIdentityKeyV2('--- ###')).toBe('');
+    expect(keywordIdentityKeyV2('\u0301')).toBe('');
+    expect(keywordIdentityKeyV2(' \u0301 ')).toBe('');
+    expect(keywordIdentityKeyV2('\u0301abc')).toBe('abc');
+  });
+
+  it('returns raw, v1, and v2 without mutating the raw value', () => {
+    expect(keywordIdentityKeys('  Café C#  ')).toEqual({
+      raw: '  Café C#  ',
+      v1: 'caf c',
+      v2: 'café c sharp',
+    });
+  });
+
+  it('returns v2-first lookup keys and collapses identical versions', () => {
+    expect(keywordIdentityLookupKeys('C#')).toEqual(['c sharp', 'c']);
+    expect(keywordIdentityLookupKeys('SEO agency')).toEqual(['seo agency']);
+    expect(keywordIdentityLookupKeys('東京')).toEqual(['東京']);
+    expect(keywordIdentityLookupKeys('---')).toEqual([]);
   });
 });
 

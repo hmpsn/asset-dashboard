@@ -11,7 +11,7 @@ let templateId = '';
 beforeAll(async () => {
   await ctx.startServer();
   wsId = createWorkspace('Fixture Content Templates Edge').id;
-});
+}, 30_000);
 
 afterAll(async () => {
   if (templateId) await del(`/api/content-templates/${wsId}/${templateId}`);

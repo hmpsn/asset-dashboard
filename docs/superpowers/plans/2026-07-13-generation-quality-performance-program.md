@@ -134,11 +134,35 @@ Model assignments:
 
 **Owner:** `seo-health`; GPT-5.4. **Depends:** K3a.
 
-- Add explicit v1 and v2 comparison helpers plus a typed identity version; do not switch the canonical helper yet.
-- Add collision-safe v2 identity storage or aliases for durable stores with reconstructible raw values, dual-read/dual-write compatibility, and a transactional TypeScript backfill where SQLite SQL cannot perform NFKC.
-- Version-invalidate the ephemeral metrics cache. Preserve all intent, CPC, source, status, feedback, timestamps, and K1 provenance when v2-equivalent rows converge.
-- For feedback/SERP legacy rows whose raw spelling is unavailable, preserve the v1 key as a readable alias and establish correct v2 identity only for recoverable/new writes.
-- Acceptance: fresh-write, legacy-upgrade, collision, rollback/idempotence, public-read, and K1 evidence-seam tests pass; canonical runtime comparison remains v1.
+- Precommit migration 183, `shared/types/keyword-identity.ts`, the explicit v1/v2 helpers, and the amended identity rule before parallel implementation. `keywordComparisonKey()` and `normalizeKeywordForComparison()` remain byte-identical v1 delegates throughout K3b.
+- Use additive full-payload raw-variant v2 stores for `tracked_keywords` and `site_keyword_metrics`, with exactly one explicitly selected canonical variant per v2 identity; spelling variants retain their complete historical payload rather than only an alias string. The v1 primary-key tables remain deterministic rollback projections. Reconciliation is identity-level: deleting one v2 identity never deletes a meaning-distinct sibling sharing its v1 key, and a noncanonical older variant cannot win unless the canonical variant is explicitly re-elected.
+- Add v2 sidecars for keyword feedback and content-gap votes, preserving transactionally assigned write order, every decision field, and raw aliases. Centralize their reads/writes so KCC, public routes, and intelligence use v2-first exact lookup and append only unrepresented v1 legacy aliases.
+- Store every new SERP observation as one coherent full-payload `(workspace,date,v2,raw)` row and choose deterministically by observed time then raw-byte order; never merge fields across observations. Add `normalized_keyword_v2` to local snapshots and update every exact/grouping/trend seam to use explicit v2-first compatibility.
+- Add a separate versioned v2 metrics-cache table keyed by `(identity_version,identity_key,region)` and retain the old table as rollback-only. Do not clear, reinterpret, or read-forward v1 cache rows as v2 evidence.
+- Provide an operator-only TypeScript backfill/verification CLI, dry-run by default and never boot-wired. It uses per-workspace immediate transactions, is restart-safe, never guesses unrecoverable raw values or provenance, and emits a redacted report with scanned/inserted/updated/already-present/collision/alias/skipped/error/unresolved-provenance counts.
+- Legacy feedback, vote, and SERP rows whose raw spelling is unavailable remain readable in their v1 tables as explicit aliases; no K3b code assigns them guessed v2 keys. `source_gap_key_v2` is written only from a raw gap identity or when backfill can prove the legacy pointer equals the tracked query v1 key.
+- Feedback, vote, and SERP projection writes first snapshot any unmarked legacy v1 row into a full-payload archive and mark the main key as a rollback projection in the same transaction. Union reads keep archived legacy aliases visible while excluding marked projections from duplicate legacy results.
+- Unicode identities whose v1 key is blank are explicitly `v2_only`: they are sidecar-only, counted in reports, and never written as blank rollback keys. Their absence from v1 rollback readers is deliberate and tested.
+- Acceptance: fresh-write, legacy-upgrade, C/C#/C++/F#/.NET coexistence, composed/decomposed and non-Latin preservation, deterministic reverse-order collisions, exact-delete isolation, transaction rollback/idempotence, paged/public reads, SERP/local/KCC/analytics joins, cache versioning, content-gap votes, and K1 evidence/provenance seams pass. Canonical runtime comparison remains v1. After merge/deploy, the staging dry-run/apply/second-run report is a blocking prerequisite for K3c, not a pre-merge data mutation.
+
+**K3b internal dependency graph and exclusive ownership:**
+
+```text
+Controller T0: migration 183 + shared identity/rank contracts + helpers/tests + plan/rule amendments
+  ├─ A tracked/site canonical stores and aliases
+  ├─ B feedback/KCC/public lifecycle compatibility
+  ├─ C SERP/local snapshot compatibility and KCC/analytics joins
+  └─ D content-gap votes + metrics-cache/DataForSEO versioning
+A + B + C + D → controller diff/full-suite review
+  → T5 operator backfill service/CLI/report and real-read rollback/idempotence tests
+  → T6 cross-seam/public/K1 evidence verification, pr-check/docs/roadmap, independent review
+```
+
+- A owns `server/tracked-keywords-store.ts`, `server/rank-tracking.ts`, `server/site-keyword-metrics.ts`, KCC tracked-provenance readers assigned in its dispatch, and focused tracked/site tests. It does not edit KCC action or route files.
+- B owns `server/keyword-feedback.ts`, KCC feedback store/types and all of `server/domains/keyword-command-center/action-service.ts`, keyword-strategy UX direct feedback read removal, client feedback lookup hook/components, and focused lifecycle/pagination tests. It does not edit `server/routes/public-portal.ts`.
+- C owns local snapshot storage, SERP store/producer, snapshot registry, KCC detail/read-model SERP/local joins, analytics computations, and focused local/SERP tests.
+- D owns the new content-gap-vote service and intelligence seam, metrics-cache/DataForSEO versioning, and focused vote/cache/provider tests. It does not edit `server/routes/public-portal.ts`.
+- After B and D integrate, the controller alone wires both feedback and vote services through the whole `server/routes/public-portal.ts` file and owns any admin route adapter changes. The controller also owns shared contracts/helpers, migration, program/rule docs, package scripts, backfill/report implementation, pr-check/generated rules, `FEATURE_AUDIT.md`, and roadmap closeout. Any lane needing another file stops with `NEEDS_CONTEXT`.
 
 ### K3c — Canonical Unicode Normalization Switchover
 
@@ -162,11 +186,12 @@ Model assignments:
 
 **Owner:** `analytics-intelligence`; GPT-5.5. **Depends:** S1 + K1.
 
-- Add recommendation provenance/revision storage and stable normalized producer identities.
+- Consume S1 recommendation-set revision/provenance storage; do not add a duplicate migration or contract. Prove the S1 CAS/provenance behavior remains intact.
+- Add stable producer identities that are independent of generated wording. Until K3c, keyword-derived producer identities explicitly carry identity version `v1` plus legacy alias material; S2 must not import an unmerged v2 helper or invent another normalizer.
 - Resolved sources cannot remint active recommendations. Suppression is merge-key local, not category-wide. Evidence priority caps survive final score normalization.
-- Recommendation lifecycle is authoritative for mirrors while preserving client comments/responses.
-- Before adding repair behavior, the controller updates the existing `strategy-divergence-sweep` catalog label, purpose, and removal condition from read-only reporting to observation/repair semantics; do not create a replacement flag.
-- Upgrade divergence sweeping from reporting to bounded repair under that updated gate. Tests prove flag-OFF/read-only parity and flag-ON bounded repair/idempotence, in addition to remint prevention, identity stability across wording changes, local suppression, provider/category partial failure, priority invariants, mirror repair, comments, and broadcasts.
+- Mirror repair follows an explicit authority matrix: create a missing mirror from the recommendation; advance a legally behind nonterminal mirror while preserving note/response/payload/items/timestamps; report without mutation when the recommendation is behind an already-decided mirror or decisions conflict; isolate failures and cap repairs per workspace/run.
+- Before adding repair behavior, audit and reset all global/workspace/environment overrides for `strategy-divergence-sweep`. Its current ON behavior is read-only; deploying writer semantics while any unknown override is ON is a stop condition. Update the existing catalog label/purpose/removal condition only after that audit; do not create a replacement flag.
+- Upgrade divergence sweeping from reporting to bounded repair under the safely transitioned gate. Flag OFF remains no mutation. Tests prove read-only transition safety, bounded repair/idempotence, remint prevention, wording-stable identity, merge-key-local suppression, provider/category partial failure, post-normalization priority caps, comments/payload/timestamp preservation, per-pair failure isolation, activity, and broadcasts.
 
 ### K1b — Keyword Strategy Provenance Adoption
 

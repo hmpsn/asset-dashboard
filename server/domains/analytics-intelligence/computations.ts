@@ -14,7 +14,10 @@ import type {
   SerpFeatureOpportunityData,
   FreshnessAlertData,
 } from '../../../shared/types/analytics.js';
-import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
+import {
+  keywordIdentityKeyV1,
+  keywordIdentityKeyV2,
+} from '../../../shared/keyword-normalization.js';
 import { extractBrandTokens, isBrandedQuery } from '../../competitor-brand-filter.js';
 import { isFeatureEnabled } from '../../feature-flags.js';
 import { normalizePageUrl, toInsightPageId } from '../../utils/page-address.js';
@@ -653,10 +656,26 @@ export function computeSerpFeatureOpportunities(
   const snapshots = getLatestSerpSnapshots(workspaceId);
   if (snapshots.length === 0) return [];
 
-  // volume lookup by normalized keyword (snapshot.query is already normalized at write).
-  const volumeMap = new Map<string, number>();
+  // Sidecar observations join on Unicode-safe v2. Unrecoverable legacy evidence
+  // falls back to the v1 alias without merging the two namespaces.
+  const volumeMapV2 = new Map<string, number>();
+  const volumeMapV1 = new Map<string, number>();
+  const v1OwnerByKey = new Map<string, string>();
+  const ambiguousV1Keys = new Set<string>();
   for (const kw of listTrackedKeywordRows(workspaceId)) {
-    volumeMap.set(keywordComparisonKey(kw.query), kw.volume ?? 0);
+    const keywordV2 = keywordIdentityKeyV2(kw.query);
+    const keywordV1 = keywordIdentityKeyV1(kw.query);
+    volumeMapV2.set(keywordV2, kw.volume ?? 0);
+    if (!keywordV1 || ambiguousV1Keys.has(keywordV1)) continue;
+    const currentOwner = v1OwnerByKey.get(keywordV1);
+    if (currentOwner && currentOwner !== keywordV2) {
+      ambiguousV1Keys.add(keywordV1);
+      v1OwnerByKey.delete(keywordV1);
+      volumeMapV1.delete(keywordV1);
+      continue;
+    }
+    v1OwnerByKey.set(keywordV1, keywordV2);
+    volumeMapV1.set(keywordV1, kw.volume ?? 0);
   }
 
   const results: Array<{ insightType: 'serp_feature_opportunity'; pageId: string; data: SerpFeatureOpportunityData; severity: InsightSeverity }> = [];
@@ -674,7 +693,9 @@ export function computeSerpFeatureOpportunities(
     const aiOverviewOpportunity = snap.aiOverviewPresent === true && snap.aiOverviewCited === false;
     if (!aiOverviewOpportunity) continue;
 
-    const volume = volumeMap.get(keywordComparisonKey(snap.query)) ?? 0;
+    const volume = (snap.identityVersion === 'v2'
+      ? volumeMapV2.get(keywordIdentityKeyV2(snap.query))
+      : volumeMapV1.get(keywordIdentityKeyV1(snap.query))) ?? 0;
     results.push({
       insightType: 'serp_feature_opportunity' as const,
       // Normalize to the bare pathname so this insight's page_id matches every other page-keyed

@@ -76,9 +76,10 @@ describe('keyword command center domain boundary', () => {
     expect(types).toContain('export interface DraftRow');
   });
 
-  it('keeps keyword feedback persistence in the domain store module', () => {
+  it('keeps KCC feedback access behind the domain adapter and central feedback service', () => {
     const facade = readRepoFile('server/keyword-command-center.ts');
     const feedbackStore = readRepoFile('server/domains/keyword-command-center/feedback-store.ts');
+    const keywordFeedback = readRepoFile('server/keyword-feedback.ts');
     const rowsService = readRepoFile('server/domains/keyword-command-center/rows-service.ts');
     const detailService = readRepoFile('server/domains/keyword-command-center/detail-service.ts');
     const sourceSnapshot = readRepoFile('server/domains/keyword-command-center/source-snapshot.ts');
@@ -96,8 +97,16 @@ describe('keyword command center domain boundary', () => {
     expect(rowsService).toContain("from './source-snapshot.js'");
     expect(detailService).toContain("from './source-snapshot.js'");
     expect(sourceSnapshot).toContain("from './feedback-store.js'");
-    expect(feedbackStore).toContain('keyword_feedback');
-    expect(feedbackStore).toContain('createStmtCache');
+    expect(feedbackStore).toContain("from '../../keyword-feedback.js'");
+    expect(feedbackStore).toContain('readKeywordFeedbackRows');
+    expect(feedbackStore).toContain('readKeywordFeedbackIndex');
+    expect(feedbackStore).toContain('saveKeywordFeedbackDecision');
+    expect(feedbackStore).toContain('clearKeywordFeedback');
+    expect(feedbackStore).not.toContain('createStmtCache');
+    expect(feedbackStore).not.toContain('db.prepare');
+    expect(keywordFeedback).toContain('keyword_feedback');
+    expect(keywordFeedback).toContain('createStmtCache');
+    expect(keywordFeedback).toMatch(/export function saveKeywordFeedbackDecision\b/);
   });
 
   it('keeps bundle filtering helpers in the domain module', () => {
@@ -122,7 +131,9 @@ describe('keyword command center domain boundary', () => {
     }
 
     expect(rowsService).toContain("from './bundle-filters.js'");
-    expect(detailService).toContain("from './bundle-filters.js'");
+    expect(detailService).not.toContain("from './bundle-filters.js'");
+    expect(detailService).toContain('selectExactIdentity');
+    expect(detailService).toContain('keywordIdentityKeyV2');
     expect(bundleFilters).toContain('createVariantParentIndex');
     expect(bundleFilters).toContain('keywordComparisonKey');
   });
@@ -273,7 +284,8 @@ describe('keyword command center domain boundary', () => {
     expect(facade).toContain("from './domains/keyword-command-center/detail-service.js'");
     expect(detailService).toContain('buildLocalSeoKeywordVisibilityForKeyword');
     expect(detailService).toContain('getScoredOutcomeReadbacks');
-    expect(detailService).toContain('filterStrategyForSingleKeyword');
+    expect(detailService).toContain('selectExactIdentity');
+    expect(detailService).toContain('const identityV2 = keywordIdentityKeyV2(keyword)');
     expect(detailService).toContain('finalizeDraftRow');
     expect(detailService).toContain("from './source-snapshot.js'");
   });

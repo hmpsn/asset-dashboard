@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { clearKeywordFeedback, saveBulkKeywordFeedback, saveKeywordFeedback } from '../../server/keyword-feedback.js';
+import {
+  KeywordFeedbackBulkConflictError,
+  clearKeywordFeedback,
+  listPublicKeywordFeedback,
+  readKeywordFeedbackIndex,
+  saveBulkKeywordFeedback,
+  saveKeywordFeedback,
+} from '../../server/keyword-feedback.js';
 import { addStrategyKeyword, keepStrategyKeyword, removeStrategyKeyword } from '../../server/domains/strategy/managed-keyword-set.js';
 import { getKeywordStrategyGenerationState } from '../../server/keyword-strategy-generation-store.js';
 import db from '../../server/db/index.js';
@@ -50,5 +57,108 @@ describe('keyword strategy synthesis-input revision census', () => {
     deleteKeywordHard(id, 'obsolete keyword');
     expect(getKeywordStrategyGenerationState(id).revision).toBe(2);
     expect(getTrackedKeywords(id, { includeInactive: true })).toEqual([]);
+  });
+});
+
+describe('keyword feedback v2 compatibility', () => {
+  it('assigns distinct-v2 bulk write order by UTF-8 bytes regardless of input order', () => {
+    const snapshots = [
+      ['C++', 'C', 'C#'],
+      ['C#', 'C', 'C++'],
+    ].map((keywords, index) => {
+      const id = createWorkspace(`feedback order ${index} ${Date.now()}`).id; cleanup.push(id);
+      saveBulkKeywordFeedback({
+        workspaceId: id,
+        keywords: keywords.map(keyword => ({ keyword, status: 'approved' as const })),
+      });
+      return {
+        compat: db.prepare(`
+          SELECT keyword_v2, raw_keyword, write_order
+            FROM keyword_feedback_v2_compat
+           WHERE workspace_id = ? ORDER BY write_order
+        `).all(id),
+        projection: db.prepare(`
+          SELECT keyword, status, reason, source, declined_by
+            FROM keyword_feedback WHERE workspace_id = ? ORDER BY keyword COLLATE BINARY
+        `).all(id),
+      };
+    });
+
+    expect(snapshots[1]).toEqual(snapshots[0]);
+    expect(snapshots[0]?.compat).toEqual([
+      expect.objectContaining({ keyword_v2: 'c', raw_keyword: 'C', write_order: 1 }),
+      expect.objectContaining({ keyword_v2: 'c plus plus', raw_keyword: 'C++', write_order: 2 }),
+      expect.objectContaining({ keyword_v2: 'c sharp', raw_keyword: 'C#', write_order: 3 }),
+    ]);
+  });
+
+  it('keeps colliding v1 identities independent and projects the latest sibling deterministically', () => {
+    const id = createWorkspace(`feedback collision ${Date.now()}`).id; cleanup.push(id);
+    saveKeywordFeedback({ workspaceId: id, keyword: 'C', status: 'declined', reason: 'language' });
+    saveKeywordFeedback({ workspaceId: id, keyword: 'C#', status: 'approved', reason: 'framework' });
+
+    expect(listPublicKeywordFeedback(id)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ keyword: 'C', status: 'declined' }),
+      expect.objectContaining({ keyword: 'C#', status: 'approved' }),
+    ]));
+    expect(readKeywordFeedbackIndex(id).get('c')?.status).toBe('declined');
+    expect(readKeywordFeedbackIndex(id).get('c#')?.status).toBe('approved');
+    expect(db.prepare('SELECT status FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').get(id, 'c'))
+      .toEqual(expect.objectContaining({ status: 'approved' }));
+
+    clearKeywordFeedback(id, 'C#');
+    expect(db.prepare('SELECT status FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').get(id, 'c'))
+      .toEqual(expect.objectContaining({ status: 'declined' }));
+  });
+
+  it('retains equivalent raw aliases and rejects a conflicting same-v2 bulk atomically', () => {
+    const id = createWorkspace(`feedback aliases ${Date.now()}`).id; cleanup.push(id);
+    saveBulkKeywordFeedback({
+      workspaceId: id,
+      keywords: [
+        { keyword: 'C#', status: 'approved' },
+        { keyword: 'Ｃ＃', status: 'approved' },
+      ],
+    });
+    expect(db.prepare('SELECT COUNT(*) AS count FROM keyword_feedback_v2_compat WHERE workspace_id = ?').get(id))
+      .toEqual({ count: 1 });
+    expect(db.prepare('SELECT COUNT(*) AS count FROM keyword_feedback_v2_aliases WHERE workspace_id = ?').get(id))
+      .toEqual({ count: 2 });
+
+    expect(() => saveBulkKeywordFeedback({
+      workspaceId: id,
+      keywords: [
+        { keyword: 'F#', status: 'approved' },
+        { keyword: 'Ｆ＃', status: 'declined' },
+      ],
+    })).toThrow(KeywordFeedbackBulkConflictError);
+    expect(readKeywordFeedbackIndex(id).get('F#')).toBeUndefined();
+  });
+
+  it('supports v2-only identities without fabricating a v1 rollback key', () => {
+    const id = createWorkspace(`feedback v2 only ${Date.now()}`).id; cleanup.push(id);
+    saveKeywordFeedback({ workspaceId: id, keyword: '東京', status: 'requested' });
+    expect(readKeywordFeedbackIndex(id).get('東京')).toEqual(expect.objectContaining({ keyword: '東京', status: 'requested' }));
+    expect(db.prepare('SELECT keyword_v1 FROM keyword_feedback_v2_compat WHERE workspace_id = ?').get(id))
+      .toEqual({ keyword_v1: '' });
+    expect(db.prepare('SELECT COUNT(*) AS count FROM keyword_feedback WHERE workspace_id = ?').get(id))
+      .toEqual({ count: 0 });
+  });
+
+  it('archives an unmarked legacy row before projection and deletes that alias without harming the projection', () => {
+    const id = createWorkspace(`feedback legacy ${Date.now()}`).id; cleanup.push(id);
+    db.prepare(`
+      INSERT INTO keyword_feedback (workspace_id, keyword, status, reason, source, declined_by)
+      VALUES (?, 'c', 'requested', 'legacy', 'page_map', NULL)
+    `).run(id);
+    saveKeywordFeedback({ workspaceId: id, keyword: 'C#', status: 'approved' });
+
+    expect(listPublicKeywordFeedback(id)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ keyword: 'c', status: 'requested', reason: 'legacy' }),
+      expect.objectContaining({ keyword: 'C#', status: 'approved' }),
+    ]));
+    expect(clearKeywordFeedback(id, 'c')).toEqual(expect.objectContaining({ existed: true, previousStatus: 'requested' }));
+    expect(db.prepare('SELECT status FROM keyword_feedback WHERE workspace_id = ? AND keyword = ?').get(id, 'c'))
+      .toEqual(expect.objectContaining({ status: 'approved' }));
   });
 });

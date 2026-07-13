@@ -23,6 +23,7 @@ import {
   runSnapshotRetentionPrune,
   updateLocalSeoConfiguration,
 } from '../../server/local-seo.js';
+import { listLatestLocalVisibilitySnapshotsForKeyword } from '../../server/domains/local-seo/snapshot-store.js';
 import { setBroadcast } from '../../server/broadcast.js';
 import { clearCompletedJobs, createJob } from '../../server/jobs.js';
 import { createClientLocation } from '../../server/client-locations.js';
@@ -34,6 +35,7 @@ import {
   LOCAL_SEO_POSTURE,
   LOCAL_VISIBILITY_STATUS,
 } from '../../shared/types/local-seo.js';
+import { keywordIdentityKeyV1, keywordIdentityKeyV2 } from '../../shared/keyword-normalization.js';
 
 // ─── Shared test DB setup ────────────────────────────────────────────────────
 
@@ -128,6 +130,7 @@ beforeEach(() => {
     `ALTER TABLE local_visibility_snapshots ADD COLUMN matched_location_id TEXT`,
     `ALTER TABLE local_visibility_snapshots ADD COLUMN matched_location_name TEXT`,
     `ALTER TABLE local_visibility_snapshots ADD COLUMN raw_results TEXT`,
+    `ALTER TABLE local_visibility_snapshots ADD COLUMN normalized_keyword_v2 TEXT`,
   ]) {
     try {
       db.exec(columnSql);
@@ -195,16 +198,17 @@ function insertRawSnapshotWithVariant(opts: {
   languageCode: string;
   id?: string;
   status?: string;
+  persistedV2?: boolean;
 }): string {
   const id = opts.id ?? randomUUID();
   db.prepare(`
     INSERT INTO local_visibility_snapshots (
-      id, workspace_id, keyword, normalized_keyword, market_id, market_label,
+      id, workspace_id, keyword, normalized_keyword, normalized_keyword_v2, market_id, market_label,
       captured_at, local_pack_present, business_found, business_match_confidence,
       local_rank, top_competitors, source_endpoint, provider, device, language_code,
       status, raw_results
     ) VALUES (
-      ?, ?, ?, ?, ?, 'Test Market',
+      ?, ?, ?, ?, ?, ?, 'Test Market',
       ?, 0, 0, 'not_found',
       NULL, '[]', 'google_organic_serp', 'dataforseo', ?, ?,
       ?, '[]'
@@ -214,6 +218,7 @@ function insertRawSnapshotWithVariant(opts: {
     opts.workspaceId,
     opts.keyword,
     opts.keyword,
+    opts.persistedV2 ? keywordIdentityKeyV2(opts.keyword) : null,
     opts.marketId,
     opts.capturedAt,
     opts.device,
@@ -518,6 +523,25 @@ describe('Bug 3 — Snapshot retention prune', () => {
     expect(pruned).toBe(batchSize);
     expect(snapshotCount(ws.id)).toBe(1);
   });
+
+  it('pages a high-cardinality census and flushes more than one deletion batch', () => {
+    const ws = createWorkspace('Retention High Cardinality Paging Test');
+    cleanupWorkspaceIds.add(ws.id);
+    const seriesCount = RETENTION_PRUNE_BATCH_SIZE + 17;
+
+    for (let i = 0; i < seriesCount; i++) {
+      seedHistory({
+        workspaceId: ws.id,
+        marketId: `market-${i}`,
+        keyword: `legacy keyword ${i}`,
+        daysAgoList: [600, 700],
+      });
+    }
+
+    const { pruned } = runSnapshotRetentionPrune(ws.id);
+    expect(pruned).toBe(seriesCount);
+    expect(snapshotCount(ws.id)).toBe(seriesCount);
+  });
 });
 
 // ─── W2.4: per-device / per-language retention granularity ────────────────────
@@ -528,6 +552,28 @@ describe('Bug 3 — Snapshot retention prune', () => {
 // row must survive the immortal guard, and per-device weekly history is independent.
 
 describe('W2.4 — retention prune preserves per-device / per-language series', () => {
+  it.each([
+    ['Café', 'Cafe\u0301'],
+    ['Cafe\u0301', 'Café'],
+  ])('thins legacy canonical-equivalent spellings as one derived-v2 series (%s first)', (first, second) => {
+    const ws = createWorkspace('Retention Legacy Unicode Identity');
+    cleanupWorkspaceIds.add(ws.id);
+    const firstId = `${ws.id}-unicode-a`;
+    insertRawSnapshotWithVariant({
+      workspaceId: ws.id, marketId: 'mkt-1', keyword: first,
+      capturedAt: makeIsoTimestamp(200), device: 'desktop', languageCode: 'en', id: firstId,
+      persistedV2: true,
+    });
+    insertRawSnapshotWithVariant({
+      workspaceId: ws.id, marketId: 'mkt-1', keyword: second,
+      capturedAt: makeIsoTimestamp(200), device: 'desktop', languageCode: 'en', id: `${ws.id}-unicode-b`,
+    });
+
+    expect(runSnapshotRetentionPrune(ws.id).pruned).toBe(1);
+    expect(snapshotCount(ws.id)).toBe(1);
+    expect(snapshotExists(firstId)).toBe(true);
+  });
+
   it('hard cutoff keeps the latest row of EACH device (other device not orphaned)', () => {
     const ws = createWorkspace('Retention Multi-Device Hard Cutoff');
     cleanupWorkspaceIds.add(ws.id);
@@ -629,6 +675,89 @@ describe('W2.4 — retention prune preserves per-device / per-language series', 
 // ─── W2.4: latestSnapshots tiebreaker on identical captured_at ─────────────────
 
 describe('W2.4 — latestSnapshots deterministic tiebreaker', () => {
+  it('groups and looks up fresh Unicode identities with explicit v2-first fallback', () => {
+    const ws = createWorkspace('Unicode Local Snapshot Identity');
+    cleanupWorkspaceIds.add(ws.id);
+    const insert = db.prepare(`
+      INSERT INTO local_visibility_snapshots (
+        id, workspace_id, keyword, normalized_keyword, normalized_keyword_v2,
+        market_id, market_label, captured_at, local_pack_present, business_found,
+        business_match_confidence, local_rank, top_competitors, source_endpoint,
+        provider, device, language_code, status, raw_results
+      ) VALUES (?, ?, ?, ?, ?, 'market', 'Market', ?, 1, 1, 'verified', ?, '[]',
+        'google_organic_serp', 'dataforseo', 'desktop', 'en', 'success', '[]')
+    `);
+    const rows = [
+      ['C', 1],
+      ['C#', 2],
+      ['東京 歯医者', 3],
+      ['Café', 4],
+      ['Cafe\u0301', 5],
+    ] as const;
+    for (const [keyword, rank] of rows) {
+      insert.run(
+        randomUUID(), ws.id, keyword, keywordIdentityKeyV1(keyword), keywordIdentityKeyV2(keyword),
+        `2026-07-01T0${rank}:00:00.000Z`, rank,
+      );
+    }
+
+    const latest = listLatestLocalVisibilitySnapshots(ws.id);
+    expect(new Set(latest.map(row => row.normalizedKeyword))).toEqual(new Set([
+      'c', 'c sharp', '東京 歯医者', 'café',
+    ]));
+    expect(listLatestLocalVisibilitySnapshotsForKeyword(ws.id, 'C')[0].localRank).toBe(1);
+    expect(listLatestLocalVisibilitySnapshotsForKeyword(ws.id, 'C#')[0].localRank).toBe(2);
+    expect(listLatestLocalVisibilitySnapshotsForKeyword(ws.id, '東京 歯医者')[0].localRank).toBe(3);
+    expect(listLatestLocalVisibilitySnapshotsForKeyword(ws.id, 'Cafe\u0301')[0].localRank).toBe(5);
+  });
+
+  it('uses recoverable raw identity to keep colliding legacy v1 rows separate', () => {
+    const ws = createWorkspace('Legacy Local Snapshot Identity');
+    cleanupWorkspaceIds.add(ws.id);
+    insertRawSnapshot({
+      workspaceId: ws.id,
+      marketId: 'market',
+      keyword: 'C',
+      normalizedKeyword: 'c',
+      capturedAt: '2026-07-01T01:00:00.000Z',
+    });
+    insertRawSnapshot({
+      workspaceId: ws.id,
+      marketId: 'market',
+      keyword: 'C#',
+      normalizedKeyword: 'c',
+      capturedAt: '2026-07-01T02:00:00.000Z',
+    });
+
+    expect(listLatestLocalVisibilitySnapshots(ws.id).map(row => row.normalizedKeyword).sort())
+      .toEqual(['c', 'c sharp']);
+    expect(listLatestLocalVisibilitySnapshotsForKeyword(ws.id, 'C')[0].keyword).toBe('C');
+    expect(listLatestLocalVisibilitySnapshotsForKeyword(ws.id, 'C#')[0].keyword).toBe('C#');
+  });
+
+  it.each([
+    [['Café', '2026-07-01T01:00:00.000Z'], ['Cafe\u0301', '2026-07-01T02:00:00.000Z']],
+    [['Cafe\u0301', '2026-07-01T02:00:00.000Z'], ['Café', '2026-07-01T01:00:00.000Z']],
+  ] as const)('dedupes canonical-equivalent legacy spellings independent of insertion order', (first, second) => {
+    const ws = createWorkspace('Legacy Local Canonical Equivalence');
+    cleanupWorkspaceIds.add(ws.id);
+    for (const [keyword, capturedAt] of [first, second]) {
+      insertRawSnapshot({
+        workspaceId: ws.id,
+        marketId: 'market',
+        keyword,
+        normalizedKeyword: 'cafe',
+        capturedAt,
+      });
+    }
+
+    const exact = listLatestLocalVisibilitySnapshotsForKeyword(ws.id, 'Café');
+    expect(exact).toHaveLength(1);
+    expect(exact[0].keyword).toBe('Cafe\u0301');
+    expect(listLatestLocalVisibilitySnapshots(ws.id)).toHaveLength(1);
+    expect(buildLocalSeoKeywordVisibilitySummaryByKey(ws.id).get('café')?.marketCount).toBe(1);
+  });
+
   it('two rows with identical captured_at in one group return exactly ONE row', () => {
     const ws = createWorkspace('Latest Tiebreaker Same Timestamp');
     cleanupWorkspaceIds.add(ws.id);
