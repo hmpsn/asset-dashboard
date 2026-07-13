@@ -28,6 +28,22 @@ const log = createLogger('keyword-strategy:enrichment');
 const URL_LEVEL_KEYWORD_PAGE_LIMIT = 12;
 const URL_LEVEL_KEYWORD_PER_PAGE_LIMIT = 10;
 const URL_LEVEL_KEYWORD_CONCURRENCY = 3;
+
+function applyPageKeywordEvidence(
+  page: StrategyPageMapEntry,
+  keywordPool: KeywordStrategyKeywordPool,
+  cpc: number | null | undefined,
+  cpcSource: string,
+): void {
+  const usableCpc = cpc != null && Number.isFinite(cpc) && cpc > 0;
+  page.cpc = usableCpc ? cpc : undefined;
+  page.cpcSource = usableCpc ? cpcSource : undefined;
+  const poolEvidence = keywordPool.get(keywordComparisonKey(page.primaryKeyword));
+  if (poolEvidence?.intent) {
+    page.searchIntent = poolEvidence.intent;
+    page.intentSource = poolEvidence.intentSource;
+  }
+}
 const topicClusterItemSchema = z.object({
   topic: z.string().trim().min(1),
   keywords: z.array(z.string().trim().min(1)).min(3),
@@ -228,6 +244,7 @@ async function applyUrlLevelKeywordIntelligence(options: {
   baseUrl: string;
   strategy: StrategyOutput;
   provider: SeoDataProvider;
+  keywordPool: KeywordStrategyKeywordPool;
 }): Promise<number> {
   const getUrlKeywords = options.provider.getUrlKeywords;
   if (!getUrlKeywords || !options.strategy.pageMap?.length) return 0;
@@ -269,7 +286,7 @@ async function applyUrlLevelKeywordIntelligence(options: {
       pm.currentPosition = top.position || pm.currentPosition;
       pm.volume = top.volume;
       pm.difficulty = top.difficulty;
-      pm.cpc = top.cpc;
+      applyPageKeywordEvidence(pm, options.keywordPool, top.cpc, `${options.provider.name}:url-level`);
       pm.metricsSource = METRICS_SOURCE.URL_LEVEL;
       return true;
     } catch (err) {
@@ -339,7 +356,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
 
   if (provider && seoDataMode === 'full') {
     sendProgress('enrichment', 'Checking URL-level keyword intelligence...', 0.91);
-    const enriched = await applyUrlLevelKeywordIntelligence({ workspaceId, baseUrl, strategy, provider });
+    const enriched = await applyUrlLevelKeywordIntelligence({ workspaceId, baseUrl, strategy, provider, keywordPool });
     if (enriched > 0) {
       log.info(`URL-level keyword enrichment applied to ${enriched} page${enriched === 1 ? '' : 's'}`);
     }
@@ -357,7 +374,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
       if (match) {
         pm.volume = match.volume;
         pm.difficulty = match.difficulty;
-        pm.cpc = match.cpc;
+        applyPageKeywordEvidence(pm, keywordPool, match.cpc, `${provider?.name ?? 'seo-provider'}:exact`);
         pm.metricsSource = METRICS_SOURCE.EXACT;
         // Capture SERP features for this page's primary keyword — stored per-page and
         // later aggregated into workspace-level SerpFeatures counts in assembleSeoContext()
@@ -383,7 +400,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
         if (partial) {
           pm.volume = partial.volume;
           pm.difficulty = partial.difficulty;
-          pm.cpc = partial.cpc;
+          applyPageKeywordEvidence(pm, keywordPool, partial.cpc, `${provider?.name ?? 'seo-provider'}:partial`);
           pm.metricsSource = METRICS_SOURCE.PARTIAL_MATCH;
         }
       }
@@ -431,7 +448,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
             if (m && !isSuspiciousPlannerGroupedVolume(m.keyword, m.volume)) {
               pm.volume = m.volume;
               pm.difficulty = m.difficulty;
-              pm.cpc = m.cpc;
+              applyPageKeywordEvidence(pm, keywordPool, m.cpc, `${provider.name}:bulk`);
               pm.metricsSource = METRICS_SOURCE.BULK_LOOKUP;
             }
           }

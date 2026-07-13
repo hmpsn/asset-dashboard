@@ -94,7 +94,7 @@ export async function runPageAssignmentBatches(opts: RunPageAssignmentBatchesOpt
       let fromPool = 0;
       let invented = 0;
       for (const pm of parsed) {
-        delete pm.volume; delete pm.difficulty; delete pm.cpc;
+        delete pm.volume; delete pm.difficulty; delete pm.cpc; delete pm.cpcSource;
         if (pm.primaryKeyword) {
           pm.primaryKeyword = pm.primaryKeyword.replace(/\s*\(invented\)\s*$/i, '').trim();
         }
@@ -130,6 +130,10 @@ export async function runPageAssignmentBatches(opts: RunPageAssignmentBatchesOpt
         if (poolMatch && poolMatch.source !== 'gsc') {
           pm.volume = poolMatch.volume;
           pm.difficulty = poolMatch.difficulty;
+          pm.cpc = poolMatch.cpc;
+          pm.cpcSource = poolMatch.cpcSource;
+          pm.searchIntent = poolMatch.intent ?? pm.searchIntent;
+          pm.intentSource = poolMatch.intent ? poolMatch.intentSource : pm.intentSource;
           fromPool++;
         } else {
           invented++;

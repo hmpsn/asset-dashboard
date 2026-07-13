@@ -504,6 +504,8 @@ export async function buildKeywordUniverse(
     const candidate: KeywordCandidate = { keyword: kw, source: m.source, volume: m.volume, difficulty: m.difficulty };
     if (m.cpc != null) candidate.cpc = m.cpc;
     if (m.intent != null) candidate.intent = m.intent;
+    if (m.cpcSource != null) candidate.cpcSource = m.cpcSource;
+    if (m.intentSource != null) candidate.intentSource = m.intentSource;
     // P7.2 — preserve the local market relevance from the local source's side-map.
     const marketId = marketByKeyword.get(kw);
     if (marketId != null) candidate.marketId = marketId;

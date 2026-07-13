@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { listContentGaps, replaceAllContentGaps } from '../../server/content-gaps.js';
 import { appendStrategyRecommendations } from '../../server/domains/recommendations/strategy-producers.js';
+import { runPageAssignmentBatches } from '../../server/keyword-strategy-synthesis/page-assignment.js';
+import { getPageKeyword, upsertPageKeyword } from '../../server/page-keywords.js';
 import type { StrategyRecommendationProducerContext } from '../../server/domains/recommendations/producer-contexts.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import type { Recommendation } from '../../shared/types/recommendations.js';
@@ -39,6 +41,34 @@ function producerContext(workspaceId: string): StrategyRecommendationProducerCon
 }
 
 describe('generation-quality keyword evidence integrity', () => {
+  it('restores pool evidence onto page assignments and persists the field sources', async () => {
+    const workspaceId = createTestWorkspace('Page assignment evidence');
+    const page = { path: '/emergency-dentist', title: 'Emergency Dentist', seoTitle: '', seoDesc: '', contentSnippet: '' };
+    const assignments = await runPageAssignmentBatches({
+      workspaceId, businessSection: 'Dental practice', pagesForBatching: [page], allPageInfo: [page],
+      strategyMode: 'full', pagesToPreserve: [], existingPageKeywords: [], gscByPath: new Map(),
+      providerKeywordsByPath: new Map(), keywordPoolReference: '', seoGenQualityEnabled: false,
+      closedSetBlock: '', candidateIds: new Set(), isEligibleGeneratedKeyword: () => true,
+      keywordPool: new Map([['emergency dentist', {
+        volume: 900, difficulty: 30, source: 'discovery:keyword_ideas', cpc: 14,
+        cpcSource: 'dataforseo:keyword-ideas', intent: 'transactional', intentSource: 'dataforseo:keyword-ideas',
+      }]]),
+      callStrategyAI: async () => JSON.stringify([{
+        pagePath: page.path, pageTitle: page.title, primaryKeyword: 'emergency dentist',
+        secondaryKeywords: [], searchIntent: 'informational',
+      }]),
+      callNamedStrategyAI: async () => '', sendProgress: () => undefined,
+    });
+
+    expect(assignments[0]).toEqual(expect.objectContaining({
+      cpc: 14, cpcSource: 'dataforseo:keyword-ideas', searchIntent: 'transactional', intentSource: 'dataforseo:keyword-ideas',
+    }));
+    upsertPageKeyword(workspaceId, assignments[0]);
+    expect(getPageKeyword(workspaceId, page.path)).toEqual(expect.objectContaining({
+      cpc: 14, cpcSource: 'dataforseo:keyword-ideas', searchIntent: 'transactional', intentSource: 'dataforseo:keyword-ideas',
+    }));
+  });
+
   it('feeds persisted content-gap CPC into the recommendation Opportunity Value consumer', () => {
     const workspaceId = createTestWorkspace('Recommendation persisted evidence');
     const controlWorkspaceId = createTestWorkspace('Recommendation no CPC control');

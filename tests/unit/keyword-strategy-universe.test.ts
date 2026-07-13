@@ -192,12 +192,16 @@ describe('buildKeywordUniverse — flag-OFF parity (drives the REAL legacy fold)
     }
     expect(actual.get('network monitoring tools')).toEqual(expect.objectContaining({
       cpc: 4,
+      cpcSource: 'discovery:keyword_ideas',
       intent: 'commercial',
+      intentSource: 'discovery:keyword_ideas',
       source: 'discovery:keyword_ideas',
     }));
     expect(universe.candidates.find(candidate => candidate.keyword === 'network monitoring tools')).toEqual(expect.objectContaining({
       cpc: 4,
+      cpcSource: 'discovery:keyword_ideas',
       intent: 'commercial',
+      intentSource: 'discovery:keyword_ideas',
       source: 'discovery:keyword_ideas',
     }));
   });
