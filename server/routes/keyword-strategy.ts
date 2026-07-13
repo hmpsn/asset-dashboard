@@ -21,6 +21,7 @@ import { listKeywordGaps, replaceAllKeywordGaps } from '../keyword-gaps.js';
 import { listTopicClusters, replaceAllTopicClusters } from '../topic-clusters.js';
 import { listCannibalizationIssues, replaceAllCannibalizationIssues } from '../cannibalization-issues.js';
 import { snapshotStrategyHistory } from '../keyword-strategy-persistence.js';
+import { bumpKeywordStrategyGenerationRevision } from '../keyword-strategy-generation-store.js';
 import { assembleStoredKeywordStrategy } from '../keyword-strategy-assembler.js';
 import type { KeywordStrategySiteKeywordMetric } from '../keyword-strategy-enrichment.js';
 import { validate, z } from '../middleware/validate.js';
@@ -477,6 +478,7 @@ router.patch('/api/webflow/keyword-strategy/:workspaceId', requireWorkspaceAcces
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   let pageMapChanged = false;
   const applyPatch = db.transaction(() => {
+    bumpKeywordStrategyGenerationRevision(ws.id);
     // Phase 5 (deliverable #4): snapshot the prior strategy boundary BEFORE the edits clobber the
     // table-backed arrays, so "What Changed" attributes this human edit to the right boundary instead
     // of the last AI regeneration. Reads prior state first; no-ops when there's no prior generatedAt.

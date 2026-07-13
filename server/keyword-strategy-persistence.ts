@@ -31,6 +31,13 @@ import type {
 import type { KeywordStrategySearchData } from './keyword-strategy-search-data.js';
 import type { KeywordStrategyPageInfo } from './keyword-strategy-pages.js';
 import type { StrategyOutput } from './keyword-strategy-ai-synthesis.js';
+import type { GenerationProvenance } from '../shared/types/ai-execution.js';
+import { claimKeywordStrategyGenerationCommit } from './keyword-strategy-generation-store.js';
+import { getKeywordStrategyGenerationState } from './keyword-strategy-generation-store.js';
+
+export class KeywordStrategyRevisionConflictError extends Error {
+  constructor() { super('Keyword strategy changed while generation was in flight'); this.name = 'KeywordStrategyRevisionConflictError'; }
+}
 
 export interface PersistKeywordStrategyOptions {
   ws: Workspace;
@@ -50,6 +57,8 @@ export interface PersistKeywordStrategyOptions {
   maxPages?: number;
   seoDataStatus: SeoDataStatus;
   searchData: Pick<KeywordStrategySearchData, 'deviceBreakdown' | 'countryBreakdown' | 'periodComparison' | 'organicLandingPages' | 'organicOverview'>;
+  expectedRevision?: number;
+  provenance?: GenerationProvenance;
 }
 
 export interface PersistKeywordStrategyResult {
@@ -206,6 +215,10 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
   };
 
   const writeKeywordStrategy = db.transaction(() => {
+    const expectedRevision = options.expectedRevision ?? getKeywordStrategyGenerationState(ws.id).revision;
+    if (!claimKeywordStrategyGenerationCommit(ws.id, expectedRevision, options.provenance ?? null)) {
+      throw new KeywordStrategyRevisionConflictError();
+    }
     // Snapshot previous table-backed state before replacing it, so history can
     // represent the exact prior generation without reading live tables later.
     const prevPageMapForHistory = listPageKeywords(ws.id);

@@ -19,6 +19,7 @@ import { getEffectiveAudit, getLatestEffectiveSnapshot, listEffectiveSnapshotSum
 import { getAuditTrafficForWorkspace } from '../audit-traffic.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
 import { updateWorkspace, getWorkspace, computeEffectiveTier } from '../workspaces.js';
+import { bumpKeywordStrategyGenerationRevision } from '../keyword-strategy-generation-store.js';
 import { buildClientBriefingView } from '../client-insight-briefing-view-model.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
@@ -510,6 +511,7 @@ router.post('/api/public/business-priorities/:workspaceId', ...requireClientStra
   const updatedAt = new Date().toISOString();
 
   // Upsert into db
+  bumpKeywordStrategyGenerationRevision(wsId);
   db.prepare(`
     INSERT INTO client_business_priorities (workspace_id, priorities, updated_at)
     VALUES (?, ?, ?)

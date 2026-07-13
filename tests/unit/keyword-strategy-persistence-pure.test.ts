@@ -17,7 +17,9 @@ import { listQuickWins } from '../../server/quick-wins.js';
 import { listKeywordGaps } from '../../server/keyword-gaps.js';
 import { listTopicClusters } from '../../server/topic-clusters.js';
 import { listCannibalizationIssues } from '../../server/cannibalization-issues.js';
-import { persistKeywordStrategy } from '../../server/keyword-strategy-persistence.js';
+import { KeywordStrategyRevisionConflictError, persistKeywordStrategy } from '../../server/keyword-strategy-persistence.js';
+import { bumpKeywordStrategyGenerationRevision, getKeywordStrategyGenerationState } from '../../server/keyword-strategy-generation-store.js';
+import type { GenerationProvenance } from '../../shared/types/ai-execution.js';
 import type { Workspace } from '../../shared/types/workspace.js';
 import type { PersistKeywordStrategyOptions } from '../../server/keyword-strategy-persistence.js';
 import type { StrategyOutput } from '../../server/keyword-strategy-ai-synthesis.js';
@@ -85,9 +87,35 @@ function makeMinimalOptions(ws: Workspace, overrides: Partial<PersistKeywordStra
   };
 }
 
+const provenance: GenerationProvenance = {
+  runId: 'run-k1b', operation: 'keyword-site-synthesis', provider: 'openai', model: 'gpt-5.4-mini',
+  inputFingerprint: 'effective-input-sha256', startedAt: '2026-07-13T00:00:00.000Z', completedAt: '2026-07-13T00:00:01.000Z',
+};
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('persistKeywordStrategy()', () => {
+  describe('generation revision CAS', () => {
+    it('persists internal provenance and advances a monotonic revision', () => {
+      const ws = makeWorkspace('Revision');
+      persistKeywordStrategy(makeMinimalOptions(ws, { expectedRevision: 0, provenance }));
+      expect(getKeywordStrategyGenerationState(ws.id)).toEqual({ revision: 1, fingerprint: provenance.inputFingerprint, provenance });
+      persistKeywordStrategy(makeMinimalOptions(getWorkspace(ws.id)!, { expectedRevision: 1, provenance: { ...provenance, runId: 'run-k1b-2' } }));
+      expect(getKeywordStrategyGenerationState(ws.id).revision).toBe(2);
+      expect(JSON.stringify(getWorkspace(ws.id))).not.toContain('effective-input-sha256');
+    });
+
+    it('rolls back the final save when an operator revision wins during generation', () => {
+      const ws = makeWorkspace('Conflict');
+      const expectedRevision = getKeywordStrategyGenerationState(ws.id).revision;
+      bumpKeywordStrategyGenerationRevision(ws.id);
+      expect(() => persistKeywordStrategy(makeMinimalOptions(ws, {
+        expectedRevision, provenance, strategy: { siteKeywords: ['stale ai keyword'], opportunities: [] },
+      }))).toThrow(KeywordStrategyRevisionConflictError);
+      expect(getWorkspace(ws.id)?.keywordStrategy).toBeUndefined();
+      expect(listPageKeywords(ws.id)).toEqual([]);
+    });
+  });
   describe('basic persistence', () => {
     it('returns a result with keywordStrategy and pageMap fields', () => {
       const ws = makeWorkspace('Basic');
