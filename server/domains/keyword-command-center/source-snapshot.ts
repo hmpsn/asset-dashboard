@@ -89,7 +89,7 @@ export function buildKeywordCommandCenterSourceSnapshot(
         workspace,
         markets: localMarkets,
         trackedKeywords,
-        contentGaps,
+        contentGaps: projection.contentGaps,
         pageMap: projection.pageMap,
         declinedKeywords: [...feedback.values()]
           .filter(row => row.status === 'declined')

@@ -27,6 +27,7 @@ import {
   LOCAL_SEO_MAX_MARKETS,
   activeLocalSeoMarkets,
   getEffectiveKeywordsPerRefresh,
+  localSeoMarketHasProviderLocationIdentity,
   readLocalSeoSettings,
 } from './configuration-service.js';
 import { applySourcePageCap, classifyLocalKeywordIntent, cleanKeywordDisplay } from './keyword-intent.js';
@@ -169,7 +170,8 @@ export function countLocalSeoKeywordCandidatesFromLoadedContext(input: {
   settingsPosture?: LocalSeoPosture;
 }): number {
   const markets = input.markets
-    .filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE && market.providerLocationCode != null)
+    .filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE)
+    .filter(localSeoMarketHasProviderLocationIdentity)
     .slice(0, LOCAL_SEO_MAX_MARKETS);
   if (markets.length === 0) return 0;
   const ctx: CandidateIterationContext = {

@@ -60,6 +60,7 @@ import {
 } from '../../shared/types/local-seo.js';
 import type { KeywordStrategy } from '../../shared/types/workspace.js';
 import { PERFORMANCE_BUDGET_REGISTRY } from '../../scripts/performance-budgets.js';
+import { gateDiscoveryGaps } from '../../server/domains/keyword-command-center/candidate-boundary.js';
 
 let workspaceId = '';
 const KCC_PERFORMANCE_BUDGET = PERFORMANCE_BUDGET_REGISTRY.find(entry => (
@@ -269,6 +270,72 @@ describe('K2 — KCC-owned read projection guard', () => {
   });
 
   it('preserves local-candidate count parity from the loaded KCC projection', async () => {
+    const expected = countLocalSeoKeywordCandidates(workspaceId);
+    const summary = await buildKeywordCommandCenterSummary(workspaceId, { includeLocalSeo: true });
+    expect(summary?.counts.localCandidates).toBe(expected);
+  });
+
+  it.each([
+    {
+      identity: 'provider name only',
+      providerLocationName: 'Austin,Texas,United States',
+      latitude: null,
+      longitude: null,
+    },
+    {
+      identity: 'coordinates only',
+      providerLocationName: null,
+      latitude: 30.2672,
+      longitude: -97.7431,
+    },
+  ])('preserves loaded-count parity for $identity markets', async ({
+    providerLocationName,
+    latitude,
+    longitude,
+  }) => {
+    db.prepare(`
+      UPDATE local_seo_markets
+      SET provider_location_code = NULL,
+          provider_location_name = ?,
+          city = '',
+          state_or_region = NULL,
+          country = '',
+          latitude = ?,
+          longitude = ?
+      WHERE workspace_id = ?
+    `).run(providerLocationName, latitude, longitude, workspaceId);
+
+    const expected = countLocalSeoKeywordCandidates(workspaceId);
+    const summary = await buildKeywordCommandCenterSummary(workspaceId, { includeLocalSeo: true });
+    expect(expected).toBeGreaterThan(0);
+    expect(summary?.counts.localCandidates).toBe(expected);
+  });
+
+  it('counts raw junk/tier-suppressed content gaps exactly like canonical local candidates', async () => {
+    const rawContentGaps = [
+      {
+        topic: 'Malformed research syntax',
+        targetKeyword: '"teeth whitening" "new patient" discount or special or package or offer',
+        intent: 'commercial' as const,
+        priority: 'high' as const,
+        rationale: 'Parity fixture for Tier 1 filtering.',
+        suggestedPageType: 'location' as const,
+        volume: 600,
+        difficulty: 30,
+      },
+      {
+        topic: 'Low-actionability phrase',
+        targetKeyword: 'paper tiger',
+        intent: 'commercial' as const,
+        priority: 'high' as const,
+        rationale: 'Parity fixture for Tier 2 filtering.',
+        suggestedPageType: 'location' as const,
+        volume: 600,
+        difficulty: 30,
+      },
+    ];
+    expect(gateDiscoveryGaps({ contentGaps: rawContentGaps, keywordGaps: [] }).contentGaps).toEqual([]);
+    replaceAllContentGaps(workspaceId, rawContentGaps);
     const expected = countLocalSeoKeywordCandidates(workspaceId);
     const summary = await buildKeywordCommandCenterSummary(workspaceId, { includeLocalSeo: true });
     expect(summary?.counts.localCandidates).toBe(expected);

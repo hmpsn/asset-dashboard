@@ -255,7 +255,8 @@ describe('keyword command center domain boundary', () => {
     expect(summaryService).toMatch(/export async function buildKeywordCommandCenterSummary\b/);
     expect(facade).toContain('  buildKeywordCommandCenterSummary,');
     expect(facade).toContain("from './domains/keyword-command-center/summary-service.js'");
-    expect(summaryService).toContain('countLocalSeoKeywordCandidates');
+    expect(summaryService).toContain('snapshot.localCandidatesCount');
+    expect(summaryService).not.toContain('countLocalSeoKeywordCandidates(');
     expect(summaryService).toContain('isSuspiciousPlannerGroupedVolume');
     expect(summaryService).toContain('trackedKeywordMatchesFilter');
     expect(summaryService).toContain('buildFilterFacetsFromCounts');
@@ -315,19 +316,22 @@ describe('keyword command center domain boundary', () => {
 
   it('keeps shared source loading in the domain source snapshot', () => {
     const sourceSnapshot = readRepoFile('server/domains/keyword-command-center/source-snapshot.ts');
+    const readProjection = readRepoFile('server/domains/keyword-command-center/read-projection.ts');
     const summaryService = readRepoFile('server/domains/keyword-command-center/summary-service.ts');
     const rowsService = readRepoFile('server/domains/keyword-command-center/rows-service.ts');
     const detailService = readRepoFile('server/domains/keyword-command-center/detail-service.ts');
     const initialViewService = readRepoFile('server/domains/keyword-command-center/initial-view-service.ts');
 
     expect(sourceSnapshot).toMatch(/export function buildKeywordCommandCenterSourceSnapshot\b/);
-    expect(sourceSnapshot).toContain('assembleStoredKeywordStrategy');
-    expect(sourceSnapshot).toContain('listPageKeywordsLite');
-    expect(sourceSnapshot).toContain('getTrackedKeywords');
-    expect(sourceSnapshot).toContain('getLatestSnapshotRanks');
+    expect(sourceSnapshot).toContain('buildKeywordCommandCenterReadProjection');
+    expect(sourceSnapshot).toContain('listTrackedKeywordRows');
+    expect(sourceSnapshot).toContain('getLatestSnapshotRanksWithDate');
+    expect(sourceSnapshot).toContain('countLocalSeoKeywordCandidatesFromLoadedContext');
     expect(sourceSnapshot).toContain('safeLostVisibilityRows');
-    expect(sourceSnapshot).toContain('safeLostVisibilityCount');
+    expect(sourceSnapshot).not.toContain('assembleStoredKeywordStrategy');
     expect(sourceSnapshot).not.toContain('buildKeywordCommandCenterModel');
+    expect(readProjection).toContain('listPageKeywordsLite');
+    expect(readProjection).not.toContain('assembleStoredKeywordStrategy');
     for (const service of [summaryService, rowsService, detailService, initialViewService]) {
       expect(service).toContain("from './source-snapshot.js'");
     }
