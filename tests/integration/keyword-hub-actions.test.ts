@@ -38,6 +38,22 @@ describe('action lifecycle guard (3b) over HTTP', () => {
     expect(Array.isArray(body.trackedKeywords)).toBe(true);
   });
 
+  it('never serializes tracked-keyword provenance metadata in an action response', async () => {
+    addTrackedKeyword(workspaceId, 'private metadata kw', {
+      source: TRACKED_KEYWORD_SOURCE.MANUAL,
+      sourceGapKey: 'private metadata kw',
+      sourceGapKeyV2: 'private metadata kw',
+      strategyOwned: true,
+    });
+    const res = await postJson(`${base()}/actions`, { action: 'track', keyword: 'private metadata kw' });
+    expect(res.status).toBe(200);
+    const body = await res.json() as KeywordCommandCenterActionResult;
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain('sourceGapKey');
+    expect(serialized).not.toContain('sourceGapKeyV2');
+    expect(serialized).not.toContain('strategyOwned');
+  });
+
   it('illegal transition (retire an already-deprecated keyword) → 409 with the transition message', async () => {
     // 'legal kw' is already deprecated from the prior test → retire again is deprecated→deprecated.
     const res = await postJson(`${base()}/actions`, { action: 'retire', keyword: 'legal kw', force: true });
@@ -66,6 +82,15 @@ describe('hard delete route (3c) over HTTP', () => {
   it('DELETE a gap-provenanced keyword without force → 403', async () => {
     addTrackedKeyword(workspaceId, 'gap del kw', { source: TRACKED_KEYWORD_SOURCE.MANUAL, sourceGapKey: 'gap:gap del kw' });
     const res = await del(`${base()}/keywords/${encodeURIComponent('gap del kw')}`);
+    expect(res.status).toBe(403);
+  });
+
+  it('DELETE a v2-only gap-provenanced keyword without force → 403', async () => {
+    addTrackedKeyword(workspaceId, '東京', {
+      source: TRACKED_KEYWORD_SOURCE.MANUAL,
+      sourceGapKeyV2: '東京',
+    });
+    const res = await del(`${base()}/keywords/${encodeURIComponent('東京')}`);
     expect(res.status).toBe(403);
   });
 });

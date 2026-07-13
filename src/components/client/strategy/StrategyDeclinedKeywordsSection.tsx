@@ -1,9 +1,7 @@
 import { Ban, ChevronDown, Undo2 } from 'lucide-react';
 import { Button, Icon, SectionCard } from '../../ui';
-import type { KeywordFeedbackStatus } from './useStrategyKeywordFeedback';
-
 interface StrategyDeclinedKeywordsSectionProps {
-  keywordFeedback: Map<string, KeywordFeedbackStatus>;
+  declinedKeywords: string[];
   expandedSections: Set<string>;
   toggleSection: (section: string) => void;
   undoFeedback: (keyword: string) => Promise<void>;
@@ -11,14 +9,13 @@ interface StrategyDeclinedKeywordsSectionProps {
 }
 
 export function StrategyDeclinedKeywordsSection({
-  keywordFeedback,
+  declinedKeywords,
   expandedSections,
   toggleSection,
   undoFeedback,
   isLoadingFeedback,
 }: StrategyDeclinedKeywordsSectionProps) {
-  const declined = [...keywordFeedback.entries()].filter(([, status]) => status === 'declined');
-  if (declined.length === 0) return null;
+  if (declinedKeywords.length === 0) return null;
 
   return (
     <SectionCard noPadding>
@@ -33,7 +30,7 @@ export function StrategyDeclinedKeywordsSection({
           </div>
           <div className="text-left">
             <div className="t-body font-medium text-[var(--brand-text-bright)]">Not Relevant Keywords</div>
-            <div className="t-caption-sm text-[var(--brand-text-muted)]">{declined.length} keywords excluded from future strategies</div>
+            <div className="t-caption-sm text-[var(--brand-text-muted)]">{declinedKeywords.length} keywords excluded from future strategies</div>
           </div>
         </div>
         <ChevronDown className={`w-4 h-4 text-[var(--brand-text-muted)] transition-transform ${expandedSections.has('declined-keywords') ? '' : '-rotate-90'}`} />
@@ -43,7 +40,7 @@ export function StrategyDeclinedKeywordsSection({
         <div className="px-4 pb-4 border-t border-[var(--brand-border)]/50">
           <p className="t-caption-sm text-[var(--brand-text-muted)] mt-3 mb-3">These keywords won't appear in future strategy recommendations. Changes apply the next time the strategy is regenerated. Click restore to bring them back.</p>
           <div className="flex flex-wrap gap-2">
-            {declined.map(([kw]) => (
+            {declinedKeywords.map(kw => (
               <div key={kw} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-lg)] bg-red-500/5 border border-red-500/20">
                 <span className="t-caption-sm text-accent-danger">{kw}</span>
                 <Button

@@ -3,7 +3,6 @@ import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
 import { addKeywordToPageInTxn, deletePageKeyword } from '../../page-keywords.js';
-import { slugify } from '../../utils/text.js';
 import {
   getTrackedKeywords,
   deleteKeywordRankHistory,
@@ -18,7 +17,8 @@ import { getWorkspace } from '../../workspaces.js';
 import { createLogger } from '../../logger.js';
 import { invalidateKeywordStrategyGenerationInputs } from '../../keyword-strategy-generation-store.js';
 import { WS_EVENTS } from '../../ws-events.js';
-import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
+import { keywordIdentityKeyV2 } from '../../../shared/keyword-normalization.js';
+import type { TrackedKeywordIdentityMetadata } from '../../../shared/types/keyword-identity.js';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
   type KeywordCommandCenterActionRequest,
@@ -37,7 +37,18 @@ import { protectedReason } from './row-lifecycle.js';
 
 const log = createLogger('keyword-command-center');
 
-function canModifyProtected(keyword: TrackedKeyword | undefined, force?: boolean): { ok: true } | { ok: false; reason: string } {
+type ProvenanceTrackedKeyword = TrackedKeyword & TrackedKeywordIdentityMetadata;
+
+function compareRawBinary(a: string, b: string): number {
+  return Buffer.compare(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8'));
+}
+
+function plannedPathForKeyword(identityV2: string): string {
+  const semanticSegment = encodeURIComponent(identityV2).replace(/%20/g, '-');
+  return `/planned/${semanticSegment || 'keyword'}`;
+}
+
+function canModifyProtected(keyword: ProvenanceTrackedKeyword | undefined, force?: boolean): { ok: true } | { ok: false; reason: string } {
   const reason = protectedReason(keyword);
   if (!reason || force) return { ok: true };
   return { ok: false, reason: `${reason} requires explicit confirmation before this action.` };
@@ -62,14 +73,14 @@ function upsertTrackedKeywordByKey(
   options: AddTrackedKeywordOptions,
   opts: { preferSource?: boolean } = {},
 ): TrackedKeyword[] {
-  const normalized = keywordComparisonKey(keyword);
+  const normalized = keywordIdentityKeyV2(keyword);
   if (!normalized) return getTrackedKeywords(workspaceId, { includeInactive: true });
 
   return updateTrackedKeywords(workspaceId, keywords => {
-    const equivalents = keywords.filter(entry => keywordComparisonKey(entry.query) === normalized);
+    const equivalents = keywords.filter(entry => keywordIdentityKeyV2(entry.query) === normalized);
     const existing = equivalents[0];
     const now = new Date().toISOString();
-    const next = keywords.filter(entry => keywordComparisonKey(entry.query) !== normalized);
+    const next = keywords.filter(entry => keywordIdentityKeyV2(entry.query) !== normalized);
 
     if (existing) {
       const nextStatus = options.status ?? existing.status ?? TRACKED_KEYWORD_STATUS.ACTIVE;
@@ -79,7 +90,7 @@ function upsertTrackedKeywordByKey(
       next.push({
         ...existing,
         ...definedOptions,
-        query: existing.query,
+        query: keyword.trim(),
         pinned: equivalents.some(entry => entry.pinned) || Boolean(options.pinned),
         addedAt: existing.addedAt || now,
         status: nextStatus,
@@ -116,12 +127,13 @@ function upsertTrackedKeywordByKey(
 }
 
 function retireTrackedKeyword(workspaceId: string, keyword: string, status: typeof TRACKED_KEYWORD_STATUS.PAUSED | typeof TRACKED_KEYWORD_STATUS.DEPRECATED): TrackedKeyword[] {
-  const normalized = keywordComparisonKey(keyword);
+  const normalized = keywordIdentityKeyV2(keyword);
   const now = new Date().toISOString();
   return updateTrackedKeywords(workspaceId, keywords => keywords.map(entry => {
-    if (keywordComparisonKey(entry.query) !== normalized) return entry;
+    if (keywordIdentityKeyV2(entry.query) !== normalized) return entry;
     return {
       ...entry,
+      query: keyword.trim(),
       status,
       deprecatedAt: status === TRACKED_KEYWORD_STATUS.DEPRECATED ? now : entry.deprecatedAt,
     };
@@ -160,7 +172,7 @@ function applyKeywordCommandCenterActionInternal(
 ): KeywordCommandCenterActionResult {
   const workspace = getWorkspace(workspaceId);
   if (!workspace) throw new Error('Workspace not found');
-  const keyword = keywordComparisonKey(request.keyword);
+  const keyword = keywordIdentityKeyV2(request.keyword);
   if (!keyword) throw new Error('keyword required');
   const displayKeyword = request.keyword.trim();
 
@@ -169,20 +181,23 @@ function applyKeywordCommandCenterActionInternal(
   // which makes protectedReason()'s "Gap-approved keyword" arm unreachable and
   // silently allows unforced retire/decline/pause of client-approved gap keywords.
   // See deleteKeywordHard for the documented trap this mirrors.
-  const existing = listTrackedKeywordRows(workspace.id).find(
-    entry => keywordComparisonKey(entry.query) === keyword,
-  );
-  const protectedCheck = canModifyProtected(existing, request.force);
+  let existing: ProvenanceTrackedKeyword | undefined;
   const now = new Date().toISOString();
   let trackedKeywords: TrackedKeyword[] | undefined;
   let message = '';
   // M3/I1: compute plannedPath before the transaction so it's available for DECLINE cleanup.
-  const plannedPath = `/planned/${slugify(displayKeyword) || 'keyword'}`;
+  const plannedPath = plannedPathForKeyword(keyword);
 
   const run = db.transaction(() => {
+    // Read lifecycle/protection state only after the outer BEGIN IMMEDIATE lock is
+    // held, so another connection cannot change provenance between guard and write.
+    existing = listTrackedKeywordRows(workspace.id).find(
+      entry => keywordIdentityKeyV2(entry.query) === keyword,
+    );
+    const protectedCheck = canModifyProtected(existing, request.force);
     switch (request.action) {
       case KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY:
-        upsertFeedback(workspace.id, keyword, 'approved', request.reason ?? 'Added to strategy from Keyword Command Center');
+        upsertFeedback(workspace.id, displayKeyword, 'approved', request.reason ?? 'Added to strategy from Keyword Command Center');
         trackedKeywords = upsertTrackedKeywordByKey(workspace.id, displayKeyword, {
           source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD,
           status: TRACKED_KEYWORD_STATUS.ACTIVE,
@@ -199,11 +214,11 @@ function applyKeywordCommandCenterActionInternal(
           const titleOverride = !request.pagePath?.trim() ? displayKeyword : undefined;
           addKeywordToPageInTxn(workspace.id, pagePath, displayKeyword, titleOverride);
         }
-        message = `"${keyword}" was added to the strategy operating loop.`;
+        message = `"${displayKeyword}" was added to the strategy operating loop.`;
         break;
       case KEYWORD_COMMAND_CENTER_ACTIONS.PROMOTE_EVIDENCE:
       case KEYWORD_COMMAND_CENTER_ACTIONS.TRACK:
-        deleteFeedbackByKeywordKey(workspace.id, keyword);
+        deleteFeedbackByKeywordKey(workspace.id, displayKeyword);
         trackedKeywords = upsertTrackedKeywordByKey(workspace.id, displayKeyword, {
           source: request.action === KEYWORD_COMMAND_CENTER_ACTIONS.PROMOTE_EVIDENCE
             ? TRACKED_KEYWORD_SOURCE.RECOMMENDATION
@@ -211,7 +226,7 @@ function applyKeywordCommandCenterActionInternal(
           status: TRACKED_KEYWORD_STATUS.ACTIVE,
           pagePath: request.pagePath,
         });
-        message = `"${keyword}" is now active in keyword tracking.`;
+        message = `"${displayKeyword}" is now active in keyword tracking.`;
         break;
       case KEYWORD_COMMAND_CENTER_ACTIONS.PAUSE_TRACKING:
         if (!existing) throw new Error('Keyword is not tracked');
@@ -220,25 +235,28 @@ function applyKeywordCommandCenterActionInternal(
         // via listTrackedKeywordRows) is the authoritative `from`; an illegal move throws
         // inside the txn so retireTrackedKeyword never runs (no partial write, no broadcast).
         validateTransition('tracked_keyword', TRACKED_KEYWORD_TRANSITIONS, existing.status ?? TRACKED_KEYWORD_STATUS.ACTIVE, TRACKED_KEYWORD_STATUS.PAUSED);
-        trackedKeywords = retireTrackedKeyword(workspace.id, keyword, TRACKED_KEYWORD_STATUS.PAUSED);
-        message = `"${keyword}" was paused from active tracking.`;
+        trackedKeywords = retireTrackedKeyword(workspace.id, displayKeyword, TRACKED_KEYWORD_STATUS.PAUSED);
+        message = `"${displayKeyword}" was paused from active tracking.`;
         break;
       case KEYWORD_COMMAND_CENTER_ACTIONS.RETIRE:
         if (!existing) throw new Error('Keyword is not tracked');
         if (!protectedCheck.ok) throw new Error(protectedCheck.reason);
         validateTransition('tracked_keyword', TRACKED_KEYWORD_TRANSITIONS, existing.status ?? TRACKED_KEYWORD_STATUS.ACTIVE, TRACKED_KEYWORD_STATUS.DEPRECATED);
-        trackedKeywords = retireTrackedKeyword(workspace.id, keyword, TRACKED_KEYWORD_STATUS.DEPRECATED);
-        message = `"${keyword}" was retired from active strategy-owned tracking.`;
+        trackedKeywords = retireTrackedKeyword(workspace.id, displayKeyword, TRACKED_KEYWORD_STATUS.DEPRECATED);
+        message = `"${displayKeyword}" was retired from active strategy-owned tracking.`;
         break;
       case KEYWORD_COMMAND_CENTER_ACTIONS.DECLINE:
         if (!protectedCheck.ok) throw new Error(protectedCheck.reason);
-        upsertFeedback(workspace.id, keyword, 'declined', request.reason ?? 'Declined from Keyword Command Center');
+        upsertFeedback(workspace.id, displayKeyword, 'declined', request.reason ?? 'Declined from Keyword Command Center');
         // Only the tracked-branch of DECLINE changes an existing row's status; guard it.
         if (existing && !protectedReason(existing)) {
           validateTransition('tracked_keyword', TRACKED_KEYWORD_TRANSITIONS, existing.status ?? TRACKED_KEYWORD_STATUS.ACTIVE, TRACKED_KEYWORD_STATUS.DEPRECATED);
-          trackedKeywords = retireTrackedKeyword(workspace.id, keyword, TRACKED_KEYWORD_STATUS.DEPRECATED);
+          trackedKeywords = retireTrackedKeyword(workspace.id, displayKeyword, TRACKED_KEYWORD_STATUS.DEPRECATED);
         }
-        message = `"${keyword}" was declined for future strategy consideration.`;
+        // Remove only this semantic identity's planned artifact. Keeping this in
+        // the outer transaction prevents a concurrent re-add from being deleted.
+        deletePageKeyword(workspace.id, plannedPath);
+        message = `"${displayKeyword}" was declined for future strategy consideration.`;
         break;
       case KEYWORD_COMMAND_CENTER_ACTIONS.RESTORE:
         // RESTORE revives a paused/deprecated row to active (an insert-style upsert when
@@ -246,23 +264,23 @@ function applyKeywordCommandCenterActionInternal(
         if (existing && (existing.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE) {
           validateTransition('tracked_keyword', TRACKED_KEYWORD_TRANSITIONS, existing.status ?? TRACKED_KEYWORD_STATUS.ACTIVE, TRACKED_KEYWORD_STATUS.ACTIVE);
         }
-        deleteFeedbackByKeywordKey(workspace.id, keyword);
+        deleteFeedbackByKeywordKey(workspace.id, displayKeyword);
         trackedKeywords = upsertTrackedKeywordByKey(workspace.id, displayKeyword, {
           source: existing?.source ?? TRACKED_KEYWORD_SOURCE.MANUAL,
           status: TRACKED_KEYWORD_STATUS.ACTIVE,
           deprecatedAt: undefined,
           replacedBy: undefined,
         });
-        message = `"${keyword}" was restored to the active keyword loop.`;
+        message = `"${displayKeyword}" was restored to the active keyword loop.`;
         break;
     }
   });
-  run();
+  run.immediate();
 
-  // I1: DECLINE removes the /planned/ artifact so it doesn't persist after the keyword is
-  // rejected. Run outside the transaction (deletePageKeyword uses its own run.immediate()).
-  if (request.action === KEYWORD_COMMAND_CENTER_ACTIONS.DECLINE) {
-    deletePageKeyword(workspace.id, plannedPath);
+  // Mutation helpers operate on provenance-bearing rows internally. Action DTOs
+  // must reread through the stripping resolver before serialization.
+  if (trackedKeywords !== undefined) {
+    trackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
   }
 
   // A4 (audit #15): Hub track/promote/add-to-strategy actions enter outcome
@@ -290,13 +308,13 @@ function applyKeywordCommandCenterActionInternal(
   }
 
   invalidateIntelligenceCache(workspace.id);
-  const payload = { keyword, action: request.action, source: 'keyword_command_center', updatedAt: now };
+  const payload = { keyword: displayKeyword, action: request.action, source: 'keyword_command_center', updatedAt: now };
   if (!options.skipBroadcast) {
     broadcastKeywordCommandCenterAction(workspace.id, request, payload);
   }
   if (!options.skipActivity) {
     addActivity(workspace.id, 'rank_tracking_updated', 'Keyword lifecycle updated', message, {
-      keyword,
+      keyword: displayKeyword,
       action: request.action,
       source: 'keyword_command_center',
     });
@@ -305,7 +323,7 @@ function applyKeywordCommandCenterActionInternal(
   return {
     ok: true,
     action: request.action,
-    keyword,
+    keyword: displayKeyword,
     protectedKeyword: Boolean(protectedReason(existing)),
     message,
     trackedKeywords,
@@ -329,13 +347,13 @@ export function applyKeywordCommandCenterAction(
  * restorable), never deleted — `force` overrides for the dedicated route.
  */
 export function isHardDeleteEligible(
-  existing: TrackedKeyword | undefined,
+  existing: ProvenanceTrackedKeyword | undefined,
   options: { hasStrategyFeedbackProvenance?: boolean } = {},
 ): boolean {
   if (!existing) return false;
   if (existing.pinned) return false;
   if (existing.source === TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED) return false;
-  if (existing.sourceGapKey) return false;
+  if (existing.sourceGapKey || existing.sourceGapKeyV2) return false;
   if (existing.strategyOwned === true) return false;
   if (options.hasStrategyFeedbackProvenance === true) return false;
   return existing.source === TRACKED_KEYWORD_SOURCE.MANUAL;
@@ -357,47 +375,44 @@ export function deleteKeywordHard(
 ): { ok: true; keyword: string; trackedKeywords: TrackedKeyword[] } {
   const workspace = getWorkspace(workspaceId);
   if (!workspace) throw new Error('Workspace not found');
-  const normalized = keywordComparisonKey(keyword);
+  const normalized = keywordIdentityKeyV2(keyword);
   if (!normalized) throw new Error('keyword required');
-
-  // Resolve from the PROVENANCE-BEARING table read (listTrackedKeywordRows), NOT
-  // getTrackedKeywords — the latter STRIPS sourceGapKey, which would make
-  // a gap-provenanced keyword look eligible and silently bypass the retire-not-delete rule.
-  const existing = listTrackedKeywordRows(workspace.id).find(
-    entry => keywordComparisonKey(entry.query) === normalized,
-  );
-  if (!existing) throw new Error('Keyword is not tracked');
-  const feedback = readFeedback(workspace.id).get(normalized);
-  const hasStrategyFeedbackProvenance = feedback?.status === 'approved' || feedback?.status === 'requested';
-
-  if (!options.force && !isHardDeleteEligible(existing, { hasStrategyFeedbackProvenance })) {
-    throw new Error('Keyword is not eligible for permanent deletion — retire it instead.');
-  }
 
   const now = new Date().toISOString();
   let trackedKeywords: TrackedKeyword[] = [];
   const run = db.transaction(() => {
-    removeTrackedKeyword(workspace.id, normalized);
-    deleteKeywordRankHistory(workspace.id, normalized);
+    // Resolve eligibility after the write lock is held. The general reader strips
+    // both gap keys, so permanent-delete guards must use the table-bearing row.
+    const existing = listTrackedKeywordRows(workspace.id).find(
+      entry => keywordIdentityKeyV2(entry.query) === normalized,
+    );
+    if (!existing) throw new Error('Keyword is not tracked');
+    const feedback = readFeedback(workspace.id).get(keyword);
+    const hasStrategyFeedbackProvenance = feedback?.status === 'approved' || feedback?.status === 'requested';
+    if (!options.force && !isHardDeleteEligible(existing, { hasStrategyFeedbackProvenance })) {
+      throw new Error('Keyword is not eligible for permanent deletion — retire it instead.');
+    }
+    removeTrackedKeyword(workspace.id, keyword);
+    deleteKeywordRankHistory(workspace.id, keyword);
     invalidateKeywordStrategyGenerationInputs(workspace.id);
     trackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
   });
-  run();
+  run.immediate();
 
   invalidateIntelligenceCache(workspace.id);
   broadcastToWorkspace(workspace.id, WS_EVENTS.RANK_TRACKING_UPDATED, {
-    keyword: normalized,
+    keyword: keyword.trim(),
     action: 'deleted',
     source: 'keyword_hub',
     updatedAt: now,
   });
   addActivity(workspace.id, 'rank_tracking_updated', 'Keyword permanently deleted', `"${normalized}" was permanently deleted (rank history dropped).`, {
-    keyword: normalized,
+    keyword: keyword.trim(),
     action: 'deleted',
     source: 'keyword_hub',
   });
 
-  return { ok: true, keyword: normalized, trackedKeywords };
+  return { ok: true, keyword: keyword.trim(), trackedKeywords };
 }
 
 function bulkActionLabel(action: KeywordCommandCenterBulkActionRequest['action']): string {
@@ -419,14 +434,18 @@ export function applyKeywordCommandCenterBulkAction(
     throw new Error('keywords required');
   }
 
-  const uniqueKeywords = Array.from(
-    request.keywords.reduce((deduped, rawKeyword) => {
+  const grouped = request.keywords.reduce((deduped, rawKeyword) => {
       const keyword = rawKeyword.trim();
-      const key = keywordComparisonKey(keyword);
-      if (keyword && key && !deduped.has(key)) deduped.set(key, keyword);
+      const key = keywordIdentityKeyV2(keyword);
+      if (keyword && key) {
+        const current = deduped.get(key);
+        if (current === undefined || compareRawBinary(keyword, current) < 0) deduped.set(key, keyword);
+      }
       return deduped;
-    }, new Map<string, string>()).values(),
-  );
+    }, new Map<string, string>());
+  const uniqueKeywords = [...grouped.entries()]
+    .sort(([a], [b]) => compareRawBinary(a, b))
+    .map(([, keyword]) => keyword);
   if (uniqueKeywords.length === 0) throw new Error('keywords required');
 
   const items: KeywordCommandCenterBulkActionItem[] = [];

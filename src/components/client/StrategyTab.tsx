@@ -30,6 +30,7 @@ import { StrategySnapshotSection } from './strategy/StrategySnapshotSection';
 import { useStrategyBusinessPriorities } from './strategy/useStrategyBusinessPriorities';
 import { useStrategyKeywordFeedback } from './strategy/useStrategyKeywordFeedback';
 import { useStrategyTrackedKeywords } from './strategy/useStrategyTrackedKeywords';
+import { keywordIdentityKeyV2 } from '../../../shared/keyword-normalization';
 import {
   type PriorityKeywordItem,
   type PriorityKeywordStatus,
@@ -158,6 +159,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     getFeedbackStatus,
     isLoadingFeedback,
     requestedKeywords,
+    declinedKeywords,
   } = useStrategyKeywordFeedback({ workspaceId, setToast });
 
   const {
@@ -223,13 +225,14 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
   const removePriorityKeyword = useCallback(async (item: PriorityKeywordItem) => {
     if (!workspaceId) return;
-    const kw = item.normalized;
-    if (!kw || removingKeyword === kw) return;
-    setRemovingKeyword(kw);
+    const kw = item.actionKeyword;
+    const identityKey = item.identityKey;
+    if (!kw || removingKeyword === identityKey) return;
+    setRemovingKeyword(identityKey);
     try {
       let removedTracked = false;
       if (item.isTracked) {
-        await removeTrackedKeyword(item.label);
+        await removeTrackedKeyword(kw);
         removedTracked = true;
       }
 
@@ -378,9 +381,12 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   const priorityKeywordMap = new Map<string, PriorityKeywordItem>();
   strategyData.siteKeywords.forEach(kw => {
     const normalized = normalizeKeyword(kw);
-    if (normalized && keywordFeedback.get(normalized) !== 'declined') {
-      priorityKeywordMap.set(normalized, {
+    const identityKey = keywordIdentityKeyV2(kw);
+    if (identityKey && keywordFeedback.get(identityKey) !== 'declined') {
+      priorityKeywordMap.set(identityKey, {
         label: kw,
+        identityKey,
+        actionKeyword: kw,
         normalized,
         isTracked: false,
         isStrategy: true,
@@ -391,10 +397,13 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   });
   trackedKeywords.forEach(tk => {
     const normalized = normalizeKeyword(tk.query);
-    if (normalized && keywordFeedback.get(normalized) !== 'declined') {
-      const existing = priorityKeywordMap.get(normalized);
-      priorityKeywordMap.set(normalized, {
+    const identityKey = keywordIdentityKeyV2(tk.query);
+    if (identityKey && keywordFeedback.get(identityKey) !== 'declined') {
+      const existing = priorityKeywordMap.get(identityKey);
+      priorityKeywordMap.set(identityKey, {
         label: existing?.label || tk.query,
+        identityKey,
+        actionKeyword: existing?.actionKeyword || tk.query,
         normalized,
         isTracked: true,
         isStrategy: existing?.isStrategy || false,
@@ -405,12 +414,16 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
   });
   requestedKeywords.forEach(kw => {
     const normalized = normalizeKeyword(kw);
-    if (normalized && keywordFeedback.get(normalized) !== 'declined') {
-      const existing = priorityKeywordMap.get(normalized);
+    const identityKey = keywordIdentityKeyV2(kw);
+    if (identityKey && keywordFeedback.get(identityKey) !== 'declined') {
+      const existing = priorityKeywordMap.get(identityKey);
       const isTracked = existing?.isTracked || false;
       const isStrategy = existing?.isStrategy || false;
-      priorityKeywordMap.set(normalized, {
+      priorityKeywordMap.set(identityKey, {
         label: existing?.label || kw,
+        identityKey,
+        // Feedback owns the requested raw spelling, so it is the exact mutation input.
+        actionKeyword: kw,
         normalized,
         isTracked,
         isStrategy,
@@ -669,8 +682,8 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     if (!workspaceId) return;
     const kw = keyword.trim();
     if (!kw || kw.length < 2 || addingKeyword) return;
-    const normalized = normalizeKeyword(kw);
-    const existingPriorityKeyword = priorityKeywordMap.get(normalized);
+    const identityKey = keywordIdentityKeyV2(kw);
+    const existingPriorityKeyword = priorityKeywordMap.get(identityKey);
     if (existingPriorityKeyword?.isTracked) {
       setToast?.(`"${kw}" is already a strategy keyword`);
       if (options?.clearInput) setNewTrackedKeyword('');
@@ -679,9 +692,9 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
     setAddingKeyword(true);
     try {
       await addTrackedKeyword(kw);
-      if (['declined', 'requested'].includes(keywordFeedback.get(normalized) || '')) {
+      if (['declined', 'requested'].includes(keywordFeedback.get(keywordIdentityKeyV2(kw)) || '')) {
         try {
-          await removeFeedback(normalized, { toast: false, clearOnError: true });
+          await removeFeedback(kw, { toast: false, clearOnError: true });
         } catch {
           // The keyword was added successfully; keep this view aligned with that action.
         }
@@ -866,7 +879,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
 
   const declinedKeywordsEl = (
     <StrategyDeclinedKeywordsSection
-      keywordFeedback={keywordFeedback}
+      declinedKeywords={declinedKeywords}
       expandedSections={expandedSections}
       toggleSection={toggleSection}
       undoFeedback={undoFeedback}
@@ -879,7 +892,7 @@ export function StrategyTab({ strategyData, requestedTopics, contentRequests, ef
       {/* Keyword detail drawer */}
       {(openKeywordDrawer || drawerClosing) && (() => {
         const allRows: StrategyKeywordTableRow[] = [...strategyKeywordRows, ...keywordIdeaRows];
-        const liveRow = allRows.find(r => r.normalized === openKeywordDrawer);
+        const liveRow = allRows.find(r => r.identityKey === openKeywordDrawer);
         if (liveRow) drawerSnapshotRef.current = liveRow;
         const drawerRow = liveRow ?? drawerSnapshotRef.current;
         if (!drawerRow) return null;

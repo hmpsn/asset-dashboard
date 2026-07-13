@@ -43,6 +43,8 @@ vi.mock('../../src/api/client', async (importOriginal) => {
 function makeStrategyRow(valueReasons?: string[]): StrategyKeywordTableRow {
   return {
     label: 'Cosmetic Dentistry',
+    identityKey: 'cosmetic dentistry',
+    actionKeyword: 'Cosmetic Dentistry',
     normalized: 'cosmetic dentistry',
     role: 'page',
     roleLabel: 'Page Opportunity',

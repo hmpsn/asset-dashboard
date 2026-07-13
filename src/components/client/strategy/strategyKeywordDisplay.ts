@@ -8,6 +8,11 @@ export type OpportunityTone = 'emerald' | 'amber' | 'blue' | 'zinc';
 
 export interface PriorityKeywordItem {
   label: string;
+  /** Unicode-safe identity for UI dedupe, selection, and mutation loading state. */
+  identityKey: string;
+  /** Trimmed raw keyword sent to feedback/tracking mutations. */
+  actionKeyword: string;
+  /** Legacy v1 join key retained only for page/metric/explanation lookups until K3c. */
   normalized: string;
   isTracked: boolean;
   isStrategy: boolean;

@@ -43,6 +43,20 @@ afterAll(async () => {
 });
 
 describe('gap-approved keyword protection on action endpoint (W2.2 bug fix)', () => {
+  it('unforced RETIRE of a v2-only gap-approved keyword → 409', async () => {
+    addTrackedKeyword(workspaceId, '東京 歯科', {
+      source: TRACKED_KEYWORD_SOURCE.CONTENT_GAP,
+      status: TRACKED_KEYWORD_STATUS.ACTIVE,
+      sourceGapKeyV2: '東京 歯科',
+    });
+    const res = await postJson(`${base()}/actions`, {
+      action: 'retire',
+      keyword: '東京 歯科',
+    });
+    expect(res.status).toBe(409);
+    expect((await res.json() as { error: string }).error).toMatch(/gap-approved keyword/i);
+  });
+
   it('unforced RETIRE of a gap-approved keyword → 409 (protection enforced)', async () => {
     // Create a keyword with sourceGapKey — the content-gap approval path writes this field
     // (server/keyword-feedback.ts:189). Direct addTrackedKeyword mirrors that write.

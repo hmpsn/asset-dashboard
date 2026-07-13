@@ -147,7 +147,7 @@ export async function populateDraftRows(rows: Map<string, DraftRow>, bundle: Com
   const strategy = bundle.strategy;
 
   for (const metric of strategy?.siteKeywordMetrics ?? []) {
-    const row = ensureRow(rows, metric.keyword);
+    const row = ensureV2CompatibilityRow(rows, metric.keyword);
     if (!row) continue;
     setAssignment(row, { role: 'site_keyword' });
     addSource(row, { kind: 'strategy', label: 'Strategy keyword', detail: 'Site keyword' });
@@ -155,7 +155,7 @@ export async function populateDraftRows(rows: Map<string, DraftRow>, bundle: Com
   }
 
   for (const keyword of strategy?.siteKeywords ?? []) {
-    const row = ensureRow(rows, keyword);
+    const row = ensureV2CompatibilityRow(rows, keyword);
     if (!row) continue;
     setAssignment(row, { role: 'site_keyword' });
     addSource(row, { kind: 'strategy', label: 'Strategy keyword', detail: 'Site keyword' });
