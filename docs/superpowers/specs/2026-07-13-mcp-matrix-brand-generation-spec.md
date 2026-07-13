@@ -1,6 +1,6 @@
 # MCP Matrix + Brand Deliverable Generation Specification
 
-**Status:** P0 contracts implemented; runtime phases proposed
+**Status:** P0 merged and green; R1 runtime foundation in progress
 **Date:** 2026-07-13
 **Target:** `staging`, one PR per phase
 **Primary contexts:** `content-pipeline`, `brand-engine`
@@ -101,6 +101,11 @@ generated proposal. A lower layer may not rewrite a higher layer as fact.
 
 All new action inputs use snake_case, stable error codes, declared workspace
 scope, expected revisions, and idempotency keys. List/detail output is bounded.
+The canonical runtime registry is the sole authority for discovery, dispatch,
+schema census, and workspace authorization. Authenticated MCP key ID/label and
+request/tool identity are retained for internal activity and durable run
+attribution, but key identity is excluded from workspace broadcasts and every
+client-visible activity projection.
 
 ### Matrix tools
 

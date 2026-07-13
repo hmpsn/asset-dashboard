@@ -398,6 +398,12 @@ generic string ID cannot satisfy a different gate.
   Conflicting camel/snake aliases are rejected for master and scoped keys.
 - New mutations receive `McpToolExecutionContext` containing request/tool name,
   key ID/label, and scope. Activity/run attribution records that identity.
+- Full admin activity may retain that caller attribution, but workspace
+  broadcasts and client-visible activity projections must remove MCP key IDs
+  and labels. Authentication identity is operational evidence, not client copy.
+- Request-local compatibility context may enrich existing activity writes, but
+  durable generation runs persist an explicit immutable execution-context
+  snapshot so restart/resume never depends on ambient process state.
 - Durable run IDs replace short-lived handles for long work.
 - Start returns quickly with job/run ID, selection count, estimate, dashboard
   URL, and `existing` idempotency signal. Status/detail is paged.

@@ -205,6 +205,12 @@ never sufficient to dispatch paid work.
   are invalid for every caller.
 - The authenticated MCP key ID/label and tool name flow into activity and run
   attribution. A generic `mcp-chat` source is not sufficient for new writes.
+- MCP key ID/label attribution is internal operational evidence. Preserve it in
+  full admin activity and durable run provenance, but remove it from workspace
+  broadcasts and client-visible activity projections.
+- Request-scoped compatibility context may enrich legacy activity writers, but
+  every durable generation run snapshots the explicit execution context; a
+  restart/resume path must never depend on ambient request state.
 - Tool registry, discovery, dispatch, schema census, and workspace-argument
   census share one canonical registry and contract test.
 

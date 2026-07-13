@@ -26,9 +26,9 @@ Parallel lanes get exclusive files. If a lane needs an unowned shared file, it
 stops with `NEEDS_CONTEXT`; the controller lands the contract and redispatches.
 
 The prerequisite planning/S0 security PR merged before implementation began.
-P0 is implemented on this branch; every later implementation phase ships as a
-separate phase-per-PR branch from then-current `origin/staging` after P0 merges
-with green CI.
+P0 merged through PR #1530 and its post-merge `staging` CI is green. Every
+later implementation phase ships as a separate phase-per-PR branch from the
+then-current green `origin/staging`.
 
 ## Bounded contexts and canonical decisions
 
@@ -142,7 +142,7 @@ different workspace values; MCP auth/routing tests and typecheck pass.
 
 **Owner:** controller. **Depends:** S0 merged.
 
-**Status on this branch:** implemented; final CI-equivalent verification pending.
+**Status:** merged through PR #1530; PR and post-merge `staging` CI green.
 
 Exclusive ownership: new
 `shared/types/{matrix-generation,generation-evidence,brand-intake,brand-generation,brand-content-onboarding}.ts`,
@@ -192,11 +192,16 @@ canonical terms are added), and generated rules are consistent.
 
 **Owner:** `platform-foundation`; GPT-5.5. **Depends:** P0.
 
+**Status:** implementation in progress on a fresh branch from the green P0
+`origin/staging` merge.
+
 Exclusive ownership: `server/mcp/server.ts`, `server/mcp/instructions.ts`,
 `server/mcp/README.md`, new canonical registry/context/error modules, and MCP
-registry/schema/routing tests. Controller owns shared schema types. Must not
-import HTTP route handlers, add generation business logic, or change job/domain
-status semantics.
+registry/schema/routing tests, plus `shared/types/mcp-runtime.ts`,
+`shared/types/index.ts`, `server/activity-log.ts`,
+`tests/unit/activity-log.test.ts`, and
+`tests/integration/mcp-api-keys-admin.test.ts`. Must not import HTTP route
+handlers, add generation business logic, or change job/domain status semantics.
 
 - Create one canonical tool registry consumed by discovery, dispatch, unique-
   name census, input-schema census, and declared-workspace-field authorization.
@@ -205,11 +210,20 @@ status semantics.
 - Thread `McpToolExecutionContext` (tool/request, key ID/label, scope) through
   write handlers into activity/run attribution. Close roadmap item
   `mcp-key-label-attribution`.
+- Preserve existing family-handler signatures by executing them inside a
+  request-scoped compatibility context while also passing the context
+  explicitly to the canonical registry boundary. Future durable run writers
+  must persist an explicit context snapshot; ambient request context is not a
+  durable resume mechanism.
+- Keep authenticated key identity internal: persist it on full admin activity,
+  but strip MCP key ID/label attribution from workspace broadcasts and the
+  client-visible activity projection.
 - Add a common stable JSON error envelope for new tools without breaking legacy
   tool payloads.
 
 Red first: duplicate/missing dispatch and undeclared/dual workspace-field fixture
-tests; caller label missing from a real write activity. Green after registry and
+tests; caller label missing from a real write activity; client activity and
+broadcast payloads exposing internal key identity. Green after registry and
 execution context are the only authority.
 
 Acceptance: list/dispatch/schema/scope cannot drift; representative existing
@@ -649,7 +663,7 @@ observed.
 |---|---|
 | S0 | `npx vitest run tests/unit/mcp-auth-perkey.test.ts tests/contract/mcp-tool-input-schema-properties.test.ts tests/contract/mcp-tool-workspace-scope-schema.test.ts` |
 | P0 | `npx vitest run tests/unit/feature-flags.test.ts tests/unit/feature-flag-lifecycle.test.ts tests/contract/feature-flag-catalog.test.ts tests/contract/mcp-generation-contracts.test.ts` |
-| R1 | `npx vitest run tests/unit/mcp-routing.test.ts tests/unit/mcp-auth-perkey.test.ts tests/contract/mcp-tool-input-schema-properties.test.ts tests/contract/mcp-tool-workspace-scope-schema.test.ts tests/integration/mcp-api-keys-admin.test.ts` |
+| R1 | `npx vitest run tests/contract/mcp-runtime-contract.test.ts tests/unit/mcp-tool-registry.test.ts tests/unit/mcp-tool-errors.test.ts tests/unit/mcp-server-routing.test.ts tests/unit/mcp-auth-perkey.test.ts tests/unit/activity-log.test.ts tests/contract/mcp-tool-input-schema-properties.test.ts tests/contract/mcp-tool-workspace-scope-schema.test.ts tests/integration/mcp-api-keys-admin.test.ts` |
 | M0 | `npx vitest run tests/unit/content-matrix-renderer.test.ts tests/integration/content-matrices-routes.test.ts tests/contract/mcp-matrix-read-tools.test.ts`; repeat structural resolve and assert identical source fingerprint/zero AI executions; accept/reject/stale template upgrade |
 | B0 | `npx vitest run tests/integration/public-onboarding-routes.test.ts tests/integration/brand-intake.test.ts`; submit the same body twice to `POST /api/public/onboarding/:id`, assert one revision/projection, then cover authenticated admin GET/evidence POST |
 | B1 | `npx vitest run tests/integration/voice-calibration.test.ts tests/contract/voice-finalization.test.ts`; assert generated-only anchors cannot finalize |
