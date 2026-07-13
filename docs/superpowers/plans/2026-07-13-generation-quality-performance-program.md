@@ -31,8 +31,8 @@ P0 program-control docs/roadmap/guardrails
  ├─ G1 AI execution governance ───────────────────────────────┐
  └─ K1 keyword evidence integrity ───────┐                    │
                                          ├─ K2 KCC read path  │
-                                         ├─ K3 Unicode norm.  │
-                                         └─ K4 recall flag ───┤
+                                         ├─ K3a identity contract ── K3b compatibility/backfill ── K3c Unicode switchover
+                                         └──────────────────────────────────────────────────────── K4 recall flag ───┤
 G1 ─┬─ C1 truthful content generation ── C2 edit safety ── C3 context-v2 flag
     ├─ S1 recommendation CAS ──────────── S2 lifecycle repair ── S3 ordered convergence
     └─ O1 runtime quality governance <──────────────────── K/C/S telemetry
@@ -43,7 +43,7 @@ O1 + S2 ── V3 confidence-aware outcome scorecard
 V1 + S2 ── V4 internal-link value priority
 ```
 
-P0 is this program-control PR. `G1 ∥ K1` may run in parallel. After G1, `C1 ∥ S1`; after K1, `K2 ∥ K3` may run in parallel. K4 waits for K1 and K3. C2 waits for C1 and G1; S2 waits for S1 and K1. O1 may be developed after G1 but merges only after it can consume the stable telemetry emitted by the completed K/C/S roots. No sibling writes another sibling's files.
+P0 is this program-control PR. `G1 ∥ K1` may run in parallel. After G1, `C1 ∥ S1`; after K1, K2 may run alongside the K3a contract amendment. The K3 audit proved that normalization keys are durable identities, so K3 is now sequenced as K3a contract → K3b additive compatibility/backfill → K3c canonical switchover. K4 waits for K3c. C2 waits for C1 and G1; S2 waits for S1 and K1. O1 may be developed after G1 but merges only after it can consume the stable telemetry emitted by the completed K/C/S roots. No sibling writes another sibling's files.
 
 ## File Ownership and Dispatch Pattern
 
@@ -121,13 +121,33 @@ Model assignments:
 - Add authoritative rank snapshot time/age and honest stale/unavailable states without changing route meaning or visuals.
 - Acceptance: one `/initial` call per mount, no summary execution after interaction, backward-compatible parity for existing fields plus typed freshness API/hook/component coverage, query-count regression test, mobile browser smoke, and materially improved measured p50/p95/query count recorded in PR evidence.
 
-### K3 — Unicode Keyword Normalization
+### K3a — Keyword Identity Compatibility Contract
 
 **Owner:** `seo-health`; GPT-5.4. **Depends:** K1.
 
-- Complete the existing `keyword-universe-overhaul` normalization task with Unicode NFKC and Unicode letters/numbers.
-- Define deterministic whitespace/punctuation/accent behavior without changing persisted externally mirrored values.
-- Test accented Latin, non-Latin scripts, compatibility characters, punctuation-only input, empty output, and duplicate equivalence.
+- Record the v1 identity census and the v2 NFKC/Unicode equivalence policy in `docs/rules/keyword-normalization-identity-migration.md` before changing runtime behavior.
+- Treat `tracked_keywords`, `site_keyword_metrics`, local visibility snapshots, SERP snapshots, keyword metrics cache, and keyword feedback as persistence compatibility boundaries. Raw provider/display values remain byte-for-byte unchanged.
+- Specify collision behavior for reconstructible identities and alias behavior for legacy rows whose raw spelling was never stored. Meaning-distinct legacy decisions must never be silently merged.
+- Acceptance: roadmap/program contracts name all three K3 PRs, K4 depends on K3c, and no runtime helper or persisted data changes in K3a.
+
+### K3b — Additive Unicode Identity Compatibility and Backfill
+
+**Owner:** `seo-health`; GPT-5.4. **Depends:** K3a.
+
+- Add explicit v1 and v2 comparison helpers plus a typed identity version; do not switch the canonical helper yet.
+- Add collision-safe v2 identity storage or aliases for durable stores with reconstructible raw values, dual-read/dual-write compatibility, and a transactional TypeScript backfill where SQLite SQL cannot perform NFKC.
+- Version-invalidate the ephemeral metrics cache. Preserve all intent, CPC, source, status, feedback, timestamps, and K1 provenance when v2-equivalent rows converge.
+- For feedback/SERP legacy rows whose raw spelling is unavailable, preserve the v1 key as a readable alias and establish correct v2 identity only for recoverable/new writes.
+- Acceptance: fresh-write, legacy-upgrade, collision, rollback/idempotence, public-read, and K1 evidence-seam tests pass; canonical runtime comparison remains v1.
+
+### K3c — Canonical Unicode Normalization Switchover
+
+**Owner:** `seo-health`; GPT-5.4. **Depends:** K3b plus staging backfill verification.
+
+- Switch the canonical comparison helper to NFKC, locale-independent lowercase, semantic technology-token rewrites, Unicode letters/numbers, ASCII whitespace collapse, and no accent folding.
+- Preserve raw externally mirrored/provider/display values. Keep legacy aliases until production evidence proves they are removable in a later PR.
+- Test accented Latin, decomposed/composed equivalence, non-Latin scripts, compatibility characters, semantic `C#`/`C++`/`F#`/`.NET` tokens, punctuation-only/empty output, deep links, and every durable identity seam.
+- Acceptance: migration/backfill idempotence, zero orphaned feedback/evidence, deterministic collisions, broad targeted/full test suites, and staging data-integrity smoke are green.
 
 ### C2 — Content Edit Safety and Provenance
 
@@ -158,7 +178,7 @@ Model assignments:
 
 ### K4 — Candidate Recall and Diversity
 
-**Owner:** `seo-health`; GPT-5.4. **Depends:** K1 + K3.
+**Owner:** `seo-health`; GPT-5.4. **Depends:** K1 + K3c.
 
 - Add one new server/per-workspace flag, `keyword-synthesis-candidate-recall`, default OFF with dated retirement target.
 - Before the cap, include all requested/voted candidates, then satisfy deterministic source/intent/market quotas, then value-rank the remaining slots.
