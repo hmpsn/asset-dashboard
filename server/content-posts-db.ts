@@ -12,6 +12,7 @@ import { validateTransition, POST_STATUS_TRANSITIONS } from './state-machines.js
 import { resolveContentGenerationStyle } from './page-type-copy-contract.js';
 import { getScoredOutcomeReadbacks } from './outcome-tracking.js';
 import { pageAddressSlug } from './utils/page-address.js';
+import { IncompleteContentPostError, isCompleteGeneratedPost } from './domains/content/generation-integrity.js';
 
 const log = createLogger('content-posts-db');
 
@@ -423,6 +424,10 @@ export function updatePostField(workspaceId: string, postId: string, updates: Pa
   }
 
   Object.assign(post, updates, { updatedAt: new Date().toISOString() });
+  if (['draft', 'review', 'approved'].includes(post.status)
+    && !isCompleteGeneratedPost(post, post.sections.length)) {
+    throw new IncompleteContentPostError();
+  }
   stmts().update.run(postToParams(post));
   return post;
 }

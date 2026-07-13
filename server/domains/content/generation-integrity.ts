@@ -4,6 +4,7 @@ import type {
   GeneratedPost,
 } from '../../../shared/types/content.js';
 import { sanitizePlainText } from '../../html-sanitize.js';
+import { isDeliverableContentPost } from '../../../shared/content-post-integrity.js';
 
 const DIAGNOSTIC_MESSAGE_LIMIT = 500;
 
@@ -40,4 +41,15 @@ export function isCompleteGeneratedPost(post: GeneratedPost, plannedSectionCount
     && section.status === 'done'
     && Boolean(section.content.trim()),
   );
+}
+
+export function isPostDeliverable(post: GeneratedPost): boolean {
+  return isDeliverableContentPost(post);
+}
+
+export class IncompleteContentPostError extends Error {
+  constructor(message = 'This post is incomplete and cannot be reviewed, exported, or published.') {
+    super(message);
+    this.name = 'IncompleteContentPostError';
+  }
 }

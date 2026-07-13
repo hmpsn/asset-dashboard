@@ -492,6 +492,19 @@ describe('POST /api/content-posts/:workspaceId/:postId/publish-to-webflow', () =
     expect(broadcastState.calls.some(call => call.event === WS_EVENTS.CONTENT_PUBLISHED)).toBe(false);
   });
 
+  it('rejects an incomplete artifact even when its stored status is publishable', async () => {
+    configurePublishTarget();
+    const post = seedPost({ status: 'approved' });
+    db.prepare('UPDATE content_posts SET conclusion = ? WHERE workspace_id = ? AND id = ?')
+      .run('', wsId, post.id);
+
+    const res = await postJson(`/api/content-posts/${wsId}/${post.id}/publish-to-webflow`, {});
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Post is incomplete and cannot be published' });
+    expect(getCapturedRequests()).toHaveLength(0);
+    expect(getPost(wsId, post.id)?.publishedAt).toBeUndefined();
+  });
+
   it('does not stamp Webflow publish metadata when manual item creation fails', async () => {
     configurePublishTarget();
     mockWebflowError(/\/collections\/collection_content_posts\/items$/, 500, 'Webflow create failed');

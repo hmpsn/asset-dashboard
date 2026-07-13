@@ -109,6 +109,13 @@ function makePublicPerformancePost(workspaceId: string, postId: string, briefId:
     totalWordCount: 500,
     targetWordCount: 1400,
     status: 'approved',
+    generationDiagnostics: [{
+      stage: 'section',
+      code: 'provider_error',
+      message: 'Internal provider detail',
+      sectionIndex: 0,
+      occurredAt: '2026-06-14T00:00:00.000Z',
+    }],
     aiReview: {
       review: {
         factual_accuracy: { pass: false, reason: 'Needs human review', humanReviewRequired: true },

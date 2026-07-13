@@ -46,6 +46,7 @@ import type { AiFixRequest, PostSection } from '../../shared/types/content.js';
 import { CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { sanitizePlainText } from '../html-sanitize.js';
+import { IncompleteContentPostError, isPostDeliverable } from '../domains/content/generation-integrity.js';
 
 const router = Router();
 
@@ -147,7 +148,7 @@ router.get('/api/content-posts/:workspaceId', requireWorkspaceAccess('workspaceI
 router.get('/api/content-posts/:workspaceId/suggest-dates', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const workspaceId = req.params.workspaceId;
 
-  const drafts = listPosts(workspaceId).filter(p => !p.plannedPublishAt && !p.publishedAt && p.status !== 'generating');
+  const drafts = listPosts(workspaceId).filter(p => !p.plannedPublishAt && !p.publishedAt && p.status === 'draft');
   if (drafts.length === 0) {
     return res.json({ suggestions: [], unscheduledCount: 0 });
   }
@@ -258,7 +259,7 @@ const updatePostSchema = z.object({
   conclusion: z.string().optional(),
   seoTitle: z.string().max(200).optional(),
   seoMetaDescription: z.string().max(500).optional(),
-  status: z.enum(['generating', 'draft', 'review', 'approved', 'error']).optional(),
+  status: z.enum(['generating', 'needs_attention', 'draft', 'review', 'approved', 'error']).optional(),
   voiceScore: z.number().min(0).max(100).optional(),
   voiceFeedback: z.string().optional(),
   reviewChecklist: z.object({
@@ -315,6 +316,9 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'InvalidTransitionError') {
       return res.status(400).json({ error: err.message });
+    }
+    if (err instanceof IncompleteContentPostError) {
+      return res.status(409).json({ error: err.message });
     }
     return next(err);
   }
@@ -424,6 +428,7 @@ router.patch('/api/content-posts/:workspaceId/:postId/planned-date',
 router.get('/api/content-posts/:workspaceId/:postId/export/markdown', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const post = getPost(req.params.workspaceId, req.params.postId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
+  if (!isPostDeliverable(post)) return res.status(409).json({ error: 'Post is incomplete and cannot be exported' });
   const md = exportPostMarkdown(post);
   res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${post.targetKeyword.replace(/[^a-z0-9]+/gi, '-')}.md"`);
@@ -434,6 +439,7 @@ router.get('/api/content-posts/:workspaceId/:postId/export/markdown', requireWor
 router.get('/api/content-posts/:workspaceId/:postId/export/html', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const post = getPost(req.params.workspaceId, req.params.postId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
+  if (!isPostDeliverable(post)) return res.status(409).json({ error: 'Post is incomplete and cannot be exported' });
   const html = exportPostHTML(post);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
@@ -443,6 +449,7 @@ router.get('/api/content-posts/:workspaceId/:postId/export/html', requireWorkspa
 router.get('/api/content-posts/:workspaceId/:postId/export/pdf', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const post = getPost(req.params.workspaceId, req.params.postId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
+  if (!isPostDeliverable(post)) return res.status(409).json({ error: 'Post is incomplete and cannot be exported' });
   const html = renderPostHTML(post);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);

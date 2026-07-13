@@ -32,6 +32,7 @@
  */
 import { getBrief } from '../../content-brief.js';
 import { getPost, updatePostField } from '../../content-posts-db.js';
+import { isPostDeliverable } from './generation-integrity.js';
 import { generateFeaturedImage } from '../../content-image.js';
 import { assemblePostHtml, generateSlug } from '../../html-to-richtext.js';
 import {
@@ -160,6 +161,9 @@ export async function publishPostToWebflow(
   // Allow approved posts or admin override (draft/review).
   if (post.status !== 'approved' && post.status !== 'draft' && post.status !== 'review') {
     throw new PublishPostError('invalid_status', `Post status "${post.status}" cannot be published`, 400);
+  }
+  if (!isPostDeliverable(post)) {
+    throw new PublishPostError('invalid_status', 'Post is incomplete and cannot be published', 400);
   }
 
   const { collectionId, fieldMap } = ws.publishTarget;

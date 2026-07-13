@@ -22,6 +22,7 @@ import {
   createContentGenerationDiagnostic,
   hasUsefulGeneratedContent,
   isCompleteGeneratedPost,
+  isPostDeliverable,
 } from './domains/content/generation-integrity.js';
 
 // Re-export everything from sub-modules for backward compatibility
@@ -163,6 +164,16 @@ export function markPostGenerationFailed(
   if (!failed) return undefined;
 
   const message = error instanceof Error ? error.message : 'Generation failed';
+  if (isPostDeliverable(failed)) {
+    addActivity(
+      workspaceId,
+      'content_updated',
+      `Content regeneration failed for "${brief.targetKeyword}"`,
+      `${message}. The prior post was preserved.`,
+      { postId: failed.id, briefId: brief.id, action: 'post_regeneration_failed', artifactPreserved: true },
+    );
+    return failed;
+  }
   failed.status = 'error';
   failed.unificationStatus = 'failed';
   failed.unificationNote = message;
@@ -200,6 +211,16 @@ export function markPostGenerationCancelled(
   if (!cancelled) return undefined;
 
   const message = GENERATION_CANCELLED_MESSAGE;
+  if (isPostDeliverable(cancelled)) {
+    addActivity(
+      workspaceId,
+      'content_updated',
+      `Content regeneration cancelled for "${brief.targetKeyword}"`,
+      'The prior post was preserved.',
+      { postId: cancelled.id, briefId: brief.id, action: 'post_regeneration_cancelled', artifactPreserved: true },
+    );
+    return cancelled;
+  }
   cancelled.status = 'error';
   cancelled.unificationStatus = 'skipped';
   cancelled.unificationNote = message;
@@ -467,7 +488,7 @@ export async function generatePost(
   throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
   reportProgress('Unifying draft...', completedSteps);
   post.unificationStatus = 'pending';
-  savePost(workspaceId, post);
+  persistProgress();
 
   try {
     const preUnifyWords = countHtmlWords(post.introduction) + post.sections.reduce((s, sec) => s + sec.wordCount, 0) + countHtmlWords(post.conclusion);
@@ -487,7 +508,7 @@ export async function generatePost(
       post.unificationNote = `Unified: ${preUnifyWords} → ${postUnifyWords} words (target: ${post.targetWordCount})`;
       log.info(`${post.unificationNote}`);
       post.updatedAt = new Date().toISOString();
-      savePost(workspaceId, post);
+      persistProgress();
     } else {
       post.unificationStatus = 'skipped';
       post.unificationNote = 'Unification returned null — post too short or JSON parse failed';
@@ -500,6 +521,7 @@ export async function generatePost(
     log.error({ err: err }, `Unification pass failed (non-critical):`);
     // Non-critical — the post is still usable without unification
   }
+  throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
   completedSteps += 1;
 
   // 5. Generate SEO title tag and meta description
@@ -516,6 +538,7 @@ export async function generatePost(
     if (isAbortSignalAborted(options.signal)) throw err;
     log.warn({ err: err }, 'SEO meta generation failed (non-critical)');
   }
+  throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
   completedSteps += 1;
   reportProgress('Finalizing post draft...', completedSteps);
 

@@ -8,7 +8,7 @@ const broadcastState = vi.hoisted(() => ({
 
 const generationState = vi.hoisted(() => ({
   failVoiceContext: false,
-  failStage: null as 'introduction' | 'section' | 'conclusion' | null,
+  failStage: null as 'introduction' | 'section' | 'conclusion' | 'all' | null,
 }));
 
 vi.mock('../../server/broadcast.js', () => ({
@@ -38,15 +38,15 @@ vi.mock('../../server/content-posts-ai.js', async importOriginal => {
       return 'calibrated-voice';
     }),
     generateIntroduction: vi.fn(async () => {
-      if (generationState.failStage === 'introduction') throw new Error('<b>intro provider failed</b>');
+      if (generationState.failStage === 'introduction' || generationState.failStage === 'all') throw new Error('<b>intro provider failed</b>');
       return '<p>Draft introduction for the generated post.</p>';
     }),
     generateSection: vi.fn(async (_brief, section: { heading: string }, index: number) => {
-      if (generationState.failStage === 'section') throw new Error('<b>section provider failed</b>');
+      if (generationState.failStage === 'section' || generationState.failStage === 'all') throw new Error('<b>section provider failed</b>');
       return `<p>${section.heading} body ${index + 1} with practical guidance.</p>`;
     }),
     generateConclusion: vi.fn(async () => {
-      if (generationState.failStage === 'conclusion') throw new Error('<b>conclusion provider failed</b>');
+      if (generationState.failStage === 'conclusion' || generationState.failStage === 'all') throw new Error('<b>conclusion provider failed</b>');
       return '<p>Draft conclusion with a clear next step.</p>';
     }),
     unifyPost: vi.fn(async () => null),
@@ -61,6 +61,12 @@ vi.mock('../../server/content-posts-ai.js', async importOriginal => {
 import db from '../../server/db/index.js';
 import { createJob, clearCompletedJobs, listJobs } from '../../server/jobs.js';
 import { getPost, listPosts } from '../../server/content-posts-db.js';
+import {
+  generatePost,
+  markPostGenerationCancelled,
+  markPostGenerationFailed,
+} from '../../server/content-posts.js';
+import { getBrief } from '../../server/content-brief.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
@@ -352,6 +358,57 @@ describe('content post generation mutation safety', () => {
       }));
     },
   );
+
+  it('persists an unusable initial generation as error without success semantics', async () => {
+    const briefId = 'brief-unusable';
+    seedBrief(briefId);
+    generationState.failStage = 'all';
+
+    const startRes = await postJson(`/api/content-posts/${workspaceId}/generate`, { briefId });
+    const started = await startRes.json() as { id: string; jobId: string };
+    const job = await waitForJob(started.jobId);
+    const post = getPost(workspaceId, started.id);
+
+    expect(job).toMatchObject({ status: 'error', result: { postId: started.id, status: 'error' } });
+    expect(post?.status).toBe('error');
+    expect(post?.generationDiagnostics).toHaveLength(3);
+    expect(activityTitles('post_generated')).toEqual([]);
+  });
+
+  it('preserves a prior valid artifact when full regeneration fails', async () => {
+    const briefId = 'brief-regeneration-preserve';
+    seedBrief(briefId);
+    const startRes = await postJson(`/api/content-posts/${workspaceId}/generate`, { briefId });
+    const started = await startRes.json() as { id: string; jobId: string };
+    await waitForJob(started.jobId);
+    const before = getPost(workspaceId, started.id)!;
+    const brief = getBrief(workspaceId, briefId)!;
+
+    generationState.failStage = 'section';
+    await expect(generatePost(workspaceId, brief, started.id)).rejects.toThrow('section provider failed');
+
+    expect(getPost(workspaceId, started.id)).toEqual(before);
+
+    markPostGenerationFailed(workspaceId, brief, started.id, new Error('job wrapper failure'));
+    expect(getPost(workspaceId, started.id)).toEqual(before);
+
+    markPostGenerationCancelled(workspaceId, brief, started.id);
+    expect(getPost(workspaceId, started.id)).toEqual(before);
+    expect(activityTitles('content_updated')).toEqual(expect.arrayContaining([
+      'Content regeneration failed for "local seo guide"',
+      'Content regeneration cancelled for "local seo guide"',
+    ]));
+
+    generationState.failStage = null;
+    const abortController = new AbortController();
+    await expect(generatePost(workspaceId, brief, started.id, {
+      signal: abortController.signal,
+      onProgress: ({ message }) => {
+        if (message === 'Generating SEO metadata...') abortController.abort();
+      },
+    })).rejects.toThrow('Generation cancelled by user');
+    expect(getPost(workspaceId, started.id)).toEqual(before);
+  });
 
   it('marks the post and job as failed when generation crashes after the skeleton write', async () => {
     const briefId = 'brief-mutation-failure';

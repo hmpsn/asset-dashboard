@@ -11,11 +11,12 @@ import type { GeneratedPost } from '../../../shared/types/content';
 import { useAdminPostsList, usePublishTarget, useSendPostToClient } from './useAdminPosts';
 
 export type ContentPostSortField = 'date' | 'title' | 'status' | 'words';
-export type ContentPostStatusFilter = 'all' | 'generating' | 'draft' | 'review' | 'approved' | 'error';
+export type ContentPostStatusFilter = 'all' | 'generating' | 'needs_attention' | 'draft' | 'review' | 'approved' | 'error';
 
 export interface ContentPostStatusCounts {
   all: number;
   generating: number;
+  needs_attention: number;
   error: number;
   draft: number;
   review: number;
@@ -44,7 +45,7 @@ export function filterAndSortPosts(
         case 'date': cmp = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); break;
         case 'title': cmp = a.title.localeCompare(b.title); break;
         case 'status': {
-          const order = { generating: 0, error: 1, draft: 2, review: 3, approved: 4 };
+          const order = { generating: 0, needs_attention: 1, error: 2, draft: 3, review: 4, approved: 5 };
           cmp = (order[a.status] || 0) - (order[b.status] || 0);
           break;
         }
@@ -58,6 +59,7 @@ export function countPostsByStatus(posts: GeneratedPost[]): ContentPostStatusCou
   return {
     all: posts.length,
     generating: posts.filter(post => post.status === 'generating').length,
+    needs_attention: posts.filter(post => post.status === 'needs_attention').length,
     error: posts.filter(post => post.status === 'error').length,
     draft: posts.filter(post => post.status === 'draft').length,
     review: posts.filter(post => post.status === 'review').length,

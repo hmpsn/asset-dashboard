@@ -657,22 +657,15 @@ describe('generateBrief — error handling', () => {
     ).rejects.toThrow('Failed to parse AI response as JSON');
   });
 
-  it('falls back to defaults when AI returns empty/partial JSON', async () => {
+  it('rejects an incomplete initial artifact when AI returns partial JSON', async () => {
     // Return a minimal JSON — most fields missing
     mockOpenAIJsonResponse('content-brief', {
       suggestedTitle: 'Minimal Title',
     });
 
-    const brief = await generateBrief(TEST_WS_ID, 'partial response keyword', {});
-
-    // Should use the one field provided
-    expect(brief.suggestedTitle).toBe('Minimal Title');
-    // Should fall back to defaults for missing fields
-    expect(brief.secondaryKeywords).toEqual([]);
-    expect(brief.outline).toEqual([]);
-    expect(brief.wordCountTarget).toBe(1500);
-    expect(brief.intent).toBe('informational');
-    expect(brief.internalLinkSuggestions).toEqual([]);
+    await expect(
+      generateBrief(TEST_WS_ID, 'partial response keyword', {}),
+    ).rejects.toThrow();
   });
 });
 

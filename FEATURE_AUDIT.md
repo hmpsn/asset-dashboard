@@ -6,6 +6,16 @@ A comprehensive value assessment of every feature in the platform — **feature 
 
 ---
 
+### 675. Truthful content-generation artifacts and delivery gates 2026-07-13
+
+**What it does:** Separates strict initial brief/copy creation from partial update parsing, requires generated copy to match the exact planned-section census, and permits only one bounded repair before failing without durable mutation. Generated posts now distinguish useful but incomplete output with a canonical `needs_attention` lifecycle state and typed, sanitized stage diagnostics. Required-stage failures report job failure without `post_generated` success activity, while failed or cancelled regeneration preserves the prior valid artifact.
+
+**Why it matters:** Operators can trust that “draft” means a complete artifact. Incomplete posts remain inspectable for repair but cannot leak through client send, export, Webflow publish, content intelligence, or MCP creation paths. Public client reads omit internal provider diagnostics, and admin status filters/actions consistently reflect the repair state.
+
+**Boundaries:** This is Phase C1 of the two-PR content-generation integrity roadmap item. Generation revisions, provider-neutral durable provenance, resource-scoped idempotency, and version-conditional operator-edit protection remain in C2.
+
+**Tests:** Strict create/update schema tests, exact copy-census repair success/failure, provider failure at introduction/body/conclusion, unusable output, regeneration failure/cancellation preservation, lifecycle retry, public diagnostic omission, client-send side-effect rejection, MCP artifact validation, export rejection, and publish rejection.
+
 ### 674. Keyword evidence integrity & edit-safe generation 2026-07-13
 
 **What it does:** Preserves authoritative intent, CPC, membership source, and field-level evidence provenance from stored keyword rows through candidate pools, enrichment, page/content-gap storage, KCC reads, and canonical Opportunity Value scoring. Keyword strategy generation now records its exact effective-input fingerprint and provider-neutral run provenance, then commits against a monotonic revision in one transaction. Every synthesis input mutation advances that revision atomically, so newer operator intent wins a race without another provider call.

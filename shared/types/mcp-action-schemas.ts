@@ -26,8 +26,8 @@ const contentRequestStatusSchema = z.enum([
   'published',
   'declined',
 ]).describe('Content request lifecycle status: pending_payment, requested, brief_generated, client_review, approved, changes_requested, in_progress, post_review, delivered, published, or declined.');
-const postStatusSchema = z.enum(['generating', 'draft', 'review', 'approved', 'error'])
-  .describe('Post lifecycle status: generating, draft, review, approved, or error.');
+const postStatusSchema = z.enum(['generating', 'needs_attention', 'draft', 'review', 'approved', 'error'])
+  .describe('Post lifecycle status: generating, needs_attention, draft, review, approved, or error.');
 const insightTypeSchema = z.enum([
   'page_health',
   'ranking_opportunity',
@@ -254,18 +254,18 @@ const postContentSchema = z.object({
   targetKeyword: z.string().min(1),
   title: z.string().min(1),
   metaDescription: z.string().min(1),
-  introduction: z.string(),
+  introduction: z.string().trim().min(1),
   sections: z.array(z.object({
     index: z.number().int().nonnegative(),
-    heading: z.string(),
-    content: z.string(),
+    heading: z.string().trim().min(1),
+    content: z.string().trim().min(1),
     wordCount: z.number().int().nonnegative(),
     targetWordCount: z.number().int().positive(),
     keywords: z.array(z.string()),
-    status: z.enum(['pending', 'generating', 'done', 'error']),
+    status: z.literal('done'),
     error: z.string().optional(),
-  })),
-  conclusion: z.string(),
+  })).min(1),
+  conclusion: z.string().trim().min(1),
   totalWordCount: z.number().int().nonnegative(),
   targetWordCount: z.number().int().positive(),
 }).passthrough();
@@ -436,7 +436,7 @@ export const listPostsInputSchema = z.object({
   limit: z.number().int().positive().max(200).optional()
     .describe('Optional max number of posts to return (1-200).'),
   status: postStatusSchema.optional()
-    .describe('Optional filter to posts at a specific lifecycle status (generating, draft, review, approved, error).'),
+    .describe('Optional filter to posts at a specific lifecycle status (generating, needs_attention, draft, review, approved, error).'),
   page_type: pageTypeSchema.optional()
     .describe('Optional filter to posts of a specific page type (blog, landing, service, location, product, pillar, resource).'),
 });

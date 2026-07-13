@@ -19,7 +19,7 @@ interface CalendarPost {
   briefId: string;
   targetKeyword: string;
   title: string;
-  status: 'generating' | 'draft' | 'review' | 'approved' | 'error';
+  status: 'generating' | 'needs_attention' | 'draft' | 'review' | 'approved' | 'error';
   totalWordCount: number;
   publishedAt?: string;
   /** W6.6: admin-set planned/scheduled publish date for forward-planning. */

@@ -148,12 +148,14 @@ ${context}`;
       if (!section) throw new Error(`Initialized copy section missing for planned id: ${s.sectionPlanItemId}`);
       const sectionPlan = entry.sectionPlan.find(p => p.id === s.sectionPlanItemId);
       const qualityFlags = sectionPlan ? runQualityCheck(s.copy, sectionPlan, guardrailsText) : [];
-      return saveGeneratedCopy(section.id, wsId, {
+      const saved = saveGeneratedCopy(section.id, wsId, {
         generatedCopy: s.copy,
         aiAnnotation: s.annotation,
         aiReasoning: s.reasoning,
         qualityFlags: qualityFlags.length > 0 ? qualityFlags : undefined,
       });
+      if (!saved) throw new Error(`Failed to persist generated copy section: ${section.id}`);
+      return saved;
     });
 
     const meta = saveMetadata(entryId, wsId, {
