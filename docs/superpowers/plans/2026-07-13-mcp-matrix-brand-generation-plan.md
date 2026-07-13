@@ -25,10 +25,10 @@ registry entries, barrels, roadmap, and generated rules are controller-owned.
 Parallel lanes get exclusive files. If a lane needs an unowned shared file, it
 stops with `NEEDS_CONTEXT`; the controller lands the contract and redispatches.
 
-This current branch is one prerequisite planning PR: the unflagged S0 security
-fix plus audit/spec/plan/rule artifacts only. It does not implement product phase
-P0. After it merges and staging is verified, P0 and every later implementation
-phase ship as separate phase-per-PR branches from then-current `origin/staging`.
+The prerequisite planning/S0 security PR merged before implementation began.
+P0 is implemented on this branch; every later implementation phase ships as a
+separate phase-per-PR branch from then-current `origin/staging` after P0 merges
+with green CI.
 
 ## Bounded contexts and canonical decisions
 
@@ -50,7 +50,7 @@ per page type.
 ## Exact dependency graph
 
 ```text
-S0 scoped-key alias security fix + planning artifacts (current prerequisite PR)
+S0 scoped-key alias security fix + planning artifacts (merged prerequisite)
   └─ P0 shared program contracts + two reserved rollout flags
       └─ R1 MCP registry/execution-context hardening
           ├─ M0 matrix revisions + run ledger + structural resolution/reads
@@ -142,18 +142,23 @@ different workspace values; MCP auth/routing tests and typecheck pass.
 
 **Owner:** controller. **Depends:** S0 merged.
 
+**Status on this branch:** implemented; final CI-equivalent verification pending.
+
 Exclusive ownership: new
 `shared/types/{matrix-generation,generation-evidence,brand-intake,brand-generation,brand-content-onboarding}.ts`,
 additive changes to
 `shared/types/{content,brand-engine,feature-flags,index}.ts`,
 shared barrels, lifecycle/flag contract tests, compatibility-only exhaustive
-`naming` metadata/instruction/test updates in `server/brand-identity.ts`,
-`src/components/brand/IdentityTab.tsx`, and its focused tests, roadmap, and
-rule/spec/plan amendments. The compatibility UI edit supplies the required
-label only; it must not add `naming` to a rendered tier/action before B2. Must
-not add routes, workers, AI calls, rendered UI, migrations, or
-background-job constants before their owning worker phase can satisfy the job
-census.
+`naming` vocabulary and closed-boundary updates in `server/brand-identity.ts`,
+the existing `server/routes/brand-identity.ts` adapter, `src/api/brand-engine.ts`,
+`src/components/brand/IdentityTab.tsx`,
+`src/components/brand-ai-rebuilt/BrandAiSurface.tsx`,
+and focused tests, plus roadmap and rule/spec/plan amendments. Compatibility
+keeps the durable label/instructions readable while the legacy generate/refine
+service, HTTP schema, API payload, generator census, rendered tier/action, and
+stale focused-UI input all reject `naming` before B2. Must not add new endpoints,
+workers, AI dispatches, generation UI actions, migrations, or background-job
+constants before their owning worker phase can satisfy the job census.
 
 1. Treat the detailed user request as authoritative because the referenced
    external operations notes are unavailable locally. Their absence is
@@ -643,7 +648,7 @@ observed.
 | Phase | Focused command / assertion |
 |---|---|
 | S0 | `npx vitest run tests/unit/mcp-auth-perkey.test.ts tests/contract/mcp-tool-input-schema-properties.test.ts tests/contract/mcp-tool-workspace-scope-schema.test.ts` |
-| P0 | `npx vitest run tests/unit/feature-flags.test.ts tests/unit/feature-flag-lifecycle.test.ts tests/contract/mcp-generation-contracts.test.ts` |
+| P0 | `npx vitest run tests/unit/feature-flags.test.ts tests/unit/feature-flag-lifecycle.test.ts tests/contract/feature-flag-catalog.test.ts tests/contract/mcp-generation-contracts.test.ts` |
 | R1 | `npx vitest run tests/unit/mcp-routing.test.ts tests/unit/mcp-auth-perkey.test.ts tests/contract/mcp-tool-input-schema-properties.test.ts tests/contract/mcp-tool-workspace-scope-schema.test.ts tests/integration/mcp-api-keys-admin.test.ts` |
 | M0 | `npx vitest run tests/unit/content-matrix-renderer.test.ts tests/integration/content-matrices-routes.test.ts tests/contract/mcp-matrix-read-tools.test.ts`; repeat structural resolve and assert identical source fingerprint/zero AI executions; accept/reject/stale template upgrade |
 | B0 | `npx vitest run tests/integration/public-onboarding-routes.test.ts tests/integration/brand-intake.test.ts`; submit the same body twice to `POST /api/public/onboarding/:id`, assert one revision/projection, then cover authenticated admin GET/evidence POST |

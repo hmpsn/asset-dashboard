@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { IdentityTab } from '../../../src/components/brand/IdentityTab';
-import type { BrandDeliverableType } from '../../../shared/types/brand-engine';
+import type { ReleasedBrandDeliverableType } from '../../../shared/types/brand-engine';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -71,7 +71,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 
 function renderIdentityTab(
   workspaceId = 'ws-1',
-  options: { focusType?: BrandDeliverableType | null; onClearFocus?: () => void } = {},
+  options: { focusType?: ReleasedBrandDeliverableType | null; onClearFocus?: () => void } = {},
 ) {
   return render(
     <IdentityTab
@@ -162,6 +162,18 @@ describe('IdentityTab', () => {
     expect(screen.getByText('Emotional Triggers')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^generate$/i })).toBeInTheDocument();
     expect(screen.queryByText('No brand deliverables yet')).not.toBeInTheDocument();
+  });
+
+  it('treats the reserved naming target as an invalid runtime focus', async () => {
+    mockList.mockResolvedValue([]);
+
+    renderIdentityTab('ws-1', {
+      focusType: 'naming' as unknown as ReleasedBrandDeliverableType,
+    });
+
+    expect(await screen.findByText('No brand deliverables yet')).toBeInTheDocument();
+    expect(screen.queryByTestId('focused-brand-deliverable')).not.toBeInTheDocument();
+    expect(screen.queryByText('Naming')).not.toBeInTheDocument();
   });
 
   it('clears only focused Identity state from the focused editor control', async () => {

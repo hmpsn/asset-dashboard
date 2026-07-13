@@ -12,6 +12,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import db from '../../server/db/index.js';
+import type { BrandDeliverableType, DeliverableTier } from '../../shared/types/brand-engine.js';
 
 const ctx = createEphemeralTestContext(import.meta.url);
 const { api, patchJson } = ctx;
@@ -23,14 +24,15 @@ function seedDeliverable(
   id: string,
   content: string,
   status: 'draft' | 'approved' = 'draft',
-  deliverableType: 'mission' | 'vision' = 'mission',
+  deliverableType: BrandDeliverableType = 'mission',
+  tier: DeliverableTier = 'essentials',
 ) {
   const now = new Date().toISOString();
   db.prepare(`
     INSERT INTO brand_identity_deliverables
     (id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, workspaceId, deliverableType, content, status, 1, 'essentials', now, now);
+  `).run(id, workspaceId, deliverableType, content, status, 1, tier, now, now);
 }
 
 beforeAll(async () => {
@@ -70,6 +72,44 @@ describe('GET /api/brand-identity/:workspaceId', () => {
     const body = await res.json();
     expect(Array.isArray(body)).toBe(true);
     expect(body.length).toBe(0);
+  });
+
+  it('round-trips a durable draft naming deliverable without a schema migration', async () => {
+    const namingWorkspaceId = createWorkspace('Brand Naming Read Contract').id;
+    const deliverableId = `bid_naming_${Date.now()}`;
+    try {
+      seedDeliverable(
+        namingWorkspaceId,
+        deliverableId,
+        'Northstar naming directions',
+        'draft',
+        'naming',
+        'premium',
+      );
+
+      const res = await api(`/api/brand-identity/${namingWorkspaceId}`);
+      expect(res.status).toBe(200);
+      const body = await res.json() as Array<{
+        id: string;
+        deliverableType: BrandDeliverableType;
+        content: string;
+        status: string;
+        version: number;
+        tier: DeliverableTier;
+      }>;
+      expect(body).toEqual([
+        expect.objectContaining({
+          id: deliverableId,
+          deliverableType: 'naming',
+          content: 'Northstar naming directions',
+          status: 'draft',
+          version: 1,
+          tier: 'premium',
+        }),
+      ]);
+    } finally {
+      deleteWorkspace(namingWorkspaceId);
+    }
   });
 });
 

@@ -1,6 +1,6 @@
 import type {
+  AuthenticVoiceEvidenceSourceRef,
   GenerationEvidenceRequirement,
-  GenerationEvidenceSourceRef,
 } from './generation-evidence.js';
 
 export const BRAND_INTAKE_SCHEMA_VERSION = 1 as const;
@@ -52,7 +52,7 @@ export interface BrandIntakeAuthenticSample {
   kind: 'client_written' | 'approved_existing_copy' | 'accepted_source_excerpt';
   content: string;
   context: 'headline' | 'body' | 'cta' | 'about' | 'service' | 'social' | 'seo';
-  sourceRef: GenerationEvidenceSourceRef;
+  sourceRef: AuthenticVoiceEvidenceSourceRef;
 }
 
 /** Stored, schema-versioned form of the existing questionnaire payload. */

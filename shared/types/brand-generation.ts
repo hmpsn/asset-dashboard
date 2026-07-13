@@ -5,10 +5,15 @@ import {
 } from './brand-engine.js';
 import type { BrandIntakeRevisionRef } from './brand-intake.js';
 import {
+  type AuthenticVoiceEvidenceSourceRef,
   GENERATION_RUN_STATUSES,
   type GenerationAuditReport,
+  type GenerationAutomaticRevisionCount,
   type GenerationEvidenceRequirement,
+  type GenerationFactualEvidenceSourceRef,
   type GenerationEvidenceSourceRef,
+  type GenerationHumanReviewerAttribution,
+  type GenerationOperatorAttribution,
   type GenerationPlaceholderProjection,
   type GenerationResolverAttribution,
   type GenerationRunCounts,
@@ -86,7 +91,7 @@ export interface BrandGenerationPresetPolicy {
   resumeTargets: readonly BrandGenerationAtomicTarget[];
 }
 
-const IDENTITY_MESSAGING_TARGETS = [
+export const IDENTITY_MESSAGING_TARGETS = [
   'mission',
   'vision',
   'values',
@@ -103,7 +108,7 @@ const IDENTITY_MESSAGING_TARGETS = [
   'naming',
 ] as const satisfies readonly BrandDeliverableType[];
 
-const AUDIENCE_TARGETS = [
+export const AUDIENCE_TARGETS = [
   'personas',
   'customer_journey',
   'objection_handling',
@@ -131,12 +136,19 @@ export const BRAND_GENERATION_PRESET_POLICY = {
 export const BRAND_VOICE_READINESS_STATES = ['missing', 'provisional', 'finalized', 'stale'] as const;
 export type BrandVoiceReadinessState = (typeof BRAND_VOICE_READINESS_STATES)[number];
 
+/** Operator-selected proof that a source is authentic rather than generated output. */
+export type AuthenticVoiceAnchorRef = AuthenticVoiceEvidenceSourceRef & {
+  selectedBy: GenerationOperatorAttribution;
+  selectedAt: string;
+};
+
 export interface FinalizedVoiceSnapshotRef {
   voiceProfileId: string;
   voiceVersion: number;
+  finalizedBy: GenerationOperatorAttribution;
   finalizedAt: string;
   fingerprint: string;
-  anchorEvidenceRefs: [GenerationEvidenceSourceRef, ...GenerationEvidenceSourceRef[]];
+  anchorEvidenceRefs: [AuthenticVoiceAnchorRef, ...AuthenticVoiceAnchorRef[]];
 }
 
 export interface ApprovedBrandDeliverableRef {
@@ -216,12 +228,38 @@ export type BrandGenerationSelection =
   | { kind: 'atomic'; target: BrandGenerationAtomicTarget }
   | { kind: 'preset'; preset: BrandGenerationPreset };
 
-export interface BrandGenerationRun {
+type BrandGenerationAtomicSelectionPlan = {
+  [Target in BrandGenerationAtomicTarget]: {
+    selection: { kind: 'atomic'; target: Target };
+    selectedTargets: readonly [Target];
+  };
+}[BrandGenerationAtomicTarget];
+
+type BrandGenerationPresetSelectionPlan =
+  | {
+      selection: { kind: 'preset'; preset: 'identity_messaging' };
+      selectedTargets: typeof IDENTITY_MESSAGING_TARGETS;
+    }
+  | {
+      selection: { kind: 'preset'; preset: 'audience' };
+      selectedTargets: typeof AUDIENCE_TARGETS;
+    }
+  | {
+      selection: { kind: 'preset'; preset: 'full_brand_system' };
+      selectedTargets:
+        | typeof BRAND_GENERATION_PRESET_POLICY.full_brand_system.initialTargets
+        | typeof BRAND_GENERATION_PRESET_POLICY.full_brand_system.resumeTargets;
+    };
+
+/** Selection and current dispatch targets are one discriminated persisted contract. */
+export type BrandGenerationRunSelectionPlan =
+  | BrandGenerationAtomicSelectionPlan
+  | BrandGenerationPresetSelectionPlan;
+
+interface BrandGenerationRunBase {
   id: string;
   workspaceId: string;
   intakeRevision: BrandIntakeRevisionRef;
-  selection: BrandGenerationSelection;
-  selectedTargets: BrandGenerationAtomicTarget[];
   status: BrandGenerationRunStatus;
   stage: BrandGenerationStage;
   revision: number;
@@ -236,11 +274,13 @@ export interface BrandGenerationRun {
   completedAt: string | null;
 }
 
+export type BrandGenerationRun = BrandGenerationRunBase & BrandGenerationRunSelectionPlan;
+
 export type BrandGeneratedClaim =
   | {
       text: string;
       classification: 'factual';
-      sourceRefs: [GenerationEvidenceSourceRef, ...GenerationEvidenceSourceRef[]];
+      sourceRefs: [GenerationFactualEvidenceSourceRef, ...GenerationFactualEvidenceSourceRef[]];
     }
   | {
       text: string;
@@ -248,21 +288,18 @@ export type BrandGeneratedClaim =
       sourceRefs: GenerationEvidenceSourceRef[];
     };
 
-export interface BrandGenerationItem {
+interface BrandGenerationItemBase {
   id: string;
   runId: string;
-  target: BrandGenerationAtomicTarget;
   status: BrandGenerationItemStatus;
   revision: number;
-  deliverableId: string | null;
-  expectedDeliverableVersion: number | null;
   content: string | null;
   claims: BrandGeneratedClaim[];
   requirements: GenerationEvidenceRequirement[];
   placeholders: GenerationPlaceholderProjection[];
   auditReport: GenerationAuditReport | null;
   attemptCount: number;
-  automaticRevisionCount: number;
+  automaticRevisionCount: GenerationAutomaticRevisionCount;
   effectiveInputFingerprint: string | null;
   provenance: GenerationProvenance | null;
   error: GenerationSanitizedError | null;
@@ -270,6 +307,21 @@ export interface BrandGenerationItem {
   updatedAt: string;
   completedAt: string | null;
 }
+
+type DurableBrandDeliverableLink =
+  | { deliverableId: null; expectedDeliverableVersion: null }
+  | { deliverableId: string; expectedDeliverableVersion: number };
+
+/** A provisional foundation can never masquerade as a durable BrandDeliverable. */
+export type BrandGenerationItem =
+  | (BrandGenerationItemBase & {
+      target: 'voice_foundation';
+      deliverableId: null;
+      expectedDeliverableVersion: null;
+    })
+  | (BrandGenerationItemBase & {
+      target: BrandDeliverableType;
+    } & DurableBrandDeliverableLink);
 
 export interface BrandGenerationAttempt {
   id: string;
@@ -287,17 +339,28 @@ export interface BrandGenerationAttempt {
 export const BRAND_REVIEW_ITEM_DECISIONS = ['approve', 'changes_requested'] as const;
 export type BrandReviewDecision = (typeof BRAND_REVIEW_ITEM_DECISIONS)[number];
 
-export interface BrandReviewItemDecision {
+interface BrandReviewItemDecisionBase {
   runId: string;
   itemId: string;
   deliverableId: string;
   deliverableType: BrandDeliverableType;
-  decision: BrandReviewDecision;
   expectedDeliverableVersion: number;
-  note?: string;
-  decidedBy: GenerationResolverAttribution;
   decidedAt: string;
 }
+
+/** Review is always human; a changes request is never allowed to lose its note. */
+export type BrandReviewItemDecision = BrandReviewItemDecisionBase & (
+  | {
+      decision: 'approve';
+      note?: string;
+      decidedBy: GenerationHumanReviewerAttribution;
+    }
+  | {
+      decision: 'changes_requested';
+      note: string;
+      decidedBy: GenerationHumanReviewerAttribution;
+    }
+);
 
 /** Deliberately excludes intake, prompts, evidence internals, and draft output. */
 export interface ClientBrandSummary {

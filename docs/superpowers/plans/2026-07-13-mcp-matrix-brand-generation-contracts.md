@@ -111,6 +111,10 @@ M0 returns this structural target without claiming generation readiness.
 - canonical effective-input fingerprint and blocking requirements.
 
 M1 is the first phase allowed to return this generation-ready target.
+A paid matrix run stores a non-empty tuple of those accepted preview selections;
+every item has a non-null preview fingerprint. Onboarding may retain a non-empty
+pre-preview selection with nullable preview fingerprints until authorization,
+but it cannot dispatch paid work from that looser shape.
 
 The resolver receives explicit IDs. The old keyword cross-reference may remain
 for legacy standalone generation but is forbidden in matrix-run code.
@@ -133,7 +137,10 @@ last; template blocks cannot use either reserved system ID.
 - `creative_proposal`: non-factual option such as a tagline or name.
 
 Each requirement has a stable ID, field/claim, reason, source refs,
-`requirementStage`, and optional client-safe prompt. `requirementStage` is:
+`claimKind`, `requirementStage`, and optional client-safe prompt. Factual refs
+exclude structural-only `content_matrix`, `content_matrix_cell`, and
+`content_template` sources; normalized `content_matrix_cell_evidence` remains a
+valid durable factual source. `requirementStage` is:
 
 - `preflight`: blocks paid work (source identity, supported/locked template,
   verified service availability, substantive location relevance, finalized
@@ -169,8 +176,13 @@ derived verdict:
 - `needs_attention`;
 - `blocked_missing_evidence`.
 
-The report never uses a single model boolean to override a deterministic failure
-or pass factual/no-hallucination checks.
+`ready_for_human_review` requires an exact empty unresolved-requirement tuple
+and deterministic results limited to `passed|not_applicable`;
+`blocked_missing_evidence` requires at least one unresolved requirement.
+Human-required checks can be `needs_human_review|not_applicable`, never
+auto-passed. The shared automatic revision count is exactly `0|1` at the audit,
+brand-item, and matrix-item seams. The report never uses a single model boolean
+to override a deterministic failure or pass factual/no-hallucination checks.
 
 ### Run outcomes
 
@@ -224,8 +236,11 @@ The run carries a monotonic revision, immutable intake/brand/voice/matrix source
 refs, child brand/page-review IDs, idempotency key, and durable gate evidence. Its
 idempotency scope is `(workspaceId, intakeRevisionId, idempotencyKey)`.
 Gate evidence is discriminated by gate. Voice proof contains the finalized
-snapshot; page proof maps every approval to matrix run/item/cell and post
-revisions. A generic string ID cannot satisfy a different gate.
+snapshot; page proof maps every approval to matrix run/item/cell, the full
+matrix/template/cell source revision, the post revision, and a human approver.
+Content authorization carries a durable authorization ID plus a named
+operator/client actor; a system recorder is not the authorization proof. A
+generic string ID cannot satisfy a different gate.
 
 ## Template and pSEO contracts
 
@@ -268,12 +283,18 @@ revisions. A generic string ID cannot satisfy a different gate.
   blocks.
 - Authentic client examples and accepted source excerpts outrank generated
   prose. Generated taglines/examples cannot silently calibrate their own source
-  model.
+  model. Authentic-sample source refs exclude generated deliverables, profiles,
+  matrix structure, intelligence summaries, and templates; finalized anchors
+  additionally record the operator who selected them and when. A referenced
+  `voice_sample` also records an allowed authentic origin, exactly `manual` or
+  `transcript_extraction`; calibration-loop and approved generated-copy origins
+  cannot anchor final voice.
 - Voice-foundation bootstrap may consume accepted intake and authentic samples
   without an already-finalized profile. A full-suite run generates only that
   provisional foundation, then pauses at `awaiting_voice_finalization`.
 - An operator reviews the foundation, selects authentic anchors, and finalizes
-  the profile. Only `resume_brand_deliverable_generation` with that durable
+  the profile; the snapshot records that finalizing operator. Only
+  `resume_brand_deliverable_generation` with that durable
   finalized version may start dependent identity/messaging/audience work.
 - `BrandGenerationAtomicTarget` is exactly
   `'voice_foundation' | BrandDeliverableType`.
@@ -290,6 +311,9 @@ revisions. A generic string ID cannot satisfy a different gate.
   selections, duplicates, and mixed foundation/dependent starts are not valid
   shared shapes. Preset policy separately freezes `initialTargets` and
   `resumeTargets`, so full-suite initial dispatch is foundation-only.
+- Persisted selection and current dispatch targets are one discriminated shape.
+  An atomic foundation run can carry only the foundation tuple, and a foundation
+  item has permanently-null `deliverableId`/version fields.
 - A finalized voice snapshot requires a non-empty authentic-anchor evidence
   tuple. Approved identity refs freeze approval time plus content/approval
   fingerprints, not only the mutable source-row version.
@@ -298,7 +322,8 @@ revisions. A generic string ID cannot satisfy a different gate.
   after commit.
 - `naming` and `tagline` output are creative proposals. Naming never claims
   trademark, domain, legal, or cultural clearance without verified external
-  evidence.
+  evidence. Naming remains outside the released legacy paid-generator service,
+  API payload type, focus prop, and rendered generator census until B2.
 - Brand generation/refinement uses named structured operations and conditional
   saves against the version read before the paid call.
 - Existing `update_brand_deliverable.expectedVersion` stays optional for wire
@@ -383,6 +408,8 @@ revisions. A generic string ID cannot satisfy a different gate.
 
 - Brand review uses one grouped `brand_generation` adapter with one typed item
   per source `BrandDeliverable` and per-item `approve|changes_requested`.
+- Review decisions require a human operator/client actor; automatic/system/MCP
+  approval is not a valid shared shape, and `changes_requested` requires a note.
 - Unresolved `ready` evidence prevents send. Item approval updates that source
   draft→approved only when its expected version matches. Changes requested
   preserves the note, keeps/returns the source in draft, and marks that run item

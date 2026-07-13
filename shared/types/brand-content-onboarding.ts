@@ -3,8 +3,14 @@ import type {
   ApprovedBrandDeliverableRef,
   FinalizedVoiceSnapshotRef,
 } from './brand-generation.js';
-import type { GenerationResolverAttribution } from './generation-evidence.js';
-import type { MatrixGenerationSelectionItem } from './matrix-generation.js';
+import type {
+  GenerationHumanReviewerAttribution,
+  GenerationResolverAttribution,
+} from './generation-evidence.js';
+import type {
+  MatrixGenerationInputSelection,
+  MatrixSourceRevision,
+} from './matrix-generation.js';
 
 export const BRAND_CONTENT_ONBOARDING_STATUSES = [
   'intake_ready',
@@ -54,8 +60,10 @@ export interface MatrixPageApprovalRef {
   matrixItemRevision: number;
   matrixId: string;
   cellId: string;
+  sourceRevision: MatrixSourceRevision;
   postId: string;
   postGenerationRevision: number;
+  approvedBy: GenerationHumanReviewerAttribution;
   approvedAt: string;
 }
 
@@ -92,8 +100,11 @@ export type BrandContentOnboardingGateEvidence =
     })
   | (BrandContentOnboardingGateEvidenceBase & {
       gate: 'content_authorized';
+      authorizationId: string;
       matrixSelectionFingerprint: string;
       authorizedCellIds: [string, ...string[]];
+      authorizedBy: GenerationHumanReviewerAttribution;
+      authorizedAt: string;
     })
   | (BrandContentOnboardingGateEvidenceBase & {
       gate: 'all_pages_approved';
@@ -108,7 +119,7 @@ export type BrandContentOnboardingGateEvidence =
 
 export interface BrandContentOnboardingInputs {
   intakeRevision: BrandIntakeRevisionRef;
-  matrixSelection: MatrixGenerationSelectionItem[] | null;
+  matrixSelection: MatrixGenerationInputSelection | null;
 }
 
 export interface BrandContentOnboardingChildren {

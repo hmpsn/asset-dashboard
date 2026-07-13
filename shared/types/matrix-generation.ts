@@ -13,6 +13,7 @@ import type {
 import {
   GENERATION_RUN_STATUSES,
   type GenerationAuditReport,
+  type GenerationAutomaticRevisionCount,
   type GenerationEvidenceRequirement,
   type GenerationEvidenceResolution,
   type GenerationEvidenceSourceRef,
@@ -20,6 +21,7 @@ import {
   type GenerationRunCounts,
   type GenerationRunStatus,
   type GenerationSanitizedError,
+  type GenerationOperatorAttribution,
   type GenerationResolverAttribution,
 } from './generation-evidence.js';
 
@@ -220,6 +222,25 @@ export interface MatrixGenerationSelectionItem {
   previewFingerprint: string | null;
 }
 
+/** Pre-preview onboarding selection; null means preview has not been accepted yet. */
+export type MatrixGenerationInputSelection = readonly [
+  MatrixGenerationSelectionItem,
+  ...MatrixGenerationSelectionItem[],
+];
+
+export type MatrixGenerationReadySelectionItem = Omit<
+  MatrixGenerationSelectionItem,
+  'previewFingerprint'
+> & {
+  previewFingerprint: string;
+};
+
+/** A paid generation start always addresses at least one previewed durable cell. */
+export type MatrixGenerationSelection = readonly [
+  MatrixGenerationReadySelectionItem,
+  ...MatrixGenerationReadySelectionItem[],
+];
+
 export type MatrixGenerationEvidenceResolution = GenerationEvidenceResolution<
   MatrixSourceRevision,
   MatrixArtifactRevisionExpectations
@@ -252,7 +273,7 @@ export interface MatrixGenerationRun {
   revision: number;
   idempotencyKey: string;
   selectionFingerprint: string;
-  selections: MatrixGenerationSelectionItem[];
+  selections: MatrixGenerationSelection;
   jobId: string | null;
   counts: GenerationRunCounts;
   createdBy: GenerationResolverAttribution;
@@ -276,7 +297,7 @@ export interface MatrixGenerationItem {
   postId: string | null;
   auditReport: GenerationAuditReport | null;
   attemptCount: number;
-  automaticRevisionCount: number;
+  automaticRevisionCount: GenerationAutomaticRevisionCount;
   error: GenerationSanitizedError | null;
   createdAt: string;
   updatedAt: string;
@@ -312,7 +333,7 @@ interface MatrixGenerationRetryRequestBase {
 }
 
 export interface MatrixGenerationReplacementAuthorization {
-  authorizedBy: GenerationResolverAttribution;
+  authorizedBy: GenerationOperatorAttribution;
   reason: string;
   authorizedAt: string;
 }

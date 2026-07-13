@@ -2,7 +2,7 @@
  * Unit + DB-backed tests for server/brand-identity.ts
  *
  * Covers:
- *   - getDeliverableInstructions: all 17 BrandDeliverableType values return non-empty,
+ *   - getDeliverableInstructions: all 18 BrandDeliverableType values return non-empty,
  *     type-specific strings (the main bug risk: type added to union but not the
  *     instructions object silently returns the generic fallback)
  *   - exportDeliverables: empty case, approved-only filter, tier filter, markdown format
@@ -74,11 +74,21 @@ vi.mock('../../server/activity.js', () => ({
 
 import {
   getDeliverableInstructions,
+  generateDeliverable,
+  refineDeliverable,
   exportDeliverables,
   approveDeliverable,
   setDeliverableStatus,
 } from '../../server/brand-identity.js';
-import type { BrandDeliverableType, DeliverableTier } from '../../shared/types/brand-engine.js';
+import { callCreativeAI } from '../../server/content-posts-ai.js';
+import {
+  BRAND_DELIVERABLE_TYPES,
+  DEFAULT_TIER_MAP,
+  RELEASED_BRAND_DELIVERABLE_TYPES,
+  type BrandDeliverableType,
+  type DeliverableTier,
+  type ReleasedBrandDeliverableType,
+} from '../../shared/types/brand-engine.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import db from '../../server/db/index.js';
@@ -118,12 +128,44 @@ function insertDeliverable(opts: {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('getDeliverableInstructions — return type', () => {
-  const ALL_TYPES: BrandDeliverableType[] = [
-    'mission', 'vision', 'values', 'tagline', 'elevator_pitch',
-    'archetypes', 'personality_traits', 'voice_guidelines', 'tone_examples',
-    'messaging_pillars', 'differentiators', 'positioning_matrix', 'brand_story',
-    'personas', 'customer_journey', 'objection_handling', 'emotional_triggers',
-  ];
+  const ALL_TYPES = BRAND_DELIVERABLE_TYPES;
+
+  it('keeps the runtime type census and tier metadata in lockstep', () => {
+    expect(Object.keys(DEFAULT_TIER_MAP).sort()).toEqual([...ALL_TYPES].sort());
+  });
+
+  it('keeps naming outside the legacy paid generator at its reusable boundary', async () => {
+    expect(RELEASED_BRAND_DELIVERABLE_TYPES).toHaveLength(17);
+    expect(RELEASED_BRAND_DELIVERABLE_TYPES).not.toContain('naming');
+    await expect(generateDeliverable(
+      'workspace-unused-before-runtime-guard',
+      'naming' as ReleasedBrandDeliverableType,
+    )).rejects.toThrow(/unsupported legacy brand deliverable type/i);
+  });
+
+  it('keeps durable naming drafts outside the legacy paid refinement boundary', async () => {
+    const ws = seedWorkspace({ tier: 'growth' });
+    try {
+      const id = insertDeliverable({
+        workspaceId: ws.workspaceId,
+        type: 'naming',
+        content: 'Reserved naming proposal',
+        status: 'draft',
+        tier: 'premium',
+      });
+      const creativeCall = vi.mocked(callCreativeAI);
+      creativeCall.mockClear();
+
+      await expect(refineDeliverable(
+        ws.workspaceId,
+        id,
+        'Try a shorter direction',
+      )).rejects.toThrow(/unsupported legacy brand deliverable type/i);
+      expect(creativeCall).not.toHaveBeenCalled();
+    } finally {
+      ws.cleanup();
+    }
+  });
 
   it('always returns a string for every BrandDeliverableType value', () => {
     for (const type of ALL_TYPES) {
@@ -148,11 +190,11 @@ describe('getDeliverableInstructions — return type', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// getDeliverableInstructions — all 17 types must be explicitly mapped
+// getDeliverableInstructions — all 18 types must be explicitly mapped
 // (bug risk: type added to union but not the instructions object returns generic fallback)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('getDeliverableInstructions — all 17 types return specific (non-generic) instructions', () => {
+describe('getDeliverableInstructions — all 18 types return specific (non-generic) instructions', () => {
   it('mission: contains type-specific content (not pure generic fallback)', () => {
     const result = getDeliverableInstructions('mission');
     const isGeneric = result === 'Write a mission for this brand. Be specific, not generic.';
@@ -271,6 +313,20 @@ describe('getDeliverableInstructions — all 17 types return specific (non-gener
     const isGeneric = result === 'Write a emotional triggers for this brand. Be specific, not generic.';
     expect(isGeneric, 'emotional_triggers returned generic fallback').toBe(false);
     expect(result).toMatch(/emotional|trigger|fear/i);
+  });
+
+  it('naming: is an explicitly caveated creative proposal, never a clearance claim', () => {
+    const result = getDeliverableInstructions('naming');
+    const isGeneric = result === 'Write a naming for this brand. Be specific, not generic.';
+    expect(isGeneric, 'naming returned generic fallback').toBe(false);
+    expect(result).toMatch(/creative proposal/i);
+    expect(result).toMatch(/do not claim|never claim/i);
+    expect(result).toMatch(/trademark/i);
+    expect(result).toMatch(/domain/i);
+    expect(result).toMatch(/legal/i);
+    expect(result).toMatch(/cultural/i);
+    expect(result).toMatch(/linguistic/i);
+    expect(result).toMatch(/clearance/i);
   });
 });
 

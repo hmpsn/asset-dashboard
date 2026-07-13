@@ -28,7 +28,7 @@ The overview should include a compact context-completeness cockpit, group sectio
 
 The overview should not show the legacy top tab strip. The grouped context inventory is the navigation surface: cockpit cards and section rows open the corresponding modal workflow while `?tab=` remains the deep-link/state contract.
 
-Each context group owns one non-overlapping Brand identity generators disclosure: seven Voice deliverables, two Knowledge deliverables, five Audience deliverables, and three Business Facts deliverables. Together they expose all 17 production `BrandDeliverableType` values exactly once while the Identity workflow remains the single editor/capability home.
+Each context group owns one non-overlapping Brand identity generators disclosure: seven Voice deliverables, two Knowledge deliverables, five Audience deliverables, and three Business Facts deliverables. Together they expose all 17 released interactive generators exactly once while the Identity workflow remains the single editor/capability home. The additive `naming` `BrandDeliverableType` is reserved for the reviewed MCP brand pipeline and intentionally remains absent from rendered tiers, actions, and focus links until that owning phase ships.
 
 Prototype-critical overlay behavior:
 
@@ -56,7 +56,7 @@ Current implementation note:
 - Long live Brand Voice, Knowledge Base, and persona fields are visually clamped to two lines in the overview while their full content remains available in the real editors. Browser-computed clamp evidence is about 37px / two lines for the 4,648-character Brand Voice fixture. Markdown-backed preview prose is normalized for display without changing stored editor values.
 - Modal shells use the owner-approved DS `workflow` size (680px) and no longer prepend synthetic workflow cards. Every carried production editor still mounts exactly once.
 - Brandscript list selection and deletion are sibling controls; the invalid nested-button composition found during browser comparison is removed.
-- All 17 prototype generators are mapped to their real production deliverable types. `?tab=identity&focus=<BrandDeliverableType>` opens the existing selected editor; bare or invalid focus opens the full library. The overview Brandscript row focuses the first real record while bare `?tab=brandscript` retains the library.
+- All 17 prototype generators are mapped to their real production deliverable types. `?tab=identity&focus=<released-generator-value>` opens the existing selected editor; bare, reserved, or invalid focus opens the full library. The overview Brandscript row focuses the first real record while bare `?tab=brandscript` retains the library.
 - The carried panel interiors remain truthful production editors, not copies of the prototype's curated fixtures. Joshua approved that data-dependent difference under V5; founder Q&A, E-E-A-T rollups, and confirmed-geo rollups remain documented backend exceptions rather than simulated data. Collapsed Brandscript previews hide Markdown syntax, and Context separators render as rules while round-tripping to the stored `---` form.
 
 ## Source-Led Desktop Discrepancy Matrix — 2026-07-10
@@ -83,7 +83,7 @@ Required receiver behavior:
 - `/ws/:workspaceId/brand` opens the overview with no modal.
 - `?tab=overview` opens the overview with no modal.
 - `?tab=identity` opens the full generator library.
-- `?tab=identity&focus=<BrandDeliverableType>` opens exactly one real focused editor; an invalid focus value safely falls back to the full library.
+- `?tab=identity&focus=<released-generator-value>` opens exactly one real focused editor; a reserved or invalid focus value safely falls back to the full library.
 - `?tab=brandscript` opens the brandscript modal.
 - `?tab=brandscript&focus=existing-brandscript` opens the first real existing Brandscript; clearing focus retains the library modal.
 - `?tab=discovery` opens the discovery modal.

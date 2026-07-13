@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AUTHENTIC_VOICE_EVIDENCE_SOURCE_TYPES,
+  GENERATION_AUTOMATIC_REVISION_COUNTS,
   GENERATION_AUDIT_VERDICTS,
   GENERATION_EVIDENCE_REQUIREMENT_STAGES,
   GENERATION_EVIDENCE_STAGE_POLICY,
   GENERATION_EVIDENCE_STATUSES,
   GENERATION_RUN_STATUSES,
+  STRUCTURAL_ONLY_GENERATION_EVIDENCE_SOURCE_TYPES,
   canRenderGenerationPlaceholder,
+  type AuthenticVoiceEvidenceSourceRef,
+  type GenerationAuditReport,
   type GenerationEvidenceResolution,
   type GenerationEvidenceRequirement,
   type GenerationEvidenceSourceRef,
+  type GenerationFactualEvidenceSourceRef,
 } from '../../shared/types/generation-evidence.js';
 import {
   BRAND_INTAKE_SCHEMA_VERSION,
@@ -22,20 +28,33 @@ import {
   BRAND_GENERATION_PRESETS,
   BRAND_GENERATION_PRESET_POLICY,
   BRAND_GENERATION_RUN_STATUSES,
+  BRAND_REVIEW_ITEM_DECISIONS,
   type ApprovedBrandDeliverableRef,
+  type AuthenticVoiceAnchorRef,
   type BrandGeneratedClaim,
+  type BrandGenerationItem,
+  type BrandGenerationRun,
   type BrandGenerationSelection,
+  type BrandReviewItemDecision,
   type BrandVoiceReadiness,
 } from '../../shared/types/brand-generation.js';
 import {
+  BRAND_CONTENT_ONBOARDING_GATES,
   BRAND_CONTENT_ONBOARDING_STATUSES,
+  type BrandContentOnboardingInputs,
   type BrandContentOnboardingGateEvidence,
+  type MatrixPageApprovalRef,
 } from '../../shared/types/brand-content-onboarding.js';
 import {
   MATRIX_GENERATION_ITEM_STATUSES,
   MATRIX_GENERATION_RUN_STATUSES,
   RESOLVED_SYSTEM_BLOCK_IDS,
   type MatrixArtifactRevisionExpectations,
+  type MatrixGenerationInputSelection,
+  type MatrixGenerationItem,
+  type MatrixGenerationRun,
+  type MatrixGenerationSelection,
+  type MatrixGenerationReplacementAuthorization,
   type MatrixGenerationPreviewTarget,
   type MatrixSourceRevision,
   type ResolveMatrixGenerationEvidenceRequest,
@@ -43,7 +62,12 @@ import {
   type ResolvedPageBlockManifest,
   type ResolvedMatrixStructuralTarget,
 } from '../../shared/types/matrix-generation.js';
-import { BRAND_DELIVERABLE_TYPES } from '../../shared/types/brand-engine.js';
+import {
+  AUTHENTIC_VOICE_SAMPLE_SOURCES,
+  BRAND_DELIVERABLE_TYPES,
+  type AuthenticVoiceSampleSource,
+  type VoiceSampleSource,
+} from '../../shared/types/brand-engine.js';
 
 type HasKey<T, K extends PropertyKey> = K extends keyof T ? true : false;
 type AssertFalse<T extends false> = T;
@@ -60,6 +84,46 @@ describe('MCP matrix + brand generation shared contracts', () => {
       'conflicting',
       'creative_proposal',
     ]);
+    expect(AUTHENTIC_VOICE_EVIDENCE_SOURCE_TYPES).toEqual([
+      'client_submission',
+      'operator_submission',
+      'brand_intake',
+      'voice_sample',
+      'external_research',
+    ]);
+    expect(AUTHENTIC_VOICE_SAMPLE_SOURCES).toEqual([
+      'manual',
+      'transcript_extraction',
+    ]);
+    expect(STRUCTURAL_ONLY_GENERATION_EVIDENCE_SOURCE_TYPES).toEqual([
+      'content_matrix',
+      'content_matrix_cell',
+      'content_template',
+    ]);
+    expect(GENERATION_AUTOMATIC_REVISION_COUNTS).toEqual([0, 1]);
+    type AuthenticSourceType = AuthenticVoiceEvidenceSourceRef['sourceType'];
+    const authenticSourcesAreNarrowed: AssertTrue<IsExact<
+      AuthenticSourceType,
+      | 'client_submission'
+      | 'operator_submission'
+      | 'brand_intake'
+      | 'voice_sample'
+      | 'external_research'
+    >> = true;
+    type GeneratedVoiceSampleSource = Extract<
+      VoiceSampleSource,
+      'calibration_loop' | 'identity_approved' | 'copy_approved'
+    >;
+    const generatedSamplesCannotAnchorVoice: AssertTrue<IsExact<
+      Extract<AuthenticVoiceSampleSource, GeneratedVoiceSampleSource>,
+      never
+    >> = true;
+    type StructuralSource = (typeof STRUCTURAL_ONLY_GENERATION_EVIDENCE_SOURCE_TYPES)[number];
+    type FactualSource = GenerationFactualEvidenceSourceRef['sourceType'];
+    const structuralLabelsCannotGroundFacts: AssertTrue<IsExact<
+      Extract<FactualSource, StructuralSource>,
+      never
+    >> = true;
     expect(GENERATION_EVIDENCE_REQUIREMENT_STAGES).toEqual([
       'preflight',
       'ready',
@@ -90,6 +154,7 @@ describe('MCP matrix + brand generation shared contracts', () => {
 
     const missingReady: GenerationEvidenceRequirement = {
       id: 'req-hours',
+      claimKind: 'factual',
       status: 'missing',
       fieldPath: 'business.hours',
       claim: 'Opening hours',
@@ -100,6 +165,7 @@ describe('MCP matrix + brand generation shared contracts', () => {
     };
     const verifiedReady: GenerationEvidenceRequirement = {
       ...missingReady,
+      claimKind: 'factual',
       status: 'verified',
       sourceRefs: [{
         sourceType: 'client_submission',
@@ -109,6 +175,56 @@ describe('MCP matrix + brand generation shared contracts', () => {
     };
     expect(canRenderGenerationPlaceholder(missingReady)).toBe(true);
     expect(canRenderGenerationPlaceholder(verifiedReady)).toBe(false);
+    expect(authenticSourcesAreNarrowed).toBe(true);
+    expect(generatedSamplesCannotAnchorVoice).toBe(true);
+    expect(structuralLabelsCannotGroundFacts).toBe(true);
+  });
+
+  it('makes ready audit verdicts truthful and caps the shared automatic revision loop', () => {
+    type ReadyReport = Extract<GenerationAuditReport, { verdict: 'ready_for_human_review' }>;
+    type BlockedReport = Extract<GenerationAuditReport, { verdict: 'blocked_missing_evidence' }>;
+    type ReadyCheckResult = ReadyReport['deterministicChecks'][number]['result'];
+    type HumanRequiredResult = GenerationAuditReport['humanRequiredChecks'][number]['result'];
+    const readyHasNoUnresolvedEvidence: AssertTrue<IsExact<
+      ReadyReport['unresolvedRequirementIds'],
+      []
+    >> = true;
+    const blockedHasMissingEvidence: AssertTrue<IsExact<
+      BlockedReport['unresolvedRequirementIds'],
+      [string, ...string[]]
+    >> = true;
+    const readyChecksCannotFail: AssertTrue<IsExact<
+      ReadyCheckResult,
+      'passed' | 'not_applicable'
+    >> = true;
+    const humanRequiredChecksCannotAutoPass: AssertTrue<IsExact<
+      HumanRequiredResult,
+      'needs_human_review' | 'not_applicable'
+    >> = true;
+    const brandRevisionLoopIsBounded: AssertTrue<IsExact<
+      BrandGenerationItem['automaticRevisionCount'],
+      0 | 1
+    >> = true;
+    const matrixRevisionLoopIsBounded: AssertTrue<IsExact<
+      MatrixGenerationItem['automaticRevisionCount'],
+      0 | 1
+    >> = true;
+
+    expect({
+      readyHasNoUnresolvedEvidence,
+      blockedHasMissingEvidence,
+      readyChecksCannotFail,
+      humanRequiredChecksCannotAutoPass,
+      brandRevisionLoopIsBounded,
+      matrixRevisionLoopIsBounded,
+    }).toEqual({
+      readyHasNoUnresolvedEvidence: true,
+      blockedHasMissingEvidence: true,
+      readyChecksCannotFail: true,
+      humanRequiredChecksCannotAutoPass: true,
+      brandRevisionLoopIsBounded: true,
+      matrixRevisionLoopIsBounded: true,
+    });
   });
 
   it('locks truthful shared run outcomes and stage-specific item outcomes', () => {
@@ -247,17 +363,78 @@ describe('MCP matrix + brand generation shared contracts', () => {
     expect(new Set(groupedDurableTargets)).toEqual(new Set(BRAND_DELIVERABLE_TYPES));
   });
 
+  it('makes bootstrap persistence singular and brand review decisions human-only', () => {
+    type FoundationRun = Extract<
+      BrandGenerationRun,
+      { selection: { kind: 'atomic'; target: 'voice_foundation' } }
+    >;
+    type FoundationItem = Extract<BrandGenerationItem, { target: 'voice_foundation' }>;
+    type Approval = Extract<BrandReviewItemDecision, { decision: 'approve' }>;
+    type ChangesRequested = Extract<BrandReviewItemDecision, { decision: 'changes_requested' }>;
+
+    const foundationTargetsAreExact: AssertTrue<IsExact<
+      FoundationRun['selectedTargets'],
+      readonly ['voice_foundation']
+    >> = true;
+    const foundationHasNoDeliverable: AssertTrue<IsExact<
+      FoundationItem['deliverableId'],
+      null
+    >> = true;
+    const foundationHasNoDeliverableVersion: AssertTrue<IsExact<
+      FoundationItem['expectedDeliverableVersion'],
+      null
+    >> = true;
+    const reviewIsHumanOnly: AssertTrue<IsExact<
+      Approval['decidedBy']['actorType'],
+      'operator' | 'client'
+    >> = true;
+    const changeNoteIsRequired: AssertTrue<IsExact<
+      ChangesRequested['note'],
+      string
+    >> = true;
+
+    expect(BRAND_REVIEW_ITEM_DECISIONS).toEqual(['approve', 'changes_requested']);
+    expect({
+      foundationTargetsAreExact,
+      foundationHasNoDeliverable,
+      foundationHasNoDeliverableVersion,
+      reviewIsHumanOnly,
+      changeNoteIsRequired,
+    }).toEqual({
+      foundationTargetsAreExact: true,
+      foundationHasNoDeliverable: true,
+      foundationHasNoDeliverableVersion: true,
+      reviewIsHumanOnly: true,
+      changeNoteIsRequired: true,
+    });
+  });
+
   it('requires immutable approved identity and anchored finalized voice snapshots', () => {
-    const anchor: GenerationEvidenceSourceRef = {
+    type FinalizedReadiness = Extract<BrandVoiceReadiness, { state: 'finalized' }>;
+    const finalizationIsOperatorOnly: AssertTrue<IsExact<
+      FinalizedReadiness['snapshot']['finalizedBy']['actorType'],
+      'operator'
+    >> = true;
+    const anchor: AuthenticVoiceAnchorRef = {
       sourceType: 'voice_sample',
+      voiceSampleSource: 'manual',
       sourceId: 'sample-1',
       capturedAt: '2026-07-13T12:00:00.000Z',
+      selectedBy: {
+        actorType: 'operator',
+        actorId: 'operator-1',
+      },
+      selectedAt: '2026-07-13T12:04:00.000Z',
     };
     const readiness: BrandVoiceReadiness = {
       state: 'finalized',
       snapshot: {
         voiceProfileId: 'voice-1',
         voiceVersion: 4,
+        finalizedBy: {
+          actorType: 'operator',
+          actorId: 'operator-1',
+        },
         finalizedAt: '2026-07-13T12:05:00.000Z',
         fingerprint: 'voice-fingerprint',
         anchorEvidenceRefs: [anchor],
@@ -274,12 +451,14 @@ describe('MCP matrix + brand generation shared contracts', () => {
     };
     expect(readiness.state).toBe('finalized');
     expect(readiness.snapshot.anchorEvidenceRefs).toHaveLength(1);
+    expect(finalizationIsOperatorOnly).toBe(true);
     expect(approvedIdentity.approvalFingerprint).toBe('approval-fingerprint');
   });
 
   it('preserves evidence cardinality for intake projections and factual claims', () => {
     const missingRequirement: GenerationEvidenceRequirement = {
       id: 'req-location-proof',
+      claimKind: 'factual',
       status: 'missing',
       fieldPath: 'business.locations',
       claim: 'Office presence',
@@ -309,7 +488,18 @@ describe('MCP matrix + brand generation shared contracts', () => {
   it('shares the current questionnaire payload without weakening typed evidence resolution', () => {
     const payload: BrandIntakePayload = {
       schemaVersion: 1,
-      authenticSamples: [],
+      authenticSamples: [{
+        id: 'sample-1',
+        kind: 'client_written',
+        content: 'An authentic client-written example',
+        context: 'body',
+        sourceRef: {
+          sourceType: 'client_submission',
+          sourceId: 'intake-revision-1',
+          fieldPath: 'brand.existingExamples',
+          capturedAt: '2026-07-13T12:00:00.000Z',
+        },
+      }],
       business: {
         businessName: 'Example Co',
         industry: 'Services',
@@ -365,10 +555,13 @@ describe('MCP matrix + brand generation shared contracts', () => {
 
     expect(BRAND_INTAKE_SCHEMA_VERSION).toBe(1);
     expect(payload.business.businessName).toBe('Example Co');
+    expect(payload.authenticSamples[0].sourceRef.sourceType).toBe('client_submission');
     expect(resolution.value).toEqual({ kind: 'boolean', value: true });
   });
 
   it('requires exact brief/post CAS, cell ownership, and explicit replacement authorization', () => {
+    type ReplacementActor = MatrixGenerationReplacementAuthorization['authorizedBy']['actorType'];
+    const replacementIsOperatorOnly: AssertTrue<IsExact<ReplacementActor, 'operator'>> = true;
     const sourceRevision: MatrixSourceRevision = {
       matrixRevision: 1,
       templateRevision: 2,
@@ -428,6 +621,39 @@ describe('MCP matrix + brand generation shared contracts', () => {
     });
     expect(retry.mode).toBe('replace');
     expect(retry.replacementAuthorization.reason).toContain('explicitly selected');
+    expect(replacementIsOperatorOnly).toBe(true);
+  });
+
+  it('requires non-empty previewed selections before a paid matrix run', () => {
+    type RunSelection = MatrixGenerationRun['selections'];
+    type OnboardingSelection = NonNullable<BrandContentOnboardingInputs['matrixSelection']>;
+    const runSelectionIsExact: AssertTrue<IsExact<
+      RunSelection,
+      MatrixGenerationSelection
+    >> = true;
+    const runSelectionIsNonEmpty: AssertTrue<
+      RunSelection extends readonly [unknown, ...unknown[]] ? true : false
+    > = true;
+    const runPreviewIsRequired: AssertTrue<IsExact<
+      RunSelection[number]['previewFingerprint'],
+      string
+    >> = true;
+    const onboardingSelectionIsNonEmpty: AssertTrue<IsExact<
+      OnboardingSelection,
+      MatrixGenerationInputSelection
+    >> = true;
+
+    expect({
+      runSelectionIsExact,
+      runSelectionIsNonEmpty,
+      runPreviewIsRequired,
+      onboardingSelectionIsNonEmpty,
+    }).toEqual({
+      runSelectionIsExact: true,
+      runSelectionIsNonEmpty: true,
+      runPreviewIsRequired: true,
+      onboardingSelectionIsNonEmpty: true,
+    });
   });
 
   it('locks onboarding gates without creating a pre-persistence transition machine', () => {
@@ -447,6 +673,16 @@ describe('MCP matrix + brand generation shared contracts', () => {
       'cancelled',
       'failed',
     ]);
+    expect(BRAND_CONTENT_ONBOARDING_GATES).toEqual([
+      'intake_accepted',
+      'voice_reviewed',
+      'voice_finalized',
+      'operator_brand_reviewed',
+      'client_brand_reviewed',
+      'content_authorized',
+      'all_pages_approved',
+      'publish_preconditions_passed',
+    ]);
     expect(BRAND_CONTENT_ONBOARDING_STATUSES.indexOf('awaiting_content_review'))
       .toBeLessThan(BRAND_CONTENT_ONBOARDING_STATUSES.indexOf('ready_to_publish'));
 
@@ -461,16 +697,53 @@ describe('MCP matrix + brand generation shared contracts', () => {
         matrixItemRevision: 9,
         matrixId: 'matrix-1',
         cellId: 'cell-1',
+        sourceRevision: {
+          matrixRevision: 2,
+          templateRevision: 3,
+          cellRevision: 4,
+        },
         postId: 'post-1',
         postGenerationRevision: 10,
+        approvedBy: { actorType: 'client', actorId: 'client-1' },
         approvedAt: '2026-07-13T12:20:00.000Z',
       }],
       recordedBy: { actorType: 'operator', actorId: 'operator-1' },
       recordedAt: '2026-07-13T12:20:00.000Z',
     };
+    const contentAuthorization: BrandContentOnboardingGateEvidence = {
+      id: 'gate-evidence-2',
+      gate: 'content_authorized',
+      authorizationId: 'authorization-1',
+      matrixSelectionFingerprint: 'selection-fingerprint',
+      authorizedCellIds: ['cell-1'],
+      authorizedBy: { actorType: 'operator', actorId: 'operator-1' },
+      authorizedAt: '2026-07-13T12:18:00.000Z',
+      recordedBy: { actorType: 'system', actorId: 'onboarding-controller' },
+      recordedAt: '2026-07-13T12:18:00.000Z',
+    };
+    type ContentAuthorization = Extract<
+      BrandContentOnboardingGateEvidence,
+      { gate: 'content_authorized' }
+    >;
+    const authorizationIsHuman: AssertTrue<IsExact<
+      ContentAuthorization['authorizedBy']['actorType'],
+      'operator' | 'client'
+    >> = true;
+    const pageApprovalIsHuman: AssertTrue<IsExact<
+      MatrixPageApprovalRef['approvedBy']['actorType'],
+      'operator' | 'client'
+    >> = true;
     expect(pageApprovalEvidence.pageApprovals[0]).toMatchObject({
       cellId: 'cell-1',
+      sourceRevision: {
+        matrixRevision: 2,
+        templateRevision: 3,
+        cellRevision: 4,
+      },
       postGenerationRevision: 10,
     });
+    expect(contentAuthorization.authorizationId).toBe('authorization-1');
+    expect(authorizationIsHuman).toBe(true);
+    expect(pageApprovalIsHuman).toBe(true);
   });
 });

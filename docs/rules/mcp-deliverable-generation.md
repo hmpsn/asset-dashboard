@@ -50,6 +50,9 @@ explicit finalization before any dependent brand or content generation.
 Preview returns the selected item count, blockers, placeholder-eligible gaps,
 estimated paid calls/tokens/cost, and an effective-input fingerprint. Start must
 present that fingerprint so the approved selection cannot drift before dispatch.
+A paid run selection is a non-empty tuple of previewed cells and every selection
+has a non-null preview fingerprint; a looser pre-preview onboarding selection is
+never sufficient to dispatch paid work.
 
 ## 3. Structure is code; prose is generated
 
@@ -73,6 +76,9 @@ present that fingerprint so the approved selection cannot drift before dispatch.
 
 - Factual claims require durable evidence references. Creative proposals such
   as names and taglines are labeled as proposals, never verified facts.
+- Evidence requirements declare `claimKind`. Factual refs exclude the
+  structural-only matrix, matrix-cell, and template source classes; normalized
+  cell evidence remains eligible. A targeting label cannot type-check as proof.
 - Missing `ready` facts remain typed unresolved requirements and render with the
   canonical token `[NEEDS CLIENT INPUT: ...]`. The token is a presentation of
   structured state, not the only detection mechanism. `preflight` gaps block
@@ -96,10 +102,15 @@ present that fingerprint so the approved selection cannot drift before dispatch.
 ## 5. Voice has one authority
 
 - Authentic client-supplied examples and approved source material outrank
-  generated prose as voice evidence.
+  generated prose as voice evidence. Authentic source refs exclude generated
+  deliverables/profiles and structural matrix/template/intelligence sources;
+  finalized anchors record the selecting operator and timestamp. When the ref
+  addresses a `voice_sample`, its origin is exactly `manual` or
+  `transcript_extraction`; calibration-loop and generated approval samples are
+  ineligible.
 - A generated voice foundation is provisional until explicitly finalized.
   Finalization requires non-empty DNA, guardrails, and selected authentic anchor
-  evidence. A brand-suite run pauses at this gate; provisional voice cannot
+  evidence and records the finalizing operator. A brand-suite run pauses at this gate; provisional voice cannot
   drive dependent identity, messaging, or content generation.
 - `BrandGenerationAtomicTarget` is exactly
   `'voice_foundation' | BrandDeliverableType`; the provisional foundation lives
@@ -111,6 +122,9 @@ present that fingerprint so the approved selection cannot drift before dispatch.
   `full_brand_system` is the sole `bootstrap_then_resume` preset: its initial
   start may create only the foundation, and dependents remain forbidden until
   the finalized-version resume. Other presets require finalized voice at start.
+- Persisted selection/dispatch shapes preserve the same invariant: an atomic
+  foundation run has only the foundation target, and its item cannot carry a
+  durable brand-deliverable ID or version.
 - Downstream generation uses one immutable voice snapshot for an entire run and
   injects it exactly once through the canonical prompt assembly path.
 - Only approved brand identity enters downstream page generation, selected by
@@ -150,18 +164,26 @@ present that fingerprint so the approved selection cannot drift before dispatch.
 - Orchestration must represent page review as its own durable waiting state.
   `content_generating` cannot transition directly to `ready_to_publish`.
 - Matrix page approval uses a review-only, version-conditional domain mutation.
-  It may satisfy the post's approved/exportable preconditions and record durable
-  approval evidence, but it never invokes publish policy or a CMS job—even when
-  auto-publish is configured. Every selected page must be individually approved
-  before a page-set workflow becomes `ready_to_publish`.
+  It freezes the full matrix/template/cell source revision plus expected
+  run/item/post revisions, may satisfy the post's approved/exportable
+  preconditions, and records durable approval evidence with a human
+  operator/client actor, but it never invokes
+  publish policy or a CMS job—even when auto-publish is configured. Every
+  selected page must be individually approved before a page-set workflow becomes
+  `ready_to_publish`.
 
 ## 8. Audit and revision limits
 
 - Deterministic checks run before model review and again after revision.
+- A ready audit report has zero unresolved requirements and no failed
+  deterministic result. A missing-evidence verdict carries a non-empty
+  requirement tuple. Human-required checks may remain human-required or be
+  inapplicable; automated paths cannot mark them passed.
 - Model review uses a named operation and a validated structured output. It may
   assess voice, persona fit, SEO, AEO, CTA clarity, and cross-item consistency.
 - Automatic revision is bounded to one pass total per item across item-level and
-  set-level audits. Continued failures become actionable findings instead of an
+  set-level audits; the shared audit, brand-item, and matrix-item counter type is
+  exactly `0|1`. Continued failures become actionable findings instead of an
   unbounded AI loop.
 - Batch generation runs deterministic set checks after item audits for URL
   duplication, typed keyword overlap/cannibalization, block-manifest coverage,
@@ -196,6 +218,8 @@ present that fingerprint so the approved selection cannot drift before dispatch.
 - Item approval updates only that source row through its legal state machine and
   only when the expected version matches. Changes requested preserves the note,
   keeps/returns that source in draft, and opens a version-safe revision path.
+  Only operator/client actors may decide an item; system/MCP actors cannot
+  auto-approve, and `changes_requested` always carries its note.
   The bundle stays `partial` until all items are terminal and becomes `approved`
   only when all are approved.
 - Voice-foundation review is a separate gate. Client approval of a voice item
@@ -206,3 +230,6 @@ present that fingerprint so the approved selection cannot drift before dispatch.
 - An intake-to-brand-to-content orchestration is a durable workflow that pauses
   at review/approval boundaries. Human gates are resumable states, not long-
   running jobs and not bypasses hidden behind “one click.”
+- Content authorization carries a durable authorization ID and a named
+  operator/client authorizer. A system/MCP recorder cannot stand in for the
+  human authorization proof.

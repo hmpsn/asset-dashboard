@@ -46,7 +46,10 @@ function cleanGitEnv(): NodeJS.ProcessEnv {
   return env;
 }
 
-function getFiles(dir: string, pattern: string): string[] {
+// Exported only for the fail-loud regression fixture in tests/pr-check.test.ts.
+export function getFiles(dir: string, pattern: string): string[] {
+  if (!existsSync(dir)) return [];
+
   try {
     // maxBuffer: 50MB. The default 1MB is not enough for `find <repo-root>
     // -name '*.ts'` which on this codebase returns ~11k absolute paths
@@ -57,19 +60,26 @@ function getFiles(dir: string, pattern: string): string[] {
     // Prune the gitignored UI-rebuild kit mirror: reference material whose token
     // files/docs false-positive repo rules under --all (PR #1473). find has no
     // gitignore awareness, so the exclusion must be explicit here.
-    return execSync(`find "${dir}" -not -path "*/hmpsn studio Design System/*" -name "${pattern}" -type f 2>/dev/null`, {
+    return execFileSync('find', [
+      dir,
+      '-not',
+      '-path',
+      '*/hmpsn studio Design System/*',
+      '-name',
+      pattern,
+      '-type',
+      'f',
+    ], {
       cwd: ROOT,
       encoding: 'utf-8',
       maxBuffer: 50 * 1024 * 1024,
     }).trim().split('\n').filter(Boolean);
   } catch (err) {
-    // Surface the error to stderr so silent file-list collapses are visible.
-    // The previous bare `return []` made every getFiles failure look identical
-    // to "directory exists but contains no matches" — the exact silent-failure
-    // class the 2026-04-10 audit was built to catch.
+    // A failed repository walk is not equivalent to an empty directory. Throw
+    // so the CLI's customCheck boundary reports a hard failure instead of
+    // handing every affected rule an empty list and printing a false ✓.
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[pr-check] getFiles("${dir}", "${pattern}") failed: ${msg}`);
-    return [];
+    throw new Error(`getFiles("${dir}", "${pattern}") failed: ${msg}`);
   }
 }
 
@@ -9733,14 +9743,18 @@ function globToExtension(glob: string): string {
 
 export function resolveRelevantChangedFilesForCheck(changedFiles: string[], check: Check): string[] {
   const exts = check.fileGlobs.map(globToExtension);
-  return changedFiles.filter(f =>
-    exts.some(ext => f.endsWith(ext)) &&
-    !isExcluded(f, check.exclude) &&
-    (!check.pathFilter || f.startsWith(check.pathFilter)) &&
-    (!EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) ||
-     (!!check.pathFilter && f.startsWith(check.pathFilter))) &&
-    !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef))
-  );
+  const pathFilterDir = check.pathFilter?.replace(/\/$/, '').split('/').pop() ?? null;
+  return changedFiles.filter(f => {
+    const segments = f.replaceAll('\\', '/').split('/');
+    const isInExcludedDir = EXCLUDED_DIRS.some(
+      d => d !== pathFilterDir && segments.includes(d),
+    );
+    return exts.some(ext => f.endsWith(ext)) &&
+      !isExcluded(f, check.exclude) &&
+      (!check.pathFilter || f.startsWith(check.pathFilter)) &&
+      !isInExcludedDir &&
+      !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef));
+  });
 }
 
 export function checkFiles(files: string[], check: Check): string[] {
@@ -9777,7 +9791,7 @@ export function checkFile(file: string, check: Check): string[] {
 // 'hmpsn studio Design System' is the gitignored UI-rebuild kit mirror — reference
 // material, not product code; its token files legitimately declare --* tokens and
 // its docs name the studio, which false-positived 3 rules under --all (PR #1473).
-const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', '.worktrees', 'scripts', 'tests', 'hmpsn studio Design System'];
+const EXCLUDED_DIRS = ['node_modules', 'dist', '.cache', '.git', '.claude', '.worktrees', 'scripts', 'tests', 'hmpsn studio Design System'];
 // Root-level files to skip (--exclude-dir doesn't work on files)
 const EXCLUDED_FILES: string[] = [];
 

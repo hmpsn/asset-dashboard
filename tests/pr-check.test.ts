@@ -40,6 +40,7 @@ import {
   findUnrenderedSliceFields,
   compareStudioConstants,
   getChangedFiles,
+  getFiles,
   getUntrackedFiles,
   mergeChangedFiles,
   resolveRelevantChangedFilesForCheck,
@@ -96,6 +97,22 @@ function uniqPath(ruleId: string, name: string): string {
   counter += 1;
   return `${ruleId}/case-${counter}/${name}`;
 }
+
+describe('pr-check repository file walking', () => {
+  it('throws when find cannot execute instead of returning a false-empty scan', () => {
+    const originalPath = process.env.PATH;
+    try {
+      process.env.PATH = '';
+      expect(() => getFiles(TMPDIR, '*.ts')).toThrow(/getFiles\(.+\) failed/);
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
+  it('treats a missing optional directory as an empty scan', () => {
+    expect(getFiles(path.join(TMPDIR, 'missing'), '*.ts')).toEqual([]);
+  });
+});
 
 interface RuleFixtureCase {
   name: string;
@@ -2900,6 +2917,7 @@ describe('Regression: pathFilter can opt into an EXCLUDED_DIRS directory', () =>
     // filtered out so a rule with pathFilter:'tests/' doesn't accidentally
     // start scanning vendor code nested underneath tests/.
     write('pathfilter-sanity/tests/node_modules/vendor.ts', `${TOKEN}\n`);
+    write('pathfilter-sanity/tests/playwright/.cache/generated.ts', `${TOKEN}\n`);
     write('pathfilter-sanity/tests/real.ts', `${TOKEN}\n`);
     const scanDir = path.join(TMPDIR, 'pathfilter-sanity', 'tests');
     const fakeCheck: Check = {
@@ -2913,6 +2931,21 @@ describe('Regression: pathFilter can opt into an EXCLUDED_DIRS directory', () =>
     const matches = checkDirectory(scanDir, fakeCheck);
     expect(matches.some((m) => m.includes('real.ts'))).toBe(true);
     expect(matches.some((m) => m.includes('node_modules'))).toBe(false);
+    expect(matches.some((m) => m.includes('.cache'))).toBe(false);
+  });
+
+  it('diff filtering rejects ignored cache artifacts at any nesting depth', () => {
+    const fakeCheck: Check = {
+      name: '__regression_cache_filter__',
+      pattern: PATTERN,
+      fileGlobs: ['*.ts'],
+      message: 'test',
+      severity: 'error',
+    };
+    expect(resolveRelevantChangedFilesForCheck([
+      'src/real.ts',
+      'playwright/.cache/generated.ts',
+    ], fakeCheck)).toEqual(['src/real.ts']);
   });
 });
 
@@ -6950,6 +6983,44 @@ describe('Pattern rule: Hand-rolled trend badge', () => {
 // ════════════════════════════════════════════════════════════════════════════
 // Rule: styleguide-token-parity
 // ════════════════════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Legacy surface token in new code
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Legacy surface token in new code', () => {
+  const RULE = 'Legacy surface token in new code';
+
+  it('flags deprecated --brand-bg-* aliases in component styles', () => {
+    const file = write(
+      uniqPath('rule-legacy-surface-token', 'src/components/Probe.tsx'),
+      lines(
+        'export function Probe() {',
+        '  return <div style={{ background: "var(--brand-bg-card)" }}>x</div>;',
+        '}',
+      ),
+    );
+    const check = CHECKS.find(c => c.name === RULE);
+    expect(check).toBeDefined();
+    const hits = checkDirectory(path.dirname(file), check!);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toContain('--brand-bg-card');
+  });
+
+  it('accepts the canonical surface token family', () => {
+    const file = write(
+      uniqPath('rule-legacy-surface-token', 'src/components/Probe.tsx'),
+      lines(
+        'export function Probe() {',
+        '  return <div style={{ background: "var(--surface-2)" }}>x</div>;',
+        '}',
+      ),
+    );
+    const check = CHECKS.find(c => c.name === RULE);
+    expect(check).toBeDefined();
+    expect(checkDirectory(path.dirname(file), check!)).toHaveLength(0);
+  });
+});
 
 // ════════════════════════════════════════════════════════════════════════════
 // Rule: radius-signature-lg used outside SectionCard

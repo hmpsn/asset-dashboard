@@ -1,3 +1,5 @@
+import type { AuthenticVoiceSampleSource } from './brand-engine.js';
+
 /** Evidence classifications shared by matrix and brand generation. */
 export const GENERATION_EVIDENCE_STATUSES = [
   'verified',
@@ -67,6 +69,21 @@ export const GENERATION_EVIDENCE_SOURCE_TYPES = [
 
 export type GenerationEvidenceSourceType = (typeof GENERATION_EVIDENCE_SOURCE_TYPES)[number];
 
+/** Matrix/template identity proves structure, never a business fact. */
+export const STRUCTURAL_ONLY_GENERATION_EVIDENCE_SOURCE_TYPES = [
+  'content_matrix',
+  'content_matrix_cell',
+  'content_template',
+] as const satisfies readonly GenerationEvidenceSourceType[];
+
+export type StructuralOnlyGenerationEvidenceSourceType =
+  (typeof STRUCTURAL_ONLY_GENERATION_EVIDENCE_SOURCE_TYPES)[number];
+
+export type GenerationFactualEvidenceSourceType = Exclude<
+  GenerationEvidenceSourceType,
+  StructuralOnlyGenerationEvidenceSourceType
+>;
+
 /** Durable source identity only; raw private evidence is not embedded here. */
 export interface GenerationEvidenceSourceRef {
   sourceType: GenerationEvidenceSourceType;
@@ -78,6 +95,46 @@ export interface GenerationEvidenceSourceRef {
   capturedAt: string;
 }
 
+/** Source identity allowed to support a factual generated claim. */
+export type GenerationFactualEvidenceSourceRef = Omit<
+  GenerationEvidenceSourceRef,
+  'sourceType'
+> & {
+  sourceType: GenerationFactualEvidenceSourceType;
+};
+
+/** Source classes allowed to back an authentic voice sample or anchor. */
+export const AUTHENTIC_VOICE_EVIDENCE_SOURCE_TYPES = [
+  'client_submission',
+  'operator_submission',
+  'brand_intake',
+  'voice_sample',
+  'external_research',
+] as const;
+
+export type AuthenticVoiceEvidenceSourceType =
+  (typeof AUTHENTIC_VOICE_EVIDENCE_SOURCE_TYPES)[number];
+
+/**
+ * A voice source that is independent of generated brand/page output. Generated
+ * deliverables, voice profiles, matrix structure, and templates cannot qualify.
+ */
+type AuthenticVoiceEvidenceSourceRefBase = Omit<
+  GenerationEvidenceSourceRef,
+  'sourceType'
+>;
+
+export type AuthenticVoiceEvidenceSourceRef =
+  | (AuthenticVoiceEvidenceSourceRefBase & {
+      sourceType: Exclude<AuthenticVoiceEvidenceSourceType, 'voice_sample'>;
+      voiceSampleSource?: never;
+    })
+  | (AuthenticVoiceEvidenceSourceRefBase & {
+      sourceType: 'voice_sample';
+      /** Generated calibration/approval samples are deliberately excluded. */
+      voiceSampleSource: AuthenticVoiceSampleSource;
+    });
+
 interface GenerationEvidenceRequirementBase {
   id: string;
   fieldPath: string;
@@ -88,26 +145,48 @@ interface GenerationEvidenceRequirementBase {
   clientSafePrompt?: string;
 }
 
-/** Classification-specific source cardinality prevents unsupported facts from looking grounded. */
-export type GenerationEvidenceRequirement =
+type SourceBackedGenerationEvidenceRequirement<
+  TClaimKind extends 'factual' | 'structural',
+  TSourceRef extends GenerationEvidenceSourceRef,
+> =
   | (GenerationEvidenceRequirementBase & {
+      claimKind: TClaimKind;
       status: 'verified';
-      sourceRefs: [GenerationEvidenceSourceRef, ...GenerationEvidenceSourceRef[]];
+      sourceRefs: [TSourceRef, ...TSourceRef[]];
     })
   | (GenerationEvidenceRequirementBase & {
+      claimKind: TClaimKind;
       status: 'conflicting';
       sourceRefs: [
-        GenerationEvidenceSourceRef,
-        GenerationEvidenceSourceRef,
-        ...GenerationEvidenceSourceRef[],
+        TSourceRef,
+        TSourceRef,
+        ...TSourceRef[],
       ];
     })
   | (GenerationEvidenceRequirementBase & {
+      claimKind: TClaimKind;
       status: 'missing';
       sourceRefs: [];
     })
   | (GenerationEvidenceRequirementBase & {
-      status: 'inferred' | 'creative_proposal';
+      claimKind: TClaimKind;
+      status: 'inferred';
+      sourceRefs: TSourceRef[];
+    });
+
+/** Classification-specific source cardinality prevents unsupported facts from looking grounded. */
+export type GenerationEvidenceRequirement =
+  | SourceBackedGenerationEvidenceRequirement<
+      'factual',
+      GenerationFactualEvidenceSourceRef
+    >
+  | SourceBackedGenerationEvidenceRequirement<
+      'structural',
+      GenerationEvidenceSourceRef
+    >
+  | (GenerationEvidenceRequirementBase & {
+      claimKind: 'creative';
+      status: 'creative_proposal';
       sourceRefs: GenerationEvidenceSourceRef[];
     });
 
@@ -132,6 +211,14 @@ export interface GenerationResolverAttribution {
   actorId: string;
   actorLabel?: string;
 }
+
+export type GenerationOperatorAttribution = GenerationResolverAttribution & {
+  actorType: 'operator';
+};
+
+export type GenerationHumanReviewerAttribution = GenerationResolverAttribution & {
+  actorType: 'operator' | 'client';
+};
 
 export interface GenerationArtifactRevision {
   artifactType: 'content_brief' | 'generated_post' | 'brand_deliverable' | 'voice_profile' | 'brand_intake';
@@ -180,6 +267,11 @@ export interface GenerationAuditCheck {
   evidenceRequirementIds: string[];
 }
 
+export type GenerationHumanRequiredAuditCheck = Omit<GenerationAuditCheck, 'result'> & {
+  /** AI/deterministic paths may route or omit this check, never auto-pass it. */
+  result: 'needs_human_review' | 'not_applicable';
+};
+
 export interface GenerationModelAuditFinding {
   code: string;
   severity: 'info' | 'warning' | 'error';
@@ -196,15 +288,37 @@ export const GENERATION_AUDIT_VERDICTS = [
 
 export type GenerationAuditVerdict = (typeof GENERATION_AUDIT_VERDICTS)[number];
 
-export interface GenerationAuditReport {
+export const GENERATION_AUTOMATIC_REVISION_COUNTS = [0, 1] as const;
+export type GenerationAutomaticRevisionCount =
+  (typeof GENERATION_AUTOMATIC_REVISION_COUNTS)[number];
+
+interface GenerationAuditReportBase {
   deterministicChecks: GenerationAuditCheck[];
   modelFindings: GenerationModelAuditFinding[];
-  humanRequiredChecks: GenerationAuditCheck[];
-  revisionCount: number;
-  unresolvedRequirementIds: string[];
-  verdict: GenerationAuditVerdict;
+  humanRequiredChecks: GenerationHumanRequiredAuditCheck[];
+  revisionCount: GenerationAutomaticRevisionCount;
   auditedAt: string;
 }
+
+type GenerationReadyDeterministicCheck = Omit<GenerationAuditCheck, 'result'> & {
+  result: 'passed' | 'not_applicable';
+};
+
+/** Ready reports cannot retain unresolved evidence or failed deterministic checks. */
+export type GenerationAuditReport =
+  | (Omit<GenerationAuditReportBase, 'deterministicChecks'> & {
+      verdict: 'ready_for_human_review';
+      deterministicChecks: GenerationReadyDeterministicCheck[];
+      unresolvedRequirementIds: [];
+    })
+  | (GenerationAuditReportBase & {
+      verdict: 'needs_attention';
+      unresolvedRequirementIds: string[];
+    })
+  | (GenerationAuditReportBase & {
+      verdict: 'blocked_missing_evidence';
+      unresolvedRequirementIds: [string, ...string[]];
+    });
 
 /** Truthful domain-run outcomes shared by matrix and brand generation. */
 export const GENERATION_RUN_STATUSES = [

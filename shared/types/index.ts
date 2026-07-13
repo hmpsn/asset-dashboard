@@ -19,7 +19,11 @@ export * from './keywords.ts';
 export type * from './keyword-command-center.ts';
 export * from './local-seo.ts';
 export type * from './brand-engine.ts';
-export { BRAND_DELIVERABLE_TYPES } from './brand-engine.ts';
+export {
+  BRAND_DELIVERABLE_TYPES,
+  RELEASED_BRAND_DELIVERABLE_TYPES,
+  isReleasedBrandDeliverableType,
+} from './brand-engine.ts';
 export * from './generation-evidence.ts';
 export * from './brand-intake.ts';
 export * from './brand-generation.ts';
