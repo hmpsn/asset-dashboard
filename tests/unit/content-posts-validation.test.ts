@@ -4,6 +4,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { parseJsonSafe } from '../../server/db/json-validation.js';
 import { postSectionsArraySchema, reviewChecklistSchema } from '../../server/schemas/content-schemas.js';
+import {
+  countVisibleHtmlWords,
+  hasVisibleHtmlContent,
+  isDeliverableContentPost,
+} from '../../shared/content-post-integrity.js';
 
 vi.mock('../../server/logger.js', () => ({
   createLogger: () => ({
@@ -94,5 +99,24 @@ describe('reviewChecklistSchema', () => {
 
   it('returns fallback for malformed JSON', () => {
     expect(parseJsonSafe('{bad', reviewChecklistSchema, fallback)).toBe(fallback);
+  });
+});
+
+describe('generated post visible-content integrity', () => {
+  it.each(['', '<p></p>', '<div><span></span></div>', '<p>&nbsp;</p>', '<style>hidden</style>'])(
+    'treats %j as having no visible content',
+    (html) => {
+      expect(hasVisibleHtmlContent(html)).toBe(false);
+      expect(countVisibleHtmlWords(html)).toBe(0);
+    },
+  );
+
+  it('requires visible content in every delivery stage', () => {
+    expect(isDeliverableContentPost({
+      status: 'draft',
+      introduction: '<p>Visible intro</p>',
+      sections: [{ status: 'done', content: '<div></div>' }],
+      conclusion: '<p>Visible conclusion</p>',
+    })).toBe(false);
   });
 });

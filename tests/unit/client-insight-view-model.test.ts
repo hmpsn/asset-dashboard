@@ -318,7 +318,7 @@ describe('buildClientIntelligenceView', () => {
     });
     expect(view.pipelineStatus).toEqual({
       briefs: { total: 6, inProgress: 4 },
-      posts: { total: 5, inProgress: 3 },
+      posts: { total: 5, inProgress: 1 },
       pendingApprovals: 3,
     });
     expect('learningHighlights' in view).toBe(false);

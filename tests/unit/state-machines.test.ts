@@ -772,8 +772,8 @@ describe('Generated Post transitions — additional coverage', () => {
     expect(validate('error', 'draft')).toBe('draft');
   });
 
-  it('error → generating (no rollback to generating)', () => {
-    expect(() => validate('error', 'generating')).toThrow(InvalidTransitionError);
+  it('error → generating (explicit retry)', () => {
+    expect(validate('error', 'generating')).toBe('generating');
   });
 
   it('error → review (cannot skip draft after error)', () => {

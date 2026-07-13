@@ -169,6 +169,57 @@ describe('mcp-action-schemas', () => {
     });
   });
 
+  describe('savePostInputSchema', () => {
+    const validHandle = `post-request_${'a'.repeat(8)}-${'b'.repeat(4)}-${'c'.repeat(4)}-${'d'.repeat(4)}-${'e'.repeat(12)}`;
+    const validContent = {
+      briefId: 'brief-1',
+      targetKeyword: 'local seo',
+      title: 'A complete post',
+      metaDescription: 'A useful summary.',
+      introduction: '<p>Introduction</p>',
+      sections: [{
+        index: 0,
+        heading: 'Section one',
+        content: '<p>Body</p>',
+        wordCount: 1,
+        targetWordCount: 100,
+        keywords: ['local seo'],
+        status: 'done' as const,
+      }],
+      conclusion: '<p>Conclusion</p>',
+      totalWordCount: 3,
+      targetWordCount: 1000,
+    };
+
+    it('accepts a complete post artifact', () => {
+      expect(savePostInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        post_request_handle: validHandle,
+        content: validContent,
+      }).success).toBe(true);
+    });
+
+    it.each([
+      { introduction: '' },
+      { introduction: '<p></p>' },
+      { introduction: '<p>&nbsp;</p>' },
+      { conclusion: '' },
+      { conclusion: '<span>&nbsp;</span>' },
+      { sections: [] },
+      { sections: [{ ...validContent.sections[0], content: '<div></div>' }] },
+      { sections: [{ ...validContent.sections[0], status: 'error' }] },
+      { sections: [validContent.sections[0], { ...validContent.sections[0] }] },
+      { sections: [{ ...validContent.sections[0], index: 1 }] },
+      { sections: [validContent.sections[0], { ...validContent.sections[0], index: 2 }] },
+    ])('rejects an incomplete post artifact', (contentOverride) => {
+      expect(savePostInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        post_request_handle: validHandle,
+        content: { ...validContent, ...contentOverride },
+      }).success).toBe(false);
+    });
+  });
+
   describe('sendToClientInputSchema', () => {
     const validBriefHandle = `brief_${'a'.repeat(8)}-${'b'.repeat(4)}-${'c'.repeat(4)}-${'d'.repeat(4)}-${'e'.repeat(12)}`;
     const validPostHandle = `post_${'a'.repeat(8)}-${'b'.repeat(4)}-${'c'.repeat(4)}-${'d'.repeat(4)}-${'e'.repeat(12)}`;

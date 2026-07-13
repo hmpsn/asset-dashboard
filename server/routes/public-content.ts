@@ -720,7 +720,11 @@ router.get('/api/public/content-posts/:workspaceId/:postId', (req, res) => {
   }
 
   // aiReview (C4) is the admin QA verdict pack — admin-internal; never serve to clients.
-  const { aiReview: _aiReview, ...clientPost } = post;
+  const {
+    aiReview: _aiReview,
+    generationDiagnostics: _generationDiagnostics,
+    ...clientPost
+  } = post;
   res.json(clientPost);
 });
 

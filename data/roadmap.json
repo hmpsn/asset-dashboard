@@ -39,7 +39,7 @@
           "status": "pending",
           "createdAt": "2026-07-13",
           "owner": "content-pipeline",
-          "notes": "Wave 2-3. Phase A adds strict create/census schemas and needs_attention partial-failure semantics so jobs never report broken drafts as success. Phase B adds generation revisions, typed provenance, resource-scoped idempotency, and version-conditional saves for posts, briefs, and copy sections so concurrent operator edits always win. Depends on genq-ai-execution-governance."
+          "notes": "Wave 2-3. Phase A (C1) implemented 2026-07-13: strict initial brief/copy schemas are separate from partial updates; copy generation enforces the exact planned-section census with one bounded repair; useful visible-text partial posts persist as needs_attention with typed sanitized diagnostics and failure-only job/activity semantics; markup-only or unusable output fails; full and single-section regeneration preserve the exact prior artifact on failure; invalid unifier candidates are rejected atomically so every pre-unification field survives; incomplete artifacts are blocked from client send, export, Webflow publish, intelligence, and MCP creation; MCP post saves enforce canonical visible content, contiguous indexes, and the prepared brief census; rebuilt admin surfaces expose amber repair actions/diagnostics; public reads omit internal diagnostics. Phase B (C2) remains pending: generation revisions, typed durable provenance, resource-scoped idempotency, and version-conditional saves for posts, briefs, and copy sections so concurrent operator edits always win. Depends on genq-ai-execution-governance."
         },
         {
           "id": "genq-recommendation-integrity",

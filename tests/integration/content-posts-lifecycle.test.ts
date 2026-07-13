@@ -148,6 +148,34 @@ function seedPost(workspaceId: string, overrides: Partial<GeneratedPost> = {}): 
   return post;
 }
 
+describe('incomplete post delivery boundaries', () => {
+  it.each(['markdown', 'html', 'pdf'] as const)('rejects %s export for a needs_attention post', async (format) => {
+    const post = seedPost(wsId, {
+      status: 'needs_attention',
+      conclusion: '',
+      sections: [makeSection(0, { status: 'error', content: '', error: 'Provider unavailable' })],
+    });
+
+    const res = await getJson(`/api/content-posts/${wsId}/${post.id}/export/${format}`);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: 'Post is incomplete and cannot be exported',
+    });
+  });
+
+  it.each([
+    ['introduction', { introduction: '<p></p>' }],
+    ['section', { sections: [makeSection(0, { content: '<div><span></span></div>', wordCount: 0 })] }],
+    ['conclusion', { conclusion: '<p>&nbsp;</p>' }],
+  ] as const)('rejects a draft whose %s contains markup but no visible text', async (_stage, overrides) => {
+    const post = seedPost(wsId, { status: 'draft', ...overrides });
+
+    const res = await getJson(`/api/content-posts/${wsId}/${post.id}/export/html`);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'Post is incomplete and cannot be exported' });
+  });
+});
+
 // ── Lifecycle setup / teardown ─────────────────────────────────────────────────
 
 beforeAll(async () => {

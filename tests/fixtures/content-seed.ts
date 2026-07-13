@@ -61,16 +61,24 @@ export function seedContentData(): SeededContent {
       (id, workspace_id, target_keyword, secondary_keywords, suggested_title,
        suggested_meta_desc, outline, word_count_target, intent, audience,
        competitor_insights, internal_link_suggestions, created_at)
-    VALUES (?, ?, ?, '[]', ?, ?, '[]', ?, ?, ?, '', '[]', ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     briefId,
     workspaceId,
     targetKeyword,
+    JSON.stringify([`${targetKeyword} guide`]),
     `How to ${targetKeyword}`,
     `Learn everything about ${targetKeyword} in this comprehensive guide.`,
+    JSON.stringify([{
+      heading: `How ${targetKeyword} works`,
+      notes: 'Explain the core concept with practical guidance.',
+      wordCount: 600,
+    }]),
     1500,
     'informational',
     'general audience',
+    'Top-ranking guides explain the topic clearly and support advice with practical examples.',
+    JSON.stringify(['/services']),
     now,
   );
 
@@ -80,7 +88,7 @@ export function seedContentData(): SeededContent {
       (id, workspace_id, brief_id, target_keyword, title, meta_description,
        introduction, sections, conclusion, total_word_count, target_word_count,
        status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, '[]', ?, ?, ?, 'draft', ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?)
   `).run(
     postId,
     workspaceId,
@@ -88,8 +96,17 @@ export function seedContentData(): SeededContent {
     targetKeyword,
     `How to ${targetKeyword}`,
     `Learn everything about ${targetKeyword}.`,
-    `This guide covers ${targetKeyword} in depth.`,
-    `In conclusion, ${targetKeyword} is important.`,
+    `<p>This guide explains ${targetKeyword} in depth and shows readers how to apply it.</p>`,
+    JSON.stringify([{
+      index: 0,
+      heading: `How ${targetKeyword} works`,
+      content: `<p>Start with a clear goal, follow a practical process, and measure the results for ${targetKeyword}.</p>`,
+      wordCount: 15,
+      targetWordCount: 600,
+      keywords: [targetKeyword],
+      status: 'done',
+    }]),
+    `<p>Use these steps to make ${targetKeyword} a repeatable part of the broader strategy.</p>`,
     1200,
     1500,
     now,

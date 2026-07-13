@@ -21,6 +21,7 @@ import {
   requiresPageTypeDensityReview,
 } from './page-type-copy-contract.js';
 import { buildSeoPromptContext } from './intelligence/generation-context-builders.js';
+import { countVisibleHtmlWords, visibleTextFromHtml } from '../shared/content-post-integrity.js';
 export { CREATIVE_WRITING_RULES, WRITING_QUALITY_RULES } from './writing-quality.js';
 
 const log = createLogger('content-posts-ai');
@@ -44,6 +45,13 @@ const unifyResponseSchema = z.object({
   sections: z.array(z.string()).optional(),
   conclusion: z.string().optional(),
 });
+
+export interface UnifiedPostCandidate {
+  introduction?: string;
+  sections?: string[];
+  conclusion?: string;
+  invalidReason?: 'section_census_mismatch';
+}
 
 const voiceScoringResponseSchema = z.object({
   voiceScore: z.number().finite(),
@@ -572,7 +580,7 @@ export function countWords(text: string): number {
 
 /** Strip HTML tags for plain-text extraction */
 export function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return visibleTextFromHtml(html);
 }
 
 /**
@@ -581,7 +589,7 @@ export function stripHtml(html: string): string {
  * `countWords()` would miscount because it treats `<p>Hello</p>` as 4 words.
  */
 export function countHtmlWords(html: string): number {
-  return countWords(stripHtml(html));
+  return countVisibleHtmlWords(html);
 }
 
 /**
@@ -662,7 +670,7 @@ export async function unifyPost(
   voiceCtx: string,
   workspaceId: string,
   options: ContentAIGenerationOptions = {},
-): Promise<{ introduction?: string; sections?: string[]; conclusion?: string } | null> {
+): Promise<UnifiedPostCandidate | null> {
   const pageType = brief.pageType || 'blog';
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
   const targetTotal = brief.wordCountTarget || 1800;
@@ -770,10 +778,12 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
 
   try {
     const parsed = parseStructuredAIOutput(rawResult, unifyResponseSchema, 'content-post-unify');
-    // Validate sections count matches
+    // Preserve the invalid candidate signal so the caller can reject the whole
+    // unification result atomically. Never hide a wrong-size sections array by
+    // converting it to an omitted field.
     if (parsed.sections && parsed.sections.length !== post.sections.length) {
-      log.warn(`Unification returned ${parsed.sections.length} sections but expected ${post.sections.length} — skipping section updates`);
-      parsed.sections = undefined;
+      log.warn(`Unification returned ${parsed.sections.length} sections but expected ${post.sections.length} — rejecting candidate`);
+      return { ...parsed, invalidReason: 'section_census_mismatch' };
     }
     return parsed;
   } catch (err) {

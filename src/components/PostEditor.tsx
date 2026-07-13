@@ -24,6 +24,7 @@ import { queryKeys } from '../lib/queryKeys';
 import { countWordsFromHtml } from '../lib/utils';
 import { formatDate } from '../utils/formatDates';
 import { useToast } from './Toast';
+import { isDeliverableContentPost } from '../../shared/content-post-integrity';
 
 interface PostSection {
   index: number;
@@ -50,7 +51,7 @@ interface GeneratedPost {
   targetWordCount?: number;
   seoTitle?: string;
   seoMetaDescription?: string;
-  status: 'generating' | 'draft' | 'review' | 'approved' | 'error';
+  status: 'generating' | 'needs_attention' | 'draft' | 'review' | 'approved' | 'error';
   unificationStatus?: 'pending' | 'success' | 'failed' | 'skipped';
   unificationNote?: string;
   reviewChecklist?: ReviewChecklist;
@@ -130,6 +131,7 @@ function tryParsePostFixPayload(input: string): PostFixPayload | null {
 function PostStatusBadge({ status }: { status: GeneratedPost['status'] }) {
   const cfg: Record<string, { color: string; label: string }> = {
     generating: { color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', label: 'Generating...' },
+    needs_attention: { color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', label: 'Needs attention' },
     error: { color: 'text-red-400 bg-red-500/10 border-red-500/20', label: 'Failed' },
     draft: { color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', label: 'Draft' },
     review: { color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20', label: 'In Review' },
@@ -536,6 +538,8 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete, workspaceLa
   );
 
   const isGenerating = post.status === 'generating';
+  const needsAttention = post.status === 'needs_attention';
+  const isDeliverable = isDeliverableContentPost(post);
   const completedSections = post.sections.filter(s => s.status === 'done').length;
   const totalSections = post.sections.length;
   const progress = isGenerating ? Math.round(((completedSections + (post.introduction ? 1 : 0)) / (totalSections + 2)) * 100) : 100;
@@ -608,7 +612,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete, workspaceLa
           </div>
         </div>
         <div className={`flex items-center gap-1.5 flex-shrink-0 ${workspaceLayout ? 'flex-wrap' : ''}`}>
-          {!isGenerating && (
+          {isDeliverable && (
             <>
               <Button
                 variant="secondary"
@@ -699,7 +703,19 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete, workspaceLa
         </SectionCard>
       )}
 
-      {!isGenerating && post.status !== 'approved' && post.status !== 'error' && (
+      {needsAttention && (
+        <SectionCard className="!border-amber-500/20">
+          <div className="flex items-start gap-2">
+            <Icon as={AlertTriangle} size="md" className="text-amber-400 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-300">Generation needs attention</p>
+              <p className="t-caption text-[var(--brand-text-muted)] mt-1">Some required content could not be generated. Review the marked sections before moving this post into review.</p>
+            </div>
+          </div>
+        </SectionCard>
+      )}
+
+      {post.status === 'draft' || post.status === 'review' ? (
         <ReviewChecklist
           postStatus={post.status}
           reviewChecklist={post.reviewChecklist}
@@ -729,7 +745,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete, workspaceLa
           evidence={reviewEvidence}
           persistedAIReview={post.aiReview}
         />
-      )}
+      ) : null}
 
       {/* Version History Panel */}
       {showVersions && (

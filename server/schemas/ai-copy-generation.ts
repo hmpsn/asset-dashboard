@@ -30,6 +30,43 @@ export function parseGeneratedPageCopy(rawText: string): AiGeneratedPageCopy {
   return aiGeneratedPageCopySchema.parse(raw);
 }
 
+/**
+ * Strict creation boundary for full-page copy. The provider must return exactly
+ * one section for every planned section id; no missing, duplicate, or invented ids.
+ * The returned sections are ordered by the authoritative plan, not model order.
+ */
+export function parseGeneratedPageCopyForPlan(
+  rawText: string,
+  plannedSectionIds: readonly string[],
+): AiGeneratedPageCopy {
+  const parsed = parseGeneratedPageCopy(rawText);
+  const planned = new Set(plannedSectionIds);
+  if (planned.size !== plannedSectionIds.length) {
+    throw new Error('The section plan contains duplicate section ids.');
+  }
+
+  const generated = new Map<string, AiGeneratedPageCopy['sections'][number]>();
+  for (const section of parsed.sections) {
+    if (!planned.has(section.sectionPlanItemId)) {
+      throw new Error(`Generated copy contains unknown section id: ${section.sectionPlanItemId}`);
+    }
+    if (generated.has(section.sectionPlanItemId)) {
+      throw new Error(`Generated copy contains duplicate section id: ${section.sectionPlanItemId}`);
+    }
+    generated.set(section.sectionPlanItemId, section);
+  }
+
+  const missing = plannedSectionIds.filter(id => !generated.has(id));
+  if (missing.length > 0) {
+    throw new Error(`Generated copy is missing planned section ids: ${missing.join(', ')}`);
+  }
+
+  return {
+    ...parsed,
+    sections: plannedSectionIds.map(id => generated.get(id)!),
+  };
+}
+
 export function parseRegeneratedSectionCopy(rawText: string): AiRegeneratedSectionCopy {
   const raw = parseAIJsonRaw(rawText);
   return aiRegeneratedSectionCopySchema.parse(raw);

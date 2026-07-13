@@ -50,14 +50,15 @@ export type ContentRequestStatus = 'pending_payment' | 'requested' | 'brief_gene
 
 // ── Generated Post ──
 export const POST_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
-  generating: ['draft', 'error'],
-  error:      ['draft'],
+  generating:      ['needs_attention', 'draft', 'error'],
+  needs_attention: ['generating', 'draft', 'error'],
+  error:           ['generating', 'draft'],
   draft:      ['review'],
   review:     ['approved', 'draft'],  // draft = send back for edits
   approved:   [],                     // terminal (publish is tracked separately)
 };
 
-export type PostStatus = 'generating' | 'draft' | 'review' | 'approved' | 'error';
+export type PostStatus = 'generating' | 'needs_attention' | 'draft' | 'review' | 'approved' | 'error';
 
 // ── Work Order ──
 // completed → closed is the operator-only one-way close-out (no reopen): once

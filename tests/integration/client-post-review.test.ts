@@ -313,6 +313,13 @@ describe('GET /api/public/content-posts/:wsId/:postId', () => {
     });
     updateContentRequest(testWsId, req.id, { briefId });
     const linkedPost = makeStubPost(testWsId, briefId);
+    linkedPost.generationDiagnostics = [{
+      stage: 'section',
+      code: 'provider_error',
+      message: 'internal provider detail',
+      sectionIndex: 0,
+      occurredAt: new Date().toISOString(),
+    }];
     const siblingPost = {
       ...makeStubPost(testWsId, briefId),
       id: `post_sibling_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -325,6 +332,9 @@ describe('GET /api/public/content-posts/:wsId/:postId', () => {
 
     const linkedRes = await api(`/api/public/content-posts/${testWsId}/${linkedPost.id}`);
     expect(linkedRes.status).toBe(200);
+    const linkedBody = await linkedRes.json() as Record<string, unknown>;
+    expect(linkedBody).not.toHaveProperty('generationDiagnostics');
+    expect(linkedBody).not.toHaveProperty('aiReview');
 
     const siblingRes = await api(`/api/public/content-posts/${testWsId}/${siblingPost.id}`);
     expect(siblingRes.status).toBe(403);

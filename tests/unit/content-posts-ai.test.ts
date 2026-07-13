@@ -248,6 +248,32 @@ describe('unifyPost', () => {
     const result = await unifyPost(longPost, makeBrief(), 'VOICE CONTEXT', 'ws_test');
     expect(result).toBeNull();
   });
+
+  it('returns an explicit invalid candidate when the section census is wrong', async () => {
+    const longPost = {
+      ...makePost(),
+      introduction: `<p>${'intro '.repeat(120)}</p>`,
+      sections: [{
+        ...makePost().sections[0],
+        content: `<h2>Section</h2><p>${'body '.repeat(260)}</p>`,
+        wordCount: 260,
+        targetWordCount: 280,
+      }],
+      conclusion: `<h2>Next Steps</h2><p>${'outro '.repeat(80)}</p>`,
+    };
+    callAIMock.mockResolvedValueOnce({
+      text: '{"introduction":"<p>New intro</p>","sections":["<p>One</p>","<p>Extra</p>"],"conclusion":"<p>New conclusion</p>"}',
+    });
+
+    const result = await unifyPost(longPost, makeBrief(), 'VOICE CONTEXT', 'ws_test');
+
+    expect(result).toEqual({
+      introduction: '<p>New intro</p>',
+      sections: ['<p>One</p>', '<p>Extra</p>'],
+      conclusion: '<p>New conclusion</p>',
+      invalidReason: 'section_census_mismatch',
+    });
+  });
 });
 
 describe('scoreVoiceMatch', () => {

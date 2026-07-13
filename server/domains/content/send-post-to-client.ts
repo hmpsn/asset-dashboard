@@ -42,6 +42,7 @@ import { createLogger } from '../../logger.js';
 import { getClientInboxReviewsUrl, getWorkspace } from '../../workspaces.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import type { ContentTopicRequest, GeneratedPost } from '../../../shared/types/content.js';
+import { IncompleteContentPostError, isPostDeliverable } from './generation-integrity.js';
 
 const log = createLogger('send-post-to-client');
 
@@ -108,6 +109,7 @@ export function sendPostToClientForReview(
 
   const post = getPost(workspaceId, postId);
   if (!post) throw new PostNotFoundError(workspaceId, postId);
+  if (!isPostDeliverable(post)) throw new IncompleteContentPostError('Post is incomplete and cannot be sent to the client.');
 
   // ── Find-or-create the post's content_request ──
   // 1) explicit request (MCP parentRequestId), 2) existing request linked to the post, 3) create.

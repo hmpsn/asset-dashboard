@@ -4,6 +4,7 @@ import {
   LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP,
 } from './local-seo.js';
 import { CONTENT_GENERATION_STYLES } from './content.js';
+import { hasVisibleHtmlContent } from '../content-post-integrity.js';
 
 // --- Shared building blocks -------------------------------------------------
 
@@ -26,8 +27,8 @@ const contentRequestStatusSchema = z.enum([
   'published',
   'declined',
 ]).describe('Content request lifecycle status: pending_payment, requested, brief_generated, client_review, approved, changes_requested, in_progress, post_review, delivered, published, or declined.');
-const postStatusSchema = z.enum(['generating', 'draft', 'review', 'approved', 'error'])
-  .describe('Post lifecycle status: generating, draft, review, approved, or error.');
+const postStatusSchema = z.enum(['generating', 'needs_attention', 'draft', 'review', 'approved', 'error'])
+  .describe('Post lifecycle status: generating, needs_attention, draft, review, approved, or error.');
 const insightTypeSchema = z.enum([
   'page_health',
   'ranking_opportunity',
@@ -249,26 +250,41 @@ export const preparePostContextInputSchema = z.object({
     .describe('The id of the saved brief to draft a post from. Returns structured drafting context plus a handle for save_post.'),
 });
 
+const visiblePostHtmlSchema = z.string().refine(
+  hasVisibleHtmlContent,
+  'must contain visible content',
+);
+
 const postContentSchema = z.object({
   briefId: z.string().min(1),
   targetKeyword: z.string().min(1),
   title: z.string().min(1),
   metaDescription: z.string().min(1),
-  introduction: z.string(),
+  introduction: visiblePostHtmlSchema,
   sections: z.array(z.object({
     index: z.number().int().nonnegative(),
-    heading: z.string(),
-    content: z.string(),
+    heading: z.string().trim().min(1),
+    content: visiblePostHtmlSchema,
     wordCount: z.number().int().nonnegative(),
     targetWordCount: z.number().int().positive(),
     keywords: z.array(z.string()),
-    status: z.enum(['pending', 'generating', 'done', 'error']),
+    status: z.literal('done'),
     error: z.string().optional(),
-  })),
-  conclusion: z.string(),
+  })).min(1),
+  conclusion: visiblePostHtmlSchema,
   totalWordCount: z.number().int().nonnegative(),
   targetWordCount: z.number().int().positive(),
-}).passthrough();
+}).passthrough().superRefine((content, ctx) => {
+  const indexes = content.sections.map(section => section.index);
+  const expectedIndexes = content.sections.map((_, index) => index);
+  if (indexes.some((index, position) => index !== expectedIndexes[position])) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['sections'],
+      message: 'section indexes must be unique, contiguous, ordered, and start at 0',
+    });
+  }
+});
 
 export const savePostInputSchema = z.object({
   workspace_id: workspaceIdSchema,
@@ -436,7 +452,7 @@ export const listPostsInputSchema = z.object({
   limit: z.number().int().positive().max(200).optional()
     .describe('Optional max number of posts to return (1-200).'),
   status: postStatusSchema.optional()
-    .describe('Optional filter to posts at a specific lifecycle status (generating, draft, review, approved, error).'),
+    .describe('Optional filter to posts at a specific lifecycle status (generating, needs_attention, draft, review, approved, error).'),
   page_type: pageTypeSchema.optional()
     .describe('Optional filter to posts of a specific page type (blog, landing, service, location, product, pillar, resource).'),
 });

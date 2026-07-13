@@ -107,6 +107,30 @@ export interface PostSection {
   error?: string;
 }
 
+export const CONTENT_POST_GENERATION_STAGES = [
+  'generation',
+  'introduction',
+  'section',
+  'conclusion',
+] as const;
+export type ContentPostGenerationStage = typeof CONTENT_POST_GENERATION_STAGES[number];
+
+export const CONTENT_POST_GENERATION_DIAGNOSTIC_CODES = [
+  'provider_error',
+  'invalid_output',
+  'cancelled',
+] as const;
+export type ContentPostGenerationDiagnosticCode = typeof CONTENT_POST_GENERATION_DIAGNOSTIC_CODES[number];
+
+/** Internal generation failure detail. Public/client serializers must omit this field. */
+export interface ContentPostGenerationDiagnostic {
+  stage: ContentPostGenerationStage;
+  code: ContentPostGenerationDiagnosticCode;
+  message: string;
+  sectionIndex?: number;
+  occurredAt: string;
+}
+
 export interface ReviewChecklist {
   factual_accuracy: boolean;
   brand_voice: boolean;
@@ -257,7 +281,9 @@ export interface GeneratedPost {
   seoMetaDescription?: string; // SEO meta description (150-160 chars)
   totalWordCount: number;
   targetWordCount: number;
-  status: 'generating' | 'draft' | 'review' | 'approved' | 'error';
+  status: 'generating' | 'needs_attention' | 'draft' | 'review' | 'approved' | 'error';
+  /** Internal-only structured diagnostics for an incomplete initial generation. */
+  generationDiagnostics?: ContentPostGenerationDiagnostic[];
   unificationStatus?: 'pending' | 'success' | 'failed' | 'skipped';
   unificationNote?: string;
   reviewChecklist?: ReviewChecklist;

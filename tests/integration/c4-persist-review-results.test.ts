@@ -137,6 +137,7 @@ function makeMockBriefResponse() {
     wordCountTarget: 1200,
     intent: 'informational',
     audience: 'Test audience',
+    competitorInsights: 'Top-ranking pages cover evidence quality but leave room for clearer provenance guidance.',
     internalLinkSuggestions: [],
     ctaRecommendations: [],
     topicalEntities: [],

@@ -8,6 +8,9 @@ const broadcastState = vi.hoisted(() => ({
 
 const generationState = vi.hoisted(() => ({
   failVoiceContext: false,
+  failStage: null as 'introduction' | 'section' | 'conclusion' | 'all' | null,
+  emptyStage: null as 'introduction' | 'section' | 'conclusion' | null,
+  unificationResult: 'none' as 'none' | 'empty' | 'mixed-invalid' | 'wrong-size',
 }));
 
 vi.mock('../../server/broadcast.js', () => ({
@@ -36,12 +39,42 @@ vi.mock('../../server/content-posts-ai.js', async importOriginal => {
       }
       return 'calibrated-voice';
     }),
-    generateIntroduction: vi.fn(async () => '<p>Draft introduction for the generated post.</p>'),
-    generateSection: vi.fn(async (_brief, section: { heading: string }, index: number) =>
-      `<p>${section.heading} body ${index + 1} with practical guidance.</p>`
-    ),
-    generateConclusion: vi.fn(async () => '<p>Draft conclusion with a clear next step.</p>'),
-    unifyPost: vi.fn(async () => null),
+    generateIntroduction: vi.fn(async () => {
+      if (generationState.failStage === 'introduction' || generationState.failStage === 'all') throw new Error('<b>intro provider failed</b>');
+      if (generationState.emptyStage === 'introduction') return '<p> </p>';
+      return '<p>Draft introduction for the generated post.</p>';
+    }),
+    generateSection: vi.fn(async (_brief, section: { heading: string }, index: number) => {
+      if (generationState.failStage === 'section' || generationState.failStage === 'all') throw new Error('<b>section provider failed</b>');
+      if (generationState.emptyStage === 'section') return '<div><span></span></div>';
+      return `<p>${section.heading} body ${index + 1} with practical guidance.</p>`;
+    }),
+    generateConclusion: vi.fn(async () => {
+      if (generationState.failStage === 'conclusion' || generationState.failStage === 'all') throw new Error('<b>conclusion provider failed</b>');
+      if (generationState.emptyStage === 'conclusion') return '<p>&nbsp;</p>';
+      return '<p>Draft conclusion with a clear next step.</p>';
+    }),
+    unifyPost: vi.fn(async () => {
+      if (generationState.unificationResult === 'empty') {
+        return { introduction: '<p></p>', sections: ['<div>&nbsp;</div>'], conclusion: '<span></span>' };
+      }
+      if (generationState.unificationResult === 'mixed-invalid') {
+        return {
+          introduction: '<p>Rewritten introduction that must not persist.</p>',
+          sections: ['<div>&nbsp;</div>'],
+          conclusion: '<p>Rewritten conclusion that must not persist.</p>',
+        };
+      }
+      if (generationState.unificationResult === 'wrong-size') {
+        return {
+          introduction: '<p>Rewritten introduction that must not persist.</p>',
+          sections: ['<p>First rewrite</p>', '<p>Unexpected extra rewrite</p>'],
+          conclusion: '<p>Rewritten conclusion that must not persist.</p>',
+          invalidReason: 'section_census_mismatch' as const,
+        };
+      }
+      return null;
+    }),
     generateSeoMeta: vi.fn(async () => ({
       seoTitle: 'Generated SEO Title',
       seoMetaDescription: 'Generated SEO meta description for the drafted post.',
@@ -52,10 +85,17 @@ vi.mock('../../server/content-posts-ai.js', async importOriginal => {
 
 import db from '../../server/db/index.js';
 import { createJob, clearCompletedJobs, listJobs } from '../../server/jobs.js';
-import { getPost, listPosts } from '../../server/content-posts-db.js';
+import { getPost, listPostVersions, listPosts, savePost } from '../../server/content-posts-db.js';
+import {
+  generatePost,
+  markPostGenerationCancelled,
+  markPostGenerationFailed,
+} from '../../server/content-posts.js';
+import { getBrief } from '../../server/content-brief.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import type { GeneratedPost } from '../../shared/types/content.js';
 
 let baseUrl = '';
 let server: http.Server | undefined;
@@ -211,6 +251,9 @@ beforeEach(() => {
   resetWorkspaceState();
   broadcastState.calls = [];
   generationState.failVoiceContext = false;
+  generationState.failStage = null;
+  generationState.emptyStage = null;
+  generationState.unificationResult = 'none';
 });
 
 afterAll(async () => {
@@ -315,6 +358,239 @@ describe('content post generation mutation safety', () => {
     ]));
   });
 
+  it.each(['introduction', 'section', 'conclusion'] as const)(
+    'persists useful partial output as needs_attention when the %s stage fails without success semantics',
+    async (stage) => {
+      const briefId = `brief-partial-${stage}`;
+      seedBrief(briefId);
+      generationState.failStage = stage;
+
+      const startRes = await postJson(`/api/content-posts/${workspaceId}/generate`, { briefId });
+      expect(startRes.status).toBe(200);
+      const started = await startRes.json() as { id: string; jobId: string };
+
+      const job = await waitForJob(started.jobId);
+      expect(job.status).toBe('error');
+      expect(job.result).toMatchObject({ postId: started.id, status: 'needs_attention' });
+
+      const post = getPost(workspaceId, started.id);
+      expect(post?.status).toBe('needs_attention');
+      expect(post?.generationDiagnostics).toEqual([
+        expect.objectContaining({ stage, code: 'provider_error' }),
+      ]);
+      expect(post?.generationDiagnostics?.[0].message).not.toContain('<');
+      expect(activityTitles('post_generated')).toEqual([]);
+      expect(broadcastState.calls).toContainEqual(expect.objectContaining({
+        event: WS_EVENTS.POST_UPDATED,
+        payload: expect.objectContaining({ postId: started.id, status: 'needs_attention' }),
+      }));
+    },
+  );
+
+  it.each(['introduction', 'section', 'conclusion'] as const)(
+    'classifies markup-only %s output as invalid_output rather than a draft',
+    async (stage) => {
+      const briefId = `brief-empty-${stage}`;
+      seedBrief(briefId);
+      generationState.emptyStage = stage;
+
+      const startRes = await postJson(`/api/content-posts/${workspaceId}/generate`, { briefId });
+      const started = await startRes.json() as { id: string; jobId: string };
+      const job = await waitForJob(started.jobId);
+      const post = getPost(workspaceId, started.id);
+
+      expect(job).toMatchObject({ status: 'error', result: { status: 'needs_attention' } });
+      expect(post?.status).toBe('needs_attention');
+      expect(post?.generationDiagnostics).toContainEqual(expect.objectContaining({
+        stage,
+        code: 'invalid_output',
+        message: 'The AI provider returned no usable visible content for this stage.',
+      }));
+      expect(activityTitles('post_generated')).toEqual([]);
+    },
+  );
+
+  it('retains every valid pre-unification stage when the unifier returns markup-only replacements', async () => {
+    const briefId = 'brief-empty-unifier';
+    seedBrief(briefId);
+    generationState.unificationResult = 'empty';
+
+    const startRes = await postJson(`/api/content-posts/${workspaceId}/generate`, { briefId });
+    const started = await startRes.json() as { id: string; jobId: string };
+    const job = await waitForJob(started.jobId);
+    const post = getPost(workspaceId, started.id);
+
+    expect(job.status).toBe('done');
+    expect(post).toMatchObject({
+      status: 'draft',
+      introduction: '<p>Draft introduction for the generated post.</p>',
+      conclusion: '<p>Draft conclusion with a clear next step.</p>',
+      unificationStatus: 'failed',
+    });
+    expect(post?.sections[0].content).toContain('practical guidance');
+  });
+
+  it.each(['mixed-invalid', 'wrong-size'] as const)(
+    'applies unification atomically when the candidate is %s',
+    async (unificationResult) => {
+      const briefId = `brief-unifier-${unificationResult}`;
+      seedBrief(briefId);
+      generationState.unificationResult = unificationResult;
+
+      const startRes = await postJson(`/api/content-posts/${workspaceId}/generate`, { briefId });
+      const started = await startRes.json() as { id: string; jobId: string };
+      const job = await waitForJob(started.jobId);
+      const post = getPost(workspaceId, started.id);
+
+      expect(job.status).toBe('done');
+      expect(post).toMatchObject({
+        status: 'draft',
+        introduction: '<p>Draft introduction for the generated post.</p>',
+        conclusion: '<p>Draft conclusion with a clear next step.</p>',
+        unificationStatus: 'failed',
+        unificationNote: 'Unification returned unusable replacement content; the valid pre-unification draft was retained.',
+      });
+      expect(post?.sections).toHaveLength(1);
+      expect(post?.sections[0].content).toContain('practical guidance');
+      expect(post?.introduction).not.toContain('Rewritten');
+      expect(post?.conclusion).not.toContain('Rewritten');
+    },
+  );
+
+  it('persists an unusable initial generation as error without success semantics', async () => {
+    const briefId = 'brief-unusable';
+    seedBrief(briefId);
+    generationState.failStage = 'all';
+
+    const startRes = await postJson(`/api/content-posts/${workspaceId}/generate`, { briefId });
+    const started = await startRes.json() as { id: string; jobId: string };
+    const job = await waitForJob(started.jobId);
+    const post = getPost(workspaceId, started.id);
+
+    expect(job).toMatchObject({ status: 'error', result: { postId: started.id, status: 'error' } });
+    expect(post?.status).toBe('error');
+    expect(post?.generationDiagnostics).toHaveLength(3);
+    expect(activityTitles('post_generated')).toEqual([]);
+  });
+
+  it('preserves a prior valid artifact when full regeneration fails', async () => {
+    const briefId = 'brief-regeneration-preserve';
+    seedBrief(briefId);
+    const startRes = await postJson(`/api/content-posts/${workspaceId}/generate`, { briefId });
+    const started = await startRes.json() as { id: string; jobId: string };
+    await waitForJob(started.jobId);
+    const before = getPost(workspaceId, started.id)!;
+    const brief = getBrief(workspaceId, briefId)!;
+
+    generationState.failStage = 'section';
+    await expect(generatePost(workspaceId, brief, started.id)).rejects.toThrow('The AI provider could not complete this stage.');
+
+    expect(getPost(workspaceId, started.id)).toEqual(before);
+
+    markPostGenerationFailed(workspaceId, brief, started.id, new Error('job wrapper failure'));
+    expect(getPost(workspaceId, started.id)).toEqual(before);
+
+    markPostGenerationCancelled(workspaceId, brief, started.id);
+    expect(getPost(workspaceId, started.id)).toEqual(before);
+    expect(activityTitles('content_updated')).toEqual(expect.arrayContaining([
+      'Content regeneration failed for "local seo guide"',
+      'Content regeneration cancelled for "local seo guide"',
+    ]));
+
+    generationState.failStage = null;
+    const abortController = new AbortController();
+    await expect(generatePost(workspaceId, brief, started.id, {
+      signal: abortController.signal,
+      onProgress: ({ message }) => {
+        if (message === 'Generating SEO metadata...') abortController.abort();
+      },
+    })).rejects.toThrow('Generation cancelled by user');
+    expect(getPost(workspaceId, started.id)).toEqual(before);
+  });
+
+  it('preserves the exact prior post and emits no success side effects when section regeneration fails', async () => {
+    const briefId = 'brief-section-regeneration-failure';
+    seedBrief(briefId);
+    const startRes = await postJson(`/api/content-posts/${workspaceId}/generate`, { briefId });
+    const started = await startRes.json() as { id: string; jobId: string };
+    await waitForJob(started.jobId);
+    const before = getPost(workspaceId, started.id)!;
+    const versionsBefore = listPostVersions(workspaceId, started.id);
+    const activitiesBefore = activityTitles('content_updated');
+    broadcastState.calls = [];
+    generationState.failStage = 'section';
+
+    const response = await postJson(`/api/content-posts/${workspaceId}/${started.id}/regenerate-section`, {
+      sectionIndex: 0,
+    });
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({
+      error: 'The AI provider could not complete this stage.',
+      diagnostic: expect.objectContaining({ stage: 'section', code: 'provider_error' }),
+    });
+    expect(getPost(workspaceId, started.id)).toEqual(before);
+    expect(listPostVersions(workspaceId, started.id)).toEqual(versionsBefore);
+    expect(activityTitles('content_updated')).toEqual(activitiesBefore);
+    expect(broadcastState.calls).toHaveLength(0);
+  });
+
+  it('moves needs_attention to draft only after a successful section repair restores exact completeness', async () => {
+    const briefId = 'brief-section-repair-success';
+    seedBrief(briefId);
+    generationState.emptyStage = 'section';
+    const startRes = await postJson(`/api/content-posts/${workspaceId}/generate`, { briefId });
+    const started = await startRes.json() as { id: string; jobId: string };
+    await waitForJob(started.jobId);
+    expect(getPost(workspaceId, started.id)?.status).toBe('needs_attention');
+    generationState.emptyStage = null;
+    broadcastState.calls = [];
+
+    const response = await postJson(`/api/content-posts/${workspaceId}/${started.id}/regenerate-section`, {
+      sectionIndex: 0,
+    });
+    expect(response.status).toBe(200);
+    const repaired = await response.json() as GeneratedPost;
+    expect(repaired.status).toBe('draft');
+    expect(repaired.generationDiagnostics).toBeUndefined();
+    expect(repaired.sections[0]).toMatchObject({ status: 'done' });
+    expect(broadcastState.calls).toContainEqual(expect.objectContaining({
+      event: WS_EVENTS.POST_UPDATED,
+      payload: expect.objectContaining({ postId: started.id }),
+    }));
+  });
+
+  it('persists a sanitized typed diagnostic for cancelled initial generation', async () => {
+    seedBrief('brief-cancel-diagnostics');
+    const brief = getBrief(workspaceId, 'brief-cancel-diagnostics')!;
+    const now = new Date().toISOString();
+    const post: GeneratedPost = {
+      id: 'post-cancel-diagnostics',
+      workspaceId,
+      briefId: 'brief-cancel-diagnostics',
+      targetKeyword: 'cancelled generation',
+      title: 'Cancelled generation',
+      metaDescription: 'meta',
+      introduction: '',
+      sections: [{ index: 0, heading: 'Body', content: '', wordCount: 0, targetWordCount: 100, keywords: [], status: 'generating' }],
+      conclusion: '',
+      totalWordCount: 0,
+      targetWordCount: 1000,
+      status: 'generating',
+      createdAt: now,
+      updatedAt: now,
+    };
+    savePost(workspaceId, post);
+
+    markPostGenerationCancelled(workspaceId, brief, post.id);
+    const cancelled = getPost(workspaceId, post.id);
+    expect(cancelled?.generationDiagnostics).toContainEqual(expect.objectContaining({
+      stage: 'generation',
+      code: 'cancelled',
+      message: 'Generation was cancelled before this stage completed.',
+    }));
+  });
+
   it('marks the post and job as failed when generation crashes after the skeleton write', async () => {
     const briefId = 'brief-mutation-failure';
     seedBrief(briefId);
@@ -343,6 +619,11 @@ describe('content post generation mutation safety', () => {
       status: 'error',
       unificationStatus: 'failed',
       unificationNote: 'Voice context unavailable',
+      generationDiagnostics: [expect.objectContaining({
+        stage: 'generation',
+        code: 'provider_error',
+        message: 'The AI provider could not complete this stage.',
+      })],
     });
     expect(failedPost?.sections).toHaveLength(1);
     expect(failedPost?.sections[0]).toMatchObject({

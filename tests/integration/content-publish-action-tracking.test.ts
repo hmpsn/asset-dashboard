@@ -88,7 +88,27 @@ function seedPublishableContent(): SeededContent {
      SET webflow_site_id = ?, webflow_token = ?, publish_target = ?
      WHERE id = ?`,
   ).run(TEST_SITE_ID, TEST_TOKEN, PUBLISH_TARGET, seeded.workspaceId);
-  db.prepare(`UPDATE content_posts SET status = 'draft' WHERE id = ?`).run(seeded.postId);
+  db.prepare(`
+    UPDATE content_posts
+    SET status = 'draft',
+        introduction = ?,
+        sections = ?,
+        conclusion = ?
+    WHERE id = ?
+  `).run(
+    '<p>This practical guide explains the publishing workflow and its measurable value.</p>',
+    JSON.stringify([{
+      index: 0,
+      heading: 'A complete publishing workflow',
+      content: '<p>Use a reviewed draft, verify the destination, and publish the approved article.</p>',
+      wordCount: 12,
+      targetWordCount: 120,
+      keywords: ['publishing workflow'],
+      status: 'done',
+    }]),
+    '<p>With each required stage complete, the article is ready to publish and track.</p>',
+    seeded.postId,
+  );
   return seeded;
 }
 

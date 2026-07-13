@@ -51,6 +51,7 @@ import {
   sendPostToClientForReview,
   PostNotFoundError,
 } from '../../server/domains/content/send-post-to-client.js';
+import { IncompleteContentPostError } from '../../server/domains/content/generation-integrity.js';
 import type { GeneratedPost } from '../../shared/types/content.js';
 
 let wsId = '';
@@ -231,6 +232,25 @@ describe('sendPostToClientForReview', () => {
 
   it('throws PostNotFoundError for a missing post', () => {
     expect(() => sendPostToClientForReview(wsId, 'post_does_not_exist')).toThrow(PostNotFoundError);
+  });
+
+  it('rejects an incomplete post before creating client-facing side effects', () => {
+    const post = seedPost(wsId, {
+      status: 'needs_attention',
+      conclusion: '',
+      generationDiagnostics: [{
+        stage: 'conclusion',
+        code: 'provider_error',
+        message: 'Provider unavailable',
+        occurredAt: new Date().toISOString(),
+      }],
+    });
+
+    expect(() => sendPostToClientForReview(wsId, post.id)).toThrow(IncompleteContentPostError);
+    expect(listContentRequests(wsId)).toHaveLength(0);
+    expect(emailState.clientPostReady).toHaveLength(0);
+    expect(broadcastState.calls).toHaveLength(0);
+    expect(activityCount(wsId, 'post_sent_for_review')).toBe(0);
   });
 
   it('makes the sent post reach the unified inbox as awaiting_client', () => {

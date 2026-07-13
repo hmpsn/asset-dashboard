@@ -7,11 +7,12 @@ import { createStmtCache } from './db/stmt-cache.js';
 import type { PostSection, GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
-import { postSectionSchema, reviewChecklistSchema, storedAiReviewSchema } from './schemas/content-schemas.js';
+import { contentPostGenerationDiagnosticSchema, postSectionSchema, reviewChecklistSchema, storedAiReviewSchema } from './schemas/content-schemas.js';
 import { validateTransition, POST_STATUS_TRANSITIONS } from './state-machines.js';
 import { resolveContentGenerationStyle } from './page-type-copy-contract.js';
 import { getScoredOutcomeReadbacks } from './outcome-tracking.js';
 import { pageAddressSlug } from './utils/page-address.js';
+import { IncompleteContentPostError, isCompleteGeneratedPost } from './domains/content/generation-integrity.js';
 
 const log = createLogger('content-posts-db');
 
@@ -32,6 +33,7 @@ interface PostRow {
   total_word_count: number;
   target_word_count: number;
   status: string;
+  generation_diagnostics: string | null;
   unification_status: string | null;
   unification_note: string | null;
   webflow_item_id: string | null;
@@ -163,7 +165,7 @@ const stmts = createStmtCache(() => ({
            (id, workspace_id, brief_id, target_keyword, title, meta_description,
             introduction, sections, conclusion, seo_title, seo_meta_description,
             total_word_count, target_word_count, status, unification_status,
-            unification_note, review_checklist, ai_review,
+            unification_note, generation_diagnostics, review_checklist, ai_review,
             webflow_item_id, webflow_collection_id, published_at, published_slug,
             planned_publish_at,
             voice_score, voice_feedback, generation_style,
@@ -172,7 +174,7 @@ const stmts = createStmtCache(() => ({
            (@id, @workspace_id, @brief_id, @target_keyword, @title, @meta_description,
             @introduction, @sections, @conclusion, @seo_title, @seo_meta_description,
             @total_word_count, @target_word_count, @status, @unification_status,
-            @unification_note, @review_checklist, @ai_review,
+            @unification_note, @generation_diagnostics, @review_checklist, @ai_review,
             @webflow_item_id, @webflow_collection_id, @published_at, @published_slug,
             @planned_publish_at,
             @voice_score, @voice_feedback, @generation_style,
@@ -191,7 +193,7 @@ const stmts = createStmtCache(() => ({
            seo_title = @seo_title, seo_meta_description = @seo_meta_description,
            total_word_count = @total_word_count, target_word_count = @target_word_count,
            status = @status, unification_status = @unification_status,
-           unification_note = @unification_note, review_checklist = @review_checklist,
+           unification_note = @unification_note, generation_diagnostics = @generation_diagnostics, review_checklist = @review_checklist,
            ai_review = @ai_review,
            webflow_item_id = @webflow_item_id, webflow_collection_id = @webflow_collection_id,
            published_at = @published_at, published_slug = @published_slug,
@@ -239,6 +241,13 @@ function rowToPost(row: PostRow): GeneratedPost {
     totalWordCount: row.total_word_count,
     targetWordCount: row.target_word_count,
     status: row.status as GeneratedPost['status'],
+    generationDiagnostics: row.generation_diagnostics
+      ? parseJsonSafeArray(row.generation_diagnostics, contentPostGenerationDiagnosticSchema, {
+          workspaceId: row.workspace_id,
+          field: 'generation_diagnostics',
+          table: 'content_posts',
+        })
+      : undefined,
     unificationStatus: row.unification_status as GeneratedPost['unificationStatus'] ?? undefined,
     unificationNote: row.unification_note ?? undefined,
     webflowItemId: row.webflow_item_id ?? undefined,
@@ -279,6 +288,7 @@ function postToParams(post: GeneratedPost): Record<string, unknown> {
     total_word_count: post.totalWordCount,
     target_word_count: post.targetWordCount,
     status: post.status,
+    generation_diagnostics: post.generationDiagnostics ? JSON.stringify(post.generationDiagnostics) : null,
     unification_status: post.unificationStatus ?? null,
     unification_note: post.unificationNote ?? null,
     webflow_item_id: post.webflowItemId ?? null,
@@ -414,6 +424,10 @@ export function updatePostField(workspaceId: string, postId: string, updates: Pa
   }
 
   Object.assign(post, updates, { updatedAt: new Date().toISOString() });
+  if (['draft', 'review', 'approved'].includes(post.status)
+    && !isCompleteGeneratedPost(post, post.sections.length)) {
+    throw new IncompleteContentPostError();
+  }
   stmts().update.run(postToParams(post));
   return post;
 }

@@ -24,7 +24,7 @@ import {
   addSteeringEntry,
   getSectionsForEntry,
 } from './copy-review.js';
-import { parseGeneratedPageCopy, parseRegeneratedSectionCopy } from './schemas/ai-copy-generation.js';
+import { parseGeneratedPageCopyForPlan, parseRegeneratedSectionCopy } from './schemas/ai-copy-generation.js';
 import type { CopySection, CopyMetadata, QualityFlag } from '../shared/types/copy-pipeline.js';
 import type { SectionPlanItem, SiteBlueprint, BlueprintEntry } from '../shared/types/page-strategy.js';
 import type { IntelligencePatternType } from '../shared/types/copy-pipeline.js';
@@ -111,12 +111,31 @@ ${context}`;
     workspaceId: wsId,
   });
 
+  const plannedSectionIds = entry.sectionPlan.map(section => section.id);
   let generated;
   try {
-    generated = parseGeneratedPageCopy(response.text);
-  } catch (err) {
-    log.error({ err, entryId, blueprintId }, 'Failed to parse generation response');
-    throw new Error('Copy generation failed: invalid AI response format');
+    generated = parseGeneratedPageCopyForPlan(response.text, plannedSectionIds);
+  } catch (initialError) {
+    log.warn({ err: initialError, entryId, blueprintId }, 'Copy generation output failed the exact section census; attempting one repair');
+    const repairResponse = await callAI({
+      operation: 'copy-generation',
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-6',
+      maxTokens: 8000,
+      system: systemPrompt,
+      messages: [{
+        role: 'user',
+        content: `Repair the prior JSON output. Return exactly one section for each of these sectionPlanItemId values, in this order: ${plannedSectionIds.join(', ')}. Do not add or omit sections. Return only valid JSON.\n\nPrior output:\n${response.text.slice(0, 12_000)}`,
+      }],
+      feature: 'copy-generation',
+      workspaceId: wsId,
+    });
+    try {
+      generated = parseGeneratedPageCopyForPlan(repairResponse.text, plannedSectionIds);
+    } catch (repairError) {
+      log.error({ err: repairError, initialError, entryId, blueprintId }, 'Copy generation repair failed exact section census');
+      throw new Error('Copy generation failed: output did not match the planned section census after one repair');
+    }
   }
   // AI call succeeded — now initialize sections and save in a single transaction.
   // Deferred initialization prevents data loss: if the AI call above fails,
@@ -124,17 +143,19 @@ ${context}`;
   const { sections: savedSections, metadata } = db.transaction(() => {
     const initialSections = initializeSections(wsId, entryId, entry.sectionPlan);
 
-    const sections: (CopySection | null)[] = generated.sections.map((s) => {
+    const sections: CopySection[] = generated.sections.map((s) => {
       const section = initialSections.find(sec => sec.sectionPlanItemId === s.sectionPlanItemId);
-      if (!section) return null;
+      if (!section) throw new Error(`Initialized copy section missing for planned id: ${s.sectionPlanItemId}`);
       const sectionPlan = entry.sectionPlan.find(p => p.id === s.sectionPlanItemId);
       const qualityFlags = sectionPlan ? runQualityCheck(s.copy, sectionPlan, guardrailsText) : [];
-      return saveGeneratedCopy(section.id, wsId, {
+      const saved = saveGeneratedCopy(section.id, wsId, {
         generatedCopy: s.copy,
         aiAnnotation: s.annotation,
         aiReasoning: s.reasoning,
         qualityFlags: qualityFlags.length > 0 ? qualityFlags : undefined,
       });
+      if (!saved) throw new Error(`Failed to persist generated copy section: ${section.id}`);
+      return saved;
     });
 
     const meta = saveMetadata(entryId, wsId, {
@@ -148,7 +169,7 @@ ${context}`;
   })();
 
   return {
-    sections: savedSections.filter((s): s is CopySection => s !== null),
+    sections: savedSections,
     metadata,
   };
 }

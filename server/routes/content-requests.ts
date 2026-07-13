@@ -20,6 +20,7 @@ import {
 } from '../content-requests.js';
 import { getContentPerformanceTrend, handleContentPerformance } from '../domains/content/content-performance.js';
 import { sendPostToClientForReview, PostNotFoundError } from '../domains/content/send-post-to-client.js';
+import { IncompleteContentPostError } from '../domains/content/generation-integrity.js';
 import { listPosts } from '../content-posts.js';
 import { notifyClientBriefReady, notifyClientContentPublished, notifyClientPostReady } from '../email.js';
 import { CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
@@ -198,6 +199,9 @@ router.post(
     } catch (err: unknown) {
       if (err instanceof PostNotFoundError) {
         return res.status(404).json({ error: err.message });
+      }
+      if (err instanceof IncompleteContentPostError) {
+        return res.status(409).json({ error: err.message });
       }
       if (err instanceof Error && err.name === 'InvalidTransitionError') {
         return res.status(400).json({ error: err.message });

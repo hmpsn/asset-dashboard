@@ -6,7 +6,7 @@
  */
 import { getWorkspace } from './workspaces.js';
 import type { ContentBrief } from './content-brief.js';
-import type { ContentGenerationStyle, GeneratedPost } from '../shared/types/content.ts';
+import type { ContentGenerationStyle, ContentPostGenerationDiagnostic, GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
 import db from './db/index.js';
 import { addActivity } from './activity-log.js';
@@ -18,6 +18,13 @@ import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
 import { sanitizePlainText, sanitizeRichText } from './html-sanitize.js';
 import { invalidateContentPipelineIntelligence } from './intelligence-freshness.js';
 import { resolveContentGenerationStyle } from './page-type-copy-contract.js';
+import { POST_STATUS_TRANSITIONS, validateTransition } from './state-machines.js';
+import {
+  createContentGenerationDiagnostic,
+  hasUsefulGeneratedContent,
+  isCompleteGeneratedPost,
+  isPostDeliverable,
+} from './domains/content/generation-integrity.js';
 
 // Re-export everything from sub-modules for backward compatibility
 export * from './content-posts-db.js';
@@ -62,6 +69,29 @@ export interface ContentPostGenerationProgress {
   message: string;
   progress: number;
   total: number;
+}
+
+function collectIncompletePostDiagnostics(
+  post: GeneratedPost,
+  plannedSectionCount: number,
+): NonNullable<GeneratedPost['generationDiagnostics']> {
+  const diagnostics: NonNullable<GeneratedPost['generationDiagnostics']> = [];
+  if (countHtmlWords(post.introduction) === 0) {
+    diagnostics.push(createContentGenerationDiagnostic('introduction', 'invalid_output'));
+  }
+  for (let index = 0; index < plannedSectionCount; index += 1) {
+    const section = post.sections[index];
+    if (!section || section.index !== index || section.status !== 'done' || countHtmlWords(section.content) === 0) {
+      diagnostics.push(createContentGenerationDiagnostic('section', 'invalid_output', index));
+    }
+  }
+  if (post.sections.length !== plannedSectionCount) {
+    diagnostics.push(createContentGenerationDiagnostic('generation', 'invalid_output'));
+  }
+  if (countHtmlWords(post.conclusion) === 0) {
+    diagnostics.push(createContentGenerationDiagnostic('conclusion', 'invalid_output'));
+  }
+  return diagnostics;
 }
 
 interface GeneratePostOptions {
@@ -158,9 +188,23 @@ export function markPostGenerationFailed(
   if (!failed) return undefined;
 
   const message = error instanceof Error ? error.message : 'Generation failed';
+  if (isPostDeliverable(failed)) {
+    addActivity(
+      workspaceId,
+      'content_updated',
+      `Content regeneration failed for "${brief.targetKeyword}"`,
+      `${message}. The prior post was preserved.`,
+      { postId: failed.id, briefId: brief.id, action: 'post_regeneration_failed', artifactPreserved: true },
+    );
+    return failed;
+  }
   failed.status = 'error';
   failed.unificationStatus = 'failed';
   failed.unificationNote = message;
+  failed.generationDiagnostics = [
+    ...(failed.generationDiagnostics ?? []),
+    createContentGenerationDiagnostic('generation', 'provider_error'),
+  ];
   failed.updatedAt = new Date().toISOString();
   failed.sections = failed.sections.map(section =>
     section.status === 'done' ? section : { ...section, status: 'error', error: message },
@@ -195,9 +239,23 @@ export function markPostGenerationCancelled(
   if (!cancelled) return undefined;
 
   const message = GENERATION_CANCELLED_MESSAGE;
+  if (isPostDeliverable(cancelled)) {
+    addActivity(
+      workspaceId,
+      'content_updated',
+      `Content regeneration cancelled for "${brief.targetKeyword}"`,
+      'The prior post was preserved.',
+      { postId: cancelled.id, briefId: brief.id, action: 'post_regeneration_cancelled', artifactPreserved: true },
+    );
+    return cancelled;
+  }
   cancelled.status = 'error';
   cancelled.unificationStatus = 'skipped';
   cancelled.unificationNote = message;
+  cancelled.generationDiagnostics = [
+    ...(cancelled.generationDiagnostics ?? []),
+    createContentGenerationDiagnostic('generation', 'cancelled'),
+  ];
   cancelled.updatedAt = new Date().toISOString();
   cancelled.sections = cancelled.sections.map(section =>
     section.status === 'done' ? section : { ...section, status: 'error', error: message },
@@ -245,6 +303,41 @@ export function runContentPostGenerationJob({
           });
         },
       });
+      if (generated.status !== 'draft') {
+        const diagnosticSummary = generated.generationDiagnostics?.map(diagnostic =>
+          `${diagnostic.stage}${diagnostic.sectionIndex === undefined ? '' : ` ${diagnostic.sectionIndex + 1}`}: ${diagnostic.message}`,
+        ).join('; ') || 'Required content stages did not complete.';
+        addActivity(
+          workspaceId,
+          'content_updated',
+          `Content generation needs attention for "${brief.targetKeyword}"`,
+          diagnosticSummary,
+          { postId: generated.id, briefId: brief.id, action: 'post_generation_needs_attention' },
+        );
+        notifyContentUpdated(workspaceId, {
+          postId: generated.id,
+          briefId: brief.id,
+          jobId,
+          action: 'post_generation_needs_attention',
+          status: generated.status,
+        });
+        broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, {
+          postId: generated.id,
+          status: generated.status,
+          jobId,
+        });
+        updateJob(jobId, {
+          status: 'error',
+          error: diagnosticSummary,
+          result: { postId: generated.id, briefId: brief.id, status: generated.status },
+          message: generated.status === 'needs_attention'
+            ? 'Post generation needs attention'
+            : 'Post generation failed',
+          progress: total,
+          total,
+        });
+        return;
+      }
       addActivity(
         workspaceId,
         'post_generated',
@@ -325,7 +418,14 @@ export async function generatePost(
   const siteDomain = ws?.liveDomain || undefined;
 
   const existingPost = getPost(workspaceId, postId);
-  const post = existingPost ?? createPostSkeleton(workspaceId, brief, postId);
+  const preservesPriorArtifact = Boolean(existingPost && ['draft', 'review', 'approved'].includes(existingPost.status));
+  const post = preservesPriorArtifact
+    ? { ...createPostSkeleton(workspaceId, brief, postId), createdAt: existingPost!.createdAt }
+    : existingPost ?? createPostSkeleton(workspaceId, brief, postId);
+  const persistProgress = () => {
+    if (!preservesPriorArtifact) savePost(workspaceId, post);
+  };
+  const requiredStageDiagnostics = [] as NonNullable<GeneratedPost['generationDiagnostics']>;
   post.generationStyle = resolveContentGenerationStyle(post.generationStyle ?? brief.generationStyle);
   if (!existingPost) {
     savePost(workspaceId, post);
@@ -335,14 +435,21 @@ export async function generatePost(
   reportProgress('Writing introduction...', completedSteps);
   try {
     throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
-    post.introduction = sanitizeRichText(
+    const introduction = sanitizeRichText(
       await generateIntroduction(brief, voiceCtx, workspaceId, siteDomain, { signal: options.signal }),
     );
+    if (countHtmlWords(introduction) === 0) {
+      post.introduction = '';
+      requiredStageDiagnostics.push(createContentGenerationDiagnostic('introduction', 'invalid_output'));
+    } else {
+      post.introduction = introduction;
+    }
     post.updatedAt = new Date().toISOString();
-    savePost(workspaceId, post);
+    persistProgress();
   } catch (err) {
     if (isAbortSignalAborted(options.signal)) throw err;
-    post.introduction = `*[Introduction generation failed: ${err instanceof Error ? err.message : 'Unknown error'}]*`;
+    post.introduction = '';
+    requiredStageDiagnostics.push(createContentGenerationDiagnostic('introduction', 'provider_error'));
   }
   completedSteps += 1;
 
@@ -352,7 +459,7 @@ export async function generatePost(
     throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
     reportProgress(`Writing section ${i + 1} of ${brief.outline.length}...`, completedSteps);
     post.sections[i].status = 'generating';
-    savePost(workspaceId, post);
+    persistProgress();
 
     // Pace API calls to avoid rate limits (Claude RPM caps)
     if (i > 0) await abortableDelay(2000, options.signal, GENERATION_CANCELLED_MESSAGE);
@@ -363,20 +470,33 @@ export async function generatePost(
         brief, brief.outline[i], i, completedSections, voiceCtx, workspaceId, siteDomain, { signal: options.signal },
       );
       const safeContent = sanitizeRichText(content);
-      post.sections[i].content = safeContent;
-      post.sections[i].wordCount = countHtmlWords(safeContent);
-      post.sections[i].status = 'done';
-      completedSections.push(safeContent);
+      const wordCount = countHtmlWords(safeContent);
+      if (wordCount === 0) {
+        post.sections[i].status = 'error';
+        post.sections[i].content = '';
+        post.sections[i].wordCount = 0;
+        const diagnostic = createContentGenerationDiagnostic('section', 'invalid_output', i);
+        post.sections[i].error = diagnostic.message;
+        requiredStageDiagnostics.push(diagnostic);
+        completedSections.push('');
+      } else {
+        post.sections[i].content = safeContent;
+        post.sections[i].wordCount = wordCount;
+        post.sections[i].status = 'done';
+        completedSections.push(safeContent);
+      }
     } catch (err) {
       if (isAbortSignalAborted(options.signal)) throw err;
       post.sections[i].status = 'error';
-      post.sections[i].error = err instanceof Error ? err.message : 'Generation failed';
-      post.sections[i].content = `*[Section generation failed: ${post.sections[i].error}]*`;
+      const diagnostic = createContentGenerationDiagnostic('section', 'provider_error', i);
+      post.sections[i].error = diagnostic.message;
+      post.sections[i].content = '';
+      requiredStageDiagnostics.push(diagnostic);
       completedSections.push('');
     }
 
     post.updatedAt = new Date().toISOString();
-    savePost(workspaceId, post);
+    persistProgress();
     completedSteps += 1;
   }
 
@@ -384,43 +504,104 @@ export async function generatePost(
   throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
   reportProgress('Writing conclusion...', completedSteps);
   try {
-    post.conclusion = sanitizeRichText(
+    const conclusion = sanitizeRichText(
       await generateConclusion(brief, voiceCtx, workspaceId, siteDomain, { signal: options.signal }),
     );
+    if (countHtmlWords(conclusion) === 0) {
+      post.conclusion = '';
+      requiredStageDiagnostics.push(createContentGenerationDiagnostic('conclusion', 'invalid_output'));
+    } else {
+      post.conclusion = conclusion;
+    }
   } catch (err) {
     if (isAbortSignalAborted(options.signal)) throw err;
-    post.conclusion = `*[Conclusion generation failed: ${err instanceof Error ? err.message : 'Unknown error'}]*`;
+    post.conclusion = '';
+    requiredStageDiagnostics.push(createContentGenerationDiagnostic('conclusion', 'provider_error'));
   }
   completedSteps += 1;
 
   post.updatedAt = new Date().toISOString();
-  savePost(workspaceId, post);
+  persistProgress();
+
+  if (requiredStageDiagnostics.length > 0 || !isCompleteGeneratedPost(post, brief.outline.length)) {
+    post.totalWordCount = countHtmlWords(post.introduction)
+      + post.sections.reduce((sum, section) => sum + countHtmlWords(section.content), 0)
+      + countHtmlWords(post.conclusion);
+    post.generationDiagnostics = requiredStageDiagnostics.length > 0
+      ? requiredStageDiagnostics
+      : collectIncompletePostDiagnostics(post, brief.outline.length);
+    post.status = hasUsefulGeneratedContent(post) ? 'needs_attention' : 'error';
+    post.unificationStatus = 'skipped';
+    post.unificationNote = 'Required generation stages did not complete.';
+    post.updatedAt = new Date().toISOString();
+    if (preservesPriorArtifact) {
+      throw new Error(requiredStageDiagnostics.map(diagnostic => diagnostic.message).join('; ') || post.unificationNote);
+    }
+    savePost(workspaceId, post);
+    return post;
+  }
 
   // 4. Unification pass — review the full post for cohesion, smooth transitions, consistent voice, and word count correction
   throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
   reportProgress('Unifying draft...', completedSteps);
   post.unificationStatus = 'pending';
-  savePost(workspaceId, post);
+  persistProgress();
 
   try {
     const preUnifyWords = countHtmlWords(post.introduction) + post.sections.reduce((s, sec) => s + sec.wordCount, 0) + countHtmlWords(post.conclusion);
     const unified = await unifyPost(post, brief, voiceCtx, workspaceId, { signal: options.signal });
     if (unified) {
-      if (unified.introduction) post.introduction = sanitizeRichText(unified.introduction);
-      for (let i = 0; i < post.sections.length; i++) {
-        if (unified.sections?.[i]) {
-          const safeSection = sanitizeRichText(unified.sections[i]);
-          post.sections[i].content = safeSection;
-          post.sections[i].wordCount = countHtmlWords(safeSection);
+      let invalidReplacement = unified.invalidReason !== undefined;
+      let replacementCount = 0;
+      let nextIntroduction = post.introduction;
+      let nextConclusion = post.conclusion;
+      const nextSections = post.sections.map(section => ({ ...section }));
+
+      if (unified.introduction !== undefined) {
+        const safeIntroduction = sanitizeRichText(unified.introduction);
+        if (countHtmlWords(safeIntroduction) > 0) {
+          nextIntroduction = safeIntroduction;
+          replacementCount += 1;
+        } else invalidReplacement = true;
+      }
+      if (unified.sections !== undefined) {
+        if (unified.sections.length !== post.sections.length) {
+          invalidReplacement = true;
+        } else {
+          for (let i = 0; i < unified.sections.length; i += 1) {
+            const safeSection = sanitizeRichText(unified.sections[i]);
+            const wordCount = countHtmlWords(safeSection);
+            if (wordCount > 0) {
+              nextSections[i].content = safeSection;
+              nextSections[i].wordCount = wordCount;
+              replacementCount += 1;
+            } else invalidReplacement = true;
+          }
         }
       }
-      if (unified.conclusion) post.conclusion = sanitizeRichText(unified.conclusion);
+      if (unified.conclusion !== undefined) {
+        const safeConclusion = sanitizeRichText(unified.conclusion);
+        if (countHtmlWords(safeConclusion) > 0) {
+          nextConclusion = safeConclusion;
+          replacementCount += 1;
+        } else invalidReplacement = true;
+      }
+
+      if (!invalidReplacement) {
+        post.introduction = nextIntroduction;
+        post.sections = nextSections;
+        post.conclusion = nextConclusion;
+      }
       const postUnifyWords = countHtmlWords(post.introduction) + post.sections.reduce((s, sec) => s + sec.wordCount, 0) + countHtmlWords(post.conclusion);
-      post.unificationStatus = 'success';
-      post.unificationNote = `Unified: ${preUnifyWords} → ${postUnifyWords} words (target: ${post.targetWordCount})`;
+      post.unificationStatus = invalidReplacement ? 'failed' : replacementCount > 0 ? 'success' : 'skipped';
+      post.unificationNote = invalidReplacement
+        ? 'Unification returned unusable replacement content; the valid pre-unification draft was retained.'
+        : replacementCount > 0
+          ? `Unified: ${preUnifyWords} → ${postUnifyWords} words (target: ${post.targetWordCount})`
+          : 'Unification returned no replacements; the original draft was retained.';
       log.info(`${post.unificationNote}`);
       post.updatedAt = new Date().toISOString();
-      savePost(workspaceId, post);
+      persistProgress();
     } else {
       post.unificationStatus = 'skipped';
       post.unificationNote = 'Unification returned null — post too short or JSON parse failed';
@@ -433,6 +614,7 @@ export async function generatePost(
     log.error({ err: err }, `Unification pass failed (non-critical):`);
     // Non-critical — the post is still usable without unification
   }
+  throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
   completedSteps += 1;
 
   // 5. Generate SEO title tag and meta description
@@ -449,6 +631,7 @@ export async function generatePost(
     if (isAbortSignalAborted(options.signal)) throw err;
     log.warn({ err: err }, 'SEO meta generation failed (non-critical)');
   }
+  throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
   completedSteps += 1;
   reportProgress('Finalizing post draft...', completedSteps);
 
@@ -460,7 +643,18 @@ export async function generatePost(
   for (const sec of post.sections) {
     sec.wordCount = countHtmlWords(sec.content);
   }
+  if (!isCompleteGeneratedPost(post, brief.outline.length)) {
+    post.generationDiagnostics = collectIncompletePostDiagnostics(post, brief.outline.length);
+    post.status = hasUsefulGeneratedContent(post) ? 'needs_attention' : 'error';
+    post.updatedAt = new Date().toISOString();
+    if (preservesPriorArtifact) {
+      throw new Error('Regeneration produced an incomplete artifact; the prior post was preserved.');
+    }
+    savePost(workspaceId, post);
+    return post;
+  }
   post.status = 'draft';
+  post.generationDiagnostics = undefined;
   post.updatedAt = new Date().toISOString();
   savePost(workspaceId, post);
 
@@ -476,41 +670,65 @@ export async function regenerateSection(
   sectionIndex: number,
   brief: ContentBrief,
 ): Promise<GeneratedPost | null> {
-  const post = getPost(workspaceId, postId);
-  if (!post || sectionIndex < 0 || sectionIndex >= post.sections.length) return null;
+  const previousPost = getPost(workspaceId, postId);
+  if (!previousPost || sectionIndex < 0 || sectionIndex >= previousPost.sections.length) return null;
 
-  const voiceCtx = await buildVoiceContext(workspaceId);
-  const previousSections = post.sections
-    .filter((s, i) => i < sectionIndex && s.status === 'done')
-    .map(s => s.content);
-
-  // Snapshot current state before regenerating
-  snapshotPostVersion(post, 'regenerate_section', `section:${sectionIndex}`);
-
-  post.sections[sectionIndex].status = 'generating';
-  savePost(workspaceId, post);
-
+  let safeContent: string;
   try {
+    const voiceCtx = await buildVoiceContext(workspaceId);
+    const previousSections = previousPost.sections
+      .filter((section, index) => index < sectionIndex && section.status === 'done')
+      .map(section => section.content);
     const content = await generateSection(
       brief, brief.outline[sectionIndex], sectionIndex, previousSections, voiceCtx, workspaceId,
     );
-    const safeContent = sanitizeRichText(content);
-    post.sections[sectionIndex].content = safeContent;
-    post.sections[sectionIndex].wordCount = countHtmlWords(safeContent);
-    post.sections[sectionIndex].status = 'done';
-    post.sections[sectionIndex].error = undefined;
+    safeContent = sanitizeRichText(content);
+    if (countHtmlWords(safeContent) === 0) {
+      throw new ContentSectionRegenerationError('invalid_output', sectionIndex);
+    }
   } catch (err) {
-    post.sections[sectionIndex].status = 'error';
-    post.sections[sectionIndex].error = err instanceof Error ? err.message : 'Regeneration failed';
+    if (err instanceof ContentSectionRegenerationError) throw err;
+    log.error({ err, workspaceId, postId, sectionIndex }, 'Content section regeneration failed before commit');
+    throw new ContentSectionRegenerationError('provider_error', sectionIndex);
   }
 
+  const post: GeneratedPost = {
+    ...previousPost,
+    sections: previousPost.sections.map(section => ({ ...section })),
+  };
+  post.sections[sectionIndex].content = safeContent;
+  post.sections[sectionIndex].wordCount = countHtmlWords(safeContent);
+  post.sections[sectionIndex].status = 'done';
+  post.sections[sectionIndex].error = undefined;
   post.totalWordCount = countHtmlWords(post.introduction)
     + post.sections.reduce((s, sec) => s + sec.wordCount, 0)
     + countHtmlWords(post.conclusion);
+  if (previousPost.status === 'needs_attention') {
+    if (isCompleteGeneratedPost(post, brief.outline.length)) {
+      post.status = validateTransition('post', POST_STATUS_TRANSITIONS, previousPost.status, 'draft');
+      post.generationDiagnostics = undefined;
+    } else {
+      post.generationDiagnostics = collectIncompletePostDiagnostics(post, brief.outline.length);
+    }
+  }
   post.updatedAt = new Date().toISOString();
-  savePost(workspaceId, post);
+  db.transaction(() => {
+    snapshotPostVersion(previousPost, 'regenerate_section', `section:${sectionIndex}`);
+    savePost(workspaceId, post);
+  })();
 
   return post;
+}
+
+export class ContentSectionRegenerationError extends Error {
+  readonly diagnostic: ContentPostGenerationDiagnostic;
+
+  constructor(code: 'provider_error' | 'invalid_output', sectionIndex: number) {
+    const diagnostic = createContentGenerationDiagnostic('section', code, sectionIndex);
+    super(diagnostic.message);
+    this.name = 'ContentSectionRegenerationError';
+    this.diagnostic = diagnostic;
+  }
 }
 
 /**
