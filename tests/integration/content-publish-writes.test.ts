@@ -85,8 +85,29 @@ function seedPublishableContent(): SeededContent {
      SET webflow_site_id = ?, webflow_token = ?, publish_target = ?
      WHERE id = ?`,
   ).run(TEST_SITE_ID, TEST_TOKEN, PUBLISH_TARGET, seeded.workspaceId);
-  // Also update the seeded post status to 'draft' so the route allows it
-  db.prepare(`UPDATE content_posts SET status = 'draft' WHERE id = ?`).run(seeded.postId);
+  // Make the post delivery-complete so these tests exercise Webflow writes,
+  // rather than stopping at the truthful-completion publish guard.
+  db.prepare(`
+    UPDATE content_posts
+    SET status = 'draft',
+        introduction = ?,
+        sections = ?,
+        conclusion = ?
+    WHERE id = ?
+  `).run(
+    '<p>This introduction contains visible, publishable content.</p>',
+    JSON.stringify([{
+      index: 0,
+      heading: 'Complete section',
+      content: '<p>This section also contains visible, publishable content.</p>',
+      wordCount: 8,
+      targetWordCount: 300,
+      keywords: [],
+      status: 'done',
+    }]),
+    '<p>This conclusion completes the publishable article.</p>',
+    seeded.postId,
+  );
   return seeded;
 }
 
