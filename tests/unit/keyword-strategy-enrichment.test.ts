@@ -485,6 +485,22 @@ describe('enrichKeywordStrategy', () => {
     }));
   });
 
+  it('does not erase usable page CPC evidence when a later provider result is unusable', async () => {
+    const opts = makeEnrichOptions({ pageMap: [makePageMapEntry({ cpc: 9, cpcSource: 'dataforseo:ideas' })] });
+    opts.domainKeywords = [{ keyword: 'cosmetic dentistry', volume: 700, difficulty: 35, cpc: 0, position: 4 }] as typeof opts.domainKeywords;
+    const page = (await enrichKeywordStrategy(opts)).strategy.pageMap?.[0];
+    expect(page).toEqual(expect.objectContaining({ cpc: 9, cpcSource: 'dataforseo:ideas' }));
+  });
+
+  it('sets CPC provenance on bulk-enriched content gaps', async () => {
+    const opts = makeEnrichOptions({ contentGaps: [{ targetKeyword: 'dental emergency', intent: 'transactional' }] });
+    opts.provider = { name: 'dataforseo', getKeywordMetrics: vi.fn(async () => [{
+      keyword: 'dental emergency', volume: 400, difficulty: 25, cpc: 10, competition: 0.9, results: 100, trend: [],
+    }]) } as never;
+    const gap = (await enrichKeywordStrategy(opts)).strategy.contentGaps?.[0];
+    expect(gap).toEqual(expect.objectContaining({ cpc: 10, cpcSource: 'dataforseo:bulk' }));
+  });
+
   it('enriches content gaps from keyword pool (priority 1)', async () => {
     const opts = makeEnrichOptions({
       contentGaps: [{ targetKeyword: 'teeth whitening cost', priority: 'high' }],

@@ -5,6 +5,7 @@ import { normalizePageUrl } from '../../shared/page-address-utils.js';
 import { filterBrandedKeywords } from '../competitor-brand-filter.js';
 import { normalizeKeyword } from '../keyword-intelligence/index.js';
 import { isStrategyQualityDiscoveryKeyword, upsertKeywordPoolCandidate } from '../keyword-strategy-helpers.js';
+import { isKeywordSearchIntent } from '../../shared/types/keywords.js';
 import { filterDeclinedFromPool } from '../strategy-filters.js';
 import type { KeywordStrategyKeywordPool } from './types.js';
 
@@ -78,7 +79,7 @@ export function buildLegacyKeywordPool(opts: BuildLegacyKeywordPoolOptions): Bui
   for (const dk of discoveryKeywords) {
     const kw = normalizeKeyword(dk.keyword);
     if (isStrategyQualityDiscoveryKeyword(dk) && isEligible(dk)) {
-      upsertKeywordPoolCandidate(keywordPool, kw, { volume: dk.volume, difficulty: dk.difficulty, cpc: dk.cpc, intent: dk.intent, source: `discovery:${dk.sourceKind}` });
+      upsertKeywordPoolCandidate(keywordPool, kw, { volume: dk.volume, difficulty: dk.difficulty, cpc: dk.cpc, intent: isKeywordSearchIntent(dk.intent) ? dk.intent : undefined, source: `discovery:${dk.sourceKind}` });
     }
   }
 

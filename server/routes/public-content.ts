@@ -30,6 +30,7 @@ import { getClientActor, requireAuthenticatedClientPortalAuth, requireClientPort
 import { getQueryPageData } from '../search-console.js';
 import { getWorkspace, computeEffectiveTier } from '../workspaces.js';
 import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../rank-tracking.js';
+import { invalidateKeywordStrategyGenerationInputs } from '../keyword-strategy-generation-store.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import { getContentPerformanceTrend, handlePublicContentPerformance } from '../domains/content/content-performance.js';
 import { isProgrammingError } from '../errors.js';
@@ -670,6 +671,7 @@ router.post('/api/public/tracked-keywords/:workspaceId', requirePublicContentWri
   res.json({ keywords });
 
   if (!alreadyTracked) {
+    invalidateKeywordStrategyGenerationInputs(ws.id);
     recordTrackedKeywordActivity(ws.id, 'client_keyword_tracked', `"${keyword}" added to strategy keywords`, actor ?? undefined);
     broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword });
 
@@ -699,6 +701,7 @@ router.delete('/api/public/tracked-keywords/:workspaceId', requirePublicContentW
   const keywords = wasTracked ? removeTrackedKeyword(ws.id, keyword) : existingKeywords;
   res.json({ keywords });
   if (wasTracked) {
+    invalidateKeywordStrategyGenerationInputs(ws.id);
     const actor = getClientActor(req, ws.id);
     recordTrackedKeywordActivity(ws.id, 'client_keyword_removed', `"${keyword}" removed from strategy keywords`, actor ?? undefined);
     broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword, removed: true });

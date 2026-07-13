@@ -46,6 +46,7 @@ vi.mock('../../server/middleware.js', async (importOriginal) => {
 });
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { getKeywordStrategyGenerationState } from '../../server/keyword-strategy-generation-store.js';
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import { getTrackedKeywords } from '../../server/rank-tracking.js';
 import db from '../../server/db/index.js';
@@ -165,6 +166,7 @@ afterAll(async () => {
 
 describe('POST /api/public/tracked-keywords/:workspaceId — add keyword', () => {
   it('adds a keyword and returns an updated list containing it', async () => {
+    const beforeRevision = getKeywordStrategyGenerationState(wsId).revision;
     const res = await postJson(`/api/public/tracked-keywords/${wsId}`, {
       keyword: 'seo strategy guide',
     });
@@ -173,6 +175,7 @@ describe('POST /api/public/tracked-keywords/:workspaceId — add keyword', () =>
     expect(body.keywords).toEqual(
       expect.arrayContaining([expect.objectContaining({ query: 'seo strategy guide' })]),
     );
+    expect(getKeywordStrategyGenerationState(wsId).revision).toBe(beforeRevision + 1);
   });
 
   it('returns keyword with expected shape (query, source, status, pinned, addedAt)', async () => {
@@ -250,6 +253,7 @@ describe('GET /api/public/tracked-keywords/:workspaceId', () => {
 describe('DELETE /api/public/tracked-keywords/:workspaceId', () => {
   it('removes a keyword from the list', async () => {
     await postJson(`/api/public/tracked-keywords/${wsId}`, { keyword: 'keyword to remove' });
+    const beforeRevision = getKeywordStrategyGenerationState(wsId).revision;
 
     const removeRes = await deleteJson(`/api/public/tracked-keywords/${wsId}`, {
       keyword: 'keyword to remove',
@@ -257,6 +261,7 @@ describe('DELETE /api/public/tracked-keywords/:workspaceId', () => {
     expect(removeRes.status).toBe(200);
     const body = await removeRes.json() as { keywords: { query: string }[] };
     expect(body.keywords.map(k => k.query)).not.toContain('keyword to remove');
+    expect(getKeywordStrategyGenerationState(wsId).revision).toBe(beforeRevision + 1);
   });
 
   it('confirms via subsequent GET that the keyword is gone after deletion', async () => {

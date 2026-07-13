@@ -36,8 +36,10 @@ function applyPageKeywordEvidence(
   cpcSource: string,
 ): void {
   const usableCpc = cpc != null && Number.isFinite(cpc) && cpc > 0;
-  page.cpc = usableCpc ? cpc : undefined;
-  page.cpcSource = usableCpc ? cpcSource : undefined;
+  if (usableCpc) {
+    page.cpc = cpc;
+    page.cpcSource = cpcSource;
+  }
   const poolEvidence = keywordPool.get(keywordComparisonKey(page.primaryKeyword));
   if (poolEvidence?.intent) {
     page.searchIntent = poolEvidence.intent;
@@ -509,6 +511,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
               cg.volume = m.volume;
               cg.difficulty = m.difficulty;
               cg.cpc = m.cpc;
+              cg.cpcSource = m.cpc > 0 && Number.isFinite(m.cpc) ? `${provider.name}:bulk` : undefined;
             }
           }
         }

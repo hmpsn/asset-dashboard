@@ -19,7 +19,7 @@ import { getEffectiveAudit, getLatestEffectiveSnapshot, listEffectiveSnapshotSum
 import { getAuditTrafficForWorkspace } from '../audit-traffic.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
 import { updateWorkspace, getWorkspace, computeEffectiveTier } from '../workspaces.js';
-import { bumpKeywordStrategyGenerationRevision } from '../keyword-strategy-generation-store.js';
+import { bumpKeywordStrategyGenerationRevision, invalidateKeywordStrategyGenerationInputs } from '../keyword-strategy-generation-store.js';
 import { buildClientBriefingView } from '../client-insight-briefing-view-model.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
@@ -622,6 +622,7 @@ router.post('/api/public/content-gap-vote/:workspaceId', ...requireClientStrateg
   // AND adds defence-in-depth: any future expansion of either branch
   // (e.g. an audit-log INSERT) inherits atomicity automatically.
   const recordVote = db.transaction(() => {
+    invalidateKeywordStrategyGenerationInputs(wsId);
     if (vote === 'none') {
       db.prepare('DELETE FROM content_gap_votes WHERE workspace_id = ? AND keyword = ?').run(wsId, kw);
     } else {

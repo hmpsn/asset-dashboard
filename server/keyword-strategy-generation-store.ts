@@ -35,3 +35,6 @@ export function claimKeywordStrategyGenerationCommit(workspaceId: string, expect
 }
 
 export function bumpKeywordStrategyGenerationRevision(workspaceId: string): void { stmts().bump.run(workspaceId); }
+
+/** Mutation-side invalidation for any operator-owned input consumed by strategy synthesis. */
+export const invalidateKeywordStrategyGenerationInputs = bumpKeywordStrategyGenerationRevision;

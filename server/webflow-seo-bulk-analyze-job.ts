@@ -16,6 +16,7 @@ import { getTokenForSite, type Workspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import type { SeoBulkAnalyzePage } from './schemas/seo-bulk-jobs.js';
 import { pageAnalysisAiResultSchema } from './schemas/page-analysis.js';
+import { isKeywordSearchIntent } from '../shared/types/keywords.js';
 
 const log = createLogger('webflow-seo-bulk-analyze-job');
 
@@ -146,7 +147,7 @@ IMPORTANT: Return ONLY valid JSON.`;
             pageTitle: existing?.pageTitle || page.title,
             primaryKeyword: resolvedPrimaryKeyword,
             secondaryKeywords: (analysis.secondaryKeywords as string[]) || existing?.secondaryKeywords || [],
-            searchIntent: (analysis.searchIntent as string) || existing?.searchIntent,
+            searchIntent: isKeywordSearchIntent(analysis.searchIntent) ? analysis.searchIntent : existing?.searchIntent,
             optimizationIssues: (analysis.optimizationIssues as string[]) || [],
             recommendations: (analysis.recommendations as string[]) || [],
             contentGaps: (analysis.contentGaps as string[]) || [],

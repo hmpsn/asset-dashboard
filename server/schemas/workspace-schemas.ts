@@ -3,6 +3,7 @@
  * Uses .passthrough() on all object schemas for forward compatibility.
  */
 import { z } from 'zod';
+import { KEYWORD_SEARCH_INTENTS } from '../../shared/types/keywords.js';
 import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 import {
   EEAT_ASSET_TYPE,
@@ -51,7 +52,7 @@ export const pageKeywordMapSchema = z.object({
   pageTitle: z.string(),
   primaryKeyword: z.string(),
   secondaryKeywords: z.array(z.string()),
-  searchIntent: z.string().optional(),
+  searchIntent: z.enum(KEYWORD_SEARCH_INTENTS).optional(),
   currentPosition: z.number().optional(),
   previousPosition: z.number().optional(),
   impressions: z.number().optional(),

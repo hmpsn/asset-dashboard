@@ -34,7 +34,7 @@ import {
 import { isStrategyPoolEligibleKeyword, normalizeKeyword, type KeywordEvaluationContext } from './keyword-intelligence/index.js';
 import type { SeoDataProvider, DomainKeyword, KeywordGapEntry, RelatedKeyword } from './seo-data-provider.js';
 import type { CompetitorKeywordData, QuestionKeywordGroup } from './keyword-strategy-seo-data.js';
-import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
+import { isKeywordSearchIntent, type KeywordSourceEvidence } from '../shared/types/keywords.js';
 import {
   KEYWORD_CANDIDATE_SOURCE,
   type KeywordCandidate,
@@ -400,7 +400,7 @@ export async function buildKeywordUniverse(
   for (const dk of [...discoveryKeywords, ...fetchedDiscovery]) {
     const kw = normalizeKeyword(dk.keyword);
     if (isStrategyQualityDiscoveryKeyword(dk, relaxConservatism) && eligible(dk)) {
-      if (upsertKeywordPoolCandidate(pool, kw, { volume: dk.volume, difficulty: dk.difficulty, cpc: dk.cpc, intent: dk.intent, source: `discovery:${dk.sourceKind}` })) {
+      if (upsertKeywordPoolCandidate(pool, kw, { volume: dk.volume, difficulty: dk.difficulty, cpc: dk.cpc, intent: isKeywordSearchIntent(dk.intent) ? dk.intent : undefined, source: `discovery:${dk.sourceKind}` })) {
         tag(kw, dk.sourceKind === 'keyword_suggestions' ? KEYWORD_CANDIDATE_SOURCE.QUESTION : KEYWORD_CANDIDATE_SOURCE.PROVIDER_DISCOVERY);
       }
     }

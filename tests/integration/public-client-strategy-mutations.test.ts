@@ -18,6 +18,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import http from 'http';
 import type { AddressInfo } from 'net';
 import { randomUUID } from 'crypto';
+import { getKeywordStrategyGenerationState } from '../../server/keyword-strategy-generation-store.js';
 
 // ── Hoisted mock state ────────────────────────────────────────────────────────
 
@@ -299,6 +300,7 @@ describe('GET /api/public/business-priorities/:workspaceId', () => {
 
 describe('POST /api/public/content-gap-vote/:workspaceId', () => {
   it('creates a vote and returns { ok: true }', async () => {
+    const revisionBefore = getKeywordStrategyGenerationState(wsId).revision;
     const res = await clientPostJson(`/api/public/content-gap-vote/${wsId}`, {
       keyword: 'seo audit software',
       vote: 'up',
@@ -307,6 +309,7 @@ describe('POST /api/public/content-gap-vote/:workspaceId', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as { ok: boolean };
     expect(body.ok).toBe(true);
+    expect(getKeywordStrategyGenerationState(wsId).revision).toBe(revisionBefore + 1);
   });
 
   it('stores the vote with the correct keyword (normalized) and vote value', async () => {
