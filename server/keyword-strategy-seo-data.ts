@@ -24,6 +24,7 @@ export interface CompetitorKeywordData {
   keyword: string;
   volume: number;
   difficulty: number;
+  cpc?: number | null;
   domain: string;
   position: number;
   serpFeatures?: string;
@@ -194,6 +195,7 @@ export async function fetchAndCacheKeywordStrategySeoData({
               keyword: ck.keyword,
               volume: ck.volume,
               difficulty: ck.difficulty,
+              cpc: ck.cpc,
               domain: cleanComp,
               position: ck.position,
               serpFeatures: ck.serpFeatures,

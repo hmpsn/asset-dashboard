@@ -1,3 +1,5 @@
+import type { KeywordPoolCandidate } from '../keyword-strategy-helpers.js';
+
 export interface StrategyPageMapEntry {
   pagePath: string;
   pageTitle?: string;
@@ -75,7 +77,7 @@ export interface StrategyOutput {
   pageMap?: StrategyPageMapEntry[];
 }
 
-export type KeywordStrategyKeywordPool = Map<string, { volume: number; difficulty: number; source: string }>;
+export type KeywordStrategyKeywordPool = Map<string, KeywordPoolCandidate>;
 
 export interface PageMapping {
   pagePath: string;

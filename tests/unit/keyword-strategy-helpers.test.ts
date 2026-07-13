@@ -81,6 +81,56 @@ describe('content gap sort order', () => {
 });
 
 describe('keyword pool source quality', () => {
+  it('merges optional CPC and intent evidence without erasing stronger source provenance', () => {
+    const pool = new Map<string, { volume: number; difficulty: number; source: string; cpc?: number; intent?: string }>();
+
+    upsertKeywordPoolCandidate(pool, 'cosmetic dentistry', {
+      volume: 1200,
+      difficulty: 36,
+      source: 'gap:example.com',
+    });
+    upsertKeywordPoolCandidate(pool, 'Cosmetic Dentistry', {
+      volume: 900,
+      difficulty: 38,
+      source: 'discovery:keyword_ideas',
+      cpc: 8.5,
+      intent: 'commercial',
+    });
+
+    expect(pool.get('cosmetic dentistry')).toEqual({
+      volume: 1200,
+      difficulty: 36,
+      source: 'gap:example.com',
+      cpc: 8.5,
+      intent: 'commercial',
+    });
+  });
+
+  it('preserves optional evidence in either source insertion order', () => {
+    const pool = new Map<string, { volume: number; difficulty: number; source: string; cpc?: number; intent?: string }>();
+
+    upsertKeywordPoolCandidate(pool, 'dental implants', {
+      volume: 600,
+      difficulty: 31,
+      source: 'discovery:keyword_ideas',
+      cpc: 9,
+      intent: 'transactional',
+    });
+    upsertKeywordPoolCandidate(pool, 'Dental Implants', {
+      volume: 1800,
+      difficulty: 42,
+      source: 'gap:competitor.com',
+    });
+
+    expect(pool.get('dental implants')).toEqual({
+      volume: 1800,
+      difficulty: 42,
+      source: 'gap:competitor.com',
+      cpc: 9,
+      intent: 'transactional',
+    });
+  });
+
   it('upgrades a GSC-only candidate with stronger provider evidence', () => {
     const pool = new Map<string, { volume: number; difficulty: number; source: string }>();
 

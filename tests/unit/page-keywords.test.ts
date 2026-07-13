@@ -222,6 +222,8 @@ describe('page-keywords integrity behavior', () => {
       clicks: 18,
       volume: 1400,
       difficulty: 41,
+      cpc: 7.25,
+      searchIntent: 'transactional',
       optimizationScore: 88,
       optimizationIssues: ['Issue A'],
       recommendations: ['Recommendation A'],
@@ -238,6 +240,8 @@ describe('page-keywords integrity behavior', () => {
     expect(row.clicks).toBe(18);
     expect(row.volume).toBe(1400);
     expect(row.difficulty).toBe(41);
+    expect(row.cpc).toBe(7.25);
+    expect(row.searchIntent).toBe('transactional');
     expect(row.optimizationScore).toBeUndefined();
     expect(row.optimizationIssues).toBeUndefined();
     expect(row.recommendations).toBeUndefined();

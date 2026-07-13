@@ -64,6 +64,7 @@ function mapToCompetitorKeywordEntry(
     keyword: ck.keyword,
     volume: ck.volume,
     difficulty: ck.difficulty,
+    cpc: ck.cpc,
     domain,
     position: ck.position,
     serpFeatures: ck.serpFeatures, // ← the field guarded by this test
@@ -134,6 +135,7 @@ describe('competitorKeywordData — serpFeatures mapping contract', () => {
 
     // Empty string should survive — the mapping must not normalise it
     expect(entry.serpFeatures).toBe('');
+    expect(entry.cpc).toBe(rawKw.cpc);
   });
 
   it('multiple keywords all carry their individual serpFeatures through a batch map', () => {
@@ -187,12 +189,15 @@ describe('competitorKeywordData — serpFeatures mapping contract', () => {
     // After volume sort: alpha (8000) → beta (3000) → gamma (800)
     expect(competitorKeywordData[0].keyword).toBe('keyword alpha');
     expect(competitorKeywordData[0].serpFeatures).toBe('1,4');
+    expect(competitorKeywordData[0].cpc).toBe(4);
 
     expect(competitorKeywordData[1].keyword).toBe('keyword beta');
     expect(competitorKeywordData[1].serpFeatures).toBe('15');
+    expect(competitorKeywordData[1].cpc).toBe(2);
 
     expect(competitorKeywordData[2].keyword).toBe('keyword gamma');
     expect(competitorKeywordData[2].serpFeatures).toBeUndefined();
+    expect(competitorKeywordData[2].cpc).toBe(0.8);
   });
 });
 
@@ -211,12 +216,14 @@ describe('KeywordStrategy.competitorKeywordData — type shape contract', () => 
       keyword: 'test keyword',
       volume: 100,
       difficulty: 30,
+      cpc: 2.5,
       domain: 'example.com',
       position: 5,
       serpFeatures: '1,4,15',
     };
 
     expect(item.serpFeatures).toBe('1,4,15');
+    expect(item.cpc).toBe(2.5);
   });
 
   it('competitorKeywordData item type accepts items without serpFeatures (field is optional)', () => {

@@ -158,7 +158,7 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     callKeywordStrategyAI(ws.id, messages, maxTokens, label);
 
   // Keyword pool — declared outside try so enrichment code can access it after batching
-  const keywordPool = new Map<string, { volume: number; difficulty: number; source: string }>();
+  const keywordPool: KeywordStrategyKeywordPool = new Map();
 
   const { assembleSynthesisContext } = await import(synthesisContextModule) as SynthesisContextModule; // dynamic-import-ok - context reads workspace intelligence; keep it off the synthesis facade's static import path.
   const {

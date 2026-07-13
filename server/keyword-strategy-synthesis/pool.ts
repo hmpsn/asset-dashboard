@@ -50,7 +50,7 @@ export function buildLegacyKeywordPool(opts: BuildLegacyKeywordPoolOptions): Bui
       const p = normalizePageUrl(k.url);
       if (!semrushByPath.has(p)) semrushByPath.set(p, []);
       semrushByPath.get(p)!.push(k);
-      upsertKeywordPoolCandidate(keywordPool, k.keyword, { volume: k.volume, difficulty: k.difficulty, source: providerName ?? 'seo-provider' });
+      upsertKeywordPoolCandidate(keywordPool, k.keyword, { volume: k.volume, difficulty: k.difficulty, cpc: k.cpc, source: providerName ?? 'seo-provider' });
     }
   }
 
@@ -64,7 +64,7 @@ export function buildLegacyKeywordPool(opts: BuildLegacyKeywordPoolOptions): Bui
   for (const ck of competitorKeywords) {
     const kw = normalizeKeyword(ck.keyword);
     if (ck.volume > 0 && isEligible({ keyword: kw, volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` })) {
-      upsertKeywordPoolCandidate(keywordPool, kw, { volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` });
+      upsertKeywordPoolCandidate(keywordPool, kw, { volume: ck.volume, difficulty: ck.difficulty, cpc: ck.cpc ?? undefined, source: `competitor:${ck.domain}` });
     }
   }
 
@@ -78,14 +78,14 @@ export function buildLegacyKeywordPool(opts: BuildLegacyKeywordPoolOptions): Bui
   for (const dk of discoveryKeywords) {
     const kw = normalizeKeyword(dk.keyword);
     if (isStrategyQualityDiscoveryKeyword(dk) && isEligible(dk)) {
-      upsertKeywordPoolCandidate(keywordPool, kw, { volume: dk.volume, difficulty: dk.difficulty, source: `discovery:${dk.sourceKind}` });
+      upsertKeywordPoolCandidate(keywordPool, kw, { volume: dk.volume, difficulty: dk.difficulty, cpc: dk.cpc, intent: dk.intent, source: `discovery:${dk.sourceKind}` });
     }
   }
 
   for (const rk of relatedKeywords) {
     const kw = normalizeKeyword(rk.keyword);
     if (rk.volume > 0 && isEligible({ keyword: kw, volume: rk.volume, difficulty: rk.difficulty, cpc: rk.cpc, source: 'related' })) {
-      upsertKeywordPoolCandidate(keywordPool, kw, { volume: rk.volume, difficulty: rk.difficulty, source: 'related' });
+      upsertKeywordPoolCandidate(keywordPool, kw, { volume: rk.volume, difficulty: rk.difficulty, cpc: rk.cpc, source: 'related' });
     }
   }
 
@@ -112,7 +112,7 @@ export function buildLegacyKeywordPool(opts: BuildLegacyKeywordPoolOptions): Bui
 }
 
 export function buildKeywordPoolSection(
-  pool: Map<string, { volume: number; difficulty: number; source: string }>,
+  pool: KeywordStrategyKeywordPool,
   maxKeywords = 200,
 ): string {
   if (pool.size === 0) return '';

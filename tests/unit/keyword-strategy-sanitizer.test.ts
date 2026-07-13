@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { sanitizeKeywordStrategyDerivedArtifacts, sanitizeKeywordStrategyKeywordGaps, sanitizeKeywordStrategyOutput } from '../../server/keyword-strategy-sanitizer.js';
 import type { KeywordStrategyKeywordPool, StrategyOutput } from '../../server/keyword-strategy-ai-synthesis.js';
 
-function pool(entries: Array<[string, { volume: number; difficulty: number; source: string }]> = []): KeywordStrategyKeywordPool {
+function pool(entries: Array<[string, { volume: number; difficulty: number; source: string; cpc?: number; intent?: string }]> = []): KeywordStrategyKeywordPool {
   return new Map(entries);
 }
 
@@ -48,7 +48,7 @@ describe('sanitizeKeywordStrategyOutput', () => {
       workspaceId: 'ws_test',
       strategy,
       keywordPool: pool([
-        ['keyword intelligence', { volume: 100, difficulty: 20, source: 'gsc' }],
+        ['keyword intelligence', { volume: 100, difficulty: 20, cpc: 4.75, intent: 'commercial', source: 'gsc' }],
         ['content strategy platform', { volume: 80, difficulty: 35, source: 'keyword_ideas' }],
         ['paper tiger', { volume: 9000, difficulty: 10, source: 'keyword_ideas' }],
         ['typing tiger', { volume: 5000, difficulty: 10, source: 'keyword_ideas' }],
@@ -61,8 +61,10 @@ describe('sanitizeKeywordStrategyOutput', () => {
     expect(result.strategy.pageMap?.map(page => page.primaryKeyword)).toEqual(['keyword intelligence', 'content strategy']);
     expect(result.strategy.pageMap?.[0].secondaryKeywords).toEqual([]);
     expect(result.strategy.pageMap?.[0].secondaryMetrics).toEqual([]);
-    expect(result.strategy.pageMap?.[0].volume).toBeUndefined();
-    expect(result.strategy.pageMap?.[0].difficulty).toBeUndefined();
+    expect(result.strategy.pageMap?.[0].volume).toBe(100);
+    expect(result.strategy.pageMap?.[0].difficulty).toBe(20);
+    expect(result.strategy.pageMap?.[0].cpc).toBe(4.75);
+    expect(result.strategy.pageMap?.[0].searchIntent).toBe('commercial');
     expect(result.strategy.contentGaps?.map(gap => gap.targetKeyword)).toEqual(['content strategy platform']);
     expect(result.removed.siteKeywords).toEqual(expect.arrayContaining(['', 'cheap seo tools', 'paper tiger']));
     expect(result.removed.contentGaps).toEqual(expect.arrayContaining(['typing tiger', 'cheap seo tools']));

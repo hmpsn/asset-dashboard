@@ -7,6 +7,10 @@ export interface KeywordPoolCandidate {
   volume: number;
   difficulty: number;
   source: string;
+  /** Provider-grounded CPC. Zero means the provider returned no usable commercial value. */
+  cpc?: number;
+  /** Provider-grounded search intent; preserved independently from demand/source upgrades. */
+  intent?: string;
 }
 
 function keywordPoolSourcePriority(source: string): number {
@@ -40,8 +44,28 @@ export function upsertKeywordPoolCandidate(
     || (candidatePriority === existingPriority && candidate.volume > existing.volume)
     || (existing.source === 'gsc' && candidate.volume > 0 && candidate.source !== 'gsc');
 
-  if (!shouldUpgrade) return false;
-  pool.set(normalized, candidate);
+  const candidateHasUsableCpc = candidate.cpc != null && candidate.cpc > 0;
+  const existingHasUsableCpc = existing.cpc != null && existing.cpc > 0;
+  const mergedCpc = candidateHasUsableCpc
+    && (!existingHasUsableCpc || candidatePriority > existingPriority)
+    ? candidate.cpc
+    : existing.cpc ?? candidate.cpc;
+  const mergedIntent = candidate.intent != null
+    && (existing.intent == null || candidatePriority > existingPriority)
+    ? candidate.intent
+    : existing.intent;
+
+  if (!shouldUpgrade) {
+    if (mergedCpc !== existing.cpc || mergedIntent !== existing.intent) {
+      pool.set(normalized, { ...existing, cpc: mergedCpc, intent: mergedIntent });
+    }
+    return false;
+  }
+  pool.set(normalized, {
+    ...candidate,
+    cpc: mergedCpc,
+    intent: mergedIntent,
+  });
   return true;
 }
 

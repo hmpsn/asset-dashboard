@@ -444,6 +444,24 @@ describe('enrichKeywordStrategy', () => {
     expect(gap?.difficulty).toBe(30);
   });
 
+  it('preserves CPC and intent from the winning keyword-pool evidence on content gaps', async () => {
+    const opts = makeEnrichOptions({
+      contentGaps: [{ targetKeyword: 'emergency dentist near me', priority: 'high', intent: 'informational' }],
+    });
+    opts.keywordPool.set('emergency dentist near me', {
+      volume: 700,
+      difficulty: 28,
+      cpc: 11.5,
+      intent: 'transactional',
+      source: 'discovery:keyword_ideas',
+    });
+
+    const result = await enrichKeywordStrategy(opts);
+    const gap = result.strategy.contentGaps?.[0];
+    expect(gap?.cpc).toBe(11.5);
+    expect(gap?.intent).toBe('transactional');
+  });
+
   it('skips GSC-sourced keyword pool entries for content gap volume (avoids impression confusion)', async () => {
     const opts = makeEnrichOptions({
       contentGaps: [{ targetKeyword: 'teeth whitening' }],

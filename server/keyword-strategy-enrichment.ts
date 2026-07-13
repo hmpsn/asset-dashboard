@@ -461,6 +461,11 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
       if (poolHit && poolHit.volume > 0 && poolHit.source !== 'gsc') {
         cg.volume = poolHit.volume;
         cg.difficulty = poolHit.difficulty;
+        if (poolHit.cpc != null) cg.cpc = poolHit.cpc;
+        if (poolHit.intent === 'informational' || poolHit.intent === 'commercial'
+          || poolHit.intent === 'transactional' || poolHit.intent === 'navigational') {
+          cg.intent = poolHit.intent;
+        }
         poolEnriched++;
         continue;
       }
@@ -633,6 +638,7 @@ export async function enrichKeywordStrategy(options: EnrichKeywordStrategyOption
           opportunityScore: base ?? null, // grounded composite spine (was: computeOpportunityScore(cg))
           volume: cg.volume ?? null,
           difficulty: cg.difficulty ?? null,
+          cpc: cg.cpc ?? null,
           trendDirection: (cg.trendDirection as 'rising' | 'declining' | 'stable' | undefined) ?? null,
           intent: deriveValueIntent(cg.targetKeyword, cg.intent),
           llmLabel: cg.priority === 'high' || cg.priority === 'medium' || cg.priority === 'low' ? cg.priority : null,

@@ -264,6 +264,8 @@ export interface KeywordStrategy {
     keyword: string;
     volume: number;
     difficulty: number;
+    /** Provider CPC retained for incremental/cached keyword-universe rebuilds. */
+    cpc?: number | null;
     domain: string;
     position: number;
     serpFeatures?: string;
