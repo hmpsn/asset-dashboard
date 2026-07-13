@@ -63,12 +63,29 @@ export const contentTools: Tool[] = [
   },
 ];
 
+export const CONTENT_HANDLED_TOOL_NAMES = Object.freeze([
+  'get_content_decay',
+  'get_keyword_analysis',
+  'get_seo_context',
+  'get_content_performance',
+] as const);
+
+type ContentHandledToolName = (typeof CONTENT_HANDLED_TOOL_NAMES)[number];
+
+function isContentHandledToolName(name: string): name is ContentHandledToolName {
+  return CONTENT_HANDLED_TOOL_NAMES.includes(name as ContentHandledToolName);
+}
+
 const SEO_CONTEXT_SLICE: readonly IntelligenceSlice[] = ['seoContext'];
 
 export async function handleContentTool(
   name: string,
   args: Record<string, unknown>,
 ): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
+  if (!isContentHandledToolName(name)) {
+    return { isError: true, content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }] };
+  }
+
   const workspaceId = args.workspaceId;
   if (typeof workspaceId !== 'string') {
     return { isError: true, content: [{ type: 'text' as const, text: 'Missing or invalid workspaceId' }] };
@@ -144,7 +161,8 @@ export async function handleContentTool(
       return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
     }
 
-    return { isError: true, content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }] };
+    const unhandledName: never = name;
+    return { isError: true, content: [{ type: 'text' as const, text: `Unknown tool: ${unhandledName}` }] };
   } catch (err) {
     log.error({ err, tool: name, workspaceId }, 'MCP tool error');
     const message = err instanceof Error ? err.message : String(err);

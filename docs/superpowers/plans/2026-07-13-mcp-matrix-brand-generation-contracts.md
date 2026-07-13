@@ -394,6 +394,10 @@ generic string ID cannot satisfy a different gate.
 - New tools use snake_case workspace inputs and described top-level schemas.
 - Tool discovery, dispatch, unique-name census, input-schema census, and
   declared-workspace-argument census derive from one canonical registry.
+- Registry construction snapshots immutable definitions, and a production
+  definition-to-handler census verifies exact family-handler identity plus
+  handled-name manifests for pre-dispatch validators, preventing early
+  workspace checks from masking a missing or wrong family branch.
 - Authorization validates the workspace field declared by the called tool.
   Conflicting camel/snake aliases are rejected for master and scoped keys.
 - New mutations receive `McpToolExecutionContext` containing request/tool name,
@@ -401,6 +405,11 @@ generic string ID cannot satisfy a different gate.
 - Full admin activity may retain that caller attribution, but workspace
   broadcasts and client-visible activity projections must remove MCP key IDs
   and labels. Authentication identity is operational evidence, not client copy.
+- Request correlation is server-owned diagnostic metadata, never authority.
+  Generate the UUID before HTTP logging/response attachment and ignore every
+  caller-supplied `X-Request-ID`; arbitrary caller text cannot be proven safe by
+  a credential denylist. Registry rejections likewise log/return stable
+  classifications rather than raw unknown tool names or workspace arguments.
 - Request-local compatibility context may enrich existing activity writes, but
   durable generation runs persist an explicit immutable execution-context
   snapshot so restart/resume never depends on ambient process state.
@@ -409,6 +418,11 @@ generic string ID cannot satisfy a different gate.
   URL, and `existing` idempotency signal. Status/detail is paged.
 - Errors are stable JSON with code, message, retryable flag, and safe details;
   no prompt, secret, stack, or raw private evidence is returned.
+- Error compatibility is per tool. Existing handlers retain legacy text while
+  registry-owned unknown/auth rejections use generic non-reflective text; a
+  `json_v1` tool's scope failures, returned errors, and thrown failures are all
+  enforced at the registry boundary, and an unvalidated handler error degrades
+  to a safe generic envelope.
 
 ## Review, events, and client projection
 

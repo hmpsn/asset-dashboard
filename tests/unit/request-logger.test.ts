@@ -91,6 +91,34 @@ describe('requestLogger middleware', () => {
     expect(next).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    ['an ordinary caller correlation id', 'trace.parent_01:span-02'],
+    ['an MCP key', 'mcp_AbCdEf0123456789_-'],
+    ['an API key', 'sk-proj-AbCdEf0123456789'],
+    ['a compact JWT', 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyLTEifQ.signature_123'],
+    ['a Bearer value', 'Bearer:sk-live-secret'],
+    ['a GitHub token', 'ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890'],
+    ['an AWS access key', 'AKIAIOSFODNN7EXAMPLE'],
+    ['a Slack token', 'xoxb-1234567890-abcdefghij'],
+    ['a webhook secret', 'whsec_abcdefghijklmnopqrstuvwxyz'],
+    ['an oversized value', 'a'.repeat(129)],
+  ])('ignores %s before response attachment or logging', (_label, callerRequestId) => {
+    const req = createReq({ headers: { 'x-request-id': callerRequestId } });
+    const { res, emitFinish, setHeader } = createRes(200);
+
+    requestLogger(req, res, vi.fn() as NextFunction);
+    emitFinish();
+
+    expect(req.requestId).toBe('uuid-fixed-1234');
+    expect(setHeader).toHaveBeenCalledWith('x-request-id', 'uuid-fixed-1234');
+    expect(JSON.stringify([
+      mocks.info.mock.calls,
+      mocks.warn.mock.calls,
+      mocks.error.mock.calls,
+      setHeader.mock.calls,
+    ])).not.toContain(callerRequestId);
+  });
+
   it('logs at info level for 2xx responses on finish', () => {
     const req = createReq({ method: 'GET', originalUrl: '/healthz' });
     const { res, emitFinish } = createRes(204);

@@ -7,6 +7,8 @@ import { randomUUID } from 'node:crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { getMcpToolExecutionContext } from './mcp/tool-execution-context.js';
+import { WS_EVENTS } from './ws-events.js';
 
 type WorkspaceBroadcastFn = (workspaceId: string, event: string, data: unknown) => void;
 let _broadcastFn: WorkspaceBroadcastFn | null = null;
@@ -241,6 +243,31 @@ function rowToEntry(row: ActivityRow): ActivityEntry {
   };
 }
 
+/** Remove internal MCP key identity before an activity crosses a client-visible seam. */
+function toClientSafeActivityEntry(entry: ActivityEntry): ActivityEntry {
+  if (!entry.metadata || !Object.prototype.hasOwnProperty.call(entry.metadata, 'mcpCaller')) {
+    return entry;
+  }
+
+  const { mcpCaller: _internalMcpCaller, ...clientSafeMetadata } = entry.metadata;
+  return {
+    ...entry,
+    metadata: Object.keys(clientSafeMetadata).length > 0 ? clientSafeMetadata : undefined,
+  };
+}
+
+/** Key-management audit detail is admin-only even though the WS channel is shared. */
+function toWorkspaceBroadcastActivityPayload(entry: ActivityEntry): ActivityEntry | Record<string, never> {
+  if (entry.type !== 'mcp_key_created' && entry.type !== 'mcp_key_revoked') {
+    return toClientSafeActivityEntry(entry);
+  }
+
+  // Client and admin subscribers share this workspace channel. The event itself
+  // is only an invalidation signal: key-management identity and even the audit
+  // entry's existence/details stay behind the admin activity read boundary.
+  return {};
+}
+
 /** Activity types visible to clients — real team work only, no system/anomaly/internal entries */
 const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
   'audit_completed', 'request_resolved', 'approval_sent', 'approval_applied', 'approval_reverted', 'seo_updated',
@@ -330,13 +357,16 @@ const stmts = createStmtCache(() => ({
 // ── Public API ──
 
 export function addActivity(workspaceId: string, type: ActivityType, title: string, description?: string, metadata?: Record<string, unknown>, actor?: { id?: string; name?: string }): ActivityEntry {
+  const mcpExecutionContext = getMcpToolExecutionContext();
   const entry: ActivityEntry = {
     id: `act_${randomUUID()}`,
     workspaceId,
     type,
     title,
     description,
-    metadata,
+    metadata: mcpExecutionContext
+      ? { ...metadata, mcpCaller: mcpExecutionContext }
+      : metadata,
     actorId: actor?.id,
     actorName: actor?.name,
     createdAt: new Date().toISOString(),
@@ -354,8 +384,8 @@ export function addActivity(workspaceId: string, type: ActivityType, title: stri
     created_at: entry.createdAt,
   });
 
-  // Broadcast to subscribed workspace clients
-  _broadcastFn?.(workspaceId, 'activity:new', entry);
+  // Workspace broadcasts are shared with client subscribers. Keep MCP key identity internal.
+  _broadcastFn?.(workspaceId, WS_EVENTS.ACTIVITY_NEW, toWorkspaceBroadcastActivityPayload(entry));
 
   return entry;
 }
@@ -388,7 +418,7 @@ export function listActivityByType(workspaceId: string, type: ActivityType, limi
 
 export function listClientActivity(workspaceId: string, limit = 50, offset = 0): ActivityEntry[] {
   const rows = stmts().selectClientVisible.all(workspaceId, ...CLIENT_VISIBLE_TYPES, limit, offset) as ActivityRow[];
-  return rows.map(rowToEntry);
+  return rows.map(rowToEntry).map(toClientSafeActivityEntry);
 }
 
 /** Returns true if the workspace has any activity log entry within the last `withinDays` days. */

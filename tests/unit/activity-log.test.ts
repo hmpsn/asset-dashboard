@@ -11,6 +11,30 @@ import {
   initActivityBroadcast,
   pruneActivityLogRetention,
 } from '../../server/activity-log.js';
+import {
+  getMcpToolExecutionContext,
+  runWithMcpToolExecutionContext,
+} from '../../server/mcp/tool-execution-context.js';
+import { WS_EVENTS } from '../../server/ws-events.js';
+import type { McpToolExecutionContext } from '../../shared/types/mcp-runtime.js';
+
+function workspaceMcpContext(
+  workspaceId: string,
+  overrides: Partial<Pick<McpToolExecutionContext, 'requestId' | 'toolName'>> = {},
+): McpToolExecutionContext {
+  return {
+    requestId: overrides.requestId ?? 'req-activity-attribution',
+    toolName: overrides.toolName ?? 'update_workspace',
+    targetWorkspaceId: workspaceId,
+    caller: {
+      kind: 'workspace_key',
+      scope: workspaceId,
+      workspaceId,
+      keyId: 'mcp_key_activity_test',
+      keyLabel: 'Activity attribution key',
+    },
+  };
+}
 
 // ── addActivity ──
 
@@ -44,10 +68,164 @@ describe('addActivity', () => {
 
     const entry = addActivity('ws_broadcast', 'note', 'Test broadcast');
 
-    expect(broadcastFn).toHaveBeenCalledWith('ws_broadcast', 'activity:new', entry);
+    expect(broadcastFn).toHaveBeenCalledWith('ws_broadcast', WS_EVENTS.ACTIVITY_NEW, entry);
 
     // Reset broadcast to avoid affecting other tests
     initActivityBroadcast(() => {});
+  });
+
+  it('durably merges MCP caller attribution without clobbering existing metadata', () => {
+    const workspaceId = `ws_mcp_activity_${Date.now()}`;
+    const context = {
+      requestId: 'req-activity-attribution',
+      toolName: 'update_workspace',
+      targetWorkspaceId: workspaceId,
+      caller: {
+        kind: 'workspace_key' as const,
+        scope: workspaceId,
+        workspaceId,
+        keyId: 'mcp_key_activity_test',
+        keyLabel: 'Activity attribution key',
+      },
+    };
+
+    const entry = runWithMcpToolExecutionContext(context, () => addActivity(
+      workspaceId,
+      'seo_updated',
+      'MCP changed SEO settings',
+      undefined,
+      { source: 'mcp-chat', updatedFields: ['title'] },
+    ));
+
+    expect(entry.metadata).toEqual({
+      source: 'mcp-chat',
+      updatedFields: ['title'],
+      mcpCaller: context,
+    });
+
+    context.requestId = 'tampered-request';
+    context.caller.keyLabel = 'Tampered label';
+
+    expect(Object.isFrozen(entry.metadata?.mcpCaller)).toBe(true);
+    expect(Object.isFrozen(
+      (entry.metadata?.mcpCaller as McpToolExecutionContext | undefined)?.caller,
+    )).toBe(true);
+    expect(listActivity(workspaceId)[0]?.metadata).toEqual({
+      source: 'mcp-chat',
+      updatedFields: ['title'],
+      mcpCaller: {
+        requestId: 'req-activity-attribution',
+        toolName: 'update_workspace',
+        targetWorkspaceId: workspaceId,
+        caller: {
+          kind: 'workspace_key',
+          scope: workspaceId,
+          workspaceId,
+          keyId: 'mcp_key_activity_test',
+          keyLabel: 'Activity attribution key',
+        },
+      },
+    });
+  });
+
+  it('strips MCP caller attribution from workspace broadcasts', () => {
+    const workspaceId = `ws_mcp_broadcast_${Date.now()}`;
+    const broadcastFn = vi.fn();
+    initActivityBroadcast(broadcastFn);
+
+    const entry = runWithMcpToolExecutionContext(workspaceMcpContext(workspaceId), () => addActivity(
+      workspaceId,
+      'seo_updated',
+      'MCP changed SEO settings',
+      undefined,
+      { source: 'mcp-chat' },
+    ));
+
+    expect(entry.metadata).toHaveProperty('mcpCaller');
+    expect(broadcastFn).toHaveBeenCalledWith(
+      workspaceId,
+      WS_EVENTS.ACTIVITY_NEW,
+      expect.objectContaining({
+        id: entry.id,
+        metadata: { source: 'mcp-chat' },
+      }),
+    );
+    expect(JSON.stringify(broadcastFn.mock.calls)).not.toContain('mcp_key_activity_test');
+
+    initActivityBroadcast(() => {});
+  });
+
+  it.each([
+    ['mcp_key_created', 'MCP API key created'],
+    ['mcp_key_revoked', 'MCP API key revoked'],
+  ] as const)('emits only an opaque invalidation for %s on shared workspace broadcasts', (type, title) => {
+    const workspaceId = `ws_mcp_key_broadcast_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const broadcastFn = vi.fn();
+    initActivityBroadcast(broadcastFn);
+
+    const entry = addActivity(
+      workspaceId,
+      type,
+      `${title}: Private automation label`,
+      'Private operator context',
+      { keyId: 'mcp_key_private_id', label: 'Private automation label' },
+      { id: 'operator-private-id', name: 'Private Operator' },
+    );
+
+    expect(entry.metadata).toEqual({
+      keyId: 'mcp_key_private_id',
+      label: 'Private automation label',
+    });
+    expect(broadcastFn).toHaveBeenCalledWith(
+      workspaceId,
+      WS_EVENTS.ACTIVITY_NEW,
+      {},
+    );
+    const stored = listActivity(workspaceId)[0];
+    expect(stored).toMatchObject({
+      id: entry.id,
+      type,
+      title: `${title}: Private automation label`,
+      description: 'Private operator context',
+      metadata: { keyId: 'mcp_key_private_id', label: 'Private automation label' },
+      actorId: 'operator-private-id',
+      actorName: 'Private Operator',
+    });
+    expect(JSON.stringify(broadcastFn.mock.calls)).not.toMatch(
+      /mcp_key_created|mcp_key_revoked|act_|mcp_key_private_id|Private automation label|Private operator context|Private Operator|operator-private-id/,
+    );
+
+    initActivityBroadcast(() => {});
+  });
+
+  it('isolates concurrent MCP execution contexts and snapshots their identity', async () => {
+    const firstInput = workspaceMcpContext('ws_mcp_concurrent_a', {
+      requestId: 'req-concurrent-a',
+      toolName: 'update_workspace',
+    });
+    const secondInput = workspaceMcpContext('ws_mcp_concurrent_b', {
+      requestId: 'req-concurrent-b',
+      toolName: 'get_workspace_overview',
+    });
+
+    const [first, second] = await Promise.all([
+      runWithMcpToolExecutionContext(firstInput, async () => {
+        await Promise.resolve();
+        return getMcpToolExecutionContext();
+      }),
+      runWithMcpToolExecutionContext(secondInput, async () => {
+        await Promise.resolve();
+        return getMcpToolExecutionContext();
+      }),
+    ]);
+
+    expect(first?.requestId).toBe('req-concurrent-a');
+    expect(second?.requestId).toBe('req-concurrent-b');
+    expect(first).not.toBe(firstInput);
+    expect(first?.caller).not.toBe(firstInput.caller);
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(Object.isFrozen(first?.caller)).toBe(true);
+    expect(getMcpToolExecutionContext()).toBeUndefined();
   });
 
   it('does not globally prune quiet workspaces when unrelated workspaces write activity', () => {
@@ -139,6 +317,26 @@ describe('listClientActivity', () => {
     // Should NOT contain internal types
     expect(types).not.toContain('anomaly_detected');
     expect(types).not.toContain('chat_session');
+  });
+
+  it('strips MCP caller attribution while the admin activity read retains it', () => {
+    const workspaceId = `ws_client_mcp_privacy_${Date.now()}`;
+    const context = workspaceMcpContext(workspaceId);
+
+    runWithMcpToolExecutionContext(context, () => addActivity(
+      workspaceId,
+      'seo_updated',
+      'MCP changed SEO settings',
+      undefined,
+      { source: 'mcp-chat' },
+    ));
+
+    expect(listActivity(workspaceId)[0]?.metadata).toEqual({
+      source: 'mcp-chat',
+      mcpCaller: context,
+    });
+    expect(listClientActivity(workspaceId)[0]?.metadata).toEqual({ source: 'mcp-chat' });
+    expect(JSON.stringify(listClientActivity(workspaceId))).not.toContain('mcp_key_activity_test');
   });
 });
 

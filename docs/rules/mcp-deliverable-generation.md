@@ -213,6 +213,20 @@ never sufficient to dispatch paid work.
   restart/resume path must never depend on ambient request state.
 - Tool registry, discovery, dispatch, schema census, and workspace-argument
   census share one canonical registry and contract test.
+- Registry definitions are immutable snapshots, and production definition names
+  are censused against exact family-handler identity and any pre-dispatch
+  handled-name manifest so early workspace validation cannot hide a missing or
+  wrong dispatch branch.
+- Request correlation is server-owned diagnostic metadata, not authority.
+  Generate the UUID before logging, response attachment, activity, or durable
+  run attribution and ignore every caller `X-Request-ID`; arbitrary caller text
+  cannot be proven non-secret with a finite denylist. Rejection logs/results use
+  stable classifications, not raw unknown tool names or workspace arguments.
+- Error compatibility is per tool. Existing handlers remain legacy text while
+  registry-owned unknown/auth rejections are generic and non-reflective; every
+  `json_v1` scope error, handler-returned error, and thrown error must cross the
+  sanitizing registry boundary. Unvalidated results degrade to a generic safe
+  envelope rather than being serialized.
 
 ## 10. Brand review and projection
 

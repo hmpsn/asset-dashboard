@@ -52,10 +52,31 @@ export const insightTools: Tool[] = [
   },
 ];
 
+export const INSIGHT_HANDLED_TOOL_NAMES = Object.freeze([
+  'get_insights',
+  'get_anomalies',
+  'get_unresolved_insights',
+  'resolve_insight',
+  'bulk_resolve_insights',
+] as const);
+
+type InsightHandledToolName = (typeof INSIGHT_HANDLED_TOOL_NAMES)[number];
+
+function isInsightHandledToolName(name: string): name is InsightHandledToolName {
+  return INSIGHT_HANDLED_TOOL_NAMES.includes(name as InsightHandledToolName);
+}
+
 export async function handleInsightTool(
   name: string,
   args: Record<string, unknown>,
 ): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
+  if (!isInsightHandledToolName(name)) {
+    return {
+      isError: true,
+      content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
+    };
+  }
+
   const workspaceId = args.workspaceId;
   try {
     if (typeof workspaceId !== 'string') {
@@ -211,9 +232,10 @@ export async function handleInsightTool(
       };
     }
 
+    const unhandledName: never = name;
     return {
       isError: true,
-      content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
+      content: [{ type: 'text' as const, text: `Unknown tool: ${unhandledName}` }],
     };
   } catch (err) {
     log.error({ err, tool: name, workspaceId }, 'MCP tool error');

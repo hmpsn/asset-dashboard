@@ -192,19 +192,26 @@ canonical terms are added), and generated rules are consistent.
 
 **Owner:** `platform-foundation`; GPT-5.5. **Depends:** P0.
 
-**Status:** implementation in progress on a fresh branch from the green P0
-`origin/staging` merge.
+**Status:** implemented on a fresh branch from the green P0 `origin/staging`
+merge; independent adversarial findings are fixed before PR/CI integration.
 
-Exclusive ownership: `server/mcp/server.ts`, `server/mcp/instructions.ts`,
+Exclusive ownership: `server/mcp/server.ts`, `server/mcp/auth.ts`, `server/mcp/instructions.ts`,
 `server/mcp/README.md`, new canonical registry/context/error modules, and MCP
 registry/schema/routing tests, plus `shared/types/mcp-runtime.ts`,
-`shared/types/index.ts`, `server/activity-log.ts`,
-`tests/unit/activity-log.test.ts`, and
-`tests/integration/mcp-api-keys-admin.test.ts`. Must not import HTTP route
-handlers, add generation business logic, or change job/domain status semantics.
+`shared/types/index.ts`, `server/activity-log.ts`, the shared
+`server/request-correlation.ts` normalizer, `server/middleware/request-logger.ts`,
+the content/insight pre-dispatch handled-name manifests,
+`tests/unit/{activity-log,request-logger}.test.ts`, and
+`tests/integration/mcp-api-keys-admin.test.ts`, plus phase closeout in
+`FEATURE_AUDIT.md` and `data/roadmap.json`. Must not import HTTP route handlers,
+add generation business logic, or change job/domain status semantics.
 
 - Create one canonical tool registry consumed by discovery, dispatch, unique-
   name census, input-schema census, and declared-workspace-field authorization.
+- Snapshot immutable definitions and run a production definition-to-handler
+  census with exact family→handler identity and pre-dispatch handled-name
+  manifests so schema/scope state and family switch dispatch cannot drift after
+  registry validation or be masked by early workspace validation.
 - Include every category, including schema tools, in the property-description
   contract; repair README tool-count drift.
 - Thread `McpToolExecutionContext` (tool/request, key ID/label, scope) through
@@ -218,13 +225,25 @@ handlers, add generation business logic, or change job/domain status semantics.
 - Keep authenticated key identity internal: persist it on full admin activity,
   but strip MCP key ID/label attribution from workspace broadcasts and the
   client-visible activity projection.
-- Add a common stable JSON error envelope for new tools without breaking legacy
-  tool payloads.
+- Generate the request-correlation UUID on the server before HTTP logs,
+  response headers, or durable audit metadata; ignore every caller-supplied
+  `X-Request-ID` because arbitrary caller text cannot be proven non-secret.
+  Registry rejection logs/results also exclude raw unknown tool names and
+  mismatched workspace values. Make admin-only key-lifecycle broadcasts opaque
+  invalidations.
+- Add a per-tool stable JSON error envelope for new tools without changing
+  registered legacy handler responses; harden registry-owned unknown/auth
+  rejections to generic text so raw caller values are not reflected. The
+  registry rejects any JSON-tool error that did not cross the sanitizing
+  constructor, including handler-returned errors and exceptions.
 
-Red first: duplicate/missing dispatch and undeclared/dual workspace-field fixture
-tests; caller label missing from a real write activity; client activity and
-broadcast payloads exposing internal key identity. Green after registry and
-execution context are the only authority.
+Red first: duplicate/missing/wrong-family dispatch (including handlers that
+validate workspace before switching), mutable schema drift, mixed error
+compatibility, raw JSON error, caller-controlled/hostile request ID, secret-shaped
+tool/workspace argument, and undeclared/dual
+workspace-field fixtures; caller label missing from a real write activity;
+client activity and broadcast payloads exposing internal key identity. Green
+after registry and execution context are the only authority.
 
 Acceptance: list/dispatch/schema/scope cannot drift; representative existing
 read/write/job tools preserve behavior; no secrets enter logs/results.
@@ -663,7 +682,7 @@ observed.
 |---|---|
 | S0 | `npx vitest run tests/unit/mcp-auth-perkey.test.ts tests/contract/mcp-tool-input-schema-properties.test.ts tests/contract/mcp-tool-workspace-scope-schema.test.ts` |
 | P0 | `npx vitest run tests/unit/feature-flags.test.ts tests/unit/feature-flag-lifecycle.test.ts tests/contract/feature-flag-catalog.test.ts tests/contract/mcp-generation-contracts.test.ts` |
-| R1 | `npx vitest run tests/contract/mcp-runtime-contract.test.ts tests/unit/mcp-tool-registry.test.ts tests/unit/mcp-tool-errors.test.ts tests/unit/mcp-server-routing.test.ts tests/unit/mcp-auth-perkey.test.ts tests/unit/activity-log.test.ts tests/contract/mcp-tool-input-schema-properties.test.ts tests/contract/mcp-tool-workspace-scope-schema.test.ts tests/integration/mcp-api-keys-admin.test.ts` |
+| R1 | `npx vitest run tests/contract/mcp-runtime-contract.test.ts tests/contract/mcp-tool-dispatch-census.test.ts tests/unit/mcp-tool-registry.test.ts tests/unit/mcp-tool-errors.test.ts tests/unit/mcp-server-routing.test.ts tests/unit/mcp-auth-perkey.test.ts tests/unit/mcp-instructions.test.ts tests/unit/activity-log.test.ts tests/unit/request-logger.test.ts tests/contract/mcp-tool-input-schema-properties.test.ts tests/contract/mcp-tool-workspace-scope-schema.test.ts tests/integration/mcp-api-keys-admin.test.ts` |
 | M0 | `npx vitest run tests/unit/content-matrix-renderer.test.ts tests/integration/content-matrices-routes.test.ts tests/contract/mcp-matrix-read-tools.test.ts`; repeat structural resolve and assert identical source fingerprint/zero AI executions; accept/reject/stale template upgrade |
 | B0 | `npx vitest run tests/integration/public-onboarding-routes.test.ts tests/integration/brand-intake.test.ts`; submit the same body twice to `POST /api/public/onboarding/:id`, assert one revision/projection, then cover authenticated admin GET/evidence POST |
 | B1 | `npx vitest run tests/integration/voice-calibration.test.ts tests/contract/voice-finalization.test.ts`; assert generated-only anchors cannot finalize |

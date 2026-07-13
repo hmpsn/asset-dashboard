@@ -31,11 +31,13 @@ function getWorkspaceIdForTelemetry(req: Request): string | undefined {
 
 /**
  * Express middleware that:
- * 1. Assigns a unique requestId to every request.
+ * 1. Assigns a bounded, non-secret correlation requestId to every request.
  * 2. Logs request start + completion with duration.
  */
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {
-  const requestId = (req.headers['x-request-id'] as string) || randomUUID();
+  // Never retain or reflect the caller-controlled X-Request-ID header. It may
+  // contain a credential even when its characters and length look harmless.
+  const requestId = randomUUID();
   const start = Date.now();
 
   // Attach to request for downstream consumers

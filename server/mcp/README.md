@@ -17,8 +17,9 @@ update this file in the same commit.
 - **Transport:** MCP over **stateless Streamable HTTP**. `handleMcpRequest` (`server/mcp/server.ts`)
   builds a **fresh `Server` + `StreamableHTTPServerTransport` per request** (`sessionIdGenerator:
   undefined`, `enableJsonResponse: true`) — the SDK's stateless transport cannot be reused across
-  requests (message-ID collisions), so tool definitions are declared once (`ALL_TOOLS`) and applied
-  to each new `Server` instance. Responses are returned as JSON-RPC objects, not SSE streams.
+  requests (message-ID collisions), so tool definitions are declared once in the canonical
+  `MCP_TOOL_REGISTRY` (`server/mcp/tool-registry.ts`) and applied to each new `Server` instance.
+  Responses are returned as JSON-RPC objects, not SSE streams.
 - **Handshake instructions:** every `initialize` response carries `MCP_SERVER_INSTRUCTIONS`
   (`server/mcp/instructions.ts`) — the agent-facing orientation string (workspace-id requirement,
   the casing split, the content-authoring handle pipeline, paid-API and destructive-tool warnings).
@@ -28,9 +29,13 @@ update this file in the same commit.
   Bearer token.
 - **Server identity:** `{ name: 'hmpsn-studio', version: '1.0.0' }`.
 
-### Workspace-id parameter casing (gotcha)
+### Workspace scope and parameter casing (gotcha)
 
-Every tool operates on **one** client workspace. The parameter name is **not** uniform:
+Most tools operate on **one** client workspace. Two tools are explicitly global and therefore
+master-key only: `list_workspaces` and `create_workspace`. `get_pending_work` has a declared,
+optional `workspaceId`; omitting it requests a cross-workspace summary and is also master-key only.
+
+For workspace-scoped tools, the parameter name is **not** uniform:
 
 - Most tools use **`workspace_id`** (snake_case).
 - A number of **read** tools use **`workspaceId`** (camelCase): `get_workspace_overview`, insights,
@@ -38,16 +43,17 @@ Every tool operates on **one** client workspace. The parameter name is **not** u
   `get_seo_context` / `get_content_performance`), client signals (`get_client_signals` /
   `get_pending_work`), and brand (`get_brand_identity` / `update_brand_deliverable`).
 
-Match each tool's own schema. Scope enforcement reads **both** casings, so a workspace-scoped key
-can never reach a sibling workspace through whichever casing a tool happens to use.
+Match each tool's own schema. The registry records the one workspace field each tool actually
+declares and rejects conflicting aliases, so an undeclared decoy field cannot authorize access to
+a sibling workspace.
 
 ---
 
 ## Auth
 
 Auth is **fail-closed** at every step. Implemented in `server/mcp/auth.ts` (`mcpAuthMiddleware`) and
-`server/mcp/api-keys.ts`; the per-workspace scope is enforced in `handleMcpRequest`
-(`server/mcp/server.ts`).
+`server/mcp/api-keys.ts`; the per-workspace scope is enforced at the canonical registry execution
+boundary (`executeMcpTool` in `server/mcp/tool-registry.ts`).
 
 Send the key as a Bearer token: `Authorization: Bearer <key>`.
 
@@ -58,14 +64,15 @@ Send the key as a Bearer token: `Authorization: Bearer <key>`.
 
 ### Scope enforcement (security-critical)
 
-For a per-workspace key (`auth.scope !== 'all'`), `handleMcpRequest` checks the tool's
-`workspace_id` / `workspaceId` argument **after** parsing, because the workspace id lives in the
-JSON body, not a header/URL. Fail-closed:
+For a per-workspace key (`auth.scope !== 'all'`), `executeMcpTool` checks the workspace field
+declared by the registered tool **after** parsing, because the workspace id lives in the JSON body,
+not a header/URL. Fail-closed:
 
 - **Cross-workspace** id (`argWorkspaceId !== auth.scope`) → rejected.
-- **No-`workspace_id` tools** (e.g. `list_workspaces`, the cross-workspace `get_pending_work`) →
-  **rejected** for scoped keys, since a workspace key must not enumerate or act across all
-  workspaces.
+- **Explicit global tools** (`list_workspaces`, `create_workspace`) → rejected for scoped keys.
+- **Optional workspace field omitted** (`get_pending_work`) → rejected for scoped keys, since a
+  workspace key must not enumerate across all workspaces.
+- **Conflicting `workspaceId` / `workspace_id` aliases** → rejected for every caller.
 
 The master key (`scope: 'all'`) bypasses both checks.
 
@@ -77,14 +84,43 @@ The master key (`scope: 'all'`) bypasses both checks.
 > Operators mint / list / revoke per-workspace keys from the dashboard at **Settings → MCP API Keys**
 > (`src/components/McpApiKeysSettings.tsx` → `GET/POST/DELETE /api/admin/mcp-api-keys`, HMAC-only).
 
+Workspace mutations retain an internal MCP execution attribution record: bounded request
+correlation id, tool name, target workspace, and authenticated key id/label. That identity is
+available to operators in the durable activity log but is stripped from client-facing activity
+projections and workspace live broadcasts. Request correlation is diagnostic only—never an
+idempotency or uniqueness authority. The server generates the UUID used by HTTP logs, the response
+header, and durable attribution; every caller-supplied `X-Request-ID` value is ignored rather than
+retained, reflected, or classified by a finite credential denylist.
+
+### Error compatibility
+
+The registry assigns each tool an explicit error contract:
+
+- The existing **61 tools** remain `legacy_text`; registered handler-owned responses are unchanged.
+  Registry-owned unknown-tool and authorization rejections are deliberately generic so caller
+  tool/workspace values cannot be reflected as secrets.
+- New tools use `json_v1`: an error is a text content item containing a JSON
+  `{ code, message, retryable, details? }` envelope.
+
+`server/mcp/tool-errors.ts` builds and privately marks the `json_v1` response and filters optional
+details as defense in depth. The registry rejects any JSON-tool error that did not cross that
+constructor, including a raw handler result, and maps thrown failures to the generic envelope.
+Raw arguments, prompts, evidence, secrets, exception messages, and stacks must enter neither MCP
+responses nor registry logs. Registry rejection logs use only registered tool names and stable
+failure classes; unknown names and mismatched workspace values are never logged or reflected.
+
 ---
 
 ## Tool inventory
 
-`ALL_TOOLS` (`server/mcp/server.ts`) composes **12 categories** for a total of **60 tools**. Each
-category is a `*Tools: Tool[]` array + a `handle*Tool(name, args)` dispatcher in
-`server/mcp/tools/<category>.ts`. The per-request dispatcher in `server.ts` routes a call to the
-first category whose `*.some(t => t.name === name)` matches.
+`MCP_TOOL_REGISTRY` (`server/mcp/tool-registry.ts`) is the single authority for discovery,
+dispatch, workspace scope, and error compatibility. It composes **13 categories** for a total of
+**61 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
+dispatcher in `server/mcp/tools/<category>.ts`; the registry snapshots immutable definitions and
+connects each one to its category handler. A production dispatch census calls every registered
+name with inert invalid input, asserts the exact 13 family-array→handler identities, and pins the
+handled-name manifests for families that validate workspace input before dispatch. Discovery
+therefore cannot silently outgrow or be paired with the wrong family switch.
 
 Legend: **W** = write/mutation (broadcasts + logs activity), **R** = read-only, **[Paid API]** =
 increments the paid-call counter.
@@ -186,6 +222,11 @@ increments the paid-call counter.
 | `generate_schema` | W | Generate JSON-LD `@graph` for a page + validation findings; persists to the snapshot (does not publish). |
 | `validate_schema` | R | Validate structural + Google Rich Results rules (`page_id` or raw `schema_json`). |
 | `publish_schema` | W | Publish schema to the **LIVE** site. **Validate-first**: refuses to publish on validation errors. |
+
+### analytics-read-actions (`tools/analytics-read-actions.ts`)
+| Tool | R/W | Purpose |
+|------|-----|---------|
+| `get_search_performance` | R | Read GSC clicks, impressions, CTR, position, daily trend, top queries/pages, and optional previous-period comparison for an explicit or trailing date range. |
 
 ### job-actions (`tools/job-actions.ts`) — background jobs
 | Tool | R/W | Purpose |
@@ -291,14 +332,21 @@ Four steps, all in the same commit:
 2. **Add the tool def + handler** in the right `server/mcp/tools/<category>.ts` file: push a
    `{ name, description, inputSchema }` entry onto the category's `*Tools` array and add a `case`/`if`
    branch to its `handle*Tool` dispatcher. Validate args with the Zod schema, return
-   `mcpSuccess(...)` / `mcpError(...)` (or the `{ content: [...], isError? }` shape).
-3. **Wire a NEW category into `server.ts`** — only if you created a new category file: add it to
-   the `ALL_TOOLS` spread **and** the per-request dispatch chain in `handleMcpRequest`. Existing
-   categories need no `server.ts` change.
+   `mcpSuccess(...)`; legacy tools keep `mcpError(...)`, while new `json_v1` tools use
+   `mcpJsonV1Error(...)` with a stable public envelope. If the family validates workspace/external
+   state before switching on `name`, also update its exported handled-name manifest; the census
+   requires that manifest to equal the advertised definitions.
+3. **Register compatibility in `server/mcp/tool-registry.ts`.** A new category supplies its name,
+   definitions, handler, global-tool declarations (normally none), and default error contract once.
+   A new `json_v1` tool added to an existing legacy category adds its name to that registration's
+   `errorContractOverrides`. Discovery, scope resolution, and dispatch are derived from the one
+   registration; do not add a second spread or dispatch chain.
 4. **Register in the tests** so coverage stays complete:
    - `tests/contract/mcp-tool-input-schema-properties.test.ts` (every top-level schema prop is
      `.describe()`'d)
-   - `tests/unit/mcp-server-routing.test.ts` (the tool routes to the right category handler)
+   - `tests/contract/mcp-tool-dispatch-census.test.ts` (every discovered name reaches its handler)
+   - `tests/unit/mcp-tool-registry.test.ts` (registry invariants and category routing)
+   - `tests/unit/mcp-server-routing.test.ts` (the transport delegates to the registry)
 
 **pr-check guardrails to respect inside `server/mcp/tools/`:**
 
@@ -310,4 +358,6 @@ Four steps, all in the same commit:
   caches where relevant, so admin and client UIs stay live.
 
 Use the shared helpers in `server/mcp/tool-helpers.ts` (`requireWorkspace`, `mcpSuccess`,
-`mcpError`, `zodErrorToMcp`, `buildDashboardUrl`) rather than hand-rolling responses.
+`mcpError`, `zodErrorToMcp`, `buildDashboardUrl`) rather than hand-rolling responses. `mcpError`
+and `zodErrorToMcp` are legacy-only; a `json_v1` handler uses the constructors in
+`server/mcp/tool-errors.ts` so the registry can verify the result.

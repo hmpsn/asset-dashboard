@@ -11,12 +11,14 @@
  * route wiring, scoping, or the revoke→reject loop is caught here.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import db from '../../server/db/index.js';
 import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 
 const ctx = createEphemeralTestContext(import.meta.url);
 
 let ws: ReturnType<typeof seedWorkspace>;
+let createdContentRequestId: string | undefined;
 
 beforeAll(async () => {
   await ctx.startServer();
@@ -24,8 +26,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  ws.cleanup();
   await ctx.stopServer();
+  if (createdContentRequestId && ws) {
+    db.prepare('DELETE FROM content_topic_requests WHERE id = ? AND workspace_id = ?')
+      .run(createdContentRequestId, ws.workspaceId);
+  }
+  ws?.cleanup();
 });
 
 async function adminPost(body: unknown): Promise<Response> {
@@ -64,6 +70,44 @@ async function mcpToolsListStatus(token: string): Promise<number> {
   return res.status;
 }
 
+async function callMcpTool<T>(
+  token: string,
+  requestId: string,
+  name: string,
+  args: Record<string, unknown>,
+): Promise<{ result: T; responseRequestId: string }> {
+  const res = await ctx.api('/mcp', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream',
+      Authorization: `Bearer ${token}`,
+      'X-Request-ID': requestId,
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'tools/call',
+      params: { name, arguments: args },
+      id: 2,
+    }),
+  });
+
+  expect(res.status).toBe(200);
+  const responseRequestId = res.headers.get('x-request-id');
+  expect(responseRequestId).toBeTruthy();
+  const body = await res.json() as {
+    result?: { isError?: boolean; content: Array<{ type: string; text: string }> };
+    error?: unknown;
+  };
+  expect(body.error).toBeUndefined();
+  expect(body.result?.isError).not.toBe(true);
+  expect(body.result?.content[0]?.type).toBe('text');
+  return {
+    result: JSON.parse(body.result!.content[0].text) as T,
+    responseRequestId: responseRequestId!,
+  };
+}
+
 describe('Admin MCP API key routes', () => {
   it('creates a key (plaintext shown once), lists it without leaking secret material, and the key authenticates at /mcp', async () => {
     // CREATE
@@ -94,6 +138,127 @@ describe('Admin MCP API key routes', () => {
 
     // The minted key authenticates at /mcp.
     expect(await mcpToolsListStatus(created.plaintextKeyOnceShown)).toBe(200);
+
+    // A real scoped write carries the authenticated key identity into the
+    // internal activity trail, correlated to the HTTP request — never the bearer
+    // token or raw tool arguments.
+    const unsafeRequestId = created.plaintextKeyOnceShown;
+    const { result: updateResult, responseRequestId: updateRequestId } = await callMcpTool<{
+      ok: boolean;
+      workspace: { id: string; onboardingEnabled?: boolean };
+    }>(
+      created.plaintextKeyOnceShown,
+      unsafeRequestId,
+      'update_workspace',
+      {
+        workspace_id: ws.workspaceId,
+        updates: { onboarding_enabled: true },
+      },
+    );
+    expect(updateRequestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    expect(updateRequestId).not.toBe(unsafeRequestId);
+    expect(updateResult.ok).toBe(true);
+    expect(updateResult.workspace.id).toBe(ws.workspaceId);
+    expect(updateResult.workspace.onboardingEnabled).toBe(true);
+
+    // Exercise a client-visible mutation too. This makes the public privacy
+    // assertion non-vacuous: the returned feed must retain the useful activity
+    // title/action while stripping only the internal MCP caller envelope.
+    const callerClientVisibleRequestId = '11111111-1111-4111-8111-111111111111';
+    const contentTopic = `MCP privacy integration ${Date.now()}`;
+    const { result: contentResult, responseRequestId: echoedClientVisibleRequestId } = await callMcpTool<{
+      ok: boolean;
+      created: boolean;
+      deduped: boolean;
+      request_id: string;
+    }>(
+      created.plaintextKeyOnceShown,
+      callerClientVisibleRequestId,
+      'create_content_request',
+      {
+        workspace_id: ws.workspaceId,
+        topic: contentTopic,
+        target_keyword: `mcp privacy keyword ${Date.now()}`,
+        dedupe: false,
+      },
+    );
+    expect(echoedClientVisibleRequestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    expect(echoedClientVisibleRequestId).not.toBe(callerClientVisibleRequestId);
+    expect(contentResult).toMatchObject({ ok: true, created: true, deduped: false });
+    createdContentRequestId = contentResult.request_id;
+
+    const activityRes = await ctx.api(`/api/activity?workspaceId=${ws.workspaceId}&limit=50`);
+    expect(activityRes.status).toBe(200);
+    const adminActivity = await activityRes.json() as Array<{
+      metadata?: {
+        action?: string;
+        mcpCaller?: unknown;
+      };
+    }>;
+    const attributedWrite = adminActivity.find(
+      (entry) => entry.metadata?.action === 'mcp_workspace_updated',
+    );
+    expect(attributedWrite?.metadata?.mcpCaller).toEqual({
+      requestId: updateRequestId,
+      toolName: 'update_workspace',
+      targetWorkspaceId: ws.workspaceId,
+      caller: {
+        kind: 'workspace_key',
+        scope: ws.workspaceId,
+        workspaceId: ws.workspaceId,
+        keyId: created.key.id,
+        keyLabel: created.key.label,
+      },
+    });
+    expect(JSON.stringify(attributedWrite)).not.toContain(created.plaintextKeyOnceShown);
+
+    const attributedClientVisibleWrite = adminActivity.find(
+      (entry) => entry.metadata?.action === 'mcp_content_request_created',
+    );
+    expect(attributedClientVisibleWrite?.metadata?.mcpCaller).toEqual({
+      requestId: echoedClientVisibleRequestId,
+      toolName: 'create_content_request',
+      targetWorkspaceId: ws.workspaceId,
+      caller: {
+        kind: 'workspace_key',
+        scope: ws.workspaceId,
+        workspaceId: ws.workspaceId,
+        keyId: created.key.id,
+        keyLabel: created.key.label,
+      },
+    });
+
+    const clientActivityRes = await ctx.api(`/api/public/activity/${ws.workspaceId}?limit=50`);
+    expect(clientActivityRes.status).toBe(200);
+    const clientActivity = await clientActivityRes.json() as Array<{
+      type: string;
+      title: string;
+      metadata?: {
+        source?: string;
+        requestId?: string;
+        action?: string;
+        mcpCaller?: unknown;
+      };
+    }>;
+    const clientVisibleWrite = clientActivity.find(
+      (entry) => entry.metadata?.action === 'mcp_content_request_created',
+    );
+    expect(clientVisibleWrite).toMatchObject({
+      type: 'content_requested',
+      title: `MCP requested topic: "${contentTopic}"`,
+      metadata: {
+        source: 'mcp-chat',
+        requestId: createdContentRequestId,
+        action: 'mcp_content_request_created',
+      },
+    });
+    expect(clientVisibleWrite?.metadata).not.toHaveProperty('mcpCaller');
+    const clientActivityJson = JSON.stringify(clientVisibleWrite);
+    expect(clientActivityJson).not.toContain(created.key.id);
+    expect(clientActivityJson).not.toContain(created.key.label);
+    expect(clientActivityJson).not.toContain(created.plaintextKeyOnceShown);
+    expect(clientActivityJson).not.toContain(callerClientVisibleRequestId);
+    expect(clientActivityJson).not.toContain(echoedClientVisibleRequestId);
 
     // REVOKE → the same key is now rejected at /mcp (fail-closed).
     const revokeRes = await ctx.api(`/api/admin/mcp-api-keys/${created.key.id}`, { method: 'DELETE' });
