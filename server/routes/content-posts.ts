@@ -17,6 +17,7 @@ import {
   notifyContentUpdated,
   runContentPostGenerationJob,
   regenerateSection,
+  ContentSectionRegenerationError,
   exportPostMarkdown,
   exportPostHTML,
   snapshotPostVersion,
@@ -247,7 +248,10 @@ router.post('/api/content-posts/:workspaceId/:postId/regenerate-section', requir
     broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: updated.id });
     res.json(updated);
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Regeneration failed' });
+    if (err instanceof ContentSectionRegenerationError) {
+      return res.status(502).json({ error: err.message, diagnostic: err.diagnostic });
+    }
+    res.status(500).json({ error: 'Regeneration failed' });
   }
 });
 

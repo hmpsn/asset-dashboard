@@ -77,6 +77,10 @@ function requestSource(request: ContentTopicRequest | undefined): { label: strin
 
 function postDetail(post: GeneratedPost): string {
   if (post.status === 'generating') return 'Generation in progress';
+  if (post.status === 'needs_attention') {
+    const count = post.generationDiagnostics?.length ?? 0;
+    return count > 0 ? `${count} generation ${count === 1 ? 'issue' : 'issues'} to repair` : 'Generation needs repair';
+  }
   if (post.status === 'error') return 'Generation needs attention';
   if (post.status === 'review') return `${post.totalWordCount.toLocaleString()} words ready for review`;
   if (post.targetWordCount > 0) {
@@ -128,6 +132,7 @@ export function deriveLifecycleBoardItems(inputs: LifecycleBoardInputs, now = ne
     const linkedBrief = briefById.get(post.briefId);
     const source = request ? requestSource(request) : linkedBrief ? briefSource(linkedBrief) : { label: 'Draft', tone: 'blue' as BadgeTone };
     const review = post.status === 'review';
+    const needsAttention = post.status === 'needs_attention';
     items.push({
       id: `post:${post.id}`,
       entityId: post.id,
@@ -139,10 +144,10 @@ export function deriveLifecycleBoardItems(inputs: LifecycleBoardInputs, now = ne
       title: post.title || post.targetKeyword || 'Untitled draft',
       keyword: post.targetKeyword || 'Keyword not set',
       pageType: titleCase(linkedBrief?.pageType ?? request?.pageType, 'Post'),
-      statusLabel: review ? 'In review' : titleCase(post.status, 'Draft'),
-      statusTone: review ? 'amber' : post.status === 'error' ? 'red' : 'blue',
+      statusLabel: review ? 'In review' : needsAttention ? 'Needs attention' : titleCase(post.status, 'Draft'),
+      statusTone: review || needsAttention ? 'amber' : post.status === 'error' ? 'red' : 'blue',
       detail: postDetail(post),
-      nextAction: review ? 'Review draft' : 'Continue draft',
+      nextAction: review ? 'Review draft' : needsAttention ? 'Repair draft' : 'Continue draft',
     });
   }
 

@@ -8,13 +8,13 @@ A comprehensive value assessment of every feature in the platform — **feature 
 
 ### 675. Truthful content-generation artifacts and delivery gates 2026-07-13
 
-**What it does:** Separates strict initial brief/copy creation from partial update parsing, requires generated copy to match the exact planned-section census, and permits only one bounded repair before failing without durable mutation. Generated posts now distinguish useful but incomplete output with a canonical `needs_attention` lifecycle state and typed, sanitized stage diagnostics. Required-stage failures report job failure without `post_generated` success activity, while failed or cancelled regeneration preserves the prior valid artifact.
+**What it does:** Separates strict initial brief/copy creation from partial update parsing, requires generated copy to match the exact planned-section census, and permits only one bounded repair before failing without durable mutation. Generated posts now distinguish useful but incomplete visible-text output with a canonical `needs_attention` lifecycle state and typed, sanitized stage diagnostics. Markup-only HTML is incomplete. Required-stage failures report job failure without `post_generated` success activity; full and single-section regeneration stage candidates in memory and preserve the exact prior artifact on failure; invalid unifier replacements retain the valid pre-unification content.
 
 **Why it matters:** Operators can trust that “draft” means a complete artifact. Incomplete posts remain inspectable for repair but cannot leak through client send, export, Webflow publish, content intelligence, or MCP creation paths. Public client reads omit internal provider diagnostics, and admin status filters/actions consistently reflect the repair state.
 
 **Boundaries:** This is Phase C1 of the two-PR content-generation integrity roadmap item. Generation revisions, provider-neutral durable provenance, resource-scoped idempotency, and version-conditional operator-edit protection remain in C2.
 
-**Tests:** Strict create/update schema tests, exact copy-census repair success/failure, provider failure at introduction/body/conclusion, unusable output, regeneration failure/cancellation preservation, lifecycle retry, public diagnostic omission, client-send side-effect rejection, MCP artifact validation, export rejection, and publish rejection.
+**Tests:** Strict create/update schema tests, exact copy-census repair success/failure, provider and markup-only output at introduction/body/conclusion, markup-only unifier replacement, atomic single-section regeneration failure and repair, fatal/cancelled diagnostic classification, lifecycle retry, rebuilt repair-state rendering, public diagnostic omission, client-send side-effect rejection, MCP artifact validation, export rejection, and publish rejection.
 
 ### 674. Keyword evidence integrity & edit-safe generation 2026-07-13
 

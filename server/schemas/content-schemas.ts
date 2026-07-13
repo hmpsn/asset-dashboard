@@ -91,7 +91,7 @@ export const postSectionSchema = z.object({
 export const postSectionsArraySchema = z.array(postSectionSchema);
 
 export const contentPostGenerationDiagnosticSchema = z.object({
-  stage: z.enum(['introduction', 'section', 'conclusion']),
+  stage: z.enum(['generation', 'introduction', 'section', 'conclusion']),
   code: z.enum(['provider_error', 'invalid_output', 'cancelled']),
   message: z.string(),
   sectionIndex: z.number().int().min(0).optional(),

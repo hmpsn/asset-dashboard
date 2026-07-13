@@ -21,6 +21,7 @@ import {
   requiresPageTypeDensityReview,
 } from './page-type-copy-contract.js';
 import { buildSeoPromptContext } from './intelligence/generation-context-builders.js';
+import { countVisibleHtmlWords, visibleTextFromHtml } from '../shared/content-post-integrity.js';
 export { CREATIVE_WRITING_RULES, WRITING_QUALITY_RULES } from './writing-quality.js';
 
 const log = createLogger('content-posts-ai');
@@ -572,7 +573,7 @@ export function countWords(text: string): number {
 
 /** Strip HTML tags for plain-text extraction */
 export function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return visibleTextFromHtml(html);
 }
 
 /**
@@ -581,7 +582,7 @@ export function stripHtml(html: string): string {
  * `countWords()` would miscount because it treats `<p>Hello</p>` as 4 words.
  */
 export function countHtmlWords(html: string): number {
-  return countWords(stripHtml(html));
+  return countVisibleHtmlWords(html);
 }
 
 /**

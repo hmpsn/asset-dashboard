@@ -108,6 +108,7 @@ export interface PostSection {
 }
 
 export const CONTENT_POST_GENERATION_STAGES = [
+  'generation',
   'introduction',
   'section',
   'conclusion',

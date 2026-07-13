@@ -1,45 +1,44 @@
 import type {
   ContentPostGenerationDiagnostic,
+  ContentPostGenerationDiagnosticCode,
   ContentPostGenerationStage,
   GeneratedPost,
 } from '../../../shared/types/content.js';
-import { sanitizePlainText } from '../../html-sanitize.js';
-import { isDeliverableContentPost } from '../../../shared/content-post-integrity.js';
+import { hasVisibleHtmlContent, isDeliverableContentPost } from '../../../shared/content-post-integrity.js';
 
-const DIAGNOSTIC_MESSAGE_LIMIT = 500;
+const DIAGNOSTIC_MESSAGES: Record<ContentPostGenerationDiagnosticCode, string> = {
+  provider_error: 'The AI provider could not complete this stage.',
+  invalid_output: 'The AI provider returned no usable visible content for this stage.',
+  cancelled: 'Generation was cancelled before this stage completed.',
+};
 
 export function createContentGenerationDiagnostic(
   stage: ContentPostGenerationStage,
-  error: unknown,
+  code: ContentPostGenerationDiagnosticCode,
   sectionIndex?: number,
 ): ContentPostGenerationDiagnostic {
-  const rawMessage = error instanceof Error ? error.message : String(error || 'Generation failed');
-  const message = sanitizePlainText(rawMessage).replace(/\s+/g, ' ').trim().slice(0, DIAGNOSTIC_MESSAGE_LIMIT)
-    || 'Generation failed';
   return {
     stage,
-    code: 'provider_error',
-    message,
+    code,
+    message: DIAGNOSTIC_MESSAGES[code],
     ...(sectionIndex === undefined ? {} : { sectionIndex }),
     occurredAt: new Date().toISOString(),
   };
 }
 
 export function hasUsefulGeneratedContent(post: GeneratedPost): boolean {
-  return Boolean(
-    post.introduction.trim()
-    || post.conclusion.trim()
-    || post.sections.some(section => section.status === 'done' && section.content.trim()),
-  );
+  return hasVisibleHtmlContent(post.introduction)
+    || hasVisibleHtmlContent(post.conclusion)
+    || post.sections.some(section => section.status === 'done' && hasVisibleHtmlContent(section.content));
 }
 
 export function isCompleteGeneratedPost(post: GeneratedPost, plannedSectionCount: number): boolean {
-  if (!post.introduction.trim() || !post.conclusion.trim()) return false;
+  if (!hasVisibleHtmlContent(post.introduction) || !hasVisibleHtmlContent(post.conclusion)) return false;
   if (post.sections.length !== plannedSectionCount) return false;
   return post.sections.every((section, index) =>
     section.index === index
     && section.status === 'done'
-    && Boolean(section.content.trim()),
+    && hasVisibleHtmlContent(section.content),
   );
 }
 

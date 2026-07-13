@@ -354,6 +354,38 @@ const posts = [
     createdAt: '2026-07-04T12:00:00.000Z',
     updatedAt: '2026-07-06T12:00:00.000Z',
   },
+  {
+    id: 'post-attention',
+    workspaceId,
+    briefId: 'brief-attention-missing',
+    targetKeyword: 'repair keyword',
+    title: 'Draft needing repair',
+    metaDescription: '',
+    introduction: '<p>Useful introduction</p>',
+    sections: [{
+      index: 0,
+      heading: 'Missing body',
+      content: '',
+      wordCount: 0,
+      targetWordCount: 300,
+      keywords: [],
+      status: 'error' as const,
+      error: 'The AI provider returned no usable visible content for this stage.',
+    }],
+    conclusion: '<p>Useful conclusion</p>',
+    totalWordCount: 4,
+    targetWordCount: 1200,
+    status: 'needs_attention' as const,
+    generationDiagnostics: [{
+      stage: 'section' as const,
+      code: 'invalid_output' as const,
+      message: 'The AI provider returned no usable visible content for this stage.',
+      sectionIndex: 0,
+      occurredAt: '2026-07-06T12:00:00.000Z',
+    }],
+    createdAt: '2026-07-04T12:00:00.000Z',
+    updatedAt: '2026-07-06T12:00:00.000Z',
+  },
 ];
 
 const suggestions = [{
@@ -638,6 +670,25 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
       statusLabel: 'Draft',
       nextAction: 'Continue draft',
     });
+    expect(items.find((item) => item.id === 'post:post-attention')).toMatchObject({
+      stage: 'draft',
+      statusLabel: 'Needs attention',
+      statusTone: 'amber',
+      detail: '1 generation issue to repair',
+      nextAction: 'Repair draft',
+    });
+  });
+
+  it('renders the needs-attention repair workspace with amber diagnostics', async () => {
+    renderSurface(`/ws/${workspaceId}/content-pipeline?tab=posts&post=post-attention`);
+
+    expect(await screen.findByRole('dialog', { name: /Draft needing repair/i })).toBeInTheDocument();
+    expect(await screen.findByTestId('repair-workspace-status-rail')).toBeInTheDocument();
+    expect(screen.getByText('Repair required')).toBeInTheDocument();
+    expect(screen.getAllByText('Needs attention').length).toBeGreaterThan(0);
+    expect(screen.getByText('Generation diagnostics')).toBeInTheDocument();
+    expect(screen.getAllByText('Section 1').length).toBeGreaterThan(0);
+    expect(screen.getByText('The AI provider returned no usable visible content for this stage.')).toBeInTheDocument();
   });
 
   it('separates pending intake artifacts and excludes non-content work orders', () => {
@@ -753,7 +804,7 @@ describe('ContentPipelineSurface rebuilt cockpit', () => {
     renderSurface(`/ws/${workspaceId}/content-pipeline?tab=calendar`);
 
     expect(await screen.findByTestId('legacy-calendar')).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: /Board/i })).toHaveTextContent('3');
+    expect(screen.getByRole('radio', { name: /Board/i })).toHaveTextContent('4');
     expect(mocks.briefsHook).toHaveBeenLastCalledWith(workspaceId);
     expect(mocks.postsHook).toHaveBeenLastCalledWith(workspaceId);
     expect(mocks.requestsHook).toHaveBeenLastCalledWith(workspaceId, false);

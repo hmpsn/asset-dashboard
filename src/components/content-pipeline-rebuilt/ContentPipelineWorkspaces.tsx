@@ -214,6 +214,7 @@ function DraftRightRail({ post }: { post: GeneratedPost | null }) {
     return <p className="t-caption text-[var(--brand-text-muted)]">Loading draft status…</p>;
   }
   const isReview = post.status === 'review';
+  const needsAttention = post.status === 'needs_attention';
   const progress = post.targetWordCount > 0 ? Math.min(100, Math.round((post.totalWordCount / post.targetWordCount) * 100)) : 0;
   const checklist = REVIEW_CHECKLIST_KEYS.map((key) => ({
     key,
@@ -223,15 +224,15 @@ function DraftRightRail({ post }: { post: GeneratedPost | null }) {
   const completedChecks = checklist.filter((item) => item.complete).length;
 
   return (
-    <div className="flex flex-col gap-4" data-testid={isReview ? 'review-workspace-status-rail' : 'draft-workspace-status-rail'}>
+    <div className="flex flex-col gap-4" data-testid={isReview ? 'review-workspace-status-rail' : needsAttention ? 'repair-workspace-status-rail' : 'draft-workspace-status-rail'}>
       <SectionCard
-        title={isReview ? 'Review status' : 'Draft progress'}
-        titleExtra={<Badge label={isReview ? 'In review' : `${progress}%`} tone={isReview ? 'amber' : 'blue'} variant="soft" size="sm" />}
-        titleIcon={<Icon name={isReview ? 'eye' : 'pencil'} size="sm" className={isReview ? 'text-[var(--amber)]' : 'text-[var(--blue)]'} />}
+        title={isReview ? 'Review status' : needsAttention ? 'Repair required' : 'Draft progress'}
+        titleExtra={<Badge label={isReview ? 'In review' : needsAttention ? 'Needs attention' : `${progress}%`} tone={isReview || needsAttention ? 'amber' : 'blue'} variant="soft" size="sm" />}
+        titleIcon={<Icon name={isReview ? 'eye' : needsAttention ? 'alert' : 'pencil'} size="sm" className={isReview || needsAttention ? 'text-[var(--amber)]' : 'text-[var(--blue)]'} />}
         iconChip
         variant="subtle"
       >
-        {!isReview && (
+        {!isReview && !needsAttention && (
           <>
             <Meter value={post.totalWordCount} max={post.targetWordCount || 1} ariaLabel="Draft word-count progress" />
             <p className="mt-2 t-caption text-[var(--brand-text-muted)]">
@@ -244,7 +245,42 @@ function DraftRightRail({ post }: { post: GeneratedPost | null }) {
             This draft is in review. The checklist reflects its latest saved review; actions remain in the editor.
           </p>
         )}
+        {needsAttention && (
+          <p className="t-caption text-[var(--brand-text-muted)]">
+            Required generated content is missing. Repair the flagged stages in the editor before review or delivery.
+          </p>
+        )}
       </SectionCard>
+
+      {needsAttention && (
+        <SectionCard
+          title="Generation diagnostics"
+          titleExtra={<Badge label={`${post.generationDiagnostics?.length ?? 0}`} tone="amber" variant="outline" size="sm" />}
+          variant="subtle"
+        >
+          {post.generationDiagnostics?.length ? (
+            <div className="flex flex-col">
+              {post.generationDiagnostics.map((diagnostic, index) => (
+                <div key={`${diagnostic.stage}-${diagnostic.sectionIndex ?? 'all'}-${index}`} className="border-t border-[var(--brand-border)] py-2 first:border-t-0">
+                  <div className="flex items-center gap-2">
+                    <Icon name="alert" size="sm" className="text-[var(--amber)]" />
+                    <span className="t-caption font-medium text-[var(--brand-text)]">
+                      {diagnostic.stage === 'section' && diagnostic.sectionIndex !== undefined
+                        ? `Section ${diagnostic.sectionIndex + 1}`
+                        : diagnostic.stage === 'generation'
+                          ? 'Generation'
+                          : diagnostic.stage[0].toUpperCase() + diagnostic.stage.slice(1)}
+                    </span>
+                  </div>
+                  <p className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">{diagnostic.message}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="t-caption text-[var(--brand-text-muted)]">Open the editor to inspect the incomplete stages.</p>
+          )}
+        </SectionCard>
+      )}
 
       <SectionCard
         title="Review checklist"
@@ -269,7 +305,7 @@ function DraftRightRail({ post }: { post: GeneratedPost | null }) {
         <DefinitionList items={[
           { label: 'Created', value: formatContentDate(post.createdAt) },
           { label: 'Updated', value: formatContentDate(post.updatedAt) },
-          { label: 'Status', value: isReview ? 'In review' : post.status, valueColor: isReview ? 'var(--amber)' : 'var(--blue)' },
+          { label: 'Status', value: isReview ? 'In review' : needsAttention ? 'Needs attention' : post.status, valueColor: isReview || needsAttention ? 'var(--amber)' : 'var(--blue)' },
         ]} />
       </SectionCard>
     </div>
@@ -331,8 +367,8 @@ export function ContentPipelineWorkspaces({
         open={postWorkspaceOpen}
         onClose={onClosePost}
         title={focusedPost?.title ?? 'Draft workspace'}
-        subtitle={focusedPost ? `${focusedPost.targetKeyword} · ${focusedPost.status === 'review' ? 'In review' : 'Draft'}` : 'Continue this draft.'}
-        eyebrow={focusedPost?.status === 'review' ? 'Review workspace' : 'Draft workspace'}
+        subtitle={focusedPost ? `${focusedPost.targetKeyword} · ${focusedPost.status === 'review' ? 'In review' : focusedPost.status === 'needs_attention' ? 'Needs attention' : 'Draft'}` : 'Continue this draft.'}
+        eyebrow={focusedPost?.status === 'review' ? 'Review workspace' : focusedPost?.status === 'needs_attention' ? 'Repair workspace' : 'Draft workspace'}
         width="100vw"
         className="!max-w-none"
         style={FULLSCREEN_DRAWER_STYLE}
