@@ -52,9 +52,11 @@ import {
   loadRecommendations,
   computeRecommendationSummary,
 } from '../../server/recommendations.js';
+import { broadcastToWorkspace } from '../../server/broadcast.js';
 import { sendRecommendation } from '../../server/recommendation-lifecycle.js';
 import { replaceAllQuickWins, deleteAllQuickWins } from '../../server/quick-wins.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
+import { WS_EVENTS } from '../../server/ws-events.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
 import type { QuickWin } from '../../shared/types/workspace.js';
 
@@ -179,6 +181,11 @@ describe('vanishing-source regen — exempt recs are retained, non-exempt are au
     // The retained rec must also not have been added to the autoResolvedRecs path
     // (i.e. it should not have the auto-resolve insight prefix injected).
     expect(sentRecAfter!.insight).not.toMatch(/Auto-resolved/);
+    expect(vi.mocked(broadcastToWorkspace)).toHaveBeenLastCalledWith(
+      wsId,
+      WS_EVENTS.RECOMMENDATIONS_UPDATED,
+      { count: run2.recommendations.length },
+    );
   });
 
   /**

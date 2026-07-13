@@ -50,7 +50,7 @@
           "status": "pending",
           "createdAt": "2026-07-13",
           "owner": "analytics-intelligence",
-          "notes": "Wave 2-3. Phase A adds recommendation-set revision/provenance CAS and bounded re-finalization against current lifecycle state. Phase B prevents resolved-signal reminting, stabilizes content-gap/issue identity, makes suppression merge-key-local, preserves evidence priority caps, and repairs recommendation/deliverable divergence. Uses strategy-divergence-sweep for staging observation; never enables strategy-trust-ladder-autosend."
+          "notes": "S1 / Phase A complete 2026-07-13: recommendation sets now carry a monotonic generation revision plus internal run provenance, generation commits transactionally with CAS, and one conflict re-finalizes cloned already-generated candidates against the latest lifecycle state without repeating provider work; a second conflict fails safely. Concurrent sends, approvals, dismissals, strikes, and operator-minted recommendations win, and finalized counts drive success logs/events. Status remains pending for S2 / Phase B: prevent resolved-signal reminting, stabilize content-gap/issue identity, make suppression merge-key-local, preserve evidence priority caps, and repair recommendation/deliverable divergence. S2 must update and reuse strategy-divergence-sweep for bounded observation/repair; never enable strategy-trust-ladder-autosend."
         },
         {
           "id": "genq-kcc-read-performance",

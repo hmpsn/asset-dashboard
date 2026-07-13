@@ -27,7 +27,8 @@ export interface AIExecutionMetadata {
 export interface GenerationProvenance {
   runId: string;
   operation: string;
-  provider: 'openai' | 'anthropic';
+  /** Includes deterministic engines; AIExecutionMetadata remains limited to actual AI providers. */
+  provider: 'openai' | 'anthropic' | 'deterministic';
   model: string;
   inputFingerprint: string;
   evidenceCapturedAt?: string;
