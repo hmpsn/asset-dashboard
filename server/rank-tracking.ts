@@ -13,6 +13,7 @@ import {
 } from '../shared/types/rank-tracking.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { listTrackedKeywordRows, replaceAllTrackedKeywordRows, resolveTrackedKeywords } from './tracked-keywords-store.js';
+import { invalidateKeywordStrategyGenerationInputs } from './keyword-strategy-generation-store.js';
 
 export interface RankSnapshot {
   date: string; // YYYY-MM-DD
@@ -347,6 +348,25 @@ export function removeTrackedKeyword(workspaceId: string, query: string): Tracke
   return withTrackedKeywordsTxn(workspaceId, existing =>
     existing.filter(k => normalizeQuery(k.query) !== normalizedQuery),
   ).filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
+}
+
+/** Operator mutation: tracked-keyword write and synthesis-input revision advance atomically. */
+export function addTrackedKeywordAndInvalidateStrategy(
+  workspaceId: string, query: string, options: boolean | AddTrackedKeywordOptions = false,
+): TrackedKeyword[] {
+  return db.transaction(() => {
+    const result = addTrackedKeyword(workspaceId, query, options);
+    invalidateKeywordStrategyGenerationInputs(workspaceId);
+    return result;
+  }).immediate();
+}
+
+export function removeTrackedKeywordAndInvalidateStrategy(workspaceId: string, query: string): TrackedKeyword[] {
+  return db.transaction(() => {
+    const result = removeTrackedKeyword(workspaceId, query);
+    invalidateKeywordStrategyGenerationInputs(workspaceId);
+    return result;
+  }).immediate();
 }
 
 export function togglePinKeyword(workspaceId: string, query: string): TrackedKeyword[] {

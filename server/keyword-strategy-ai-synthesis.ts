@@ -15,6 +15,7 @@ import { buildKeywordUniverse } from './keyword-strategy-universe.js';
 import type { KeywordCandidate } from '../shared/types/keyword-universe.js';
 import type { WorkspaceIntelligence } from '../shared/types/intelligence.js';
 import { callKeywordStrategyAI, callNamedStrategyAI } from './keyword-strategy-synthesis/ai-callers.js';
+import type { KeywordStrategyAIExecution } from './keyword-strategy-synthesis/ai-callers.js';
 import { validatePageMappingsWithProvider } from './keyword-strategy-synthesis/provider-validation.js';
 import {
   buildKeywordPoolSection,
@@ -131,9 +132,11 @@ export interface SynthesizeKeywordStrategyResult {
   suppressedCount?: number;
   /** Flag-ON question keywords surfaced by the keyword-universe assembler. */
   questionKeywords?: QuestionKeywordGroup[];
+  executions: KeywordStrategyAIExecution[];
 }
 
 export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrategyOptions): Promise<SynthesizeKeywordStrategyResult> {
+  const executions: KeywordStrategyAIExecution[] = [];
   const {
     ws,
     businessContext,
@@ -155,10 +158,12 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
   const { gscData } = searchData;
 
   const callStrategyAI = (messages: Array<{ role: string; content: string }>, maxTokens: number, label?: string): Promise<string> =>
-    callKeywordStrategyAI(ws.id, messages, maxTokens, label);
+    callKeywordStrategyAI(ws.id, messages, maxTokens, label, execution => executions.push(execution));
+  const callNamedAI = (workspaceId: string, operation: 'keyword-page-assignment' | 'keyword-site-synthesis' | 'keyword-topic-clusters', messages: Array<{ role: string; content: string }>, maxTokens: number): Promise<string> =>
+    callNamedStrategyAI(workspaceId, operation, messages, maxTokens, execution => executions.push(execution));
 
   // Keyword pool — declared outside try so enrichment code can access it after batching
-  const keywordPool = new Map<string, { volume: number; difficulty: number; source: string }>();
+  const keywordPool: KeywordStrategyKeywordPool = new Map();
 
   const { assembleSynthesisContext } = await import(synthesisContextModule) as SynthesisContextModule; // dynamic-import-ok - context reads workspace intelligence; keep it off the synthesis facade's static import path.
   const {
@@ -201,7 +206,7 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
           ...(ws.keywordStrategy ?? {}),
           pageMap: existingPageKeywords,
         } as StrategyOutput;
-        return { strategy: currentStrategy, upToDate: true, freshPageCount: pagesToPreserve.length, pagesToAnalyze, keywordPool, businessSection, keywordEvaluationContext: strategyKeywordEvaluationContext };
+        return { strategy: currentStrategy, upToDate: true, freshPageCount: pagesToPreserve.length, pagesToAnalyze, keywordPool, businessSection, keywordEvaluationContext: strategyKeywordEvaluationContext, executions };
       }
     }
     // For AI batching we only process stale pages; preserved pages are merged back after.
@@ -435,7 +440,7 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
       candidateIds,
       isEligibleGeneratedKeyword,
       callStrategyAI,
-      callNamedStrategyAI,
+      callNamedStrategyAI: callNamedAI,
       sendProgress,
     });
 
@@ -483,7 +488,7 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
       seoGenQualityEnabled,
       isEligibleGeneratedKeyword,
       callStrategyAI,
-      callNamedStrategyAI,
+      callNamedStrategyAI: callNamedAI,
     });
 
     // Post-generation hard filter: remove declined keywords from siteKeywords.
@@ -550,5 +555,5 @@ export async function synthesizeKeywordStrategy(options: SynthesizeKeywordStrate
     }
     log.info(`Final strategy: ${strategy.pageMap?.length ?? 0} pages, ${strategy.siteKeywords?.length ?? 0} site keywords, ${strategy.contentGaps?.length ?? 0} content gaps, ${strategy.quickWins?.length ?? 0} quick wins`);
 
-  return { strategy, pagesToAnalyze, keywordPool, businessSection, keywordEvaluationContext: strategyKeywordEvaluationContext, suppressedCount: suppressedUniverseCount, questionKeywords: universeQuestionKeywords };
+  return { strategy, pagesToAnalyze, keywordPool, businessSection, keywordEvaluationContext: strategyKeywordEvaluationContext, suppressedCount: suppressedUniverseCount, questionKeywords: universeQuestionKeywords, executions };
 }

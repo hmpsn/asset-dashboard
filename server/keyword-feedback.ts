@@ -17,6 +17,7 @@ import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { trackedKeywordSourceForFeedback } from './keyword-feedback-tracking.js';
+import { invalidateKeywordStrategyGenerationInputs } from './keyword-strategy-generation-store.js';
 import { addTrackedKeyword, addTrackedKeywords } from './rank-tracking.js';
 import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { broadcastToWorkspace } from './broadcast.js';
@@ -212,14 +213,13 @@ export function saveKeywordFeedback(input: SaveKeywordFeedbackInput): {
   const source = input.source ?? null;
   const declinedBy = input.declinedBy && input.declinedBy.trim() ? input.declinedBy : null;
 
-  stmts().upsert.run(input.workspaceId, keyword, input.status, reason, source, declinedBy);
-
-  if (input.status === 'approved') {
-    addTrackedKeyword(input.workspaceId, displayKeyword, {
-      source: trackedKeywordSourceForFeedback(source ?? undefined),
-      sourceGapKey: sourceGapKeyForFeedback(source, displayKeyword),
+  db.transaction(() => {
+    stmts().upsert.run(input.workspaceId, keyword, input.status, reason, source, declinedBy);
+    if (input.status === 'approved') addTrackedKeyword(input.workspaceId, displayKeyword, {
+      source: trackedKeywordSourceForFeedback(source ?? undefined), sourceGapKey: sourceGapKeyForFeedback(source, displayKeyword),
     });
-  }
+    invalidateKeywordStrategyGenerationInputs(input.workspaceId);
+  }).immediate();
 
   const row = stmts().getByKeyword.get(input.workspaceId, keyword) as KeywordFeedbackDbRow | undefined;
   const fallback: KeywordFeedbackDbRow = {
@@ -266,6 +266,7 @@ export function saveBulkKeywordFeedback(input: SaveBulkKeywordFeedbackInput): {
     if (trackedEntries.length > 0) {
       addTrackedKeywords(input.workspaceId, trackedEntries);
     }
+    invalidateKeywordStrategyGenerationInputs(input.workspaceId);
   });
 
   insert.immediate(input.keywords);
@@ -283,6 +284,7 @@ export function clearKeywordFeedback(workspaceId: string, keywordInput: string):
     const existing = stmts().getByKeyword.get(workspaceId, keyword) as KeywordFeedbackDbRow | undefined;
     if (!existing) return { existing: null, deleted: false };
     const result = stmts().deleteByKeyword.run(workspaceId, keyword);
+    if (result.changes > 0) invalidateKeywordStrategyGenerationInputs(workspaceId);
     return { existing, deleted: result.changes > 0 };
   });
 

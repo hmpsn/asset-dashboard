@@ -24,10 +24,11 @@
           "source": "2026-07-13 generation quality/performance audit K3/K5",
           "est": "M",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-07-13",
+          "shippedAt": "2026-07-13",
           "owner": "seo-health",
-          "notes": "Wave 1 keyword root. Repair the lightweight page-map search_intent omission and CPC loss in candidate pooling/enrichment; prove the real stored read path through Opportunity Value and recommendation producers. Unflagged correctness PR. Prerequisite for the existing kwv-conversion-grounded-vpc and kwv-intent-branded-split items."
+          "notes": "Done 2026-07-13. Stored search intent now survives the lite page adapter into real KCC routes. CPC, intent, membership source, and field-level evidence provenance survive canonical/fallback pools, incremental competitor cache, assignment, every enrichment writer, page/content-gap persistence, sanitizer replacement, and the recommendation Opportunity Value path; unusable CPC remains unknown instead of authoritative zero. Keyword strategy generation now stores an exact effective-input fingerprint plus provider-neutral run provenance, uses a monotonic revision, and commits with transactional CAS so every audited feedback/vote/managed-set/tracked-keyword/business-priority/operator edit wins without repeating provider work. Internal provenance is omitted from workspace/public serialization. Migrations 179-180."
         },
         {
           "id": "genq-content-generation-integrity",

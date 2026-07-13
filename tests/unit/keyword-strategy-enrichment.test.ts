@@ -94,7 +94,7 @@ function makeEnrichOptions(strategyOverride: Partial<StrategyOutput> = {}) {
     workspaceId: 'ws-test-123',
     baseUrl: 'https://example.com',
     strategy: makeStrategy(strategyOverride),
-    keywordPool: new Map<string, { volume: number; difficulty: number; source: string }>(),
+    keywordPool: new Map<string, import('../../server/keyword-strategy-helpers.js').KeywordPoolCandidate>(),
     businessSection: 'Dental practice.',
     searchData: { gscData: [] } as Parameters<typeof enrichKeywordStrategy>[0]['searchData'],
     domainKeywords: [],
@@ -390,12 +390,19 @@ describe('enrichKeywordStrategy', () => {
     opts.domainKeywords = [
       { keyword: 'cosmetic dentistry', volume: 1200, difficulty: 45, cpc: 6.5, position: 8 },
     ] as typeof opts.domainKeywords;
+    opts.keywordPool.set('cosmetic dentistry', {
+      volume: 1100, difficulty: 44, source: 'discovery:keyword_ideas',
+      intent: 'commercial', intentSource: 'discovery:keyword_ideas',
+    });
 
     const result = await enrichKeywordStrategy(opts);
     const pm = result.strategy.pageMap?.[0];
     expect(pm?.volume).toBe(1200);
     expect(pm?.difficulty).toBe(45);
     expect(pm?.cpc).toBe(6.5);
+    expect(pm?.cpcSource).toBe('seo-provider:exact');
+    expect(pm?.searchIntent).toBe('commercial');
+    expect(pm?.intentSource).toBe('discovery:keyword_ideas');
     expect(pm?.metricsSource).toBe('exact');
   });
 
@@ -406,12 +413,18 @@ describe('enrichKeywordStrategy', () => {
     opts.domainKeywords = [
       { keyword: 'dental implants cosmetic', volume: 900, difficulty: 40, cpc: 5, position: 10 },
     ] as typeof opts.domainKeywords;
+    opts.keywordPool.set('cosmetic dental implants', {
+      volume: 850, difficulty: 39, source: 'discovery:keyword_ideas',
+      intent: 'transactional', intentSource: 'discovery:keyword_ideas',
+    });
 
     const result = await enrichKeywordStrategy(opts);
     const pm = result.strategy.pageMap?.[0];
     // 3 words: "cosmetic", "dental", "implants" — all 3 appear in "dental implants cosmetic" → 100% overlap ≥ 80%
     expect(pm?.volume).toBe(900);
     expect(pm?.metricsSource).toBe('partial_match');
+    expect(pm?.cpcSource).toBe('seo-provider:partial');
+    expect(pm?.searchIntent).toBe('transactional');
   });
 
   it('skips pages that already have URL-level metrics source', async () => {
@@ -432,6 +445,62 @@ describe('enrichKeywordStrategy', () => {
     expect(result.strategy.pageMap?.[0].volume).toBe(500);
   });
 
+  it('threads URL-level CPC provenance and pool intent evidence', async () => {
+    const opts = makeEnrichOptions({ pageMap: [makePageMapEntry({ primaryKeyword: 'cosmetic dentistry' })] });
+    opts.keywordPool.set('cosmetic dentistry', {
+      volume: 500, difficulty: 30, source: 'discovery:keyword_ideas',
+      intent: 'commercial', intentSource: 'dataforseo:keyword-ideas',
+    });
+    opts.provider = {
+      name: 'dataforseo',
+      getUrlKeywords: vi.fn(async () => [{
+        keyword: 'cosmetic dentistry', position: 4, volume: 700, difficulty: 35, cpc: 7.25,
+        url: 'https://example.com/services/dentistry', traffic: 20, trafficPercent: 1,
+      }]),
+    } as never;
+
+    const page = (await enrichKeywordStrategy(opts)).strategy.pageMap?.[0];
+    expect(page).toEqual(expect.objectContaining({
+      cpc: 7.25, cpcSource: 'dataforseo:url-level', searchIntent: 'commercial', intentSource: 'dataforseo:keyword-ideas',
+    }));
+  });
+
+  it('threads bulk CPC provenance and pool intent evidence', async () => {
+    const opts = makeEnrichOptions({ pageMap: [makePageMapEntry({ primaryKeyword: 'cosmetic dentistry' })] });
+    opts.keywordPool.set('cosmetic dentistry', {
+      volume: 0, difficulty: 0, source: 'discovery:keyword_ideas',
+      intent: 'commercial', intentSource: 'dataforseo:keyword-ideas',
+    });
+    opts.provider = {
+      name: 'dataforseo',
+      getKeywordMetrics: vi.fn(async () => [{
+        keyword: 'cosmetic dentistry', volume: 600, difficulty: 33, cpc: 6.75,
+        competition: 0.8, results: 1000, trend: [],
+      }]),
+    } as never;
+
+    const page = (await enrichKeywordStrategy(opts)).strategy.pageMap?.[0];
+    expect(page).toEqual(expect.objectContaining({
+      cpc: 6.75, cpcSource: 'dataforseo:bulk', searchIntent: 'commercial', intentSource: 'dataforseo:keyword-ideas',
+    }));
+  });
+
+  it('does not erase usable page CPC evidence when a later provider result is unusable', async () => {
+    const opts = makeEnrichOptions({ pageMap: [makePageMapEntry({ cpc: 9, cpcSource: 'dataforseo:ideas' })] });
+    opts.domainKeywords = [{ keyword: 'cosmetic dentistry', volume: 700, difficulty: 35, cpc: 0, position: 4 }] as typeof opts.domainKeywords;
+    const page = (await enrichKeywordStrategy(opts)).strategy.pageMap?.[0];
+    expect(page).toEqual(expect.objectContaining({ cpc: 9, cpcSource: 'dataforseo:ideas' }));
+  });
+
+  it('sets CPC provenance on bulk-enriched content gaps', async () => {
+    const opts = makeEnrichOptions({ contentGaps: [{ targetKeyword: 'dental emergency', intent: 'transactional' }] });
+    opts.provider = { name: 'dataforseo', getKeywordMetrics: vi.fn(async () => [{
+      keyword: 'dental emergency', volume: 400, difficulty: 25, cpc: 10, competition: 0.9, results: 100, trend: [],
+    }]) } as never;
+    const gap = (await enrichKeywordStrategy(opts)).strategy.contentGaps?.[0];
+    expect(gap).toEqual(expect.objectContaining({ cpc: 10, cpcSource: 'dataforseo:bulk' }));
+  });
+
   it('enriches content gaps from keyword pool (priority 1)', async () => {
     const opts = makeEnrichOptions({
       contentGaps: [{ targetKeyword: 'teeth whitening cost', priority: 'high' }],
@@ -442,6 +511,24 @@ describe('enrichKeywordStrategy', () => {
     const gap = result.strategy.contentGaps?.[0];
     expect(gap?.volume).toBe(800);
     expect(gap?.difficulty).toBe(30);
+  });
+
+  it('preserves CPC and intent from the winning keyword-pool evidence on content gaps', async () => {
+    const opts = makeEnrichOptions({
+      contentGaps: [{ targetKeyword: 'emergency dentist near me', priority: 'high', intent: 'informational' }],
+    });
+    opts.keywordPool.set('emergency dentist near me', {
+      volume: 700,
+      difficulty: 28,
+      cpc: 11.5,
+      intent: 'transactional',
+      source: 'discovery:keyword_ideas',
+    });
+
+    const result = await enrichKeywordStrategy(opts);
+    const gap = result.strategy.contentGaps?.[0];
+    expect(gap?.cpc).toBe(11.5);
+    expect(gap?.intent).toBe('transactional');
   });
 
   it('skips GSC-sourced keyword pool entries for content gap volume (avoids impression confusion)', async () => {

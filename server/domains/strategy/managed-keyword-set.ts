@@ -22,6 +22,7 @@ import db from '../../db/index.js';
 import { createStmtCache } from '../../db/stmt-cache.js';
 import { addActivity } from '../../activity-log.js';
 import { createLogger } from '../../logger.js';
+import { invalidateKeywordStrategyGenerationInputs } from '../../keyword-strategy-generation-store.js';
 import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
 import type { KeywordStrategy } from '../../../shared/types/workspace.js';
 import type {
@@ -250,6 +251,7 @@ export function addStrategyKeyword(
     }
     const row = stmts().getByKeyword.get(workspaceId, normalized) as StrategyKeywordSetDbRow;
     if (didWrite) {
+      invalidateKeywordStrategyGenerationInputs(workspaceId);
       addActivity(
         workspaceId,
         'strategy_keyword_added',
@@ -273,6 +275,7 @@ export function removeStrategyKeyword(workspaceId: string, keyword: string): voi
     const existing = stmts().getByKeyword.get(workspaceId, normalized) as StrategyKeywordSetDbRow | undefined;
     if (!existing || existing.removed_at != null) return; // absent or already removed — no-op
     stmts().setRemoved.run(new Date().toISOString(), workspaceId, normalized);
+    invalidateKeywordStrategyGenerationInputs(workspaceId);
     addActivity(
       workspaceId,
       'strategy_keyword_removed',
@@ -294,6 +297,7 @@ export function keepStrategyKeyword(workspaceId: string, keyword: string): void 
     const existing = stmts().getByKeyword.get(workspaceId, normalized) as StrategyKeywordSetDbRow | undefined;
     if (!existing) return; // absent — nothing to keep
     stmts().setKept.run(new Date().toISOString(), workspaceId, normalized);
+    invalidateKeywordStrategyGenerationInputs(workspaceId);
     addActivity(
       workspaceId,
       'strategy_keyword_kept',

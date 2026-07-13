@@ -6,7 +6,7 @@ describe('keyword strategy activity parity', () => {
     const serviceSrc = readFileSync('server/keyword-strategy-generation.ts', 'utf-8'); // readFile-ok - migration guard: direct SSE and background jobs must share strategy_generated activity logging through the generation service.
     const persistenceSrc = readFileSync('server/keyword-strategy-persistence.ts', 'utf-8'); // readFile-ok - migration guard: direct SSE and background jobs must share persistence, activity, and broadcast side effects through the extracted service.
 
-    expect(serviceSrc).toContain("import { persistKeywordStrategy } from './keyword-strategy-persistence.js'");
+    expect(serviceSrc).toMatch(/import \{[^}]*persistKeywordStrategy[^}]*\} from '\.\/keyword-strategy-persistence\.js'/s);
     expect(serviceSrc).toContain('persistKeywordStrategy({');
     expect(persistenceSrc).toContain("import { addActivity } from './activity-log.js'");
     expect(persistenceSrc).toContain("addActivity(ws.id, 'strategy_generated'");

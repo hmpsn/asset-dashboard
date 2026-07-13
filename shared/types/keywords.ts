@@ -1,5 +1,12 @@
 // shared/types/keywords.ts
 
+export const KEYWORD_SEARCH_INTENTS = ['informational', 'commercial', 'transactional', 'navigational'] as const;
+export type KeywordSearchIntent = typeof KEYWORD_SEARCH_INTENTS[number];
+
+export function isKeywordSearchIntent(value: unknown): value is KeywordSearchIntent {
+  return typeof value === 'string' && (KEYWORD_SEARCH_INTENTS as readonly string[]).includes(value);
+}
+
 /**
  * Canonical source values for keyword metrics.
  * Use these constants — never raw string literals.

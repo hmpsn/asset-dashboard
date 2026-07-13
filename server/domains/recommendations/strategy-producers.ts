@@ -118,6 +118,7 @@ export function appendStrategyRecommendations(
         opportunityScore: cg.opportunityScore ?? null,
         volume: cg.volume ?? null,
         difficulty: cg.difficulty ?? null,
+        cpc: cg.cpc ?? null,
         trendDirection: cg.trendDirection ?? null,
         llmLabel: cg.priority,
         intent: deriveValueIntent(cg.targetKeyword, cg.intent),

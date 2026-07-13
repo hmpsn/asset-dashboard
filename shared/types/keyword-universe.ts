@@ -6,10 +6,9 @@
 // and (in later phases) by MCP + UI. Defined BEFORE implementation per
 // Data-Flow #5 — a typed contract, never an inline untyped key/value bag.
 //
-// Field names mirror the existing inline pool contract (`KeywordPoolCandidate`
-// at `server/keyword-strategy-helpers.ts`) so the fold preserves the canonical
-// `Map<string, { volume; difficulty; source }>` shape the synthesis pipeline
-// already reads (`keywordPool.get(...)`).
+// Field names mirror the canonical pool contract (`KeywordPoolCandidate` at
+// `server/keyword-strategy-helpers.ts`) so demand, CPC, intent, and fine-grained
+// source provenance survive the fold that synthesis reads via `keywordPool.get(...)`.
 
 /**
  * Canonical candidate-source values for the keyword universe.
@@ -57,7 +56,9 @@ export interface KeywordCandidate {
   volume: number;
   difficulty: number;
   cpc?: number;
-  intent?: string;
+  intent?: import('./keywords.js').KeywordSearchIntent;
+  cpcSource?: string;
+  intentSource?: string;
   /**
    * The local market this candidate was generated for, threaded verbatim from the
    * local SEO candidate engine. Set only on

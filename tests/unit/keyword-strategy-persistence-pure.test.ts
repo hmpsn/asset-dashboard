@@ -17,7 +17,9 @@ import { listQuickWins } from '../../server/quick-wins.js';
 import { listKeywordGaps } from '../../server/keyword-gaps.js';
 import { listTopicClusters } from '../../server/topic-clusters.js';
 import { listCannibalizationIssues } from '../../server/cannibalization-issues.js';
-import { persistKeywordStrategy } from '../../server/keyword-strategy-persistence.js';
+import { KeywordStrategyRevisionConflictError, persistKeywordStrategy } from '../../server/keyword-strategy-persistence.js';
+import { bumpKeywordStrategyGenerationRevision, getKeywordStrategyGenerationState } from '../../server/keyword-strategy-generation-store.js';
+import type { GenerationProvenance } from '../../shared/types/ai-execution.js';
 import type { Workspace } from '../../shared/types/workspace.js';
 import type { PersistKeywordStrategyOptions } from '../../server/keyword-strategy-persistence.js';
 import type { StrategyOutput } from '../../server/keyword-strategy-ai-synthesis.js';
@@ -85,9 +87,35 @@ function makeMinimalOptions(ws: Workspace, overrides: Partial<PersistKeywordStra
   };
 }
 
+const provenance: GenerationProvenance = {
+  runId: 'run-k1b', operation: 'keyword-site-synthesis', provider: 'openai', model: 'gpt-5.4-mini',
+  inputFingerprint: 'effective-input-sha256', startedAt: '2026-07-13T00:00:00.000Z', completedAt: '2026-07-13T00:00:01.000Z',
+};
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('persistKeywordStrategy()', () => {
+  describe('generation revision CAS', () => {
+    it('persists internal provenance and advances a monotonic revision', () => {
+      const ws = makeWorkspace('Revision');
+      persistKeywordStrategy(makeMinimalOptions(ws, { expectedRevision: 0, provenance }));
+      expect(getKeywordStrategyGenerationState(ws.id)).toEqual({ revision: 1, fingerprint: provenance.inputFingerprint, provenance });
+      persistKeywordStrategy(makeMinimalOptions(getWorkspace(ws.id)!, { expectedRevision: 1, provenance: { ...provenance, runId: 'run-k1b-2' } }));
+      expect(getKeywordStrategyGenerationState(ws.id).revision).toBe(2);
+      expect(JSON.stringify(getWorkspace(ws.id))).not.toContain('effective-input-sha256');
+    });
+
+    it('rolls back the final save when an operator revision wins during generation', () => {
+      const ws = makeWorkspace('Conflict');
+      const expectedRevision = getKeywordStrategyGenerationState(ws.id).revision;
+      bumpKeywordStrategyGenerationRevision(ws.id);
+      expect(() => persistKeywordStrategy(makeMinimalOptions(ws, {
+        expectedRevision, provenance, strategy: { siteKeywords: ['stale ai keyword'], opportunities: [] },
+      }))).toThrow(KeywordStrategyRevisionConflictError);
+      expect(getWorkspace(ws.id)?.keywordStrategy).toBeUndefined();
+      expect(listPageKeywords(ws.id)).toEqual([]);
+    });
+  });
   describe('basic persistence', () => {
     it('returns a result with keywordStrategy and pageMap fields', () => {
       const ws = makeWorkspace('Basic');
@@ -552,6 +580,38 @@ describe('persistKeywordStrategy()', () => {
   });
 
   describe('incremental strategy mode', () => {
+    it('preserves CPC and intent provenance with their values on incremental merges', () => {
+      const ws = makeWorkspace('IncrementalEvidence');
+      persistKeywordStrategy(makeMinimalOptions(ws, { strategy: { siteKeywords: [], opportunities: [], pageMap: [{
+        pagePath: '/page', pageTitle: 'Page', primaryKeyword: 'dentist', secondaryKeywords: [],
+        cpc: 8, cpcSource: 'dataforseo:exact', searchIntent: 'commercial', intentSource: 'dataforseo:ideas',
+      }] } }));
+      persistKeywordStrategy(makeMinimalOptions(getWorkspace(ws.id)!, {
+        strategyMode: 'incremental', pagesToAnalyze: [{ path: '/page', title: 'Page', seoTitle: '', seoDesc: '', contentSnippet: '' }],
+        strategy: { siteKeywords: [], opportunities: [], pageMap: [{ pagePath: '/page', pageTitle: 'Page', primaryKeyword: 'dentist', secondaryKeywords: [] }] },
+      }));
+      expect(listPageKeywords(ws.id)[0]).toEqual(expect.objectContaining({
+        cpc: 8, cpcSource: 'dataforseo:exact', searchIntent: 'commercial', intentSource: 'dataforseo:ideas',
+      }));
+    });
+
+    it('clears stale provenance when an incremental merge supplies a new value without a source', () => {
+      const ws = makeWorkspace('IncrementalChangedEvidence');
+      persistKeywordStrategy(makeMinimalOptions(ws, { strategy: { siteKeywords: [], opportunities: [], pageMap: [{
+        pagePath: '/page', pageTitle: 'Page', primaryKeyword: 'dentist', secondaryKeywords: [],
+        cpc: 8, cpcSource: 'old-cpc', searchIntent: 'commercial', intentSource: 'old-intent',
+      }] } }));
+      persistKeywordStrategy(makeMinimalOptions(getWorkspace(ws.id)!, {
+        strategyMode: 'incremental', pagesToAnalyze: [{ path: '/page', title: 'Page', seoTitle: '', seoDesc: '', contentSnippet: '' }],
+        strategy: { siteKeywords: [], opportunities: [], pageMap: [{
+          pagePath: '/page', pageTitle: 'Page', primaryKeyword: 'dentist', secondaryKeywords: [], cpc: 12, searchIntent: 'transactional',
+        }] },
+      }));
+      const page = listPageKeywords(ws.id)[0];
+      expect(page).toEqual(expect.objectContaining({ cpc: 12, searchIntent: 'transactional' }));
+      expect(page).not.toHaveProperty('cpcSource');
+      expect(page).not.toHaveProperty('intentSource');
+    });
     it('only updates specified pages in incremental mode, leaving others intact', () => {
       const ws = makeWorkspace('Incremental');
 
