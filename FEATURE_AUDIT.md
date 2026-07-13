@@ -1,10 +1,16 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 670** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 672** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
+
+### 672. Generation quality & performance autonomous program contracts 2026-07-13
+
+**What it does:** Establishes the decision-complete, phase-per-PR delivery program for the verified keyword, strategy/recommendation, content-generation, and shared-AI audit. The committed audit, spec, durable runtime-integrity rules, implementation DAG, and cross-phase contracts define authority boundaries, flags, red→green acceptance tests, parallel file ownership, the autonomous review/CI/merge loop, and staging-only release gates before implementation starts.
+
+**Why it matters:** The highest-risk generation work now has one coordinated execution contract instead of independent fixes that could recreate stale writes, false-success artifacts, lossy evidence, or unmeasurable prompt/scoring changes. The roadmap tracks every foundation phase explicitly and preserves existing companion items as downstream consumers rather than duplicating them.
 
 ### 671. Roadmap value audit + canonical deferred-status contract 2026-07-12
 
