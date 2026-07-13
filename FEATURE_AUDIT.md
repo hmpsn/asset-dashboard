@@ -1,10 +1,24 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 677** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 678** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
+
+### 678. Additive Unicode keyword identity compatibility and operator backfill 2026-07-13
+
+**What it does:** Adds a Unicode-safe v2 keyword identity alongside the unchanged v1 canonical comparison key. Tracked keywords and site metrics retain complete raw variants with deterministic canonical election and rollback projections; feedback and content-gap votes retain exact raw decisions plus unrecoverable legacy aliases; SERP and local-visibility readers resolve coherent v2 evidence before legacy fallback; and the global/provider metrics caches use a separate v2-identity generation without reading old lossy rows forward. C, C#, C++, F#, .NET, accented forms, compatibility forms, and non-Latin keywords can therefore coexist without exact actions, joins, or cache hits collapsing them through the historical ASCII key.
+
+**Safety and operations:** Migration 183 is additive. Before a legacy feedback, vote, or SERP row becomes a rollback projection, its complete payload is archived transactionally. An operator-only CLI is dry-run by default, requires explicit `--apply`, supports fail-closed workspace scoping, uses per-workspace immediate transactions, and emits a bounded redacted compatibility census. It backfills only identities recoverable from raw values, derives v2 provenance only when the legacy pointer is provably self-consistent, never guesses old feedback/vote/SERP/cache identities, and is restart-safe and idempotent.
+
+**Boundaries:** K3b does not switch the global canonical normalizer; `keywordComparisonKey()` remains v1 until K3c. Raw provider/display values remain authoritative. A staging dry-run, apply, and zero-write second apply are mandatory before K3c can begin; this feature record does not claim that staging data mutation has occurred.
+
+**Why it matters:** Keyword strategy, ranking, client feedback, local visibility, and recommendations can preserve international and technology-specific intent without silent decision cross-talk or misleading evidence. The additive rollout keeps rollback possible while making the eventual canonical Unicode switchover measurable rather than speculative.
+
+**Tests:** Fresh writes, legacy archive/projection upgrades, reverse-order collision determinism, complete comparator coverage, explicit raw promotion, exact deletion, v2-only rollback unavailability, public paging/raw keys, KCC/SERP/local/analytics joins, cache caller-raw authority, provider difficulty joins, no-op and transaction rollback, production-reader parity, CLI scope safety, report redaction/census, and second-apply idempotence.
+
+**Files:** migration 183; `shared/types/keyword-identity.ts`; `shared/keyword-normalization.ts`; tracked/site/feedback/vote/SERP/local/cache compatibility stores and consumers; `server/keyword-identity-v2-backfill.ts`; `scripts/backfill-keyword-identity-v2.ts`; focused unit/integration tests; `docs/rules/keyword-normalization-identity-migration.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
 
 ### 677. Keyword Command Center first-paint and skinny-read performance 2026-07-13
 

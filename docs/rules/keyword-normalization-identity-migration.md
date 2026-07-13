@@ -36,6 +36,15 @@ Keyword normalization is a durable identity contract, not only a display helper.
 - `keyword_metrics_cache_v2` is separate and explicitly versioned. The legacy cache remains rollback-only and is never read-forward or reinterpreted as v2 evidence.
 - The backfill is an operator-only TypeScript CLI, dry-run by default, never invoked by server boot. It uses per-workspace immediate transactions and emits counts/stable error codes plus bounded redacted samples (`workspaceId` and stable row-reference hash only)—never raw keywords, workspace names, provider payloads, prompts, or secrets.
 
+### Operator invocation
+
+- Dry-run every workspace: `npm run db:backfill-keyword-identity-v2`
+- Dry-run one workspace: `npm run db:backfill-keyword-identity-v2 -- --workspace-id <workspace-id>`
+- Apply to one workspace: `npm run db:backfill-keyword-identity-v2 -- --apply --workspace-id <workspace-id>`
+- Apply to every workspace only when intentionally authorized: `npm run db:backfill-keyword-identity-v2 -- --apply`
+
+Empty or flag-like workspace values fail closed. The staging gate records the first dry-run, the apply report, and a second apply whose `inserted`, `updated`, and `errors` totals are zero. Compatibility census counts can remain nonzero on the second report because retained aliases, projections, and collisions are durable evidence rather than repeated writes.
+
 ## Collision rules
 
 1. Backfills are transactional, idempotent, restart-safe, and run in TypeScript because SQLite migrations cannot execute the JavaScript NFKC policy.
