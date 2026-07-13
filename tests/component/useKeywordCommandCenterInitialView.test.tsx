@@ -16,6 +16,12 @@ const { initialMock, rowsMock, summaryMock } = vi.hoisted(() => ({
   summaryMock: vi.fn(),
 }));
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(next => { resolve = next; });
+  return { promise, resolve };
+}
+
 vi.mock('../../src/api/keywordCommandCenter', () => ({
   keywordCommandCenter: {
     initial: initialMock,
@@ -123,5 +129,93 @@ describe('useKeywordCommandCenterInitialView', () => {
     expect(initialMock).toHaveBeenCalledTimes(1);
     expect(summaryMock).toHaveBeenCalledTimes(1);
     expect(rowsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not seed canonical caches after an in-flight prefix invalidation', async () => {
+    const query = { filter: 'all' as const, sort: 'rank' as const, page: 1, pageSize: 50 };
+    const payload = {
+      summary: {
+        counts: { total: 1, inStrategy: 1, tracked: 1, needsReview: 0, evidence: 0, local: 0, localCandidates: 0, retired: 0, declined: 0 },
+        filters: [],
+        rawEvidenceTotal: 0,
+        rawEvidenceReturned: 0,
+        summarizedAt: '2026-07-13T00:00:00.000Z',
+        rankFreshness: { snapshotDate: null, ageDays: null, status: 'missing' as const },
+      },
+      rows: {
+        rows: [],
+        pageInfo: { page: 1, pageSize: 50, totalRows: 0, totalPages: 0, hasNextPage: false, hasPreviousPage: false },
+        rankFreshness: { snapshotDate: null, ageDays: null, status: 'missing' as const },
+      },
+    } satisfies KeywordCommandCenterInitialViewResponse;
+    const pending = deferred<KeywordCommandCenterInitialViewResponse>();
+    initialMock.mockReturnValue(pending.promise);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(
+      () => useKeywordCommandCenterInitialView('ws-race', query),
+      { wrapper },
+    );
+    await waitFor(() => expect(initialMock).toHaveBeenCalledTimes(1));
+
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.admin.keywordCommandCenter('ws-race'),
+    });
+    pending.resolve(payload);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(queryClient.getQueryData(queryKeys.admin.keywordCommandCenterSummary('ws-race'))).toBeUndefined();
+    expect(queryClient.getQueryData(queryKeys.admin.keywordCommandCenterRows('ws-race', query))).toBeUndefined();
+  });
+
+  it('does not overwrite newer canonical cache data while initial is in flight', async () => {
+    const query = { filter: 'all' as const, sort: 'rank' as const, page: 1, pageSize: 50 };
+    const stalePayload = {
+      summary: {
+        counts: { total: 1, inStrategy: 1, tracked: 1, needsReview: 0, evidence: 0, local: 0, localCandidates: 0, retired: 0, declined: 0 },
+        filters: [],
+        rawEvidenceTotal: 0,
+        rawEvidenceReturned: 0,
+        summarizedAt: '2026-07-13T00:00:00.000Z',
+        rankFreshness: { snapshotDate: null, ageDays: null, status: 'missing' as const },
+      },
+      rows: {
+        rows: [],
+        pageInfo: { page: 1, pageSize: 50, totalRows: 1, totalPages: 1, hasNextPage: false, hasPreviousPage: false },
+        rankFreshness: { snapshotDate: null, ageDays: null, status: 'missing' as const },
+      },
+    } satisfies KeywordCommandCenterInitialViewResponse;
+    const newerSummary = {
+      ...stalePayload.summary,
+      counts: { ...stalePayload.summary.counts, total: 7 },
+      summarizedAt: '2026-07-13T00:10:00.000Z',
+    };
+    const newerRows = {
+      ...stalePayload.rows,
+      pageInfo: { ...stalePayload.rows.pageInfo, totalRows: 7 },
+    };
+    const pending = deferred<KeywordCommandCenterInitialViewResponse>();
+    initialMock.mockReturnValue(pending.promise);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(
+      () => useKeywordCommandCenterInitialView('ws-newer', query),
+      { wrapper },
+    );
+    await waitFor(() => expect(initialMock).toHaveBeenCalledTimes(1));
+
+    queryClient.setQueryData(queryKeys.admin.keywordCommandCenterSummary('ws-newer'), newerSummary);
+    queryClient.setQueryData(queryKeys.admin.keywordCommandCenterRows('ws-newer', query), newerRows);
+    pending.resolve(stalePayload);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(queryClient.getQueryData(queryKeys.admin.keywordCommandCenterSummary('ws-newer'))).toEqual(newerSummary);
+    expect(queryClient.getQueryData(queryKeys.admin.keywordCommandCenterRows('ws-newer', query))).toEqual(newerRows);
   });
 });

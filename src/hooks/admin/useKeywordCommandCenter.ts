@@ -34,9 +34,40 @@ export function useKeywordCommandCenterInitialView(
   return useQuery({
     queryKey: queryKeys.admin.keywordCommandCenterInitial(workspaceId, query),
     queryFn: async () => {
-      const initial = await keywordCommandCenter.initial(workspaceId, query);
-      queryClient.setQueryData(queryKeys.admin.keywordCommandCenterSummary(workspaceId), initial.summary);
-      queryClient.setQueryData(queryKeys.admin.keywordCommandCenterRows(workspaceId, query), initial.rows);
+      const guardKey = queryKeys.admin.keywordCommandCenterInitialGuard(workspaceId);
+      const summaryKey = queryKeys.admin.keywordCommandCenterSummary(workspaceId);
+      const rowsKey = queryKeys.admin.keywordCommandCenterRows(workspaceId, query);
+      const requestToken = {};
+      let summaryChanged = false;
+      let rowsChanged = false;
+
+      // Materialize a guard beneath the canonical KCC prefix. Prefix invalidation
+      // therefore remains observable even when summary/rows do not exist yet.
+      queryClient.setQueryData(guardKey, requestToken);
+      const unsubscribe = queryClient.getQueryCache().subscribe(event => {
+        if (event.type !== 'updated') return;
+        const summaryQuery = queryClient.getQueryCache().find({ queryKey: summaryKey, exact: true });
+        const rowsQuery = queryClient.getQueryCache().find({ queryKey: rowsKey, exact: true });
+        if (event.query === summaryQuery) summaryChanged = true;
+        if (event.query === rowsQuery) rowsChanged = true;
+      });
+
+      let initial: Awaited<ReturnType<typeof keywordCommandCenter.initial>>;
+      try {
+        initial = await keywordCommandCenter.initial(workspaceId, query);
+      } finally {
+        unsubscribe();
+      }
+
+      const guardState = queryClient.getQueryState(guardKey);
+      const requestIsCurrent = queryClient.getQueryData(guardKey) === requestToken
+        && guardState?.isInvalidated !== true;
+      if (requestIsCurrent && !summaryChanged) {
+        queryClient.setQueryData(summaryKey, initial.summary);
+      }
+      if (requestIsCurrent && !rowsChanged) {
+        queryClient.setQueryData(rowsKey, initial.rows);
+      }
       return initial;
     },
     enabled: !!workspaceId && enabled,
