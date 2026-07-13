@@ -1,10 +1,16 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 672** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 673** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
+
+### 673. Provider-neutral AI execution governance 2026-07-13
+
+**What it does:** Replaces global completed-response replay with named-operation cache policies (`none`, in-flight coalescing, or explicit TTL) across dispatcher-backed OpenAI and Anthropic text generation. Each request now returns safe execution metadata and correlates provider attempts, token usage, operation traces, cache reuse, and real Claude-to-GPT fallback chains. Cancellable calls never share work, long-running in-flight calls are not silently evicted into duplicate paid requests, and AI statistics use event counters plus real requested time windows.
+
+**Why it matters:** Explicit regeneration can no longer be suppressed by a stale five-minute response, concurrent equivalent work can still avoid duplicate cost, and every durable generator can attach a truthful run record without storing raw prompts or secrets. Operators gain defensible latency, retry, fallback, and cache evidence instead of inferred hit rates or disconnected provider logs.
 
 ### 672. Generation quality & performance autonomous program contracts 2026-07-13
 

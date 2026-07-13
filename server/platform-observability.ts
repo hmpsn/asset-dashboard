@@ -4,6 +4,7 @@ import path from 'path';
 import { getDataDir } from './data-dir.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createLogger } from './logger.js';
+import type { AICacheOutcome } from '../shared/types/ai-execution.js';
 
 export type OperationTraceStatus = 'success' | 'error' | 'warning';
 
@@ -15,6 +16,14 @@ export interface OperationTraceEntry {
   workspaceId?: string;
   durationMs?: number;
   message?: string;
+  runId?: string;
+  executionChainId?: string;
+  originRunId?: string;
+  provider?: 'openai' | 'anthropic';
+  model?: string;
+  attempts?: number;
+  cacheOutcome?: AICacheOutcome;
+  fallbackUsed?: boolean;
 }
 
 export interface ExternalApiTelemetryEntry {

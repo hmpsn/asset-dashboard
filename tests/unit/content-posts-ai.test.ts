@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContentBrief } from '../../server/content-brief.js';
 import type { GeneratedPost } from '../../shared/types/content.ts';
 
-const { callAIMock } = vi.hoisted(() => ({
+const { callAIMock, isAnthropicConfiguredMock } = vi.hoisted(() => ({
   callAIMock: vi.fn(),
+  isAnthropicConfiguredMock: vi.fn(() => false),
 }));
 
 vi.mock('../../server/ai.js', () => ({
@@ -11,7 +12,7 @@ vi.mock('../../server/ai.js', () => ({
 }));
 
 vi.mock('../../server/anthropic-helpers.js', () => ({
-  isAnthropicConfigured: vi.fn(() => false),
+  isAnthropicConfigured: isAnthropicConfiguredMock,
 }));
 
 vi.mock('../../server/workspace-intelligence.js', () => ({
@@ -27,7 +28,7 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
   formatPageMapForPrompt: vi.fn(() => ''),
 }));
 
-import { generateSeoMeta, scoreVoiceMatch, unifyPost } from '../../server/content-posts-ai.js';
+import { callCreativeAI, generateSeoMeta, scoreVoiceMatch, unifyPost } from '../../server/content-posts-ai.js';
 
 function makeBrief(): ContentBrief {
   return {
@@ -76,6 +77,54 @@ function makePost(): GeneratedPost {
 
 beforeEach(() => {
   callAIMock.mockReset();
+  isAnthropicConfiguredMock.mockReset();
+  isAnthropicConfiguredMock.mockReturnValue(false);
+});
+
+describe('callCreativeAI fallback correlation', () => {
+  const opts = {
+    operation: 'copy-generation' as const,
+    systemPrompt: 'Write clearly.',
+    userPrompt: 'Draft a paragraph.',
+    maxTokens: 200,
+    workspaceId: 'ws_test',
+  };
+
+  it('links a successful GPT fallback to the failed Claude attempt', async () => {
+    isAnthropicConfiguredMock.mockReturnValue(true);
+    callAIMock
+      .mockRejectedValueOnce(new Error('Claude unavailable'))
+      .mockResolvedValueOnce({ text: 'GPT draft' });
+
+    await expect(callCreativeAI(opts)).resolves.toBe('GPT draft');
+    expect(callAIMock).toHaveBeenCalledTimes(2);
+    const claude = callAIMock.mock.calls[0][0];
+    const gpt = callAIMock.mock.calls[1][0];
+    expect(claude).toMatchObject({ provider: 'anthropic', executionChainId: expect.any(String) });
+    expect(claude).not.toHaveProperty('fallbackUsed');
+    expect(gpt).toMatchObject({ executionChainId: claude.executionChainId, fallbackUsed: true });
+  });
+
+  it('preserves the shared chain when the fallback also fails', async () => {
+    isAnthropicConfiguredMock.mockReturnValue(true);
+    callAIMock
+      .mockRejectedValueOnce(new Error('Claude unavailable'))
+      .mockRejectedValueOnce(new Error('GPT unavailable'));
+
+    await expect(callCreativeAI(opts)).rejects.toThrow('GPT unavailable');
+    expect(callAIMock.mock.calls[1][0]).toMatchObject({
+      executionChainId: callAIMock.mock.calls[0][0].executionChainId,
+      fallbackUsed: true,
+    });
+  });
+
+  it('does not label GPT as fallback when Anthropic is unconfigured', async () => {
+    callAIMock.mockResolvedValueOnce({ text: 'Primary GPT draft' });
+    await expect(callCreativeAI(opts)).resolves.toBe('Primary GPT draft');
+    expect(callAIMock).toHaveBeenCalledOnce();
+    expect(callAIMock).toHaveBeenCalledWith(expect.objectContaining({ executionChainId: expect.any(String) }));
+    expect(callAIMock.mock.calls[0][0]).not.toHaveProperty('fallbackUsed');
+  });
 });
 
 describe('generateSeoMeta', () => {

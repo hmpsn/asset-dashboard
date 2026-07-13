@@ -19,7 +19,7 @@ Names below are the required semantic contracts; the shared-contract task must r
 
 - `AIExecutionPolicy.cache`: discriminated union of `none`, `inflight`, or `ttl` with an explicit positive TTL.
 - `AIExecutionMetadata`: `runId`, named `operation`, provider, model, attempts, fallback-used, cache outcome, start/completion timestamps, duration, and token usage where supplied.
-- Existing `callAI(): Promise<string>` remains source-compatible. New durable generators use a metadata-returning dispatcher path; provider helpers remain dispatcher implementation details.
+- Existing `callAI(opts): Promise<AICallResult>` remains source-compatible. New durable generators use a metadata-returning dispatcher path or backward-compatible metadata extension; provider helpers remain dispatcher implementation details.
 - Traces store identifiers and measurements, never raw prompts, generated content, secrets, or provider credentials.
 
 ### Durable generation provenance

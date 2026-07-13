@@ -13,6 +13,7 @@ import { composeTimeoutSignal, throwIfSignalAborted } from './abort-helpers.js';
 import { buildProviderRetryDelayMs, RetryableProviderError, withProviderRetry } from './ai-provider-retry.js';
 import { recordOperationTrace } from './platform-observability.js';
 import { isLocalFakeProviderModeEnabled } from './local-provider-mode.js';
+import type { AICacheOutcome, AICachePolicy } from '../shared/types/ai-execution.js';
 
 const log = createLogger('openai');
 const AI_REQUEST_CANCELLED_MESSAGE = 'AI request cancelled';
@@ -28,6 +29,14 @@ export interface TokenUsage {
   workspaceId?: string;
   timestamp: string;
   durationMs?: number;
+  runId?: string;
+  operation?: string;
+  executionCacheOutcome?: AICacheOutcome;
+  provider?: 'openai' | 'anthropic';
+  attempts?: number;
+  cacheOutcome?: AICacheOutcome;
+  executionChainId?: string;
+  fallbackUsed?: boolean;
 }
 
 const USAGE_DIR = getDataDir('ai-usage');
@@ -260,6 +269,12 @@ interface OpenAIChatOptions {
   timeoutMs?: number;
   /** Optional caller cancellation signal. Composed with timeoutMs. */
   signal?: AbortSignal;
+  cachePolicy?: AICachePolicy;
+  runId?: string;
+  operation?: string;
+  executionCacheOutcome?: AICacheOutcome;
+  executionChainId?: string;
+  fallbackUsed?: boolean;
 }
 
 interface OpenAIChatResult {
@@ -267,6 +282,7 @@ interface OpenAIChatResult {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  execution?: { attempts: number; cacheOutcome: AICacheOutcome; originRunId?: string };
 }
 
 /**
@@ -285,16 +301,22 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     maxRetries = 3,
     timeoutMs = 60_000,
     signal,
+    cachePolicy = { mode: 'inflight' },
+    runId,
+    operation = feature,
+    executionChainId,
+    fallbackUsed,
   } = opts;
 
-  if (signal) {
-    // Cancellable requests are per-job work; sharing a deduped promise would let one job abort another.
-    return executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal });
-  }
+  // Cancellable requests are per-job work; counting them as explicit bypasses keeps
+  // governance telemetry truthful without sharing an abortable promise.
+  const effectivePolicy: AICachePolicy = signal ? { mode: 'none' } : cachePolicy;
 
   // Create deduplication key from request parameters
   const { AIRequestDeduplicator }: typeof AiDeduplication = await import('./ai-deduplication.js'); // dynamic-import-ok
   const dedupeKey = AIRequestDeduplicator.createKey({
+    provider: 'openai',
+    operation,
     model,
     messages: messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) })),
     temperature,
@@ -304,18 +326,12 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     feature,
   });
 
-  // Use deduplication with 5-minute cache for most requests
-  // Skip cache for one-time operations like content generation
-  const shouldSkipCache = ['content-brief', 'content-post'].includes(feature);
-
-  return aiDeduplicator.deduplicate(
+  const deduped = await aiDeduplicator.execute(
     dedupeKey,
-    () => executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal }),
-    {
-      cacheTtlMs: 5 * 60 * 1000, // 5 minutes
-      skipCache: shouldSkipCache,
-    }
+    () => executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal, runId, operation, executionChainId, fallbackUsed, executionCacheOutcome: effectivePolicy.mode === 'none' ? 'bypass' : 'miss' }),
+    effectivePolicy,
   );
+  return { ...deduped.value, execution: { attempts: deduped.value.execution?.attempts ?? 1, cacheOutcome: deduped.cacheOutcome, originRunId: deduped.value.execution?.originRunId } };
 }
 
 /**
@@ -333,7 +349,13 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     maxRetries = 3,
     timeoutMs = 60_000,
     signal,
+    runId,
+    operation = feature,
+    executionCacheOutcome = 'miss',
+    executionChainId,
+    fallbackUsed,
   } = opts;
+  const callStartMs = Date.now();
 
   if (isLocalFakeProviderModeEnabled()) {
     const fallbackText = responseFormat?.type === 'json_object'
@@ -347,12 +369,16 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     const promptTokens = Math.max(1, Math.round(messages.length * 9));
     const completionTokens = Math.max(1, Math.round(fallbackText.length / 6));
     const totalTokens = promptTokens + completionTokens;
-    logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs: 1 });
-    return { text: fallbackText, promptTokens, completionTokens, totalTokens };
+    logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs: 1, runId, operation, provider: 'openai', attempts: 1, cacheOutcome: executionCacheOutcome, executionChainId, fallbackUsed });
+    recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - callStartMs, workspaceId, message: `${model} local fake call completed`, runId, executionChainId, provider: 'openai', model, attempts: 1, cacheOutcome: executionCacheOutcome, fallbackUsed });
+    return { text: fallbackText, promptTokens, completionTokens, totalTokens, execution: { attempts: 1, cacheOutcome: executionCacheOutcome, originRunId: runId } };
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
+  if (!apiKey) {
+    recordOperationTrace({ source: 'ai', operation, status: 'error', durationMs: Date.now() - callStartMs, workspaceId, message: 'OpenAI API key not configured', runId, executionChainId, provider: 'openai', model, attempts: 0, cacheOutcome: executionCacheOutcome, fallbackUsed });
+    throw new Error('OPENAI_API_KEY not configured');
+  }
 
   const tokenLimit = usesMaxCompletionTokens(model)
     ? { max_completion_tokens: maxTokens }
@@ -366,7 +392,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     ...(responseFormat && { response_format: responseFormat }),
   });
 
-  const callStartMs = Date.now();
+  let attempts = 0;
   try {
     const result = await withProviderRetry({
       feature,
@@ -376,6 +402,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
       signal,
       cancelMessage: AI_REQUEST_CANCELLED_MESSAGE,
       run: async (attempt) => {
+        attempts = attempt + 1;
         throwIfSignalAborted(signal, AI_REQUEST_CANCELLED_MESSAGE);
         const res = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -432,27 +459,36 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
       feature,
       workspaceId,
       durationMs,
+      runId,
+      operation,
+      provider: 'openai',
+      attempts,
+      cacheOutcome: executionCacheOutcome,
+      executionChainId,
+      fallbackUsed,
     });
     recordOperationTrace({
       source: 'ai',
-      operation: feature,
+      operation,
       status: 'success',
       durationMs,
       workspaceId,
       message: `${model} call completed`,
+      runId, executionChainId, provider: 'openai', model, attempts, cacheOutcome: executionCacheOutcome, fallbackUsed,
     });
 
-    return result;
+    return { ...result, execution: { attempts, cacheOutcome: executionCacheOutcome, originRunId: runId } };
   } catch (err) {
     if (signal?.aborted || (err instanceof Error && err.message === AI_REQUEST_CANCELLED_MESSAGE)) {
       throw err;
     }
     recordOperationTrace({
       source: 'ai',
-      operation: feature,
+      operation,
       status: 'error',
       durationMs: Date.now() - callStartMs,
       workspaceId,
+      runId, executionChainId, provider: 'openai', model, attempts, cacheOutcome: executionCacheOutcome, fallbackUsed,
       message: err instanceof Error ? err.message : String(err),
     });
     throw err;

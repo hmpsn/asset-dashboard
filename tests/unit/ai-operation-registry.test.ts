@@ -36,6 +36,12 @@ describe('AI operation registry', () => {
     expect(getAIOperationPolicyMetadata('content-post-seo-meta').researchMode).toBe('forbidden');
   });
 
+  it('defaults generation to inflight-only and requires explicit TTL opt-in', () => {
+    expect(getAIOperationRuntimeDefaults('content-brief-regenerate').cachePolicy).toEqual({ mode: 'inflight' });
+    expect(getAIOperationRuntimeDefaults('content-post-feedback-fix').cachePolicy).toEqual({ mode: 'none' });
+    expect(getAIOperationRuntimeDefaults('schema-plan').cachePolicy).toEqual({ mode: 'ttl', ttlMs: 300_000 });
+  });
+
   it('registers Monthly Digest as a closed-world clause-selection operation', () => {
     expect(isAIOperationId('monthly-digest')).toBe(true);
     expect(getAIOperationPolicyMetadata('monthly-digest')).toMatchObject({
@@ -63,6 +69,7 @@ describe('AI operation registry', () => {
       defaultMaxRetries: 3,
       defaultTimeoutMs: 60_000,
       defaultResearchMode: false,
+      cachePolicy: { mode: 'inflight' },
     });
     expect(runtimeDefaults).not.toHaveProperty('providerIntent');
     expect(runtimeDefaults).not.toHaveProperty('outputMode');

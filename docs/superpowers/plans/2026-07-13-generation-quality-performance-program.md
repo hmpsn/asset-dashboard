@@ -79,7 +79,7 @@ Model assignments:
 **Owner:** `platform-foundation`; GPT-5.5. **Own pattern:** AI dispatcher, operation registry, provider helpers, telemetry/dedup tests.
 
 - Add typed operation cache policy: `none`, `inflight`, or explicit TTL. Unclassified generation defaults to inflight-only; completed-response caching requires a named operation policy.
-- Preserve `callAI(): Promise<string>` while adding a metadata-returning execution path for new consumers.
+- Preserve the current `callAI(opts): Promise<AICallResult>` source contract while adding a metadata-returning execution path or a backward-compatible metadata extension for new consumers. This amendment reflects the verified staging signature; no caller may be forced through an unrelated return-shape migration.
 - Emit provider-neutral run ID, operation, attempt, retry/fallback, latency, tokens, and real cache hit/miss traces for OpenAI and Anthropic.
 - Correct AI usage-window and cache-rate calculations without changing authentication or public exposure.
 - Tests prove explicit regeneration never replays a completed cached response, safe TTL operations do, concurrent identical inflight calls deduplicate, providers emit equivalent traces, and prompt/secret content is not recorded.

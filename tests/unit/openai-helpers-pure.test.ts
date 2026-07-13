@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   getDataDir: vi.fn(() => '/fake/ai-usage'),
   createLogger: vi.fn(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() })),
   AIRequestDeduplicator: { createKey: vi.fn(() => 'dedupe-key') },
-  aiDeduplicator: { deduplicate: vi.fn((_key: string, fn: () => unknown) => fn()) },
+  aiDeduplicator: { execute: vi.fn(async (_key: string, fn: () => unknown) => ({ value: await fn(), cacheOutcome: 'miss' })) },
   stripCodeFences: vi.fn((s: string) => s),
   abortableDelay: vi.fn(),
   composeTimeoutSignal: vi.fn(() => undefined),
@@ -350,6 +350,7 @@ describe('callOpenAI retry behavior', () => {
     mocks.composeTimeoutSignal.mockReturnValue(undefined);
     mocks.throwIfSignalAborted.mockReset();
     mocks.recordOperationTrace.mockReset();
+    mocks.aiDeduplicator.execute.mockClear();
   });
 
   afterEach(() => {
@@ -402,9 +403,52 @@ describe('callOpenAI retry behavior', () => {
       signal: controller.signal,
     })).rejects.toThrow('AI request cancelled');
 
+    expect(mocks.aiDeduplicator.execute).toHaveBeenCalledWith(
+      'dedupe-key', expect.any(Function), { mode: 'none' },
+    );
+
     expect(mocks.recordOperationTrace).not.toHaveBeenCalledWith(expect.objectContaining({
       operation: 'openai-cancel-test',
       status: 'error',
+    }));
+  });
+
+  it('traces a missing API key without exposing request content', async () => {
+    delete process.env.OPENAI_API_KEY;
+    await expect(callOpenAI({ messages: [{ role: 'user', content: 'secret prompt' }], feature: 'missing-key', runId: 'run-missing' }))
+      .rejects.toThrow('OPENAI_API_KEY not configured');
+    expect(mocks.recordOperationTrace).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'error', operation: 'missing-key', runId: 'run-missing', provider: 'openai', attempts: 0,
+    }));
+    expect(JSON.stringify(mocks.recordOperationTrace.mock.calls)).not.toContain('secret prompt');
+  });
+});
+
+describe('callOpenAI fallback-chain telemetry', () => {
+  beforeEach(() => {
+    mocks.isLocalFakeProviderModeEnabled.mockReturnValue(true);
+    mocks.recordOperationTrace.mockReset();
+    mocks.writeFileSync.mockReset();
+    flushToDisk();
+  });
+
+  afterEach(() => {
+    mocks.isLocalFakeProviderModeEnabled.mockReturnValue(false);
+  });
+
+  it('marks token usage and traces for a proven fallback attempt', async () => {
+    await callOpenAI({
+      messages: [{ role: 'user', content: 'fallback' }],
+      feature: 'creative-fallback',
+      runId: 'gpt-run',
+      executionChainId: 'creative-chain',
+      fallbackUsed: true,
+    });
+    flushToDisk();
+    const persisted = JSON.parse(String(mocks.writeFileSync.mock.calls.at(-1)?.[1])) as Array<Record<string, unknown>>;
+    expect(persisted.at(-1)).toMatchObject({ runId: 'gpt-run', executionChainId: 'creative-chain', fallbackUsed: true });
+    expect(mocks.recordOperationTrace).toHaveBeenCalledWith(expect.objectContaining({
+      runId: 'gpt-run', executionChainId: 'creative-chain', fallbackUsed: true, provider: 'openai',
     }));
   });
 });

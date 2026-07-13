@@ -83,6 +83,15 @@ describe('AIRequestDeduplicator.createKey', () => {
     expect(k1).not.toBe(k2);
   });
 
+  it('isolates identical requests by provider and operation', () => {
+    const base = { model: 'shared-model', messages: [{ role: 'user', content: 'q' }] };
+    const openai = AIRequestDeduplicator.createKey({ ...base, provider: 'openai', operation: 'keyword-generation' });
+    const anthropic = AIRequestDeduplicator.createKey({ ...base, provider: 'anthropic', operation: 'keyword-generation' });
+    const strategy = AIRequestDeduplicator.createKey({ ...base, provider: 'openai', operation: 'strategy-generation' });
+    expect(openai).not.toBe(anthropic);
+    expect(openai).not.toBe(strategy);
+  });
+
   it('includes a 16-char hex hash suffix', () => {
     const key = AIRequestDeduplicator.createKey({
       model: 'gpt-4',
@@ -151,6 +160,14 @@ describe('AIRequestDeduplicator — cache hit / miss', () => {
     await dedup.deduplicate('key-3', fetcher, { cacheTtlMs: shortTtl });
 
     expect(callCount).toBe(2);
+  });
+
+  it('counts an expired entry evicted during a read', async () => {
+    const fetcher = vi.fn(async () => 'value');
+    await dedup.execute('expired-read', fetcher, { mode: 'ttl', ttlMs: 10 });
+    vi.advanceTimersByTime(11);
+    await dedup.execute('expired-read', fetcher, { mode: 'ttl', ttlMs: 10 });
+    expect(dedup.getStats()).toMatchObject({ misses: 2, evictions: 1 });
   });
 
   it('different keys get different cached values', async () => {
@@ -238,6 +255,53 @@ describe('AIRequestDeduplicator.getStats', () => {
     await dedup.deduplicate('age-key', async () => 'v');
     const stats = dedup.getStats();
     expect(stats.oldestCache).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('AIRequestDeduplicator — policy outcomes and counters', () => {
+  it('distinguishes misses, completed cache hits, and inflight coalesces', async () => {
+    const dedup = new AIRequestDeduplicator();
+    let resolve!: (value: string) => void;
+    const fetcher = vi.fn(() => new Promise<string>(r => { resolve = r; }));
+
+    const first = dedup.execute('policy-key', fetcher, { mode: 'ttl', ttlMs: 60_000 });
+    const joined = dedup.execute('policy-key', fetcher, { mode: 'ttl', ttlMs: 60_000 });
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+    resolve('value');
+
+    expect(await first).toEqual({ value: 'value', cacheOutcome: 'miss' });
+    expect(await joined).toEqual({ value: 'value', cacheOutcome: 'inflight' });
+    expect(await dedup.execute('policy-key', fetcher, { mode: 'ttl', ttlMs: 60_000 }))
+      .toEqual({ value: 'value', cacheOutcome: 'hit' });
+    expect(dedup.getStats()).toMatchObject({ requests: 3, misses: 1, cacheHits: 1, inflightJoins: 1 });
+  });
+
+  it('none executes every request while inflight never replays completion', async () => {
+    const dedup = new AIRequestDeduplicator();
+    const fetcher = vi.fn(async () => 'value');
+    await dedup.execute('none-key', fetcher, { mode: 'none' });
+    await dedup.execute('none-key', fetcher, { mode: 'none' });
+    await dedup.execute('inflight-key-2', fetcher, { mode: 'inflight' });
+    await dedup.execute('inflight-key-2', fetcher, { mode: 'inflight' });
+    expect(fetcher).toHaveBeenCalledTimes(4);
+  });
+
+  it('never expires a live in-flight request into duplicate provider work', async () => {
+    vi.useFakeTimers();
+    const dedup = new AIRequestDeduplicator();
+    let resolve!: (value: string) => void;
+    const fetcher = vi.fn(() => new Promise<string>(r => { resolve = r; }));
+    const first = dedup.execute('long-running', fetcher, { mode: 'inflight' });
+    vi.advanceTimersByTime(10 * 60 * 1000);
+    dedup.cleanup();
+    const joined = dedup.execute('long-running', fetcher, { mode: 'inflight' });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    resolve('done');
+    await expect(Promise.all([first, joined])).resolves.toEqual([
+      { value: 'done', cacheOutcome: 'miss' },
+      { value: 'done', cacheOutcome: 'inflight' },
+    ]);
+    vi.useRealTimers();
   });
 });
 

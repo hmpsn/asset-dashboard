@@ -26,7 +26,9 @@ describe('roadmap data integrity', () => {
 
   it('closes merged, obsolete, and superseded audit dispositions without claiming shipment', () => {
     const { sprints } = loadRoadmap('data/roadmap.json');
-    const auditedClosures = sprints.flatMap(sprint => sprint.items).filter(item => item.status === 'closed');
+    const auditedClosures = sprints.flatMap(sprint => sprint.items).filter(item =>
+      item.status === 'closed' && (item.notes ?? '').includes('[ROADMAP VALUE AUDIT 2026-07-12]'),
+    );
     expect(auditedClosures).toHaveLength(26);
     const invalidClosures = auditedClosures.filter(item =>
       !/\[ROADMAP VALUE AUDIT 2026-07-12\] (?:OBSOLETE-CLOSE|RESCOPE-MERGE)/.test(item.notes ?? '')
