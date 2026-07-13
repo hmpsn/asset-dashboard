@@ -22,7 +22,7 @@ import type { RoadmapData } from '../../shared/types/roadmap.js';
 
 const ROADMAP_PATH = path.resolve(process.cwd(), 'data/roadmap.json');
 const ROADMAP_ARCHIVE_PATH = path.resolve(process.cwd(), 'data/roadmap.archive.json');
-const CURRENT_AUDIT_AS_OF = '2026-07-05';
+const CURRENT_AUDIT_AS_OF = '2026-07-13';
 
 // Shipped roadmap items move to roadmap.archive.json; a flag's linkedRoadmapItemId still
 // references its archived item until the flag is retired, so resolve links against BOTH
@@ -141,22 +141,23 @@ describe('feature-flag lifecycle audit', () => {
       expect(after.pastDoneTargetCount).toBeGreaterThan(0);
     });
 
-    it('assigns no doneTarget to any reserved flag (forward guard — category currently empty)', () => {
+    it('keeps the two P0 generation flags reserved and outside lifecycle burn-down queues', () => {
       const roadmap = loadRoadmap();
       const report = buildFeatureFlagLifecycleReport(roadmap, CURRENT_AUDIT_AS_OF);
 
       const reservedRows = report.rows.filter(
         r => FEATURE_FLAG_CATALOG[r.key].lifecycle.status === 'reserved',
       );
-      // Reserved flags are currently ZERO: the three that existed (strategy-paid-topics,
-      // the-issue-client-reconciliation, the-issue-client-segment-inserts) were retired in
-      // flag-sunset Wave 1 (delete-then-re-add-when-built). The reserved→null-doneTarget
-      // outcome shares its ternary (`permanentlyExempt || reserved ? null : …`) with the
-      // permanently-exempt case, which the "…never marks…with a doneTarget" test above asserts
-      // non-vacuously. This stays as a forward guard for whenever a reserved flag is re-added.
+      expect(reservedRows.map(row => row.key).sort()).toEqual([
+        'brand-deliverable-generation',
+        'content-matrix-generation',
+      ]);
+
       for (const row of reservedRows) {
         expect(row.doneTarget).toBeNull();
         expect(row.pastDoneTarget).toBe(false);
+        expect(row.reviewDue).toBe(false);
+        expect(row.staleCandidate).toBe(false);
       }
     });
 

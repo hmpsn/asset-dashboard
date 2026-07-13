@@ -8,7 +8,7 @@ import { awaitSuccessfulRefetches } from '../../lib/reactQueryRefresh';
 import { formatDate } from '../../utils/formatDates';
 import { markdownToPlainTextPreview } from '../../utils/markdownPreview';
 import type { AudiencePersona, TargetGeo } from '../../../shared/types/workspace';
-import type { BrandDeliverableType } from '../../../shared/types/brand-engine';
+import type { ReleasedBrandDeliverableType } from '../../../shared/types/brand-engine';
 import { useToast } from '../Toast';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { BrandHub } from '../BrandHub';
@@ -95,7 +95,7 @@ interface ContextItem {
 }
 
 interface IdentityGenerator {
-  deliverableType: BrandDeliverableType;
+  deliverableType: ReleasedBrandDeliverableType;
   name: string;
   tier: 'ess' | 'pro' | 'prem';
 }
@@ -141,7 +141,7 @@ const IDENTITY_GENERATORS_BY_GROUP = {
   ],
 } as const satisfies Record<ContextGroupId, readonly IdentityGenerator[]>;
 
-const IDENTITY_GENERATOR_TYPES = new Set<BrandDeliverableType>(
+const IDENTITY_GENERATOR_TYPES = new Set<ReleasedBrandDeliverableType>(
   Object.values(IDENTITY_GENERATORS_BY_GROUP).flat().map((generator) => generator.deliverableType),
 );
 const BRANDSCRIPT_OVERVIEW_FOCUS = 'existing-brandscript';
@@ -222,8 +222,8 @@ function hasText(value: string | null | undefined): boolean {
   return Boolean(value?.trim());
 }
 
-function isIdentityGeneratorFocus(value: string | null | undefined): value is BrandDeliverableType {
-  return typeof value === 'string' && IDENTITY_GENERATOR_TYPES.has(value as BrandDeliverableType);
+function isIdentityGeneratorFocus(value: string | null | undefined): value is ReleasedBrandDeliverableType {
+  return typeof value === 'string' && IDENTITY_GENERATOR_TYPES.has(value as ReleasedBrandDeliverableType);
 }
 
 function countComplete(values: boolean[]): number {
@@ -695,7 +695,7 @@ function BrandIdentityGeneratorDisclosure({
   onOpenGenerator,
 }: {
   group: BrandContextGroup;
-  onOpenGenerator: (deliverableType: BrandDeliverableType) => void;
+  onOpenGenerator: (deliverableType: ReleasedBrandDeliverableType) => void;
 }) {
   const generators = IDENTITY_GENERATORS_BY_GROUP[group.id];
   return (
@@ -742,7 +742,7 @@ function BrandContextGroupSection({
   group: BrandContextGroup;
   activeTab: BrandAiTab;
   onOpenTab: (tab: BrandAiTab, focus?: string | null) => void;
-  onOpenGenerator: (deliverableType: BrandDeliverableType) => void;
+  onOpenGenerator: (deliverableType: ReleasedBrandDeliverableType) => void;
 }) {
   const groupPercent = percentage(group.configured, group.total);
   return (
@@ -848,7 +848,7 @@ function BrandContextOverview({
   ws: WorkspaceData | undefined;
   activeTab: BrandAiTab;
   onOpenTab: (tab: BrandAiTab, focus?: string | null) => void;
-  onOpenGenerator: (deliverableType: BrandDeliverableType) => void;
+  onOpenGenerator: (deliverableType: ReleasedBrandDeliverableType) => void;
 }) {
   const summary = buildBrandContextSummary(ws);
   const workspaceName = ws?.name || 'this client';

@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BrandDeliverableType } from '../../../shared/types/brand-engine';
+import type { ReleasedBrandDeliverableType } from '../../../shared/types/brand-engine';
 import { BrandAiSurface } from '../../../src/components/brand-ai-rebuilt/BrandAiSurface';
 import { ToastProvider } from '../../../src/components/Toast';
 import { queryKeys } from '../../../src/lib/queryKeys';
@@ -103,7 +103,7 @@ vi.mock('../../../src/components/brand/IdentityTab', () => ({
     onClearFocus,
   }: {
     workspaceId: string;
-    focusType?: BrandDeliverableType | null;
+    focusType?: ReleasedBrandDeliverableType | null;
     onClearFocus?: () => void;
   }) => (
     <div data-testid="legacy-identity-panel" data-focus={focusType ?? 'library'}>
@@ -488,7 +488,7 @@ describe('BrandAiSurface rebuilt cockpit', () => {
   });
 
   it('maps all 17 unique prototype generators to focused real Identity receivers', async () => {
-    const generators: Array<{ label: string; type: BrandDeliverableType }> = [
+    const generators: Array<{ label: string; type: ReleasedBrandDeliverableType }> = [
       { label: 'Tagline', type: 'tagline' },
       { label: 'Voice Guidelines', type: 'voice_guidelines' },
       { label: 'Brand Archetypes', type: 'archetypes' },
@@ -512,7 +512,7 @@ describe('BrandAiSurface rebuilt cockpit', () => {
     await screen.findByText('Read by every AI action');
     for (const disclosure of screen.getAllByText('Brand identity generators')) fireEvent.click(disclosure);
 
-    const expectedByGroup: Record<string, BrandDeliverableType[]> = {
+    const expectedByGroup: Record<string, ReleasedBrandDeliverableType[]> = {
       voice: ['tagline', 'voice_guidelines', 'archetypes', 'personality_traits', 'messaging_pillars', 'differentiators', 'tone_examples'],
       knowledge: ['elevator_pitch', 'brand_story'],
       audience: ['positioning_matrix', 'personas', 'customer_journey', 'objection_handling', 'emotional_triggers'],

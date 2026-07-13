@@ -25,10 +25,10 @@ registry entries, barrels, roadmap, and generated rules are controller-owned.
 Parallel lanes get exclusive files. If a lane needs an unowned shared file, it
 stops with `NEEDS_CONTEXT`; the controller lands the contract and redispatches.
 
-This current branch is one prerequisite planning PR: the unflagged S0 security
-fix plus audit/spec/plan/rule artifacts only. It does not implement product phase
-P0. After it merges and staging is verified, P0 and every later implementation
-phase ship as separate phase-per-PR branches from then-current `origin/staging`.
+The prerequisite planning/S0 security PR merged before implementation began.
+P0 is implemented on this branch; every later implementation phase ships as a
+separate phase-per-PR branch from then-current `origin/staging` after P0 merges
+with green CI.
 
 ## Bounded contexts and canonical decisions
 
@@ -50,7 +50,7 @@ per page type.
 ## Exact dependency graph
 
 ```text
-S0 scoped-key alias security fix + planning artifacts (current prerequisite PR)
+S0 scoped-key alias security fix + planning artifacts (merged prerequisite)
   └─ P0 shared program contracts + two reserved rollout flags
       └─ R1 MCP registry/execution-context hardening
           ├─ M0 matrix revisions + run ledger + structural resolution/reads
@@ -86,7 +86,7 @@ helpers inside its owned directory but may not rename or duplicate a locked seam
 
 | Phase | Shared exports / tables | Domain exports | HTTP / MCP surface |
 |---|---|---|---|
-| P0 | `MatrixSourceRevision`, `ResolvedMatrixStructuralTarget`, `MatrixGenerationPreviewTarget`, `ResolvedPageBlockManifest`, `GenerationEvidenceRequirement`, `GenerationEvidenceResolution`, `BrandGenerationAtomicTarget`, `BRAND_DELIVERABLE_TARGET_POLICY`, `BRAND_GENERATION_PRESET_POLICY`, `MatrixGenerationRun`, `BrandGenerationRun`, `BrandReviewItemDecision`, `BrandContentOnboardingRun` | lifecycle/status registries only | two OFF flag catalog entries |
+| P0 | `MatrixSourceRevision`, `ResolvedMatrixStructuralTarget`, `MatrixGenerationPreviewTarget`, `ResolvedPageBlockManifest`, `MatrixArtifactRevisionExpectations`, `ResolveMatrixGenerationEvidenceRequest`, `RetryMatrixGenerationRequest`, `GenerationEvidenceRequirement`, `GenerationEvidenceResolution`, `BrandGenerationAtomicTarget`, `BRAND_DELIVERABLE_TARGET_POLICY`, `BRAND_GENERATION_PRESET_POLICY`, `MatrixGenerationRun`, `BrandGenerationRun`, `BrandReviewItemDecision`, `BrandContentOnboardingRun` | shared status/policy registries only; transition tables land with each first persisted writer | two OFF flag catalog entries |
 | R1 | `McpToolDefinition`, `McpToolExecutionContext`, `McpToolErrorEnvelope` | `MCP_TOOL_REGISTRY`, `getDeclaredWorkspaceField()`, `executeMcpTool()` | existing `/mcp`; no product tool yet |
 | M0 | revisions on `content_matrices`/`content_templates`; cell `revision`; `content_matrix_generation_runs`, `_items`, `_attempts`; `content_matrix_cell_evidence` | `resolveMatrixStructure()`, `acceptTemplateGenerationUpgrade()`, `createMatrixGenerationRun()`, `listMatrixGenerationItems()` | `POST /api/content-templates/:workspaceId/:templateId/accept-generation-upgrade`; MCP `list_content_matrices`, `get_content_matrix`, `resolve_content_matrix_cells`, `accept_content_template_generation_upgrade` |
 | B0 | `brand_intake_revisions` | `submitBrandIntake()`, `getBrandIntakeRevision()`, `resolveBrandIntakeEvidence()` | existing `POST /api/public/onboarding/:id`; `GET /api/brand-intake/:workspaceId`; `POST /api/brand-intake/:workspaceId/:revisionId/evidence-resolutions`; MCP `get_brand_intake`, `resolve_brand_intake_evidence` |
@@ -142,18 +142,23 @@ different workspace values; MCP auth/routing tests and typecheck pass.
 
 **Owner:** controller. **Depends:** S0 merged.
 
+**Status on this branch:** implemented; final CI-equivalent verification pending.
+
 Exclusive ownership: new
 `shared/types/{matrix-generation,generation-evidence,brand-intake,brand-generation,brand-content-onboarding}.ts`,
 additive changes to
-`shared/types/{content,brand-engine,client-deliverable,feature-flags,lifecycle}.ts`,
+`shared/types/{content,brand-engine,feature-flags,index}.ts`,
 shared barrels, lifecycle/flag contract tests, compatibility-only exhaustive
-`naming` metadata/instruction/test updates in `server/brand-identity.ts`,
-`src/components/brand/IdentityTab.tsx`, and its focused tests, roadmap, and
-rule/spec/plan amendments. The compatibility UI edit supplies the required
-label only; it must not add `naming` to a rendered tier/action before B2. Must
-not add routes, workers, AI calls, rendered UI, migrations, or
-background-job constants before their owning worker phase can satisfy the job
-census.
+`naming` vocabulary and closed-boundary updates in `server/brand-identity.ts`,
+the existing `server/routes/brand-identity.ts` adapter, `src/api/brand-engine.ts`,
+`src/components/brand/IdentityTab.tsx`,
+`src/components/brand-ai-rebuilt/BrandAiSurface.tsx`,
+and focused tests, plus roadmap and rule/spec/plan amendments. Compatibility
+keeps the durable label/instructions readable while the legacy generate/refine
+service, HTTP schema, API payload, generator census, rendered tier/action, and
+stale focused-UI input all reject `naming` before B2. Must not add new endpoints,
+workers, AI dispatches, generation UI actions, migrations, or background-job
+constants before their owning worker phase can satisfy the job census.
 
 1. Treat the detailed user request as authoritative because the referenced
    external operations notes are unavailable locally. Their absence is
@@ -165,8 +170,13 @@ census.
 3. Precommit the exact types named in the cross-phase contract, including
    `MatrixSourceRevision`, separate structural/ready matrix targets,
    `ResolvedPageBlockManifest`, `BrandGenerationAtomicTarget`, evidence
-   requirement stages, run/item statuses, per-item brand review decisions, and
-   `BrandContentOnboardingRun`; add lifecycle/census tests before consumers.
+   requirement stages, exact brief/post CAS, cell-addressed evidence resolution,
+   authorized retry/replace, run/item statuses, per-item brand review decisions,
+   and typed onboarding gate evidence; add status/policy census tests before consumers.
+   Do not register transition tables before the owning persisted writer exists:
+   M0 owns matrix run/item transitions, B2 owns brand run/item transitions, and
+   O1 owns onboarding transitions plus the conditional `needs_attention` resume
+   rule. This preserves the lifecycle registry's persisted-entity-only contract.
 4. The prerequisite PR already added the pending roadmap program and corrected
    the audited feature claims. P0 only amends those records if contract
    reconciliation or the actual shared-type implementation changes them.
@@ -329,11 +339,12 @@ generation, or provider-specific AI helpers.
 - Register named structured generate/refine/audit operations. Persist evidence
   refs, claim classification, typed missing requirements, provenance, findings,
   and sanitized errors.
-- Add ordered presets (`voice_foundation`, identity/messaging, audience,
-  `full_brand_system`) and typed `naming` as creative proposal. A full-suite
+- Add ordered presets (identity/messaging, audience, `full_brand_system`) and
+  typed `naming` as creative proposal. `voice_foundation` is an atomic bootstrap
+  target, never a normal preset. A full-suite
   start runs only the provisional voice foundation from accepted intake and
-  authentic samples, then transitions to `awaiting_voice_finalization` and ends
-  the generic job.
+  authentic samples, then persists stage `awaiting_voice_finalization` under the
+  truthful `awaiting_review` run status and ends the generic job.
 - Add `BrandGenerationAtomicTarget = 'voice_foundation' | BrandDeliverableType`
   and exhaustive atomic/preset policies. `voice_foundation` is the only atomic
   bootstrap target and persists only in the run item/attempt ledger;
@@ -637,7 +648,7 @@ observed.
 | Phase | Focused command / assertion |
 |---|---|
 | S0 | `npx vitest run tests/unit/mcp-auth-perkey.test.ts tests/contract/mcp-tool-input-schema-properties.test.ts tests/contract/mcp-tool-workspace-scope-schema.test.ts` |
-| P0 | `npx vitest run tests/contract/feature-flag-catalog.test.ts tests/contract/mcp-generation-contracts.test.ts tests/contract/lifecycle-registry-census.test.ts` |
+| P0 | `npx vitest run tests/unit/feature-flags.test.ts tests/unit/feature-flag-lifecycle.test.ts tests/contract/feature-flag-catalog.test.ts tests/contract/mcp-generation-contracts.test.ts` |
 | R1 | `npx vitest run tests/unit/mcp-routing.test.ts tests/unit/mcp-auth-perkey.test.ts tests/contract/mcp-tool-input-schema-properties.test.ts tests/contract/mcp-tool-workspace-scope-schema.test.ts tests/integration/mcp-api-keys-admin.test.ts` |
 | M0 | `npx vitest run tests/unit/content-matrix-renderer.test.ts tests/integration/content-matrices-routes.test.ts tests/contract/mcp-matrix-read-tools.test.ts`; repeat structural resolve and assert identical source fingerprint/zero AI executions; accept/reject/stale template upgrade |
 | B0 | `npx vitest run tests/integration/public-onboarding-routes.test.ts tests/integration/brand-intake.test.ts`; submit the same body twice to `POST /api/public/onboarding/:id`, assert one revision/projection, then cover authenticated admin GET/evidence POST |

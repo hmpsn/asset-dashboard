@@ -76,12 +76,24 @@ export type VoiceSampleContext = 'headline' | 'body' | 'cta' | 'about' | 'servic
  * Phase 1 produces: manual, transcript_extraction, calibration_loop, identity_approved
  * Phase 3 produces: copy_approved (approved copy sections become training samples)
  */
-export type VoiceSampleSource =
-  | 'manual'
-  | 'transcript_extraction'
-  | 'calibration_loop'
-  | 'identity_approved'    // Phase 1: approved taglines/pitches become samples
-  | 'copy_approved';       // Phase 3: approved copy sections become samples
+export const VOICE_SAMPLE_SOURCES = [
+  'manual',
+  'transcript_extraction',
+  'calibration_loop',
+  'identity_approved',
+  'copy_approved',
+] as const;
+
+export type VoiceSampleSource = (typeof VOICE_SAMPLE_SOURCES)[number];
+
+/** Generated sample origins can inform drafts but cannot anchor finalized voice. */
+export const AUTHENTIC_VOICE_SAMPLE_SOURCES = [
+  'manual',
+  'transcript_extraction',
+] as const satisfies readonly VoiceSampleSource[];
+
+export type AuthenticVoiceSampleSource =
+  (typeof AUTHENTIC_VOICE_SAMPLE_SOURCES)[number];
 
 // ═══ CONTEXT EMPHASIS (for SEO context source builders) ═══
 /**
@@ -179,11 +191,43 @@ export interface CalibrationSession {
 
 // ═══ BRAND IDENTITY ═══
 
-export type BrandDeliverableType =
-  | 'mission' | 'vision' | 'values' | 'tagline' | 'elevator_pitch'
-  | 'archetypes' | 'personality_traits' | 'voice_guidelines' | 'tone_examples'
-  | 'messaging_pillars' | 'differentiators' | 'positioning_matrix' | 'brand_story'
-  | 'personas' | 'customer_journey' | 'objection_handling' | 'emotional_triggers';
+/** Deliverables supported by the existing single-item paid generator and UI. */
+export const RELEASED_BRAND_DELIVERABLE_TYPES = [
+  'mission',
+  'vision',
+  'values',
+  'tagline',
+  'elevator_pitch',
+  'archetypes',
+  'personality_traits',
+  'voice_guidelines',
+  'tone_examples',
+  'messaging_pillars',
+  'differentiators',
+  'positioning_matrix',
+  'brand_story',
+  'personas',
+  'customer_journey',
+  'objection_handling',
+  'emotional_triggers',
+] as const;
+
+export type ReleasedBrandDeliverableType =
+  (typeof RELEASED_BRAND_DELIVERABLE_TYPES)[number];
+
+export function isReleasedBrandDeliverableType(
+  value: string,
+): value is ReleasedBrandDeliverableType {
+  return (RELEASED_BRAND_DELIVERABLE_TYPES as readonly string[]).includes(value);
+}
+
+/** Durable vocabulary; reserved types may exist in storage before their owning UI ships. */
+export const BRAND_DELIVERABLE_TYPES = [
+  ...RELEASED_BRAND_DELIVERABLE_TYPES,
+  'naming',
+] as const;
+
+export type BrandDeliverableType = (typeof BRAND_DELIVERABLE_TYPES)[number];
 
 export type DeliverableTier = 'essentials' | 'professional' | 'premium';
 export type BrandDeliverableStatus = 'draft' | 'approved';
@@ -229,6 +273,7 @@ export const DEFAULT_TIER_MAP: Record<BrandDeliverableType, DeliverableTier> = {
   customer_journey: 'premium',
   objection_handling: 'premium',
   emotional_triggers: 'premium',
+  naming: 'premium',
 };
 
 // ═══ VOICE CALIBRATION FEEDBACK ═══

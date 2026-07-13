@@ -10,6 +10,12 @@
  *   VITE_FEATURE_NATIONAL_SERP_TRACKING=true  (Vite build)
  */
 export const FEATURE_FLAGS = {
+  // MCP deliverable generation program. Reserved in P0 so the rollout contract exists before
+  // any paid-run start gate or product UI is wired. Correctness, authorization, CAS, and failure
+  // truth remain unflagged; these flags will gate only paid generation starts in their owner phases.
+  'content-matrix-generation': false,
+  'brand-deliverable-generation': false,
+
   // Client Insights Briefing (5-phase feature)
   // NOTE: the CLIENT magazine overview variant (InsightsBriefingPage + sub-components)
   // was removed (2026-06-20). These flags are RETAINED because the SERVER briefing
@@ -194,6 +200,34 @@ export const LEGACY_FEATURE_FLAG_ROADMAP_IDS = Object.values(LEGACY_ROADMAP) as 
 const REVIEWED_AT = '2026-05-15';
 
 export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntry> = {
+  'content-matrix-generation': {
+    label: 'Content matrix — grounded page-set generation',
+    group: 'Platform Intelligence Enhancements',
+    lifecycle: {
+      owner: 'content-pipeline',
+      status: 'reserved',
+      createdAt: '2026-07-13',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Re-audit by 2026-08-03; if the paid matrix-run start gate is still unwired, remove the reservation. Once active, retire after the matrix generation workflow is staging-validated and the guarded path is the supported default.',
+      linkedRoadmapItemId: 'mcp-content-matrix-generation',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-07-13',
+    },
+  },
+  'brand-deliverable-generation': {
+    label: 'Brand intake — reviewed deliverable generation',
+    group: 'Platform Intelligence Enhancements',
+    lifecycle: {
+      owner: 'brand-engine',
+      status: 'reserved',
+      createdAt: '2026-07-13',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Re-audit by 2026-08-03; if the paid brand-run start gate is still unwired, remove the reservation. Once active, retire after the brand generation workflow is staging-validated and the guarded path is the supported default.',
+      linkedRoadmapItemId: 'mcp-brand-deliverable-generation',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-07-13',
+    },
+  },
   'client-briefing-v2': {
     label: 'Client insights briefing — v2 layout',
     group: 'Client Insights Briefing',
@@ -475,7 +509,7 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
   {
     label: 'Platform Intelligence Enhancements',
-    keys: [],
+    keys: ['content-matrix-generation', 'brand-deliverable-generation'],
   },
   {
     label: 'Client Insights Briefing',

@@ -13,9 +13,13 @@ import { WS_EVENTS } from './ws-events.js';
 import { BRAND_DELIVERABLE_TRANSITIONS, validateTransition } from './state-machines.js';
 import type {
   BrandDeliverable, BrandDeliverableType, DeliverableTier,
+  ReleasedBrandDeliverableType,
   VoiceSampleContext,
 } from '../shared/types/brand-engine.js';
-import { DEFAULT_TIER_MAP } from '../shared/types/brand-engine.js';
+import {
+  DEFAULT_TIER_MAP,
+  isReleasedBrandDeliverableType,
+} from '../shared/types/brand-engine.js';
 import { rowToDeliverable, listDeliverables, getDeliverable, type DeliverableRow } from './brand-deliverable-read-model.js';
 import { isProgrammingError } from './errors.js';
 
@@ -82,7 +86,7 @@ function buildBrandContext(workspaceId: string): string {
 }
 
 export function getDeliverableInstructions(type: BrandDeliverableType): string {
-  const instructions: Partial<Record<BrandDeliverableType, string>> = {
+  const instructions: Record<BrandDeliverableType, string> = {
     mission: 'Write a mission statement: 1-2 sentences explaining why this business exists. Start with an action verb. Specific to this business.',
     vision: 'Write a vision statement: 1-2 sentences describing where this business is headed in 5-10 years. Aspirational but grounded.',
     values: 'Write 3-5 core values. For each: value name (2-3 words), one sentence description that shows it in action. Format as a numbered list.',
@@ -100,11 +104,20 @@ export function getDeliverableInstructions(type: BrandDeliverableType): string {
     objection_handling: 'List the top 5 objections prospects raise and on-brand responses to each. Keep responses conversational, not defensive.',
     emotional_triggers: 'Identify the primary emotional triggers for each persona: what motivates them to act, what fears hold them back, what outcomes they truly want.',
     tone_examples: 'Write tone of voice examples: 3 "do this" examples and 3 "not this" examples for each of these contexts: headlines, body copy, CTAs.',
+    naming: 'Develop 3-5 brand name directions as creative proposals grounded only in verified business facts, approved positioning, audience evidence, and the finalized voice. For each, provide the candidate, a concise rationale, and any evidence gap as [NEEDS CLIENT INPUT: ...]. Do not invent availability. Do not claim or imply trademark, domain, legal, cultural, or linguistic clearance; those require separate verified review.',
   };
   return instructions[type] || `Write a ${type.replace(/_/g, ' ')} for this brand. Be specific, not generic.`;
 }
 
-export async function generateDeliverable(workspaceId: string, deliverableType: BrandDeliverableType): Promise<BrandDeliverable> {
+export async function generateDeliverable(
+  workspaceId: string,
+  deliverableType: ReleasedBrandDeliverableType,
+): Promise<BrandDeliverable> {
+  // Runtime defense for untyped/JavaScript callers. The MCP-owned `naming`
+  // target must not leak into this legacy paid path before B2 owns its gates.
+  if (!isReleasedBrandDeliverableType(deliverableType)) {
+    throw new Error(`Unsupported legacy brand deliverable type: ${deliverableType}`);
+  }
   const fullContext = await buildIntelPrompt(workspaceId, ['seoContext']);
   const brandContext = buildBrandContext(workspaceId);
   const instructions = getDeliverableInstructions(deliverableType);
@@ -198,6 +211,9 @@ export async function refineDeliverable(workspaceId: string, id: string, directi
   // version between the AI call and our write.
   const preload = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
   if (!preload) return null;
+  if (!isReleasedBrandDeliverableType(preload.deliverable_type)) {
+    throw new Error(`Unsupported legacy brand deliverable type: ${preload.deliverable_type}`);
+  }
 
   const userPrompt = `Refine this ${preload.deliverable_type.replace(/_/g, ' ')} based on the direction given.
 

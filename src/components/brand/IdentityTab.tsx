@@ -2,7 +2,13 @@ import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Sparkles, Check, Download, Pencil, Save, X } from 'lucide-react';
 import { identity } from '../../api/brand-engine';
-import type { BrandDeliverable, BrandDeliverableType, DeliverableTier } from '../../../shared/types/brand-engine';
+import { isReleasedBrandDeliverableType } from '../../../shared/types/brand-engine';
+import type {
+  BrandDeliverable,
+  BrandDeliverableType,
+  DeliverableTier,
+  ReleasedBrandDeliverableType,
+} from '../../../shared/types/brand-engine';
 import { SectionCard, EmptyState, Skeleton, Button, cn, FormInput, FormTextarea } from '../ui';
 import { useToast } from '../Toast';
 import { queryKeys } from '../../lib/queryKeys';
@@ -28,6 +34,7 @@ const DELIVERABLE_LABELS: Record<BrandDeliverableType, string> = {
   customer_journey: 'Customer Journey',
   objection_handling: 'Objection Handling',
   emotional_triggers: 'Emotional Triggers',
+  naming: 'Naming',
 };
 
 const TIER_ORDER: DeliverableTier[] = ['essentials', 'professional', 'premium'];
@@ -38,7 +45,7 @@ const TIER_LABELS: Record<DeliverableTier, string> = {
   premium: 'Premium',
 };
 
-const TIER_TYPES: Record<DeliverableTier, BrandDeliverableType[]> = {
+const TIER_TYPES: Record<DeliverableTier, ReleasedBrandDeliverableType[]> = {
   essentials: ['mission', 'vision', 'values', 'tagline', 'voice_guidelines'],
   professional: ['elevator_pitch', 'archetypes', 'personality_traits', 'messaging_pillars', 'differentiators', 'tone_examples'],
   premium: ['positioning_matrix', 'brand_story', 'personas', 'customer_journey', 'objection_handling', 'emotional_triggers'],
@@ -48,7 +55,7 @@ const TIER_TYPES: Record<DeliverableTier, BrandDeliverableType[]> = {
 
 interface DeliverableCardProps {
   workspaceId: string;
-  deliverableType: BrandDeliverableType;
+  deliverableType: ReleasedBrandDeliverableType;
   deliverable: BrandDeliverable | undefined;
   onChanged: () => void;
 }
@@ -338,7 +345,7 @@ function TierSection({ tier, workspaceId, deliverableMap, onChanged }: TierSecti
 interface IdentityTabProps {
   workspaceId: string;
   /** Selected-only presentation used by Brand overview generator deep links. */
-  focusType?: BrandDeliverableType | null;
+  focusType?: ReleasedBrandDeliverableType | null;
   /** Clears focus while leaving the Identity workflow/library open. */
   onClearFocus?: () => void;
 }
@@ -348,6 +355,11 @@ export function IdentityTab({ workspaceId, focusType = null, onClearFocus }: Ide
   const { toast } = useToast();
   const [exporting, setExporting] = useState(false);
   const [generatingMission, setGeneratingMission] = useState(false);
+  // Keep the released UI boundary defensive at runtime too. Untyped deep-link
+  // state or stale callers must not resurrect the reserved `naming` target.
+  const releasedFocusType = focusType && isReleasedBrandDeliverableType(focusType)
+    ? focusType
+    : null;
 
   const { data: deliverables, isLoading, isError } = useQuery({
     queryKey: queryKeys.admin.brandIdentity(workspaceId),
@@ -406,7 +418,7 @@ export function IdentityTab({ workspaceId, focusType = null, onClearFocus }: Ide
   };
 
   if (isLoading) {
-    if (focusType) {
+    if (releasedFocusType) {
       return <Skeleton className="h-40 rounded-[var(--radius-xl)]" />;
     }
     return (
@@ -442,7 +454,7 @@ export function IdentityTab({ workspaceId, focusType = null, onClearFocus }: Ide
     );
   }
 
-  if (focusType) {
+  if (releasedFocusType) {
     return (
       <div className="space-y-4">
         {onClearFocus && (
@@ -450,11 +462,11 @@ export function IdentityTab({ workspaceId, focusType = null, onClearFocus }: Ide
             View all brand identity
           </Button>
         )}
-        <div data-testid="focused-brand-deliverable" data-deliverable-type={focusType}>
+        <div data-testid="focused-brand-deliverable" data-deliverable-type={releasedFocusType}>
           <DeliverableCard
             workspaceId={workspaceId}
-            deliverableType={focusType}
-            deliverable={deliverableMap.get(focusType)}
+            deliverableType={releasedFocusType}
+            deliverable={deliverableMap.get(releasedFocusType)}
             onChanged={invalidate}
           />
         </div>

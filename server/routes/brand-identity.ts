@@ -9,7 +9,11 @@ import {
   generateDeliverable, refineDeliverable,
   setDeliverableStatus, updateDeliverableContent, exportDeliverables,
 } from '../brand-identity.js';
-import type { DeliverableTier } from '../../shared/types/brand-engine.js';
+import {
+  isReleasedBrandDeliverableType,
+  RELEASED_BRAND_DELIVERABLE_TYPES,
+  type DeliverableTier,
+} from '../../shared/types/brand-engine.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { InvalidTransitionError } from '../state-machines.js';
 import { computeEffectiveTier, getWorkspace } from '../workspaces.js';
@@ -43,12 +47,10 @@ function refundBrandIdentityUsage(workspaceId: string): void {
 
 // ── Zod schemas ─────────────────────────────────────────────────────────────
 
-const deliverableTypeSchema = z.enum([
-  'mission', 'vision', 'values', 'tagline', 'elevator_pitch',
-  'archetypes', 'personality_traits', 'voice_guidelines', 'tone_examples',
-  'messaging_pillars', 'differentiators', 'positioning_matrix', 'brand_story',
-  'personas', 'customer_journey', 'objection_handling', 'emotional_triggers',
-]);
+// Compatibility boundary: this is the legacy single-deliverable paid generator.
+// `naming` is durable vocabulary reserved for the reviewed MCP brand pipeline and
+// intentionally stays excluded here until that pipeline owns its generation gates.
+const deliverableTypeSchema = z.enum(RELEASED_BRAND_DELIVERABLE_TYPES);
 
 const deliverableTierSchema = z.enum(['essentials', 'professional', 'premium']);
 
@@ -141,6 +143,10 @@ router.post('/api/brand-identity/:workspaceId/:id/refine', requireWorkspaceAcces
   const { direction } = req.body;
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+  const target = getDeliverable(req.params.workspaceId, req.params.id);
+  if (target && !isReleasedBrandDeliverableType(target.deliverableType)) {
+    return res.status(400).json({ error: 'Unsupported legacy brand deliverable type' });
+  }
   const tier = computeEffectiveTier(ws);
   if (!incrementIfAllowed(ws.id, tier, 'brandscript_generations')) {
     return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });

@@ -5,6 +5,7 @@ import type {
   DiscoverySource, DiscoveryExtraction,
   VoiceProfile, VoiceSample, CalibrationSession,
   BrandDeliverable,
+  ReleasedBrandDeliverableType,
 } from '../../shared/types/brand-engine';
 import type {
   SiteBlueprint,
@@ -82,7 +83,7 @@ export const voice = {
 
 export const identity = {
   list: (wsId: string) => get<BrandDeliverable[]>(`/api/brand-identity/${wsId}`),
-  generate: (wsId: string, body: { deliverableType: string }) =>
+  generate: (wsId: string, body: { deliverableType: ReleasedBrandDeliverableType }) =>
     post<BrandDeliverable>(`/api/brand-identity/${wsId}/generate`, body),
   refine: (wsId: string, id: string, body: { direction: string }) =>
     post<BrandDeliverable>(`/api/brand-identity/${wsId}/${id}/refine`, body),

@@ -1,6 +1,6 @@
 # MCP Matrix + Brand Deliverable Generation Specification
 
-**Status:** Proposed for phased implementation
+**Status:** P0 contracts implemented; runtime phases proposed
 **Date:** 2026-07-13
 **Target:** `staging`, one PR per phase
 **Primary contexts:** `content-pipeline`, `brand-engine`
@@ -237,8 +237,15 @@ which contains the structural target and additionally snapshots:
 - intelligence/evidence timestamps, expected artifact revision, fingerprint;
 - typed evidence requirements by stage and estimated paid budget.
 
-A batch start presents one `MatrixSourceRevision` per selected cell, not one
-matrix-only revision. Every item commits against its own frozen envelope.
+A batch start presents a non-empty tuple of previewed cells with a non-null
+preview fingerprint and one `MatrixSourceRevision` per selected cell, not one
+matrix-only revision. Every item commits against its own frozen envelope. An
+onboarding selection may exist before preview, but that looser shape cannot
+dispatch paid work.
+The manifest tuple fixes exactly one introduction first and one conclusion
+last. Generation-ready preview also carries an exact brief/post revision
+envelope; unrelated, duplicate, or missing artifact expectations are not a
+valid shared shape.
 
 Resolving a content requirement is a free, conditional mutation. It persists a
 typed value/source ref, advances that cell revision, marks prior previews stale,
@@ -285,7 +292,9 @@ Human page approval uses `approveMatrixPageForPublishReadiness()` at
 It requires the expected run/item/post generation revisions, verifies the item
 is `ready_for_human_review`, has no unresolved `ready` requirements, applies the
 legal post status transition, and records immutable approval evidence in the
-same transaction. It deliberately does not evaluate auto-publish policy or call
+same transaction. That evidence freezes the full matrix/template/cell source
+revision as well as run/item/post identity and the approving operator/client.
+It deliberately does not evaluate auto-publish policy or call
 a publish job/API. Existing client-content “delivered” state is not sufficient
 approval evidence. Orchestration requires this evidence for every selected page.
 
@@ -300,8 +309,10 @@ The requested seven protections map to enforceable behavior:
 3. **Never invent:** every requirement declares `requirementStage`:
    `preflight`, `ready`, or `optional_omit`. `preflight` gaps block paid work;
    `ready` gaps render typed `[NEEDS CLIENT INPUT: ...]` placeholders and block
-   readiness/send; `optional_omit` gaps disappear cleanly. Local labels are not
-   evidence.
+   readiness/send; `optional_omit` gaps disappear cleanly. Requirements also
+   declare `claimKind`; factual refs exclude structural matrix/cell/template
+   sources while normalized cell evidence remains eligible. Local labels are
+   not evidence.
 4. **Key-position coverage:** deterministic checks for primary keyword in URL,
    title/H1, opening, at least one planned heading, and meta; secondary coverage
    is natural and bounded.
@@ -326,6 +337,11 @@ item's still-unused automatic revision, but the total remains one revision per
 item across both audit levels. Both gates rerun after revisions. Remaining
 conflicts produce an honest mixed/needs-attention outcome.
 
+The report shape itself enforces the boundary: a ready verdict has no unresolved
+requirements and no failed deterministic check; a missing-evidence verdict has
+at least one unresolved requirement; human-required checks cannot be auto-passed;
+and automatic revision counters are exactly `0|1` on audit and item records.
+
 ## 9. Brand generation and voice contract
 
 Generation presets are const-owned and ordered. A full-suite start runs only
@@ -334,6 +350,14 @@ its generic job. Missing authentic samples produce a provisional foundation,
 not a calibrated claim. After review, an operator selects authentic anchors and
 calls `finalize_brand_voice`; `resume_brand_deliverable_generation` verifies the
 durable finalization/version and only then starts identity/messaging/audience.
+Authentic `voice_sample` anchors must carry a `manual` or
+`transcript_extraction` origin; calibration-loop and generated approval samples
+are ineligible. The finalized snapshot records the finalizing operator.
+
+`voice_foundation` is an atomic bootstrap target, not a normal preset. The
+pause is persisted as brand-generation stage `awaiting_voice_finalization`
+under the shared truthful run status `awaiting_review`; the common run-outcome
+vocabulary does not grow a workflow-specific tenth status.
 
 `BrandGenerationAtomicTarget` is the exact union
 `'voice_foundation' | BrandDeliverableType`.
@@ -347,12 +371,26 @@ final voice authority. `BRAND_GENERATION_PRESET_POLICY` separately maps every pr
 create only its foundation and pause; identity/messaging/audience cannot dispatch
 until finalized-version resume. Other presets require finalized voice at start.
 Unknown/unmapped values fail the contract test and cannot dispatch.
+Direct atomic selection is singular. Full-suite preset policy stores
+foundation-only `initialTargets` and durable `resumeTargets`, preventing mixed
+bootstrap/dependent dispatch. Persisted selection/dispatch is also
+discriminated: an atomic foundation run carries only the foundation tuple, and
+its item cannot link to a durable `BrandDeliverable`. Finalized voice snapshots
+require at least one authentic anchor from a non-generated source plus the
+operator selection proof, and approved identity snapshots freeze
+approval/content fingerprints so a mutable row version alone cannot stand in
+for authority.
 
 Structured output contains content, creative/factual claim classification,
 evidence refs, unresolved requirements, audit findings, effective-input
 fingerprint, and `GenerationProvenance`. Naming output is explicitly a creative
 proposal; legal/domain/trademark availability remains unknown unless separately
 verified.
+
+The additive naming vocabulary remains closed on every legacy paid boundary:
+the legacy service parameter, HTTP schema, frontend API payload, focused editor
+prop, and released 17-generator census. B2 is the first phase allowed to open
+the reviewed naming path.
 
 Brand generation/refinement is background work with conditional saves. The
 expected deliverable version is read before the paid call and checked at commit.
@@ -364,7 +402,9 @@ bounded revision is allowed. Operator send creates one grouped Inbox review.
 That review contains one item per source `BrandDeliverable` with independent
 approve/changes-requested decisions. Approval commits only the expected source
 version; changes requested preserves the note and leaves/returns the source in
-draft. The bundle is `partial` until all items are terminal and `approved` only
+draft. Only an operator or client can decide an item; system/MCP actors cannot
+auto-approve, and a changes request requires a note. The bundle is `partial`
+until all items are terminal and `approved` only
 when all items are approved. Voice review is a separate bundle/gate and client
 approval never finalizes the profile. Only approved source deliverables enter
 `BrandSlice` and `ClientBrandSummary`.
@@ -395,7 +435,9 @@ requires `expected_revision`, the named current gate, and durable evidence that
 its human decision exists. The only route to `ready_to_publish` is
 `awaiting_content_review` → explicit page approval → export/publish precondition
 check → `ready_to_publish`, and every selected ready page must carry the review-
-only approval evidence. A workflow waiting on humans has no running generic job.
+only approval evidence. Content authorization carries a durable authorization
+ID and named operator/client authorizer; a system/MCP recorder cannot substitute
+for that proof. A workflow waiting on humans has no running generic job.
 
 ## 11. Query cache and real-time contract
 
