@@ -623,16 +623,17 @@ export function replaceAllTrackedKeywordRows(workspaceId: string, keywords: Trac
     }
 
     let writeOrder = (stmts().maxCompatWriteOrder.get(workspaceId) as { value: number }).value;
-    const submittedGroups = [...submittedByV2.entries()].sort(([aV2, aRows], [bV2, bRows]) => {
+    const submittedGroups = [...submittedByV2.entries()].map(([v2, rows]) => [
+      v2,
+      [...rows].sort((a, b) => compareBinaryUtf8(a.keyword.query, b.keyword.query)),
+    ] as const).sort(([aV2, aRows], [bV2, bRows]) => {
       const v1Order = compareBinaryUtf8(
         keywordIdentityKeyV1(aRows[0].keyword.query),
         keywordIdentityKeyV1(bRows[0].keyword.query),
       );
       return v1Order || compareBinaryUtf8(aV2, bV2);
     });
-    for (const [v2, submittedUnsorted] of submittedGroups) {
-      const submitted = [...submittedUnsorted].sort((a, b) =>
-        compareBinaryUtf8(a.keyword.query, b.keyword.query));
+    for (const [v2, submitted] of submittedGroups) {
       const priorCanonical = existingByV2.get(v2)?.find(row => row.is_canonical === 1);
       for (const item of submitted) {
         const existing = existingByV2.get(v2)?.find(row => row.query === item.keyword.query);

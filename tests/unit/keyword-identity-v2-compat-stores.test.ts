@@ -141,6 +141,28 @@ describe('tracked keyword v2 compatibility store', () => {
     `).get(workspaceId) as { query: string }).query).toBe(firstProjection);
   });
 
+  it('keeps the v1 projection stable when a retained composed alias group is reversed beside its plain sibling', () => {
+    const reverseWorkspaceId = createWorkspace(`Tracked projection reverse ${Date.now()}`).id;
+    const composed = 'Caf\u00e9';
+    const decomposed = 'Cafe\u0301';
+    const forward = [tracked(composed), tracked(decomposed, { pinned: true }), tracked('Cafe')];
+    try {
+      replaceAllTrackedKeywordRows(workspaceId, [tracked(decomposed)]);
+      replaceAllTrackedKeywordRows(reverseWorkspaceId, [tracked(decomposed)]);
+      replaceAllTrackedKeywordRows(workspaceId, forward);
+      replaceAllTrackedKeywordRows(reverseWorkspaceId, [...forward].reverse());
+
+      const projection = (id: string) => db.prepare(`
+        SELECT normalized_query, query FROM tracked_keywords
+        WHERE workspace_id = ? ORDER BY normalized_query COLLATE BINARY
+      `).all(id);
+      expect(projection(reverseWorkspaceId)).toEqual(projection(workspaceId));
+      expect(projection(workspaceId)).toEqual([{ normalized_query: 'cafe', query: decomposed }]);
+    } finally {
+      deleteWorkspace(reverseWorkspaceId);
+    }
+  });
+
   it('accepts only explicit v2 provenance, never leaks it, and rolls both projections back together', () => {
     replaceAllTrackedKeywordRows(workspaceId, [tracked('C#', { sourceGapKey: 'c' })]);
     expect((db.prepare(`
@@ -226,6 +248,32 @@ describe('site keyword metric v2 compatibility store', () => {
     expect((db.prepare(`
       SELECT keyword FROM site_keyword_metrics WHERE workspace_id = ? AND normalized_query = 'c'
     `).get(workspaceId) as { keyword: string }).keyword).toBe(firstProjection);
+  });
+
+  it('keeps the v1 projection stable when a retained composed metric group is reversed beside its plain sibling', () => {
+    const reverseWorkspaceId = createWorkspace(`Site projection reverse ${Date.now()}`).id;
+    const composed = 'Caf\u00e9';
+    const decomposed = 'Cafe\u0301';
+    const forward = [
+      { keyword: composed, volume: 10, difficulty: 20 },
+      { keyword: decomposed, volume: 10, difficulty: 20 },
+      { keyword: 'Cafe', volume: 10, difficulty: 20 },
+    ];
+    try {
+      replaceAllSiteKeywordMetrics(workspaceId, [{ keyword: decomposed, volume: 5, difficulty: 20 }]);
+      replaceAllSiteKeywordMetrics(reverseWorkspaceId, [{ keyword: decomposed, volume: 5, difficulty: 20 }]);
+      replaceAllSiteKeywordMetrics(workspaceId, forward);
+      replaceAllSiteKeywordMetrics(reverseWorkspaceId, [...forward].reverse());
+
+      const projection = (id: string) => db.prepare(`
+        SELECT normalized_query, keyword FROM site_keyword_metrics
+        WHERE workspace_id = ? ORDER BY normalized_query COLLATE BINARY
+      `).all(id);
+      expect(projection(reverseWorkspaceId)).toEqual(projection(workspaceId));
+      expect(projection(workspaceId)).toEqual([{ normalized_query: 'cafe', keyword: decomposed }]);
+    } finally {
+      deleteWorkspace(reverseWorkspaceId);
+    }
   });
 
   it('uses SQLite BINARY-compatible UTF-8 ordering for a supplementary Unicode tie', () => {

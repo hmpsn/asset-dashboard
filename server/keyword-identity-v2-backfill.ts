@@ -662,8 +662,15 @@ function backfillTracked(
   }
 
   let writeOrder = (stmts().trackedMaxOrder.get(workspaceId) as { value: number }).value;
-  missing.sort((a, b) => a.normalized_query_v2.localeCompare(b.normalized_query_v2) || compareTracked(a, b));
-  for (const row of missing) {
+  const orderedMissing = [...groupByV2(missing).entries()]
+    .map(([v2, rows]) => ({
+      v2,
+      groupV1: [...rows].sort((a, b) => rawBinaryCompare(a.query, b.query))[0].normalized_query_v1,
+      rows: [...rows].sort(compareTracked),
+    }))
+    .sort((a, b) => rawBinaryCompare(a.groupV1, b.groupV1) || rawBinaryCompare(a.v2, b.v2))
+    .flatMap(group => group.rows);
+  for (const row of orderedMissing) {
     row.write_order = ++writeOrder;
     row.is_canonical = winnerByV2.get(row.normalized_query_v2) === row.query ? 1 : 0;
     report.inserted++;
@@ -719,8 +726,15 @@ function backfillSite(
   }
 
   let writeOrder = (stmts().siteMaxOrder.get(workspaceId) as { value: number }).value;
-  missing.sort((a, b) => a.normalized_query_v2.localeCompare(b.normalized_query_v2) || compareSite(a, b));
-  for (const row of missing) {
+  const orderedMissing = [...groupByV2(missing).entries()]
+    .map(([v2, rows]) => ({
+      v2,
+      groupV1: [...rows].sort((a, b) => rawBinaryCompare(a.keyword, b.keyword))[0].normalized_query_v1,
+      rows: [...rows].sort(compareSite),
+    }))
+    .sort((a, b) => rawBinaryCompare(a.groupV1, b.groupV1) || rawBinaryCompare(a.v2, b.v2))
+    .flatMap(group => group.rows);
+  for (const row of orderedMissing) {
     row.write_order = ++writeOrder;
     row.is_canonical = winnerByV2.get(row.normalized_query_v2) === row.keyword ? 1 : 0;
     report.inserted++;

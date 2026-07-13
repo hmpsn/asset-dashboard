@@ -6,10 +6,11 @@ import { runKeywordIdentityV2Backfill } from '../../server/keyword-identity-v2-b
 import { setContentGapVote } from '../../server/content-gap-votes.js';
 import { saveKeywordFeedbackDecision } from '../../server/keyword-feedback.js';
 import { storeSerpSnapshots } from '../../server/serp-snapshots-store.js';
-import { listSiteKeywordMetrics } from '../../server/site-keyword-metrics.js';
-import { listTrackedKeywordRows } from '../../server/tracked-keywords-store.js';
+import { listSiteKeywordMetrics, replaceAllSiteKeywordMetrics } from '../../server/site-keyword-metrics.js';
+import { listTrackedKeywordRows, replaceAllTrackedKeywordRows } from '../../server/tracked-keywords-store.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { parseKeywordIdentityBackfillOptions } from '../../scripts/backfill-keyword-identity-v2.js';
+import { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS } from '../../shared/types/rank-tracking.js';
 
 const cleanup: string[] = [];
 const cacheCleanup: string[] = [];
@@ -232,6 +233,54 @@ describe('keyword identity v2 operator backfill', () => {
       .toEqual(db.prepare('SELECT query FROM tracked_keywords WHERE workspace_id = ?').all(forward));
     expect(db.prepare('SELECT keyword FROM site_keyword_metrics WHERE workspace_id = ?').all(reverse))
       .toEqual(db.prepare('SELECT keyword FROM site_keyword_metrics WHERE workspace_id = ?').all(forward));
+  });
+
+  it('matches runtime UTF-8 group ordering and projections with non-Latin and supplementary identities', () => {
+    const runtime = workspace('identity runtime byte parity');
+    const backfill = workspace('identity backfill byte parity');
+    const values = ['東京', 'C#', 'deseret \u{10400}'];
+
+    replaceAllTrackedKeywordRows(runtime, values.map((query, index) => ({
+      query,
+      pinned: false,
+      addedAt: `2026-01-0${index + 1}T00:00:00.000Z`,
+      source: TRACKED_KEYWORD_SOURCE.MANUAL,
+      status: TRACKED_KEYWORD_STATUS.ACTIVE,
+    })));
+    replaceAllSiteKeywordMetrics(runtime, values.map((keyword, index) => ({
+      keyword,
+      volume: index + 1,
+      difficulty: 20,
+    })));
+
+    for (const [index, query] of values.entries()) {
+      const normalized = query === '東京' ? '' : query === 'C#' ? 'c' : query.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      insertTracked(backfill, query, normalized, { addedAt: `2026-01-0${index + 1}T00:00:00.000Z`, sortOrder: index });
+      insertSiteMetric(backfill, query, normalized, index + 1);
+    }
+    runKeywordIdentityV2Backfill({ mode: KEYWORD_IDENTITY_BACKFILL_MODES.APPLY, workspaceId: backfill });
+
+    const trackedProjection = (workspaceId: string) => db.prepare(`
+      SELECT normalized_query, query FROM tracked_keywords
+      WHERE workspace_id = ? ORDER BY normalized_query COLLATE BINARY
+    `).all(workspaceId);
+    const siteProjection = (workspaceId: string) => db.prepare(`
+      SELECT normalized_query, keyword FROM site_keyword_metrics
+      WHERE workspace_id = ? ORDER BY normalized_query COLLATE BINARY
+    `).all(workspaceId);
+    expect(trackedProjection(backfill)).toEqual(trackedProjection(runtime));
+    expect(siteProjection(backfill)).toEqual(siteProjection(runtime));
+
+    const trackedOrders = (workspaceId: string) => db.prepare(`
+      SELECT normalized_query_v2 FROM tracked_keywords_v2_compat
+      WHERE workspace_id = ? AND is_canonical = 1 ORDER BY write_order
+    `).all(workspaceId);
+    const siteOrders = (workspaceId: string) => db.prepare(`
+      SELECT normalized_query_v2 FROM site_keyword_metrics_v2_compat
+      WHERE workspace_id = ? AND is_canonical = 1 ORDER BY write_order
+    `).all(workspaceId);
+    expect(trackedOrders(backfill)).toEqual(trackedOrders(runtime));
+    expect(siteOrders(backfill)).toEqual(siteOrders(runtime));
   });
 
   it('implements every tracked and site canonical comparator dimension exactly', () => {
