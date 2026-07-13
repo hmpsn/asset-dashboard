@@ -20,14 +20,18 @@ const dbPath = path.join(dbDir, 'dashboard.db');
 
 interface ActiveSqlExecutionCounter {
   count: number;
+  statements: string[];
 }
 
 let activeSqlExecutionCounter: ActiveSqlExecutionCounter | null = null;
 
 const db = process.env.NODE_ENV === 'test'
   ? new Database(dbPath, {
-      verbose: () => {
-        if (activeSqlExecutionCounter) activeSqlExecutionCounter.count += 1;
+      verbose: (sql) => {
+        if (activeSqlExecutionCounter) {
+          activeSqlExecutionCounter.count += 1;
+          activeSqlExecutionCounter.statements.push(String(sql));
+        }
       },
     })
   : new Database(dbPath);
@@ -39,18 +43,18 @@ const db = process.env.NODE_ENV === 'test'
  */
 export async function measureSqlExecutionsForTest<T>(
   run: () => T | Promise<T>,
-): Promise<{ result: T; count: number }> {
+): Promise<{ result: T; count: number; statements: readonly string[] }> {
   if (process.env.NODE_ENV !== 'test') {
     throw new Error('SQL execution measurement is available only under NODE_ENV=test');
   }
   if (activeSqlExecutionCounter) {
     throw new Error('SQL execution measurement cannot be nested or overlap');
   }
-  const counter: ActiveSqlExecutionCounter = { count: 0 };
+  const counter: ActiveSqlExecutionCounter = { count: 0, statements: [] };
   activeSqlExecutionCounter = counter;
   try {
     const result = await run();
-    return { result, count: counter.count };
+    return { result, count: counter.count, statements: counter.statements };
   } finally {
     activeSqlExecutionCounter = null;
   }

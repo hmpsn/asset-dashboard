@@ -39,6 +39,9 @@ import * as pageKeywordsModule from '../../server/page-keywords.js';
 import * as siteMetricsModule from '../../server/site-keyword-metrics.js';
 import * as trackedStoreModule from '../../server/tracked-keywords-store.js';
 import * as localSnapshotModule from '../../server/domains/local-seo/snapshot-store.js';
+import { updateLocalSeoConfiguration } from '../../server/domains/local-seo/configuration-actions.js';
+import { countLocalSeoKeywordCandidates } from '../../server/domains/local-seo/candidate-service.js';
+import { getLocalSeoPosture } from '../../server/domains/local-seo/configuration-service.js';
 import { replaceAllContentGaps } from '../../server/content-gaps.js';
 import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
 import { replaceAllSiteKeywordMetrics } from '../../server/site-keyword-metrics.js';
@@ -46,6 +49,15 @@ import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { addTrackedKeyword, storeRankSnapshot } from '../../server/rank-tracking.js';
 import { createWorkspace, deleteWorkspace, getWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { KEYWORD_COMMAND_CENTER_FILTERS } from '../../shared/types/keyword-command-center.js';
+import {
+  LOCAL_BUSINESS_MATCH_CONFIDENCE,
+  LOCAL_SEO_DEVICE,
+  LOCAL_SEO_MARKET_STATUS,
+  LOCAL_SEO_POSTURE,
+  LOCAL_SEO_POSTURE_SOURCE,
+  LOCAL_VISIBILITY_SOURCE_ENDPOINT,
+  LOCAL_VISIBILITY_STATUS,
+} from '../../shared/types/local-seo.js';
 import type { KeywordStrategy } from '../../shared/types/workspace.js';
 import { PERFORMANCE_BUDGET_REGISTRY } from '../../scripts/performance-budgets.js';
 
@@ -115,6 +127,40 @@ beforeEach(() => {
     { query: 'emergency dentist near me', position: 14, clicks: 4, impressions: 220, ctr: 0.018 },
     { query: 'invisalign austin price', position: 18, clicks: 1, impressions: 60, ctr: 0.016 },
   ]);
+
+  updateLocalSeoConfiguration(workspaceId, {
+    posture: LOCAL_SEO_POSTURE.LOCAL,
+    markets: [{
+      label: 'Austin, TX',
+      city: 'Austin',
+      stateOrRegion: 'TX',
+      country: 'US',
+      providerLocationCode: 1026201,
+      status: LOCAL_SEO_MARKET_STATUS.ACTIVE,
+    }],
+  }, true);
+  const market = db.prepare(
+    'SELECT id FROM local_seo_markets WHERE workspace_id = ? LIMIT 1',
+  ).get(workspaceId) as { id: string };
+  localSnapshotModule.storeLocalVisibilitySnapshot({
+    id: `kcc-perf-local-${workspaceId}`,
+    workspaceId,
+    keyword: 'cosmetic dentist austin',
+    normalizedKeyword: 'cosmetic dentist austin',
+    marketId: market.id,
+    marketLabel: 'Austin, TX',
+    capturedAt: '2026-05-20T12:00:00.000Z',
+    localPackPresent: true,
+    businessFound: true,
+    businessMatchConfidence: LOCAL_BUSINESS_MATCH_CONFIDENCE.VERIFIED,
+    localRank: 2,
+    topCompetitors: [],
+    sourceEndpoint: LOCAL_VISIBILITY_SOURCE_ENDPOINT.GOOGLE_ORGANIC_SERP,
+    provider: 'kcc-perf-fixture',
+    device: LOCAL_SEO_DEVICE.DESKTOP,
+    languageCode: 'en',
+    status: LOCAL_VISIBILITY_STATUS.SUCCESS,
+  });
 });
 
 afterEach(() => {
@@ -204,6 +250,30 @@ describe('K2 — KCC-owned read projection guard', () => {
     expect(localVisibility).not.toHaveBeenCalled();
   });
 
+  it('resolves missing and stored admin-override posture without suggestion derivation', () => {
+    const unconfiguredWorkspaceId = createWorkspace(`KCC posture ${Date.now()}`).id;
+    try {
+      expect(getLocalSeoPosture(unconfiguredWorkspaceId)).toBe(LOCAL_SEO_POSTURE.UNKNOWN);
+      updateLocalSeoConfiguration(unconfiguredWorkspaceId, {
+        posture: LOCAL_SEO_POSTURE.HYBRID,
+        markets: [],
+      }, true);
+      expect(getLocalSeoPosture(unconfiguredWorkspaceId)).toBe(LOCAL_SEO_POSTURE.HYBRID);
+      const stored = db.prepare(
+        'SELECT posture_source FROM local_seo_workspace_settings WHERE workspace_id = ?',
+      ).get(unconfiguredWorkspaceId) as { posture_source: string };
+      expect(stored.posture_source).toBe(LOCAL_SEO_POSTURE_SOURCE.ADMIN_OVERRIDE);
+    } finally {
+      deleteWorkspace(unconfiguredWorkspaceId);
+    }
+  });
+
+  it('preserves local-candidate count parity from the loaded KCC projection', async () => {
+    const expected = countLocalSeoKeywordCandidates(workspaceId);
+    const summary = await buildKeywordCommandCenterSummary(workspaceId, { includeLocalSeo: true });
+    expect(summary?.counts.localCandidates).toBe(expected);
+  });
+
   it('reports missing and fresh rank snapshots honestly', async () => {
     db.prepare('DELETE FROM rank_snapshots WHERE workspace_id = ?').run(workspaceId);
     const missing = await buildKeywordCommandCenterSummary(workspaceId);
@@ -282,9 +352,9 @@ describe('Task 7 — determinism / self-parity (no output drift)', () => {
       page: 1,
       pageSize: 50,
     };
-    const initial = await buildKeywordCommandCenterInitialView(workspaceId, query);
-    const summary = await buildKeywordCommandCenterSummary(workspaceId);
-    const rows = await buildKeywordCommandCenterRows(workspaceId, query);
+    const initial = await buildKeywordCommandCenterInitialView(workspaceId, query, { includeLocalSeo: true });
+    const summary = await buildKeywordCommandCenterSummary(workspaceId, { includeLocalSeo: true });
+    const rows = await buildKeywordCommandCenterRows(workspaceId, query, { includeLocalSeo: true });
     const strip = <T extends { summarizedAt?: string }>(value: T): T => ({ ...value, summarizedAt: '' });
 
     expect(initial).not.toBeNull();
@@ -311,36 +381,54 @@ describe('K2 — measured read-path budget', () => {
   });
 
   it('hard-gates initial-view executed SQL at the registered 22-query budget', async () => {
-    const measurement = await measureSqlExecutionsForTest(() => buildKeywordCommandCenterInitialView(workspaceId, {
-      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
-      sort: 'rank',
-      page: 1,
-      pageSize: 50,
-    }));
+    const measurement = await measureSqlExecutionsForTest(() => buildKeywordCommandCenterInitialView(
+      workspaceId,
+      {
+        filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+        sort: 'rank',
+        page: 1,
+        pageSize: 50,
+      },
+      { includeLocalSeo: true },
+    ));
     expect(measurement.result).not.toBeNull();
     expect(measurement.count).toBeGreaterThan(0);
-    expect(measurement.count).toBeLessThanOrEqual(KCC_PERFORMANCE_BUDGET.queryCountBudget);
+    expect(measurement.statements.some(sql => sql.includes('local_visibility_snapshots'))).toBe(true);
+    expect(measurement.statements.some(sql => sql.includes('local_seo_markets'))).toBe(true);
+    expect(
+      measurement.count,
+      measurement.statements.join('\n---\n'),
+    ).toBeLessThanOrEqual(KCC_PERFORMANCE_BUDGET.queryCountBudget);
   });
 
   it('hard-gates rows executed SQL at the registered 22-query budget', async () => {
-    const measurement = await measureSqlExecutionsForTest(() => buildKeywordCommandCenterRows(workspaceId, {
-      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
-      sort: 'rank',
-      page: 1,
-      pageSize: 50,
-    }));
+    const measurement = await measureSqlExecutionsForTest(() => buildKeywordCommandCenterRows(
+      workspaceId,
+      {
+        filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+        sort: 'rank',
+        page: 1,
+        pageSize: 50,
+      },
+      { includeLocalSeo: true },
+    ));
     expect(measurement.result).not.toBeNull();
     expect(measurement.count).toBeGreaterThan(0);
-    expect(measurement.count).toBeLessThanOrEqual(KCC_PERFORMANCE_BUDGET.queryCountBudget);
+    expect(measurement.statements.some(sql => sql.includes('local_visibility_snapshots'))).toBe(true);
+    expect(measurement.statements.some(sql => sql.includes('local_seo_markets'))).toBe(true);
+    expect(
+      measurement.count,
+      measurement.statements.join('\n---\n'),
+    ).toBeLessThanOrEqual(KCC_PERFORMANCE_BUDGET.queryCountBudget);
   });
 
   it('records first-paint p50/p95 against the deterministic fixture', async () => {
     const samples: number[] = [];
     const query = { filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL, page: 1, pageSize: 50 };
-    await buildKeywordCommandCenterInitialView(workspaceId, query);
+    await buildKeywordCommandCenterInitialView(workspaceId, query, { includeLocalSeo: true });
     for (let index = 0; index < 30; index++) {
       const startedAt = performance.now();
-      await buildKeywordCommandCenterInitialView(workspaceId, query);
+      await buildKeywordCommandCenterInitialView(workspaceId, query, { includeLocalSeo: true });
       samples.push(performance.now() - startedAt);
     }
     samples.sort((a, b) => a - b);
@@ -377,10 +465,10 @@ describe('K2 — measured read-path budget', () => {
     }
     const samples: number[] = [];
     const query = { filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL, search: 'dentist', page: 1, pageSize: 50 };
-    await buildKeywordCommandCenterRows(workspaceId, query);
+    await buildKeywordCommandCenterRows(workspaceId, query, { includeLocalSeo: true });
     for (let index = 0; index < 30; index++) {
       const startedAt = performance.now();
-      await buildKeywordCommandCenterRows(workspaceId, query);
+      await buildKeywordCommandCenterRows(workspaceId, query, { includeLocalSeo: true });
       samples.push(performance.now() - startedAt);
     }
     samples.sort((a, b) => a - b);

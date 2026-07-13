@@ -8,12 +8,14 @@ import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
 import {
   LOCAL_SEO_DEFAULT_KEYWORDS_PER_REFRESH,
   LOCAL_SEO_DEVICE,
+  LOCAL_SEO_MARKET_STATUS,
   type LocalSeoDevice,
   type LocalSeoMarket,
+  type LocalSeoPosture,
   type LocalSeoRefreshRequest,
 } from '../../../shared/types/local-seo.js';
-import { TRACKED_KEYWORD_STATUS } from '../../../shared/types/rank-tracking.js';
-import type { Workspace } from '../../../shared/types/workspace.js';
+import { TRACKED_KEYWORD_STATUS, type TrackedKeyword } from '../../../shared/types/rank-tracking.js';
+import type { ContentGap, PageKeywordMap, Workspace } from '../../../shared/types/workspace.js';
 import {
   buildLocalSeoKeywordCandidatesEvaluatedFromContext,
   buildLocalSeoKeywordCandidatesFromContext,
@@ -153,6 +155,40 @@ export function buildLocalSeoKeywordCandidatesEvaluated(
 export function countLocalSeoKeywordCandidates(workspaceId: string): number {
   const ctx = loadCandidateIterationContext(workspaceId, []);
   if (!ctx || ctx.markets.length === 0) return 0;
+  return countLocalSeoKeywordCandidatesFromContext(ctx, { hardCap: LOCAL_CANDIDATE_HARD_CAP });
+}
+
+/** Count candidates from an already-loaded workspace read projection. */
+export function countLocalSeoKeywordCandidatesFromLoadedContext(input: {
+  workspace: Workspace;
+  markets: LocalSeoMarket[];
+  trackedKeywords: TrackedKeyword[];
+  contentGaps: ContentGap[];
+  pageMap: PageKeywordMap[];
+  declinedKeywords: string[];
+  settingsPosture?: LocalSeoPosture;
+}): number {
+  const markets = input.markets
+    .filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE && market.providerLocationCode != null)
+    .slice(0, LOCAL_SEO_MAX_MARKETS);
+  if (markets.length === 0) return 0;
+  const ctx: CandidateIterationContext = {
+    workspace: input.workspace,
+    markets,
+    declined: new Set(input.declinedKeywords.map(keywordComparisonKey)),
+    inactiveTracked: new Set(input.trackedKeywords
+      .filter(tracked => (tracked.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE)
+      .map(tracked => keywordComparisonKey(tracked.query))),
+    trackedKeywords: input.trackedKeywords,
+    contentGaps: input.contentGaps,
+    pageMap: input.pageMap,
+    explicitKeywords: [],
+    settingsPosture: input.settingsPosture,
+    classifiers: {
+      geoTermRegex: buildWorkspaceGeoRegex(input.workspace, markets) ?? /\bnear me\b|\/location\//i,
+      serviceTermRegex: buildWorkspaceServiceTermRegex(input.workspace),
+    },
+  };
   return countLocalSeoKeywordCandidatesFromContext(ctx, { hardCap: LOCAL_CANDIDATE_HARD_CAP });
 }
 

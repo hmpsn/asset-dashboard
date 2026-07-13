@@ -492,7 +492,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   };
 
   const handleRetryRows = () => {
-    void (viewingInitialRows ? initialView.refetch() : rowsResult.refetch());
+    void rowsResult.refetch();
   };
 
   const handleFocusAddKeyword = () => {

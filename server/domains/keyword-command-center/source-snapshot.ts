@@ -14,6 +14,7 @@ import type { Workspace } from '../../../shared/types/workspace.js';
 import type { LatestRank, TrackedKeyword } from '../../../shared/types/rank-tracking.js';
 import { getLocalSeoPosture } from '../../local-seo.js';
 import type { ScoringContext } from '../../scoring/keyword-value-score.js';
+import { countLocalSeoKeywordCandidatesFromLoadedContext } from '../local-seo/candidate-service.js';
 
 export interface KeywordCommandCenterSourceSnapshot {
   workspace: Workspace;
@@ -28,6 +29,7 @@ export interface KeywordCommandCenterSourceSnapshot {
   lostVisibilityCount: number;
   localVisibilityByKeyword?: Map<string, LocalSeoKeywordVisibilitySummary>;
   activeLocalMarketCount?: number;
+  localCandidatesCount?: number;
   geoLabel?: string;
   trafficValueMonthly?: number | null;
   topicClusters?: import('../../../shared/types/workspace.js').TopicCluster[];
@@ -78,6 +80,23 @@ export function buildKeywordCommandCenterSourceSnapshot(
   const trackedKeywords = listTrackedKeywordRows(workspace.id);
   const latestSnapshot = getLatestSnapshotRanksWithDate(workspace.id, { trackedKeywords });
   const lostVisibilityRows = safeLostVisibilityRows(workspace.id);
+  const feedback = readFeedback(workspace.id);
+  const posture = options.includeLocalSeo || options.includeScoring
+    ? getLocalSeoPosture(workspace.id)
+    : undefined;
+  const localCandidatesCount = options.includeLocalSeo
+    ? countLocalSeoKeywordCandidatesFromLoadedContext({
+        workspace,
+        markets: localMarkets,
+        trackedKeywords,
+        contentGaps,
+        pageMap: projection.pageMap,
+        declinedKeywords: [...feedback.values()]
+          .filter(row => row.status === 'declined')
+          .map(row => row.keyword),
+        settingsPosture: posture,
+      })
+    : undefined;
   return {
     workspace,
     strategy: projection.strategy,
@@ -86,11 +105,12 @@ export function buildKeywordCommandCenterSourceSnapshot(
     keywordGaps,
     trackedKeywords,
     latestRanks: latestSnapshot.ranks,
-    feedback: readFeedback(workspace.id),
+    feedback,
     lostVisibilityRows,
     lostVisibilityCount: lostVisibilityRows.length,
     localVisibilityByKeyword,
     activeLocalMarketCount,
+    localCandidatesCount,
     geoLabel: primaryMarket
       ? (primaryMarket.stateOrRegion ? `${primaryMarket.city}, ${primaryMarket.stateOrRegion}` : `${primaryMarket.city}, ${primaryMarket.country}`)
       : undefined,
@@ -99,7 +119,7 @@ export function buildKeywordCommandCenterSourceSnapshot(
     cannibalization: projection.cannibalization,
     rankFreshness: rankFreshness(latestSnapshot.snapshotDate),
     scoringContext: options.includeScoring ? {
-      posture: getLocalSeoPosture(workspace.id),
+      posture: posture ?? getLocalSeoPosture(workspace.id),
       markets: localMarkets,
       city: workspace.businessProfile?.address?.city?.toLowerCase(),
       state: workspace.businessProfile?.address?.state?.toLowerCase(),

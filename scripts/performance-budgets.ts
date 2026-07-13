@@ -99,7 +99,7 @@ export const PERFORMANCE_BUDGET_REGISTRY: PerformanceBudgetEntry[] = [
     cacheExpectation: 'react-query-event-invalidation',
     escalation: {
       level: 'release-block',
-      trigger: 'The full strategy assembler is called, executed SQL exceeds 22 statements, a normalized source is read more than once, or production-observed p95 exceeds 250ms.',
+      trigger: 'The full strategy assembler is called, executed SQL exceeds 22 statements, a normalized source is read more than once, or a representative external-log sample shows p95 above 250ms.',
       action: 'Block release, profile the KCC projection/read fanout, and restore rows-only interactions before widening the source model.',
     },
     evidence: [

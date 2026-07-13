@@ -7,7 +7,6 @@ import {
 import { LOCAL_SEO_VISIBILITY_POSTURE } from '../../../shared/types/local-seo.js';
 import { TRACKED_KEYWORD_STATUS } from '../../../shared/types/rank-tracking.js';
 import { isSuspiciousPlannerGroupedVolume } from '../../keyword-strategy-helpers.js';
-import { countLocalSeoKeywordCandidates } from '../local-seo/candidate-service.js';
 import { createLogger } from '../../logger.js';
 import {
   UNIVERSE_SAFETY_CEILING,
@@ -159,15 +158,7 @@ export async function buildKeywordCommandCenterSummary(
   for (const key of localVisibility.keys()) allKeys.add(key);
   const localVisibilityValues = [...localVisibility.values()];
 
-  let localCandidatesCount = 0;
-  if (options.includeLocalSeo) {
-    try {
-      // local-candidates-unconditional-ok: countLocalSeoKeywordCandidates is the cheap-count helper, not the full generator; capped at LOCAL_CANDIDATE_HARD_CAP
-      localCandidatesCount = countLocalSeoKeywordCandidates(workspace.id);
-    } catch (err) {
-      log.warn({ err, workspaceId }, 'localCandidates count failed; reporting 0');
-    }
-  }
+  const localCandidatesCount = options.includeLocalSeo ? snapshot.localCandidatesCount ?? 0 : 0;
 
   const missingVolume = Math.max(0, allKeys.size - keysWithVolume.size);
 
