@@ -45,6 +45,8 @@ interface AnthropicChatOptions {
   runId?: string;
   operation?: string;
   executionCacheOutcome?: AICacheOutcome;
+  executionChainId?: string;
+  fallbackUsed?: boolean;
 }
 
 interface AnthropicChatResult {
@@ -105,6 +107,8 @@ async function executeAnthropicCall(opts: AnthropicChatOptions): Promise<Anthrop
     runId,
     operation = feature,
     executionCacheOutcome = 'miss',
+    executionChainId,
+    fallbackUsed,
   } = opts;
   const callStartMs = Date.now();
 
@@ -113,14 +117,14 @@ async function executeAnthropicCall(opts: AnthropicChatOptions): Promise<Anthrop
     const promptTokens = Math.max(1, Math.round(messages.length * 8));
     const completionTokens = Math.max(1, Math.round(text.length / 7));
     const totalTokens = promptTokens + completionTokens;
-    logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs: 1, runId, operation, provider: 'anthropic', attempts: 1, cacheOutcome: executionCacheOutcome });
-    recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - callStartMs, workspaceId, message: `${model} local fake call completed`, runId, provider: 'anthropic', model, attempts: 1, cacheOutcome: executionCacheOutcome });
+    logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs: 1, runId, operation, provider: 'anthropic', attempts: 1, cacheOutcome: executionCacheOutcome, executionChainId, fallbackUsed });
+    recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - callStartMs, workspaceId, message: `${model} local fake call completed`, runId, executionChainId, provider: 'anthropic', model, attempts: 1, cacheOutcome: executionCacheOutcome, fallbackUsed });
     return { text, promptTokens, completionTokens, totalTokens, execution: { attempts: 1, cacheOutcome: executionCacheOutcome, originRunId: runId } };
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    recordOperationTrace({ source: 'ai', operation, status: 'error', durationMs: Date.now() - callStartMs, workspaceId, message: 'Anthropic API key not configured', runId, provider: 'anthropic', model, attempts: 0, cacheOutcome: executionCacheOutcome });
+    recordOperationTrace({ source: 'ai', operation, status: 'error', durationMs: Date.now() - callStartMs, workspaceId, message: 'Anthropic API key not configured', runId, executionChainId, provider: 'anthropic', model, attempts: 0, cacheOutcome: executionCacheOutcome, fallbackUsed });
     throw new Error('ANTHROPIC_API_KEY not configured');
   }
 
@@ -201,13 +205,15 @@ async function executeAnthropicCall(opts: AnthropicChatOptions): Promise<Anthrop
       provider: 'anthropic',
       attempts,
       cacheOutcome: executionCacheOutcome,
+      executionChainId,
+      fallbackUsed,
     });
-    recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs, workspaceId, message: `${model} call completed`, runId, provider: 'anthropic', model, attempts, cacheOutcome: executionCacheOutcome });
+    recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs, workspaceId, message: `${model} call completed`, runId, executionChainId, provider: 'anthropic', model, attempts, cacheOutcome: executionCacheOutcome, fallbackUsed });
 
     return { ...result, execution: { attempts, cacheOutcome: executionCacheOutcome, originRunId: runId } };
   } catch (err) {
     if (!(signal?.aborted || (err instanceof Error && err.message === AI_REQUEST_CANCELLED_MESSAGE))) {
-      recordOperationTrace({ source: 'ai', operation, status: 'error', durationMs: Date.now() - callStartMs, workspaceId, message: err instanceof Error ? err.message : String(err), runId, provider: 'anthropic', model, attempts, cacheOutcome: executionCacheOutcome });
+      recordOperationTrace({ source: 'ai', operation, status: 'error', durationMs: Date.now() - callStartMs, workspaceId, message: err instanceof Error ? err.message : String(err), runId, executionChainId, provider: 'anthropic', model, attempts, cacheOutcome: executionCacheOutcome, fallbackUsed });
     }
     throw err;
   }

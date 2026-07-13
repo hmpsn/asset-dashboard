@@ -17,6 +17,7 @@ export interface OperationTraceEntry {
   durationMs?: number;
   message?: string;
   runId?: string;
+  executionChainId?: string;
   originRunId?: string;
   provider?: 'openai' | 'anthropic';
   model?: string;

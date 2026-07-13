@@ -7,6 +7,8 @@ export type AICacheOutcome = 'bypass' | 'miss' | 'inflight' | 'hit';
 
 export interface AIExecutionMetadata {
   runId: string;
+  /** Correlates multiple provider attempts in one logical generation. */
+  executionChainId?: string;
   /** Run that performed the provider call when this request reused work. */
   originRunId?: string;
   operation: string;

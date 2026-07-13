@@ -35,6 +35,8 @@ export interface TokenUsage {
   provider?: 'openai' | 'anthropic';
   attempts?: number;
   cacheOutcome?: AICacheOutcome;
+  executionChainId?: string;
+  fallbackUsed?: boolean;
 }
 
 const USAGE_DIR = getDataDir('ai-usage');
@@ -271,6 +273,8 @@ interface OpenAIChatOptions {
   runId?: string;
   operation?: string;
   executionCacheOutcome?: AICacheOutcome;
+  executionChainId?: string;
+  fallbackUsed?: boolean;
 }
 
 interface OpenAIChatResult {
@@ -300,6 +304,8 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     cachePolicy = { mode: 'inflight' },
     runId,
     operation = feature,
+    executionChainId,
+    fallbackUsed,
   } = opts;
 
   // Cancellable requests are per-job work; counting them as explicit bypasses keeps
@@ -322,7 +328,7 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
 
   const deduped = await aiDeduplicator.execute(
     dedupeKey,
-    () => executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal, runId, operation, executionCacheOutcome: effectivePolicy.mode === 'none' ? 'bypass' : 'miss' }),
+    () => executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal, runId, operation, executionChainId, fallbackUsed, executionCacheOutcome: effectivePolicy.mode === 'none' ? 'bypass' : 'miss' }),
     effectivePolicy,
   );
   return { ...deduped.value, execution: { attempts: deduped.value.execution?.attempts ?? 1, cacheOutcome: deduped.cacheOutcome, originRunId: deduped.value.execution?.originRunId } };
@@ -346,6 +352,8 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     runId,
     operation = feature,
     executionCacheOutcome = 'miss',
+    executionChainId,
+    fallbackUsed,
   } = opts;
   const callStartMs = Date.now();
 
@@ -361,14 +369,14 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     const promptTokens = Math.max(1, Math.round(messages.length * 9));
     const completionTokens = Math.max(1, Math.round(fallbackText.length / 6));
     const totalTokens = promptTokens + completionTokens;
-    logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs: 1, runId, operation, provider: 'openai', attempts: 1, cacheOutcome: executionCacheOutcome });
-    recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - callStartMs, workspaceId, message: `${model} local fake call completed`, runId, provider: 'openai', model, attempts: 1, cacheOutcome: executionCacheOutcome });
+    logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs: 1, runId, operation, provider: 'openai', attempts: 1, cacheOutcome: executionCacheOutcome, executionChainId, fallbackUsed });
+    recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - callStartMs, workspaceId, message: `${model} local fake call completed`, runId, executionChainId, provider: 'openai', model, attempts: 1, cacheOutcome: executionCacheOutcome, fallbackUsed });
     return { text: fallbackText, promptTokens, completionTokens, totalTokens, execution: { attempts: 1, cacheOutcome: executionCacheOutcome, originRunId: runId } };
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    recordOperationTrace({ source: 'ai', operation, status: 'error', durationMs: Date.now() - callStartMs, workspaceId, message: 'OpenAI API key not configured', runId, provider: 'openai', model, attempts: 0, cacheOutcome: executionCacheOutcome });
+    recordOperationTrace({ source: 'ai', operation, status: 'error', durationMs: Date.now() - callStartMs, workspaceId, message: 'OpenAI API key not configured', runId, executionChainId, provider: 'openai', model, attempts: 0, cacheOutcome: executionCacheOutcome, fallbackUsed });
     throw new Error('OPENAI_API_KEY not configured');
   }
 
@@ -456,6 +464,8 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
       provider: 'openai',
       attempts,
       cacheOutcome: executionCacheOutcome,
+      executionChainId,
+      fallbackUsed,
     });
     recordOperationTrace({
       source: 'ai',
@@ -464,7 +474,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
       durationMs,
       workspaceId,
       message: `${model} call completed`,
-      runId, provider: 'openai', model, attempts, cacheOutcome: executionCacheOutcome,
+      runId, executionChainId, provider: 'openai', model, attempts, cacheOutcome: executionCacheOutcome, fallbackUsed,
     });
 
     return { ...result, execution: { attempts, cacheOutcome: executionCacheOutcome, originRunId: runId } };
@@ -478,7 +488,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
       status: 'error',
       durationMs: Date.now() - callStartMs,
       workspaceId,
-      runId, provider: 'openai', model, attempts, cacheOutcome: executionCacheOutcome,
+      runId, executionChainId, provider: 'openai', model, attempts, cacheOutcome: executionCacheOutcome, fallbackUsed,
       message: err instanceof Error ? err.message : String(err),
     });
     throw err;

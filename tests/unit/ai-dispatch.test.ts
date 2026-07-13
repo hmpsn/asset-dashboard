@@ -247,6 +247,17 @@ describe('callAI', () => {
     }));
   });
 
+  it('reports a proven fallback on execution metadata and provider options', async () => {
+    mocks.callOpenAI.mockResolvedValue({ text: 'fallback', promptTokens: 2, completionTokens: 1, totalTokens: 3 });
+    const result = await callAI({
+      operation: 'copy-generation', messages: [{ role: 'user', content: 'draft' }],
+      provider: 'openai',
+      executionChainId: 'creative-chain', fallbackUsed: true,
+    });
+    expect(result.execution).toMatchObject({ executionChainId: 'creative-chain', fallbackUsed: true });
+    expect(mocks.callOpenAI).toHaveBeenCalledWith(expect.objectContaining({ executionChainId: 'creative-chain', fallbackUsed: true }));
+  });
+
   it('lets explicit options override registry defaults', async () => {
     mocks.callOpenAI.mockResolvedValue({
       text: '{"ok":true}',

@@ -42,6 +42,10 @@ export interface AICallOptions {
   responseFormat?: { type: 'json_object' };
   /** Adds factual-grounding instructions for research-heavy outputs. */
   researchMode?: boolean;
+  /** Internal correlation for multi-provider execution chains. */
+  executionChainId?: string;
+  /** Set only when this call follows a failed provider attempt. */
+  fallbackUsed?: boolean;
 }
 
 export interface AICallResult {
@@ -102,20 +106,24 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
       cachePolicy,
       runId,
       operation,
+      executionChainId: opts.executionChainId,
+      fallbackUsed: opts.fallbackUsed,
     });
     const completedAt = new Date();
     const cacheOutcome = result.execution?.cacheOutcome ?? 'miss';
     const originRunId = result.execution?.originRunId;
-    if (cacheOutcome === 'hit' || cacheOutcome === 'inflight') recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - startedMs, workspaceId: opts.workspaceId, message: `${model ?? 'claude-sonnet-4-6'} reused ${cacheOutcome} result`, runId, originRunId, provider, model: model ?? 'claude-sonnet-4-6', attempts: result.execution?.attempts ?? 1, cacheOutcome });
+    if (cacheOutcome === 'hit' || cacheOutcome === 'inflight') recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - startedMs, workspaceId: opts.workspaceId, message: `${model ?? 'claude-sonnet-4-6'} reused ${cacheOutcome} result`, runId, originRunId, executionChainId: opts.executionChainId, provider, model: model ?? 'claude-sonnet-4-6', attempts: result.execution?.attempts ?? 1, cacheOutcome, fallbackUsed: opts.fallbackUsed });
     return {
       text: result.text,
       tokens: { prompt: result.promptTokens, completion: result.completionTokens, total: result.totalTokens },
       execution: {
         runId,
+        ...(opts.executionChainId ? { executionChainId: opts.executionChainId } : {}),
         operation,
         provider,
         model: model ?? 'claude-sonnet-4-6',
         attempts: result.execution?.attempts ?? 1,
+        ...(opts.fallbackUsed !== undefined ? { fallbackUsed: opts.fallbackUsed } : {}),
         ...(originRunId && originRunId !== runId ? { originRunId } : {}),
         cacheOutcome,
         startedAt: startedAt.toISOString(),
@@ -144,21 +152,25 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
     cachePolicy,
     runId,
     operation,
+    executionChainId: opts.executionChainId,
+    fallbackUsed: opts.fallbackUsed,
   });
   const completedAt = new Date();
   const cacheOutcome = result.execution?.cacheOutcome ?? 'miss';
   const originRunId = result.execution?.originRunId;
-  if (cacheOutcome === 'hit' || cacheOutcome === 'inflight') recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - startedMs, workspaceId: opts.workspaceId, message: `${model ?? 'gpt-5.4-mini'} reused ${cacheOutcome} result`, runId, originRunId, provider, model: model ?? 'gpt-5.4-mini', attempts: result.execution?.attempts ?? 1, cacheOutcome });
+  if (cacheOutcome === 'hit' || cacheOutcome === 'inflight') recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - startedMs, workspaceId: opts.workspaceId, message: `${model ?? 'gpt-5.4-mini'} reused ${cacheOutcome} result`, runId, originRunId, executionChainId: opts.executionChainId, provider, model: model ?? 'gpt-5.4-mini', attempts: result.execution?.attempts ?? 1, cacheOutcome, fallbackUsed: opts.fallbackUsed });
 
   return {
     text: result.text,
     tokens: { prompt: result.promptTokens, completion: result.completionTokens, total: result.totalTokens },
     execution: {
       runId,
+      ...(opts.executionChainId ? { executionChainId: opts.executionChainId } : {}),
       operation,
       provider,
       model: model ?? 'gpt-5.4-mini',
       attempts: result.execution?.attempts ?? 1,
+      ...(opts.fallbackUsed !== undefined ? { fallbackUsed: opts.fallbackUsed } : {}),
       ...(originRunId && originRunId !== runId ? { originRunId } : {}),
       cacheOutcome,
       startedAt: startedAt.toISOString(),

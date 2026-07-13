@@ -9,6 +9,7 @@ import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structure
 import { isAnthropicConfigured } from './anthropic-helpers.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
 import type { ContentBrief } from '../shared/types/content.js';
 import type { GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
@@ -94,6 +95,8 @@ export async function callCreativeAI(opts: {
   const temperature = opts.temperature ?? CLAUDE_TEMP;
   const json = opts.json === true;
   const featureLabel = feature ?? opts.operation ?? 'creative-ai';
+  const executionChainId = randomUUID();
+  let claudeAttemptFailed = false;
 
   // Claude has no structured JSON mode — lean on the system prompt instead.
   const effectiveSystem = json
@@ -116,12 +119,14 @@ export async function callCreativeAI(opts: {
         timeoutMs: 90_000,
         researchMode: opts.researchMode,
         signal: opts.signal,
+        executionChainId,
       });
       log.info(`[${featureLabel}] Generated with Claude`);
       const text = result.text.trim();
       return json ? stripCodeFence(text) : text;
     } catch (err) {
       if (opts.signal?.aborted) throw err;
+      claudeAttemptFailed = true;
       log.info(`[${featureLabel}] Claude failed (${err instanceof Error ? err.message : err}), falling back to GPT`);
     }
   }
@@ -137,6 +142,8 @@ export async function callCreativeAI(opts: {
     workspaceId,
     researchMode: opts.researchMode,
     signal: opts.signal,
+    executionChainId,
+    ...(claudeAttemptFailed ? { fallbackUsed: true } : {}),
     ...(json ? { responseFormat: { type: 'json_object' as const } } : {}),
   });
   log.info(`[${featureLabel}] Generated with GPT`);

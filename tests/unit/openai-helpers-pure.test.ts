@@ -423,3 +423,32 @@ describe('callOpenAI retry behavior', () => {
     expect(JSON.stringify(mocks.recordOperationTrace.mock.calls)).not.toContain('secret prompt');
   });
 });
+
+describe('callOpenAI fallback-chain telemetry', () => {
+  beforeEach(() => {
+    mocks.isLocalFakeProviderModeEnabled.mockReturnValue(true);
+    mocks.recordOperationTrace.mockReset();
+    mocks.writeFileSync.mockReset();
+    flushToDisk();
+  });
+
+  afterEach(() => {
+    mocks.isLocalFakeProviderModeEnabled.mockReturnValue(false);
+  });
+
+  it('marks token usage and traces for a proven fallback attempt', async () => {
+    await callOpenAI({
+      messages: [{ role: 'user', content: 'fallback' }],
+      feature: 'creative-fallback',
+      runId: 'gpt-run',
+      executionChainId: 'creative-chain',
+      fallbackUsed: true,
+    });
+    flushToDisk();
+    const persisted = JSON.parse(String(mocks.writeFileSync.mock.calls.at(-1)?.[1])) as Array<Record<string, unknown>>;
+    expect(persisted.at(-1)).toMatchObject({ runId: 'gpt-run', executionChainId: 'creative-chain', fallbackUsed: true });
+    expect(mocks.recordOperationTrace).toHaveBeenCalledWith(expect.objectContaining({
+      runId: 'gpt-run', executionChainId: 'creative-chain', fallbackUsed: true, provider: 'openai',
+    }));
+  });
+});
