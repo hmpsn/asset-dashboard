@@ -1,0 +1,6 @@
+/*
+ * Keep production's source(none) scan narrow while compiling fixture utilities
+ * into the component-test bundle only.
+ */
+@import '../../src/index.css';
+@import 'tailwindcss';

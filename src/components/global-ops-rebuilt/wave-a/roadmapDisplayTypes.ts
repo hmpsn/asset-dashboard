@@ -1,6 +1,6 @@
 import type { RoadmapItem } from '../../../../shared/types/roadmap';
 
-export type RoadmapRuntimeStatus = RoadmapItem['status'] | 'deferred';
+export type RoadmapRuntimeStatus = RoadmapItem['status'];
 export type RoadmapPriority = NonNullable<RoadmapItem['priority']>;
 
 export interface RoadmapDisplayRow {

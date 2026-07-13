@@ -1,4 +1,4 @@
-import '../../src/index.css';
+import './component-test-styles.css';
 
 import {
   KEYWORDS_SURFACE_FILTERS,

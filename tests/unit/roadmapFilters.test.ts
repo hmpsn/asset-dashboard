@@ -22,6 +22,16 @@ describe('matchesFilters', () => {
     expect(matchesFilters(base, { ...DEFAULT_FILTERS, status: 'pending' }, 'backlog')).toBe(true);
   });
 
+  it('recognizes deferred as a first-class roadmap status', () => {
+    const filters = filtersFromParams(new URLSearchParams('status=deferred'));
+    expect(filters.status).toBe('deferred');
+  });
+
+  it('recognizes closed as a terminal non-shipped roadmap status', () => {
+    const filters = filtersFromParams(new URLSearchParams('status=closed'));
+    expect(filters.status).toBe('closed');
+  });
+
   it('filters by sprint id', () => {
     expect(matchesFilters(base, { ...DEFAULT_FILTERS, sprint: 'backlog' }, 'backlog')).toBe(true);
     expect(matchesFilters(base, { ...DEFAULT_FILTERS, sprint: 'other' }, 'backlog')).toBe(false);
@@ -61,9 +71,14 @@ describe('sortItems', () => {
     expect(sorted.map(i => i.priority)).toEqual(['P2', 'P1', 'P0']);
   });
 
-  it('sorts by status asc — in_progress → pending → done', () => {
-    const sorted = sortItems(items, 'status', 'asc');
-    expect(sorted.map(i => i.status)).toEqual(['in_progress', 'pending', 'done']);
+  it('sorts by status asc — in_progress → pending → deferred → done → closed', () => {
+    const withDeferred: FlatItem[] = [
+      ...items,
+      { ...base, id: 4, priority: 'P3', status: 'deferred', sprintId: 'd', sprintName: 'D' },
+      { ...base, id: 5, priority: 'P3', status: 'closed', sprintId: 'e', sprintName: 'E' },
+    ];
+    const sorted = sortItems(withDeferred, 'status', 'asc');
+    expect(sorted.map(i => i.status)).toEqual(['in_progress', 'pending', 'deferred', 'done', 'closed']);
   });
 
   it('sorts by id asc', () => {

@@ -6,6 +6,18 @@ A comprehensive value assessment of every feature in the platform — **feature 
 
 ---
 
+### 671. Roadmap value audit + canonical deferred-status contract 2026-07-12
+
+**What it does:** Reconciles all 75 pending roadmap entries against current staging code, tests, feature history, active flags, and successor items after the owner-approved UI parity merge. Six pending items are verified `done`, 24 become terminal `closed` items without claiming shipment, 33 move to `deferred` with explicit re-entry triggers, and 12 remain genuinely executable. Two older deferred duplicates also close into canonical owners. The full evidence and disposition tables live in `docs/audits/2026-07-12-roadmap-value-audit.md`.
+
+**Contract correction:** Makes `deferred` and `closed` canonical `RoadmapStatus` values shared by data, API validation, filters, and both Roadmap UIs. `closed` distinguishes obsolete, merged, and superseded planning records from genuinely shipped `done` work. Only `done` may carry `shippedAt`; transitioning away clears the date, and closed/deferred records never inflate velocity or shipped-sprint archival. The legacy surface displays and filters neutral “On hold” and “Closed” states, while the rebuilt surface consumes the shared type instead of maintaining a private compatibility union. Unit, component, integration, sorter, and data-integrity coverage pin the contract.
+
+**Why it matters:** Operators see an actionable roadmap instead of a 75-item mixture of real work, already-shipped capability, abandoned implementation ideas, and demand-gated bets. Deferred work remains discoverable without being mistaken for the current queue, and the API/UI can no longer disagree with the repository's actual status vocabulary.
+
+**Files:** `data/roadmap.json`; `docs/audits/2026-07-12-roadmap-value-audit.md`; `shared/types/roadmap.ts`; `server/routes/roadmap.ts`; legacy and rebuilt Roadmap components/models; roadmap unit/component/integration tests.
+
+---
+
 ### 670. Post-parity capability, wiring, AI-context, and performance closeout 2026-07-11
 
 **Status:** Complete locally in the isolated `codex/ui-visual-parity` worktree. No P0 functionality loss was found. Joshua approved `AUD-D1` through `AUD-D7` plus the measured `AUD-B1` bundle disposition on 2026-07-11; every approved direction is implemented, committed, and P5-verified. This is not staging or production shipment, and automated review remains evidence rather than owner approval.
