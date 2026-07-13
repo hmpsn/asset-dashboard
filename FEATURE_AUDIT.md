@@ -1,10 +1,16 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 673** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 674** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
 ---
+
+### 674. Keyword evidence integrity & edit-safe generation 2026-07-13
+
+**What it does:** Preserves authoritative intent, CPC, membership source, and field-level evidence provenance from stored keyword rows through candidate pools, enrichment, page/content-gap storage, KCC reads, and canonical Opportunity Value scoring. Keyword strategy generation now records its exact effective-input fingerprint and provider-neutral run provenance, then commits against a monotonic revision in one transaction. Every synthesis input mutation advances that revision atomically, so newer operator intent wins a race without another provider call.
+
+**Why it matters:** Keyword recommendations and value estimates no longer fall back to heuristics because an adapter discarded known evidence, and unknown commercial value can no longer masquerade as a provider-grounded zero. Operators can edit, vote, manage, or track keywords while generation is running without having those decisions silently overwritten.
 
 ### 673. Provider-neutral AI execution governance 2026-07-13
 
