@@ -11,8 +11,13 @@ import {
   type TrackedKeywordSource,
   type TrackedKeywordStatus,
 } from '../shared/types/rank-tracking.js';
-import { keywordComparisonKey } from '../shared/keyword-normalization.js';
-import { listTrackedKeywordRows, replaceAllTrackedKeywordRows, resolveTrackedKeywords } from './tracked-keywords-store.js';
+import type { TrackedKeywordIdentityMetadata } from '../shared/types/keyword-identity.js';
+import { keywordComparisonKey, keywordIdentityKeyV2 } from '../shared/keyword-normalization.js';
+import {
+  listTrackedKeywordRows,
+  replaceAllTrackedKeywordRows,
+  resolveTrackedKeywords,
+} from './tracked-keywords-store.js';
 import { invalidateKeywordStrategyGenerationInputs } from './keyword-strategy-generation-store.js';
 
 export interface RankSnapshot {
@@ -43,6 +48,9 @@ export interface AddTrackedKeywordOptions {
   deprecatedAt?: string;
   /** Wave 3d-i ADDITIVE provenance — content-addressed gap key (see TrackedKeyword.sourceGapKey). */
   sourceGapKey?: string;
+  /** Internal-only v2 provenance. Supply only when the writer holds the raw gap
+   * identity; the general/public tracked-keyword serializer strips this field. */
+  sourceGapKeyV2?: string;
   /** Wave 3d-ii ownership flag — see TrackedKeyword.strategyOwned. Reconcile is the
    *  SOLE writer of `true`; other callers leave it undefined (conservative default). */
   strategyOwned?: boolean;
@@ -126,7 +134,7 @@ export function normalizeTrackedKeywords(keywords: Array<Partial<TrackedKeyword>
   const now = new Date().toISOString();
   for (const keyword of keywords) {
     const displayQuery = keyword.query.trim();
-    const queryKey = normalizeQuery(displayQuery);
+    const queryKey = keywordIdentityKeyV2(displayQuery);
     if (!displayQuery || !queryKey || seen.has(queryKey)) continue;
     seen.add(queryKey);
     normalized.push({
@@ -259,9 +267,10 @@ function addTrackedKeywordToConfig(
   query: string,
   options: AddTrackedKeywordOptions,
 ): boolean {
-  const normalizedQuery = normalizeQuery(query);
+  const displayQuery = query.trim();
+  const normalizedQuery = keywordIdentityKeyV2(displayQuery);
   if (!normalizedQuery) return false;
-  const existing = config.trackedKeywords.find(k => normalizeQuery(k.query) === normalizedQuery);
+  const existing = config.trackedKeywords.find(k => keywordIdentityKeyV2(k.query) === normalizedQuery);
   if (existing) {
     const nextStatus = options.status ?? TRACKED_KEYWORD_STATUS.ACTIVE;
     const existingSource = existing.source ?? TRACKED_KEYWORD_SOURCE.UNKNOWN;
@@ -278,8 +287,14 @@ function addTrackedKeywordToConfig(
     // (existing.sourceGapKey is already hydrated from the table by withTrackedKeywordsTxn.)
     // Drop it from the blind spread; re-apply only when the row has none yet.
     delete definedOptions.sourceGapKey;
+    delete definedOptions.sourceGapKeyV2;
+    const storedExisting = existing as TrackedKeyword & TrackedKeywordIdentityMetadata;
     Object.assign(existing, {
       ...definedOptions,
+      // A single-identity mutation explicitly elects the supplied raw spelling.
+      // The compatibility store retains the previous canonical as a complete
+      // noncanonical audit row rather than discarding either payload.
+      query: displayQuery,
       pinned: existing.pinned || Boolean(options.pinned),
       status: nextStatus,
       source: nextSource,
@@ -287,10 +302,13 @@ function addTrackedKeywordToConfig(
       deprecatedAt: nextStatus === TRACKED_KEYWORD_STATUS.ACTIVE ? undefined : existing.deprecatedAt,
     });
     if (!existing.sourceGapKey && options.sourceGapKey) existing.sourceGapKey = options.sourceGapKey;
+    if (!storedExisting.sourceGapKeyV2 && options.sourceGapKeyV2) {
+      storedExisting.sourceGapKeyV2 = options.sourceGapKeyV2;
+    }
     return true;
   }
-  config.trackedKeywords.push({
-    query: query.trim(),
+  const added: TrackedKeyword & TrackedKeywordIdentityMetadata = {
+    query: displayQuery,
     pinned: Boolean(options.pinned),
     addedAt: new Date().toISOString(),
     source: options.source ?? TRACKED_KEYWORD_SOURCE.MANUAL,
@@ -310,8 +328,10 @@ function addTrackedKeywordToConfig(
     replacedBy: options.replacedBy,
     deprecatedAt: options.deprecatedAt,
     sourceGapKey: options.sourceGapKey, // Wave 3d-i ADDITIVE provenance (gap-approve path).
+    sourceGapKeyV2: options.sourceGapKeyV2,
     strategyOwned: options.strategyOwned, // Wave 3d-ii ownership (undefined unless reconcile sets it).
-  });
+  };
+  config.trackedKeywords.push(added);
   return true;
 }
 
@@ -344,9 +364,9 @@ export function addTrackedKeywords(
 }
 
 export function removeTrackedKeyword(workspaceId: string, query: string): TrackedKeyword[] {
-  const normalizedQuery = normalizeQuery(query);
+  const normalizedQuery = keywordIdentityKeyV2(query);
   return withTrackedKeywordsTxn(workspaceId, existing =>
-    existing.filter(k => normalizeQuery(k.query) !== normalizedQuery),
+    existing.filter(k => keywordIdentityKeyV2(k.query) !== normalizedQuery),
   ).filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
 }
 
@@ -370,9 +390,9 @@ export function removeTrackedKeywordAndInvalidateStrategy(workspaceId: string, q
 }
 
 export function togglePinKeyword(workspaceId: string, query: string): TrackedKeyword[] {
-  const normalizedQuery = normalizeQuery(query);
+  const normalizedQuery = keywordIdentityKeyV2(query);
   return withTrackedKeywordsTxn(workspaceId, existing => {
-    const kw = existing.find(k => normalizeQuery(k.query) === normalizedQuery);
+    const kw = existing.find(k => keywordIdentityKeyV2(k.query) === normalizedQuery);
     if (kw) kw.pinned = !kw.pinned;
     return existing;
   }).filter(keyword => (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) === TRACKED_KEYWORD_STATUS.ACTIVE);
@@ -399,14 +419,14 @@ export function storeRankSnapshot(
 }
 
 export function deleteKeywordRankHistory(workspaceId: string, query: string): number {
-  const normalizedQuery = normalizeQuery(query);
+  const normalizedQuery = keywordIdentityKeyV2(query);
   if (!normalizedQuery) return 0;
 
   const run = db.transaction(() => {
     let changedSnapshots = 0;
     const snapshots = readSnapshots(workspaceId);
     for (const snapshot of snapshots) {
-      const filteredQueries = snapshot.queries.filter(entry => normalizeQuery(entry.query) !== normalizedQuery);
+      const filteredQueries = snapshot.queries.filter(entry => keywordIdentityKeyV2(entry.query) !== normalizedQuery);
       if (filteredQueries.length === snapshot.queries.length) continue;
       changedSnapshots++;
       stmts().updateSnapshotQueries.run({

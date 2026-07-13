@@ -1,4 +1,4 @@
-import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
+import { keywordIdentityKeyV2 } from '../../../shared/keyword-normalization.js';
 import { TRACKED_KEYWORD_SOURCE, type TrackedKeyword } from '../../../shared/types/rank-tracking.js';
 import type { ContentGap, KeywordStrategy } from '../../../shared/types/workspace.js';
 import { assembleStoredKeywordStrategy } from '../../keyword-strategy-assembler.js';
@@ -44,27 +44,27 @@ export function inferTrackedKeywordSources(
 ): TrackedKeyword[] {
   const siteKeywordMetricKeys = new Set(
     (context.strategy?.siteKeywordMetrics ?? [])
-      .map(m => keywordComparisonKey(m.keyword))
+      .map(m => keywordIdentityKeyV2(m.keyword))
       .filter(Boolean),
   );
   const siteKeywordKeys = new Set(
     (context.strategy?.siteKeywords ?? [])
-      .map(k => keywordComparisonKey(k))
+      .map(k => keywordIdentityKeyV2(k))
       .filter(Boolean),
   );
   const contentGapKeys = new Set(
     (context.contentGaps ?? [])
-      .map(gap => keywordComparisonKey(gap.targetKeyword))
+      .map(gap => keywordIdentityKeyV2(gap.targetKeyword))
       .filter(Boolean),
   );
   return trackedKeywords.map(keyword => {
     const existing = keyword.source ?? TRACKED_KEYWORD_SOURCE.UNKNOWN;
     if (existing !== TRACKED_KEYWORD_SOURCE.UNKNOWN) return keyword;
-    const normalized = keywordComparisonKey(keyword.query);
+    const normalized = keywordIdentityKeyV2(keyword.query);
     if (!normalized) return keyword;
     if (siteKeywordMetricKeys.has(normalized)) return { ...keyword, source: TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY };
     if (siteKeywordKeys.has(normalized)) return { ...keyword, source: TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD };
-    const fb = context.feedback?.get(normalized);
+    const fb = context.feedback?.get(keyword.query);
     if (fb?.status === 'requested') return { ...keyword, source: TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED };
     if (contentGapKeys.has(normalized)) return { ...keyword, source: TRACKED_KEYWORD_SOURCE.CONTENT_GAP };
     return keyword;
@@ -88,14 +88,14 @@ export function mergeTrackedKeywordProvenance(
   const gapKeyByQuery = new Map<string, string>();
   const ownedByQuery = new Map<string, boolean>();
   for (const row of listTrackedKeywordRows(workspaceId)) {
-    const key = keywordComparisonKey(row.query);
+    const key = keywordIdentityKeyV2(row.query);
     if (row.sourceGapKey) gapKeyByQuery.set(key, row.sourceGapKey);
     // `!== undefined` tri-state guard: `false` is a real value, not "absent".
     if (row.strategyOwned !== undefined) ownedByQuery.set(key, row.strategyOwned);
   }
   if (gapKeyByQuery.size === 0 && ownedByQuery.size === 0) return trackedKeywords;
   return trackedKeywords.map(keyword => {
-    const key = keywordComparisonKey(keyword.query);
+    const key = keywordIdentityKeyV2(keyword.query);
     const gapKey = gapKeyByQuery.get(key);
     const owned = ownedByQuery.get(key);
     if (gapKey === undefined && owned === undefined) return keyword;

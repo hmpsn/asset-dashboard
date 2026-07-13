@@ -247,7 +247,7 @@ describe('Admin keyword CRUD — full lifecycle', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as { ok: boolean; keyword: string };
     expect(body.ok).toBe(true);
-    expect(body.keyword).toBe('100 growth');
+    expect(body.keyword).toBe('100% growth');
   });
 
   it('POST with pinned:true adds keyword already pinned', async () => {
@@ -314,15 +314,12 @@ describe('Admin keyword POST — deduplication', () => {
     expect(matches).toHaveLength(1);
   });
 
-  it('canonical variants are treated as the same keyword (preserves first form)', async () => {
+  it('canonical variants remain one identity and promote the explicitly touched raw form', async () => {
     await postJson(kwUrl(wsId), { query: 'Keyword Variant - Original' });
     const dupRes = await postJson(kwUrl(wsId), { query: ' keyword variant original ' });
     expect(dupRes.status).toBe(200);
     const body = await dupRes.json() as { query: string }[];
-    // keywordComparisonKey normalizes both to the same canonical — only one entry
-    const matches = body.filter(k =>
-      k.query === 'Keyword Variant - Original' || k.query === ' keyword variant original ',
-    );
+    const matches = body.filter(k => k.query === 'keyword variant original');
     expect(matches).toHaveLength(1);
   });
 });

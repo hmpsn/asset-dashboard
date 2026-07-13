@@ -24,7 +24,12 @@ import db from './db/index.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import {
+  keywordComparisonKey,
+  keywordIdentityKeyV1,
+  keywordIdentityKeyV2,
+} from '../shared/keyword-normalization.js';
+import type { TrackedKeywordIdentityMetadata } from '../shared/types/keyword-identity.js';
 import {
   TRACKED_KEYWORD_SOURCE,
   TRACKED_KEYWORD_STATUS,
@@ -70,6 +75,40 @@ export interface TrackedKeywordRow {
   // (from the live blob order) and re-stamped on every write from the array index.
   sort_order: number | null;
 }
+
+export interface TrackedKeywordV2Row {
+  workspace_id: string;
+  normalized_query_v2: string;
+  normalized_query_v1: string;
+  query: string;
+  pinned: number;
+  added_at: string;
+  source: string | null;
+  status: string | null;
+  page_path: string | null;
+  page_title: string | null;
+  strategy_generated_at: string | null;
+  last_strategy_seen_at: string | null;
+  intent: string | null;
+  volume: number | null;
+  difficulty: number | null;
+  cpc: number | null;
+  authority_posture: string | null;
+  baseline_position: number | null;
+  baseline_clicks: number | null;
+  baseline_impressions: number | null;
+  replaced_by: string | null;
+  deprecated_at: string | null;
+  source_page_id: string | null;
+  source_gap_key_v1: string | null;
+  source_gap_key_v2: string | null;
+  strategy_owned: number | null;
+  sort_order: number | null;
+  is_canonical: number;
+  write_order: number;
+}
+
+export type StoredTrackedKeyword = TrackedKeyword & TrackedKeywordIdentityMetadata;
 
 /** A NULL column maps to `undefined` (omitted by JSON.stringify) — never `null` —
  *  so the serialized shape is byte-identical to the blob path. */
@@ -122,6 +161,33 @@ export function rowToTrackedKeyword(row: TrackedKeywordRow): TrackedKeyword {
   };
 }
 
+function compatRowToTrackedKeyword(row: TrackedKeywordV2Row): StoredTrackedKeyword {
+  return {
+    query: row.query,
+    pinned: row.pinned === 1,
+    addedAt: row.added_at,
+    source: nullToUndefined(row.source) as TrackedKeywordSource | undefined,
+    status: nullToUndefined(row.status) as TrackedKeywordStatus | undefined,
+    pagePath: nullToUndefined(row.page_path),
+    pageTitle: nullToUndefined(row.page_title),
+    strategyGeneratedAt: nullToUndefined(row.strategy_generated_at),
+    lastStrategySeenAt: nullToUndefined(row.last_strategy_seen_at),
+    intent: nullToUndefined(row.intent),
+    volume: nullToUndefined(row.volume),
+    difficulty: nullToUndefined(row.difficulty),
+    cpc: nullToUndefined(row.cpc),
+    authorityPosture: nullToUndefined(row.authority_posture) as TrackedKeywordAuthorityPosture | undefined,
+    baselinePosition: nullToUndefined(row.baseline_position),
+    baselineClicks: nullToUndefined(row.baseline_clicks),
+    baselineImpressions: nullToUndefined(row.baseline_impressions),
+    replacedBy: nullToUndefined(row.replaced_by),
+    deprecatedAt: nullToUndefined(row.deprecated_at),
+    sourceGapKey: nullToUndefined(row.source_gap_key_v1),
+    sourceGapKeyV2: nullToUndefined(row.source_gap_key_v2),
+    strategyOwned: row.strategy_owned === null ? undefined : row.strategy_owned === 1,
+  };
+}
+
 /** undefined in-memory → NULL column (the inverse of nullToUndefined). */
 function undefinedToNull<T>(value: T | undefined): T | null {
   return value === undefined ? null : value;
@@ -168,6 +234,142 @@ function keywordToParams(workspaceId: string, keyword: TrackedKeyword, sortOrder
     // backfill UPDATE path, which sets it via a dedicated statement, not this insert).
     sort_order: sortOrder,
   };
+}
+
+function keywordToCompatParams(
+  workspaceId: string,
+  keyword: StoredTrackedKeyword,
+  sortOrder: number,
+  writeOrder: number,
+) {
+  const v1 = keywordIdentityKeyV1(keyword.query);
+  const v2 = keywordIdentityKeyV2(keyword.query);
+  return {
+    workspace_id: workspaceId,
+    normalized_query_v2: v2,
+    normalized_query_v1: v1,
+    query: keyword.query,
+    pinned: keyword.pinned ? 1 : 0,
+    added_at: keyword.addedAt,
+    source: undefinedToNull(keyword.source),
+    status: undefinedToNull(keyword.status),
+    page_path: undefinedToNull(keyword.pagePath),
+    page_title: undefinedToNull(keyword.pageTitle),
+    strategy_generated_at: undefinedToNull(keyword.strategyGeneratedAt),
+    last_strategy_seen_at: undefinedToNull(keyword.lastStrategySeenAt),
+    intent: undefinedToNull(keyword.intent),
+    volume: undefinedToNull(keyword.volume),
+    difficulty: undefinedToNull(keyword.difficulty),
+    cpc: undefinedToNull(keyword.cpc),
+    authority_posture: undefinedToNull(keyword.authorityPosture),
+    baseline_position: undefinedToNull(keyword.baselinePosition),
+    baseline_clicks: undefinedToNull(keyword.baselineClicks),
+    baseline_impressions: undefinedToNull(keyword.baselineImpressions),
+    replaced_by: undefinedToNull(keyword.replacedBy),
+    deprecated_at: undefinedToNull(keyword.deprecatedAt),
+    source_page_id: null,
+    source_gap_key_v1: undefinedToNull(keyword.sourceGapKey),
+    // Normal writers may only persist a v2 provenance key supplied by a caller
+    // that holds the raw gap identity. Proven legacy-v1 derivation belongs to the
+    // operator backfill, where ambiguity is measured and reported.
+    source_gap_key_v2: undefinedToNull(keyword.sourceGapKeyV2),
+    strategy_owned: keyword.strategyOwned === undefined ? null : keyword.strategyOwned ? 1 : 0,
+    sort_order: sortOrder,
+    is_canonical: 0,
+    write_order: writeOrder,
+  };
+}
+
+const STATUS_PRIORITY: Record<string, number> = {
+  [TRACKED_KEYWORD_STATUS.ACTIVE]: 4,
+  [TRACKED_KEYWORD_STATUS.PAUSED]: 3,
+  [TRACKED_KEYWORD_STATUS.REPLACED]: 2,
+  [TRACKED_KEYWORD_STATUS.DEPRECATED]: 1,
+};
+
+const SOURCE_PRIORITY: Record<string, number> = {
+  [TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED]: 7,
+  [TRACKED_KEYWORD_SOURCE.MANUAL]: 6,
+  [TRACKED_KEYWORD_SOURCE.CONTENT_GAP]: 5,
+  [TRACKED_KEYWORD_SOURCE.RECOMMENDATION]: 4,
+  [TRACKED_KEYWORD_SOURCE.STRATEGY_PRIMARY]: 3,
+  [TRACKED_KEYWORD_SOURCE.STRATEGY_SITE_KEYWORD]: 2,
+  [TRACKED_KEYWORD_SOURCE.UNKNOWN]: 1,
+};
+
+function validTime(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function compareBinaryUtf8(a: string, b: string): number {
+  return Buffer.compare(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8'));
+}
+
+function compareNullableLatest(a: string | null, b: string | null): number {
+  const at = validTime(a);
+  const bt = validTime(b);
+  if (at === null) return bt === null ? 0 : 1;
+  if (bt === null) return -1;
+  return bt - at;
+}
+
+function compareTrackedCanonical(a: TrackedKeywordV2Row, b: TrackedKeywordV2Row): number {
+  if (a.pinned !== b.pinned) return b.pinned - a.pinned;
+  const status = (STATUS_PRIORITY[b.status ?? ''] ?? 0) - (STATUS_PRIORITY[a.status ?? ''] ?? 0);
+  if (status !== 0) return status;
+  const source = (SOURCE_PRIORITY[b.source ?? ''] ?? 0) - (SOURCE_PRIORITY[a.source ?? ''] ?? 0);
+  if (source !== 0) return source;
+  const lastSeen = compareNullableLatest(a.last_strategy_seen_at, b.last_strategy_seen_at);
+  if (lastSeen !== 0) return lastSeen;
+  const generated = compareNullableLatest(a.strategy_generated_at, b.strategy_generated_at);
+  if (generated !== 0) return generated;
+  const aa = validTime(a.added_at);
+  const ba = validTime(b.added_at);
+  if (aa !== ba) {
+    if (aa === null) return 1;
+    if (ba === null) return -1;
+    return aa - ba;
+  }
+  if (a.sort_order !== b.sort_order) {
+    if (a.sort_order === null) return 1;
+    if (b.sort_order === null) return -1;
+    return a.sort_order - b.sort_order;
+  }
+  return compareBinaryUtf8(a.query, b.query);
+}
+
+function trackedPayloadChanged(
+  existing: TrackedKeywordV2Row | undefined,
+  params: ReturnType<typeof keywordToCompatParams>,
+): boolean {
+  if (!existing) return true;
+  const desiredSourcePageId = params.source_page_id ?? existing.source_page_id;
+  const desiredSourceGapKeyV2 = params.source_gap_key_v2 ?? existing.source_gap_key_v2;
+  return existing.normalized_query_v1 !== params.normalized_query_v1
+    || existing.pinned !== params.pinned
+    || existing.added_at !== params.added_at
+    || existing.source !== params.source
+    || existing.status !== params.status
+    || existing.page_path !== params.page_path
+    || existing.page_title !== params.page_title
+    || existing.strategy_generated_at !== params.strategy_generated_at
+    || existing.last_strategy_seen_at !== params.last_strategy_seen_at
+    || existing.intent !== params.intent
+    || existing.volume !== params.volume
+    || existing.difficulty !== params.difficulty
+    || existing.cpc !== params.cpc
+    || existing.authority_posture !== params.authority_posture
+    || existing.baseline_position !== params.baseline_position
+    || existing.baseline_clicks !== params.baseline_clicks
+    || existing.baseline_impressions !== params.baseline_impressions
+    || existing.replaced_by !== params.replaced_by
+    || existing.deprecated_at !== params.deprecated_at
+    || existing.source_page_id !== desiredSourcePageId
+    || existing.source_gap_key_v1 !== params.source_gap_key_v1
+    || existing.source_gap_key_v2 !== desiredSourceGapKeyV2
+    || existing.strategy_owned !== params.strategy_owned;
 }
 
 // ── Lazy prepared statements ──
@@ -249,20 +451,133 @@ const stmts = createStmtCache(() => ({
       -- for a duplicate normalized_query) must also re-stamp so order stays canonical.
       sort_order = excluded.sort_order
   `),
+  listCompatByWs: db.prepare<[workspaceId: string]>(`
+    SELECT * FROM tracked_keywords_v2_compat
+    WHERE workspace_id = ?
+    ORDER BY normalized_query_v2 ASC, query ASC
+  `),
+  listCompatCanonicalByWs: db.prepare<[workspaceId: string]>(`
+    SELECT * FROM tracked_keywords_v2_compat
+    WHERE workspace_id = ? AND is_canonical = 1
+    ORDER BY sort_order ASC, added_at ASC, normalized_query_v2 ASC, query ASC
+  `),
+  listLegacyFallbackByWs: db.prepare<[workspaceId: string]>(`
+    SELECT legacy.* FROM tracked_keywords legacy
+    WHERE legacy.workspace_id = ?
+      AND NOT EXISTS (
+        SELECT 1 FROM tracked_keywords_v2_compat compat
+        WHERE compat.workspace_id = legacy.workspace_id
+          AND compat.normalized_query_v1 = legacy.normalized_query
+      )
+    ORDER BY legacy.sort_order ASC, legacy.added_at ASC, legacy.normalized_query ASC
+  `),
+  maxCompatWriteOrder: db.prepare<[workspaceId: string]>(`
+    SELECT COALESCE(MAX(write_order), 0) AS value
+    FROM tracked_keywords_v2_compat WHERE workspace_id = ?
+  `),
+  upsertCompat: db.prepare(`
+    INSERT INTO tracked_keywords_v2_compat (
+      workspace_id, normalized_query_v2, normalized_query_v1, query,
+      pinned, added_at, source, status, page_path, page_title,
+      strategy_generated_at, last_strategy_seen_at, intent, volume, difficulty, cpc,
+      authority_posture, baseline_position, baseline_clicks, baseline_impressions,
+      replaced_by, deprecated_at, source_page_id, source_gap_key_v1, source_gap_key_v2,
+      strategy_owned, sort_order, is_canonical, write_order
+    ) VALUES (
+      @workspace_id, @normalized_query_v2, @normalized_query_v1, @query,
+      @pinned, @added_at, @source, @status, @page_path, @page_title,
+      @strategy_generated_at, @last_strategy_seen_at, @intent, @volume, @difficulty, @cpc,
+      @authority_posture, @baseline_position, @baseline_clicks, @baseline_impressions,
+      @replaced_by, @deprecated_at, @source_page_id, @source_gap_key_v1, @source_gap_key_v2,
+      @strategy_owned, @sort_order, @is_canonical, @write_order
+    )
+    ON CONFLICT(workspace_id, normalized_query_v2, query) DO UPDATE SET
+      normalized_query_v1 = excluded.normalized_query_v1,
+      pinned = excluded.pinned,
+      added_at = excluded.added_at,
+      source = excluded.source,
+      status = excluded.status,
+      page_path = excluded.page_path,
+      page_title = excluded.page_title,
+      strategy_generated_at = excluded.strategy_generated_at,
+      last_strategy_seen_at = excluded.last_strategy_seen_at,
+      intent = excluded.intent,
+      volume = excluded.volume,
+      difficulty = excluded.difficulty,
+      cpc = excluded.cpc,
+      authority_posture = excluded.authority_posture,
+      baseline_position = excluded.baseline_position,
+      baseline_clicks = excluded.baseline_clicks,
+      baseline_impressions = excluded.baseline_impressions,
+      replaced_by = excluded.replaced_by,
+      deprecated_at = excluded.deprecated_at,
+      source_page_id = COALESCE(tracked_keywords_v2_compat.source_page_id, excluded.source_page_id),
+      source_gap_key_v1 = excluded.source_gap_key_v1,
+      source_gap_key_v2 = COALESCE(tracked_keywords_v2_compat.source_gap_key_v2, excluded.source_gap_key_v2),
+      strategy_owned = excluded.strategy_owned,
+      sort_order = excluded.sort_order,
+      write_order = excluded.write_order
+  `),
+  demoteCompatGroup: db.prepare<[workspaceId: string, v2: string]>(`
+    UPDATE tracked_keywords_v2_compat SET is_canonical = 0
+    WHERE workspace_id = ? AND normalized_query_v2 = ? AND is_canonical = 1
+  `),
+  promoteCompatRaw: db.prepare<[workspaceId: string, v2: string, raw: string]>(`
+    UPDATE tracked_keywords_v2_compat SET is_canonical = 1
+    WHERE workspace_id = ? AND normalized_query_v2 = ? AND query = ?
+  `),
+  deleteCompatGroup: db.prepare<[workspaceId: string, v2: string]>(`
+    DELETE FROM tracked_keywords_v2_compat WHERE workspace_id = ? AND normalized_query_v2 = ?
+  `),
+  deleteAllCompat: db.prepare<[workspaceId: string]>(`
+    DELETE FROM tracked_keywords_v2_compat WHERE workspace_id = ?
+  `),
 }));
 
 // ── Public API ──
 
 /** All tracked-keyword rows for a workspace, in sort_order ASC (the old blob array
  *  index), with (added_at, normalized_query) as a transient-NULL tiebreaker. */
-export function listTrackedKeywordRows(workspaceId: string): TrackedKeyword[] {
-  const rows = stmts().listByWs.all(workspaceId) as TrackedKeywordRow[];
-  return rows.map(rowToTrackedKeyword);
+export function listTrackedKeywordRows(workspaceId: string): StoredTrackedKeyword[] {
+  const compat = stmts().listCompatCanonicalByWs.all(workspaceId) as TrackedKeywordV2Row[];
+  const legacy = stmts().listLegacyFallbackByWs.all(workspaceId) as TrackedKeywordRow[];
+  return [
+    ...compat.map(row => ({ keyword: compatRowToTrackedKeyword(row), sortOrder: row.sort_order })),
+    ...legacy.map(row => ({ keyword: rowToTrackedKeyword(row), sortOrder: row.sort_order })),
+  ].sort((a, b) => {
+    if (a.sortOrder !== b.sortOrder) {
+      if (a.sortOrder === null) return 1;
+      if (b.sortOrder === null) return -1;
+      return a.sortOrder - b.sortOrder;
+    }
+    return a.keyword.addedAt.localeCompare(b.keyword.addedAt)
+      || a.keyword.query.localeCompare(b.keyword.query);
+  }).map(entry => entry.keyword);
 }
 
 /** Count tracked-keyword rows for a workspace. */
 export function countTrackedKeywordRows(workspaceId: string): number {
-  return (stmts().countByWs.get(workspaceId) as { cnt: number }).cnt;
+  return listTrackedKeywordRows(workspaceId).length;
+}
+
+function rebuildTrackedKeywordV1Projection(workspaceId: string): void {
+  const canonicalRows = stmts().listCompatCanonicalByWs.all(workspaceId) as TrackedKeywordV2Row[];
+  const winnerByV1 = new Map<string, TrackedKeywordV2Row>();
+  for (const row of canonicalRows) {
+    if (!row.normalized_query_v1) continue;
+    const existing = winnerByV1.get(row.normalized_query_v1);
+    if (
+      !existing
+      || row.write_order > existing.write_order
+      || (row.write_order === existing.write_order && compareTrackedCanonical(row, existing) < 0)
+    ) {
+      winnerByV1.set(row.normalized_query_v1, row);
+    }
+  }
+  stmts().deleteAll.run(workspaceId);
+  for (const row of winnerByV1.values()) {
+    stmts().upsert.run(keywordToParams(workspaceId, compatRowToTrackedKeyword(row), row.sort_order));
+  }
 }
 
 /**
@@ -281,26 +596,81 @@ export function countTrackedKeywordRows(workspaceId: string): number {
  */
 export function replaceAllTrackedKeywordRows(workspaceId: string, keywords: TrackedKeyword[]): void {
   const run = db.transaction(() => {
-    stmts().deleteAll.run(workspaceId);
-    const upsert = stmts().upsert;
-    // Wave 3c-iii-a: `keywords` IS the canonical order (mirroring the old blob array).
-    // `position` is a monotonic counter incremented ONLY on an actual insert, so a
-    // defensively-dropped blank does not leave the surviving rows' sort_order out of
-    // step with the boot-backfill semantics (blob array index of surviving entries).
-    let position = 0;
-    for (const keyword of keywords) {
-      const normalized = keywordComparisonKey(keyword.query);
-      if (!normalized) continue; // mirror the blob path's blank-drop defensively
-      upsert.run(keywordToParams(workspaceId, keyword, position));
-      position++;
+    const existingRows = stmts().listCompatByWs.all(workspaceId) as TrackedKeywordV2Row[];
+    const existingByV2 = new Map<string, TrackedKeywordV2Row[]>();
+    for (const row of existingRows) {
+      const rows = existingByV2.get(row.normalized_query_v2) ?? [];
+      rows.push(row);
+      existingByV2.set(row.normalized_query_v2, rows);
     }
+
+    const submittedByV2 = new Map<string, Array<{ keyword: StoredTrackedKeyword; sortOrder: number }>>();
+    for (let index = 0; index < keywords.length; index++) {
+      const keyword = keywords[index] as StoredTrackedKeyword;
+      const raw = keyword.query.trim();
+      const v2 = keywordIdentityKeyV2(raw);
+      if (!raw || !v2) continue;
+      const rows = submittedByV2.get(v2) ?? [];
+      const prior = rows.findIndex(item => item.keyword.query === raw);
+      const item = { keyword: { ...keyword, query: raw }, sortOrder: index };
+      if (prior >= 0) rows[prior] = item;
+      else rows.push(item);
+      submittedByV2.set(v2, rows);
+    }
+
+    for (const v2 of existingByV2.keys()) {
+      if (!submittedByV2.has(v2)) stmts().deleteCompatGroup.run(workspaceId, v2);
+    }
+
+    let writeOrder = (stmts().maxCompatWriteOrder.get(workspaceId) as { value: number }).value;
+    const submittedGroups = [...submittedByV2.entries()].sort(([aV2, aRows], [bV2, bRows]) => {
+      const v1Order = compareBinaryUtf8(
+        keywordIdentityKeyV1(aRows[0].keyword.query),
+        keywordIdentityKeyV1(bRows[0].keyword.query),
+      );
+      return v1Order || compareBinaryUtf8(aV2, bV2);
+    });
+    for (const [v2, submittedUnsorted] of submittedGroups) {
+      const submitted = [...submittedUnsorted].sort((a, b) =>
+        compareBinaryUtf8(a.keyword.query, b.keyword.query));
+      const priorCanonical = existingByV2.get(v2)?.find(row => row.is_canonical === 1);
+      for (const item of submitted) {
+        const existing = existingByV2.get(v2)?.find(row => row.query === item.keyword.query);
+        const candidateParams = keywordToCompatParams(
+          workspaceId,
+          item.keyword,
+          item.sortOrder,
+          existing?.write_order ?? writeOrder + 1,
+        );
+        const nextWriteOrder = trackedPayloadChanged(existing, candidateParams)
+          ? ++writeOrder
+          : existing!.write_order;
+        stmts().upsertCompat.run({ ...candidateParams, write_order: nextWriteOrder });
+      }
+      const refreshed = (stmts().listCompatByWs.all(workspaceId) as TrackedKeywordV2Row[])
+        .filter(row => row.normalized_query_v2 === v2);
+      const retained = priorCanonical
+        ? submitted.find(item => item.keyword.query === priorCanonical.query)
+        : undefined;
+      const submittedRaw = new Set(submitted.map(item => item.keyword.query));
+      const candidates = refreshed.filter(row => submittedRaw.has(row.query));
+      const winnerRaw = retained?.keyword.query ?? [...candidates].sort(compareTrackedCanonical)[0]?.query;
+      if (!winnerRaw) continue;
+      stmts().demoteCompatGroup.run(workspaceId, v2);
+      stmts().promoteCompatRaw.run(workspaceId, v2, winnerRaw);
+    }
+    rebuildTrackedKeywordV1Projection(workspaceId);
   });
   run();
 }
 
 /** Delete all tracked-keyword rows for a workspace. */
 export function deleteAllTrackedKeywordRows(workspaceId: string): void {
-  stmts().deleteAll.run(workspaceId);
+  const run = db.transaction(() => {
+    stmts().deleteAllCompat.run(workspaceId);
+    stmts().deleteAll.run(workspaceId);
+  });
+  run();
 }
 
 /**
@@ -336,7 +706,7 @@ export function deleteAllTrackedKeywordRows(workspaceId: string): void {
  * TABLE-sourced row through the SAME JSON round-trip the blob path applied, dropping
  * undefined-valued keys.
  */
-function stripUndefinedKeys(keyword: TrackedKeyword): TrackedKeyword {
+function stripUndefinedKeys(keyword: StoredTrackedKeyword): TrackedKeyword {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(keyword)) {
     if (value !== undefined) out[key] = value;
@@ -347,6 +717,7 @@ function stripUndefinedKeys(keyword: TrackedKeyword): TrackedKeyword {
   // auto-deprecation and must be read from the table/hydrated shape, never leaked
   // into getTrackedKeywords or the public payload.
   delete out.sourceGapKey;
+  delete out.sourceGapKeyV2;
   delete out.sourcePageId;
   delete out.strategyOwned;
   return out as unknown as TrackedKeyword;

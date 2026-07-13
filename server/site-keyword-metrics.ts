@@ -17,7 +17,11 @@ import db from './db/index.js';
 import { createLogger } from './logger.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { keywordComparisonKey } from '../shared/keyword-normalization.js';
+import {
+  keywordComparisonKey,
+  keywordIdentityKeyV1,
+  keywordIdentityKeyV2,
+} from '../shared/keyword-normalization.js';
 import { dedupeByLast } from './utils/collections.js';
 import type { KeywordStrategySiteKeywordMetric } from './keyword-strategy-enrichment.js';
 
@@ -33,8 +37,23 @@ interface SiteKeywordMetricRow {
   difficulty: number | null;
 }
 
+interface SiteKeywordMetricV2Row {
+  workspace_id: string;
+  normalized_query_v2: string;
+  normalized_query_v1: string;
+  keyword: string;
+  volume: number | null;
+  difficulty: number | null;
+  is_canonical: number;
+  write_order: number;
+}
+
 function finiteNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function compareBinaryUtf8(a: string, b: string): number {
+  return Buffer.compare(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8'));
 }
 
 /** NULL columns map to the model's required numeric fields via a 0 default —
@@ -57,12 +76,29 @@ function modelToParams(workspaceId: string, metric: KeywordStrategySiteKeywordMe
   };
 }
 
+function modelToCompatParams(
+  workspaceId: string,
+  metric: KeywordStrategySiteKeywordMetric,
+  writeOrder: number,
+) {
+  return {
+    workspace_id: workspaceId,
+    normalized_query_v2: keywordIdentityKeyV2(metric.keyword),
+    normalized_query_v1: keywordIdentityKeyV1(metric.keyword),
+    keyword: metric.keyword,
+    volume: metric.volume ?? null,
+    difficulty: metric.difficulty ?? null,
+    is_canonical: 0,
+    write_order: writeOrder,
+  };
+}
+
 /** Normalize an unknown blob entry into a valid metric (drops blanks/non-finite). */
 function normalizeMetric(raw: unknown): KeywordStrategySiteKeywordMetric | null {
   if (!raw || typeof raw !== 'object') return null;
   const candidate = raw as Record<string, unknown>;
   const keyword = typeof candidate.keyword === 'string' ? candidate.keyword.trim() : '';
-  if (!keyword || !keywordComparisonKey(keyword)) return null;
+  if (!keyword || !keywordIdentityKeyV2(keyword)) return null;
   return {
     keyword,
     volume: finiteNumber(candidate.volume) ?? 0,
@@ -89,42 +125,203 @@ const stmts = createStmtCache(() => ({
   countByWs: db.prepare<[workspaceId: string]>(
     'SELECT COUNT(*) as cnt FROM site_keyword_metrics WHERE workspace_id = ?',
   ),
+  listCompatByWs: db.prepare<[workspaceId: string]>(`
+    SELECT * FROM site_keyword_metrics_v2_compat
+    WHERE workspace_id = ? ORDER BY normalized_query_v2 ASC, keyword ASC
+  `),
+  listCompatCanonicalByWs: db.prepare<[workspaceId: string]>(`
+    SELECT * FROM site_keyword_metrics_v2_compat
+    WHERE workspace_id = ? AND is_canonical = 1
+    ORDER BY volume DESC NULLS LAST, keyword ASC
+  `),
+  listLegacyFallbackByWs: db.prepare<[workspaceId: string]>(`
+    SELECT legacy.* FROM site_keyword_metrics legacy
+    WHERE legacy.workspace_id = ?
+      AND NOT EXISTS (
+        SELECT 1 FROM site_keyword_metrics_v2_compat compat
+        WHERE compat.workspace_id = legacy.workspace_id
+          AND compat.normalized_query_v1 = legacy.normalized_query
+      )
+    ORDER BY legacy.volume DESC NULLS LAST, legacy.keyword ASC
+  `),
+  maxCompatWriteOrder: db.prepare<[workspaceId: string]>(`
+    SELECT COALESCE(MAX(write_order), 0) AS value
+    FROM site_keyword_metrics_v2_compat WHERE workspace_id = ?
+  `),
+  upsertCompat: db.prepare(`
+    INSERT INTO site_keyword_metrics_v2_compat (
+      workspace_id, normalized_query_v2, normalized_query_v1, keyword,
+      volume, difficulty, is_canonical, write_order
+    ) VALUES (
+      @workspace_id, @normalized_query_v2, @normalized_query_v1, @keyword,
+      @volume, @difficulty, @is_canonical, @write_order
+    )
+    ON CONFLICT(workspace_id, normalized_query_v2, keyword) DO UPDATE SET
+      normalized_query_v1 = excluded.normalized_query_v1,
+      volume = excluded.volume,
+      difficulty = excluded.difficulty,
+      write_order = excluded.write_order
+  `),
+  demoteCompatGroup: db.prepare<[workspaceId: string, v2: string]>(`
+    UPDATE site_keyword_metrics_v2_compat SET is_canonical = 0
+    WHERE workspace_id = ? AND normalized_query_v2 = ? AND is_canonical = 1
+  `),
+  promoteCompatRaw: db.prepare<[workspaceId: string, v2: string, raw: string]>(`
+    UPDATE site_keyword_metrics_v2_compat SET is_canonical = 1
+    WHERE workspace_id = ? AND normalized_query_v2 = ? AND keyword = ?
+  `),
+  deleteCompatGroup: db.prepare<[workspaceId: string, v2: string]>(`
+    DELETE FROM site_keyword_metrics_v2_compat WHERE workspace_id = ? AND normalized_query_v2 = ?
+  `),
+  deleteAllCompat: db.prepare<[workspaceId: string]>(`
+    DELETE FROM site_keyword_metrics_v2_compat WHERE workspace_id = ?
+  `),
 }));
 
 // ── Public API ──
 
 /** All site keyword metrics for a workspace (volume DESC, keyword ASC). */
 export function listSiteKeywordMetrics(workspaceId: string): KeywordStrategySiteKeywordMetric[] {
-  const rows = stmts().listByWs.all(workspaceId) as SiteKeywordMetricRow[];
-  return rows.map(rowToModel);
+  const compat = stmts().listCompatCanonicalByWs.all(workspaceId) as SiteKeywordMetricV2Row[];
+  const legacy = stmts().listLegacyFallbackByWs.all(workspaceId) as SiteKeywordMetricRow[];
+  return [
+    ...compat.map(row => ({
+      keyword: row.keyword,
+      volume: row.volume ?? 0,
+      difficulty: row.difficulty ?? 0,
+    })),
+    ...legacy.map(rowToModel),
+  ].sort((a, b) => b.volume - a.volume || a.keyword.localeCompare(b.keyword));
 }
 
 /** Count site keyword metrics rows for a workspace. */
 export function countSiteKeywordMetrics(workspaceId: string): number {
-  return (stmts().countByWs.get(workspaceId) as { cnt: number }).cnt;
+  return listSiteKeywordMetrics(workspaceId).length;
 }
 
-/** Replace all site keyword metrics for a workspace (delete + insert in a txn).
- *  Deduplicates by normalized_query — the last occurrence wins (matches the
- *  blob-path dedup semantics the readers historically relied on). */
+function compareSiteMetricCanonical(a: SiteKeywordMetricV2Row, b: SiteKeywordMetricV2Row): number {
+  const populatedA = Number(a.volume !== null) + Number(a.difficulty !== null);
+  const populatedB = Number(b.volume !== null) + Number(b.difficulty !== null);
+  if (populatedA !== populatedB) return populatedB - populatedA;
+  const volumeA = a.volume ?? Number.NEGATIVE_INFINITY;
+  const volumeB = b.volume ?? Number.NEGATIVE_INFINITY;
+  if (volumeA !== volumeB) return volumeB - volumeA;
+  const difficultyA = a.difficulty ?? Number.NEGATIVE_INFINITY;
+  const difficultyB = b.difficulty ?? Number.NEGATIVE_INFINITY;
+  if (difficultyA !== difficultyB) return difficultyB - difficultyA;
+  return compareBinaryUtf8(a.keyword, b.keyword);
+}
+
+function siteMetricPayloadChanged(
+  existing: SiteKeywordMetricV2Row | undefined,
+  params: ReturnType<typeof modelToCompatParams>,
+): boolean {
+  return !existing
+    || existing.normalized_query_v1 !== params.normalized_query_v1
+    || existing.volume !== params.volume
+    || existing.difficulty !== params.difficulty;
+}
+
+function rebuildSiteKeywordMetricsV1Projection(workspaceId: string): void {
+  const canonicalRows = stmts().listCompatCanonicalByWs.all(workspaceId) as SiteKeywordMetricV2Row[];
+  const winnerByV1 = new Map<string, SiteKeywordMetricV2Row>();
+  for (const row of canonicalRows) {
+    if (!row.normalized_query_v1) continue;
+    const existing = winnerByV1.get(row.normalized_query_v1);
+    if (
+      !existing
+      || row.write_order > existing.write_order
+      || (row.write_order === existing.write_order && compareSiteMetricCanonical(row, existing) < 0)
+    ) {
+      winnerByV1.set(row.normalized_query_v1, row);
+    }
+  }
+  stmts().deleteAll.run(workspaceId);
+  for (const row of winnerByV1.values()) {
+    stmts().insert.run(modelToParams(workspaceId, {
+      keyword: row.keyword,
+      volume: row.volume ?? 0,
+      difficulty: row.difficulty ?? 0,
+    }));
+  }
+}
+
+/** Replace the active v2 collection and atomically rebuild the v1 rollback projection. */
 export function replaceAllSiteKeywordMetrics(workspaceId: string, metrics: KeywordStrategySiteKeywordMetric[]): void {
   const run = db.transaction(() => {
-    stmts().deleteAll.run(workspaceId);
     const normalized = metrics
       .map(normalizeMetric)
       .filter((m): m is KeywordStrategySiteKeywordMetric => m != null);
-    const deduped = dedupeByLast(normalized, m => keywordComparisonKey(m.keyword));
-    const stmt = stmts().insert;
-    for (const metric of deduped) {
-      stmt.run(modelToParams(workspaceId, metric));
+
+    const existingRows = stmts().listCompatByWs.all(workspaceId) as SiteKeywordMetricV2Row[];
+    const existingByV2 = new Map<string, SiteKeywordMetricV2Row[]>();
+    for (const row of existingRows) {
+      const rows = existingByV2.get(row.normalized_query_v2) ?? [];
+      rows.push(row);
+      existingByV2.set(row.normalized_query_v2, rows);
     }
+
+    const submittedByV2 = new Map<string, KeywordStrategySiteKeywordMetric[]>();
+    for (const metric of normalized) {
+      const v2 = keywordIdentityKeyV2(metric.keyword);
+      const rows = submittedByV2.get(v2) ?? [];
+      const prior = rows.findIndex(row => row.keyword === metric.keyword);
+      if (prior >= 0) rows[prior] = metric;
+      else rows.push(metric);
+      submittedByV2.set(v2, rows);
+    }
+
+    for (const v2 of existingByV2.keys()) {
+      if (!submittedByV2.has(v2)) stmts().deleteCompatGroup.run(workspaceId, v2);
+    }
+
+    let writeOrder = (stmts().maxCompatWriteOrder.get(workspaceId) as { value: number }).value;
+    const submittedGroups = [...submittedByV2.entries()].sort(([aV2, aRows], [bV2, bRows]) => {
+      const v1Order = compareBinaryUtf8(
+        keywordIdentityKeyV1(aRows[0].keyword),
+        keywordIdentityKeyV1(bRows[0].keyword),
+      );
+      return v1Order || compareBinaryUtf8(aV2, bV2);
+    });
+    for (const [v2, submittedUnsorted] of submittedGroups) {
+      const submitted = [...submittedUnsorted].sort((a, b) => compareBinaryUtf8(a.keyword, b.keyword));
+      const priorCanonical = existingByV2.get(v2)?.find(row => row.is_canonical === 1);
+      for (const metric of submitted) {
+        const existing = existingByV2.get(v2)?.find(row => row.keyword === metric.keyword);
+        const candidateParams = modelToCompatParams(
+          workspaceId,
+          metric,
+          existing?.write_order ?? writeOrder + 1,
+        );
+        const nextWriteOrder = siteMetricPayloadChanged(existing, candidateParams)
+          ? ++writeOrder
+          : existing!.write_order;
+        stmts().upsertCompat.run({ ...candidateParams, write_order: nextWriteOrder });
+      }
+      const refreshed = (stmts().listCompatByWs.all(workspaceId) as SiteKeywordMetricV2Row[])
+        .filter(row => row.normalized_query_v2 === v2);
+      const retainedRaw = priorCanonical && submitted.some(metric => metric.keyword === priorCanonical.keyword)
+        ? priorCanonical.keyword
+        : undefined;
+      const submittedRaw = new Set(submitted.map(metric => metric.keyword));
+      const winnerRaw = retainedRaw
+        ?? refreshed.filter(row => submittedRaw.has(row.keyword)).sort(compareSiteMetricCanonical)[0]?.keyword;
+      if (!winnerRaw) continue;
+      stmts().demoteCompatGroup.run(workspaceId, v2);
+      stmts().promoteCompatRaw.run(workspaceId, v2, winnerRaw);
+    }
+    rebuildSiteKeywordMetricsV1Projection(workspaceId);
   });
   run();
 }
 
 /** Delete all site keyword metrics for a workspace. */
 export function deleteAllSiteKeywordMetrics(workspaceId: string): void {
-  stmts().deleteAll.run(workspaceId);
+  const run = db.transaction(() => {
+    stmts().deleteAllCompat.run(workspaceId);
+    stmts().deleteAll.run(workspaceId);
+  });
+  run();
 }
 
 /**
