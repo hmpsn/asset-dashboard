@@ -34,6 +34,12 @@ const mockNormalizePageUrl = vi.fn((p: string) => p);
 // carry that method too.
 const mockDbPrepare = vi.fn();
 const mockRun = vi.fn(() => ({ changes: 0 }));
+const mockGenerationStateGet = vi.fn(() => ({
+  revision: 0,
+  fingerprint: null,
+  provenance: null,
+}));
+const mockGenerationClaimRun = vi.fn(() => ({ changes: 1 }));
 const mockTransaction = vi.fn((fn: (...args: unknown[]) => unknown) => {
   const txn = (...args: unknown[]) => fn(...args);
   txn.immediate = (...args: unknown[]) => fn(...args);
@@ -80,7 +86,13 @@ vi.mock('../../server/cannibalization-issues.js', () => ({
 }));
 vi.mock('../../server/db/index.js', () => ({
   default: {
-    prepare: mockDbPrepare.mockReturnValue({ run: mockRun }),
+    // The generation store may initialize its lazy statement cache while the
+    // module graph is loading, before per-test SQL-specific behavior is set.
+    // Model both statement capabilities in that baseline return value.
+    prepare: mockDbPrepare.mockReturnValue({
+      get: mockGenerationStateGet,
+      run: mockGenerationClaimRun,
+    }),
     transaction: mockTransaction,
   },
 }));
@@ -172,7 +184,15 @@ describe('persistKeywordStrategy', () => {
       txn.exclusive = (...args: unknown[]) => fn(...args);
       return txn;
     });
-    mockDbPrepare.mockReturnValue({ run: mockRun });
+    mockDbPrepare.mockImplementation((sql: string) => {
+      if (sql.includes('keyword_strategy_generation_revision AS revision')) {
+        return { get: mockGenerationStateGet };
+      }
+      if (sql.includes('keyword_strategy_generation_revision = keyword_strategy_generation_revision + 1')) {
+        return { run: mockGenerationClaimRun };
+      }
+      return { run: mockRun };
+    });
     mockNormalizePageUrl.mockImplementation((p: string) => p);
   });
 
