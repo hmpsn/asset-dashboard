@@ -8,11 +8,11 @@ cross-referencing. Evidence came from current implementation and tests,
 `FEATURE_AUDIT.md`, feature-flag lifecycle state, roadmap predecessor/successor
 notes, and staging history from April–July 2026.
 
-The review used four dispositions:
+The review used five dispositions:
 
-- **Done/closed** — shipped, superseded, merged into a canonical item, or
-  deliberately closed as no longer valuable. A closure note distinguishes these
-  cases; `done` does not imply that obsolete work was implemented.
+- **Done** — implementation is complete and may contribute to shipped history.
+- **Closed** — superseded, merged into a canonical item, or deliberately closed
+  as no longer valuable. Closed items never imply implementation or shipment.
 - **Deferred** — potentially valuable, but not executable now. Every item has a
   demand, data, provider, scale, or owner-decision re-entry trigger.
 - **Pending** — a current, concrete gap with no unmet strategic prerequisite.
@@ -25,12 +25,14 @@ The review used four dispositions:
 |---|---:|---:|---:|
 | Pending | 75 | 12 | -63 |
 | Deferred | 18 | 49 | +31 |
-| Done | 127 | 159 | +32 |
+| Done | 127 | 133 | +6 |
+| Closed | — | 26 | +26 |
 | In progress | 9 | 9 | — |
 
-Thirty pending items were closed. Thirty-three pending items moved to deferred.
-Two older deferred duplicates were also closed into canonical owners, producing
-the net status changes above.
+Of the thirty pending items removed from the executable queue, six were verified
+complete and 24 were closed as merged, superseded, or obsolete. Thirty-three
+pending items moved to deferred. Two older deferred duplicates were also closed
+into canonical owners, producing the net status changes above.
 
 ## Pending — retain in the executable queue (12)
 
@@ -141,10 +143,11 @@ The audit exposed a data-contract bug: `data/roadmap.json` already used
 `deferred`, and the rebuilt Roadmap surface rendered it, while the shared type,
 legacy filters/UI, and PATCH route accepted only `done | in_progress | pending`.
 
-The correction makes `deferred` a canonical shared status, validates it at the
-API boundary, gives the legacy UI a neutral on-hold state and filter, and
-prevents accidental status cycling until the item's documented re-entry trigger
-is met. Focused unit, component, and integration coverage pins the contract.
+The correction makes `deferred` and `closed` canonical shared statuses, validates
+them at the API boundary, gives the UIs distinct on-hold and terminal states, and
+prevents either status from inflating shipment velocity or shipped-sprint history.
+`shippedAt` is now valid only for `done`; leaving `done` clears it. Focused unit,
+component, integration, and data-integrity coverage pins the contract.
 
 ## Recommended next queue
 

@@ -137,10 +137,9 @@
           "source": "docs/superpowers/specs/2026-06-23-seo-decision-engine-design.md",
           "est": "L",
           "priority": "P3",
-          "status": "done",
+          "status": "closed",
           "createdAt": "2026-06-23",
-          "notes": "Provider-grounded traffic/seasonality forecasting beyond the heuristic value bands. Lower leverage than the program; revisit after Group C. || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE into ov-seasonality-monthly-volumes, the canonical deferred series/forecasting owner.",
-          "shippedAt": "2026-07-12"
+          "notes": "Provider-grounded traffic/seasonality forecasting beyond the heuristic value bands. Lower leverage than the program; revisit after Group C. || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE into ov-seasonality-monthly-volumes, the canonical deferred series/forecasting owner."
         },
         {
           "id": "seo-engine-deferred-link-gap-backlink-depth",
@@ -416,12 +415,11 @@
           "source": "Brand slice P5 follow-on (owner thread 2026-06-29)",
           "est": "S",
           "priority": "P3",
-          "status": "done",
+          "status": "closed",
           "plannedSprint": "deferred",
           "createdAt": "2026-06-29",
           "owner": "content-pipeline",
-          "notes": "setDeliverableStatus auto-creates a voice_sample (source 'identity_approved', 500-char snapshot, no link back to the deliverable) when a tagline/elevator_pitch/tone_examples deliverable is approved. Editing (now cheap via update_brand_deliverable) resets to draft; re-approving creates a FRESH sample rather than updating the prior one → stale/near-dup samples can accumulate and dilute voice calibration. DECISION 2026-06-29: LEAVE AS-IS — the sample/deliverable decoupling is deliberate (samples are independently curatable; revert-to-draft intentionally doesn't delete the sample), frequency is low, impact mild, and a proper fix fights that design. REVISIT TRIGGER: agent-driven edits churn these 3 types frequently and the VoiceTab fills with near-dup samples. Then: add source_deliverable_id to voice_samples + non-destructive 'update-if-unedited' logic (don't clobber curator edits). Cheap interim option: idempotency guard skipping an auto-sample when an identical-content 'identity_approved' sample already exists. Owner may remove. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE with no implementation. Independent sample curation and low observed churn outweigh provenance-linked dedup complexity. Reopen only with evidence of near-duplicate sample accumulation.",
-          "shippedAt": "2026-07-12"
+          "notes": "setDeliverableStatus auto-creates a voice_sample (source 'identity_approved', 500-char snapshot, no link back to the deliverable) when a tagline/elevator_pitch/tone_examples deliverable is approved. Editing (now cheap via update_brand_deliverable) resets to draft; re-approving creates a FRESH sample rather than updating the prior one → stale/near-dup samples can accumulate and dilute voice calibration. DECISION 2026-06-29: LEAVE AS-IS — the sample/deliverable decoupling is deliberate (samples are independently curatable; revert-to-draft intentionally doesn't delete the sample), frequency is low, impact mild, and a proper fix fights that design. REVISIT TRIGGER: agent-driven edits churn these 3 types frequently and the VoiceTab fills with near-dup samples. Then: add source_deliverable_id to voice_samples + non-destructive 'update-if-unedited' logic (don't clobber curator edits). Cheap interim option: idempotency guard skipping an auto-sample when an identical-content 'identity_approved' sample already exists. Owner may remove. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE with no implementation. Independent sample curation and low observed churn outweigh provenance-linked dedup complexity. Reopen only with evidence of near-duplicate sample accumulation."
         }
       ]
     },
@@ -438,10 +436,9 @@
           "source": "docs/superpowers/specs/2026-06-20-the-issue-client-redesign-design.md",
           "est": "TBD",
           "priority": "P1",
-          "status": "done",
+          "status": "closed",
           "createdAt": "2026-06-20",
-          "notes": "Deferred — integration-dependent. Do not start until P0 is merged + green on staging. Flag: the-issue-client-reconciliation (declared OFF). || [DELTA AUDIT 2026-06-24 · partially-done — re-scope]: website form-capture already shipped under the-issue-client-measured-capture. Remaining under THIS flag = the P3 graduation to actual_reconciled (currently a reserved enum member only, outcome-tracking.ts:67) + junk quality-scoring (zero today). The \"call tracking + CRM\" title is stale — owner to confirm whether junk-scoring is near-term or bundled with the deferred CRM item (the-issue-client-crm-reconciliation). || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE: website-native measured capture and named leads ship. Remaining actual_reconciled work moves to the deferred CRM/call-tracking item; speculative junk scoring is dropped until evidence creates a separate need.",
-          "shippedAt": "2026-07-12"
+          "notes": "Deferred — integration-dependent. Do not start until P0 is merged + green on staging. Flag: the-issue-client-reconciliation (declared OFF). || [DELTA AUDIT 2026-06-24 · partially-done — re-scope]: website form-capture already shipped under the-issue-client-measured-capture. Remaining under THIS flag = the P3 graduation to actual_reconciled (currently a reserved enum member only, outcome-tracking.ts:67) + junk quality-scoring (zero today). The \"call tracking + CRM\" title is stale — owner to confirm whether junk-scoring is near-term or bundled with the deferred CRM item (the-issue-client-crm-reconciliation). || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE: website-native measured capture and named leads ship. Remaining actual_reconciled work moves to the deferred CRM/call-tracking item; speculative junk scoring is dropped until evidence creates a separate need."
         },
         {
           "id": "email-preference-center",
@@ -527,10 +524,9 @@
           "source": "Strategy v3 spec 2026-06-18 (decision D8 — deferred)",
           "est": "L",
           "priority": "P3",
-          "status": "done",
+          "status": "closed",
           "createdAt": "2026-06-18",
-          "notes": "DEFERRED. Gated behind the strategy-paid-topics child flag (default OFF). Until this lands, v3 renders Add-to-plan only where rec.productType already resolves a SKU. Enables a generic strategy_addon SKU + a rec→cart bridge for keyword/topic rec types so keyword/topic opportunities become purchasable add-ons. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: the real content-recommendation-to-brief checkout path ships, while a generic strategy_addon SKU would violate catalog and fulfillment contracts. Reopen only for a concrete priced deliverable.",
-          "shippedAt": "2026-07-12"
+          "notes": "DEFERRED. Gated behind the strategy-paid-topics child flag (default OFF). Until this lands, v3 renders Add-to-plan only where rec.productType already resolves a SKU. Enables a generic strategy_addon SKU + a rec→cart bridge for keyword/topic rec types so keyword/topic opportunities become purchasable add-ons. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: the real content-recommendation-to-brief checkout path ships, while a generic strategy_addon SKU would violate catalog and fulfillment contracts. Reopen only for a concrete priced deliverable."
         },
         {
           "id": "strategy-the-issue",
@@ -762,9 +758,8 @@
           "source": "/docs/superpowers/specs/2026-06-05-keyword-value-scoring-design.md (2026-06-05 wiring audit + a-ha ideation)",
           "est": "medium",
           "priority": "P2",
-          "status": "done",
-          "notes": "Wave 3. Named risers/fallers ('emergency dentist #19→#8 +340 impr; [service] near me #4→#9 — defend it') from getLatestRanks change + getRankHistory 90-day slope. AND mint defend/push recommendations from tracked movement — the rec surface is 100% blind to rank movement today (ranking_mover insight exists but is never converted to a Recommendation). Reuses kwv-gsc-per-keyword-context. || PLACEMENT [split]: named risers/fallers ALREADY ship — ranking_mover insight + ranking-mover.ts client win story (signal-story-registry.ts:410 -> InsightsBriefingPage). The genuinely-NEW half = defend/push RECOMMENDATIONS: add a rank/defend/push RecType + RecActionType + RecSourceCategory via the four-line contract in recommendations.ts (overlaps the existing strategy:ranking-opportunity source). Do NOT re-render named movers as a new surface. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: KEEP — still-relevant, but re-scope to ONLY the movement-driven defend/push recommendation half (do not re-render named movers; they already ship). The four-line RecType/RecActionType/RecSourceCategory contract in recommendations.ts is the insertion point; reuse the existing strategyRankingOpp source family but feed it rank-history slope (riser→push, faller→defend) rather than the static currentPosition snapshot. The static 4-20 push rec partially covers 'push' but adds no 'defend' and ignores momentum. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: named movement, rank-drop detection, work-queue surfacing, and event-driven recommendation re-ranking ship. Separate defend/push auto-minting would duplicate those paths without evidence of an action gap.",
-          "shippedAt": "2026-07-12"
+          "status": "closed",
+          "notes": "Wave 3. Named risers/fallers ('emergency dentist #19→#8 +340 impr; [service] near me #4→#9 — defend it') from getLatestRanks change + getRankHistory 90-day slope. AND mint defend/push recommendations from tracked movement — the rec surface is 100% blind to rank movement today (ranking_mover insight exists but is never converted to a Recommendation). Reuses kwv-gsc-per-keyword-context. || PLACEMENT [split]: named risers/fallers ALREADY ship — ranking_mover insight + ranking-mover.ts client win story (signal-story-registry.ts:410 -> InsightsBriefingPage). The genuinely-NEW half = defend/push RECOMMENDATIONS: add a rank/defend/push RecType + RecActionType + RecSourceCategory via the four-line contract in recommendations.ts (overlaps the existing strategy:ranking-opportunity source). Do NOT re-render named movers as a new surface. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: KEEP — still-relevant, but re-scope to ONLY the movement-driven defend/push recommendation half (do not re-render named movers; they already ship). The four-line RecType/RecActionType/RecSourceCategory contract in recommendations.ts is the insertion point; reuse the existing strategyRankingOpp source family but feed it rank-history slope (riser→push, faller→defend) rather than the static currentPosition snapshot. The static 4-20 push rec partially covers 'push' but adds no 'defend' and ignores momentum. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: named movement, rank-drop detection, work-queue surfacing, and event-driven recommendation re-ranking ship. Separate defend/push auto-minting would duplicate those paths without evidence of an action gap."
         },
         {
           "id": "kwv-intent-branded-split",
@@ -799,9 +794,8 @@
           "source": "/docs/superpowers/specs/2026-06-05-keyword-value-scoring-design.md (2026-06-05 wiring audit + a-ha ideation)",
           "est": "small-medium",
           "priority": "P2",
-          "status": "done",
-          "notes": "Wave 5 (wiring-audit gap). Title/meta + schema generation ARE keyword-targeted per page but get NO prioritization signal — they lead by strategy slot order, not value, and SchemaContext.searchIntent is declared (schema-suggester.ts:314) but never populated or consumed (dead field). Make seo-copy + buildSchemaContext lead with the highest-value target keyword and use intent to shape schema (Article vs Service/FAQ). HOME: existing seo-copy + buildSchemaContext (server/schema/context-builder.ts). PLACEMENT [enrich existing generation path]. | Absorbs admin-audit W6.2 (2026-06-11, report §4): populate dead ctx.searchIntent + per-page value score in buildSchemaContext; sort schema page list + bulk-generation order by value. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: KEEP — still-relevant, correctly framed. Two concrete, low-risk changes: (a) make copy-generation.ts lead with the highest-value target keyword for the page (using the resolved value score from the kwv-one-score foundation), and (b) populate the dead ctx.searchIntent in buildSchemaContext (context-builder.ts) + sort the schema page list and bulk-generation order by per-page value, and use intent to shape schema type (Article vs Service/FAQ). Depends on kwv-one-score's resolved value score being callable from these generation paths. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: page primary keyword is already authoritative, schema plans own intent, and unused SchemaContext.searchIntent was deliberately removed and contract-tested.",
-          "shippedAt": "2026-07-12"
+          "status": "closed",
+          "notes": "Wave 5 (wiring-audit gap). Title/meta + schema generation ARE keyword-targeted per page but get NO prioritization signal — they lead by strategy slot order, not value, and SchemaContext.searchIntent is declared (schema-suggester.ts:314) but never populated or consumed (dead field). Make seo-copy + buildSchemaContext lead with the highest-value target keyword and use intent to shape schema (Article vs Service/FAQ). HOME: existing seo-copy + buildSchemaContext (server/schema/context-builder.ts). PLACEMENT [enrich existing generation path]. | Absorbs admin-audit W6.2 (2026-06-11, report §4): populate dead ctx.searchIntent + per-page value score in buildSchemaContext; sort schema page list + bulk-generation order by value. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: KEEP — still-relevant, correctly framed. Two concrete, low-risk changes: (a) make copy-generation.ts lead with the highest-value target keyword for the page (using the resolved value score from the kwv-one-score foundation), and (b) populate the dead ctx.searchIntent in buildSchemaContext (context-builder.ts) + sort the schema page list and bulk-generation order by per-page value, and use intent to shape schema type (Article vs Service/FAQ). Depends on kwv-one-score's resolved value score being callable from these generation paths. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: page primary keyword is already authoritative, schema plans own intent, and unused SchemaContext.searchIntent was deliberately removed and contract-tested."
         },
         {
           "id": "kwv-internal-linking-value-priority",
@@ -827,9 +821,8 @@
           "source": "/docs/audits/2026-05-31-intelligence-quality-audit.md",
           "est": "3-5h",
           "priority": "P2",
-          "status": "done",
-          "notes": "Audit finding Q7: estimatedGain recovery-% are static per-check constants ('could recover 15-30%'), identical for every workspace/page. Deferred from PR3/PR6 (client-facing + $-exposure). Once OV is live, derive the client-safe gain string from the page's actual traffic-at-risk + median realized attributed_value — never a raw $/wk to the client. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: Re-scope and keep as a smaller follow-up. The static-constant credibility risk (the audit's actual concern) is resolved — close that part. Remaining work: once a workspace has conclusive outcome history, blend the page's median realized attributed_value (from action_outcomes via getCalibrationOutcomes / the new EMV-calibration ratio) into buildOvGainString's band selection so the client phrasing reflects what has actually been realized, not just the predicted proxy. This is naturally the same 'P6 basis flip' as ov-calibration-realized-vs-predicted-emv — bundle them. Still client-safe-non-dollarized. || [BUNDLE 2026-06-24]: ship together with ov-calibration-realized-vs-predicted-emv — same P6 realized-vs-predicted-EMV basis flip. || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE into kwv-conversion-grounded-vpc so real attribution and client gain bands do not maintain a second calibration path.",
-          "shippedAt": "2026-07-12"
+          "status": "closed",
+          "notes": "Audit finding Q7: estimatedGain recovery-% are static per-check constants ('could recover 15-30%'), identical for every workspace/page. Deferred from PR3/PR6 (client-facing + $-exposure). Once OV is live, derive the client-safe gain string from the page's actual traffic-at-risk + median realized attributed_value — never a raw $/wk to the client. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: Re-scope and keep as a smaller follow-up. The static-constant credibility risk (the audit's actual concern) is resolved — close that part. Remaining work: once a workspace has conclusive outcome history, blend the page's median realized attributed_value (from action_outcomes via getCalibrationOutcomes / the new EMV-calibration ratio) into buildOvGainString's band selection so the client phrasing reflects what has actually been realized, not just the predicted proxy. This is naturally the same 'P6 basis flip' as ov-calibration-realized-vs-predicted-emv — bundle them. Still client-safe-non-dollarized. || [BUNDLE 2026-06-24]: ship together with ov-calibration-realized-vs-predicted-emv — same P6 realized-vs-predicted-EMV basis flip. || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE into kwv-conversion-grounded-vpc so real attribution and client gain bands do not maintain a second calibration path."
         },
         {
           "id": "ov-calibration-realized-vs-predicted-emv",
@@ -837,9 +830,8 @@
           "source": "/docs/superpowers/plans/2026-06-01-opportunity-value-model.md",
           "est": "3-5h",
           "priority": "P3",
-          "status": "done",
-          "notes": "PR5 ships a documented win-rate-derived calibration because predicted EMV isn't persisted to divide against. Persist predicted emvPerWeek at rec-generation time (or join via ov_divergence), then swap computeOvCalibration to median(realized attributed_value / predicted EMV) per (actionType, difficultyBucket). Clamp + identity-gate contract stays. Needs accumulated outcome history. || PARTIAL 2026-06-11 (A5, audit #20): the substrate now exists — predictedEmv is snapshotted on ALL completion paths (live PATCH + backfill, plus a NULL-snapshot repair pass in server/outcome-backfill.ts), and the weekly cron server/outcome-emv-calibration.ts (migration 131, outcome_emv_calibration) persists median(attributed_value/predicted_emv) per (workspace, actionType) with an honest conclusive/inconclusive gate at 5 pairs, plus median time-to-completion effort priors (getEffortPriorDays). REMAINING: flip computeOvCalibration's basis to consume getEmvCalibrationForWorkspace() (per-actionType; difficultyBucket needs difficulty persisted on actions) and thread effort priors into OpportunityInput.effortDays. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: Keep, framed correctly, as a focused ~3-5h item — it is the highest-leverage of the OV set because the dead-ended substrate is pure waste until consumed. Two concrete hookups: flip computeOvCalibration to read getEmvCalibrationForWorkspace() (per-actionType median ratio, same clamp+identity-gate) with the win-rate proxy as the <5-pair fallback; thread getEffortPriorDays() into OpportunityInput.effortDays at the recommendations.ts push sites. Defer the difficultyBucket dimension to a separate item (needs a new difficulty column on tracked_actions first) — or drop it if per-actionType calibration proves sufficient. || [BUNDLE 2026-06-24]: ship together with ov-estimatedgain-real-attribution — same P6 basis flip. Highest-leverage of the OV set: flip computeOvCalibration to call getEmvCalibrationForWorkspace() (zero consumers today) + thread getEffortPriorDays(); defer the difficultyBucket dimension (needs a new column). || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE into kwv-conversion-grounded-vpc. Measured effort priors ship; the remaining realized-value basis flip must move with GA4 value grounding.",
-          "shippedAt": "2026-07-12"
+          "status": "closed",
+          "notes": "PR5 ships a documented win-rate-derived calibration because predicted EMV isn't persisted to divide against. Persist predicted emvPerWeek at rec-generation time (or join via ov_divergence), then swap computeOvCalibration to median(realized attributed_value / predicted EMV) per (actionType, difficultyBucket). Clamp + identity-gate contract stays. Needs accumulated outcome history. || PARTIAL 2026-06-11 (A5, audit #20): the substrate now exists — predictedEmv is snapshotted on ALL completion paths (live PATCH + backfill, plus a NULL-snapshot repair pass in server/outcome-backfill.ts), and the weekly cron server/outcome-emv-calibration.ts (migration 131, outcome_emv_calibration) persists median(attributed_value/predicted_emv) per (workspace, actionType) with an honest conclusive/inconclusive gate at 5 pairs, plus median time-to-completion effort priors (getEffortPriorDays). REMAINING: flip computeOvCalibration's basis to consume getEmvCalibrationForWorkspace() (per-actionType; difficultyBucket needs difficulty persisted on actions) and thread effort priors into OpportunityInput.effortDays. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: Keep, framed correctly, as a focused ~3-5h item — it is the highest-leverage of the OV set because the dead-ended substrate is pure waste until consumed. Two concrete hookups: flip computeOvCalibration to read getEmvCalibrationForWorkspace() (per-actionType median ratio, same clamp+identity-gate) with the win-rate proxy as the <5-pair fallback; thread getEffortPriorDays() into OpportunityInput.effortDays at the recommendations.ts push sites. Defer the difficultyBucket dimension to a separate item (needs a new difficulty column on tracked_actions first) — or drop it if per-actionType calibration proves sufficient. || [BUNDLE 2026-06-24]: ship together with ov-estimatedgain-real-attribution — same P6 basis flip. Highest-leverage of the OV set: flip computeOvCalibration to call getEmvCalibrationForWorkspace() (zero consumers today) + thread getEffortPriorDays(); defer the difficultyBucket dimension (needs a new column). || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE into kwv-conversion-grounded-vpc. Measured effort priors ship; the remaining realized-value basis flip must move with GA4 value grounding."
         },
         {
           "id": "ov-seasonality-monthly-volumes",
@@ -856,9 +848,8 @@
           "source": "/docs/designs/2026-05-31-opportunity-value-model.md",
           "est": "3-5h",
           "priority": "P3",
-          "status": "done",
-          "notes": "Deferred from PR7: the competitor detector currently only raises a timing boost on the affected page's EXISTING recs. When no rec covers the overtaken keyword, mint a defensive recommendation. Higher-risk (creates recs) — do after OV is live + validated. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep, framed correctly. It is the highest-RISK of the OV set (creates client-visible recs), and its stated precondition ('do after OV is live + validated') is now MET — OV is live and the OV Divergence shadow review gated the flag flip (FEATURE_AUDIT.md:538). Proceed when ready: in the competitor detector, when the overtaken keyword resolves to no covering rec, mint a defensive 'technical'/content rec with an OV opportunity attached. Validate against duplicate-minting on repeated competitor cron runs (use a buildMergeKey-style dedup). || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: competitor alert-to-timing/re-rank and operator-triggered idempotent mint paths ship. Auto-minting adds noise under the current curation model.",
-          "shippedAt": "2026-07-12"
+          "status": "closed",
+          "notes": "Deferred from PR7: the competitor detector currently only raises a timing boost on the affected page's EXISTING recs. When no rec covers the overtaken keyword, mint a defensive recommendation. Higher-risk (creates recs) — do after OV is live + validated. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep, framed correctly. It is the highest-RISK of the OV set (creates client-visible recs), and its stated precondition ('do after OV is live + validated') is now MET — OV is live and the OV Divergence shadow review gated the flag flip (FEATURE_AUDIT.md:538). Proceed when ready: in the competitor detector, when the overtaken keyword resolves to no covering rec, mint a defensive 'technical'/content rec with an OV opportunity attached. Validate against duplicate-minting on repeated competitor cron runs (use a buildMergeKey-style dedup). || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: competitor alert-to-timing/re-rank and operator-triggered idempotent mint paths ship. Auto-minting adds noise under the current curation model."
         },
         {
           "id": "keyword-surface-dedup-audit",
@@ -905,8 +896,7 @@
           "est": "4-6h",
           "priority": "P0",
           "notes": "Client connects Google Search Console and GA4 via OAuth consent screen. Phase 2 of self-service (Phase 1 = Webflow).\n[Audit 2026-04-22 partial] Google OAuth backend + admin Settings UI fully shipped; missing only the client-facing onboarding surface (OnboardingWizard reads hasGSC/hasGA4 but never triggers the connect flow). || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: Keep as partially-done / still-relevant for the remaining slice only: add a client-facing connect step (a workspace-scoped auth-url endpoint the client portal can call + an OnboardingWizard connect action). Do NOT re-build the OAuth backend — it is complete. Re-scope the item to 'client OnboardingWizard Google connect step' (est. drops to ~1-2h). Same founder distribution-strategy gate as #100 applies. || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE into item 100. Google OAuth backend/admin connection is complete; any remaining client-connect UX belongs to one self-service distribution decision.",
-          "status": "done",
-          "shippedAt": "2026-07-12"
+          "status": "closed"
         },
         {
           "id": 119,
@@ -1003,11 +993,10 @@
           "source": "Focused local SEO wiring audit 2026-05-24",
           "est": "5-8h",
           "priority": "P1",
-          "status": "done",
+          "status": "closed",
           "plannedSprint": "deferred",
           "owner": "analytics-intelligence",
-          "notes": "Deferred until admin staging QA proves local visibility data quality and copy clarity. Public/client surfaces currently expose only legacy `local_pack` SERP-feature chips, not LocalSeoSlice data. Rollout should add a scrubbed client-safe local SEO summary to `/api/public/intelligence/:workspaceId`, the client Overview/Strategy surfaces, public AI advisor context, and briefing/recommendation surfaces only after conservative copy and tier gating are approved. Do not expose raw provider evidence, match internals, admin-only candidate state, or claim verified local rank unless the evidence explicitly supports it. Guardrails added on 2026-05-24 to pin the deferred boundary: public workspace bootstrap, public intelligence, and public strategy responses must not expose LocalSeoSlice, local visibility snapshots, candidate state, service/repeat-competitor internals, or prompt-only local SEO blocks until this rollout item is intentionally implemented.\n[Platform health recommendation pass 2026-05-26: promoted priority because client surfaces still rely on legacy local_pack signaling while LocalSeoSlice is admin-only.] || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep as still-relevant; correctly framed and now the most actionable of the local set (P1, admin data exists, only client-surface exposure + copy/tier gating remain). The item is correctly framed as a deliberate exposure decision pending data-quality/copy sign-off. BUT it shares a real dependency with intel-quality-keyword-per-market-relevance: exposing per-market visibility to clients before the cross-market-noise fix risks showing clients the 27.5% wrong-market 'top local results'. Recommend either (a) ship client rollout for single-market workspaces first (no cross-market noise), or (b) sequence the per-market relevance fix before multi-market client exposure. Needs a brief owner go/no-go on copy + tier gating, then it's a 5-8h build. || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE into the narrowed the-issue-client-redesign-p1-segments item, which now owns scrubbed local/portfolio client proof in the current client IA.",
-          "shippedAt": "2026-07-12"
+          "notes": "Deferred until admin staging QA proves local visibility data quality and copy clarity. Public/client surfaces currently expose only legacy `local_pack` SERP-feature chips, not LocalSeoSlice data. Rollout should add a scrubbed client-safe local SEO summary to `/api/public/intelligence/:workspaceId`, the client Overview/Strategy surfaces, public AI advisor context, and briefing/recommendation surfaces only after conservative copy and tier gating are approved. Do not expose raw provider evidence, match internals, admin-only candidate state, or claim verified local rank unless the evidence explicitly supports it. Guardrails added on 2026-05-24 to pin the deferred boundary: public workspace bootstrap, public intelligence, and public strategy responses must not expose LocalSeoSlice, local visibility snapshots, candidate state, service/repeat-competitor internals, or prompt-only local SEO blocks until this rollout item is intentionally implemented.\n[Platform health recommendation pass 2026-05-26: promoted priority because client surfaces still rely on legacy local_pack signaling while LocalSeoSlice is admin-only.] || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep as still-relevant; correctly framed and now the most actionable of the local set (P1, admin data exists, only client-surface exposure + copy/tier gating remain). The item is correctly framed as a deliberate exposure decision pending data-quality/copy sign-off. BUT it shares a real dependency with intel-quality-keyword-per-market-relevance: exposing per-market visibility to clients before the cross-market-noise fix risks showing clients the 27.5% wrong-market 'top local results'. Recommend either (a) ship client rollout for single-market workspaces first (no cross-market noise), or (b) sequence the per-market relevance fix before multi-market client exposure. Needs a brief owner go/no-go on copy + tier gating, then it's a 5-8h build. || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE into the narrowed the-issue-client-redesign-p1-segments item, which now owns scrubbed local/portfolio client proof in the current client IA."
         },
         {
           "id": "superpowers-mcp-content-edit-orchestration-followup",
@@ -1035,9 +1024,8 @@
           "est": "2d",
           "priority": "P2",
           "sprint": "future",
-          "status": "done",
-          "notes": "Optional polish: codeBlocks → CodeRepository/SoftwareSourceCode (low ROI for agency sites); headings → WebPage.speakable cssSelector (overlaps with schema-engagement-signals; whichever ships first wins). May be skipped if cycles are short. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep as still-relevant but LOW priority, and re-scope to drop the codeBlocks half. The spec itself rates codeBlocks→SoftwareSourceCode as 'low ROI for agency sites' and the roadmap note agrees. The only piece with real SEO value is headings→WebPage.speakable cssSelector, which fully overlaps schema-engagement-signals (per the spec's own §5.3/§ note: 'whichever lands first wins'). Recommendation: fold the speakable cssSelector deliverable into schema-engagement-signals and mark this item obsolete-once-that-ships, or keep it as a thin 'headings extraction + speakable' task. The codeBlocks portion should be explicitly dropped/deferred indefinitely. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: low-ROI code schema is dropped; speakable was evaluated with engagement signals and is not retained for ordinary agency sites.",
-          "shippedAt": "2026-07-12"
+          "status": "closed",
+          "notes": "Optional polish: codeBlocks → CodeRepository/SoftwareSourceCode (low ROI for agency sites); headings → WebPage.speakable cssSelector (overlaps with schema-engagement-signals; whichever ships first wins). May be skipped if cycles are short. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep as still-relevant but LOW priority, and re-scope to drop the codeBlocks half. The spec itself rates codeBlocks→SoftwareSourceCode as 'low ROI for agency sites' and the roadmap note agrees. The only piece with real SEO value is headings→WebPage.speakable cssSelector, which fully overlaps schema-engagement-signals (per the spec's own §5.3/§ note: 'whichever lands first wins'). Recommendation: fold the speakable cssSelector deliverable into schema-engagement-signals and mark this item obsolete-once-that-ships, or keep it as a thin 'headings extraction + speakable' task. The codeBlocks portion should be explicitly dropped/deferred indefinitely. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: low-ROI code schema is dropped; speakable was evaluated with engagement signals and is not retained for ordinary agency sites."
         },
         {
           "id": "schema-engagement-signals",
@@ -1046,9 +1034,8 @@
           "est": "2d",
           "priority": "P1",
           "sprint": "future",
-          "status": "done",
-          "notes": "Article.wordCount shipped in the Blog/Article Schema Quality Hardening pass (May 2026) using visible content extraction instead of full articleBody duplication. Remaining quick-win Tier-4 fields with data the platform already has: Article.timeRequired = wordCount/250wpm rounded; WebPage.speakable with cssSelector pointing to .lead/.intro/first-paragraph — voice-assistant rich result; Article.educationalLevel via AI classification (Beginner/Intermediate/Advanced). All wire through existing PageData typed boundary. No new admin UI required for the basics; speakable cssSelector is a per-template constant. Independent rich-result eligibility unlock for Google Article + voice-search amplification. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: Keep as still-relevant, re-scoped: remove wordCount from the title (it's shipped) and re-frame as the three remaining Tier-4 quick-wins. timeRequired = wordCount/250 is trivial since wordCount already exists. educationalLevel needs a small AI classification step. speakable cssSelector is a per-template constant — and is the SAME deliverable claimed by schema-page-element-catalog-pr3, so consolidate the two: make this item the single owner of speakable and close the PR3 speakable scope here. Net: a ~1-2 day task, not 2 days of net-new for all four. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: wordCount ships; remaining timeRequired, educationalLevel, and speakable fields do not create a supported general agency-site search benefit.",
-          "shippedAt": "2026-07-12"
+          "status": "closed",
+          "notes": "Article.wordCount shipped in the Blog/Article Schema Quality Hardening pass (May 2026) using visible content extraction instead of full articleBody duplication. Remaining quick-win Tier-4 fields with data the platform already has: Article.timeRequired = wordCount/250wpm rounded; WebPage.speakable with cssSelector pointing to .lead/.intro/first-paragraph — voice-assistant rich result; Article.educationalLevel via AI classification (Beginner/Intermediate/Advanced). All wire through existing PageData typed boundary. No new admin UI required for the basics; speakable cssSelector is a per-template constant. Independent rich-result eligibility unlock for Google Article + voice-search amplification. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: Keep as still-relevant, re-scoped: remove wordCount from the title (it's shipped) and re-frame as the three remaining Tier-4 quick-wins. timeRequired = wordCount/250 is trivial since wordCount already exists. educationalLevel needs a small AI classification step. speakable cssSelector is a per-template constant — and is the SAME deliverable claimed by schema-page-element-catalog-pr3, so consolidate the two: make this item the single owner of speakable and close the PR3 speakable scope here. Net: a ~1-2 day task, not 2 days of net-new for all four. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: wordCount ships; remaining timeRequired, educationalLevel, and speakable fields do not create a supported general agency-site search benefit."
         },
         {
           "id": "schema-eeat-amplifiers",
@@ -1057,9 +1044,8 @@
           "est": "1w",
           "priority": "P1",
           "sprint": "future",
-          "status": "done",
-          "notes": "Tier-3 trust signals Google increasingly weighs. Add 4 new optional Workspace fields: publishingPrinciplesUrl, actionableFeedbackPolicyUrl (both → Organization.publishingPrinciples + actionableFeedbackPolicy on every page's @graph). Article.copyrightHolder ref to Organization, copyrightYear from datePublished. Article.reviewedBy as Person from new CMS field 'fact_checker' (optional). Article.isAccessibleForFree from per-tier content gating. Person.jobTitle + worksFor on author when CMS author records have those fields (currently they're just string names). Mostly admin Settings UI work + template emission. Each field is an additive E-E-A-T signal — non-breaking, immediate ranking benefit on YMYL content. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: Keep as still-relevant, re-scoped: drop Person.jobTitle from the title (shipped, with worksFor + hasCredential as a bonus). The remaining real work is the four org/article trust-policy fields: publishingPrinciplesUrl + actionableFeedbackPolicyUrl (new Workspace Settings fields → Organization node), Article.copyrightHolder/copyrightYear (derivable from existing org ref + datePublished — near-free), Article.reviewedBy (needs a new optional CMS 'fact_checker' field), Article.isAccessibleForFree (wire from existing per-tier content gating). Mostly admin Settings UI + template emission, lower effort than the original 1w estimate. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: Person jobTitle/worksFor/hasCredential authority fields ship. Unsupported or usually inapplicable additive fields are dropped unless a real paywalled client requires them.",
-          "shippedAt": "2026-07-12"
+          "status": "closed",
+          "notes": "Tier-3 trust signals Google increasingly weighs. Add 4 new optional Workspace fields: publishingPrinciplesUrl, actionableFeedbackPolicyUrl (both → Organization.publishingPrinciples + actionableFeedbackPolicy on every page's @graph). Article.copyrightHolder ref to Organization, copyrightYear from datePublished. Article.reviewedBy as Person from new CMS field 'fact_checker' (optional). Article.isAccessibleForFree from per-tier content gating. Person.jobTitle + worksFor on author when CMS author records have those fields (currently they're just string names). Mostly admin Settings UI work + template emission. Each field is an additive E-E-A-T signal — non-breaking, immediate ranking benefit on YMYL content. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: Keep as still-relevant, re-scoped: drop Person.jobTitle from the title (shipped, with worksFor + hasCredential as a bonus). The remaining real work is the four org/article trust-policy fields: publishingPrinciplesUrl + actionableFeedbackPolicyUrl (new Workspace Settings fields → Organization node), Article.copyrightHolder/copyrightYear (derivable from existing org ref + datePublished — near-free), Article.reviewedBy (needs a new optional CMS 'fact_checker' field), Article.isAccessibleForFree (wire from existing per-tier content gating). Mostly admin Settings UI + template emission, lower effort than the original 1w estimate. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: Person jobTitle/worksFor/hasCredential authority fields ship. Unsupported or usually inapplicable additive fields are dropped unless a real paywalled client requires them."
         },
         {
           "id": "schema-commerce-types",
@@ -1088,9 +1074,8 @@
           "est": "2-3w",
           "priority": "P1",
           "sprint": "I",
-          "status": "done",
-          "notes": "Follow-up to lean-schema-rewrite. Re-injects the platform's intelligence layer surgically into schema generation after the current deterministic schema path is stable: (1) Healthcare type escalation through canonical seoContext/business profile signals, falling back to LocalBusiness only when evidence supports it. (2) FAQ enrichment from GSC question queries via a new slice-backed helper if this feature is revived; the old unused extractFaqOpportunities/schema prompt block was removed in Workspace Intelligence Consolidation PR4. (3) E-E-A-T author injection from content brief evidence into Article.author with Person.knowsAbout/sameAs. (4) Service serviceType from voice profile + business profile. Any revived intelligence enrichment must flow through buildSchemaIntelligence() or another documented central intelligence builder, not direct raw workspace reads. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · medium conf]: Keep as still-relevant but significantly re-scope down. Two of four sub-features are effectively shipped (evidence-based healthcare escalation via semantics.businessType + industrySubtype; E-E-A-T author injection via the eeat-assets slice and article.ts). The remaining genuine work is narrow: (2) FAQ enrichment from GSC question queries (the only sizable piece — needs a new slice-backed helper since the old path was deleted) and (4) wiring serviceType from voice/business profile. Re-frame the item around just those two, flowing through the already-built buildSchemaIntelligence() facade. Drop the original 2-3w estimate to ~1w. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: healthcare escalation, E-E-A-T authorship, and serviceType ship. GSC questions belong in content/AEO ideation, not schema injection; visible-content FAQ extraction stays canonical.",
-          "shippedAt": "2026-07-12"
+          "status": "closed",
+          "notes": "Follow-up to lean-schema-rewrite. Re-injects the platform's intelligence layer surgically into schema generation after the current deterministic schema path is stable: (1) Healthcare type escalation through canonical seoContext/business profile signals, falling back to LocalBusiness only when evidence supports it. (2) FAQ enrichment from GSC question queries via a new slice-backed helper if this feature is revived; the old unused extractFaqOpportunities/schema prompt block was removed in Workspace Intelligence Consolidation PR4. (3) E-E-A-T author injection from content brief evidence into Article.author with Person.knowsAbout/sameAs. (4) Service serviceType from voice profile + business profile. Any revived intelligence enrichment must flow through buildSchemaIntelligence() or another documented central intelligence builder, not direct raw workspace reads. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · medium conf]: Keep as still-relevant but significantly re-scope down. Two of four sub-features are effectively shipped (evidence-based healthcare escalation via semantics.businessType + industrySubtype; E-E-A-T author injection via the eeat-assets slice and article.ts). The remaining genuine work is narrow: (2) FAQ enrichment from GSC question queries (the only sizable piece — needs a new slice-backed helper since the old path was deleted) and (4) wiring serviceType from voice/business profile. Re-frame the item around just those two, flowing through the already-built buildSchemaIntelligence() facade. Drop the original 2-3w estimate to ~1w. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: healthcare escalation, E-E-A-T authorship, and serviceType ship. GSC questions belong in content/AEO ideation, not schema injection; visible-content FAQ extraction stays canonical."
         },
         {
           "id": "schema-pillar-3-gates",
@@ -1143,8 +1128,7 @@
           "est": "8-10h",
           "priority": "P3",
           "notes": "Comments on strategy items, @mentions on briefs, shared notes. Per-seat pricing opportunity. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: Keep as still-relevant but re-frame: the generic 'collaboration' need is being incrementally met by the inbox conversation threads, so DON'T build a parallel comment system — extend the existing thread/note model to strategy items and briefs rather than introducing @mentions/shared-notes as a separate feature. This is the largest item (8-10h, P3) and the 'per-seat pricing opportunity' makes it a needs-owner-decision on monetization strategy. Recommend deferring until client base justifies multi-seat collaboration; it duplicates item 32's 'shared notes'. || [DEDUPE 2026-06-24]: the shared-notes sub-scope is owned by item 32 (Shared notes/wiki per workspace) — extend the existing work-order conversation threads to strategy items + briefs; do NOT build a parallel notes/comment system. Per-seat pricing is an owner decision. || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE: recommendation discussions, work-order comments, and content-request conversations ship. Private workspace notes remain owned only by item 32.",
-          "status": "done",
-          "shippedAt": "2026-07-12"
+          "status": "closed"
         },
         {
           "id": 20,
@@ -1170,8 +1154,7 @@
           "est": "6-8h",
           "priority": "P2",
           "notes": "Let users pin/unpin modules on Workspace Home, rearrange widget order, choose sizes (compact/full/wide). Save per-workspace layouts to localStorage or workspace config. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep as still-relevant but genuinely optional P2/P3 polish. Framing still accurate. This is admin-only ergonomics (the founder is the only admin), so ROI is modest vs the client-facing items in this batch — consider deprioritizing rather than building soon. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: the owner-approved fixed Cockpit now provides intentional home hierarchy. User-arranged legacy widgets would reintroduce a competing information architecture.",
-          "status": "done",
-          "shippedAt": "2026-07-12"
+          "status": "closed"
         },
         {
           "id": 541,
@@ -1180,8 +1163,7 @@
           "est": "4-6h",
           "priority": "P3",
           "notes": "Swipeable insight cards: 'LCP improved 23%', '3 pages need schema', 'Competitor published 5 articles'. Auto-generated from anomaly detection + audit + strategy data.\n[Audit 2026-04-22 partial] Filterable insight feed UI shipped (src/components/insights/InsightFeed + InsightFeedItem + filter chips); swipeable vertical-feed presentation not built. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: Keep the underlying need (surface actionable insights) but DROP the 'TikTok-style swipeable' presentation framing — poor fit for a B2B SEO analytics tool, and the practical value (filterable, prioritized insight list) is already delivered. Re-scope to 'extend insight feed coverage / client-facing variant' if still wanted, or close the swipeable-UI portion as obsolete. Low priority (P3). || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: the actionable filterable Insight Feed ships; swipe/TikTok mechanics are a poor fit for an operator workflow.",
-          "status": "done",
-          "shippedAt": "2026-07-12"
+          "status": "closed"
         },
         {
           "id": 542,
@@ -1190,8 +1172,7 @@
           "est": "4-6h",
           "priority": "P3",
           "notes": "Expand from navigation to actions: 'Generate schema for [page]', 'Create brief for [keyword]', 'Run audit'. Natural language: 'Show thin content pages'.\n[Audit 2026-04-22 partial] CommandPalette.tsx scaffolds an \"action\" item type alongside nav/workspace/recent, but no natural-language action handlers are wired (no LLM call, no parameterised \"Generate schema for [page]\"). || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: Keep but re-scope to the precise unbuilt delta: NL parsing + parameterized actions. The executable-action layer (run audit, scan anomalies as real jobs) already exists — update the item to acknowledge that and target only the NL/param layer. Low priority (P3) for a single-admin tool; the deterministic action list already covers common verbs. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: deterministic in-app palette actions ship, while natural-language parameterized actions now belong to MCP and external agents.",
-          "status": "done",
-          "shippedAt": "2026-07-12"
+          "status": "closed"
         },
         {
           "id": 514,
@@ -1218,8 +1199,7 @@
           "est": "4-6h",
           "priority": "P2",
           "notes": "Add ARIA landmarks, focus management for modals, keyboard navigation for complex widgets. Skip links. Test with screen reader (NVDA/VoiceOver).\n[Audit 2026-04-22 partial] 63 aria-label usages across 20 components ship; ARIA landmark roles, skip-links, and modal focus-management are not implemented. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: This is the most accurately-scoped of the three a11y items — make it the canonical WCAG-AA epic and fold 43 + 44 into it (all three are the same work). Re-scope the residual: (1) add ARIA landmarks to the app shell, (2) add a skip link in App.tsx, (3) screen-reader smoke test. The modal-focus line item can be checked off. P2 priority is defensible if pursuing accessibility-conscious clients or compliance positioning. || [MERGE 2026-06-24]: canonical WCAG-AA epic — absorbed item 43 (Accessibility audit expansion: WCAG contrast/ARIA/heading order/form labels) + item 44 (WCAG AA full compliance: focus indicators, keyboard nav). Residual across all three = skip links, ARIA landmark roles, automated axe/heading/contrast check, SR smoke test; modal focus already ships. || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE into completed ui-rebuild-f2b-gates: landmarks, skip navigation, shared focus management, and automated axe coverage ship. Manual screen-reader/contrast checks remain release QA.",
-          "status": "done",
-          "shippedAt": "2026-07-12"
+          "status": "closed"
         },
         {
           "id": 52,
@@ -1282,8 +1262,7 @@
           "est": "2-3h",
           "priority": "P3",
           "notes": "Re-generate schemas on cadence, flag stale pages. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep as still-relevant, P3, small. The original 2-3h estimate is plausible because the hard parts (publish dates, regen path, queue infra) already exist. Two concrete deliverables: (a) add a stale computation to toAdminSchemaPageSuggestionView comparing lastPublishedAt against the schema snapshot's generatedAt to flag stale pages in the existing Schema UI; (b) add a lightweight scheduled regeneration trigger following the established recommendation-regen-scheduler.ts pattern. No new architecture needed — frame as 'wire existing publish-date + regen primitives into a cadence + stale badge.' || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: stale visibility and explicit regeneration ship; blind cadence would conflict with evidence fingerprints and operator edits. Reopen only as content-change-driven refresh with approval.",
-          "status": "done",
-          "shippedAt": "2026-07-12"
+          "status": "closed"
         },
         {
           "id": 41,
@@ -1356,8 +1335,7 @@
           "est": "3-4h",
           "priority": "P4",
           "notes": "Push prospect data to HubSpot/Pipedrive. || [AUDIT 2026-06-24 · OWNER DECISION · high conf]: Escalate to needs-owner-decision rather than auto-keep. This is a P4 outbound-sales/GTM bet: it only has value if the founder runs an outbound-prospecting motion that lives in HubSpot/Pipedrive. There is no evidence of that workflow in the platform (no CRM, no prospect pipeline, no lead model beyond ad-hoc sales reports). Recommend the owner confirm whether outbound-via-CRM is part of the business model; if not, mark obsolete-remove. If yes, it is a clean greenfield build dependent on which CRM is actually used. || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE into the canonical deferred CRM reconciliation item. Any future CRM provider substrate should serve both prospect push and client outcome reconciliation.",
-          "status": "done",
-          "shippedAt": "2026-07-12"
+          "status": "closed"
         },
         {
           "id": 108,
@@ -1366,8 +1344,7 @@
           "est": "8-12h",
           "priority": "P4",
           "notes": "Historical GSC data + Google Trends API + seasonal patterns → predict growing keywords 30-90 days out. || [AUDIT 2026-06-24 · KEEP — still relevant · high conf]: Keep, but re-scope and explicitly LINK to ov-seasonality-monthly-volumes — they share the same missing substrate (a per-keyword monthly series over time) and the same 'seasonal pattern' goal. Recommend MERGING the predictive layer with the seasonality item: build the durable monthly series + seasonal-event emitter first (seasonality item), then the 'predict growing keywords 30-90 days out' surface becomes a thin read on top. Note the FEATURE_VISION '8-12h' estimate is optimistic given the Google Trends integration and series-accrual (>=1yr) prerequisites. P4 priority is appropriate. || [MERGE 2026-06-24]: shares substrate with ov-seasonality-monthly-volumes (durable 12-month volume series). Build the monthly series + seasonal emitter THERE first; this item is then the thin \"predict growing keywords\" read on top — do not duplicate the series work. || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE into ov-seasonality-monthly-volumes, now the single owner of durable series, seasonality, and predictive reads.",
-          "status": "done",
-          "shippedAt": "2026-07-12"
+          "status": "closed"
         },
         {
           "id": 109,
@@ -1394,8 +1371,7 @@
           "est": "15-20h",
           "priority": "P4",
           "notes": "GBP integration, local keyword tracking, citation monitoring. Add-on $99-149/mo. || [AUDIT 2026-06-24 · PARTIALLY DONE — re-scope to remaining delta · high conf]: Re-scope and largely close this umbrella item. The 'local keyword tracking' pillar is delivered and should be marked done within this entry. The remaining live sub-features have already been split into more precise, individually-tracked items: GBP→intel-quality-google-business-profile-health, reviews→intel-quality-google-reviews-local-reputation, geo-grid→intel-quality-local-geo-grid-tracking, client surface→intel-quality-client-local-seo-dashboard-rollout. Citation monitoring is the only sub-feature with NO successor item. Recommendation: rewrite item 112's notes to reflect that local keyword tracking shipped, point to the four intel-quality successor items, and EITHER spin citation monitoring + the $99-149 add-on monetization into their own explicit items OR fold the monetization question into a needs-owner-decision. As written, item 112 is stale (it predates and is mostly superseded by the v1 build) and should not stay as a single P4 blob. || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE: local visibility, GBP OAuth/mapping, authenticated reviews/replies, and rebuilt Local Presence ship. Track only explicit geo-grid/citation/client successors.",
-          "status": "done",
-          "shippedAt": "2026-07-12"
+          "status": "closed"
         },
         {
           "id": 118,
@@ -1844,16 +1820,15 @@
           "source": "Delta audit 2026-06-24",
           "est": "S",
           "priority": "P3",
-          "status": "done",
+          "status": "closed",
           "createdAt": "2026-06-24",
-          "notes": "DELTA AUDIT follow-on. The 4 reserved flags (the-issue-client-reconciliation/-next-bets/-segment-inserts, strategy-paid-topics) were marked lifecycle.status:\"reserved\" in this audit's fix PR (verifier now exempts them from the stale nag). The remaining cleanup — deferred because it touches in-flight feature code — is to delete the && null inert placeholders (TheIssueClientPage.tsx:335-336) and trim resolveSegmentProfile to the one consumed field (showCompetitorAuthority) — to be done WHEN the segment-inserts feature ships, not before. || [TAIL TRIAGE 2026-06-27]: reclassified pending -> deferred because the note explicitly ties implementation to the segment-inserts ship point. Re-entry: segment-inserts ships or the owner cancels it and asks to remove the reserved stubs. || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE into the narrowed client segment follow-on; no separate reserved-flag cleanup item remains.",
-          "shippedAt": "2026-07-12"
+          "notes": "DELTA AUDIT follow-on. The 4 reserved flags (the-issue-client-reconciliation/-next-bets/-segment-inserts, strategy-paid-topics) were marked lifecycle.status:\"reserved\" in this audit's fix PR (verifier now exempts them from the stale nag). The remaining cleanup — deferred because it touches in-flight feature code — is to delete the && null inert placeholders (TheIssueClientPage.tsx:335-336) and trim resolveSegmentProfile to the one consumed field (showCompetitorAuthority) — to be done WHEN the segment-inserts feature ships, not before. || [TAIL TRIAGE 2026-06-27]: reclassified pending -> deferred because the note explicitly ties implementation to the segment-inserts ship point. Re-entry: segment-inserts ships or the owner cancels it and asks to remove the reserved stubs. || [ROADMAP VALUE AUDIT 2026-07-12] RESCOPE-MERGE into the narrowed client segment follow-on; no separate reserved-flag cleanup item remains."
         }
       ]
     },
     {
       "id": "sprint-ui-rebuild-parity-recovery-2026-07-09",
-      "name": "✅ SHIPPED — UI Rebuild - prototype parity recovery and staged extraction",
+      "name": "UI Rebuild - prototype parity recovery and staged extraction",
       "hours": "phased - isolated integration sandbox, then one staging PR per dependency",
       "rationale": "Use Cockpit and the hmpsn studio prototype as behavior-first calibration surfaces. Prove interaction, routing, capability homes, typography, navigation, and desktop composition in an isolated flag-gated branch before extracting small staging PRs. Integration acceptance is not production shipment.",
       "items": [
@@ -1874,11 +1849,10 @@
           "source": "docs/ui-rebuild/parity/shipping-manifest.md",
           "est": "phased",
           "priority": "P1",
-          "status": "done",
+          "status": "closed",
           "createdAt": "2026-07-09",
           "owner": "workspace-command-center",
-          "notes": "Dormant during the active visual-parity goal. Do not start staging extraction unless Joshua explicitly authorizes it after the owner-approval sequence. When authorized, start each shipping branch from staging and extract governance, typography authority, shell/nav, then one approved surface per PR; never open the integration sandbox itself as one giant PR. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: PR #1519 (f4278712f) banked the owner-approved parity stack directly on staging, so the unused dependency-ordered extraction plan is no longer actionable.",
-          "shippedAt": "2026-07-12"
+          "notes": "Dormant during the active visual-parity goal. Do not start staging extraction unless Joshua explicitly authorizes it after the owner-approval sequence. When authorized, start each shipping branch from staging and extract governance, typography authority, shell/nav, then one approved surface per PR; never open the integration sandbox itself as one giant PR. || [ROADMAP VALUE AUDIT 2026-07-12] OBSOLETE-CLOSE: PR #1519 (f4278712f) banked the owner-approved parity stack directly on staging, so the unused dependency-ordered extraction plan is no longer actionable."
         },
         {
           "id": "ui-rebuild-engine-owner-visual-recheck",
@@ -1963,8 +1937,7 @@
           "owner": "content-production",
           "notes": "Completed in codex/ui-visual-parity and explicitly owner-approved by Joshua as part of the Page Intelligence plus Content Performance receiving-home bundle. Pipeline Published owns the prototype-led four-stat/result-card composition and server-authoritative readback summary. The nonexistent refresh mutation was removed, matrix/request items have stable identities, trends return typed availability and load only after intentional Drawer open to avoid N live GSC calls, public items omit admin outcome internals, and ?tab=published&item= deep links initialize and clear truthfully. Flag-on /content-perf bookmarks redirect with item identity and the rebuilt sidebar removes the duplicate; flag-off keeps the legacy route/nav. Browser evidence at both fixed viewports is under /tmp/asset-dashboard-codex-visual-parity/content-performance/; the owner workspace is truthfully empty while populated composition is component-fixture protected. Status: owner-approved; rendered review and automated PASS are supporting evidence only, while Joshua's explicit approval is the acceptance source."
         }
-      ],
-      "shippedAt": "2026-07-12"
+      ]
     },
     {
       "id": "sprint-ui-rebuild-2026-07-05",
