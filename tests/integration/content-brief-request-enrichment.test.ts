@@ -149,6 +149,7 @@ function makeMockBriefResponse() {
     wordCountTarget: 1200,
     intent: 'informational',
     audience: 'Test audience',
+    competitorInsights: 'Competitors provide introductory guides.',
     internalLinkSuggestions: [],
     ctaRecommendations: [],
     topicalEntities: [],

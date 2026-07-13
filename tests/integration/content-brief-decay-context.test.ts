@@ -61,6 +61,10 @@ function makeMockBriefResponse() {
     toneAndStyle: 'tone',
     outline: [{ heading: 'H', notes: 'n', wordCount: 100 }],
     wordCountTarget: 1000,
+    intent: 'informational',
+    audience: 'Homeowners researching plumbing services',
+    competitorInsights: 'Competitors emphasize availability and local expertise.',
+    internalLinkSuggestions: [],
   };
 }
 
