@@ -205,6 +205,16 @@ describe('PATCH /api/roadmap/item/:id', () => {
     expect(body.item.status).toBe('pending');
   });
 
+  it('updates status to "deferred" successfully', async () => {
+    const res = await patchJson(`/api/roadmap/item/${ITEM_ID}?sprintId=${SPRINT_ID}`, {
+      status: 'deferred',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { ok: boolean; item: { status: string } };
+    expect(body.ok).toBe(true);
+    expect(body.item.status).toBe('deferred');
+  });
+
   it('updates notes field without touching status', async () => {
     const res = await patchJson(`/api/roadmap/item/${ITEM_ID}?sprintId=${SPRINT_ID}`, {
       notes: 'Integration test note',

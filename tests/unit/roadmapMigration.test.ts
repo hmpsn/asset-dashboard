@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ROADMAP_STATUSES } from '../../shared/types/roadmap.js';
 
 function loadRoadmap(file: string) {
   const raw = fs.readFileSync(path.resolve(file), 'utf-8');
@@ -8,6 +9,14 @@ function loadRoadmap(file: string) {
 }
 
 describe('roadmap data integrity', () => {
+  it('active roadmap uses only canonical shared statuses', () => {
+    const { sprints } = loadRoadmap('data/roadmap.json');
+    const items = sprints.flatMap(sprint => sprint.items);
+    expect(items.length).toBeGreaterThan(0);
+    const invalid = items.filter(item => !ROADMAP_STATUSES.includes(item.status as (typeof ROADMAP_STATUSES)[number]));
+    expect(invalid).toEqual([]);
+  });
+
   it('active roadmap does not carry monthly shipped archive buckets', () => {
     const { sprints } = loadRoadmap('data/roadmap.json');
     const archiveBuckets = sprints.filter(s => s.id.startsWith('shipped-'));

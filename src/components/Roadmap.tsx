@@ -88,7 +88,7 @@ export function Roadmap() {
     const cache = queryClient.getQueryData<SprintData[]>(queryKeys.admin.roadmap()) ?? [];
     const sprint = cache.find(s => s.id === sprintId);
     const item = sprint?.items.find(i => i.id === itemId);
-    if (!item) return;
+    if (!item || item.status === 'deferred') return;
     const idx = STATUS_CYCLE.indexOf(item.status);
     const newStatus = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
     toggleMutation.mutate({ itemId, sprintId, newStatus });
@@ -118,14 +118,15 @@ export function Roadmap() {
   const done = allItems.filter(i => i.status === 'done').length;
   const inProgress = allItems.filter(i => i.status === 'in_progress').length;
   const pending = allItems.filter(i => i.status === 'pending').length;
+  const deferred = allItems.filter(i => i.status === 'deferred').length;
   const total = allItems.length;
-  const currentSprint = roadmap.find(s => s.items.some(i => i.status !== 'done'));
+  const currentSprint = roadmap.find(s => s.items.some(i => i.status === 'pending' || i.status === 'in_progress'));
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Roadmap"
-        subtitle={`${total} items · ${done} done · ${inProgress} active · ${pending} pending`}
+        subtitle={`${total} items · ${done} done · ${inProgress} active · ${pending} pending · ${deferred} on hold`}
         icon={<MapIcon className="w-5 h-5 text-accent-brand" />}
       />
 
@@ -152,6 +153,7 @@ export function Roadmap() {
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-[var(--radius-pill)] bg-emerald-500" /> Done ({done})</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-[var(--radius-pill)] bg-teal-400" /> Active ({inProgress})</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-[var(--radius-pill)] bg-[var(--brand-border-hover)]" /> Pending ({pending})</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-[var(--radius-pill)] bg-[var(--brand-text-dim)]" /> On hold ({deferred})</span>
           </div>
         </div>
       </SectionCard>

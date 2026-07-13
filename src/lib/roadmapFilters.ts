@@ -1,10 +1,10 @@
-import type { RoadmapItem } from '../../shared/types/roadmap';
+import { ROADMAP_STATUSES, type RoadmapItem, type RoadmapStatus } from '../../shared/types/roadmap';
 
 export type Priority = 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
-export type Status = 'done' | 'in_progress' | 'pending';
+export type Status = RoadmapStatus;
 
 export const PRIORITY_VALUES: readonly Priority[] = ['P0', 'P1', 'P2', 'P3', 'P4'];
-export const STATUS_VALUES: readonly Status[] = ['done', 'in_progress', 'pending'];
+export const STATUS_VALUES: readonly Status[] = ROADMAP_STATUSES;
 
 export type FilterValue<T extends string> = 'all' | T;
 
@@ -47,7 +47,7 @@ export type SortDir = 'asc' | 'desc';
 export type FlatRoadmapItem = RoadmapItem & { sprintId: string; sprintName: string };
 
 const PRIORITY_ORDER: Record<Priority, number> = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
-const STATUS_ORDER: Record<Status, number> = { in_progress: 0, pending: 1, done: 2 };
+const STATUS_ORDER: Record<Status, number> = { in_progress: 0, pending: 1, deferred: 2, done: 3 };
 
 /**
  * Best-effort numeric estimate (hours) parsed from human-readable strings:

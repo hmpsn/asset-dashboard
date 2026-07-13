@@ -4,7 +4,7 @@ import type { RoadmapDisplayRow, RoadmapPriority, RoadmapRuntimeStatus } from '.
 export type SortKey = 'priority' | 'status' | 'sprint' | 'createdAt' | 'title' | 'est';
 export type SortDir = 'asc' | 'desc';
 
-export const STATUS_CYCLE: readonly RoadmapItem['status'][] = ['pending', 'in_progress', 'done'];
+export const STATUS_CYCLE = ['pending', 'in_progress', 'done'] as const satisfies readonly Exclude<RoadmapItem['status'], 'deferred'>[];
 export const RUNTIME_STATUSES: readonly RoadmapRuntimeStatus[] = ['pending', 'in_progress', 'done', 'deferred'];
 export const PRIORITIES: readonly RoadmapPriority[] = ['P0', 'P1', 'P2', 'P3', 'P4'];
 

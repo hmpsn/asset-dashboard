@@ -16,6 +16,7 @@ const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
   { value: 'pending', label: '○ Pending' },
   { value: 'in_progress', label: '◑ In Progress' },
+  { value: 'deferred', label: '‖ On Hold' },
   { value: 'done', label: '● Done' },
 ];
 

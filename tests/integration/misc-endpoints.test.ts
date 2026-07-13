@@ -107,11 +107,11 @@ describe('PATCH /api/roadmap/item/:id — Zod validation, sprint scoping, field 
   // the end so the test is idempotent across runs.
   let sprintId = '';
   let itemId: number | string = 0;
-  let originalStatus: 'pending' | 'in_progress' | 'done' = 'pending';
+  let originalStatus: 'pending' | 'in_progress' | 'done' | 'deferred' = 'pending';
 
   beforeAll(async () => {
     const res = await api('/api/roadmap');
-    const body = await res.json() as { sprints: Array<{ id: string; items: Array<{ id: number | string; status: 'pending' | 'in_progress' | 'done' }> }> };
+    const body = await res.json() as { sprints: Array<{ id: string; items: Array<{ id: number | string; status: 'pending' | 'in_progress' | 'done' | 'deferred' }> }> };
     const sprint = body.sprints.find(s => s.items.length > 0);
     if (!sprint) throw new Error('No sprint with items found in roadmap.json — cannot run PATCH integration tests');
     sprintId = sprint.id;

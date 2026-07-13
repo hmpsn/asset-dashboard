@@ -12,10 +12,11 @@ import { getDataDir } from '../data-dir.js';
 import { isProgrammingError } from '../errors.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
+import { ROADMAP_STATUSES } from '../../shared/types/roadmap.js';
 
 const patchItemSchema = z
   .object({
-    status: z.enum(['done', 'in_progress', 'pending']).optional(),
+    status: z.enum(ROADMAP_STATUSES).optional(),
     notes: z.string().optional(),
     shippedAt: z.string().optional(),
   })
