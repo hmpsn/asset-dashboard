@@ -20,6 +20,7 @@ import { outlineItemSchema } from './schemas/content-schemas.js';
 import {
   parseContentBriefOutline,
   parseContentBriefSchema,
+  parseContentBriefUpdate,
 } from './schemas/ai-content-brief.js';
 import { isProgrammingError } from './errors.js';
 import { createLogger } from './logger.js';
@@ -829,7 +830,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   });
 
   const raw = aiResult.text || '{}';
-  const parsed = parseContentBriefSchema(raw);
+  const parsed = parseContentBriefUpdate(raw);
 
   // Create a new brief ID — preserves the old one for history
   const newBrief: ContentBrief = {

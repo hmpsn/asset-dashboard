@@ -8,6 +8,7 @@ const broadcastState = vi.hoisted(() => ({
 
 const generationState = vi.hoisted(() => ({
   failVoiceContext: false,
+  failStage: null as 'introduction' | 'section' | 'conclusion' | null,
 }));
 
 vi.mock('../../server/broadcast.js', () => ({
@@ -36,11 +37,18 @@ vi.mock('../../server/content-posts-ai.js', async importOriginal => {
       }
       return 'calibrated-voice';
     }),
-    generateIntroduction: vi.fn(async () => '<p>Draft introduction for the generated post.</p>'),
-    generateSection: vi.fn(async (_brief, section: { heading: string }, index: number) =>
-      `<p>${section.heading} body ${index + 1} with practical guidance.</p>`
-    ),
-    generateConclusion: vi.fn(async () => '<p>Draft conclusion with a clear next step.</p>'),
+    generateIntroduction: vi.fn(async () => {
+      if (generationState.failStage === 'introduction') throw new Error('<b>intro provider failed</b>');
+      return '<p>Draft introduction for the generated post.</p>';
+    }),
+    generateSection: vi.fn(async (_brief, section: { heading: string }, index: number) => {
+      if (generationState.failStage === 'section') throw new Error('<b>section provider failed</b>');
+      return `<p>${section.heading} body ${index + 1} with practical guidance.</p>`;
+    }),
+    generateConclusion: vi.fn(async () => {
+      if (generationState.failStage === 'conclusion') throw new Error('<b>conclusion provider failed</b>');
+      return '<p>Draft conclusion with a clear next step.</p>';
+    }),
     unifyPost: vi.fn(async () => null),
     generateSeoMeta: vi.fn(async () => ({
       seoTitle: 'Generated SEO Title',
@@ -211,6 +219,7 @@ beforeEach(() => {
   resetWorkspaceState();
   broadcastState.calls = [];
   generationState.failVoiceContext = false;
+  generationState.failStage = null;
 });
 
 afterAll(async () => {
@@ -314,6 +323,35 @@ describe('content post generation mutation safety', () => {
       }),
     ]));
   });
+
+  it.each(['introduction', 'section', 'conclusion'] as const)(
+    'persists useful partial output as needs_attention when the %s stage fails without success semantics',
+    async (stage) => {
+      const briefId = `brief-partial-${stage}`;
+      seedBrief(briefId);
+      generationState.failStage = stage;
+
+      const startRes = await postJson(`/api/content-posts/${workspaceId}/generate`, { briefId });
+      expect(startRes.status).toBe(200);
+      const started = await startRes.json() as { id: string; jobId: string };
+
+      const job = await waitForJob(started.jobId);
+      expect(job.status).toBe('error');
+      expect(job.result).toMatchObject({ postId: started.id, status: 'needs_attention' });
+
+      const post = getPost(workspaceId, started.id);
+      expect(post?.status).toBe('needs_attention');
+      expect(post?.generationDiagnostics).toEqual([
+        expect.objectContaining({ stage, code: 'provider_error' }),
+      ]);
+      expect(post?.generationDiagnostics?.[0].message).not.toContain('<');
+      expect(activityTitles('post_generated')).toEqual([]);
+      expect(broadcastState.calls).toContainEqual(expect.objectContaining({
+        event: WS_EVENTS.POST_UPDATED,
+        payload: expect.objectContaining({ postId: started.id, status: 'needs_attention' }),
+      }));
+    },
+  );
 
   it('marks the post and job as failed when generation crashes after the skeleton write', async () => {
     const briefId = 'brief-mutation-failure';

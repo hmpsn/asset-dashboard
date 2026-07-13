@@ -98,7 +98,9 @@ function summarizeInsightsForClient(insights: InsightsSlice): ClientInsightsSumm
 
 function formatPipelineForClient(pipeline: ContentPipelineSlice): ClientPipelineStatus {
   const inProgressBriefStatuses = ['in_review', 'ai_generated', 'draft'];
-  const inProgressPostStatuses = ['draft', 'in_review', 'scheduled'];
+  // GeneratedPost has never used the stale `in_review` / `scheduled` literals.
+  // Scheduling is represented by plannedPublishAt; lifecycle review is `review`.
+  const inProgressPostStatuses = ['generating', 'needs_attention', 'draft', 'review'];
   return {
     briefs: {
       total: pipeline.briefs.total,

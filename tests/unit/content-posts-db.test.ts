@@ -278,6 +278,36 @@ describe('getPublishedPostCountsByMonth', () => {
   });
 });
 
+describe('generated-post needs_attention lifecycle', () => {
+  let ws: SeededFullWorkspace;
+
+  beforeAll(() => {
+    ws = seedWorkspace();
+  });
+  afterAll(() => {
+    ws?.cleanup();
+  });
+
+  it('allows a partial initial generation to enter needs_attention and be retried', () => {
+    const id = randomUUID();
+    savePost(ws.workspaceId, makePost(id, ws.workspaceId, null, 'generating'));
+
+    const partial = updatePostField(ws.workspaceId, id, { status: 'needs_attention' });
+    expect(partial?.status).toBe('needs_attention');
+
+    const retried = updatePostField(ws.workspaceId, id, { status: 'generating' });
+    expect(retried?.status).toBe('generating');
+  });
+
+  it('allows an operator-repaired partial artifact to become a draft', () => {
+    const id = randomUUID();
+    savePost(ws.workspaceId, makePost(id, ws.workspaceId, null, 'generating'));
+    updatePostField(ws.workspaceId, id, { status: 'needs_attention' });
+
+    expect(updatePostField(ws.workspaceId, id, { status: 'draft' })?.status).toBe('draft');
+  });
+});
+
 describe('savePost persistence integrity', () => {
   let ws: SeededFullWorkspace;
 

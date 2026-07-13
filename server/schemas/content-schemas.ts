@@ -90,6 +90,14 @@ export const postSectionSchema = z.object({
 
 export const postSectionsArraySchema = z.array(postSectionSchema);
 
+export const contentPostGenerationDiagnosticSchema = z.object({
+  stage: z.enum(['introduction', 'section', 'conclusion']),
+  code: z.enum(['provider_error', 'invalid_output', 'cancelled']),
+  message: z.string(),
+  sectionIndex: z.number().int().min(0).optional(),
+  occurredAt: z.string(),
+}).strip();
+
 export const reviewChecklistSchema = z.object({
   factual_accuracy: z.boolean(),
   brand_voice: z.boolean(),
