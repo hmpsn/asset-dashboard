@@ -103,6 +103,20 @@ describe('content-gap vote v2 compatibility', () => {
     `).get(WORKSPACE_ID)).toEqual(before);
   });
 
+  it('does not delete a legacy-only v1 vote through a meaning-distinct raw fallback', () => {
+    db.prepare(`
+      INSERT INTO content_gap_votes (workspace_id, keyword, vote, voted_by, updated_at)
+      VALUES (?, 'c', 'down', 'legacy@example.com', datetime('now'))
+    `).run(WORKSPACE_ID);
+
+    expect(clearContentGapVote(WORKSPACE_ID, 'C#')).toBe(false);
+    expect(listContentGapVotes(WORKSPACE_ID)).toEqual([
+      expect.objectContaining({ keyword: 'c', vote: 'down' }),
+    ]);
+    expect(clearContentGapVote(WORKSPACE_ID, 'c')).toBe(true);
+    expect(listContentGapVotes(WORKSPACE_ID)).toEqual([]);
+  });
+
   it('rebuilds every retained v1 alias projection when a v2-equivalent raw spelling changes', () => {
     setContentGapVote(WORKSPACE_ID, 'C#', 'up', null);
     setContentGapVote(WORKSPACE_ID, 'Ｃ#', 'down', null);

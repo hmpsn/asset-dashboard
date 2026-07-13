@@ -289,7 +289,8 @@ export function setContentGapVote(
 }
 
 export function clearContentGapVote(workspaceId: string, keyword: string): boolean {
-  const identity = keywordIdentityKeys(keyword.trim());
+  const rawKeyword = keyword.trim();
+  const identity = keywordIdentityKeys(rawKeyword);
   if (!identity.v2 && !identity.v1) return false;
 
   return db.transaction(() => {
@@ -310,7 +311,10 @@ export function clearContentGapVote(workspaceId: string, keyword: string): boole
         return deleted;
       }
     }
-    if (!identity.v1) return false;
+    // Legacy rows have no recoverable raw identity. Only an exact historical
+    // key may delete them; falling back from C# to lossy v1 `c` would erase a
+    // potentially meaning-distinct legacy C decision.
+    if (!identity.v1 || rawKeyword !== identity.v1) return false;
     const archiveDeleted = stmts().deleteLegacyArchive.run(workspaceId, identity.v1).changes > 0;
     const mainDeleted = stmts().deleteUnmarkedLegacy.run(workspaceId, identity.v1).changes > 0;
     return archiveDeleted || mainDeleted;
