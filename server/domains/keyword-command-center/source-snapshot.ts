@@ -14,7 +14,10 @@ import type { Workspace } from '../../../shared/types/workspace.js';
 import type { LatestRank, TrackedKeyword } from '../../../shared/types/rank-tracking.js';
 import { getLocalSeoPosture } from '../../local-seo.js';
 import type { ScoringContext } from '../../scoring/keyword-value-score.js';
-import { countLocalSeoKeywordCandidatesFromLoadedContext } from '../local-seo/candidate-service.js';
+import {
+  countLocalSeoKeywordCandidatesFromLoadedContext,
+  type LocalSeoKeywordCandidateLoadedContext,
+} from '../local-seo/candidate-service.js';
 
 export interface KeywordCommandCenterSourceSnapshot {
   workspace: Workspace;
@@ -30,6 +33,7 @@ export interface KeywordCommandCenterSourceSnapshot {
   localVisibilityByKeyword?: Map<string, LocalSeoKeywordVisibilitySummary>;
   activeLocalMarketCount?: number;
   localCandidatesCount?: number;
+  localCandidateContext?: LocalSeoKeywordCandidateLoadedContext;
   geoLabel?: string;
   trafficValueMonthly?: number | null;
   topicClusters?: import('../../../shared/types/workspace.js').TopicCluster[];
@@ -54,7 +58,12 @@ function rankFreshness(snapshotDate: string | null, now = Date.now()): KeywordRa
 
 export function buildKeywordCommandCenterSourceSnapshot(
   workspaceId: string,
-  options: { includeLocalSeo?: boolean; includeSummary?: boolean; includeScoring?: boolean } = {},
+  options: {
+    includeLocalSeo?: boolean;
+    includeSummary?: boolean;
+    includeScoring?: boolean;
+    includeLocalCandidates?: boolean;
+  } = {},
 ): KeywordCommandCenterSourceSnapshot | null {
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return null;
@@ -68,7 +77,9 @@ export function buildKeywordCommandCenterSourceSnapshot(
   const localVisibilityByKeyword = options.includeLocalSeo
     ? buildLocalSeoKeywordVisibilitySummaryByKey(workspace.id)
     : undefined;
-  const localMarkets = options.includeLocalSeo || options.includeScoring ? listLocalSeoMarkets(workspace.id) : [];
+  const localMarkets = options.includeLocalSeo || options.includeScoring || options.includeLocalCandidates
+    ? listLocalSeoMarkets(workspace.id)
+    : [];
   const activeLocalMarketCount = options.includeLocalSeo
     ? localMarkets.filter(market => market.status === LOCAL_SEO_MARKET_STATUS.ACTIVE).length
     : undefined;
@@ -81,21 +92,24 @@ export function buildKeywordCommandCenterSourceSnapshot(
   const latestSnapshot = getLatestSnapshotRanksWithDate(workspace.id, { trackedKeywords });
   const lostVisibilityRows = safeLostVisibilityRows(workspace.id);
   const feedback = readFeedback(workspace.id);
-  const posture = options.includeLocalSeo || options.includeScoring
+  const posture = options.includeLocalSeo || options.includeScoring || options.includeLocalCandidates
     ? getLocalSeoPosture(workspace.id)
     : undefined;
-  const localCandidatesCount = options.includeLocalSeo
-    ? countLocalSeoKeywordCandidatesFromLoadedContext({
+  const localCandidateContext = options.includeLocalSeo || options.includeLocalCandidates
+    ? {
         workspace,
         markets: localMarkets,
         trackedKeywords,
-        contentGaps: projection.contentGaps,
+        contentGaps: projection.localCandidateContentGaps,
         pageMap: projection.pageMap,
         declinedKeywords: [...feedback.values()]
           .filter(row => row.status === 'declined')
           .map(row => row.keyword),
         settingsPosture: posture,
-      })
+      }
+    : undefined;
+  const localCandidatesCount = options.includeLocalSeo
+    ? countLocalSeoKeywordCandidatesFromLoadedContext(localCandidateContext!)
     : undefined;
   return {
     workspace,
@@ -111,6 +125,7 @@ export function buildKeywordCommandCenterSourceSnapshot(
     localVisibilityByKeyword,
     activeLocalMarketCount,
     localCandidatesCount,
+    localCandidateContext,
     geoLabel: primaryMarket
       ? (primaryMarket.stateOrRegion ? `${primaryMarket.city}, ${primaryMarket.stateOrRegion}` : `${primaryMarket.city}, ${primaryMarket.country}`)
       : undefined,

@@ -17,6 +17,8 @@ export interface KeywordCommandCenterReadProjection {
   strategy: KeywordStrategy | null | undefined;
   pageMap: PageKeywordMap[];
   contentGaps: ContentGap[];
+  /** Table-only gaps matching the canonical local-candidate builder's input. */
+  localCandidateContentGaps: ContentGap[];
   keywordGaps: KeywordGapItem[];
   trafficValueMonthly?: number | null;
   topicClusters?: TopicCluster[];
@@ -42,20 +44,24 @@ export function buildKeywordCommandCenterReadProjection(
 ): KeywordCommandCenterReadProjection {
   const strategyBlob = workspace.keywordStrategy;
   const pageMap = listPageKeywordsLite(workspace.id);
-  const contentGaps = tableOrBlob(listContentGaps(workspace.id), strategyBlob?.contentGaps);
+  const localCandidateContentGaps = listContentGaps(workspace.id);
+  const contentGaps = tableOrBlob(localCandidateContentGaps, strategyBlob?.contentGaps);
   const keywordGaps = tableOrBlob(listKeywordGaps(workspace.id), strategyBlob?.keywordGaps);
   const siteKeywordMetrics = resolveSiteKeywordMetrics(workspace.id);
   const strategy = strategyBlob
     ? { ...strategyBlob, siteKeywordMetrics: siteKeywordMetrics.length > 0 ? siteKeywordMetrics : undefined }
     : strategyBlob;
 
-  if (!options.includeSummary) return { strategy, pageMap, contentGaps, keywordGaps };
+  if (!options.includeSummary) {
+    return { strategy, pageMap, contentGaps, localCandidateContentGaps, keywordGaps };
+  }
 
   const valuePages = pageMap.length > 0 ? pageMap : (strategyBlob?.pageMap ?? []);
   return {
     strategy,
     pageMap,
     contentGaps,
+    localCandidateContentGaps,
     keywordGaps,
     trafficValueMonthly: trafficValueFromPages(valuePages),
     topicClusters: tableOrBlob(listTopicClusters(workspace.id), strategyBlob?.topicClusters),

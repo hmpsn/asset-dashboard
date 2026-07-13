@@ -40,7 +40,12 @@ import * as siteMetricsModule from '../../server/site-keyword-metrics.js';
 import * as trackedStoreModule from '../../server/tracked-keywords-store.js';
 import * as localSnapshotModule from '../../server/domains/local-seo/snapshot-store.js';
 import { updateLocalSeoConfiguration } from '../../server/domains/local-seo/configuration-actions.js';
-import { countLocalSeoKeywordCandidates } from '../../server/domains/local-seo/candidate-service.js';
+import {
+  buildLocalSeoKeywordCandidates,
+  buildLocalSeoKeywordCandidatesFromLoadedContext,
+  countLocalSeoKeywordCandidates,
+} from '../../server/domains/local-seo/candidate-service.js';
+import { buildKeywordCommandCenterSourceSnapshot } from '../../server/domains/keyword-command-center/source-snapshot.js';
 import { getLocalSeoPosture } from '../../server/domains/local-seo/configuration-service.js';
 import { replaceAllContentGaps } from '../../server/content-gaps.js';
 import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
@@ -487,6 +492,55 @@ describe('K2 — measured read-path budget', () => {
       measurement.count,
       measurement.statements.join('\n---\n'),
     ).toBeLessThanOrEqual(KCC_PERFORMANCE_BUDGET.queryCountBudget);
+  });
+
+  it('hard-gates local-candidate rows while preserving canonical count and evidence', async () => {
+    // Establish parity against the canonical standalone builder outside the SQL
+    // measurement. The production KCC path must produce the same candidates from
+    // its already-loaded snapshot instead of invoking that builder's DB reads.
+    const canonicalCandidates = buildLocalSeoKeywordCandidates(workspaceId);
+    const canonicalByKey = new Map(canonicalCandidates.map(candidate => [candidate.normalizedKeyword, candidate]));
+    expect(canonicalCandidates.length).toBeGreaterThan(0);
+    const snapshot = buildKeywordCommandCenterSourceSnapshot(workspaceId, {
+      includeLocalSeo: true,
+      includeScoring: true,
+      includeLocalCandidates: true,
+    });
+    expect(snapshot?.localCandidateContext).toBeDefined();
+    const candidatesFromLoadedSnapshot = buildLocalSeoKeywordCandidatesFromLoadedContext(
+      snapshot!.localCandidateContext!,
+    );
+    // Deep parity pins candidate count, selection, metrics, and source evidence.
+    expect(candidatesFromLoadedSnapshot).toEqual(canonicalCandidates);
+
+    const measurement = await measureSqlExecutionsForTest(() => buildKeywordCommandCenterRows(
+      workspaceId,
+      {
+        filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES,
+        sort: 'keyword',
+        direction: 'asc',
+        page: 1,
+        pageSize: 100,
+      },
+      { includeLocalSeo: true },
+    ));
+    const payload = measurement.result;
+    expect(payload).not.toBeNull();
+    expect(measurement.statements.some(sql => sql.includes('local_seo_markets'))).toBe(true);
+    expect(measurement.count, measurement.statements.join('\n---\n'))
+      .toBeLessThanOrEqual(KCC_PERFORMANCE_BUDGET.queryCountBudget);
+
+    expect(payload!.pageInfo.totalRows).toBe(payload!.rows.length);
+    expect(payload!.pageInfo.totalRows).toBeGreaterThan(0);
+    for (const row of payload!.rows) {
+      const canonical = canonicalByKey.get(row.normalizedKeyword);
+      expect(canonical).toBeDefined();
+      expect(row.sourceLabels).toContainEqual({
+        kind: 'local_candidate',
+        label: canonical!.sourceLabel,
+        detail: canonical!.detail,
+      });
+    }
   });
 
   it('records first-paint p50/p95 against the deterministic fixture', async () => {

@@ -7,7 +7,7 @@ import {
 } from '../../../shared/types/keyword-command-center.js';
 import { LOCAL_SEO_VISIBILITY_POSTURE, type LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo.js';
 import type { PageKeywordMap } from '../../../shared/types/workspace.js';
-import { buildLocalSeoKeywordCandidates } from '../local-seo/candidate-service.js';
+import { buildLocalSeoKeywordCandidatesFromLoadedContext } from '../local-seo/candidate-service.js';
 import { buildLocalSeoKeywordVisibilitySummaryByKey } from '../local-seo/snapshot-store.js';
 import { createLogger } from '../../logger.js';
 import { listPublishedPostPagePaths } from '../../content-posts-db.js';
@@ -140,8 +140,10 @@ function buildFilteredBundle(input: {
   };
 }
 
-function localCandidatesForRows(workspaceId: string): LocalSeoKeywordCandidate[] {
-  const candidates = buildLocalSeoKeywordCandidates(workspaceId);
+function localCandidatesForRows(snapshot: KeywordCommandCenterSourceSnapshot): LocalSeoKeywordCandidate[] {
+  const candidates = snapshot.localCandidateContext
+    ? buildLocalSeoKeywordCandidatesFromLoadedContext(snapshot.localCandidateContext)
+    : [];
   const prioritized = [
     ...candidates.filter(candidate => !candidate.selected),
     ...candidates.filter(candidate => candidate.selected),
@@ -149,7 +151,7 @@ function localCandidatesForRows(workspaceId: string): LocalSeoKeywordCandidate[]
   if (prioritized.length > LOCAL_CANDIDATE_ROW_LIMIT) {
     log.warn(
       {
-        workspaceId,
+        workspaceId: snapshot.workspace.id,
         total: prioritized.length,
         kept: LOCAL_CANDIDATE_ROW_LIMIT,
         dropped: prioritized.length - LOCAL_CANDIDATE_ROW_LIMIT,
@@ -166,13 +168,16 @@ async function buildKeywordCommandCenterLocalCandidateRows(
   options: { includeLocalSeo?: boolean; sourceSnapshot?: KeywordCommandCenterSourceSnapshot },
 ): Promise<KeywordCommandCenterRowsResponse | null> {
   const startedAt = Date.now();
-  const snapshot = options.sourceSnapshot ?? buildKeywordCommandCenterSourceSnapshot(workspaceId, {
-    includeLocalSeo: options.includeLocalSeo,
-    includeScoring: true,
-  });
+  const snapshot = options.sourceSnapshot?.localCandidateContext
+    ? options.sourceSnapshot
+    : buildKeywordCommandCenterSourceSnapshot(workspaceId, {
+        includeLocalSeo: options.includeLocalSeo,
+        includeScoring: true,
+        includeLocalCandidates: true,
+      });
   if (!snapshot) return null;
   const { workspace } = snapshot;
-  const localCandidates = localCandidatesForRows(workspace.id);
+  const localCandidates = localCandidatesForRows(snapshot);
   const candidateKeys = new Set(localCandidates.map(candidate => candidate.normalizedKeyword));
   const localVisibilityByKeyword = options.includeLocalSeo
     ? snapshot.localVisibilityByKeyword ?? new Map<string, LocalSeoKeywordVisibilitySummary>()
