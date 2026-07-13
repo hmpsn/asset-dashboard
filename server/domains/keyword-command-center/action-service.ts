@@ -16,6 +16,7 @@ import { recordKeywordTrackingAction } from '../../outcome-measurement-keywords.
 import { InvalidTransitionError, TRACKED_KEYWORD_TRANSITIONS, validateTransition } from '../../state-machines.js';
 import { getWorkspace } from '../../workspaces.js';
 import { createLogger } from '../../logger.js';
+import { invalidateKeywordStrategyGenerationInputs } from '../../keyword-strategy-generation-store.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
 import {
@@ -378,6 +379,7 @@ export function deleteKeywordHard(
   const run = db.transaction(() => {
     removeTrackedKeyword(workspace.id, normalized);
     deleteKeywordRankHistory(workspace.id, normalized);
+    invalidateKeywordStrategyGenerationInputs(workspace.id);
     trackedKeywords = getTrackedKeywords(workspace.id, { includeInactive: true });
   });
   run();

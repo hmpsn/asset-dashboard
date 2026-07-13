@@ -594,6 +594,24 @@ describe('persistKeywordStrategy()', () => {
         cpc: 8, cpcSource: 'dataforseo:exact', searchIntent: 'commercial', intentSource: 'dataforseo:ideas',
       }));
     });
+
+    it('clears stale provenance when an incremental merge supplies a new value without a source', () => {
+      const ws = makeWorkspace('IncrementalChangedEvidence');
+      persistKeywordStrategy(makeMinimalOptions(ws, { strategy: { siteKeywords: [], opportunities: [], pageMap: [{
+        pagePath: '/page', pageTitle: 'Page', primaryKeyword: 'dentist', secondaryKeywords: [],
+        cpc: 8, cpcSource: 'old-cpc', searchIntent: 'commercial', intentSource: 'old-intent',
+      }] } }));
+      persistKeywordStrategy(makeMinimalOptions(getWorkspace(ws.id)!, {
+        strategyMode: 'incremental', pagesToAnalyze: [{ path: '/page', title: 'Page', seoTitle: '', seoDesc: '', contentSnippet: '' }],
+        strategy: { siteKeywords: [], opportunities: [], pageMap: [{
+          pagePath: '/page', pageTitle: 'Page', primaryKeyword: 'dentist', secondaryKeywords: [], cpc: 12, searchIntent: 'transactional',
+        }] },
+      }));
+      const page = listPageKeywords(ws.id)[0];
+      expect(page).toEqual(expect.objectContaining({ cpc: 12, searchIntent: 'transactional' }));
+      expect(page).not.toHaveProperty('cpcSource');
+      expect(page).not.toHaveProperty('intentSource');
+    });
     it('only updates specified pages in incremental mode, leaving others intact', () => {
       const ws = makeWorkspace('Incremental');
 

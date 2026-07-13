@@ -510,29 +510,22 @@ router.post('/api/public/business-priorities/:workspaceId', ...requireClientStra
   }));
   const updatedAt = new Date().toISOString();
 
-  // Upsert into db
-  bumpKeywordStrategyGenerationRevision(wsId);
-  db.prepare(`
-    INSERT INTO client_business_priorities (workspace_id, priorities, updated_at)
-    VALUES (?, ?, ?)
-    ON CONFLICT(workspace_id) DO UPDATE SET
-      priorities = excluded.priorities,
-      updated_at = excluded.updated_at
-  `).run(wsId, JSON.stringify(clean), updatedAt);
-
-  // Also inject a summary into workspace businessContext so it's available for AI prompts
-  if (ws.keywordStrategy) {
-    const existingContext = ws.keywordStrategy.businessContext || '';
-    const base = existingContext.includes(CLIENT_BUSINESS_PRIORITIES_MARKER)
-      ? existingContext.split(CLIENT_BUSINESS_PRIORITIES_MARKER)[0]
-      : existingContext;
-    const priorityText = clean.map(p => `[${p.category}] ${p.text}`).join('; ');
-    const businessContext = priorityText
-      ? `${base}${CLIENT_BUSINESS_PRIORITIES_MARKER}${priorityText}`
-      : base;
-
-    updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext } });
-  }
+  db.transaction(() => {
+    bumpKeywordStrategyGenerationRevision(wsId);
+    db.prepare(`
+      INSERT INTO client_business_priorities (workspace_id, priorities, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(workspace_id) DO UPDATE SET priorities = excluded.priorities, updated_at = excluded.updated_at
+    `).run(wsId, JSON.stringify(clean), updatedAt);
+    if (ws.keywordStrategy) {
+      const existingContext = ws.keywordStrategy.businessContext || '';
+      const base = existingContext.includes(CLIENT_BUSINESS_PRIORITIES_MARKER)
+        ? existingContext.split(CLIENT_BUSINESS_PRIORITIES_MARKER)[0] : existingContext;
+      const priorityText = clean.map(p => `[${p.category}] ${p.text}`).join('; ');
+      const businessContext = priorityText ? `${base}${CLIENT_BUSINESS_PRIORITIES_MARKER}${priorityText}` : base;
+      updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext } });
+    }
+  }).immediate();
   // Bridge #3: business priorities updated — immediate flush + debounced
   // defense-in-depth. Priorities are also read directly by clientSignals, so
   // this must run even before a workspace has a keywordStrategy blob.

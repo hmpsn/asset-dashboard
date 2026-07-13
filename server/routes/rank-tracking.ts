@@ -9,7 +9,7 @@ import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import {
   getTrackedKeywords,
-  addTrackedKeyword,
+  addTrackedKeywordAndInvalidateStrategy,
   togglePinKeyword,
   storeRankSnapshot,
   getRankHistory,
@@ -78,7 +78,7 @@ router.post('/api/rank-tracking/:workspaceId/keywords', requireWorkspaceAccess('
   const normalizedQuery = normalizeKeywordQuery(query);
   if (!normalizedQuery) return res.status(400).json({ error: 'query required' });
   const wasTracked = getTrackedKeywords(req.params.workspaceId).some(keyword => sameKeyword(keyword.query, query));
-  const keywords = addTrackedKeyword(req.params.workspaceId, query.trim(), {
+  const keywords = addTrackedKeywordAndInvalidateStrategy(req.params.workspaceId, query.trim(), {
     pinned: Boolean(pinned),
     source: TRACKED_KEYWORD_SOURCE.MANUAL,
   });

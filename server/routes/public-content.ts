@@ -29,8 +29,7 @@ import { assembleStoredKeywordStrategy } from '../keyword-strategy-assembler.js'
 import { getClientActor, requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
 import { getQueryPageData } from '../search-console.js';
 import { getWorkspace, computeEffectiveTier } from '../workspaces.js';
-import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../rank-tracking.js';
-import { invalidateKeywordStrategyGenerationInputs } from '../keyword-strategy-generation-store.js';
+import { getTrackedKeywords, addTrackedKeywordAndInvalidateStrategy, removeTrackedKeywordAndInvalidateStrategy } from '../rank-tracking.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
 import { getContentPerformanceTrend, handlePublicContentPerformance } from '../domains/content/content-performance.js';
 import { isProgrammingError } from '../errors.js';
@@ -665,13 +664,12 @@ router.post('/api/public/tracked-keywords/:workspaceId', requirePublicContentWri
   const actor = getClientActor(req, ws.id);
   const existingKeywords = getTrackedKeywords(ws.id);
   const alreadyTracked = existingKeywords.some(k => k.query === keyword);
-  const keywords = alreadyTracked ? existingKeywords : addTrackedKeyword(ws.id, keyword, {
+  const keywords = alreadyTracked ? existingKeywords : addTrackedKeywordAndInvalidateStrategy(ws.id, keyword, {
     source: TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED,
   });
   res.json({ keywords });
 
   if (!alreadyTracked) {
-    invalidateKeywordStrategyGenerationInputs(ws.id);
     recordTrackedKeywordActivity(ws.id, 'client_keyword_tracked', `"${keyword}" added to strategy keywords`, actor ?? undefined);
     broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword });
 
@@ -698,10 +696,9 @@ router.delete('/api/public/tracked-keywords/:workspaceId', requirePublicContentW
   if (!keyword) return res.status(400).json({ error: 'Keyword required' });
   const existingKeywords = getTrackedKeywords(ws.id);
   const wasTracked = existingKeywords.some(k => k.query === keyword);
-  const keywords = wasTracked ? removeTrackedKeyword(ws.id, keyword) : existingKeywords;
+  const keywords = wasTracked ? removeTrackedKeywordAndInvalidateStrategy(ws.id, keyword) : existingKeywords;
   res.json({ keywords });
   if (wasTracked) {
-    invalidateKeywordStrategyGenerationInputs(ws.id);
     const actor = getClientActor(req, ws.id);
     recordTrackedKeywordActivity(ws.id, 'client_keyword_removed', `"${keyword}" removed from strategy keywords`, actor ?? undefined);
     broadcastToWorkspace(ws.id, WS_EVENTS.RANK_TRACKING_UPDATED, { keyword, removed: true });
