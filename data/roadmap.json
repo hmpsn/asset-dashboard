@@ -12,10 +12,11 @@
           "source": "2026-07-13 MCP matrix/brand generation audit",
           "est": "M",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-07-13",
+          "shippedAt": "2026-07-13",
           "owner": "platform-foundation",
-          "notes": "Immediate dual workspace-alias scope bypass fix is implemented on the planning branch with read/write/job/global-tool regressions. Remaining R1 work: one canonical discovery/dispatch/schema/workspace-field registry, full tool-category census, stable new-tool error envelope, and authenticated MCP key ID/label threaded into activity and durable run attribution. Closes mcp-key-label-attribution rather than duplicating it. Must land before new generation write tools."
+          "notes": "Done 2026-07-13 (R1). One fail-fast canonical registry now owns discovery, dispatch, schema census, declared workspace scope, and per-tool error compatibility for all 13 existing families / 61 tools. All existing registered handlers retain legacy text behavior; registry-owned unknown/auth rejections are generic and non-reflective. Future tools can opt into an end-to-end sanitized/bounded json_v1 envelope, including handler-returned and thrown failures. Authenticated MCP execution carries an immutable bounded request/tool/workspace/key snapshot through explicit handler context plus a concurrency-safe compatibility bridge for existing activity writers. Full admin activity retains key attribution; client reads and shared broadcasts remove it, and admin-only key lifecycle events emit opaque invalidations. Request correlation is server-owned: the UUID used by HTTP logs/responses and durable attribution is generated internally, every caller X-Request-ID is ignored, and registry rejections exclude raw unknown tool/workspace values. Scoped auth fails closed without key ID/label, conflicting aliases remain rejected, and production dispatch census pins exact family handlers plus pre-dispatch handled-name manifests. No migration, job, AI call, product tool, endpoint, flag activation, lifecycle change, or UI ships here. Future durable generation runs must persist the explicit context snapshot rather than rely on ambient request state. Closes mcp-key-label-attribution rather than duplicating it."
         },
         {
           "id": "mcp-content-matrix-generation",

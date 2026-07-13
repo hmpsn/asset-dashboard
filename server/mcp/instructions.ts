@@ -13,7 +13,7 @@
  */
 import { STUDIO_NAME } from '../constants.js';
 
-export const MCP_SERVER_INSTRUCTIONS = `${STUDIO_NAME} is an SEO / web-analytics agency platform. Every tool operates on ONE client workspace and needs a workspace id — call \`list_workspaces\` first to get ids, and \`get_workspace_overview\` for a snapshot of pending work. NOTE the casing split: most tools name the parameter \`workspace_id\` (snake_case), but most READ tools (workspace overview/intelligence, insights, content reads, client signals, and brand) use \`workspaceId\` (camelCase) while action/write tools use \`workspace_id\` (snake_case). Don't assume — match each tool's own schema.
+export const MCP_SERVER_INSTRUCTIONS = `${STUDIO_NAME} is an SEO / web-analytics agency platform. Most tools operate on ONE client workspace and need a workspace id — call \`list_workspaces\` first to get ids, and \`get_workspace_overview\` for a snapshot of pending work. \`list_workspaces\` and \`create_workspace\` are explicit global tools and require the master key. \`get_pending_work\` may omit \`workspaceId\` for a cross-workspace summary with the master key; a per-workspace key must always supply its own workspace id. NOTE the casing split: most tools name the parameter \`workspace_id\` (snake_case), but several tools (workspace overview/intelligence, insights, content reads, client signals, and brand) use \`workspaceId\` (camelCase). Don't assume — match each tool's own schema.
 
 CONTENT AUTHORING IS A HANDLE PIPELINE. \`prepare_brief_context\` returns a \`brief_request_handle\` plus the brief schema — YOU generate the brief locally, then \`save_brief\` (returns a \`brief_handle\`). Repeat with \`prepare_post_context\` → \`save_post\` (returns a \`post_handle\`). Finally \`send_to_client\` turns a saved brief/post into a client-facing request AND emails the client. Handles are single-use, expire ~15 minutes after creation, and are scoped to one workspace + kind: if a handle errors as not-found or expired, re-run the tool that produced it — never retry the consumer with a stale handle.
 
@@ -27,4 +27,6 @@ PAID APIS COST REAL MONEY — use deliberately: \`research_keywords\`, \`start_k
 
 DESTRUCTIVE / IRREVERSIBLE — confirm intent before calling: \`delete_workspace\`, \`delete_brief\`, \`delete_post\`, \`replace_keyword_strategy\`, \`revert_post_version\`.
 
-All writes are workspace-scoped and recorded in the activity log.`;
+WORKSPACE WRITES ARE ATTRIBUTED INTERNALLY. Activity records capture the MCP request, tool, and authenticated key identity for operator audit. Per-key ids and labels are internal-only and are removed from client-facing activity and live broadcasts.
+
+ERROR COMPATIBILITY. Existing tools retain their legacy text errors. New \`json_v1\` tools return a stable JSON envelope in the text payload with \`code\`, \`message\`, \`retryable\`, and optional safe \`details\`; raw arguments, prompts, secrets, evidence, exceptions, and stacks are never returned.`;

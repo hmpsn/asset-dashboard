@@ -1,6 +1,6 @@
 # MCP Matrix + Brand Deliverable Generation Specification
 
-**Status:** P0 contracts implemented; runtime phases proposed
+**Status:** P0 merged and green; R1 runtime foundation implemented
 **Date:** 2026-07-13
 **Target:** `staging`, one PR per phase
 **Primary contexts:** `content-pipeline`, `brand-engine`
@@ -101,6 +101,22 @@ generated proposal. A lower layer may not rewrite a higher layer as fact.
 
 All new action inputs use snake_case, stable error codes, declared workspace
 scope, expected revisions, and idempotency keys. List/detail output is bounded.
+The canonical runtime registry is the sole authority for discovery, dispatch,
+schema census, and workspace authorization. Authenticated MCP key ID/label and
+request/tool identity are retained for internal activity and durable run
+attribution, but key identity is excluded from workspace broadcasts and every
+client-visible activity projection.
+Definitions are immutable registry snapshots, every production definition is
+censused against its exact family handler and any pre-dispatch handled-name
+manifest, and error compatibility is selected per tool. Caller correlation is
+not trusted: the server-generated UUID is used for HTTP logging, response
+attachment, and durable attribution, while every caller `X-Request-ID` is
+ignored. Rejection logging also excludes raw unknown tool/workspace values.
+Future `json_v1`
+tools cannot return an unsanitized handler error: invalid
+or thrown failures become bounded generic envelopes while the existing 61
+registered handlers retain legacy text behavior. Registry-owned unknown/auth
+rejections are intentionally generic and never reflect caller values.
 
 ### Matrix tools
 
