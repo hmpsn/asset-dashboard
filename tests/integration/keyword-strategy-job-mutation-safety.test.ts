@@ -117,6 +117,7 @@ vi.mock('../../server/keyword-strategy-ai-synthesis.js', async importOriginal =>
             businessTerms: ['local', 'seo'],
             strictBusinessFit: false,
           },
+          executions: [],
         };
       }
 
@@ -147,6 +148,7 @@ vi.mock('../../server/keyword-strategy-ai-synthesis.js', async importOriginal =>
             businessTerms: ['local', 'seo'],
             strictBusinessFit: false,
           },
+          executions: [],
         };
       }
 
@@ -158,6 +160,7 @@ vi.mock('../../server/keyword-strategy-ai-synthesis.js', async importOriginal =>
           businessSection: 'Existing strategy is still fresh.',
           upToDate: true,
           freshPageCount: 1,
+          executions: [],
         };
       }
 
@@ -194,6 +197,7 @@ vi.mock('../../server/keyword-strategy-ai-synthesis.js', async importOriginal =>
             businessTerms: ['local', 'seo'],
             strictBusinessFit: false,
           },
+          executions: [],
         };
       }
 
@@ -247,6 +251,7 @@ vi.mock('../../server/keyword-strategy-ai-synthesis.js', async importOriginal =>
           ['local seo', { volume: 1200, difficulty: 42, source: 'mock' }],
         ]),
         businessSection: 'Serve local businesses that need measurable SEO growth.',
+        executions: [],
       };
     }),
   };
