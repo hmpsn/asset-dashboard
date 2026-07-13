@@ -127,6 +127,7 @@ function mockBriefResponse() {
     wordCountTarget: 1200,
     intent: 'informational',
     audience: 'Business owners',
+    competitorInsights: 'Top-ranking guides pair practical local SEO steps with concrete examples.',
     internalLinkSuggestions: ['/services/seo'],
   };
 }
