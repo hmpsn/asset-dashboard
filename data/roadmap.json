@@ -12,10 +12,11 @@
           "source": "2026-07-13 generation quality/performance audit A1-A6",
           "est": "L",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-07-13",
+          "shippedAt": "2026-07-13",
           "owner": "platform-foundation",
-          "notes": "Wave 1 shared root. Replace the global five-minute completed-response cache with named-operation none/inflight/ttl policy; add OpenAI/Anthropic parity for run IDs, retry/fallback, latency, tokens, and cache hit/miss telemetry; pre-commit GenerationProvenance contracts used by later content and recommendation phases. Unflagged correctness/infrastructure PR. Must merge before genq-content-generation-integrity or genq-recommendation-integrity."
+          "notes": "Done 2026-07-13. Named-operation none/inflight/ttl policy now governs dispatcher-backed OpenAI and Anthropic text calls; signal-bearing calls remain uncached and cancellation-isolated. Execution metadata, provider attempts, token usage, operation traces, cache outcomes, origin-run reuse, and real Claude-to-GPT fallback chains share truthful correlation IDs without storing prompts. Cache statistics use cumulative events and real time windows, live pending calls are never age-evicted into duplicate provider work, and the typed GenerationProvenance contract is ready for durable consumers. The unused typed Anthropic tool helper remains explicitly cache-none and outside dispatcher governance until a production caller is introduced."
         },
         {
           "id": "genq-keyword-evidence-integrity",
