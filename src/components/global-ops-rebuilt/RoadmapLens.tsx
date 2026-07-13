@@ -99,7 +99,8 @@ export function RoadmapLens() {
   const inProgress = allRows.filter((row) => row.status === 'in_progress').length;
   const pending = allRows.filter((row) => row.status === 'pending').length;
   const deferred = allRows.filter((row) => row.status === 'deferred').length;
-  const completion = total > 0 ? Math.round((done / total) * 100) : 0;
+  const executableTotal = done + inProgress + pending;
+  const completion = executableTotal > 0 ? Math.round((done / executableTotal) * 100) : 0;
 
   const priorityParam = searchParams.get('priority');
   const statusParam = searchParams.get('status');
@@ -192,7 +193,11 @@ export function RoadmapLens() {
   };
 
   const cycleStatus = (row: RoadmapDisplayRow) => {
-    if (row.status === 'deferred') return;
+    if (row.status === 'closed') return;
+    if (row.status === 'deferred') {
+      toggleStatus.mutate({ row, nextStatus: 'pending' });
+      return;
+    }
     const currentIndex = STATUS_CYCLE.indexOf(row.status);
     const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
     toggleStatus.mutate({ row, nextStatus });

@@ -1,6 +1,6 @@
 // ── Roadmap domain types ────────────────────────────────────────
 
-export const ROADMAP_STATUSES = ['done', 'in_progress', 'pending', 'deferred'] as const;
+export const ROADMAP_STATUSES = ['done', 'in_progress', 'pending', 'deferred', 'closed'] as const;
 
 export type RoadmapStatus = (typeof ROADMAP_STATUSES)[number];
 
@@ -14,7 +14,7 @@ export interface RoadmapItem {
   priority?: 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
   notes?: string;
   status: RoadmapStatus;
-  shippedAt?: string;   // ISO date — set when item first reaches 'done'
+  shippedAt?: string;   // ISO date — set only when item first reaches 'done'; closed/deferred items never carry it
   createdAt?: string;   // ISO date — forward-only; undefined for pre-existing items
   featureId?: number;   // soft reference to id field in data/features.json
   tags?: string[];      // free-form labels e.g. ["auth", "infra"]

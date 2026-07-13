@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Clock, PauseCircle } from 'lucide-react';
+import { CheckCircle2, Circle, CircleX, Clock, PauseCircle } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { Priority, Status } from './roadmapFilters';
 
@@ -24,6 +24,7 @@ export const STATUS_ICON: Record<Status, ReactNode> = {
   in_progress: <Clock className="w-4 h-4 text-teal-400 animate-pulse flex-shrink-0" />,
   pending: <Circle className="w-4 h-4 text-[var(--brand-text-muted)] flex-shrink-0" />,
   deferred: <PauseCircle className="w-4 h-4 text-[var(--brand-text-muted)] flex-shrink-0" />,
+  closed: <CircleX className="w-4 h-4 text-[var(--brand-text-muted)] flex-shrink-0" />,
 };
 
 interface ChipProps {

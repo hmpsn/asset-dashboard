@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
@@ -147,6 +147,7 @@ beforeEach(() => {
         { id: 1, title: 'Settings composition', status: 'in_progress', priority: 'P1', est: '4h', tags: ['ui'] },
         { id: 2, title: 'Owner circle-back', status: 'deferred', priority: 'P2', est: '2h', tags: ['review'] },
         { id: 3, title: 'Shipped surface', status: 'done', priority: 'P3', est: '1h', shippedAt: '2026-07-01' },
+        { id: 4, title: 'Superseded surface', status: 'closed', priority: 'P3', est: '1h' },
       ],
     }],
   });
@@ -200,7 +201,7 @@ describe('Global Ops Wave A composition contracts', () => {
     expect(within(surface).getByRole('button', { name: 'Archive' })).toBeInTheDocument();
   });
 
-  it('renders the sprint-grouped roadmap composition and a neutral deferred state', async () => {
+  it('renders deferred work as reopenable and closed work as terminal but unshipped', async () => {
     const { container } = renderWithProviders(<RoadmapLens />, '/roadmap?view=sprint');
 
     const surface = await screen.findByTestId('roadmap-rebuilt');
@@ -209,7 +210,11 @@ describe('Global Ops Wave A composition contracts', () => {
     expect(within(surface).getByLabelText('Filter by priority')).toBeInTheDocument();
     expect(within(surface).getByLabelText('Filter by status')).toBeInTheDocument();
     expect(within(surface).getAllByText('On hold').length).toBeGreaterThan(0);
-    expect(within(surface).getByRole('button', { name: /deferred status/i })).toBeDisabled();
+    const reopen = within(surface).getByRole('button', { name: /re-open owner circle-back/i });
+    expect(reopen).toBeEnabled();
+    fireEvent.click(reopen);
+    await waitFor(() => expect(mocks.roadmapUpdate).toHaveBeenCalledWith(2, 'current', { status: 'pending' }));
+    expect(within(surface).getByRole('button', { name: /superseded surface is closed/i })).toBeDisabled();
     expect(within(surface).queryByText(/phased - isolated integration sandbox/i)).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
   });

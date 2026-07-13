@@ -86,9 +86,9 @@ export function RoadmapSprintView({ sprints, filters, featureMap, onToggleStatus
                         variant="ghost"
                         size="sm"
                         onClick={() => onToggleStatus(item.id, sprint.id)}
-                        disabled={item.status === 'deferred'}
+                        disabled={item.status === 'closed'}
                         className="flex-shrink-0 hover:scale-110 px-0 py-0 bg-transparent hover:bg-transparent"
-                        title={item.status === 'deferred' ? 'Status: on hold — re-open when its documented trigger is met' : `Status: ${item.status} — click to cycle`}
+                        title={item.status === 'closed' ? 'Status: closed — terminal, not shipped' : item.status === 'deferred' ? 'Status: on hold — click to re-open as pending' : `Status: ${item.status} — click to cycle`}
                       >
                         {STATUS_ICON[item.status]}
                       </Button>

@@ -5,6 +5,7 @@ import type { RoadmapDisplayRow, RoadmapPriority, RoadmapRuntimeStatus } from '.
 
 function statusLabel(status: RoadmapRuntimeStatus) {
   if (status === 'deferred') return 'On hold';
+  if (status === 'closed') return 'Closed';
   return status
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -14,6 +15,7 @@ function statusLabel(status: RoadmapRuntimeStatus) {
 function statusIcon(status: RoadmapRuntimeStatus) {
   if (status === 'done') return 'check' as const;
   if (status === 'in_progress') return 'clock' as const;
+  if (status === 'closed') return 'x' as const;
   return 'minus' as const;
 }
 
@@ -41,9 +43,12 @@ interface RoadmapItemRowProps {
 
 export function RoadmapItemRow({ row, expanded, cycling, variant = 'sprint', onToggle, onCycle }: RoadmapItemRowProps) {
   const deferred = row.status === 'deferred';
+  const closed = row.status === 'closed';
   const backlog = variant === 'backlog';
-  const cycleLabel = deferred
-    ? `${row.title} has deferred status; status cycling is unavailable`
+  const cycleLabel = closed
+    ? `${row.title} is closed and was not shipped`
+    : deferred
+    ? `Re-open ${row.title} as pending`
     : `Cycle ${row.title} status from ${statusLabel(row.status)}`;
 
   const idCell = (
@@ -62,7 +67,7 @@ export function RoadmapItemRow({ row, expanded, cycling, variant = 'sprint', onT
       size="sm"
       aria-label={cycleLabel}
       title={cycleLabel}
-      disabled={deferred || cycling}
+      disabled={closed || cycling}
       onClick={onCycle}
       className={`h-7 min-w-0 w-7 px-0 transition-transform enabled:hover:scale-110 disabled:cursor-not-allowed ${statusClass(row.status)}`}
       style={{ transitionDuration: 'var(--dur-fast)' }}
@@ -104,6 +109,7 @@ export function RoadmapItemRow({ row, expanded, cycling, variant = 'sprint', onT
             <span className={`truncate t-caption font-semibold ${row.status === 'done' ? 'text-[var(--brand-text-dim)] line-through' : 'text-[var(--brand-text-bright)]'}`}>{row.title}</span>
             <Badge label={row.priority} tone={priorityTone(row.priority)} variant="soft" />
             {deferred && <Badge label="On hold" tone="zinc" variant="outline" />}
+            {closed && <Badge label="Closed" tone="zinc" variant="outline" />}
             {row.feature && <Badge label={row.feature} tone="blue" variant="soft" />}
             {row.tags.slice(0, 2).map((tag) => <Badge key={tag} label={tag} tone="zinc" variant="outline" />)}
           </div>

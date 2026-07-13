@@ -47,7 +47,7 @@ export type SortDir = 'asc' | 'desc';
 export type FlatRoadmapItem = RoadmapItem & { sprintId: string; sprintName: string };
 
 const PRIORITY_ORDER: Record<Priority, number> = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
-const STATUS_ORDER: Record<Status, number> = { in_progress: 0, pending: 1, deferred: 2, done: 3 };
+const STATUS_ORDER: Record<Status, number> = { in_progress: 0, pending: 1, deferred: 2, done: 3, closed: 4 };
 
 /**
  * Best-effort numeric estimate (hours) parsed from human-readable strings:

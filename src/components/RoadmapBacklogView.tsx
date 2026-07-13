@@ -122,12 +122,12 @@ export function RoadmapBacklogView({ sprints, filters, featureMap, onToggleStatu
                       <Button
                         type="button"
                         onClick={() => onToggleStatus(item.id, item.sprintId)}
-                        disabled={item.status === 'deferred'}
+                        disabled={item.status === 'closed'}
                         variant="ghost"
                         size="sm"
                         className="hover:scale-110 transition-transform flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 focus:ring-1 focus:ring-teal-400/50 rounded p-0 min-h-0 h-auto"
-                        aria-label={item.status === 'deferred' ? `${item.title} is on hold` : `Cycle status (currently ${item.status.replace('_', ' ')})`}
-                        title={item.status === 'deferred' ? 'Status: on hold — re-open when its documented trigger is met' : `Status: ${item.status} — click to cycle`}
+                        aria-label={item.status === 'closed' ? `${item.title} is closed` : item.status === 'deferred' ? `Re-open ${item.title}` : `Cycle status (currently ${item.status.replace('_', ' ')})`}
+                        title={item.status === 'closed' ? 'Status: closed — terminal, not shipped' : item.status === 'deferred' ? 'Status: on hold — click to re-open as pending' : `Status: ${item.status} — click to cycle`}
                       >
                         {STATUS_ICON[item.status]}
                       </Button>

@@ -88,7 +88,11 @@ export function Roadmap() {
     const cache = queryClient.getQueryData<SprintData[]>(queryKeys.admin.roadmap()) ?? [];
     const sprint = cache.find(s => s.id === sprintId);
     const item = sprint?.items.find(i => i.id === itemId);
-    if (!item || item.status === 'deferred') return;
+    if (!item || item.status === 'closed') return;
+    if (item.status === 'deferred') {
+      toggleMutation.mutate({ itemId, sprintId, newStatus: 'pending' });
+      return;
+    }
     const idx = STATUS_CYCLE.indexOf(item.status);
     const newStatus = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
     toggleMutation.mutate({ itemId, sprintId, newStatus });
@@ -119,6 +123,7 @@ export function Roadmap() {
   const inProgress = allItems.filter(i => i.status === 'in_progress').length;
   const pending = allItems.filter(i => i.status === 'pending').length;
   const deferred = allItems.filter(i => i.status === 'deferred').length;
+  const closed = allItems.filter(i => i.status === 'closed').length;
   const total = allItems.length;
   const currentSprint = roadmap.find(s => s.items.some(i => i.status === 'pending' || i.status === 'in_progress'));
 
@@ -126,7 +131,7 @@ export function Roadmap() {
     <div className="space-y-6">
       <PageHeader
         title="Roadmap"
-        subtitle={`${total} items · ${done} done · ${inProgress} active · ${pending} pending · ${deferred} on hold`}
+        subtitle={`${total} items · ${done} shipped · ${inProgress} active · ${pending} pending · ${deferred} on hold · ${closed} closed`}
         icon={<MapIcon className="w-5 h-5 text-accent-brand" />}
       />
 
