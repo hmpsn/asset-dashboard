@@ -14,6 +14,7 @@ import type {
 
 interface ProfileRow {
   id: string; workspace_id: string; status: string;
+  revision: number;
   voice_dna_json: string | null; guardrails_json: string | null;
   context_modifiers_json: string | null; created_at: string; updated_at: string;
 }
@@ -32,6 +33,7 @@ const stmts = createStmtCache(() => ({
 function rowToProfile(row: ProfileRow): Omit<VoiceProfile, 'samples'> {
   return {
     id: row.id, workspaceId: row.workspace_id,
+    revision: row.revision,
     status: row.status as VoiceProfileStatus,
     voiceDNA: row.voice_dna_json ? parseJsonFallback<VoiceDNA | null>(row.voice_dna_json, null) ?? undefined : undefined,
     guardrails: row.guardrails_json ? parseJsonFallback<VoiceGuardrails | null>(row.guardrails_json, null) ?? undefined : undefined,

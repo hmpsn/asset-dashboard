@@ -417,6 +417,14 @@ Authentic `voice_sample` anchors must carry a `manual` or
 `transcript_extraction` origin; calibration-loop and generated approval samples
 are ineligible. The finalized snapshot records the finalizing operator.
 
+MCP authentication proves a key, not a human identity. Before
+`finalize_brand_voice` may mutate state, an authenticated operator creates a
+short-lived one-time authorization bound to the exact workspace/profile
+revision, proposed voice fields, authentic anchor selections, calibration
+ratings, and idempotency key. MCP supplies that bearer secret; storage keeps
+only its digest and records the MCP key separately as execution provenance.
+Caller-supplied operator identities and key-as-human coercion are forbidden.
+
 `voice_foundation` is an atomic bootstrap target, not a normal preset. The
 pause is persisted as brand-generation stage `awaiting_voice_finalization`
 under the shared truthful run status `awaiting_review`; the common run-outcome

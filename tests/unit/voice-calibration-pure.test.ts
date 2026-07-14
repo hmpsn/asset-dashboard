@@ -136,6 +136,7 @@ function makeProfile(
   return {
     id: 'vp_test',
     workspaceId: 'ws-test',
+    revision: 1,
     status,
     samples: [],
     createdAt: '2026-01-01T00:00:00.000Z',

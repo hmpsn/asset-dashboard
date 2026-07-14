@@ -188,7 +188,7 @@ function previewTargetFor(
         actorLabel: 'Content lead',
       },
       finalizedAt: capturedAt,
-      fingerprint: 'voice-fingerprint',
+      fingerprint: 'a'.repeat(64),
       anchorEvidenceRefs: [{
         sourceType: 'client_submission',
         sourceId: 'client-submission-1',

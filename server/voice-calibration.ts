@@ -109,7 +109,7 @@ export function createVoiceProfile(workspaceId: string): VoiceProfile & { sample
   doCreate.immediate();
 
   log.info({ workspaceId, profileId: id }, 'created voice profile');
-  return { id, workspaceId, status: 'draft', contextModifiers: defaultModifiers, samples: [], createdAt: now, updatedAt: now };
+  return { id, workspaceId, revision: 1, status: 'draft', contextModifiers: defaultModifiers, samples: [], createdAt: now, updatedAt: now };
 }
 
 // The legal voice-profile status transitions now live in server/state-machines.ts

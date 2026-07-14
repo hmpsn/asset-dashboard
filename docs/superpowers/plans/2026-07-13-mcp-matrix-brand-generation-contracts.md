@@ -344,6 +344,13 @@ generic string ID cannot satisfy a different gate.
 - Real finalization requires non-empty DNA, guardrails, and selected anchor
   evidence, uses the voice state machine, and records calibration activity only
   after commit.
+- `finalizedBy` is always a verified operator. An MCP master/workspace key is
+  recorded separately as the execution actor and cannot be reinterpreted as a
+  human. MCP finalization therefore consumes a short-lived, one-time bearer
+  authorization created through authenticated operator HTTP, bound to the
+  complete exact command and expected profile revision; only its digest is
+  durable. Expired or mismatched authorizations fail closed, while consumption
+  replay returns the already-created immutable finalization.
 - `naming` and `tagline` output are creative proposals. Naming never claims
   trademark, domain, legal, or cultural clearance without verified external
   evidence. Naming remains outside the released legacy paid-generator service,

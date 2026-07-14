@@ -411,6 +411,12 @@ provisional foundation, dependent brand pieces, or content.
 
 - Add one domain service for finalization requiring non-empty DNA, guardrails,
   and selected authentic anchor evidence; persist ratings/selections.
+- MCP keys are execution identities, not human operators. `finalize_brand_voice`
+  consumes a short-lived one-time authorization created by an authenticated
+  operator and bound to the exact workspace/profile revision, DNA, guardrails,
+  modifiers, anchor selectors, ratings, and idempotency key. Storage retains
+  only the authorization-token digest. Direct authenticated HTTP finalization
+  remains available; neither path may accept a caller-authored operator ID.
 - Use legal voice transitions and optimistic concurrency. Record/broadcast
   calibration only after real finalization; correct legacy actions that call a
   generated draft “calibrated.”

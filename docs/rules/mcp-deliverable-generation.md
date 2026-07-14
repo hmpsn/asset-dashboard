@@ -262,6 +262,12 @@ never sufficient to dispatch paid work.
   are invalid for every caller.
 - The authenticated MCP key ID/label and tool name flow into activity and run
   attribution. A generic `mcp-chat` source is not sufficient for new writes.
+- Human authority never comes from an MCP key. When an action requires operator
+  attribution, the tool consumes a short-lived one-time authorization created
+  through an authenticated operator boundary and bound to the exact resource
+  revision and mutation payload. Persist only the bearer-token digest, derive
+  the operator from that authorization, record the MCP key separately as the
+  executor, and make replay return the already-committed result.
 - MCP key ID/label attribution is internal operational evidence. Preserve it in
   full admin activity and durable run provenance, but remove it from workspace
   broadcasts and client-visible activity projections.
