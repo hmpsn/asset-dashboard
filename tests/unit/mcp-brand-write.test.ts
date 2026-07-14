@@ -18,7 +18,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 // ─── Mocks (before module imports) ────────────────────────────────────────────
 
 vi.mock('../../server/logger.js', () => ({
-  createLogger: () => ({ warn: vi.fn(), info: vi.fn(), debug: vi.fn(), error: vi.fn() }),
+  createLogger: () => h.logger,
 }));
 
 // Keep server/brand-identity.ts loadable without dragging in the AI stack — none of
@@ -50,6 +50,12 @@ const h = vi.hoisted(() => ({
   broadcastToWorkspace: vi.fn(),
   invalidateIntelligenceCache: vi.fn(),
   buildWorkspaceIntelligence: vi.fn(),
+  logger: {
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+    error: vi.fn(),
+  },
 }));
 vi.mock('../../server/activity-log.js', () => ({ addActivity: h.addActivity }));
 vi.mock('../../server/broadcast.js', () => ({ broadcastToWorkspace: h.broadcastToWorkspace }));
@@ -61,6 +67,10 @@ vi.mock('../../server/ws-events.js', () => ({
 // ─── Imports (after mocks) ────────────────────────────────────────────────────
 
 import { handleBrandTool } from '../../server/mcp/tools/brand.js';
+import {
+  BrandDeliverableVersionConflictError,
+  updateDeliverableContent,
+} from '../../server/brand-identity.js';
 import { getDeliverable } from '../../server/brand-deliverable-read-model.js';
 import { seedWorkspace, seedTwoWorkspaces } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
@@ -145,6 +155,7 @@ describe('update_brand_deliverable MCP tool', () => {
     );
     expect(h.broadcastToWorkspace).toHaveBeenCalledWith(ws.workspaceId, 'brand-identity:updated', expect.objectContaining({ deliverableId: id, contentUpdated: true }));
     expect(h.invalidateIntelligenceCache).toHaveBeenCalledWith(ws.workspaceId);
+    expect(h.logger.warn).not.toHaveBeenCalled();
   });
 
   it('treats identical content as a no-op: no version bump, no side effects', async () => {
@@ -167,6 +178,32 @@ describe('update_brand_deliverable MCP tool', () => {
     expect(h.invalidateIntelligenceCache).not.toHaveBeenCalled();
   });
 
+  it('keeps the omitted-version compatibility path and logs a content-free deprecation event', async () => {
+    const id = insertDeliverable(ws.workspaceId, 'Legacy mission');
+
+    const result = await handleBrandTool('update_brand_deliverable', {
+      workspaceId: ws.workspaceId,
+      deliverableId: id,
+      content: 'Sensitive replacement copy must not reach logs',
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(parse(result)).toMatchObject({
+      id,
+      content: 'Sensitive replacement copy must not reach logs',
+      version: 2,
+      changed: true,
+    });
+    expect(h.logger.warn).toHaveBeenCalledWith({
+      tool: 'update_brand_deliverable',
+      workspaceId: ws.workspaceId,
+      deliverableId: id,
+      omittedField: 'expectedVersion',
+      deprecation: 'legacy_missing_expected_version',
+    }, 'Deprecated MCP brand-deliverable update omitted its concurrency guard');
+    expect(JSON.stringify(h.logger.warn.mock.calls)).not.toContain('Sensitive replacement copy');
+  });
+
   it('rejects a stale expectedVersion as a conflict without writing', async () => {
     const id = insertDeliverable(ws.workspaceId, 'Mission v1');
 
@@ -178,12 +215,35 @@ describe('update_brand_deliverable MCP tool', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]?.text).toContain('Version conflict');
-    expect(result.content[0]?.text).toContain('Current version: 1');
+    expect(result.content[0]?.text).toBe(
+      'Version conflict. Current version: 1. Re-fetch via get_brand_identity (includeDeliverables:true) before retrying.',
+    );
     // No write happened
     expect(rawRow(id)).toMatchObject({ content: 'Mission v1', version: 1 });
+    expect(getDeliverable(ws.workspaceId, id)?.versions).toHaveLength(0);
     expect(h.addActivity).not.toHaveBeenCalled();
     expect(h.broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(h.logger.error).not.toHaveBeenCalled();
+  });
+
+  it('throws a typed expected/actual conflict from the domain transaction', () => {
+    const id = insertDeliverable(ws.workspaceId, 'Mission v1');
+
+    let conflict: unknown;
+    try {
+      updateDeliverableContent(ws.workspaceId, id, 'Mission v2', 7);
+    } catch (error) {
+      conflict = error;
+    }
+
+    expect(conflict).toBeInstanceOf(BrandDeliverableVersionConflictError);
+    expect(conflict).toMatchObject({
+      code: 'conflict',
+      expectedVersion: 7,
+      actualVersion: 1,
+    });
+    expect(rawRow(id)).toMatchObject({ content: 'Mission v1', version: 1 });
+    expect(getDeliverable(ws.workspaceId, id)?.versions).toHaveLength(0);
   });
 
   it('returns not found for an unknown deliverable id', async () => {
@@ -205,6 +265,7 @@ describe('update_brand_deliverable MCP tool', () => {
         workspaceId: wsB.workspaceId,
         deliverableId: id,
         content: 'hijacked',
+        expectedVersion: 1,
       }).then(result => {
         expect(result.isError).toBe(true);
         expect(result.content[0]?.text).toContain('not found');

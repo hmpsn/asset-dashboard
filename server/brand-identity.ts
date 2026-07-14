@@ -32,9 +32,33 @@ const stmts = createStmtCache(() => ({
   getByType: db.prepare(`SELECT * FROM brand_identity_deliverables WHERE workspace_id = ? AND deliverable_type = ? ORDER BY updated_at DESC LIMIT 1`),
   insert: db.prepare(`INSERT INTO brand_identity_deliverables (id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at) VALUES (@id, @workspace_id, @deliverable_type, @content, @status, @version, @tier, @created_at, @updated_at)`),
   updateContent: db.prepare(`UPDATE brand_identity_deliverables SET content = @content, status = @status, version = @version, tier = @tier, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: content-edit always resets to 'draft' (a content-reset side-effect, not a lifecycle transition); the guarded lifecycle write is setDeliverableStatus()
+  updateContentIfVersion: db.prepare(`UPDATE brand_identity_deliverables SET content = @content, status = @status, version = @version, tier = @tier, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id AND version = @expected_version`), // status-ok: content-edit always resets to 'draft'; expected_version is the atomic optimistic-concurrency guard
   updateStatus: db.prepare(`UPDATE brand_identity_deliverables SET status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: BRAND_DELIVERABLE_TRANSITIONS guard runs in setDeliverableStatus() before this write (draft↔approved)
   insertVersion: db.prepare(`INSERT INTO brand_identity_versions (id, deliverable_id, content, steering_notes, version, created_at) VALUES (@id, @deliverable_id, @content, @steering_notes, @version, @created_at)`),
 }));
+
+/**
+ * A caller attempted to update a deliverable from a stale durable version.
+ *
+ * Keep this domain error transport-neutral: HTTP/MCP adapters decide how to
+ * project the conflict while the write path carries the exact expected and
+ * actual versions needed for a safe re-read/retry.
+ */
+export class BrandDeliverableVersionConflictError extends Error {
+  readonly code = 'conflict' as const;
+  readonly expectedVersion: number;
+  readonly actualVersion: number;
+
+  constructor(
+    expectedVersion: number,
+    actualVersion: number,
+  ) {
+    super(`Brand deliverable version conflict: expected ${expectedVersion}, actual ${actualVersion}`);
+    this.name = 'BrandDeliverableVersionConflictError';
+    this.expectedVersion = expectedVersion;
+    this.actualVersion = actualVersion;
+  }
+}
 
 function buildBrandContext(workspaceId: string): string {
   const parts: string[] = [];
@@ -258,10 +282,19 @@ export function updateDeliverableContent(
   workspaceId: string,
   id: string,
   content: string,
+  expectedVersion?: number,
 ): BrandDeliverable | null {
   const doUpdate = db.transaction((): BrandDeliverable | null => {
     const existing = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
     if (!existing) return null;
+
+    // The authoritative version check belongs inside the same IMMEDIATE
+    // transaction as the snapshot + write. An adapter-level pre-read cannot
+    // protect against an operator edit landing between that read and this
+    // mutation.
+    if (expectedVersion !== undefined && existing.version !== expectedVersion) {
+      throw new BrandDeliverableVersionConflictError(expectedVersion, existing.version);
+    }
 
     if (existing.content === content) {
       return rowToDeliverable(existing);
@@ -277,7 +310,7 @@ export function updateDeliverableContent(
       version: existing.version,
       created_at: now,
     });
-    stmts().updateContent.run({
+    const updateParams = {
       id,
       workspace_id: workspaceId,
       content,
@@ -285,7 +318,20 @@ export function updateDeliverableContent(
       version: newVersion,
       tier: existing.tier,
       updated_at: now,
-    });
+    };
+    const updateResult = expectedVersion === undefined
+      ? stmts().updateContent.run(updateParams)
+      : stmts().updateContentIfVersion.run({
+          ...updateParams,
+          expected_version: expectedVersion,
+        });
+
+    // The IMMEDIATE transaction serializes writers, so this is defensive
+    // against future trigger/statement changes rather than an expected race.
+    // Throwing rolls back the version snapshot above as well as the update.
+    if (updateResult.changes !== 1) {
+      throw new Error('Brand deliverable update did not affect exactly one workspace-scoped row');
+    }
     return { ...rowToDeliverable(existing), content, status: 'draft', version: newVersion, updatedAt: now };
   });
 
