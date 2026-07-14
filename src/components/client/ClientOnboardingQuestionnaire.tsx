@@ -4,50 +4,17 @@ import {
   Target,
 } from 'lucide-react';
 import { STUDIO_NAME } from '../../constants';
+import type { BrandIntakeQuestionnaireData } from '../../../shared/types/brand-intake';
 import { Badge, Icon, Button, FormInput, FormTextarea, cn } from '../ui';
 
 // ── Step types ──
 
-interface BusinessInfo {
-  businessName: string;
-  industry: string;
-  description: string;
-  services: string;
-  locations: string;
-  differentiators: string;
-  website: string;
-}
+type BusinessInfo = BrandIntakeQuestionnaireData['business'];
+type AudienceInfo = BrandIntakeQuestionnaireData['audience'];
+type BrandInfo = BrandIntakeQuestionnaireData['brand'];
+type CompetitorInfo = BrandIntakeQuestionnaireData['competitors'];
 
-interface AudienceInfo {
-  primaryAudience: string;
-  painPoints: string;
-  goals: string;
-  objections: string;
-  buyingStage: string;
-  secondaryAudience: string;
-}
-
-interface BrandInfo {
-  tone: string;
-  personality: string[];
-  avoidWords: string;
-  contentFormats: string[];
-  existingExamples: string;
-}
-
-interface CompetitorInfo {
-  competitors: string;
-  whatTheyDoBetter: string;
-  whatYouDoBetter: string;
-  referenceUrls: string;
-}
-
-export interface OnboardingData {
-  business: BusinessInfo;
-  audience: AudienceInfo;
-  brand: BrandInfo;
-  competitors: CompetitorInfo;
-}
+export type OnboardingData = BrandIntakeQuestionnaireData;
 
 interface Props {
   workspaceName: string;
@@ -75,7 +42,11 @@ const BUYING_STAGE_OPTIONS = [
   { value: 'consideration', label: 'Consideration', desc: 'Evaluating solutions and options' },
   { value: 'decision', label: 'Decision', desc: 'Ready to buy, choosing a provider' },
   { value: 'mixed', label: 'All stages', desc: 'We serve customers at every stage' },
-];
+] as const satisfies ReadonlyArray<{
+  value: AudienceInfo['buyingStage'];
+  label: string;
+  desc: string;
+}>;
 
 export function ClientOnboardingQuestionnaire({ workspaceName, onComplete, onSkip, saving }: Props) {
   const [step, setStep] = useState<Step>('intro');

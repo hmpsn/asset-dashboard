@@ -1,10 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import type {
+  BrandIntakeEvidenceValue,
+  BrandIntakeFieldPath,
   BrandIntakePayload,
   BrandIntakeSubmissionRequest,
   ResolveBrandIntakeEvidenceRequest,
 } from '../../shared/types/brand-intake.js';
+import { brandIntakeEvidenceRequirementId } from '../../shared/types/brand-intake.js';
 import { brandIntakePayloadSchema } from '../../shared/types/brand-intake-schemas.js';
 import db from '../../server/db/index.js';
 import {
@@ -106,6 +109,36 @@ function resolution(
       sourceType: 'operator_attestation',
       sourceId: 'attestation-website-1',
       fieldPath: 'business.website',
+      capturedAt: '2026-07-13T12:00:00.000Z',
+    },
+    resolvedBy: {
+      actorType: 'operator',
+      actorId: 'operator-1',
+      actorLabel: 'Operator One',
+    },
+    idempotencyKey,
+  };
+}
+
+function fieldResolution(
+  workspaceId: string,
+  intakeRevisionId: string,
+  expectedRevision: number,
+  fieldPath: BrandIntakeFieldPath,
+  value: BrandIntakeEvidenceValue,
+  idempotencyKey: string,
+): ResolveBrandIntakeEvidenceRequest {
+  return {
+    workspaceId,
+    intakeRevisionId,
+    expectedRevision,
+    requirementId: brandIntakeEvidenceRequirementId(fieldPath),
+    fieldPath,
+    value,
+    sourceRef: {
+      sourceType: 'operator_attestation',
+      sourceId: `attestation-${fieldPath}`,
+      fieldPath,
       capturedAt: '2026-07-13T12:00:00.000Z',
     },
     resolvedBy: {
@@ -441,6 +474,82 @@ describe('brand intake durable service', () => {
     expect(resubmitted.revision.revision).toBe(3);
     expect(resubmitted.revision.evidenceResolutions).toEqual([]);
     expect(getWorkspace(workspaceId)?.knowledgeBase).toContain('Website: https://northstar.example');
+  });
+
+  it('enforces canonical field limits and never persists placeholder evidence', () => {
+    const workspaceId = createTestWorkspace('resolution-field-limits');
+    const source = submitBrandIntake(submission(workspaceId)).revision;
+    const invalidRequests = [
+      fieldResolution(
+        workspaceId,
+        source.id,
+        source.revision,
+        'business.businessName',
+        { kind: 'text', value: 'x'.repeat(201) },
+        'overlong-business-name',
+      ),
+      fieldResolution(
+        workspaceId,
+        source.id,
+        source.revision,
+        'brand.tone',
+        { kind: 'text', value: 'x'.repeat(501) },
+        'overlong-tone',
+      ),
+      fieldResolution(
+        workspaceId,
+        source.id,
+        source.revision,
+        'business.description',
+        { kind: 'text', value: 'Known prefix [NEEDS CLIENT INPUT: verified description]' },
+        'placeholder-description',
+      ),
+      fieldResolution(
+        workspaceId,
+        source.id,
+        source.revision,
+        'brand.personality',
+        { kind: 'text_list', value: ['Direct', '[NEEDS CLIENT INPUT: voice trait]'] },
+        'placeholder-personality',
+      ),
+    ];
+
+    for (const request of invalidRequests) {
+      expect(() => resolveBrandIntakeEvidence(request)).toThrow();
+    }
+    expect(getBrandIntakeRevision({ workspaceId }).revision).toMatchObject({
+      id: source.id,
+      revision: 1,
+    });
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count FROM brand_intake_revisions WHERE workspace_id = ?
+    `).get(workspaceId)).toEqual({ count: 1 });
+
+    const legalExample = 'x'.repeat(10_000);
+    const created = resolveBrandIntakeEvidence(fieldResolution(
+      workspaceId,
+      source.id,
+      source.revision,
+      'brand.existingExamples',
+      { kind: 'text', value: legalExample },
+      'legal-existing-example',
+    ));
+    expect(created.created).toBe(true);
+    expect(created.revision.evidenceResolutions[0]).toMatchObject({
+      fieldPath: 'brand.existingExamples',
+      value: { kind: 'text', value: legalExample },
+    });
+    expect(getWorkspace(workspaceId)?.brandVoice).toContain(legalExample);
+
+    expect(() => resolveBrandIntakeEvidence(fieldResolution(
+      workspaceId,
+      created.revision.id,
+      created.revision.revision,
+      'brand.existingExamples',
+      { kind: 'text', value: 'x'.repeat(10_001) },
+      'overlong-existing-example',
+    ))).toThrow();
+    expect(getBrandIntakeRevision({ workspaceId }).revision?.id).toBe(created.revision.id);
   });
 
   it('uses an admin-only intake activity for operator and MCP submissions', () => {

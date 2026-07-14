@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import {
   BRAND_INTAKE_FIELD_PATHS,
-  BRAND_INTAKE_FIELD_POLICY,
   BRAND_INTAKE_LIMITS,
   BRAND_INTAKE_RESOLUTION_SOURCE_TYPES,
   brandIntakeEvidenceRequirementId,
@@ -9,6 +8,7 @@ import {
 import {
   brandIntakeEvidenceRequirementIdSchema,
   brandIntakeEvidenceValueSchema,
+  refineBrandIntakeEvidenceFieldValue,
 } from './brand-intake-schemas.js';
 
 const workspaceIdSchema = z.string().trim().min(1, 'workspace_id is required')
@@ -49,14 +49,10 @@ export const resolveBrandIntakeEvidenceInputSchema = z.object({
   idempotency_key: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxIdempotencyKeyLength)
     .describe('Caller-stable key bound to this exact resolution mutation.'),
 }).strict().superRefine((value, ctx) => {
-  const expectedKind = BRAND_INTAKE_FIELD_POLICY[value.field_path].valueKind;
-  if (value.value.kind !== expectedKind) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['value', 'kind'],
-      message: `${value.field_path} requires evidence value kind ${expectedKind}`,
-    });
-  }
+  refineBrandIntakeEvidenceFieldValue({
+    fieldPath: value.field_path,
+    value: value.value,
+  }, ctx);
   if (value.requirement_id !== brandIntakeEvidenceRequirementId(value.field_path)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,

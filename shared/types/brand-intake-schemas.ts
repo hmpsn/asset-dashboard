@@ -9,6 +9,9 @@ import {
   BRAND_INTAKE_SOURCES,
   brandIntakeEvidenceRequirementId,
   type BrandIntakeEvidenceRequirementId,
+  type BrandIntakeEvidenceValue,
+  type BrandIntakeFieldPath,
+  type BrandIntakeQuestionnaireData,
 } from './brand-intake.js';
 import { AUTHENTIC_VOICE_SAMPLE_SOURCES } from './brand-engine.js';
 import { AUTHENTIC_VOICE_EVIDENCE_SOURCE_TYPES } from './generation-evidence.js';
@@ -180,7 +183,9 @@ export const brandIntakePayloadSchema = publicOnboardingQuestionnaireSchema.exte
 });
 
 export const brandIntakeEvidenceValueSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('text'), value: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxTextLength) }).strict(),
+  // The unpaired value contract admits the widest legal text field. Every
+  // field-addressed boundary below applies the canonical field schema too.
+  z.object({ kind: z.literal('text'), value: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxExampleLength) }).strict(),
   z.object({
     kind: z.literal('text_list'),
     value: z.array(z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxListItemLength))
@@ -192,6 +197,79 @@ export const brandIntakeEvidenceValueSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('url_list'), value: z.array(httpUrlSchema).min(1).max(BRAND_INTAKE_LIMITS.maxListItems) }).strict(),
   z.object({ kind: z.literal('buying_stage'), value: z.enum(BRAND_INTAKE_BUYING_STAGES) }).strict(),
 ]);
+
+const NEEDS_CLIENT_INPUT_PLACEHOLDER = /\[NEEDS CLIENT INPUT:[^\]]*\]/;
+
+function evidenceStrings(value: BrandIntakeEvidenceValue): string[] {
+  switch (value.kind) {
+    case 'text':
+    case 'url':
+      return [value.value];
+    case 'text_list':
+    case 'url_list':
+      return value.value;
+    case 'buying_stage':
+      return [value.value];
+  }
+}
+
+function canonicalQuestionnaireValue(value: BrandIntakeEvidenceValue): string | string[] {
+  switch (value.kind) {
+    case 'url_list':
+      return value.value.join('\n');
+    default:
+      return value.value;
+  }
+}
+
+/**
+ * Single authority for validating a typed resolution against its addressed
+ * questionnaire field. The public questionnaire schemas remain canonical for
+ * field limits/URL rules, while resolution-only placeholder rejection prevents
+ * a rendered evidence gap from being persisted as verified fact.
+ */
+export function refineBrandIntakeEvidenceFieldValue(
+  input: { fieldPath: BrandIntakeFieldPath; value: BrandIntakeEvidenceValue },
+  ctx: z.RefinementCtx,
+  path: Array<string | number> = ['value'],
+): void {
+  const expectedKind = BRAND_INTAKE_FIELD_POLICY[input.fieldPath].valueKind;
+  if (input.value.kind !== expectedKind) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [...path, 'kind'],
+      message: `${input.fieldPath} requires evidence value kind ${expectedKind}`,
+    });
+    return;
+  }
+
+  if (evidenceStrings(input.value).some(value => NEEDS_CLIENT_INPUT_PLACEHOLDER.test(value))) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [...path, 'value'],
+      message: `${input.fieldPath} cannot be resolved with a [NEEDS CLIENT INPUT: ...] placeholder`,
+    });
+    return;
+  }
+
+  const [section, field] = input.fieldPath.split('.') as [
+    keyof BrandIntakeQuestionnaireData,
+    string,
+  ];
+  const canonical = publicOnboardingQuestionnaireSchema.safeParse({
+    [section]: { [field]: canonicalQuestionnaireValue(input.value) },
+  });
+  if (canonical.success) return;
+
+  const fieldIssue = canonical.error.issues.find(
+    issue => issue.path[0] === section && issue.path[1] === field,
+  ) ?? canonical.error.issues[0];
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: [...path, 'value'],
+    message: `${input.fieldPath} evidence value is invalid: ${fieldIssue?.message ?? 'invalid value'}`,
+  });
+}
 
 export const brandIntakeEvidenceRequirementIdSchema = z.string()
   .trim()
@@ -232,14 +310,7 @@ export const brandIntakeEvidenceResolutionSchema = z.object({
   expectedArtifactRevisions: z.tuple([]),
   resolvedAt: z.string().datetime(),
 }).strict().superRefine((value, ctx) => {
-  const expectedKind = BRAND_INTAKE_FIELD_POLICY[value.fieldPath].valueKind;
-  if (value.value.kind !== expectedKind) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['value', 'kind'],
-      message: `${value.fieldPath} requires evidence value kind ${expectedKind}`,
-    });
-  }
+  refineBrandIntakeEvidenceFieldValue(value, ctx);
   if (value.requirementId !== brandIntakeEvidenceRequirementId(value.fieldPath)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -307,14 +378,7 @@ export const resolveBrandIntakeEvidenceBodySchema = z.object({
   sourceRef: brandIntakeResolutionSourceRefSchema,
   idempotencyKey: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxIdempotencyKeyLength),
 }).strict().superRefine((value, ctx) => {
-  const expectedKind = BRAND_INTAKE_FIELD_POLICY[value.fieldPath].valueKind;
-  if (value.value.kind !== expectedKind) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['value', 'kind'],
-      message: `${value.fieldPath} requires evidence value kind ${expectedKind}`,
-    });
-  }
+  refineBrandIntakeEvidenceFieldValue(value, ctx);
   if (value.requirementId !== brandIntakeEvidenceRequirementId(value.fieldPath)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,

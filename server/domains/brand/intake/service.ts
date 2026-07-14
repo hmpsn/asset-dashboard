@@ -16,7 +16,6 @@ import type {
 } from '../../../../shared/types/brand-intake.js';
 import {
   BRAND_INTAKE_FIELD_PATHS,
-  BRAND_INTAKE_FIELD_POLICY,
   BRAND_INTAKE_LIMITS,
   BRAND_INTAKE_SOURCE_ACTOR_POLICY,
   BRAND_INTAKE_WORKSPACE_EVENT_ACTION,
@@ -28,6 +27,7 @@ import {
   brandIntakePayloadSchema,
   brandIntakeResolutionSourceRefSchema,
   brandIntakeResolverAttributionSchema,
+  refineBrandIntakeEvidenceFieldValue,
   brandIntakeSourceSchema,
   brandIntakeSubmitterSchema,
 } from '../../../../shared/types/brand-intake-schemas.js';
@@ -77,6 +77,7 @@ const evidenceResolutionRequestSchema = z.object({
   resolvedBy: brandIntakeResolverAttributionSchema,
   idempotencyKey: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxIdempotencyKeyLength),
 }).strict().superRefine((value, ctx) => {
+  refineBrandIntakeEvidenceFieldValue(value, ctx);
   if (value.requirementId !== brandIntakeEvidenceRequirementId(value.fieldPath)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -235,19 +236,6 @@ function buildFieldEvidence(revision: BrandIntakeRevision): BrandIntakeFieldEvid
   });
 }
 
-function assertResolutionValueMatchesField(
-  fieldPath: BrandIntakeFieldPath,
-  value: ResolveBrandIntakeEvidenceRequest['value'],
-): void {
-  const expectedKind = BRAND_INTAKE_FIELD_POLICY[fieldPath].valueKind;
-  if (value.kind !== expectedKind) {
-    throw new Error(`Evidence value kind ${value.kind} does not match ${fieldPath}`);
-  }
-  if ((value.kind === 'text_list' || value.kind === 'url_list') && value.value.length === 0) {
-    throw new Error(`Evidence value for ${fieldPath} must contain at least one item`);
-  }
-}
-
 function requireInsertedRevision(workspaceId: string, revisionId: string): BrandIntakeRevision {
   const stored = getStoredBrandIntakeRevisionById(workspaceId, revisionId);
   if (!stored) throw new Error('Brand intake revision insert did not persist');
@@ -262,7 +250,12 @@ function projectionStateFor(
 ) {
   const workspace = getWorkspace(workspaceId);
   if (!workspace) throw new Error('Workspace not found');
-  const effectivePayload = materializeBrandIntakePayloadFrom(payload, evidenceResolutions);
+  // A resolution is stored separately from the immutable submission payload.
+  // Re-parse the fully materialized document so no adapter or future mapping
+  // change can bypass the canonical questionnaire field contracts.
+  const effectivePayload = brandIntakePayloadSchema.parse(
+    materializeBrandIntakePayloadFrom(payload, evidenceResolutions),
+  );
   return buildBrandIntakeCompatibilityProjectionState({
     currentWorkspaceDomains: workspace.competitorDomains ?? [],
     previousProjectionState: previous?.projectionState ?? null,
@@ -383,7 +376,6 @@ export function resolveBrandIntakeEvidence(
   request: ResolveBrandIntakeEvidenceRequest,
 ): ResolveBrandIntakeEvidenceServiceResult {
   const parsed = evidenceResolutionRequestSchema.parse(request);
-  assertResolutionValueMatchesField(parsed.fieldPath, parsed.value);
   const mutationFingerprint = resolutionMutationFingerprint(parsed);
 
   const transaction = db.transaction((): ResolveBrandIntakeEvidenceServiceResult => {

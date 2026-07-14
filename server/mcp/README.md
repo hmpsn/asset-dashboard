@@ -22,7 +22,7 @@ update this file in the same commit.
   Responses are returned as JSON-RPC objects, not SSE streams.
 - **Handshake instructions:** every `initialize` response carries `MCP_SERVER_INSTRUCTIONS`
   (`server/mcp/instructions.ts`) — the agent-facing orientation string (workspace-id requirement,
-  the casing split, the content-authoring handle pipeline, paid-API and destructive-tool warnings).
+  the casing split, content-authoring and immutable brand-intake workflows, paid-API and destructive-tool warnings).
   Its concrete claims are asserted by `tests/unit/mcp-instructions.test.ts`; keep it in sync with
   the tool schemas.
 - **Clients:** Claude.ai (remote MCP connector) and Claude Code connect over this endpoint with a
@@ -99,7 +99,7 @@ The registry assigns each tool an explicit error contract:
 - The original **61 tools** remain `legacy_text`; registered handler-owned responses are unchanged.
   Registry-owned unknown-tool and authorization rejections are deliberately generic so caller
   tool/workspace values cannot be reflected as secrets.
-- The four content-matrix structural tools use `json_v1`: an error is a text content item containing a JSON
+- The four content-matrix structural tools and two brand-intake tools use `json_v1`: an error is a text content item containing a JSON
   `{ code, message, retryable, details? }` envelope.
 
 `server/mcp/tool-errors.ts` builds and privately marks the `json_v1` response and filters optional
@@ -114,11 +114,11 @@ failure classes; unknown names and mismatched workspace values are never logged 
 ## Tool inventory
 
 `MCP_TOOL_REGISTRY` (`server/mcp/tool-registry.ts`) is the single authority for discovery,
-dispatch, workspace scope, and error compatibility. It composes **14 categories** for a total of
-**65 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
+dispatch, workspace scope, and error compatibility. It composes **15 categories** for a total of
+**67 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
 dispatcher in `server/mcp/tools/<category>.ts`; the registry snapshots immutable definitions and
 connects each one to its category handler. A production dispatch census calls every registered
-name with inert invalid input, asserts the exact 14 family-array→handler identities, and pins the
+name with inert invalid input, asserts the exact 15 family-array→handler identities, and pins the
 handled-name manifests for families that validate workspace input before dispatch. Discovery
 therefore cannot silently outgrow or be paired with the wrong family switch.
 
@@ -161,6 +161,12 @@ increments the paid-call counter.
 |------|-----|---------|
 | `get_brand_identity` | R | Structured brand identity + voice status; `includeDeliverables:true` adds every deliverable with `version`. |
 | `update_brand_deliverable` | W | Edit a deliverable's content. Optimistic concurrency via `expectedVersion`; resets to `draft`. |
+
+### brand-intake-actions (`tools/brand-intake-actions.ts`) — immutable evidence authority
+| Tool | R/W | Purpose |
+|------|-----|---------|
+| `get_brand_intake` | R | Read the current or named immutable intake revision with field-level evidence availability. |
+| `resolve_brand_intake_evidence` | W | Create/reuse a version-safe superseding revision for one exact typed field requirement and factual source. |
 
 ### clients (`tools/clients.ts`) — inbox / client signals
 | Tool | R/W | Purpose |

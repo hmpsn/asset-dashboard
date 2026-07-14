@@ -34,6 +34,10 @@ import {
   contentMatrixActionTools,
   handleContentMatrixActionTool,
 } from './tools/content-matrix-actions.js';
+import {
+  brandIntakeActionTools,
+  handleBrandIntakeActionTool,
+} from './tools/brand-intake-actions.js';
 import { schemaActionTools, handleSchemaActionTool } from './tools/schema-actions.js';
 import {
   analyticsReadActionTools,
@@ -350,6 +354,12 @@ const MCP_TOOL_FAMILY_REGISTRATIONS: readonly McpToolFamilyRegistration[] = Obje
     family: 'content-matrix-actions',
     tools: contentMatrixActionTools,
     handler: handleContentMatrixActionTool,
+    errorContract: jsonV1Contract,
+  },
+  {
+    family: 'brand-intake-actions',
+    tools: brandIntakeActionTools,
+    handler: handleBrandIntakeActionTool,
     errorContract: jsonV1Contract,
   },
   {

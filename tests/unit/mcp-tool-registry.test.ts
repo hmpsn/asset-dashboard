@@ -67,10 +67,10 @@ function parseErrorText(result: Awaited<ReturnType<ReturnType<typeof createMcpTo
 const masterAuth = { scope: 'all' as const, label: 'master' };
 
 describe('canonical MCP tool registry', () => {
-  it('is the sole 14-family, 65-tool discovery source with exact global tools', () => {
+  it('is the sole 15-family, 67-tool discovery source with exact global tools', () => {
     const definitions = listMcpToolDefinitions();
-    expect(definitions).toHaveLength(65);
-    expect(new Set([...MCP_TOOL_REGISTRY.values()].map(entry => entry.family)).size).toBe(14);
+    expect(definitions).toHaveLength(67);
+    expect(new Set([...MCP_TOOL_REGISTRY.values()].map(entry => entry.family)).size).toBe(15);
     expect(
       [...MCP_TOOL_REGISTRY.values()]
         .filter(entry => entry.scope === 'global')
@@ -98,6 +98,8 @@ describe('canonical MCP tool registry', () => {
       'get_content_matrix',
       'resolve_content_matrix_cells',
       'accept_content_template_generation_upgrade',
+      'get_brand_intake',
+      'resolve_brand_intake_evidence',
     ]);
   });
 

@@ -17,6 +17,7 @@ import {
 } from '../../shared/types/brand-intake.js';
 import {
   brandIntakeCompatibilityProjectionStateSchema,
+  brandIntakeEvidenceResolutionSchema,
   brandIntakeEvidenceResolutionsSchema,
   brandIntakePayloadSchema,
   publicOnboardingQuestionnaireSchema,
@@ -59,7 +60,16 @@ const EXPECTED_FIELD_PATHS = [
 
 function maxEvidenceValue(fieldPath: BrandIntakeFieldPath): BrandIntakeEvidenceValue {
   switch (BRAND_INTAKE_FIELD_POLICY[fieldPath].valueKind) {
-    case 'text': return { kind: 'text', value: '界'.repeat(BRAND_INTAKE_LIMITS.maxTextLength) };
+    case 'text': {
+      const maxLength = fieldPath === 'business.businessName' || fieldPath === 'business.industry'
+        ? BRAND_INTAKE_LIMITS.maxShortTextLength
+        : fieldPath === 'brand.tone'
+          ? BRAND_INTAKE_LIMITS.maxToneLength
+          : fieldPath === 'brand.existingExamples'
+            ? BRAND_INTAKE_LIMITS.maxExampleLength
+            : BRAND_INTAKE_LIMITS.maxTextLength;
+      return { kind: 'text', value: '界'.repeat(maxLength) };
+    }
     case 'text_list': return {
       kind: 'text_list',
       value: Array.from(
@@ -77,6 +87,65 @@ function maxEvidenceValue(fieldPath: BrandIntakeFieldPath): BrandIntakeEvidenceV
     };
     case 'buying_stage': return { kind: 'buying_stage', value: 'mixed' };
   }
+}
+
+function storedEvidenceResolution(
+  fieldPath: BrandIntakeFieldPath,
+  value: BrandIntakeEvidenceValue,
+) {
+  return {
+    id: `resolution-${fieldPath}`,
+    requirementId: brandIntakeEvidenceRequirementId(fieldPath),
+    fieldPath,
+    value,
+    sourceRef: {
+      sourceType: 'operator_attestation' as const,
+      sourceId: `attestation-${fieldPath}`,
+      capturedAt: '2026-07-13T12:00:00.000Z',
+    },
+    resolvedBy: { actorType: 'operator' as const, actorId: 'operator-1' },
+    expectedSourceRevision: 1,
+    expectedArtifactRevisions: [] as [],
+    resolvedAt: '2026-07-13T12:00:00.000Z',
+  };
+}
+
+function mcpEvidenceResolution(
+  fieldPath: BrandIntakeFieldPath,
+  value: BrandIntakeEvidenceValue,
+) {
+  return {
+    workspace_id: 'workspace-1',
+    intake_revision_id: 'intake-1',
+    expected_revision: 1,
+    requirement_id: brandIntakeEvidenceRequirementId(fieldPath),
+    field_path: fieldPath,
+    value,
+    source_ref: {
+      source_type: 'operator_attestation' as const,
+      source_id: `attestation-${fieldPath}`,
+      captured_at: '2026-07-13T12:00:00.000Z',
+    },
+    idempotency_key: `resolve-${fieldPath}`,
+  };
+}
+
+function adminEvidenceResolution(
+  fieldPath: BrandIntakeFieldPath,
+  value: BrandIntakeEvidenceValue,
+) {
+  return {
+    expectedRevision: 1,
+    requirementId: brandIntakeEvidenceRequirementId(fieldPath),
+    fieldPath,
+    value,
+    sourceRef: {
+      sourceType: 'operator_attestation' as const,
+      sourceId: `attestation-${fieldPath}`,
+      capturedAt: '2026-07-13T12:00:00.000Z',
+    },
+    idempotencyKey: `resolve-${fieldPath}`,
+  };
 }
 
 describe('brand intake shared contracts', () => {
@@ -237,6 +306,91 @@ describe('brand intake shared contracts', () => {
       ok: true,
       message: 'Onboarding responses saved successfully',
     });
+  });
+
+  it('applies canonical field limits to stored, admin, and MCP evidence values', () => {
+    const overlongBusinessName = { kind: 'text' as const, value: 'x'.repeat(201) };
+    const overlongTone = { kind: 'text' as const, value: 'x'.repeat(501) };
+    const legalExample = { kind: 'text' as const, value: 'x'.repeat(10_000) };
+    const overlongExample = { kind: 'text' as const, value: 'x'.repeat(10_001) };
+
+    expect(brandIntakeEvidenceResolutionSchema.safeParse(
+      storedEvidenceResolution('business.businessName', overlongBusinessName),
+    ).success).toBe(false);
+    expect(resolveBrandIntakeEvidenceInputSchema.safeParse(
+      mcpEvidenceResolution('business.businessName', overlongBusinessName),
+    ).success).toBe(false);
+    expect(resolveBrandIntakeEvidenceBodySchema.safeParse(
+      adminEvidenceResolution('business.businessName', overlongBusinessName),
+    ).success).toBe(false);
+    expect(brandIntakeEvidenceResolutionSchema.safeParse(
+      storedEvidenceResolution('brand.tone', overlongTone),
+    ).success).toBe(false);
+    expect(resolveBrandIntakeEvidenceInputSchema.safeParse(
+      mcpEvidenceResolution('brand.tone', overlongTone),
+    ).success).toBe(false);
+    expect(resolveBrandIntakeEvidenceBodySchema.safeParse(
+      adminEvidenceResolution('brand.tone', overlongTone),
+    ).success).toBe(false);
+
+    expect(brandIntakeEvidenceResolutionSchema.safeParse(
+      storedEvidenceResolution('brand.existingExamples', legalExample),
+    ).success).toBe(true);
+    expect(resolveBrandIntakeEvidenceInputSchema.safeParse(
+      mcpEvidenceResolution('brand.existingExamples', legalExample),
+    ).success).toBe(true);
+    expect(resolveBrandIntakeEvidenceBodySchema.safeParse(
+      adminEvidenceResolution('brand.existingExamples', legalExample),
+    ).success).toBe(true);
+    expect(brandIntakeEvidenceResolutionSchema.safeParse(
+      storedEvidenceResolution('brand.existingExamples', overlongExample),
+    ).success).toBe(false);
+    expect(resolveBrandIntakeEvidenceInputSchema.safeParse(
+      mcpEvidenceResolution('brand.existingExamples', overlongExample),
+    ).success).toBe(false);
+    expect(resolveBrandIntakeEvidenceBodySchema.safeParse(
+      adminEvidenceResolution('brand.existingExamples', overlongExample),
+    ).success).toBe(false);
+  });
+
+  it('rejects canonical client-input placeholders without rejecting ordinary brackets', () => {
+    const placeholderValues: Array<[BrandIntakeFieldPath, BrandIntakeEvidenceValue]> = [
+      ['business.description', { kind: 'text', value: 'Known prefix [NEEDS CLIENT INPUT: founding year]' }],
+      ['brand.personality', { kind: 'text_list', value: ['Direct', '[NEEDS CLIENT INPUT: voice trait]'] }],
+      ['business.website', { kind: 'url', value: 'https://example.com/[NEEDS CLIENT INPUT: path]' }],
+      ['competitors.referenceUrls', {
+        kind: 'url_list',
+        value: ['https://example.com/reference', 'https://example.com/[NEEDS CLIENT INPUT: competitor]'],
+      }],
+    ];
+    for (const [fieldPath, value] of placeholderValues) {
+      expect(brandIntakeEvidenceResolutionSchema.safeParse(
+        storedEvidenceResolution(fieldPath, value),
+      ).success).toBe(false);
+    }
+
+    const ordinaryBracketedText = { kind: 'text' as const, value: 'Use [square brackets] literally.' };
+    expect(brandIntakeEvidenceResolutionSchema.safeParse(
+      storedEvidenceResolution('business.description', ordinaryBracketedText),
+    ).success).toBe(true);
+    expect(resolveBrandIntakeEvidenceInputSchema.safeParse(
+      mcpEvidenceResolution('business.description', {
+        kind: 'text',
+        value: '[NEEDS CLIENT INPUT: verified description]',
+      }),
+    ).success).toBe(false);
+    expect(resolveBrandIntakeEvidenceInputSchema.safeParse(
+      mcpEvidenceResolution('business.description', ordinaryBracketedText),
+    ).success).toBe(true);
+    expect(resolveBrandIntakeEvidenceBodySchema.safeParse(
+      adminEvidenceResolution('business.description', {
+        kind: 'text',
+        value: '[NEEDS CLIENT INPUT: verified description]',
+      }),
+    ).success).toBe(false);
+    expect(resolveBrandIntakeEvidenceBodySchema.safeParse(
+      adminEvidenceResolution('business.description', ordinaryBracketedText),
+    ).success).toBe(true);
   });
 
   it('accepts a full legal multibyte evidence census above the former storage ceiling', () => {
