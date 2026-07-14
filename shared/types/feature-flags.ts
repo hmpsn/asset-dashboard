@@ -219,10 +219,10 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
     group: 'Platform Intelligence Enhancements',
     lifecycle: {
       owner: 'brand-engine',
-      status: 'reserved',
+      status: 'active',
       createdAt: '2026-07-13',
       rolloutTarget: 'staging-validation',
-      removalCondition: 'Re-audit by 2026-08-03; if the paid brand-run start gate is still unwired, remove the reservation. Once active, retire after the brand generation workflow is staging-validated and the guarded path is the supported default.',
+      removalCondition: 'Retire after the grounded brand-generation workflow is staging-validated, the guarded path is the supported default, and B3 review delivery no longer requires an OFF compatibility branch.',
       linkedRoadmapItemId: 'mcp-brand-deliverable-generation',
       staleAuditCadence: 'weekly',
       lastReviewedAt: '2026-07-13',

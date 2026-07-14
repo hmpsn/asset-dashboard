@@ -79,9 +79,27 @@ describe('MCP server instructions', () => {
     expect(MCP_SERVER_INSTRUCTIONS).toMatch(/never retry a stale authorization/i);
   });
 
+  it('explains the paid, pause-and-resume brand-generation workflow', () => {
+    for (const tool of [
+      'start_brand_deliverable_generation',
+      'get_brand_generation',
+      'resume_brand_deliverable_generation',
+      'start_brand_deliverable_revision',
+    ]) {
+      expect(MCP_SERVER_INSTRUCTIONS).toContain(tool);
+    }
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('full_brand_system');
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('voice_foundation');
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('awaiting_voice_finalization');
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/creates no dependent deliverables until/i);
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/never auto-approves\/sends\/publishes/i);
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/creative proposals/i);
+  });
+
   it('flags the paid tools and that start_* tools are polled jobs', () => {
     expect(MCP_SERVER_INSTRUCTIONS).toContain('research_keywords');
     expect(MCP_SERVER_INSTRUCTIONS).toContain('start_local_seo_refresh');
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('resume_brand_deliverable_generation');
     expect(MCP_SERVER_INSTRUCTIONS).toContain('get_job_status');
     expect(MCP_SERVER_INSTRUCTIONS).toMatch(/paid/i);
   });

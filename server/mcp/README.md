@@ -99,7 +99,7 @@ The registry assigns each tool an explicit error contract:
 - The original **61 tools** remain `legacy_text`; registered handler-owned responses are unchanged.
   Registry-owned unknown-tool and authorization rejections are deliberately generic so caller
   tool/workspace values cannot be reflected as secrets.
-- The four content-matrix structural tools, two brand-intake tools, and two brand-voice tools use `json_v1`: an error is a text content item containing a JSON
+- The four content-matrix structural tools, two brand-intake tools, two brand-voice tools, and four brand-generation tools use `json_v1`: an error is a text content item containing a JSON
   `{ code, message, retryable, details? }` envelope.
 
 `server/mcp/tool-errors.ts` builds and privately marks the `json_v1` response and filters optional
@@ -115,10 +115,10 @@ failure classes; unknown names and mismatched workspace values are never logged 
 
 `MCP_TOOL_REGISTRY` (`server/mcp/tool-registry.ts`) is the single authority for discovery,
 dispatch, workspace scope, and error compatibility. It composes **16 categories** for a total of
-**69 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
+**73 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
 dispatcher in `server/mcp/tools/<category>.ts`; the registry snapshots immutable definitions and
 connects each one to its category handler. A production dispatch census calls every registered
-name with inert invalid input, asserts the exact 16 family-array→handler identities, and pins the
+name with inert invalid input, asserts the exact 17 family-array→handler identities, and pins the
 handled-name manifests for families that validate workspace input before dispatch. Discovery
 therefore cannot silently outgrow or be paired with the wrong family switch.
 
@@ -179,6 +179,17 @@ Voice finalization is deliberately a two-boundary workflow:
 1. Call `get_brand_voice` and present the current readiness plus eligible authentic samples to the operator. It returns one page in `eligible_anchors.items`; while `eligible_anchors.has_more` is true, pass `eligible_anchors.next_cursor` back as `anchor_cursor`. Generated calibration-loop, identity-approved, and copy-approved samples are forbidden as anchors.
 2. A human operator creates the exact, short-lived authorization through the authenticated `POST /api/voice/:workspaceId/finalization-authorizations` HTTP boundary. MCP cannot create it or submit a caller-authored operator identity.
 3. Call `finalize_brand_voice` with only `workspace_id` and the one-time `authorization_token`. A replay returns the original finalization without duplicating activity or broadcasts. On a revision conflict, or when an anchor cursor conflicts because its profile/intake revision changed, restart `get_brand_voice` from the first page and request a new authorization; never retry the stale authorization.
+
+### brand-generation-actions (`tools/brand-generation-actions.ts`) — grounded, review-gated brand generation
+
+| Tool | R/W | Purpose |
+|------|-----|---------|
+| `start_brand_deliverable_generation` | W | **[Paid API]** Start one atomic deliverable, an ordered preset, or the voice-foundation stage of a full brand system from one exact immutable intake revision. Durable deliverables require the exact finalized voice version/fingerprint. |
+| `get_brand_generation` | R | Read one durable run plus a cursor-paged item slice. Returns public attribution and bounded summaries; never exposes idempotency keys, MCP key identity, raw prompts, or evidence bodies. |
+| `resume_brand_deliverable_generation` | W | **[Paid API]** Resume a paused `full_brand_system` run after explicit human voice finalization, using the exact run revision and finalized voice version/fingerprint. |
+| `start_brand_deliverable_revision` | W | **[Paid API]** Start one review-directed revision using exact run, item, and deliverable versions. A newer human edit always wins the conditional save. |
+
+Brand generation is a durable background workflow, not a synchronous copy endpoint. Start returns `run_id` and `job_id`; poll `get_job_status`, then read paged detail with `get_brand_generation`. A `full_brand_system` start creates only a provisional `voice_foundation`, truthfully finishes its first job at `awaiting_voice_finalization`, and creates no dependent deliverables until a human finalizes voice and calls `resume_brand_deliverable_generation`. Every generated deliverable stops at `ready_for_human_review` or a truthful attention/error state. These tools never approve, send, publish, claim name availability, or treat placeholder prose as evidence. Reuse the same idempotency key only for the byte-equivalent business command; on revision conflicts, re-read before retrying.
 
 ### clients (`tools/clients.ts`) — inbox / client signals
 | Tool | R/W | Purpose |

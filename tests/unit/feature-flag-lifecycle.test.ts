@@ -141,17 +141,14 @@ describe('feature-flag lifecycle audit', () => {
       expect(after.pastDoneTargetCount).toBeGreaterThan(0);
     });
 
-    it('keeps the two P0 generation flags reserved and outside lifecycle burn-down queues', () => {
+    it('keeps only the not-yet-wired matrix flag reserved outside lifecycle burn-down queues', () => {
       const roadmap = loadRoadmap();
       const report = buildFeatureFlagLifecycleReport(roadmap, CURRENT_AUDIT_AS_OF);
 
       const reservedRows = report.rows.filter(
         r => FEATURE_FLAG_CATALOG[r.key].lifecycle.status === 'reserved',
       );
-      expect(reservedRows.map(row => row.key).sort()).toEqual([
-        'brand-deliverable-generation',
-        'content-matrix-generation',
-      ]);
+      expect(reservedRows.map(row => row.key).sort()).toEqual(['content-matrix-generation']);
 
       for (const row of reservedRows) {
         expect(row.doneTarget).toBeNull();
