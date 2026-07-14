@@ -34,6 +34,7 @@ import {
   listCalibrationSessions,
   VoiceProfileStateTransitionError,
 } from '../../server/voice-calibration.js';
+import db from '../../server/db/index.js';
 import type { VoiceDNA, VoiceGuardrails, ContextModifier } from '../../shared/types/brand-engine.js';
 
 // ─── Shared fixtures ─────────────────────────────────────────────────────────
@@ -187,14 +188,11 @@ describe('updateVoiceProfile — legal state transitions', () => {
     expect(result.status).toBe('calibrating');
   });
 
-  it('calibrating → calibrated succeeds', () => {
+  it('generic mutation cannot perform calibrating → calibrated', () => {
     updateVoiceProfile(ws.workspaceId, { status: 'calibrating' });
-    const result = updateVoiceProfile(ws.workspaceId, {
-      status: 'calibrated',
-      voiceDNA: SAMPLE_DNA,
-      guardrails: SAMPLE_GUARDRAILS,
-    });
-    expect(result.status).toBe('calibrated');
+    expect(() => updateVoiceProfile(ws.workspaceId, {
+      status: 'calibrated', voiceDNA: SAMPLE_DNA, guardrails: SAMPLE_GUARDRAILS,
+    })).toThrow(VoiceProfileStateTransitionError);
   });
 
   it('calibrating → draft succeeds (rollback)', () => {
@@ -204,15 +202,15 @@ describe('updateVoiceProfile — legal state transitions', () => {
   });
 
   it('calibrated → draft succeeds (reset)', () => {
-    updateVoiceProfile(ws.workspaceId, { status: 'calibrating' });
-    updateVoiceProfile(ws.workspaceId, { status: 'calibrated', voiceDNA: SAMPLE_DNA });
+    db.prepare(`UPDATE voice_profiles SET status = 'calibrated' WHERE workspace_id = ?`) // status-ok: seed a compatibility-only legacy calibrated row
+      .run(ws.workspaceId);
     const result = updateVoiceProfile(ws.workspaceId, { status: 'draft' });
     expect(result.status).toBe('draft');
   });
 
   it('calibrated → calibrating succeeds (re-calibrate)', () => {
-    updateVoiceProfile(ws.workspaceId, { status: 'calibrating' });
-    updateVoiceProfile(ws.workspaceId, { status: 'calibrated', voiceDNA: SAMPLE_DNA });
+    db.prepare(`UPDATE voice_profiles SET status = 'calibrated' WHERE workspace_id = ?`) // status-ok: seed a compatibility-only legacy calibrated row
+      .run(ws.workspaceId);
     const result = updateVoiceProfile(ws.workspaceId, { status: 'calibrating' });
     expect(result.status).toBe('calibrating');
   });
@@ -228,11 +226,11 @@ describe('updateVoiceProfile — legal state transitions', () => {
     expect(result.status).toBe('calibrating');
   });
 
-  it('calibrated → calibrated is a legal no-op', () => {
-    updateVoiceProfile(ws.workspaceId, { status: 'calibrating' });
-    updateVoiceProfile(ws.workspaceId, { status: 'calibrated', voiceDNA: SAMPLE_DNA });
-    const result = updateVoiceProfile(ws.workspaceId, { status: 'calibrated' });
-    expect(result.status).toBe('calibrated');
+  it('generic mutation rejects calibrated → calibrated', () => {
+    db.prepare(`UPDATE voice_profiles SET status = 'calibrated' WHERE workspace_id = ?`) // status-ok: seed a compatibility-only legacy calibrated row
+      .run(ws.workspaceId);
+    expect(() => updateVoiceProfile(ws.workspaceId, { status: 'calibrated' }))
+      .toThrow(VoiceProfileStateTransitionError);
   });
 });
 
@@ -308,6 +306,31 @@ describe('updateVoiceProfile — field updates', () => {
     updateVoiceProfile(ws.workspaceId, { guardrails: SAMPLE_GUARDRAILS });
     const profile = getVoiceProfile(ws.workspaceId);
     expect(profile!.guardrails).toEqual(SAMPLE_GUARDRAILS);
+  });
+
+  it('round-trips legacy-compatible empty DNA and guardrail groups', () => {
+    const emptyDNA: VoiceDNA = {
+      personalityTraits: [],
+      toneSpectrum: { formal_casual: 5, serious_playful: 5, technical_accessible: 5 },
+      sentenceStyle: '',
+      vocabularyLevel: '',
+    };
+    const emptyGuardrails: VoiceGuardrails = {
+      forbiddenWords: [],
+      requiredTerminology: [],
+      toneBoundaries: [],
+      antiPatterns: [],
+    };
+    updateVoiceProfile(ws.workspaceId, {
+      voiceDNA: emptyDNA,
+      guardrails: emptyGuardrails,
+      contextModifiers: [{ context: '', description: '' }],
+    });
+    expect(getVoiceProfile(ws.workspaceId)).toMatchObject({
+      voiceDNA: emptyDNA,
+      guardrails: emptyGuardrails,
+      contextModifiers: [{ context: '', description: '' }],
+    });
   });
 
   it('replaces all contextModifiers when provided', () => {

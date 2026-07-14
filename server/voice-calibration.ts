@@ -34,7 +34,27 @@ const stmts = createStmtCache(() => ({
   // UNIQUE(workspace_id) constraint — whichever inserts first wins, the loser
   // gets changes=0 and the caller throws/returns 409.
   insertProfile: db.prepare(`INSERT OR IGNORE INTO voice_profiles (id, workspace_id, status, voice_dna_json, guardrails_json, context_modifiers_json, created_at, updated_at) VALUES (@id, @workspace_id, @status, @voice_dna_json, @guardrails_json, @context_modifiers_json, @created_at, @updated_at)`),
-  updateProfile: db.prepare(`UPDATE voice_profiles SET status = @status, voice_dna_json = @voice_dna_json, guardrails_json = @guardrails_json, context_modifiers_json = @context_modifiers_json, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: voice profile status is not a platform state machine column
+  updateProfile: db.prepare(`
+    UPDATE voice_profiles
+    SET status = @status, -- status-ok: validated transition; generic mutation rejects calibrated
+        voice_dna_json = @voice_dna_json,
+        guardrails_json = @guardrails_json,
+        context_modifiers_json = @context_modifiers_json,
+        revision = revision + 1,
+        updated_at = @updated_at
+    WHERE id = @id
+      AND workspace_id = @workspace_id
+      AND revision = @expected_revision
+  `), // status-ok: generic mutations validate transitions and can never set calibrated
+  touchProfileAfterSampleMutation: db.prepare(`
+    UPDATE voice_profiles
+    SET status = CASE WHEN status = 'calibrated' THEN 'calibrating' ELSE status END, -- status-ok: sample mutation reopens finalized authority
+        revision = revision + 1,
+        updated_at = @updated_at
+    WHERE id = @id
+      AND workspace_id = @workspace_id
+      AND revision = @expected_revision
+  `), // status-ok: changing prompt evidence reopens finalized voice for review
   // Compute next sort_order atomically inside the transaction. Reading
   // profile.samples.length from an in-memory snapshot races: two concurrent
   // addVoiceSample() calls both see length=N and both assign sort_order=N.
@@ -143,38 +163,87 @@ export function updateVoiceProfile(
   workspaceId: string,
   updates: { status?: VoiceProfileStatus; voiceDNA?: VoiceDNA; guardrails?: VoiceGuardrails; contextModifiers?: ContextModifier[] },
 ): VoiceProfile & { samples: VoiceSample[] } {
-  const profile = getVoiceProfile(workspaceId);
-  if (!profile) throw new Error('No voice profile exists for this workspace');
-  // Enforce state-machine at the write boundary. Any caller — route handler,
-  // internal flow, test harness — flows through here, so the guard catches
-  // every path without depending on Zod-schema discipline at the edge.
-  if (updates.status !== undefined && updates.status !== profile.status) {
-    try {
-      validateTransition('voice_profile', VOICE_PROFILE_TRANSITIONS, profile.status, updates.status);
-    } catch (err) {
-      if (err instanceof InvalidTransitionError) {
-        log.warn({ workspaceId, from: profile.status, to: updates.status }, 'rejected illegal voice profile state transition');
-        throw new VoiceProfileStateTransitionError(profile.status, updates.status);
-      }
-      throw err;
+  const doUpdate = db.transaction((): {
+    profile: VoiceProfile & { samples: VoiceSample[] };
+    changed: boolean;
+  } => {
+    const profile = getVoiceProfile(workspaceId);
+    if (!profile) throw new Error('No voice profile exists for this workspace');
+
+    // Finalized authority is created only by finalizeBrandVoice(). The generic
+    // editor may reopen/revise a profile, but can never label a mutable draft as
+    // calibrated — including a same-status calibrated write.
+    if (updates.status === 'calibrated') {
+      throw new VoiceProfileStateTransitionError(profile.status, 'calibrated');
     }
-  }
-  const now = new Date().toISOString();
-  stmts().updateProfile.run({
-    id: profile.id,
-    workspace_id: workspaceId,
-    status: updates.status ?? profile.status,
-    voice_dna_json: updates.voiceDNA !== undefined ? JSON.stringify(updates.voiceDNA) : (profile.voiceDNA ? JSON.stringify(profile.voiceDNA) : null),
-    guardrails_json: updates.guardrails !== undefined ? JSON.stringify(updates.guardrails) : (profile.guardrails ? JSON.stringify(profile.guardrails) : null),
-    context_modifiers_json: updates.contextModifiers !== undefined ? JSON.stringify(updates.contextModifiers) : (profile.contextModifiers ? JSON.stringify(profile.contextModifiers) : null),
-    updated_at: now,
+
+    const dnaChanged = updates.voiceDNA !== undefined
+      && JSON.stringify(updates.voiceDNA) !== JSON.stringify(profile.voiceDNA);
+    const guardrailsChanged = updates.guardrails !== undefined
+      && JSON.stringify(updates.guardrails) !== JSON.stringify(profile.guardrails);
+    const modifiersChanged = updates.contextModifiers !== undefined
+      && JSON.stringify(updates.contextModifiers) !== JSON.stringify(profile.contextModifiers);
+    const semanticEdit = dnaChanged || guardrailsChanged || modifiersChanged;
+    const targetStatus = updates.status
+      ?? (semanticEdit && profile.status === 'calibrated' ? 'calibrating' : profile.status);
+    const statusChanged = targetStatus !== profile.status;
+
+    if (statusChanged) {
+      try {
+        validateTransition('voice_profile', VOICE_PROFILE_TRANSITIONS, profile.status, targetStatus);
+      } catch (err) {
+        if (err instanceof InvalidTransitionError) {
+          log.warn(
+            { workspaceId, from: profile.status, to: targetStatus },
+            'rejected illegal voice profile state transition',
+          );
+          throw new VoiceProfileStateTransitionError(profile.status, targetStatus);
+        }
+        throw err;
+      }
+    }
+    if (!semanticEdit && !statusChanged) return { profile, changed: false };
+
+    const now = new Date().toISOString();
+    const result = stmts().updateProfile.run({
+      id: profile.id,
+      workspace_id: workspaceId,
+      expected_revision: profile.revision,
+      status: targetStatus,
+      voice_dna_json: updates.voiceDNA !== undefined
+        ? JSON.stringify(updates.voiceDNA)
+        : (profile.voiceDNA ? JSON.stringify(profile.voiceDNA) : null),
+      guardrails_json: updates.guardrails !== undefined
+        ? JSON.stringify(updates.guardrails)
+        : (profile.guardrails ? JSON.stringify(profile.guardrails) : null),
+      context_modifiers_json: updates.contextModifiers !== undefined
+        ? JSON.stringify(updates.contextModifiers)
+        : (profile.contextModifiers ? JSON.stringify(profile.contextModifiers) : null),
+      updated_at: now,
+    });
+    if (result.changes !== 1) {
+      throw new Error(`Voice profile revision conflict at revision ${profile.revision}`);
+    }
+    return {
+      profile: {
+        ...profile,
+        status: targetStatus,
+        voiceDNA: updates.voiceDNA ?? profile.voiceDNA,
+        guardrails: updates.guardrails ?? profile.guardrails,
+        contextModifiers: updates.contextModifiers ?? profile.contextModifiers,
+        revision: profile.revision + 1,
+        updatedAt: now,
+      },
+      changed: true,
+    };
   });
-  const digestVoiceInputChanged = (
-    ['status', 'voiceDNA', 'guardrails'] as const
-  ).some(key => key in updates);
-  if (digestVoiceInputChanged) invalidateMonthlyDigestCache(workspaceId);
-  clearIntelligenceCache(workspaceId);
-  return { ...profile, ...updates, updatedAt: now };
+
+  const result = doUpdate.immediate();
+  if (result.changed) {
+    invalidateMonthlyDigestCache(workspaceId);
+    clearIntelligenceCache(workspaceId);
+  }
+  return result.profile;
 }
 
 // Takes workspaceId (not profile.id) — resolves profile internally.
@@ -202,17 +271,51 @@ export function addVoiceSample(
       context_tag: contextTag ?? null, source: effectiveSource,
       sort_order: sortOrder, created_at: now,
     });
+    const touched = stmts().touchProfileAfterSampleMutation.run({
+      id: profile.id,
+      workspace_id: workspaceId,
+      expected_revision: profile.revision,
+      updated_at: now,
+    });
+    if (touched.changes !== 1) {
+      throw new Error(`Voice profile revision conflict at revision ${profile.revision}`);
+    }
     return { voiceProfileId: profile.id, sortOrder };
   });
 
   const { voiceProfileId, sortOrder } = doAdd.immediate();
+  invalidateMonthlyDigestCache(workspaceId);
+  clearIntelligenceCache(workspaceId);
   return { id, voiceProfileId, content, contextTag, source: effectiveSource, sortOrder, createdAt: now };
 }
 
 export function deleteVoiceSample(workspaceId: string, sampleId: string): boolean {
-  const profile = getVoiceProfile(workspaceId);
-  if (!profile) return false;
-  return stmts().deleteSampleById.run(sampleId, profile.id).changes > 0;
+  const doDelete = db.transaction((): boolean => {
+    const profile = getVoiceProfile(workspaceId);
+    if (!profile) return false;
+    // Read before delete both proves workspace ownership and preserves context
+    // for future activity/effect callers without relying on a vanished row.
+    const sample = profile.samples.find(candidate => candidate.id === sampleId);
+    if (!sample) return false;
+    const deleted = stmts().deleteSampleById.run(sample.id, profile.id);
+    if (deleted.changes !== 1) return false;
+    const touched = stmts().touchProfileAfterSampleMutation.run({
+      id: profile.id,
+      workspace_id: workspaceId,
+      expected_revision: profile.revision,
+      updated_at: new Date().toISOString(),
+    });
+    if (touched.changes !== 1) {
+      throw new Error(`Voice profile revision conflict at revision ${profile.revision}`);
+    }
+    return true;
+  });
+  const deleted = doDelete.immediate();
+  if (deleted) {
+    invalidateMonthlyDigestCache(workspaceId);
+    clearIntelligenceCache(workspaceId);
+  }
+  return deleted;
 }
 
 export function listCalibrationSessions(workspaceId: string): CalibrationSession[] {
