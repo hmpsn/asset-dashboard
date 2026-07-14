@@ -1,6 +1,7 @@
 import type { GenerationProvenance } from './ai-execution.js';
 import {
   BRAND_DELIVERABLE_TYPES,
+  type BrandDeliverableStatus,
   type ContextModifier,
   type BrandDeliverableType,
   type VoiceDNA,
@@ -38,18 +39,32 @@ export const BRAND_GENERATION_LIMITS = {
   maxItemPageSize: 100,
   maxTargets: BRAND_DELIVERABLE_TYPES.length + 1,
   maxProviderCalls: (BRAND_DELIVERABLE_TYPES.length + 1) * 6,
-  maxInputTokens: 4_000_000,
+  maxInputTokens: 5_000_000,
   maxOutputTokens: 250_000,
   maxEstimatedUsdMicros: 100_000_000,
   maxConcurrency: 3,
   maxIdLength: 200,
   maxIdempotencyKeyLength: 200,
   maxCursorLength: 2_048,
-  maxDirectionBytes: 8 * 1_024,
+  maxDirectionBytes: 2 * 1_024,
+  /** Internal audit-derived direction after control stripping; human input keeps the larger bound. */
+  maxAutomaticDirectionBytes: 512,
   maxContentBytes: 64 * 1_024,
   maxFoundationBytes: 128 * 1_024,
   maxSnapshotBytes: 512 * 1_024,
-  maxPromptBytes: 192 * 1_024,
+  /** Maximum exact provider instruction payload for any one reserved dispatch. */
+  maxPromptBytes: 40 * 1_024,
+  /** Acceptance keeps this much provider-envelope slack for finite wrapper/report drift. */
+  providerStageClosureSafetyBytes: 512,
+  /** Base generation prompt cap leaves deterministic headroom for audit/refinement. */
+  maxBasePromptBytes: 24 * 1_024,
+  /** Candidate core projected into refine/audit prompts; frozen requirements are supplied once. */
+  maxCandidateSnapshotBytes: 4 * 1_024,
+  /** Normalized durable candidate may also carry the frozen requirement/placeholder snapshot. */
+  maxResolvedCandidateSnapshotBytes: 256 * 1_024,
+  /** Cross-target consistency context is a bounded digest, never N full candidates. */
+  maxRelatedCandidateContextBytes: 3 * 1_024,
+  providerPromptFramingTokenCeiling: 512,
 } as const;
 
 export const BRAND_GENERATION_ATOMIC_TARGETS = [
@@ -370,11 +385,19 @@ export type BrandGeneratedClaim =
   | {
       text: string;
       classification: 'factual';
+      evidenceKeys: [string, ...string[]];
       sourceRefs: [GenerationFactualEvidenceSourceRef, ...GenerationFactualEvidenceSourceRef[]];
     }
   | {
       text: string;
-      classification: 'inferred' | 'creative_proposal';
+      classification: 'inferred';
+      evidenceKeys: [string, ...string[]];
+      sourceRefs: [GenerationFactualEvidenceSourceRef, ...GenerationFactualEvidenceSourceRef[]];
+    }
+  | {
+      text: string;
+      classification: 'creative_proposal';
+      evidenceKeys: string[];
       sourceRefs: GenerationEvidenceSourceRef[];
     };
 
@@ -532,6 +555,9 @@ interface BrandGenerationAttemptBase {
   expectedRunRevision: number;
   expectedItemRevision: number;
   expectedDeliverableVersion: number | null;
+  /** Frozen authority/source snapshot shared by candidate and audit stages. */
+  sourceInputFingerprint: string;
+  /** Exact rendered prompt or deterministic stage input for this attempt. */
   effectiveInputFingerprint: string;
   budgetUsage: BrandGenerationBudgetUsage;
   provenance: GenerationProvenance | null;
@@ -656,6 +682,16 @@ export type BrandGenerationAcceptedCommandResult = Omit<
 export const BRAND_GENERATION_COMMAND_KINDS = ['start', 'resume', 'revision'] as const;
 export type BrandGenerationCommandKind = (typeof BRAND_GENERATION_COMMAND_KINDS)[number];
 
+export const BRAND_GENERATION_REVISION_SOURCE_STATUSES = [
+  'ready_for_human_review',
+  'changes_requested',
+  'needs_attention',
+  'conflict',
+] as const satisfies readonly BrandGenerationItemStatus[];
+
+export type BrandGenerationRevisionSourceStatus =
+  (typeof BRAND_GENERATION_REVISION_SOURCE_STATUSES)[number];
+
 type DistributiveOmit<T, Keys extends PropertyKey> = T extends unknown
   ? Omit<T, Extract<keyof T, Keys>>
   : never;
@@ -727,8 +763,72 @@ export type BrandGenerationCommand =
       expectedRunRevision: number;
       expectedItemRevision: number;
       expectedDeliverableVersion: number;
-      priorItemStatus: 'ready_for_human_review' | 'changes_requested';
+      priorItemStatus: BrandGenerationRevisionSourceStatus;
     });
+
+export const BRAND_GENERATION_EFFECT_KINDS = [
+  'command_accepted',
+  'artifact_committed',
+  'command_completed',
+] as const;
+
+export type BrandGenerationEffectKind =
+  (typeof BRAND_GENERATION_EFFECT_KINDS)[number];
+
+export type BrandGenerationEffectPayload =
+  | {
+      schemaVersion: typeof BRAND_GENERATION_CONTRACT_VERSION;
+      kind: 'command_accepted';
+    }
+  | {
+      schemaVersion: typeof BRAND_GENERATION_CONTRACT_VERSION;
+      kind: 'artifact_committed';
+      deliverableId: string;
+      deliverableType: BrandDeliverableType;
+      deliverableVersion: number;
+      deliverableStatus: BrandDeliverableStatus;
+    }
+  | {
+      schemaVersion: typeof BRAND_GENERATION_CONTRACT_VERSION;
+      kind: 'command_completed';
+      status: BrandGenerationRunStatus;
+      counts: BrandGenerationRunCounts;
+    };
+
+interface BrandGenerationEffectEventBase {
+  sequence: number;
+  effectKey: string;
+  workspaceId: string;
+  runId: string;
+  commandId: string;
+  attemptCount: number;
+  lastAttemptAt: string | null;
+  lastError: string | null;
+  appliedAt: string | null;
+  createdAt: string;
+}
+
+/** Durable transactional-outbox event for post-commit activity and invalidation. */
+export type BrandGenerationEffectEvent =
+  | (BrandGenerationEffectEventBase & {
+      kind: 'command_accepted';
+      itemId: null;
+      payload: Extract<BrandGenerationEffectPayload, { kind: 'command_accepted' }>;
+    })
+  | (BrandGenerationEffectEventBase & {
+      kind: 'artifact_committed';
+      itemId: string;
+      payload: Extract<BrandGenerationEffectPayload, { kind: 'artifact_committed' }>;
+    })
+  | (BrandGenerationEffectEventBase & {
+      kind: 'command_completed';
+      itemId: null;
+      payload: Extract<BrandGenerationEffectPayload, { kind: 'command_completed' }>;
+    });
+
+export interface BrandGenerationEffectCursor {
+  sequence: number;
+}
 
 export type StartBrandGenerationResult = BrandGenerationCommandResult;
 

@@ -28,6 +28,12 @@ import {
 const WORKSPACE_ID = 'ws_brand_routes';
 const RUN_ID = 'brand_run_routes_1';
 const ITEM_ID = 'brand_item_routes_1';
+const SIGNED_ITEM_CURSOR = `${Buffer.from(JSON.stringify({
+  schemaVersion: 1,
+  workspaceId: WORKSPACE_ID,
+  runId: RUN_ID,
+  runRevision: 3,
+})).toString('base64url')}.${Buffer.from('cursor-hmac-signature').toString('base64url')}`;
 
 function commandResult(existing = false) {
   return {
@@ -228,14 +234,14 @@ describe('brand generation HTTP routes', () => {
       'get',
       {
         params: { workspaceId: WORKSPACE_ID, runId: RUN_ID },
-        query: { itemCursor: 'brand_cursor_1', itemLimit: '25' },
+        query: { itemCursor: SIGNED_ITEM_CURSOR, itemLimit: '25' },
       },
     );
 
     expect(deps.getBrandGeneration).toHaveBeenCalledWith({
       workspaceId: WORKSPACE_ID,
       runId: RUN_ID,
-      cursor: 'brand_cursor_1',
+      cursor: SIGNED_ITEM_CURSOR,
       limit: 25,
     });
     expect(result.body).toMatchObject({
@@ -246,6 +252,23 @@ describe('brand generation HTTP routes', () => {
     expect(serialized).not.toContain('idempotency');
     expect(serialized).not.toContain('must-not-escape');
     expect(serialized).not.toContain('mcpExecutionContext');
+  });
+
+  it('rejects a cursor with extra signature separators before the read service', async () => {
+    const deps = dependencies();
+    const result = await invokeFinal(
+      createBrandGenerationRouter(deps.value),
+      '/api/brand-generation/:workspaceId/runs/:runId',
+      'get',
+      {
+        params: { workspaceId: WORKSPACE_ID, runId: RUN_ID },
+        query: { itemCursor: `${SIGNED_ITEM_CURSOR}.unexpected` },
+      },
+    );
+
+    expect(result.status).toBe(400);
+    expect(result.body).toEqual({ error: 'Invalid brand-generation query' });
+    expect(deps.getBrandGeneration).not.toHaveBeenCalled();
   });
 
   it.each([

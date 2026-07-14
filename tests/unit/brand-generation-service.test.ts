@@ -6,6 +6,7 @@ import type {
   BrandGenerationItem,
   PersistedBrandGenerationRun,
   ResumeBrandGenerationRequest,
+  ReviseBrandGenerationItemRequest,
 } from '../../shared/types/brand-generation.js';
 import { BRAND_GENERATION_ATOMIC_TARGETS } from '../../shared/types/brand-generation.js';
 import type { FinalizedVoiceSnapshot } from '../../shared/types/voice-finalization.js';
@@ -19,6 +20,8 @@ const repository = vi.hoisted(() => ({
   acceptBrandGenerationRevisionCommand: vi.fn(),
   getPersistedBrandGenerationRun: vi.fn(),
   getBrandGenerationItem: vi.fn(),
+  isBrandGenerationJobRepairEligible: vi.fn(),
+  removeRestartInterruptedBrandGenerationJobForRepair: vi.fn(),
   listPersistedBrandGenerationItems: vi.fn(),
   listBrandGenerationItemsPage: vi.fn(),
 }));
@@ -36,19 +39,24 @@ const preflight = vi.hoisted(() => ({
 vi.mock('../../server/domains/brand/generation/repository.js', () => repository);
 vi.mock('../../server/domains/brand/generation/snapshots.js', () => snapshots);
 vi.mock('../../server/domains/brand/generation/preflight.js', () => preflight);
+vi.mock('../../server/domains/brand/generation/effects.js', () => ({
+  applyBrandGenerationCommandAcceptedEffects: vi.fn(),
+}));
 
 import {
   getBrandGeneration,
   resumeBrandGeneration,
+  reviseBrandGenerationItem,
   startBrandGeneration,
 } from '../../server/domains/brand/generation/service.js';
+import { BrandGenerationPreconditionError } from '../../server/domains/brand/generation/errors.js';
 
 const NOW = '2026-07-14T12:00:00.000Z';
 const INTAKE_FINGERPRINT = 'a'.repeat(64);
 const VOICE_FINGERPRINT = 'b'.repeat(64);
 const MAX_BUDGET = {
   maxProviderCalls: 114,
-  maxInputTokens: 4_000_000,
+  maxInputTokens: 5_000_000,
   maxOutputTokens: 250_000,
   maxEstimatedCostMicros: 100_000_000,
   maxConcurrency: 3,
@@ -56,6 +64,7 @@ const MAX_BUDGET = {
 
 function finalizedVoice(finalizedAt = '2026-07-14T11:00:00.000Z'): FinalizedVoiceSnapshot {
   return {
+    id: 'voice-version-2',
     workspaceId: 'ws-1',
     voiceProfileId: 'voice-profile-1',
     voiceVersion: 2,
@@ -71,7 +80,41 @@ function finalizedVoice(finalizedAt = '2026-07-14T11:00:00.000Z'): FinalizedVoic
       selectedBy: { actorType: 'operator', actorId: 'operator-voice' },
       selectedAt: finalizedAt,
     }],
-  } as FinalizedVoiceSnapshot;
+    voiceDNA: {
+      personalityTraits: ['Warm'],
+      toneSpectrum: { formal_casual: 5, serious_playful: 5, technical_accessible: 5 },
+      sentenceStyle: 'Short, clear sentences.',
+      vocabularyLevel: 'Plain language.',
+    },
+    guardrails: {
+      forbiddenWords: [],
+      requiredTerminology: [],
+      toneBoundaries: [],
+      antiPatterns: [],
+    },
+    contextModifiers: [],
+    anchors: [{
+      selector: {
+        kind: 'brand_intake_sample',
+        intakeRevisionId: 'intake-1',
+        intakeRevision: 1,
+        sampleId: 'sample-1',
+      },
+      content: 'An authentic brand sample.',
+      context: 'body',
+      evidenceRef: {
+        sourceType: 'brand_intake',
+        sourceId: 'intake-1',
+        sourceRevision: 1,
+        capturedAt: '2026-07-14T09:00:00.000Z',
+        selectedBy: { actorType: 'operator', actorId: 'operator-voice' },
+        selectedAt: finalizedAt,
+      },
+    }],
+    calibrationSelections: [],
+    executionActor: { actorType: 'operator', actorId: 'operator-voice' },
+    createdAt: finalizedAt,
+  };
 }
 
 function frozen(target: BrandGenerationAtomicTarget) {
@@ -154,14 +197,14 @@ function runFixture(overrides: Partial<PersistedBrandGenerationRun> = {}): Persi
     budget: {
       estimate: {
         providerCalls: 114,
-        inputTokens: 4_000_000,
+        inputTokens: 5_000_000,
         outputTokens: 250_000,
         estimatedCostMicros: 100_000_000,
         maxConcurrency: 3,
       },
       limits: {
         providerCalls: 114,
-        inputTokens: 4_000_000,
+        inputTokens: 5_000_000,
         outputTokens: 250_000,
         maxEstimatedCostMicros: 100_000_000,
         maxConcurrency: 3,
@@ -222,6 +265,25 @@ function foundationItem(): BrandGenerationItem {
     createdAt: '2026-07-14T09:00:00.000Z',
     updatedAt: '2026-07-14T10:00:00.000Z',
     completedAt: '2026-07-14T10:00:00.000Z',
+  } as BrandGenerationItem;
+}
+
+function deliverableItem(): BrandGenerationItem {
+  return {
+    ...foundationItem(),
+    id: 'item-mission',
+    target: 'mission',
+    status: 'changes_requested',
+    inputSnapshot: frozen('mission').inputSnapshot,
+    content: 'Existing generated mission',
+    foundationDraft: null,
+    artifactExpectation: {
+      kind: 'update',
+      deliverableId: 'deliverable-mission',
+      expectedVersion: 2,
+    },
+    committedDeliverableId: 'deliverable-mission',
+    committedDeliverableVersion: 2,
   } as BrandGenerationItem;
 }
 
@@ -289,6 +351,24 @@ beforeEach(() => {
   repository.lookupBrandGenerationResumeReplay.mockReturnValue(null);
   repository.lookupBrandGenerationRevisionReplay.mockReturnValue(null);
   repository.getPersistedBrandGenerationRun.mockReturnValue(runFixture());
+  repository.isBrandGenerationJobRepairEligible.mockImplementation((
+    run: PersistedBrandGenerationRun,
+    command: BrandGenerationCommand,
+    items: BrandGenerationItem[],
+  ) => {
+    const targets = new Set(run.selectedTargets);
+    const commandItems = command.kind === 'revision'
+      ? items.filter((item: BrandGenerationItem) => item.id === command.itemId)
+      : items.filter((item: BrandGenerationItem) => targets.has(item.target));
+    return (run.status === 'queued' || run.status === 'running')
+      && run.currentJobId === command.jobId
+      && commandItems.length === command.result.selectionCount
+      && commandItems.length > 0
+      && commandItems.every((item: BrandGenerationItem) => ( // every-ok -- non-empty exact count above
+        command.kind === 'revision' ? item.status === 'revising' : item.status === 'queued'
+      ));
+  });
+  repository.removeRestartInterruptedBrandGenerationJobForRepair.mockReturnValue(true);
   repository.listPersistedBrandGenerationItems.mockReturnValue([foundationItem()]);
   repository.listBrandGenerationItemsPage.mockReturnValue({
     items: [foundationItem()],
@@ -325,6 +405,18 @@ beforeEach(() => {
 describe('brand generation service orchestration', () => {
   it('replays before the flag check and repairs the missing accepted job exactly once', () => {
     const replay = accepted('start', true);
+    replay.run = runFixture({
+      status: 'queued',
+      stage: 'preflight',
+      currentJobId: 'job-1',
+    });
+    replay.items = [{
+      ...foundationItem(),
+      status: 'queued',
+      revision: 0,
+      attemptCount: 0,
+      completedAt: null,
+    }];
     repository.lookupBrandGenerationStartReplay.mockReturnValue(replay);
     const isFeatureEnabled = vi.fn(() => false);
     const getJob = vi.fn(() => undefined);
@@ -360,7 +452,137 @@ describe('brand generation service orchestration', () => {
       message: 'Preparing grounded brand generation...',
     });
     expect(queueBrandGenerationJob).toHaveBeenCalledWith('job-1');
-    expect(applyCommandEffects).not.toHaveBeenCalled();
+    expect(applyCommandEffects).toHaveBeenCalledOnce();
+    expect(applyCommandEffects).toHaveBeenCalledWith(replay.command);
+  });
+
+  it('replaces an initJobs restart-error tombstone before requeueing the accepted command', () => {
+    const replay = accepted('start', true);
+    replay.run = runFixture({
+      status: 'queued',
+      stage: 'preflight',
+      currentJobId: 'job-1',
+    });
+    replay.items = [{
+      ...foundationItem(),
+      status: 'queued',
+      revision: 0,
+      attemptCount: 0,
+      completedAt: null,
+    }];
+    repository.lookupBrandGenerationStartReplay.mockReturnValue(replay);
+    const createJob = vi.fn(() => ({ id: 'job-1' }));
+    const queueBrandGenerationJob = vi.fn();
+
+    const result = startBrandGeneration({
+      workspaceId: 'ws-1',
+      intakeRevisionId: 'intake-stale-on-replay',
+      expectedIntakeRevision: 999,
+      expectedIntakeFingerprint: '0'.repeat(64),
+      selection: { kind: 'preset', preset: 'full_brand_system' },
+      budget: MAX_BUDGET,
+      idempotencyKey: 'accepted-key',
+      createdBy: { actorType: 'operator', actorId: 'operator-1' },
+      mcpExecutionContext: null,
+    }, {
+      isFeatureEnabled: vi.fn(() => false),
+      getJob: vi.fn(() => ({
+        id: 'job-1',
+        type: 'brand-deliverable-generation',
+        status: 'error',
+        workspaceId: 'ws-1',
+        message: 'Interrupted by server restart',
+        error: 'Server restarted — job interrupted',
+        createdAt: NOW,
+        updatedAt: NOW,
+      })) as never,
+      createJob: createJob as never,
+      queueBrandGenerationJob,
+      applyCommandEffects: vi.fn(),
+    });
+
+    expect(result).toMatchObject({ existing: true, jobId: 'job-1' });
+    expect(repository.removeRestartInterruptedBrandGenerationJobForRepair)
+      .toHaveBeenCalledWith('ws-1', 'job-1');
+    expect(createJob).toHaveBeenCalledOnce();
+    expect(queueBrandGenerationJob).toHaveBeenCalledWith('job-1');
+  });
+
+  it('does not mistake a stale in-memory restart tombstone for a concurrent repair', () => {
+    const replay = accepted('start', true);
+    replay.run = runFixture({
+      status: 'queued',
+      stage: 'preflight',
+      currentJobId: 'job-1',
+    });
+    replay.items = [{
+      ...foundationItem(),
+      status: 'queued',
+      revision: 0,
+      attemptCount: 0,
+      completedAt: null,
+    }];
+    repository.lookupBrandGenerationStartReplay.mockReturnValue(replay);
+    const restartTombstone = {
+      id: 'job-1',
+      type: 'brand-deliverable-generation',
+      status: 'error',
+      workspaceId: 'ws-1',
+      message: 'Interrupted by server restart',
+      error: 'Server restarted — job interrupted',
+      createdAt: NOW,
+      updatedAt: NOW,
+    } as const;
+    const createFailure = new Error('job insert failed');
+    const queueBrandGenerationJob = vi.fn();
+
+    expect(() => startBrandGeneration({
+      workspaceId: 'ws-1',
+      intakeRevisionId: 'intake-stale-on-replay',
+      expectedIntakeRevision: 999,
+      expectedIntakeFingerprint: '0'.repeat(64),
+      selection: { kind: 'preset', preset: 'full_brand_system' },
+      budget: MAX_BUDGET,
+      idempotencyKey: 'accepted-key',
+      createdBy: { actorType: 'operator', actorId: 'operator-1' },
+      mcpExecutionContext: null,
+    }, {
+      isFeatureEnabled: vi.fn(() => false),
+      getJob: vi.fn(() => restartTombstone) as never,
+      createJob: vi.fn(() => { throw createFailure; }) as never,
+      queueBrandGenerationJob,
+      applyCommandEffects: vi.fn(),
+    })).toThrow(createFailure);
+
+    expect(queueBrandGenerationJob).not.toHaveBeenCalled();
+  });
+
+  it('never recreates a missing generic job after durable work has started', () => {
+    const replay = accepted('start', true);
+    repository.lookupBrandGenerationStartReplay.mockReturnValue(replay);
+    const createJob = vi.fn();
+    const queueBrandGenerationJob = vi.fn();
+
+    const result = startBrandGeneration({
+      workspaceId: 'ws-1',
+      intakeRevisionId: 'intake-stale-on-replay',
+      expectedIntakeRevision: 999,
+      expectedIntakeFingerprint: '0'.repeat(64),
+      selection: { kind: 'preset', preset: 'full_brand_system' },
+      budget: MAX_BUDGET,
+      idempotencyKey: 'accepted-key',
+      createdBy: { actorType: 'operator', actorId: 'operator-1' },
+      mcpExecutionContext: null,
+    }, {
+      isFeatureEnabled: vi.fn(() => false),
+      getJob: vi.fn(() => undefined) as never,
+      createJob,
+      queueBrandGenerationJob,
+    });
+
+    expect(result).toMatchObject({ existing: true, jobId: 'job-1' });
+    expect(createJob).not.toHaveBeenCalled();
+    expect(queueBrandGenerationJob).not.toHaveBeenCalled();
   });
 
   it('bootstraps only the foundation while reserving the cumulative 19-target suite', () => {
@@ -422,7 +644,7 @@ describe('brand generation service orchestration', () => {
     expect(BRAND_GENERATION_ATOMIC_TARGETS).toHaveLength(19);
   });
 
-  it('requires finalized voice to be newer than the completed foundation before resume', () => {
+  it('requires newer finalized voice and permits a needs-attention foundation to resume', () => {
     const request: ResumeBrandGenerationRequest = {
       workspaceId: 'ws-1',
       runId: 'run-1',
@@ -450,6 +672,10 @@ describe('brand generation service orchestration', () => {
         selectionCount: input.items.length,
       },
     }));
+    repository.listPersistedBrandGenerationItems.mockReturnValue([{
+      ...foundationItem(),
+      status: 'needs_attention',
+    }]);
     const later = finalizedVoice('2026-07-14T10:00:00.001Z');
     const result = resumeBrandGeneration(request, {
       isFeatureEnabled: feature,
@@ -475,6 +701,159 @@ describe('brand generation service orchestration', () => {
       }),
     );
     expect(result).toMatchObject({ selectionCount: 18, existing: false });
+  });
+
+  it('rejects an oversized frozen base prompt before accepting a command or job', () => {
+    preflight.runBrandGenerationPreflight.mockReturnValue({
+      attemptOutput: {
+        kind: 'preflight',
+        readyForPaidWork: true,
+        blockingRequirementIds: [],
+        requirements: [],
+        placeholders: [],
+        estimate: {
+          providerCalls: 6,
+          inputTokens: 10_000,
+          outputTokens: 1_000,
+          estimatedCostMicros: 500_000,
+          maxConcurrency: 1,
+        },
+      },
+      evidenceCatalog: [{
+        key: 'brand-intake:business.description',
+        kind: 'intake_field',
+        fieldPath: 'business.description',
+        value: 'x'.repeat(28_000),
+        supportsFactualClaims: true,
+        sourceRefs: [],
+      }],
+      materializedPayload: {},
+    });
+
+    let thrown: unknown;
+    try {
+      startBrandGeneration({
+        workspaceId: 'ws-1',
+        intakeRevisionId: 'intake-1',
+        expectedIntakeRevision: 1,
+        expectedIntakeFingerprint: INTAKE_FINGERPRINT,
+        selection: { kind: 'preset', preset: 'full_brand_system' },
+        budget: MAX_BUDGET,
+        idempotencyKey: 'oversized-start',
+        createdBy: { actorType: 'operator', actorId: 'operator-1' },
+        mcpExecutionContext: null,
+      }, {
+        isFeatureEnabled: vi.fn(() => true),
+        getBrandVoiceAuthoritySummary: vi.fn(() => ({
+          readiness: { state: 'missing', blockingReasons: ['No finalized voice.'] },
+        })) as never,
+      });
+    } catch (err) {
+      thrown = err;
+    }
+
+    expect(thrown).toBeInstanceOf(BrandGenerationPreconditionError);
+    expect(thrown).toMatchObject({ reason: 'input_too_large' });
+    expect(repository.acceptBrandGenerationStartCommand).not.toHaveBeenCalled();
+  });
+
+  it('rejects provider-envelope expansion before accepting otherwise bounded raw input', () => {
+    preflight.runBrandGenerationPreflight.mockReturnValue({
+      attemptOutput: {
+        kind: 'preflight',
+        readyForPaidWork: true,
+        blockingRequirementIds: [],
+        requirements: [],
+        placeholders: [],
+        estimate: {
+          providerCalls: 6,
+          inputTokens: 10_000,
+          outputTokens: 1_000,
+          estimatedCostMicros: 500_000,
+          maxConcurrency: 1,
+        },
+      },
+      evidenceCatalog: [{
+        key: 'brand-intake:business.description',
+        kind: 'intake_field',
+        fieldPath: 'business.description',
+        value: '"\\'.repeat(5_000),
+        supportsFactualClaims: true,
+        sourceRefs: [],
+      }],
+      materializedPayload: {},
+    });
+
+    let thrown: unknown;
+    try {
+      startBrandGeneration({
+        workspaceId: 'ws-1',
+        intakeRevisionId: 'intake-1',
+        expectedIntakeRevision: 1,
+        expectedIntakeFingerprint: INTAKE_FINGERPRINT,
+        selection: { kind: 'preset', preset: 'full_brand_system' },
+        budget: MAX_BUDGET,
+        idempotencyKey: 'provider-envelope-expansion',
+        createdBy: { actorType: 'operator', actorId: 'operator-1' },
+        mcpExecutionContext: null,
+      }, {
+        isFeatureEnabled: vi.fn(() => true),
+        getBrandVoiceAuthoritySummary: vi.fn(() => ({
+          readiness: { state: 'missing', blockingReasons: ['No finalized voice.'] },
+        })) as never,
+      });
+    } catch (err) {
+      thrown = err;
+    }
+
+    expect(thrown).toBeInstanceOf(BrandGenerationPreconditionError);
+    expect(thrown).toMatchObject({ reason: 'input_too_large' });
+    expect(repository.acceptBrandGenerationStartCommand).not.toHaveBeenCalled();
+  });
+
+  it('prebuilds a revision from current human content and rejects oversized input before acceptance', () => {
+    const item = deliverableItem();
+    repository.getBrandGenerationItem.mockReturnValue(item);
+    snapshots.hydrateBrandGenerationSnapshot.mockReturnValue(frozen('mission'));
+    const request: ReviseBrandGenerationItemRequest = {
+      workspaceId: 'ws-1',
+      runId: 'run-1',
+      itemId: item.id,
+      expectedRunRevision: 5,
+      expectedItemRevision: item.revision,
+      deliverableId: 'deliverable-mission',
+      expectedDeliverableVersion: 2,
+      direction: 'Make this warmer without changing any facts.',
+      idempotencyKey: 'oversized-revision',
+      requestedBy: { actorType: 'operator', actorId: 'operator-1' },
+      mcpExecutionContext: null,
+    };
+
+    let thrown: unknown;
+    try {
+      reviseBrandGenerationItem(request, {
+        isFeatureEnabled: vi.fn(() => true),
+        getFinalizedVoiceSnapshotForGeneration: vi.fn(() => finalizedVoice()) as never,
+        getDeliverable: vi.fn(() => ({
+          id: request.deliverableId,
+          workspaceId: request.workspaceId,
+          deliverableType: 'mission',
+          content: 'x'.repeat(40_000),
+          status: 'draft',
+          version: request.expectedDeliverableVersion,
+          tier: 'essentials',
+          createdAt: NOW,
+          updatedAt: NOW,
+          versions: [],
+        })),
+      });
+    } catch (err) {
+      thrown = err;
+    }
+
+    expect(thrown).toBeInstanceOf(BrandGenerationPreconditionError);
+    expect(thrown).toMatchObject({ reason: 'input_too_large' });
+    expect(repository.acceptBrandGenerationRevisionCommand).not.toHaveBeenCalled();
   });
 
   it('redacts idempotency and MCP key identity from the public run projection', () => {

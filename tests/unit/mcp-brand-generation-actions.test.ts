@@ -2,8 +2,12 @@ import type { Tool } from '@modelcontextprotocol/sdk/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
-  recordPaidCall: vi.fn(
-    (_increment = 1, _workspaceId?: string): { count: number; warning?: string } => ({ count: 1 }),
+  recordPaidCallOnce: vi.fn(
+    (
+      _eventKey: string,
+      _increment = 1,
+      _workspaceId?: string,
+    ): { count: number; warning?: string } => ({ count: 1 }),
   ),
 }));
 
@@ -15,7 +19,7 @@ vi.mock('../../server/domains/brand/generation/service.js', () => ({
 }));
 
 vi.mock('../../server/mcp/paid-call-counter.js', () => ({
-  recordPaidCall: h.recordPaidCall,
+  recordPaidCallOnce: h.recordPaidCallOnce,
 }));
 
 import type {
@@ -48,6 +52,12 @@ const RUN_ID = 'brand_run_1';
 const ITEM_ID = 'brand_item_1';
 const FINGERPRINT = 'a'.repeat(64);
 const VOICE_FINGERPRINT = 'b'.repeat(64);
+const SIGNED_ITEM_CURSOR = `${Buffer.from(JSON.stringify({
+  schemaVersion: 1,
+  workspaceId: WORKSPACE_ID,
+  runId: RUN_ID,
+  runRevision: 3,
+})).toString('base64url')}.${Buffer.from('cursor-hmac-signature').toString('base64url')}`;
 
 const BUDGET_INPUT = {
   max_provider_calls: 6,
@@ -72,11 +82,14 @@ function workspaceContext(toolName = 'start_brand_deliverable_generation'): McpT
   };
 }
 
-function commandResult(existing = false): StartBrandGenerationResult {
+function commandResult(
+  existing = false,
+  jobId = 'job_brand_1',
+): StartBrandGenerationResult {
   return {
     runId: RUN_ID,
     runRevision: 0,
-    jobId: 'job_brand_1',
+    jobId,
     selectionCount: 1,
     estimate: {
       providerCalls: 3,
@@ -170,11 +183,11 @@ function dependencies() {
     () => getResult(),
   );
   const resumeBrandGeneration = vi.fn<BrandGenerationActionDependencies['resumeBrandGeneration']>(
-    () => commandResult(),
+    () => commandResult(false, 'job_brand_resume_1'),
   );
   const reviseBrandGenerationItem = vi.fn<
     BrandGenerationActionDependencies['reviseBrandGenerationItem']
-  >(() => commandResult());
+  >(() => commandResult(false, 'job_brand_revision_1'));
   const value: BrandGenerationActionDependencies = {
     startBrandGeneration,
     getBrandGeneration,
@@ -200,8 +213,8 @@ function textPayload(
 
 describe('MCP brand generation actions', () => {
   beforeEach(() => {
-    h.recordPaidCall.mockReset();
-    h.recordPaidCall.mockReturnValue({ count: 1 });
+    h.recordPaidCallOnce.mockReset();
+    h.recordPaidCallOnce.mockReturnValue({ count: 1 });
   });
 
   it('advertises a dedicated four-tool snake_case JSON-v1 family', () => {
@@ -331,7 +344,7 @@ describe('MCP brand generation actions', () => {
       {
         workspace_id: WORKSPACE_ID,
         run_id: RUN_ID,
-        item_cursor: 'brand_cursor_1',
+        item_cursor: SIGNED_ITEM_CURSOR,
         item_limit: 25,
       },
       workspaceContext('get_brand_generation'),
@@ -340,7 +353,7 @@ describe('MCP brand generation actions', () => {
     expect(deps.getBrandGeneration).toHaveBeenCalledWith({
       workspaceId: WORKSPACE_ID,
       runId: RUN_ID,
-      cursor: 'brand_cursor_1',
+      cursor: SIGNED_ITEM_CURSOR,
       limit: 25,
     });
     expect(textPayload(result)).toMatchObject({
@@ -434,7 +447,7 @@ describe('MCP brand generation actions', () => {
     });
   });
 
-  it('meters each accepted non-replay paid command exactly once and leaves reads free', async () => {
+  it('submits each accepted paid command under a stable job event and leaves reads free', async () => {
     const deps = dependencies();
     const handle = createBrandGenerationActionHandler(deps.value);
 
@@ -486,17 +499,32 @@ describe('MCP brand generation actions', () => {
       workspaceContext('start_brand_deliverable_revision'),
     );
 
-    expect(h.recordPaidCall).toHaveBeenCalledTimes(3);
-    expect(h.recordPaidCall).toHaveBeenNthCalledWith(1, 1, WORKSPACE_ID);
-    expect(h.recordPaidCall).toHaveBeenNthCalledWith(2, 1, WORKSPACE_ID);
-    expect(h.recordPaidCall).toHaveBeenNthCalledWith(3, 1, WORKSPACE_ID);
+    expect(h.recordPaidCallOnce).toHaveBeenCalledTimes(3);
+    expect(h.recordPaidCallOnce).toHaveBeenNthCalledWith(
+      1,
+      'mcp:brand-generation:accepted-command:job_brand_1',
+      1,
+      WORKSPACE_ID,
+    );
+    expect(h.recordPaidCallOnce).toHaveBeenNthCalledWith(
+      2,
+      'mcp:brand-generation:accepted-command:job_brand_resume_1',
+      1,
+      WORKSPACE_ID,
+    );
+    expect(h.recordPaidCallOnce).toHaveBeenNthCalledWith(
+      3,
+      'mcp:brand-generation:accepted-command:job_brand_revision_1',
+      1,
+      WORKSPACE_ID,
+    );
   });
 
-  it('never meters exact idempotent replays', async () => {
+  it('submits exact idempotent replays so a missing durable event can be repaired', async () => {
     const deps = dependencies();
-    deps.startBrandGeneration.mockReturnValue(commandResult(true));
-    deps.resumeBrandGeneration.mockReturnValue(commandResult(true));
-    deps.reviseBrandGenerationItem.mockReturnValue(commandResult(true));
+    deps.startBrandGeneration.mockReturnValue(commandResult(true, 'job_brand_replay_start'));
+    deps.resumeBrandGeneration.mockReturnValue(commandResult(true, 'job_brand_replay_resume'));
+    deps.reviseBrandGenerationItem.mockReturnValue(commandResult(true, 'job_brand_replay_revision'));
     const handle = createBrandGenerationActionHandler(deps.value);
 
     const results = await Promise.all([
@@ -544,7 +572,25 @@ describe('MCP brand generation actions', () => {
       ),
     ]);
 
-    expect(h.recordPaidCall).not.toHaveBeenCalled();
+    expect(h.recordPaidCallOnce).toHaveBeenCalledTimes(3);
+    expect(h.recordPaidCallOnce).toHaveBeenNthCalledWith(
+      1,
+      'mcp:brand-generation:accepted-command:job_brand_replay_start',
+      1,
+      WORKSPACE_ID,
+    );
+    expect(h.recordPaidCallOnce).toHaveBeenNthCalledWith(
+      2,
+      'mcp:brand-generation:accepted-command:job_brand_replay_resume',
+      1,
+      WORKSPACE_ID,
+    );
+    expect(h.recordPaidCallOnce).toHaveBeenNthCalledWith(
+      3,
+      'mcp:brand-generation:accepted-command:job_brand_replay_revision',
+      1,
+      WORKSPACE_ID,
+    );
     for (const result of results) {
       expect(textPayload(result)).toMatchObject({ existing: true });
     }
@@ -552,7 +598,7 @@ describe('MCP brand generation actions', () => {
 
   it('returns the canonical paid-call threshold warning on an accepted command', async () => {
     const warning = 'paid_call_count: 100 (threshold 100; informational only)';
-    h.recordPaidCall.mockReturnValue({ count: 100, warning });
+    h.recordPaidCallOnce.mockReturnValue({ count: 100, warning });
     const deps = dependencies();
 
     const result = await createBrandGenerationActionHandler(deps.value)(
@@ -571,8 +617,12 @@ describe('MCP brand generation actions', () => {
       workspaceContext(),
     );
 
-    expect(h.recordPaidCall).toHaveBeenCalledOnce();
-    expect(h.recordPaidCall).toHaveBeenCalledWith(1, WORKSPACE_ID);
+    expect(h.recordPaidCallOnce).toHaveBeenCalledOnce();
+    expect(h.recordPaidCallOnce).toHaveBeenCalledWith(
+      'mcp:brand-generation:accepted-command:job_brand_1',
+      1,
+      WORKSPACE_ID,
+    );
     expect(textPayload(result)).toMatchObject({ existing: false, warning });
   });
 
@@ -583,6 +633,15 @@ describe('MCP brand generation actions', () => {
         workspace_id: WORKSPACE_ID,
         workspaceId: WORKSPACE_ID,
         run_id: RUN_ID,
+      },
+      tool: 'get_brand_generation',
+    },
+    {
+      label: 'cursor with extra signature separators',
+      args: {
+        workspace_id: WORKSPACE_ID,
+        run_id: RUN_ID,
+        item_cursor: `${SIGNED_ITEM_CURSOR}.unexpected`,
       },
       tool: 'get_brand_generation',
     },
@@ -615,6 +674,7 @@ describe('MCP brand generation actions', () => {
     });
     expect(deps.startBrandGeneration).not.toHaveBeenCalled();
     expect(deps.getBrandGeneration).not.toHaveBeenCalled();
+    expect(h.recordPaidCallOnce).not.toHaveBeenCalled();
   });
 
   it.each([

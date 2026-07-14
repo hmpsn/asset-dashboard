@@ -6,14 +6,20 @@ import {
   acceptBrandGenerationResumeCommand,
   acceptBrandGenerationStartCommand,
   beginBrandGenerationAttempt,
+  brandGenerationAcceptedEffectKey,
+  brandGenerationArtifactEffectKey,
+  brandGenerationCompletedEffectKey,
   cancelBrandGenerationAttempt,
   commitBrandGenerationDeliverableCandidate,
   completeBrandGenerationAttempt,
+  countBrandGenerationAttemptsForCommand,
   failBrandGenerationAttempt,
   getBrandGenerationAttempt,
+  getBrandGenerationEffectEvent,
   getBrandGenerationItem,
   getBrandGenerationRun,
   getPersistedBrandGenerationRun,
+  isBrandGenerationJobRepairEligible,
   listBrandGenerationItemsPage,
   lookupBrandGenerationStartReplay,
   reserveBrandGenerationAttemptBudget,
@@ -35,6 +41,7 @@ import {
   BrandGenerationRevisionConflictError,
 } from '../../server/domains/brand/generation/errors.js';
 import { brandGenerationPreflightAttemptOutputSchema } from '../../server/domains/brand/generation/persistence-schemas.js';
+import { canonicalBrandGenerationFingerprint } from '../../server/domains/brand/generation/fingerprint.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import type {
   BrandGenerationAttempt,
@@ -50,7 +57,30 @@ const FINGERPRINTS = Array.from({ length: 20 }, (_, index) =>
   (index + 1).toString(16).padStart(64, '0'));
 
 afterEach(() => {
-  for (const workspaceId of cleanup.splice(0)) deleteWorkspace(workspaceId);
+  for (const workspaceId of cleanup.splice(0)) {
+    // Vitest disables foreign keys in worker DBs, so fixture cleanup must be
+    // explicit. Remove the workspace first to satisfy immutable-history
+    // triggers, then clear B2-owned descendants from leaf to root.
+    deleteWorkspace(workspaceId);
+    db.prepare(`
+      DELETE FROM brand_identity_versions
+      WHERE deliverable_id IN (
+        SELECT id FROM brand_identity_deliverables WHERE workspace_id = ?
+      )
+    `).run(workspaceId);
+    db.prepare(`
+      DELETE FROM brand_generation_attempts
+      WHERE item_id IN (
+        SELECT id FROM brand_generation_items WHERE workspace_id = ?
+      )
+    `).run(workspaceId);
+    db.prepare('DELETE FROM brand_generation_effect_events WHERE workspace_id = ?').run(workspaceId);
+    db.prepare('DELETE FROM brand_generation_commands WHERE workspace_id = ?').run(workspaceId);
+    db.prepare('DELETE FROM brand_generation_items WHERE workspace_id = ?').run(workspaceId);
+    db.prepare('DELETE FROM brand_generation_runs WHERE workspace_id = ?').run(workspaceId);
+    db.prepare('DELETE FROM brand_identity_deliverables WHERE workspace_id = ?').run(workspaceId);
+    db.prepare('DELETE FROM brand_intake_revisions WHERE workspace_id = ?').run(workspaceId);
+  }
 });
 
 function seedWorkspace(label: string): { workspaceId: string; intake: BrandIntakeRevisionRef } {
@@ -94,20 +124,23 @@ function preparedItem(
   intake: BrandIntakeRevisionRef,
   target: BrandGenerationPreparedItem['target'],
   artifactExpectation: BrandGenerationTargetInputSnapshot['artifactExpectation'],
-  fingerprint = FINGERPRINTS[3]!,
+  _fingerprintSeed = FINGERPRINTS[3]!,
 ): BrandGenerationPreparedItem {
+  const core = {
+    schemaVersion: 1 as const,
+    target,
+    intakeRevision: intake,
+    voiceSnapshot: target === 'voice_foundation' ? null : finalizedVoice,
+    approvedDeliverables: [],
+    evidenceRequirementIds: [],
+    artifactExpectation,
+    capturedAt: '2026-07-14T01:00:00.000Z',
+  };
   return {
     target,
     inputSnapshot: {
-      schemaVersion: 1,
-      target,
-      intakeRevision: intake,
-      voiceSnapshot: target === 'voice_foundation' ? null : finalizedVoice,
-      approvedDeliverables: [],
-      evidenceRequirementIds: [],
-      artifactExpectation,
-      capturedAt: '2026-07-14T01:00:00.000Z',
-      fingerprint,
+      ...core,
+      fingerprint: canonicalBrandGenerationFingerprint(core),
     },
   };
 }
@@ -132,7 +165,7 @@ function mcpAttribution(workspaceId: string, requestId = 'request-1') {
 
 const maxBudget = {
   maxProviderCalls: 114,
-  maxInputTokens: 4_000_000,
+  maxInputTokens: 5_000_000,
   maxOutputTokens: 250_000,
   maxEstimatedCostMicros: 100_000_000,
   maxConcurrency: 3,
@@ -140,7 +173,7 @@ const maxBudget = {
 
 const maxEstimate = {
   providerCalls: 114,
-  inputTokens: 4_000_000,
+  inputTokens: 5_000_000,
   outputTokens: 250_000,
   estimatedCostMicros: 100_000_000,
   maxConcurrency: 3,
@@ -164,12 +197,20 @@ function foundationStart(
     idempotencyKey: key,
     ...mcpAttribution(workspaceId, requestId),
   };
+  const items: [BrandGenerationPreparedItem, ...BrandGenerationPreparedItem[]] = [
+    preparedItem(intake, 'voice_foundation', null),
+  ];
   return {
     request,
-    items: [preparedItem(intake, 'voice_foundation', null)],
+    items,
     voiceReadiness: { state: 'missing', blockingReasons: ['Voice foundation must be finalized'] },
-    selectionFingerprint: FINGERPRINTS[4]!,
-    effectiveInputFingerprint: FINGERPRINTS[5]!,
+    selectionFingerprint: canonicalBrandGenerationFingerprint({
+      selection: request.selection,
+      initialTargets: items.map(item => item.target),
+    }),
+    effectiveInputFingerprint: canonicalBrandGenerationFingerprint(
+      items.map(item => item.inputSnapshot.fingerprint),
+    ),
     jobId: `job-${key}`,
     estimate: maxEstimate,
     dashboardUrl: `/ws/${workspaceId}/brand`,
@@ -195,12 +236,20 @@ function durableStart(
     createdBy: { actorType: 'operator', actorId: 'op-test' },
     mcpExecutionContext: null,
   };
+  const items: [BrandGenerationPreparedItem, ...BrandGenerationPreparedItem[]] = [
+    preparedItem(intake, target, { kind: 'create', deliverableId: null, expectedVersion: 0 }),
+  ];
   return {
     request,
-    items: [preparedItem(intake, target, { kind: 'create', deliverableId: null, expectedVersion: 0 })],
+    items,
     voiceReadiness: { state: 'finalized', snapshot: finalizedVoice, blockingReasons: [] },
-    selectionFingerprint: FINGERPRINTS[6]!,
-    effectiveInputFingerprint: FINGERPRINTS[7]!,
+    selectionFingerprint: canonicalBrandGenerationFingerprint({
+      selection: request.selection,
+      initialTargets: items.map(item => item.target),
+    }),
+    effectiveInputFingerprint: canonicalBrandGenerationFingerprint(
+      items.map(item => item.inputSnapshot.fingerprint),
+    ),
     jobId: `job-${key}`,
     estimate: { providerCalls: 6, inputTokens: 10_000, outputTokens: 5_000, estimatedCostMicros: 500_000, maxConcurrency: 1 },
     dashboardUrl: `/ws/${workspaceId}/brand`,
@@ -225,17 +274,23 @@ function audienceStart(
     createdBy: { actorType: 'operator', actorId: 'op-test' },
     mcpExecutionContext: null,
   };
+  const items = targets.map((target, index) => preparedItem(
+    intake,
+    target,
+    { kind: 'create', deliverableId: null, expectedVersion: 0 },
+    FINGERPRINTS[8 + index]!,
+  )) as [BrandGenerationPreparedItem, ...BrandGenerationPreparedItem[]];
   return {
     request,
-    items: targets.map((target, index) => preparedItem(
-      intake,
-      target,
-      { kind: 'create', deliverableId: null, expectedVersion: 0 },
-      FINGERPRINTS[8 + index]!,
-    )) as [BrandGenerationPreparedItem, ...BrandGenerationPreparedItem[]],
+    items,
     voiceReadiness: { state: 'finalized', snapshot: finalizedVoice, blockingReasons: [] },
-    selectionFingerprint: FINGERPRINTS[12]!,
-    effectiveInputFingerprint: FINGERPRINTS[13]!,
+    selectionFingerprint: canonicalBrandGenerationFingerprint({
+      selection: request.selection,
+      initialTargets: items.map(item => item.target),
+    }),
+    effectiveInputFingerprint: canonicalBrandGenerationFingerprint(
+      items.map(item => item.inputSnapshot.fingerprint),
+    ),
     jobId: 'job-audience',
     estimate: { providerCalls: 24, inputTokens: 100_000, outputTokens: 30_000, estimatedCostMicros: 2_000_000, maxConcurrency: 3 },
     dashboardUrl: `/ws/${workspaceId}/brand`,
@@ -247,7 +302,7 @@ function candidateOutput(content = 'A grounded mission.'): BrandGenerationAttemp
     kind: 'deliverable_candidate',
     content,
     foundationDraft: null,
-    claims: [{ text: content, classification: 'creative_proposal', sourceRefs: [] }],
+    claims: [{ text: content, classification: 'creative_proposal', evidenceKeys: [], sourceRefs: [] }],
     requirements: [],
     placeholders: [],
   };
@@ -266,6 +321,13 @@ function auditOutput(verdict: 'ready_for_human_review' | 'needs_attention'): Bra
       auditedAt: '2026-07-14T02:00:00.000Z',
     },
   };
+}
+
+function rehashSnapshot(
+  snapshot: BrandGenerationTargetInputSnapshot,
+): BrandGenerationTargetInputSnapshot {
+  const { fingerprint: _fingerprint, ...core } = snapshot;
+  return { ...core, fingerprint: canonicalBrandGenerationFingerprint(core) };
 }
 
 const provenance = {
@@ -324,7 +386,8 @@ function stageDurableCandidate(
     expectedRunRevision: running.revision,
     expectedItemRevision: item.revision,
     expectedDeliverableVersion: 0,
-    effectiveInputFingerprint: item.effectiveInputFingerprint!,
+    sourceInputFingerprint: item.inputSnapshot!.fingerprint,
+    effectiveInputFingerprint: FINGERPRINTS[16]!,
     reservation: zeroReservation,
   });
   completeBrandGenerationAttempt({
@@ -333,7 +396,7 @@ function stageDurableCandidate(
     itemId: item.id,
     attemptId: candidate.id,
     output: generatedCandidate,
-    provenance: { ...provenance, inputFingerprint: item.effectiveInputFingerprint! },
+    provenance: { ...provenance, inputFingerprint: FINGERPRINTS[16]! },
   });
   item = transitionBrandGenerationItem({
     workspaceId,
@@ -352,7 +415,8 @@ function stageDurableCandidate(
     expectedRunRevision: running.revision,
     expectedItemRevision: item.revision,
     expectedDeliverableVersion: 0,
-    effectiveInputFingerprint: item.effectiveInputFingerprint!,
+    sourceInputFingerprint: item.inputSnapshot!.fingerprint,
+    effectiveInputFingerprint: FINGERPRINTS[17]!,
     reservation: zeroReservation,
   });
   completeBrandGenerationAttempt({
@@ -404,12 +468,27 @@ describe('brand generation repository', () => {
       selectedTargets: ['voice_foundation'],
       counts: { selected: 1, queued: 1 },
       currentJobId: input.jobId,
+      budget: {
+        estimate: { maxConcurrency: 3 },
+        limits: { maxConcurrency: 3 },
+      },
     });
     expect(accepted.command).toMatchObject({
       runId: accepted.run.id,
       kind: 'start',
       jobId: input.jobId,
       result: { runId: accepted.run.id, selectionCount: 1 },
+    });
+    expect(getBrandGenerationEffectEvent(
+      brandGenerationAcceptedEffectKey(accepted.command.id),
+    )).toMatchObject({
+      workspaceId,
+      runId: accepted.run.id,
+      commandId: accepted.command.id,
+      kind: 'command_accepted',
+      itemId: null,
+      attemptCount: 0,
+      appliedAt: null,
     });
     expect(accepted.items[0]?.inputSnapshot).toEqual(input.items[0].inputSnapshot);
 
@@ -426,6 +505,11 @@ describe('brand generation repository', () => {
     const replay = lookupBrandGenerationStartReplay(replayRequest);
     expect(replay).toMatchObject({ existing: true, result: accepted.result });
     expect(replay?.command.id).toBe(accepted.command.id);
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM brand_generation_effect_events
+      WHERE effect_key = ?
+    `).get(brandGenerationAcceptedEffectKey(accepted.command.id))).toEqual({ count: 1 });
 
     const changedBusinessRequest: StartBrandGenerationRequest = {
       ...replayRequest,
@@ -433,6 +517,62 @@ describe('brand generation repository', () => {
     };
     expect(() => lookupBrandGenerationStartReplay(changedBusinessRequest))
       .toThrow(BrandGenerationIdempotencyConflictError);
+  });
+
+  it('rejects forged acceptance fingerprints and fingerprint drift on hydrated runs', () => {
+    const { workspaceId, intake } = seedWorkspace('brand repository fingerprint integrity');
+
+    const forgedSelection = foundationStart(workspaceId, intake, 'forged-selection');
+    forgedSelection.selectionFingerprint = FINGERPRINTS[19]!;
+    expect(() => acceptBrandGenerationStartCommand(forgedSelection))
+      .toThrow(/fingerprints do not match the ordered prepared inputs/i);
+
+    const forgedSnapshot = foundationStart(workspaceId, intake, 'forged-snapshot');
+    forgedSnapshot.items[0] = {
+      ...forgedSnapshot.items[0],
+      inputSnapshot: {
+        ...forgedSnapshot.items[0].inputSnapshot,
+        capturedAt: '2026-07-14T01:00:01.000Z',
+      },
+    };
+    expect(() => acceptBrandGenerationStartCommand(forgedSnapshot))
+      .toThrow(/prepared item snapshot is invalid/i);
+
+    const accepted = acceptBrandGenerationStartCommand(
+      foundationStart(workspaceId, intake, 'stored-fingerprint-drift'),
+    );
+    db.prepare(`
+      UPDATE brand_generation_runs
+      SET selection_fingerprint = ?
+      WHERE id = ? AND workspace_id = ?
+    `).run(FINGERPRINTS[19], accepted.run.id, workspaceId);
+    expect(() => getPersistedBrandGenerationRun(workspaceId, accepted.run.id))
+      .toThrow(/fingerprints do not match their immutable inputs/i);
+  });
+
+  it('preserves an immutable estimate concurrency below the run limit across reads and replay', () => {
+    const { workspaceId, intake } = seedWorkspace('brand repository concurrency estimate');
+    const input = durableStart(workspaceId, intake, 'mission', 'start-concurrency-estimate');
+    expect(input.estimate.maxConcurrency).toBe(1);
+    expect(input.request.budget.maxConcurrency).toBe(3);
+
+    const accepted = acceptBrandGenerationStartCommand(input);
+    expect(accepted.run.budget).toMatchObject({
+      estimate: { maxConcurrency: 1 },
+      limits: { maxConcurrency: 3 },
+    });
+
+    const persisted = getPersistedBrandGenerationRun(workspaceId, accepted.run.id);
+    expect(persisted?.budget).toMatchObject({
+      estimate: { maxConcurrency: 1 },
+      limits: { maxConcurrency: 3 },
+    });
+
+    const replay = lookupBrandGenerationStartReplay(input.request);
+    expect(replay?.run.budget).toMatchObject({
+      estimate: { maxConcurrency: 1 },
+      limits: { maxConcurrency: 3 },
+    });
   });
 
   it('scopes every read to workspace and fails closed on corrupt stored JSON', () => {
@@ -531,6 +671,7 @@ describe('brand generation repository', () => {
       expectedRunRevision: running.revision,
       expectedItemRevision: 0,
       expectedDeliverableVersion: 0,
+      sourceInputFingerprint: accepted.items[0]!.inputSnapshot!.fingerprint,
       effectiveInputFingerprint: accepted.items[0]!.effectiveInputFingerprint!,
       reservation: zeroReservation,
     })).toThrow(BrandGenerationPersistenceContractError);
@@ -551,6 +692,7 @@ describe('brand generation repository', () => {
       expectedRunRevision: running.revision,
       expectedItemRevision: item.revision,
       expectedDeliverableVersion: 0,
+      sourceInputFingerprint: item.inputSnapshot!.fingerprint,
       effectiveInputFingerprint: item.effectiveInputFingerprint!,
       reservation: zeroReservation,
     });
@@ -569,6 +711,7 @@ describe('brand generation repository', () => {
       expectedRunRevision: running.revision,
       expectedItemRevision: items[0]!.revision,
       expectedDeliverableVersion: 0,
+      sourceInputFingerprint: items[0]!.inputSnapshot!.fingerprint,
       effectiveInputFingerprint: items[0]!.effectiveInputFingerprint!,
       reservation: { ...zeroReservation, providerCalls: 1 },
     })).toThrow(BrandGenerationAttemptCheckpointConflictError);
@@ -580,9 +723,11 @@ describe('brand generation repository', () => {
       attemptId: attempts[0]!.id,
       expectedRunRevision: running.revision,
       expectedItemRevision: items[0]!.revision,
+      effectiveInputFingerprint: FINGERPRINTS[19]!,
       reservation: { ...zeroReservation, providerCalls: 114 },
     });
     expect(reserved.budgetUsage.providerCalls).toBe(114);
+    expect(reserved.effectiveInputFingerprint).toBe(FINGERPRINTS[19]);
     expect(() => reserveBrandGenerationAttemptBudget({
       workspaceId,
       runId: accepted.run.id,
@@ -590,8 +735,18 @@ describe('brand generation repository', () => {
       attemptId: attempts[0]!.id,
       expectedRunRevision: running.revision,
       expectedItemRevision: items[0]!.revision,
+      effectiveInputFingerprint: FINGERPRINTS[18]!,
       reservation: { ...zeroReservation, providerCalls: 1 },
     })).toThrow(BrandGenerationBudgetExceededError);
+    expect(getBrandGenerationAttempt(
+      workspaceId,
+      accepted.run.id,
+      items[0]!.id,
+      attempts[0]!.id,
+    )).toMatchObject({
+      effectiveInputFingerprint: FINGERPRINTS[19],
+      budgetUsage: { providerCalls: 114 },
+    });
 
     failBrandGenerationAttempt({
       workspaceId,
@@ -658,6 +813,19 @@ describe('brand generation repository', () => {
       deliverable: { content: 'A grounded mission.', status: 'draft', version: 1 },
       item: { status: 'ready_for_human_review', committedDeliverableVersion: 1 },
     });
+    if (committed.kind !== 'committed') throw new Error('Expected committed effect fixture');
+    expect(getBrandGenerationEffectEvent(brandGenerationArtifactEffectKey(
+      ready.accepted.command.id,
+      ready.item.id,
+      committed.deliverable.version,
+    ))).toMatchObject({
+      kind: 'artifact_committed',
+      itemId: ready.item.id,
+      payload: {
+        deliverableId: committed.deliverable.id,
+        deliverableVersion: committed.deliverable.version,
+      },
+    });
 
     const attentionWorkspace = seedWorkspace('brand repository withheld commit');
     const attention = stageDurableCandidate(
@@ -677,6 +845,11 @@ describe('brand generation repository', () => {
       nextStatus: 'needs_attention',
     });
     expect(withheld).toMatchObject({ kind: 'withheld', item: { status: 'needs_attention' } });
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM brand_generation_effect_events
+      WHERE workspace_id = ? AND effect_kind = 'artifact_committed'
+    `).get(attentionWorkspace.workspaceId)).toEqual({ count: 0 });
     expect(db.prepare(`
       SELECT COUNT(*) AS count FROM brand_identity_deliverables
       WHERE workspace_id = ? AND deliverable_type = 'mission'
@@ -743,7 +916,8 @@ describe('brand generation repository', () => {
       expectedRunRevision: staged.running.revision,
       expectedItemRevision: item.revision,
       expectedDeliverableVersion: 0,
-      effectiveInputFingerprint: item.effectiveInputFingerprint!,
+      sourceInputFingerprint: item.inputSnapshot!.fingerprint,
+      effectiveInputFingerprint: FINGERPRINTS[18]!,
       reservation: zeroReservation,
     });
     expect(() => completeBrandGenerationAttempt({
@@ -760,7 +934,7 @@ describe('brand generation repository', () => {
       itemId: item.id,
       attemptId: revisedCandidate.id,
       output: candidateOutput('A revised grounded mission.'),
-      provenance: { ...provenance, inputFingerprint: item.effectiveInputFingerprint! },
+      provenance: { ...provenance, inputFingerprint: FINGERPRINTS[18]! },
     });
     item = transitionBrandGenerationItem({
       workspaceId,
@@ -779,7 +953,8 @@ describe('brand generation repository', () => {
       expectedRunRevision: staged.running.revision,
       expectedItemRevision: item.revision,
       expectedDeliverableVersion: 0,
-      effectiveInputFingerprint: item.effectiveInputFingerprint!,
+      sourceInputFingerprint: item.inputSnapshot!.fingerprint,
+      effectiveInputFingerprint: FINGERPRINTS[19]!,
       reservation: zeroReservation,
     });
     completeBrandGenerationAttempt({
@@ -855,12 +1030,49 @@ describe('brand generation repository', () => {
       nextStatus: 'running',
       nextStage: 'voice_foundation_generation',
     });
+    const foundation = transitionBrandGenerationItem({
+      workspaceId,
+      runId: initial.run.id,
+      itemId: initial.items[0]!.id,
+      expectedRevision: initial.items[0]!.revision,
+      nextStatus: 'preflighting',
+    });
+    const priorAttempt = beginBrandGenerationAttempt({
+      workspaceId,
+      runId: initial.run.id,
+      itemId: foundation.id,
+      commandId: initial.command.id,
+      jobId: initial.command.jobId,
+      stage: 'preflight',
+      expectedRunRevision: running.revision,
+      expectedItemRevision: foundation.revision,
+      expectedDeliverableVersion: null,
+      sourceInputFingerprint: foundation.inputSnapshot!.fingerprint,
+      effectiveInputFingerprint: FINGERPRINTS[17]!,
+      reservation: zeroReservation,
+    });
+    completeBrandGenerationAttempt({
+      workspaceId,
+      runId: initial.run.id,
+      itemId: foundation.id,
+      attemptId: priorAttempt.id,
+      output: {
+        kind: 'preflight',
+        readyForPaidWork: true,
+        blockingRequirementIds: [],
+        requirements: [],
+        placeholders: [],
+        estimate: maxEstimate,
+      },
+      provenance: null,
+    });
     const paused = transitionBrandGenerationRun({
       workspaceId,
       runId: initial.run.id,
       expectedRevision: running.revision,
       nextStatus: 'awaiting_review',
       nextStage: 'awaiting_voice_finalization',
+      completionCommandId: initial.command.id,
     });
     const resumeEstimate = {
       providerCalls: 80,
@@ -891,11 +1103,38 @@ describe('brand generation repository', () => {
       estimate: resumeEstimate,
       dashboardUrl: `/ws/${workspaceId}/brand`,
     };
+    db.prepare(`
+      UPDATE brand_generation_runs
+      SET reserved_provider_calls = 40
+      WHERE id = ? AND workspace_id = ?
+    `).run(initial.run.id, workspaceId);
+    expect(() => acceptBrandGenerationResumeCommand(resumeInput))
+      .toThrow(BrandGenerationBudgetExceededError);
+    db.prepare(`
+      UPDATE brand_generation_runs
+      SET reserved_provider_calls = 0
+      WHERE id = ? AND workspace_id = ?
+    `).run(initial.run.id, workspaceId);
     const resumed = acceptBrandGenerationResumeCommand(resumeInput);
     expect(resumed.result.estimate).toEqual(resumeEstimate);
     expect(resumed.command.result.estimate).toEqual(resumeEstimate);
     expect(resumed.run.budget.estimate).toEqual(maxEstimate);
     expect(resumed.run.counts.selected).toBe(19);
+    expect(countBrandGenerationAttemptsForCommand(
+      workspaceId,
+      resumed.run.id,
+      initial.command.id,
+    )).toBe(1);
+    expect(countBrandGenerationAttemptsForCommand(
+      workspaceId,
+      resumed.run.id,
+      resumed.command.id,
+    )).toBe(0);
+    expect(isBrandGenerationJobRepairEligible(
+      resumed.run,
+      resumed.command,
+      resumed.items,
+    )).toBe(true);
   });
 
   it('accepts revision only against exact run, item, and deliverable versions with a replacement snapshot', () => {
@@ -913,6 +1152,18 @@ describe('brand generation repository', () => {
     });
     expect(committed.kind).toBe('committed');
     if (committed.kind !== 'committed') throw new Error('Expected committed revision fixture');
+    const editedDeliverableVersion = committed.deliverable.version + 1;
+    db.prepare(`
+      UPDATE brand_identity_deliverables
+      SET content = ?, version = ?, updated_at = ?
+      WHERE id = ? AND workspace_id = ?
+    `).run(
+      'Operator-authored mission to refine',
+      editedDeliverableVersion,
+      new Date().toISOString(),
+      committed.deliverable.id,
+      workspaceId,
+    );
     const completedRun = transitionBrandGenerationRun({
       workspaceId,
       runId: staged.accepted.run.id,
@@ -920,13 +1171,20 @@ describe('brand generation repository', () => {
       nextStatus: 'completed',
       nextStage: 'complete',
       completedAt: new Date().toISOString(),
+      completionCommandId: staged.accepted.command.id,
+    });
+    expect(getBrandGenerationEffectEvent(
+      brandGenerationCompletedEffectKey(staged.accepted.command.id),
+    )).toMatchObject({
+      kind: 'command_completed',
+      payload: { status: 'completed', counts: completedRun.counts },
     });
     const replacementSnapshot: BrandGenerationTargetInputSnapshot = {
       ...committed.item.inputSnapshot!,
       artifactExpectation: {
         kind: 'update',
         deliverableId: committed.deliverable.id,
-        expectedVersion: committed.deliverable.version,
+        expectedVersion: editedDeliverableVersion,
       },
       capturedAt: '2026-07-14T03:00:00.000Z',
       fingerprint: FINGERPRINTS[18]!,
@@ -939,7 +1197,7 @@ describe('brand generation repository', () => {
         expectedRunRevision: completedRun.revision,
         expectedItemRevision: committed.item.revision,
         deliverableId: committed.deliverable.id,
-        expectedDeliverableVersion: committed.deliverable.version,
+        expectedDeliverableVersion: editedDeliverableVersion,
         direction: 'Make the mission more specific.',
         idempotencyKey: 'revision-success',
         requestedBy: { actorType: 'operator', actorId: 'op-test' },
@@ -969,7 +1227,7 @@ describe('brand generation repository', () => {
       ...base,
       request: {
         ...base.request,
-        expectedDeliverableVersion: committed.deliverable.version + 1,
+        expectedDeliverableVersion: editedDeliverableVersion + 1,
         idempotencyKey: 'stale-deliverable',
       },
       inputSnapshot: {
@@ -977,11 +1235,26 @@ describe('brand generation repository', () => {
         artifactExpectation: {
           kind: 'update',
           deliverableId: committed.deliverable.id,
-          expectedVersion: committed.deliverable.version + 1,
+          expectedVersion: editedDeliverableVersion + 1,
         },
         fingerprint: FINGERPRINTS[19]!,
       },
     })).toThrow(BrandGenerationRevisionConflictError);
+
+    db.prepare(`
+      UPDATE brand_generation_runs
+      SET reserved_provider_calls = 113
+      WHERE id = ? AND workspace_id = ?
+    `).run(staged.accepted.run.id, workspaceId);
+    expect(() => acceptBrandGenerationRevisionCommand({
+      ...base,
+      request: { ...base.request, idempotencyKey: 'revision-budget-exhausted' },
+    })).toThrow(BrandGenerationBudgetExceededError);
+    db.prepare(`
+      UPDATE brand_generation_runs
+      SET reserved_provider_calls = 0
+      WHERE id = ? AND workspace_id = ?
+    `).run(staged.accepted.run.id, workspaceId);
 
     const accepted = acceptBrandGenerationRevisionCommand(base);
     expect(accepted).toMatchObject({
@@ -990,13 +1263,187 @@ describe('brand generation repository', () => {
       command: {
         kind: 'revision',
         priorItemStatus: 'ready_for_human_review',
-        expectedDeliverableVersion: committed.deliverable.version,
+        expectedDeliverableVersion: editedDeliverableVersion,
       },
     });
     expect(accepted.items.find(item => item.id === committed.item.id)).toMatchObject({
       status: 'revising',
       inputSnapshot: replacementSnapshot,
       artifactExpectation: replacementSnapshot.artifactExpectation,
+      content: 'Operator-authored mission to refine',
+      claims: [],
+      placeholders: [],
+      auditReport: null,
+      provenance: null,
+      committedDeliverableId: committed.deliverable.id,
+      committedDeliverableVersion: editedDeliverableVersion,
     });
+    expect(countBrandGenerationAttemptsForCommand(
+      workspaceId,
+      accepted.run.id,
+      accepted.command.id,
+    )).toBe(0);
+    expect(isBrandGenerationJobRepairEligible(
+      accepted.run,
+      accepted.command,
+      accepted.items,
+    )).toBe(true);
   });
+
+  it.each([
+    ['needs_attention', 'completed_with_errors'],
+    ['conflict', 'conflict'],
+  ] as const)(
+    'allows an explicitly linked %s revision item to be retried against current authority',
+    (itemStatus, runStatus) => {
+      const { workspaceId, intake } = seedWorkspace(`brand revision retry ${itemStatus}`);
+      const staged = stageDurableCandidate(
+        workspaceId,
+        intake,
+        'ready_for_human_review',
+        `retry-source-${itemStatus}`,
+      );
+      const committed = commitBrandGenerationDeliverableCandidate({
+        workspaceId,
+        runId: staged.accepted.run.id,
+        itemId: staged.item.id,
+        candidateAttemptId: staged.candidate.id,
+        finalAuditAttemptId: staged.audit.id,
+        expectedRunRevision: staged.running.revision,
+        expectedItemRevision: staged.item.revision,
+        nextStatus: 'ready_for_human_review',
+      });
+      if (committed.kind !== 'committed') throw new Error('Expected committed retry fixture');
+      const initialRun = transitionBrandGenerationRun({
+        workspaceId,
+        runId: staged.accepted.run.id,
+        expectedRevision: staged.running.revision,
+        nextStatus: 'completed',
+        nextStage: 'complete',
+        completedAt: new Date().toISOString(),
+        completionCommandId: staged.accepted.command.id,
+      });
+      const firstSnapshot = rehashSnapshot({
+        ...committed.item.inputSnapshot!,
+        artifactExpectation: {
+          kind: 'update',
+          deliverableId: committed.deliverable.id,
+          expectedVersion: committed.deliverable.version,
+        },
+        capturedAt: '2026-07-14T04:00:00.000Z',
+      });
+      const firstRevision = acceptBrandGenerationRevisionCommand({
+        request: {
+          workspaceId,
+          runId: staged.accepted.run.id,
+          itemId: committed.item.id,
+          expectedRunRevision: initialRun.revision,
+          expectedItemRevision: committed.item.revision,
+          deliverableId: committed.deliverable.id,
+          expectedDeliverableVersion: committed.deliverable.version,
+          direction: 'Resolve the review finding without inventing facts.',
+          idempotencyKey: `first-revision-${itemStatus}`,
+          requestedBy: { actorType: 'operator', actorId: 'op-test' },
+          mcpExecutionContext: null,
+        },
+        inputSnapshot: firstSnapshot,
+        jobId: `job-first-revision-${itemStatus}`,
+        estimate: {
+          providerCalls: 3,
+          inputTokens: 5_000,
+          outputTokens: 2_500,
+          estimatedCostMicros: 250_000,
+          maxConcurrency: 1,
+        },
+        dashboardUrl: `/ws/${workspaceId}/brand`,
+      });
+      const revisingItem = firstRevision.items.find(item => item.id === committed.item.id)!;
+      let currentVersion = committed.deliverable.version;
+      if (itemStatus === 'conflict') {
+        currentVersion += 1;
+        db.prepare(`
+          UPDATE brand_identity_deliverables
+          SET content = ?, version = ?, updated_at = ?
+          WHERE id = ? AND workspace_id = ?
+        `).run(
+          'A later operator edit that must win',
+          currentVersion,
+          new Date().toISOString(),
+          committed.deliverable.id,
+          workspaceId,
+        );
+      }
+      const retryableItem = transitionBrandGenerationItem({
+        workspaceId,
+        runId: staged.accepted.run.id,
+        itemId: revisingItem.id,
+        expectedRevision: revisingItem.revision,
+        nextStatus: itemStatus,
+        patch: {
+          completedAt: new Date().toISOString(),
+          ...(itemStatus === 'conflict' ? {
+            error: {
+              code: 'deliverable_changed',
+              message: 'A newer operator edit was preserved.',
+              retryable: true,
+              stage: 'artifact_commit',
+            },
+          } : {}),
+        },
+      });
+      const endedRun = transitionBrandGenerationRun({
+        workspaceId,
+        runId: staged.accepted.run.id,
+        expectedRevision: firstRevision.run.revision,
+        nextStatus: runStatus,
+        nextStage: 'awaiting_operator_review',
+        completedAt: new Date().toISOString(),
+        completionCommandId: firstRevision.command.id,
+      });
+      const retrySnapshot = rehashSnapshot({
+        ...firstSnapshot,
+        artifactExpectation: {
+          kind: 'update',
+          deliverableId: committed.deliverable.id,
+          expectedVersion: currentVersion,
+        },
+        capturedAt: '2026-07-14T05:00:00.000Z',
+      });
+      const retry = acceptBrandGenerationRevisionCommand({
+        request: {
+          workspaceId,
+          runId: staged.accepted.run.id,
+          itemId: retryableItem.id,
+          expectedRunRevision: endedRun.revision,
+          expectedItemRevision: retryableItem.revision,
+          deliverableId: committed.deliverable.id,
+          expectedDeliverableVersion: currentVersion,
+          direction: 'Retry against the latest operator-owned version.',
+          idempotencyKey: `retry-revision-${itemStatus}`,
+          requestedBy: { actorType: 'operator', actorId: 'op-test' },
+          mcpExecutionContext: null,
+        },
+        inputSnapshot: retrySnapshot,
+        jobId: `job-retry-revision-${itemStatus}`,
+        estimate: {
+          providerCalls: 3,
+          inputTokens: 5_000,
+          outputTokens: 2_500,
+          estimatedCostMicros: 250_000,
+          maxConcurrency: 1,
+        },
+        dashboardUrl: `/ws/${workspaceId}/brand`,
+      });
+      expect(retry.command).toMatchObject({
+        kind: 'revision',
+        priorItemStatus: itemStatus,
+        expectedDeliverableVersion: currentVersion,
+      });
+      expect(retry.items.find(item => item.id === retryableItem.id)).toMatchObject({
+        status: 'revising',
+        committedDeliverableId: committed.deliverable.id,
+        artifactExpectation: retrySnapshot.artifactExpectation,
+      });
+    },
+  );
 });

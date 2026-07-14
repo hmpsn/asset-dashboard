@@ -157,7 +157,7 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
       expectedCancellable: true,
       expectedResultBehavior: 'domain-store-and-result',
     },
-    'tests/contract/brand-generation-b2-contracts.test.ts',
+    'tests/integration/brand-generation.test.ts',
   ),
   [BACKGROUND_JOB_TYPES.PERSONA_GENERATION]: entry(
     'PERSONA_GENERATION',

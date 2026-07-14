@@ -52,6 +52,13 @@ CREATE TABLE brand_generation_runs (
     length(effective_input_fingerprint) = 64
     AND effective_input_fingerprint NOT GLOB '*[^0-9a-f]*'
   ),
+  initial_input_fingerprints_json TEXT NOT NULL -- json-array-column-ok: immutable ordered hashes used for read-time run fingerprint verification
+  CHECK (
+    length(CAST(initial_input_fingerprints_json AS BLOB)) <= 8192
+    AND json_valid(initial_input_fingerprints_json)
+    AND json_type(initial_input_fingerprints_json) = 'array'
+    AND json_array_length(initial_input_fingerprints_json) BETWEEN 1 AND 18
+  ),
   voice_snapshot_json TEXT CHECK (
     voice_snapshot_json IS NULL OR (
       length(CAST(voice_snapshot_json AS BLOB)) <= 524288
@@ -79,8 +86,9 @@ CREATE TABLE brand_generation_runs (
   estimated_input_tokens INTEGER NOT NULL CHECK (typeof(estimated_input_tokens) = 'integer' AND estimated_input_tokens >= 0),
   estimated_output_tokens INTEGER NOT NULL CHECK (typeof(estimated_output_tokens) = 'integer' AND estimated_output_tokens >= 0),
   estimated_cost_microusd INTEGER NOT NULL CHECK (typeof(estimated_cost_microusd) = 'integer' AND estimated_cost_microusd >= 0),
+  estimated_max_concurrency INTEGER NOT NULL CHECK (typeof(estimated_max_concurrency) = 'integer' AND estimated_max_concurrency BETWEEN 1 AND 3),
   max_provider_calls INTEGER NOT NULL CHECK (typeof(max_provider_calls) = 'integer' AND max_provider_calls BETWEEN 1 AND 114),
-  max_input_tokens INTEGER NOT NULL CHECK (typeof(max_input_tokens) = 'integer' AND max_input_tokens BETWEEN 1 AND 4000000),
+  max_input_tokens INTEGER NOT NULL CHECK (typeof(max_input_tokens) = 'integer' AND max_input_tokens BETWEEN 1 AND 5000000),
   max_output_tokens INTEGER NOT NULL CHECK (typeof(max_output_tokens) = 'integer' AND max_output_tokens BETWEEN 1 AND 250000),
   max_cost_microusd INTEGER NOT NULL CHECK (typeof(max_cost_microusd) = 'integer' AND max_cost_microusd BETWEEN 1 AND 100000000),
   max_concurrency INTEGER NOT NULL CHECK (typeof(max_concurrency) = 'integer' AND max_concurrency BETWEEN 1 AND 3),
@@ -113,6 +121,7 @@ CREATE TABLE brand_generation_runs (
   CHECK (estimated_input_tokens <= max_input_tokens),
   CHECK (estimated_output_tokens <= max_output_tokens),
   CHECK (estimated_cost_microusd <= max_cost_microusd),
+  CHECK (estimated_max_concurrency <= max_concurrency),
   UNIQUE (workspace_id, intake_revision_id, idempotency_key),
   UNIQUE (id, workspace_id),
   FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -281,7 +290,7 @@ CREATE TABLE brand_generation_commands (
   ),
   prior_item_status TEXT CHECK (
     prior_item_status IS NULL OR prior_item_status IN (
-      'ready_for_human_review', 'changes_requested'
+      'ready_for_human_review', 'changes_requested', 'needs_attention', 'conflict'
     )
   ),
   job_id TEXT NOT NULL CHECK (length(job_id) BETWEEN 1 AND 200),
@@ -361,6 +370,10 @@ CREATE TABLE brand_generation_attempts (
       AND expected_deliverable_version >= 0
     )
   ),
+  source_input_fingerprint TEXT NOT NULL CHECK (
+    length(source_input_fingerprint) = 64
+    AND source_input_fingerprint NOT GLOB '*[^0-9a-f]*'
+  ),
   effective_input_fingerprint TEXT NOT NULL CHECK (
     length(effective_input_fingerprint) = 64
     AND effective_input_fingerprint NOT GLOB '*[^0-9a-f]*'
@@ -413,3 +426,60 @@ CREATE INDEX idx_brand_generation_attempts_item_started
   ON brand_generation_attempts(item_id, started_at, id);
 CREATE INDEX idx_brand_generation_attempts_command
   ON brand_generation_attempts(command_id, started_at, id);
+
+-- Transactional outbox for effects that must survive a process crash after the
+-- authoritative command/artifact/run transaction commits. Activity insertion
+-- is exactly-once; broadcasts and cache invalidations are safely at-least-once.
+CREATE TABLE brand_generation_effect_events (
+  sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+  effect_key TEXT NOT NULL UNIQUE CHECK (
+    length(trim(effect_key)) > 0
+    AND length(CAST(effect_key AS BLOB)) <= 512
+  ),
+  schema_version INTEGER NOT NULL DEFAULT 1 CHECK (
+    typeof(schema_version) = 'integer' AND schema_version = 1
+  ),
+  workspace_id TEXT NOT NULL,
+  run_id TEXT NOT NULL,
+  command_id TEXT NOT NULL,
+  item_id TEXT,
+  effect_kind TEXT NOT NULL CHECK (effect_kind IN (
+    'command_accepted', 'artifact_committed', 'command_completed'
+  )),
+  payload_json TEXT NOT NULL CHECK (
+    length(CAST(payload_json AS BLOB)) <= 8192
+    AND json_valid(payload_json)
+    AND json_type(payload_json) = 'object'
+    AND COALESCE(json_extract(payload_json, '$.schemaVersion') = 1, 0)
+    AND COALESCE(json_extract(payload_json, '$.kind') = effect_kind, 0)
+  ),
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (
+    typeof(attempt_count) = 'integer' AND attempt_count >= 0
+  ),
+  last_attempt_at TEXT,
+  last_error TEXT CHECK (
+    last_error IS NULL OR length(CAST(last_error AS BLOB)) <= 512
+  ),
+  applied_at TEXT,
+  created_at TEXT NOT NULL CHECK (length(created_at) > 0),
+
+  CHECK (
+    (effect_kind = 'artifact_committed' AND item_id IS NOT NULL)
+    OR (effect_kind <> 'artifact_committed' AND item_id IS NULL)
+  ),
+  CHECK (
+    (attempt_count = 0 AND last_attempt_at IS NULL AND last_error IS NULL AND applied_at IS NULL)
+    OR (attempt_count > 0 AND last_attempt_at IS NOT NULL)
+  ),
+  CHECK (applied_at IS NULL OR last_error IS NULL),
+  FOREIGN KEY (run_id, workspace_id)
+    REFERENCES brand_generation_runs(id, workspace_id) ON DELETE CASCADE,
+  FOREIGN KEY (command_id, run_id)
+    REFERENCES brand_generation_commands(id, run_id) ON DELETE CASCADE,
+  FOREIGN KEY (item_id, run_id)
+    REFERENCES brand_generation_items(id, run_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_brand_generation_effect_events_pending
+  ON brand_generation_effect_events(sequence)
+  WHERE applied_at IS NULL;

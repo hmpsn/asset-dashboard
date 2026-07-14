@@ -41,7 +41,7 @@ import {
 } from '../../domains/brand/generation/service.js';
 import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
-import { recordPaidCall } from '../paid-call-counter.js';
+import { recordPaidCallOnce } from '../paid-call-counter.js';
 import { mcpJsonV1Error } from '../tool-errors.js';
 import { mcpSuccess } from '../tool-helpers.js';
 
@@ -146,11 +146,12 @@ function paidCommandSuccess(
   result: BrandGenerationCommandResult,
   workspaceId: string,
 ): CallToolResult {
-  // The domain service resolves idempotency before returning. Exact replays reuse
-  // accepted work and therefore must not increment the MCP paid-trigger signal.
-  const warning = result.existing
-    ? undefined
-    : recordPaidCall(1, workspaceId).warning;
+  // Meter every successful result, including an exact domain replay. The
+  // durable event key makes ordinary replays no-ops while allowing a replay to
+  // repair metering if the process crashed after acceptance but before this
+  // boundary committed the paid-trigger event.
+  const eventKey = `mcp:brand-generation:accepted-command:${result.jobId}`;
+  const warning = recordPaidCallOnce(eventKey, 1, workspaceId).warning;
   return mcpSuccess(toMcpPayload(projectPublicValue({
     ...result,
     ...(warning ? { warning } : {}),

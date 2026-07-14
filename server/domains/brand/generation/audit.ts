@@ -101,12 +101,13 @@ function exactPlaceholderCheck(
   );
 }
 
-function factualClaimCheck(candidate: BrandGenerationCandidateAttemptOutput): GenerationAuditCheck {
+function sourceBackedClaimCheck(candidate: BrandGenerationCandidateAttemptOutput): GenerationAuditCheck {
   const structural = new Set<string>(STRUCTURAL_ONLY_GENERATION_EVIDENCE_SOURCE_TYPES);
   const invalid = candidate.claims.some(claim => (
-    claim.classification === 'factual'
+    (claim.classification === 'factual' || claim.classification === 'inferred')
     && (
-      claim.sourceRefs.length === 0
+      claim.evidenceKeys.length === 0
+      || claim.sourceRefs.length === 0
       || claim.sourceRefs.some(source => structural.has(source.sourceType))
     )
   ));
@@ -114,8 +115,8 @@ function factualClaimCheck(candidate: BrandGenerationCandidateAttemptOutput): Ge
     'factual-claim-evidence',
     'grounding',
     !invalid,
-    'Every declared factual claim carries non-structural evidence.',
-    'A declared factual claim is unsupported or cites structural-only evidence.',
+    'Every declared factual or inferred claim carries non-structural evidence.',
+    'A declared factual or inferred claim is unsupported or cites structural-only evidence.',
   );
 }
 
@@ -221,24 +222,24 @@ function namingClearanceCheck(
 }
 
 function humanChecks(candidate: BrandGenerationCandidateAttemptOutput): GenerationHumanRequiredAuditCheck[] {
-  const hasFactualClaims = candidate.claims.some(claim => claim.classification === 'factual');
+  const hasSourceBackedClaims = candidate.claims.some(claim => (
+    claim.classification === 'factual' || claim.classification === 'inferred'
+  ));
   return [
     {
       id: 'factual-accuracy',
       category: 'provenance',
-      result: hasFactualClaims ? 'needs_human_review' : 'not_applicable',
-      message: hasFactualClaims
-        ? 'A human must verify factual accuracy against the cited sources.'
-        : 'The candidate declares no factual claims.',
+      result: hasSourceBackedClaims ? 'needs_human_review' : 'not_applicable',
+      message: hasSourceBackedClaims
+        ? 'A human must verify factual and inferred assertions against the cited sources.'
+        : 'The candidate declares no factual or inferred claims.',
       evidenceRequirementIds: [],
     },
     {
       id: 'no-hallucinations',
       category: 'provenance',
-      result: hasFactualClaims ? 'needs_human_review' : 'not_applicable',
-      message: hasFactualClaims
-        ? 'A human must confirm the candidate introduces no unsupported factual implication.'
-        : 'The candidate declares no factual claims.',
+      result: 'needs_human_review',
+      message: 'A human must confirm the generated prose introduces no unsupported factual implication, including assertions omitted from the claim ledger.',
       evidenceRequirementIds: [],
     },
   ];
@@ -249,7 +250,7 @@ export function runBrandGenerationDeterministicAudit(
 ): GenerationAuditReport {
   const checks = [
     exactPlaceholderCheck(input.preflight, input.candidate),
-    factualClaimCheck(input.candidate),
+    sourceBackedClaimCheck(input.candidate),
     sensitiveClaimCheck(input.candidate),
     voiceGuardrailCheck(input.frozenInput, input.candidate),
     creativeProposalCheck(input.frozenInput, input.candidate),
@@ -262,7 +263,7 @@ export function runBrandGenerationDeterministicAudit(
     ))
     .map(requirement => requirement.id);
   const verdict = unresolvedRequirementIds.length > 0
-    ? 'blocked_missing_evidence'
+    ? 'needs_attention'
     : checks.some(item => item.result === 'failed')
       ? 'needs_attention'
       : 'ready_for_human_review';
@@ -295,7 +296,7 @@ export function mergeBrandGenerationAudit(
   const modelNeedsAttention = input.modelOutput.revisionRecommended
     || input.modelOutput.findings.some(finding => finding.severity !== 'info');
   const verdict = unresolved.length > 0
-    ? 'blocked_missing_evidence'
+    ? 'needs_attention'
     : deterministicFailed || modelNeedsAttention
       ? 'needs_attention'
       : 'ready_for_human_review';
@@ -315,6 +316,9 @@ export function getBrandGenerationAuditDisposition(
     throw new BrandGenerationAuditContractError('Audit report revision count does not match the item.');
   }
   if (report.verdict === 'blocked_missing_evidence') return 'blocked_missing_evidence';
+  // A prose revision cannot manufacture missing evidence. Keep the candidate
+  // visible for operator attention without spending the one automatic revision.
+  if (report.unresolvedRequirementIds.length > 0) return 'needs_attention';
   if (report.verdict === 'ready_for_human_review') return 'ready';
   return revisionCount === 0 ? 'revise' : 'needs_attention';
 }

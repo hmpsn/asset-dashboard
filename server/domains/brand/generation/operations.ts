@@ -4,9 +4,10 @@ import type {
   AICallOptions,
   AICallResult,
 } from '../../../ai.js';
-import { callAI } from '../../../ai.js';
+import { callAI, renderAIProviderInput } from '../../../ai.js';
 import {
   callCreativeAIWithMetadata,
+  renderCreativeProviderCallInput,
   type CreativeAICallOptions,
 } from '../../../content-posts-ai.js';
 import type { GenerationProvenance } from '../../../../shared/types/ai-execution.js';
@@ -18,8 +19,14 @@ import type {
   BrandGenerationDeliverableCandidateAttemptOutput,
   BrandGenerationFoundationCandidateAttemptOutput,
 } from '../../../../shared/types/brand-generation.js';
+import {
+  BRAND_GENERATION_ATOMIC_TARGETS,
+  BRAND_DELIVERABLE_TARGET_POLICY,
+  BRAND_GENERATION_LIMITS,
+} from '../../../../shared/types/brand-generation.js';
 import type {
   GenerationAutomaticRevisionCount,
+  GenerationAuditReport,
   GenerationEvidenceSourceRef,
   GenerationFactualEvidenceSourceRef,
 } from '../../../../shared/types/generation-evidence.js';
@@ -42,12 +49,17 @@ import type {
   BrandGenerationPreflightResult,
 } from './preflight.js';
 import {
+  brandGenerationPromptInputTokenCeiling,
+  brandGenerationCandidatePromptBytes,
   buildBrandGenerationAuditPrompt,
   buildBrandGenerationPrompt,
   buildBrandGenerationRefinementPrompt,
+  BrandGenerationPromptContractError,
   type BrandGenerationEffectivePrompt,
+  type BrandGenerationRenderedProviderInput,
   type BrandGenerationRelatedCandidate,
 } from './prompt.js';
+import { canonicalBrandGenerationFingerprint } from './fingerprint.js';
 
 export interface BrandProviderReservationRequest {
   operation: 'brand-deliverable-generate' | 'brand-deliverable-refine' | 'brand-deliverable-audit';
@@ -57,6 +69,8 @@ export interface BrandProviderReservationRequest {
   inputTokens: number;
   outputTokens: number;
   estimatedCostMicros: number;
+  /** Exact rendered input for the provider dispatch this reservation precedes. */
+  effectiveInputFingerprint: string;
 }
 
 export type ReserveBrandProviderDispatch = (
@@ -81,6 +95,8 @@ export interface BrandGenerationAIOperationResult<TOutput> {
 export interface GenerateBrandGenerationCandidateInput {
   frozenInput: BrandGenerationFrozenTargetInput;
   preflight: BrandGenerationPreflightResult;
+  /** Worker-supplied exact prompt; direct callers may omit and let the operation assemble it. */
+  effectivePrompt?: BrandGenerationEffectivePrompt;
   reserveProviderDispatch: ReserveBrandProviderDispatch;
   signal?: AbortSignal;
   dependencies?: Partial<BrandGenerationAIDependencies>;
@@ -95,6 +111,8 @@ export interface RefineBrandGenerationCandidateInput extends GenerateBrandGenera
 export interface AuditBrandGenerationCandidateInput extends GenerateBrandGenerationCandidateInput {
   candidate: BrandGenerationCandidateAttemptOutput;
   revisionCount: GenerationAutomaticRevisionCount;
+  /** Persisted deterministic checkpoint used verbatim by the model-audit prompt. */
+  deterministicReport?: GenerationAuditReport;
   relatedCandidates?: readonly BrandGenerationRelatedCandidate[];
   now?: () => Date;
 }
@@ -124,21 +142,361 @@ const DEFAULT_DEPENDENCIES: BrandGenerationAIDependencies = {
   callStructuredAI: callAI,
 };
 
-const CREATIVE_RESERVATION = {
-  anthropic: { inputTokens: 10_000, outputTokens: 2_500, estimatedCostMicros: 1_000_000 },
-  openai: { inputTokens: 10_000, outputTokens: 2_500, estimatedCostMicros: 750_000 },
+const PROVIDER_TOKEN_COST_MICROS = {
+  anthropic: { input: 3, output: 15 },
+  openai: { input: 5, output: 30 },
 } as const;
 
-const AUDIT_RESERVATION = {
-  inputTokens: 5_000,
-  outputTokens: 1_500,
-  estimatedCostMicros: 500_000,
-} as const;
+const CREATIVE_OUTPUT_TOKEN_CEILING = 2_500;
+const AUDIT_OUTPUT_TOKEN_CEILING = 1_500;
 
 function dependencies(
   overrides?: Partial<BrandGenerationAIDependencies>,
 ): BrandGenerationAIDependencies {
   return { ...DEFAULT_DEPENDENCIES, ...overrides };
+}
+
+function resolveEffectivePrompt(
+  supplied: BrandGenerationEffectivePrompt | undefined,
+  assembled: BrandGenerationEffectivePrompt,
+): BrandGenerationEffectivePrompt {
+  if (supplied && (supplied.effectiveInputFingerprint !== assembled.effectiveInputFingerprint
+    || supplied.systemPrompt !== assembled.systemPrompt
+    || supplied.userPrompt !== assembled.userPrompt)) {
+    throw new BrandGenerationOutputContractError(
+      'Worker-supplied brand prompt does not match the canonical effective input.',
+    );
+  }
+  return supplied ?? assembled;
+}
+
+function providerReservation(
+  operation: BrandProviderReservationRequest['operation'],
+  provider: BrandProviderReservationRequest['provider'],
+  fallback: boolean,
+  renderedInput: BrandGenerationRenderedProviderInput,
+  outputTokens: number,
+): BrandProviderReservationRequest {
+  const inputTokens = brandGenerationPromptInputTokenCeiling(renderedInput);
+  const rates = PROVIDER_TOKEN_COST_MICROS[provider];
+  return {
+    operation,
+    provider,
+    fallback,
+    providerCalls: 1,
+    inputTokens,
+    outputTokens,
+    estimatedCostMicros: (inputTokens * rates.input) + (outputTokens * rates.output),
+    effectiveInputFingerprint: canonicalBrandGenerationFingerprint(renderedInput),
+  };
+}
+
+function renderedProviderInput(input: {
+  provider: 'anthropic' | 'openai';
+  system?: string;
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  researchMode: boolean;
+  responseFormat?: { type: 'json_object' };
+}): BrandGenerationRenderedProviderInput {
+  const rendered = renderAIProviderInput(input);
+  return {
+    provider: rendered.provider,
+    system: rendered.system,
+    messages: rendered.messages,
+    ...(input.responseFormat ? { responseFormat: input.responseFormat } : {}),
+  };
+}
+
+function renderedCreativeInput(
+  prompt: BrandGenerationEffectivePrompt,
+  provider: 'anthropic' | 'openai',
+): BrandGenerationRenderedProviderInput {
+  const callInput = renderCreativeProviderCallInput({
+    systemPrompt: prompt.systemPrompt,
+    userPrompt: prompt.userPrompt,
+    json: true,
+  }, provider);
+  return renderedProviderInput({
+    provider,
+    system: callInput.system,
+    messages: callInput.messages,
+    researchMode: true,
+    ...(provider === 'openai' ? { responseFormat: { type: 'json_object' } } : {}),
+  });
+}
+
+/**
+ * Deterministic acceptance-time check for every provider envelope the creative
+ * dispatcher may choose on its first call or fallback.
+ */
+export function validateBrandGenerationCreativeProviderEnvelopes(
+  prompt: BrandGenerationEffectivePrompt,
+): void {
+  brandGenerationPromptInputTokenCeiling(renderedCreativeInput(prompt, 'anthropic'));
+  brandGenerationPromptInputTokenCeiling(renderedCreativeInput(prompt, 'openai'));
+  brandGenerationPromptInputTokenCeiling(renderedStructuredInput(prompt, 'creative_repair'));
+}
+
+function renderedStructuredInput(
+  prompt: BrandGenerationEffectivePrompt,
+  mode: 'audit' | 'creative_repair',
+): BrandGenerationRenderedProviderInput {
+  return renderedProviderInput({
+    provider: 'openai',
+    ...(mode === 'audit' ? { system: prompt.systemPrompt } : {}),
+    messages: [{
+      role: 'user',
+      content: mode === 'audit'
+        ? prompt.userPrompt
+        : `${prompt.systemPrompt}\n\n${prompt.userPrompt}`,
+    }],
+    researchMode: true,
+    responseFormat: { type: 'json_object' },
+  });
+}
+
+function utf8Bytes(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
+}
+
+function buildWorstEscapingCandidate(
+  frozenInput: BrandGenerationFrozenTargetInput,
+  preflight: BrandGenerationPreflightResult,
+): BrandGenerationCandidateAttemptOutput {
+  const target = frozenInput.inputSnapshot.target;
+  const placeholderPrefix = preflight.attemptOutput.placeholders
+    .map(placeholder => placeholder.token)
+    .join(' ');
+  const namingPrefix = target === 'naming'
+    ? 'Creative naming proposal. Trademark, domain, legal, and cultural clearance have not been verified. '
+    : '';
+  const creativeClaim = BRAND_DELIVERABLE_TARGET_POLICY[target].claimPolicy === 'creative_proposal'
+    ? [{
+        text: 'x',
+        classification: 'creative_proposal' as const,
+        evidenceKeys: [],
+        sourceRefs: [],
+      }]
+    : [];
+  const candidate = (repeatCount: number): BrandGenerationCandidateAttemptOutput => {
+    const worstText = [placeholderPrefix, namingPrefix, '"'.repeat(repeatCount)]
+      .filter(Boolean)
+      .join(' ');
+    if (target === 'voice_foundation') {
+      return {
+        kind: 'foundation_candidate',
+        content: null,
+        foundationDraft: {
+          schemaVersion: 1,
+          summary: worstText,
+          voiceDNA: {
+            personalityTraits: ['x'],
+            toneSpectrum: { formal_casual: 1, serious_playful: 1, technical_accessible: 1 },
+            sentenceStyle: 'x',
+            vocabularyLevel: 'x',
+          },
+          guardrails: {
+            forbiddenWords: [],
+            requiredTerminology: [],
+            toneBoundaries: [],
+            antiPatterns: [],
+          },
+          contextModifiers: [],
+          evidenceRequirementIds: preflight.attemptOutput.requirements.map(requirement => requirement.id),
+          fingerprint: '0'.repeat(64),
+        },
+        claims: [],
+        requirements: preflight.attemptOutput.requirements,
+        placeholders: preflight.attemptOutput.placeholders,
+      };
+    }
+    return {
+      kind: 'deliverable_candidate',
+      content: worstText,
+      foundationDraft: null,
+      claims: creativeClaim,
+      requirements: preflight.attemptOutput.requirements,
+      placeholders: preflight.attemptOutput.placeholders,
+    };
+  };
+  if (brandGenerationCandidatePromptBytes(candidate(0)) > BRAND_GENERATION_LIMITS.maxCandidateSnapshotBytes) {
+    throw new BrandGenerationPromptContractError(
+      'Frozen requirements leave no bounded candidate envelope for automatic review.',
+    );
+  }
+  let low = 0;
+  let high = BRAND_GENERATION_LIMITS.maxCandidateSnapshotBytes;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (brandGenerationCandidatePromptBytes(candidate(middle)) <= BRAND_GENERATION_LIMITS.maxCandidateSnapshotBytes) {
+      low = middle;
+    } else {
+      high = middle - 1;
+    }
+  }
+  const bounded = candidate(low);
+  if (utf8Bytes(JSON.stringify(bounded)) > BRAND_GENERATION_LIMITS.maxResolvedCandidateSnapshotBytes) {
+    throw new BrandGenerationPromptContractError(
+      'Frozen requirements leave no bounded durable candidate snapshot.',
+    );
+  }
+  return bounded;
+}
+
+/**
+ * Related-candidate compaction consumes only content/claims before replacing
+ * the full candidate with a fixed-length fingerprint. Keep this sentinel
+ * independent from the current target: required placeholder or naming copy at
+ * the front of that target must not displace the quote-heavy prefix that
+ * maximizes the nested provider envelope for the other targets.
+ */
+function buildWorstEscapingRelatedCandidate(): BrandGenerationDeliverableCandidateAttemptOutput {
+  const candidate = (repeatCount: number): BrandGenerationDeliverableCandidateAttemptOutput => ({
+    kind: 'deliverable_candidate',
+    content: '"'.repeat(repeatCount),
+    foundationDraft: null,
+    claims: [],
+    requirements: [],
+    placeholders: [],
+  });
+  let low = 1;
+  let high = BRAND_GENERATION_LIMITS.maxCandidateSnapshotBytes;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (brandGenerationCandidatePromptBytes(candidate(middle)) <= BRAND_GENERATION_LIMITS.maxCandidateSnapshotBytes) {
+      low = middle;
+    } else {
+      high = middle - 1;
+    }
+  }
+  return candidate(low);
+}
+
+function worstEscapingDirection(): string {
+  // Automatic audit findings are stripped of control characters before this
+  // bound. Quotes/backslashes then maximize the remaining JSON expansion.
+  return '"\\'.repeat(Math.floor(BRAND_GENERATION_LIMITS.maxAutomaticDirectionBytes / 2));
+}
+
+function validateBrandGenerationAuditProviderEnvelope(
+  prompt: BrandGenerationEffectivePrompt,
+  maxInstructionBytes = BRAND_GENERATION_LIMITS.maxPromptBytes,
+): void {
+  brandGenerationPromptInputTokenCeiling(
+    renderedStructuredInput(prompt, 'audit'),
+    maxInstructionBytes,
+  );
+}
+
+function validateEnvelopeStage(stage: string, validate: () => void): void {
+  try {
+    validate();
+  } catch (err) {
+    if (err instanceof BrandGenerationPromptContractError) {
+      throw new BrandGenerationPromptContractError(
+        `Required ${stage} envelope cannot fit: ${err.message}`,
+      );
+    }
+    throw err;
+  }
+}
+
+/**
+ * Acceptance-time closure proof for every mandatory paid stage. The synthetic
+ * candidate fills the persisted candidate allowance with the JSON characters
+ * that expand most when the prompt is embedded in a provider message. Related
+ * context uses the complete target census, and refinement uses the maximum
+ * allowed direction. Therefore an accepted frozen input leaves room for any
+ * candidate the output contract can retain, its deterministic report, the
+ * whole-set digest, one refinement, and the post-refinement audit.
+ */
+export function validateBrandGenerationRequiredStageEnvelopeClosure(
+  frozenInput: BrandGenerationFrozenTargetInput,
+  preflight: BrandGenerationPreflightResult,
+): void {
+  const closureLimit = BRAND_GENERATION_LIMITS.maxPromptBytes
+    - BRAND_GENERATION_LIMITS.providerStageClosureSafetyBytes;
+  validateEnvelopeStage('generation', () => {
+    const generationPrompt = buildBrandGenerationPrompt(frozenInput, preflight);
+    brandGenerationPromptInputTokenCeiling(
+      renderedCreativeInput(generationPrompt, 'anthropic'),
+      closureLimit,
+    );
+    brandGenerationPromptInputTokenCeiling(
+      renderedCreativeInput(generationPrompt, 'openai'),
+      closureLimit,
+    );
+    brandGenerationPromptInputTokenCeiling(
+      renderedStructuredInput(generationPrompt, 'creative_repair'),
+      closureLimit,
+    );
+  });
+
+  const candidate = buildWorstEscapingCandidate(frozenInput, preflight);
+  const relatedCandidate = buildWorstEscapingRelatedCandidate();
+  const relatedCandidates = BRAND_GENERATION_ATOMIC_TARGETS
+    .filter(targetId => targetId !== frozenInput.inputSnapshot.target)
+    .map(targetId => ({ targetId, candidate: relatedCandidate }));
+  const initialReport = runBrandGenerationDeterministicAudit({
+    frozenInput,
+    preflight,
+    candidate,
+    revisionCount: 0,
+    now: () => new Date('2000-01-01T00:00:00.000Z'),
+  });
+  validateEnvelopeStage('initial audit', () => {
+    validateBrandGenerationAuditProviderEnvelope(
+      buildBrandGenerationAuditPrompt(
+        frozenInput,
+        preflight,
+        candidate,
+        initialReport,
+        relatedCandidates,
+      ),
+      closureLimit,
+    );
+  });
+
+  if (frozenInput.inputSnapshot.target === 'voice_foundation') return;
+  validateEnvelopeStage('automatic refinement', () => {
+    const refinementPrompt = buildBrandGenerationRefinementPrompt(
+      frozenInput,
+      preflight,
+      candidate,
+      worstEscapingDirection(),
+    );
+    brandGenerationPromptInputTokenCeiling(
+      renderedCreativeInput(refinementPrompt, 'anthropic'),
+      closureLimit,
+    );
+    brandGenerationPromptInputTokenCeiling(
+      renderedCreativeInput(refinementPrompt, 'openai'),
+      closureLimit,
+    );
+    brandGenerationPromptInputTokenCeiling(
+      renderedStructuredInput(refinementPrompt, 'creative_repair'),
+      closureLimit,
+    );
+  });
+  const revisedReport = runBrandGenerationDeterministicAudit({
+    frozenInput,
+    preflight,
+    candidate,
+    revisionCount: 1,
+    now: () => new Date('2000-01-01T00:00:00.000Z'),
+  });
+  validateEnvelopeStage('post-refinement audit', () => {
+    validateBrandGenerationAuditProviderEnvelope(
+      buildBrandGenerationAuditPrompt(
+        frozenInput,
+        preflight,
+        candidate,
+        revisedReport,
+        relatedCandidates,
+      ),
+      closureLimit,
+    );
+  });
 }
 
 function assertCanDispatch(
@@ -201,24 +559,27 @@ function resolveClaims(
       return entry;
     });
     if (
-      claim.classification === 'factual'
+      (claim.classification === 'factual' || claim.classification === 'inferred')
       && entries.some(entry => (
         !entry.supportsFactualClaims
         || entry.sourceRefs.length === 0
         || entry.sourceRefs.some(source => structural.has(source.sourceType))
       ))
     ) {
-      throw new BrandGenerationOutputContractError('A factual claim cited evidence that cannot prove business facts.');
+      throw new BrandGenerationOutputContractError(
+        'A factual or inferred claim cited evidence that cannot support business assertions.',
+      );
     }
     const uniqueSources = new Map<string, GenerationEvidenceSourceRef>();
     entries.flatMap(entry => entry.sourceRefs).forEach(source => {
       uniqueSources.set(sourceIdentity(source), source);
     });
     const sourceRefs = [...uniqueSources.values()];
-    return claim.classification === 'factual'
+    return claim.classification === 'factual' || claim.classification === 'inferred'
       ? {
           text: claim.text,
           classification: claim.classification,
+          evidenceKeys: claim.evidenceKeys as [string, ...string[]],
           sourceRefs: sourceRefs as [
             GenerationFactualEvidenceSourceRef,
             ...GenerationFactualEvidenceSourceRef[],
@@ -227,6 +588,7 @@ function resolveClaims(
       : {
           text: claim.text,
           classification: claim.classification,
+          evidenceKeys: claim.evidenceKeys,
           sourceRefs,
         };
   }) as BrandGeneratedClaim[];
@@ -272,6 +634,24 @@ function foundationFingerprint(value: Omit<BrandGenerationFoundationCandidateAtt
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
+function assertCandidateSnapshotBounded<T extends BrandGenerationCandidateAttemptOutput>(
+  candidate: T,
+): T {
+  const promptBytes = brandGenerationCandidatePromptBytes(candidate);
+  const resolvedBytes = utf8Bytes(JSON.stringify(candidate));
+  if (promptBytes > BRAND_GENERATION_LIMITS.maxCandidateSnapshotBytes) {
+    throw new BrandGenerationOutputContractError(
+      'Resolved candidate exceeds the bounded refine/audit projection limit.',
+    );
+  }
+  if (resolvedBytes > BRAND_GENERATION_LIMITS.maxResolvedCandidateSnapshotBytes) {
+    throw new BrandGenerationOutputContractError(
+      'Resolved candidate exceeds the durable normalized snapshot limit.',
+    );
+  }
+  return candidate;
+}
+
 function foundationCandidate(
   raw: ReturnType<typeof parseBrandFoundationAIOutput>,
   input: BrandGenerationFrozenTargetInput,
@@ -289,7 +669,7 @@ function foundationCandidate(
   };
   assertPlaceholders(JSON.stringify(draftWithoutFingerprint), preflight);
   assertCreativeProposalBoundary(input, claims, raw.summary);
-  return {
+  return assertCandidateSnapshotBounded({
     kind: 'foundation_candidate',
     content: null,
     foundationDraft: {
@@ -299,7 +679,7 @@ function foundationCandidate(
     claims,
     requirements: preflight.attemptOutput.requirements,
     placeholders: preflight.attemptOutput.placeholders,
-  };
+  });
 }
 
 function deliverableCandidate(
@@ -311,14 +691,14 @@ function deliverableCandidate(
   const claims = resolveClaims(raw.claims, preflight.evidenceCatalog);
   assertPlaceholders(raw.content, preflight);
   assertCreativeProposalBoundary(input, claims, raw.content);
-  return {
+  return assertCandidateSnapshotBounded({
     kind: 'deliverable_candidate',
     content: raw.content,
     foundationDraft: null,
     claims,
     requirements: preflight.attemptOutput.requirements,
     placeholders: preflight.attemptOutput.placeholders,
-  };
+  });
 }
 
 function provenanceFrom(
@@ -345,13 +725,32 @@ function provenanceFrom(
 function resultFrom<TOutput>(
   output: TOutput,
   aiResult: AICallResult,
-  prompt: BrandGenerationEffectivePrompt,
   reservations: BrandProviderReservationRequest[],
   preflight: BrandGenerationPreflightResult,
 ): BrandGenerationAIOperationResult<TOutput> {
+  const providerReservations = reservations.filter(
+    reservation => reservation.provider === aiResult.execution.provider,
+  );
+  if (providerReservations.length === 0
+    || aiResult.tokens.prompt > providerReservations.reduce((sum, value) => sum + value.inputTokens, 0)
+    || aiResult.tokens.completion > providerReservations.reduce((sum, value) => sum + value.outputTokens, 0)) {
+    throw new BrandGenerationOutputContractError(
+      'Provider usage exceeded its pessimistic durable reservation.',
+    );
+  }
+  const successfulReservation = providerReservations.at(-1);
+  if (!successfulReservation) {
+    throw new BrandGenerationOutputContractError(
+      'Successful provider input has no exact durable fingerprint.',
+    );
+  }
   return {
     output,
-    provenance: provenanceFrom(aiResult, prompt.effectiveInputFingerprint, preflight),
+    provenance: provenanceFrom(
+      aiResult,
+      successfulReservation.effectiveInputFingerprint,
+      preflight,
+    ),
     budgetUsage: {
       providerCalls: reservations.length,
       inputTokens: aiResult.tokens.prompt,
@@ -362,7 +761,7 @@ function resultFrom<TOutput>(
     },
     tokens: aiResult.tokens,
     execution: aiResult.execution,
-    effectiveInputFingerprint: prompt.effectiveInputFingerprint,
+    effectiveInputFingerprint: successfulReservation.effectiveInputFingerprint,
   };
 }
 
@@ -387,14 +786,13 @@ async function creativeDispatch<TOutput>(
     signal: input.signal,
     openAIModel: 'gpt-5.5',
     beforeProviderDispatch: async dispatch => {
-      const envelope = CREATIVE_RESERVATION[dispatch.provider];
-      const reservation: BrandProviderReservationRequest = {
+      const reservation = providerReservation(
         operation,
-        provider: dispatch.provider,
-        fallback: dispatch.fallback,
-        providerCalls: 1,
-        ...envelope,
-      };
+        dispatch.provider,
+        dispatch.fallback,
+        renderedCreativeInput(prompt, dispatch.provider),
+        CREATIVE_OUTPUT_TOKEN_CEILING,
+      );
       await input.reserveProviderDispatch(reservation);
       reservations.push(reservation);
     },
@@ -415,13 +813,13 @@ async function creativeDispatch<TOutput>(
         ? input.signal.reason
         : new Error('Brand generation was cancelled.');
     }
-    const fallbackReservation: BrandProviderReservationRequest = {
+    const fallbackReservation = providerReservation(
       operation,
-      provider: 'openai',
-      fallback: true,
-      providerCalls: 1,
-      ...CREATIVE_RESERVATION.openai,
-    };
+      'openai',
+      true,
+      renderedStructuredInput(prompt, 'creative_repair'),
+      CREATIVE_OUTPUT_TOKEN_CEILING,
+    );
     await input.reserveProviderDispatch(fallbackReservation);
     reservations.push(fallbackReservation);
     // Cancellation after reservation never enters a provider. The durable
@@ -439,7 +837,7 @@ async function creativeDispatch<TOutput>(
         role: 'user',
         content: `${prompt.systemPrompt}\n\n${prompt.userPrompt}`,
       }],
-      maxTokens: CREATIVE_RESERVATION.openai.outputTokens,
+      maxTokens: CREATIVE_OUTPUT_TOKEN_CEILING,
       workspaceId: input.frozenInput.workspaceId,
       responseFormat: { type: 'json_object' },
       researchMode: true,
@@ -450,13 +848,16 @@ async function creativeDispatch<TOutput>(
     });
     output = parseOutput(aiResult.text);
   }
-  return resultFrom(output, aiResult, prompt, reservations, input.preflight);
+  return resultFrom(output, aiResult, reservations, input.preflight);
 }
 
 export async function generateBrandGenerationCandidate(
   input: GenerateBrandGenerationCandidateInput,
 ): Promise<BrandGenerationAIOperationResult<BrandGenerationCandidateAttemptOutput>> {
-  const prompt = buildBrandGenerationPrompt(input.frozenInput, input.preflight);
+  const prompt = resolveEffectivePrompt(
+    input.effectivePrompt,
+    buildBrandGenerationPrompt(input.frozenInput, input.preflight),
+  );
   return creativeDispatch(
     'brand-deliverable-generate',
     prompt,
@@ -473,11 +874,14 @@ export async function refineBrandGenerationCandidate(
   if (input.automaticRevisionCount !== 0) {
     throw new BrandGenerationOutputContractError('The one automatic brand revision has already been used.');
   }
-  const prompt = buildBrandGenerationRefinementPrompt(
-    input.frozenInput,
-    input.preflight,
-    input.priorCandidate,
-    input.direction,
+  const prompt = resolveEffectivePrompt(
+    input.effectivePrompt,
+    buildBrandGenerationRefinementPrompt(
+      input.frozenInput,
+      input.preflight,
+      input.priorCandidate,
+      input.direction,
+    ),
   );
   return creativeDispatch(
     'brand-deliverable-refine',
@@ -495,27 +899,31 @@ export async function auditBrandGenerationCandidate(
   input: AuditBrandGenerationCandidateInput,
 ): Promise<BrandGenerationAIOperationResult<BrandGenerationAuditAttemptOutput>> {
   assertCanDispatch(input.preflight, input.reserveProviderDispatch, input.signal);
-  const deterministicReport = runBrandGenerationDeterministicAudit({
-    frozenInput: input.frozenInput,
-    preflight: input.preflight,
-    candidate: input.candidate,
-    revisionCount: input.revisionCount,
-    now: input.now,
-  });
-  const prompt = buildBrandGenerationAuditPrompt(
-    input.frozenInput,
-    input.preflight,
-    input.candidate,
-    deterministicReport,
-    input.relatedCandidates,
+  const deterministicReport = input.deterministicReport
+    ?? runBrandGenerationDeterministicAudit({
+      frozenInput: input.frozenInput,
+      preflight: input.preflight,
+      candidate: input.candidate,
+      revisionCount: input.revisionCount,
+      now: input.now,
+    });
+  const prompt = resolveEffectivePrompt(
+    input.effectivePrompt,
+    buildBrandGenerationAuditPrompt(
+      input.frozenInput,
+      input.preflight,
+      input.candidate,
+      deterministicReport,
+      input.relatedCandidates,
+    ),
   );
-  const reservation: BrandProviderReservationRequest = {
-    operation: 'brand-deliverable-audit',
-    provider: 'openai',
-    fallback: false,
-    providerCalls: 1,
-    ...AUDIT_RESERVATION,
-  };
+  const reservation = providerReservation(
+    'brand-deliverable-audit',
+    'openai',
+    false,
+    renderedStructuredInput(prompt, 'audit'),
+    AUDIT_OUTPUT_TOKEN_CEILING,
+  );
   await input.reserveProviderDispatch(reservation);
   if (input.signal?.aborted) {
     throw input.signal.reason instanceof Error
@@ -527,7 +935,7 @@ export async function auditBrandGenerationCandidate(
     provider: 'openai',
     system: prompt.systemPrompt,
     messages: [{ role: 'user', content: prompt.userPrompt }],
-    maxTokens: AUDIT_RESERVATION.outputTokens,
+    maxTokens: AUDIT_OUTPUT_TOKEN_CEILING,
     workspaceId: input.frozenInput.workspaceId,
     responseFormat: { type: 'json_object' },
     researchMode: true,
@@ -544,7 +952,6 @@ export async function auditBrandGenerationCandidate(
   return resultFrom(
     { kind: 'audit', auditReport },
     aiResult,
-    prompt,
     [reservation],
     input.preflight,
   );

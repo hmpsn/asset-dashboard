@@ -114,7 +114,7 @@ failure classes; unknown names and mismatched workspace values are never logged 
 ## Tool inventory
 
 `MCP_TOOL_REGISTRY` (`server/mcp/tool-registry.ts`) is the single authority for discovery,
-dispatch, workspace scope, and error compatibility. It composes **16 categories** for a total of
+dispatch, workspace scope, and error compatibility. It composes **17 categories** for a total of
 **73 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
 dispatcher in `server/mcp/tools/<category>.ts`; the registry snapshots immutable definitions and
 connects each one to its category handler. A production dispatch census calls every registered

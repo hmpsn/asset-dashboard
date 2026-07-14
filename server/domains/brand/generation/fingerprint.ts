@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 
 import type {
+  ApprovedBrandDeliverableRef,
+  BrandGenerationTargetInputSnapshot,
   ResumeBrandGenerationCommandSnapshot,
   ResumeBrandGenerationRequest,
   ReviseBrandGenerationItemCommandSnapshot,
@@ -27,6 +29,36 @@ export function canonicalBrandGenerationFingerprint(value: unknown): string {
   return createHash('sha256')
     .update(JSON.stringify(canonicalize(value)))
     .digest('hex');
+}
+
+export function brandGenerationApprovalFingerprint(
+  ref: Omit<ApprovedBrandDeliverableRef, 'approvalFingerprint'>,
+): string {
+  return canonicalBrandGenerationFingerprint({
+    deliverableId: ref.deliverableId,
+    deliverableType: ref.deliverableType,
+    version: ref.version,
+    approvedAt: ref.approvedAt,
+    contentFingerprint: ref.contentFingerprint,
+    status: 'approved',
+  });
+}
+
+export function brandGenerationSnapshotFingerprint(
+  snapshot: Omit<BrandGenerationTargetInputSnapshot, 'fingerprint'>,
+): string {
+  return canonicalBrandGenerationFingerprint(snapshot);
+}
+
+export function brandGenerationSnapshotFingerprintsAreValid(
+  snapshot: BrandGenerationTargetInputSnapshot,
+): boolean {
+  const { fingerprint, ...core } = snapshot;
+  return brandGenerationSnapshotFingerprint(core) === fingerprint
+    && snapshot.approvedDeliverables.every(ref => {
+      const { approvalFingerprint, ...approval } = ref;
+      return brandGenerationApprovalFingerprint(approval) === approvalFingerprint;
+    });
 }
 
 export function startBrandGenerationCommandSnapshot(

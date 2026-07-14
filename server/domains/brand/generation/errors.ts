@@ -108,6 +108,7 @@ export const BRAND_GENERATION_PRECONDITION_REASONS = [
   'invalid_selection',
   'invalid_lifecycle',
   'missing_evidence',
+  'input_too_large',
   'approved_deliverable',
 ] as const;
 
@@ -117,8 +118,8 @@ export type BrandGenerationPreconditionReason =
 export class BrandGenerationPreconditionError extends Error {
   readonly reason: BrandGenerationPreconditionReason;
 
-  constructor(reason: BrandGenerationPreconditionReason, message: string) {
-    super(message);
+  constructor(reason: BrandGenerationPreconditionReason, message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'BrandGenerationPreconditionError';
     this.reason = reason;
   }

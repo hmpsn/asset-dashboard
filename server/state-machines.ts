@@ -621,8 +621,11 @@ export const BRAND_GENERATION_ITEM_TRANSITIONS = {
   queued: ['preflighting', 'cancelled', 'failed'],
   preflighting: ['generating', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
   generating: ['auditing_deterministic', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
-  auditing_deterministic: ['auditing_model', 'revising', 'ready_for_human_review', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
-  auditing_model: ['revising', 'ready_for_human_review', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  // The review states are also legal recovery targets when a human-requested
+  // revision is cancelled or fails after entering either audit stage. The
+  // worker uses changes_requested because acceptance invalidated old lineage.
+  auditing_deterministic: ['auditing_model', 'revising', 'ready_for_human_review', 'changes_requested', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  auditing_model: ['revising', 'ready_for_human_review', 'changes_requested', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
   revising: ['auditing_deterministic', 'ready_for_human_review', 'changes_requested', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
   ready_for_human_review: ['approved', 'changes_requested', 'revising', 'conflict'],
   approved: [],

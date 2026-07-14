@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type {
-  BrandGenerationAttempt,
-  BrandGenerationAtomicTarget,
-  BrandGenerationCandidateAttemptOutput,
-  BrandGenerationCommand,
-  BrandGenerationItem,
-  BrandGenerationItemStatus,
-  PersistedBrandGenerationRun,
+import {
+  BRAND_GENERATION_LIMITS,
+  type BrandGenerationAttempt,
+  type BrandGenerationAtomicTarget,
+  type BrandGenerationCandidateAttemptOutput,
+  type BrandGenerationCommand,
+  type BrandGenerationItem,
+  type BrandGenerationItemStatus,
+  type PersistedBrandGenerationRun,
 } from '../../shared/types/brand-generation.js';
 import type { GenerationAuditReport } from '../../shared/types/generation-evidence.js';
 
@@ -156,10 +157,53 @@ function itemFixture(
   } as BrandGenerationItem;
 }
 
+function foundationItemFixture(): BrandGenerationItem {
+  return {
+    id: 'item-voice-foundation',
+    runId: 'run-1',
+    target: 'voice_foundation',
+    status: 'queued',
+    revision: 0,
+    inputSnapshot: {
+      schemaVersion: 1,
+      target: 'voice_foundation',
+      intakeRevision: {
+        intakeRevisionId: 'intake-1',
+        revision: 1,
+        fingerprint: FINGERPRINT,
+      },
+      voiceSnapshot: null,
+      approvedDeliverables: [],
+      evidenceRequirementIds: ['brand-intake:authenticSamples'],
+      artifactExpectation: null,
+      capturedAt: NOW,
+      fingerprint: FINGERPRINT,
+    },
+    content: null,
+    foundationDraft: null,
+    artifactExpectation: null,
+    committedDeliverableId: null,
+    committedDeliverableVersion: null,
+    claims: [],
+    requirements: [],
+    placeholders: [],
+    auditReport: null,
+    attemptCount: 0,
+    automaticRevisionCount: 0,
+    effectiveInputFingerprint: null,
+    provenance: null,
+    error: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+    completedAt: null,
+  };
+}
+
 function runFixture(
   items: readonly BrandGenerationItem[],
   status: PersistedBrandGenerationRun['status'] = 'queued',
 ): PersistedBrandGenerationRun {
+  const bootstrap = items.length === 1 && items[0]?.target === 'voice_foundation';
   return {
     id: 'run-1',
     workspaceId: 'ws-1',
@@ -168,7 +212,10 @@ function runFixture(
       revision: 1,
       fingerprint: FINGERPRINT,
     },
-    selection: { kind: 'preset', preset: 'identity_messaging' },
+    selection: {
+      kind: 'preset',
+      preset: bootstrap ? 'full_brand_system' : 'identity_messaging',
+    },
     selectedTargets: items.map(item => item.target),
     status,
     stage: status === 'queued' ? 'preflight' : 'revision',
@@ -177,23 +224,28 @@ function runFixture(
     selectionFingerprint: 'c'.repeat(64),
     effectiveInputFingerprint: FINGERPRINT,
     currentJobId: 'job-1',
-    voiceReadiness: {
-      state: 'finalized',
-      snapshot: items[0]!.inputSnapshot!.voiceSnapshot!,
-      blockingReasons: [],
-    },
+    voiceReadiness: bootstrap
+      ? {
+          state: 'missing',
+          blockingReasons: ['A provisional voice foundation has not yet been generated.'],
+        }
+      : {
+          state: 'finalized',
+          snapshot: items[0]!.inputSnapshot!.voiceSnapshot!,
+          blockingReasons: [],
+        },
     counts: counts(items),
     budget: {
       estimate: {
         providerCalls: 114,
-        inputTokens: 4_000_000,
+        inputTokens: 5_000_000,
         outputTokens: 250_000,
         estimatedCostMicros: 100_000_000,
         maxConcurrency: 3,
       },
       limits: {
         providerCalls: 114,
-        inputTokens: 4_000_000,
+        inputTokens: 5_000_000,
         outputTokens: 250_000,
         maxEstimatedCostMicros: 100_000_000,
         maxConcurrency: 3,
@@ -275,7 +327,7 @@ function candidate(content: string): BrandGenerationCandidateAttemptOutput {
     kind: 'deliverable_candidate',
     content,
     foundationDraft: null,
-    claims: [{ text: content, classification: 'creative_proposal', sourceRefs: [] }],
+    claims: [{ text: content, classification: 'creative_proposal', evidenceKeys: [], sourceRefs: [] }],
     requirements: [],
     placeholders: [],
   };
@@ -284,6 +336,7 @@ function candidate(content: string): BrandGenerationCandidateAttemptOutput {
 function auditReport(
   verdict: GenerationAuditReport['verdict'],
   revisionCount: 0 | 1,
+  findingMessage = 'Voice needs more specificity.',
 ): GenerationAuditReport {
   return {
     verdict,
@@ -294,7 +347,7 @@ function auditReport(
           id: 'voice-flat',
           category: 'voice',
           severity: 'warning',
-          message: 'Voice needs more specificity.',
+          message: findingMessage,
           evidenceRequirementIds: [],
         }]
       : [],
@@ -398,6 +451,7 @@ function installHarness(options: HarnessOptions) {
       expectedRunRevision: input.expectedRunRevision,
       expectedItemRevision: input.expectedItemRevision,
       expectedDeliverableVersion: input.expectedDeliverableVersion,
+      sourceInputFingerprint: input.sourceInputFingerprint,
       effectiveInputFingerprint: input.effectiveInputFingerprint,
       budgetUsage: input.reservation,
       output: null,
@@ -488,17 +542,42 @@ function installHarness(options: HarnessOptions) {
       },
     };
   });
+  mocks.repository.commitBrandVoiceFoundationCandidate.mockImplementation(input => {
+    const current = items.find(item => item.id === input.itemId)!;
+    const candidateAttempt = attempts.find(attempt => attempt.id === input.candidateAttemptId)!;
+    const auditAttempt = attempts.find(attempt => attempt.id === input.finalAuditAttemptId)!;
+    if (!candidateAttempt.output || candidateAttempt.output.kind !== 'foundation_candidate') {
+      throw new Error('missing foundation candidate');
+    }
+    if (!auditAttempt.output || auditAttempt.output.kind !== 'audit') {
+      throw new Error('missing foundation audit');
+    }
+    return replaceItem({
+      ...current,
+      status: input.nextStatus,
+      revision: current.revision + 1,
+      foundationDraft: candidateAttempt.output.foundationDraft,
+      claims: candidateAttempt.output.claims,
+      requirements: candidateAttempt.output.requirements,
+      placeholders: candidateAttempt.output.placeholders,
+      auditReport: auditAttempt.output.auditReport,
+      automaticRevisionCount: auditAttempt.output.auditReport.revisionCount,
+      completedAt: NOW,
+    } as BrandGenerationItem);
+  });
   mocks.snapshots.hydrateBrandGenerationSnapshot.mockImplementation((_workspaceId, snapshot) => ({
     workspaceId: 'ws-1',
     inputSnapshot: snapshot,
     intakeRevision: { id: 'intake-1' },
     fieldEvidence: [],
-    finalizedVoice: {
-      guardrails: {
-        forbiddenWords: [],
-        requiredTerminology: [],
-      },
-    },
+    finalizedVoice: snapshot.target === 'voice_foundation'
+      ? null
+      : {
+          guardrails: {
+            forbiddenWords: [],
+            requiredTerminology: [],
+          },
+        },
     approvedDeliverables: [],
   }));
   mocks.preflight.runBrandGenerationPreflight.mockReturnValue({
@@ -522,6 +601,10 @@ function installHarness(options: HarnessOptions) {
 
   return {
     setCancelled: () => { cancelled = true; },
+    setJobStatus: (status: 'pending' | 'cancelled') => {
+      job = { ...job, status, updatedAt: NOW };
+      cancelled = status === 'cancelled';
+    },
     state: {
       items: () => items,
       run: () => run,
@@ -536,6 +619,132 @@ beforeEach(() => {
 });
 
 describe('brand generation worker orchestration', () => {
+  it('terminalizes the durable run when cancellation lands before worker start', async () => {
+    const harness = installHarness({ items: [itemFixture('mission')] });
+    harness.setJobStatus('cancelled');
+    const generateCandidate = vi.fn();
+
+    await runBrandGenerationJob('job-1', {
+      generateCandidate,
+      auditCandidate: vi.fn(),
+      refineCandidate: vi.fn(),
+    });
+
+    expect(generateCandidate).not.toHaveBeenCalled();
+    expect(harness.state.attempts()).toEqual([]);
+    expect(harness.state.items()[0]).toMatchObject({ status: 'cancelled' });
+    expect(harness.state.run()).toMatchObject({ status: 'cancelled', stage: 'complete' });
+    expect(harness.state.job()).toMatchObject({
+      status: 'cancelled',
+      result: { runId: 'run-1', terminalStatus: 'cancelled' },
+    });
+    expect(mocks.effects.applyBrandGenerationCompletedEffects).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'cancelled' }),
+      expect.objectContaining({ id: 'command-1' }),
+    );
+  });
+
+  it('pauses a provisional foundation with missing authentic samples for human resolution', async () => {
+    const foundation = foundationItemFixture();
+    const harness = installHarness({ items: [foundation] });
+    const requirement = {
+      id: 'brand-intake:authenticSamples',
+      fieldPath: 'authenticSamples',
+      claim: 'An authentic voice sample exists.',
+      reason: 'A human anchor is required before finalization.',
+      requirementStage: 'ready' as const,
+      claimKind: 'structural' as const,
+      status: 'missing' as const,
+      sourceRefs: [] as [],
+      clientSafePrompt: 'Provide an authentic voice sample.',
+    };
+    const placeholder = {
+      requirementId: requirement.id,
+      token: '[NEEDS CLIENT INPUT: Provide an authentic voice sample.]',
+      prompt: requirement.clientSafePrompt,
+    };
+    mocks.preflight.runBrandGenerationPreflight.mockReturnValue({
+      attemptOutput: {
+        kind: 'preflight',
+        readyForPaidWork: true,
+        blockingRequirementIds: [],
+        requirements: [requirement],
+        placeholders: [placeholder],
+        estimate: {
+          providerCalls: 6,
+          inputTokens: 10_000,
+          outputTokens: 2_000,
+          estimatedCostMicros: 500_000,
+          maxConcurrency: 1,
+        },
+      },
+      evidenceCatalog: [],
+      materializedPayload: {},
+    });
+    const generatedFoundation: BrandGenerationCandidateAttemptOutput = {
+      kind: 'foundation_candidate',
+      content: null,
+      foundationDraft: {
+        schemaVersion: 1,
+        summary: placeholder.token,
+        voiceDNA: {
+          personalityTraits: ['Warm'],
+          toneSpectrum: { formal_casual: 7, serious_playful: 3, technical_accessible: 8 },
+          sentenceStyle: 'Short sentences.',
+          vocabularyLevel: 'Plain language.',
+        },
+        guardrails: {
+          forbiddenWords: [],
+          requiredTerminology: [],
+          toneBoundaries: ['Never invent facts.'],
+          antiPatterns: ['No unsupported claims.'],
+        },
+        contextModifiers: [],
+        evidenceRequirementIds: [requirement.id],
+        fingerprint: 'f'.repeat(64),
+      },
+      claims: [],
+      requirements: [requirement],
+      placeholders: [placeholder],
+    };
+    const report: GenerationAuditReport = {
+      verdict: 'needs_attention',
+      deterministicChecks: [],
+      modelFindings: [],
+      humanRequiredChecks: [],
+      revisionCount: 0,
+      unresolvedRequirementIds: [requirement.id],
+      auditedAt: NOW,
+    };
+
+    await runBrandGenerationJob('job-1', {
+      generateCandidate: vi.fn(async () => ({
+        output: generatedFoundation,
+        provenance,
+      } as never)),
+      auditCandidate: vi.fn(async () => ({
+        output: { kind: 'audit', auditReport: report },
+        provenance,
+      } as never)),
+      refineCandidate: vi.fn(),
+    });
+
+    expect(harness.state.items()[0]).toMatchObject({
+      target: 'voice_foundation',
+      status: 'needs_attention',
+      auditReport: { unresolvedRequirementIds: [requirement.id] },
+    });
+    expect(harness.state.run()).toMatchObject({
+      status: 'awaiting_review',
+      stage: 'awaiting_voice_finalization',
+      voiceReadiness: {
+        state: 'provisional',
+        blockingReasons: [expect.stringMatching(/evidence requirements/i)],
+      },
+    });
+    expect(harness.state.job()).toMatchObject({ status: 'done' });
+  });
+
   it('holds the candidate barrier, audits the whole set, revises once, and commits only final checkpoints', async () => {
     const harness = installHarness({
       items: [itemFixture('mission'), itemFixture('vision')],
@@ -552,6 +761,7 @@ describe('brand generation worker orchestration', () => {
         inputTokens: 100,
         outputTokens: 20,
         estimatedCostMicros: 10,
+        effectiveInputFingerprint: FINGERPRINT,
       });
       await Promise.resolve();
       events.push(`generate-end:${target}`);
@@ -571,12 +781,19 @@ describe('brand generation worker orchestration', () => {
         inputTokens: 50,
         outputTokens: 10,
         estimatedCostMicros: 5,
+        effectiveInputFingerprint: FINGERPRINT,
       });
       const verdict = target === 'mission' && input.revisionCount === 0
         ? 'needs_attention'
         : 'ready_for_human_review';
+      const findingMessage = verdict === 'needs_attention'
+        ? `Voice needs more specificity. \u0000${'😀'.repeat(10_000)}`
+        : undefined;
       return {
-        output: { kind: 'audit', auditReport: auditReport(verdict, input.revisionCount) },
+        output: {
+          kind: 'audit',
+          auditReport: auditReport(verdict, input.revisionCount, findingMessage),
+        },
         provenance,
       } as never;
     });
@@ -590,6 +807,7 @@ describe('brand generation worker orchestration', () => {
         inputTokens: 100,
         outputTokens: 20,
         estimatedCostMicros: 10,
+        effectiveInputFingerprint: FINGERPRINT,
       });
       return { output: candidate('Revised mission'), provenance } as never;
     });
@@ -620,6 +838,12 @@ describe('brand generation worker orchestration', () => {
       automaticRevisionCount: 0,
       direction: expect.stringContaining('Voice needs more specificity.'),
     }));
+    const boundedDirection = refineCandidate.mock.calls[0]![0].direction;
+    expect(new TextEncoder().encode(boundedDirection).byteLength)
+      .toBeLessThanOrEqual(BRAND_GENERATION_LIMITS.maxAutomaticDirectionBytes);
+    expect(boundedDirection).not.toContain('\u0000');
+    const finalCodeUnit = boundedDirection.charCodeAt(boundedDirection.length - 1);
+    expect(finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff).toBe(false);
 
     expect(mocks.repository.commitBrandGenerationDeliverableCandidate).toHaveBeenCalledTimes(2);
     expect(harness.state.attempts().filter(attempt => attempt.stage === 'deterministic_audit'))
@@ -646,6 +870,8 @@ describe('brand generation worker orchestration', () => {
     expect(harness.state.run()).toMatchObject({ status: 'completed', stage: 'complete' });
     expect(harness.state.job()).toMatchObject({
       status: 'done',
+      progress: 1,
+      total: 1,
       result: {
         runId: 'run-1',
         terminalStatus: 'completed',
@@ -655,7 +881,17 @@ describe('brand generation worker orchestration', () => {
     expect(serializedJob).not.toContain('Revised mission');
     expect(serializedJob).not.toContain('Initial vision');
     expect(mocks.effects.applyBrandGenerationArtifactCommittedEffects).toHaveBeenCalledTimes(2);
+    expect(mocks.effects.applyBrandGenerationArtifactCommittedEffects).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'run-1' }),
+      expect.objectContaining({ id: 'command-1', actor: commandFixture().actor }),
+      expect.any(Object),
+      expect.stringMatching(/^item-/),
+    );
     expect(mocks.effects.applyBrandGenerationCompletedEffects).toHaveBeenCalledOnce();
+    expect(mocks.effects.applyBrandGenerationCompletedEffects).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'run-1' }),
+      expect.objectContaining({ id: 'command-1', actor: commandFixture().actor }),
+    );
   });
 
   it('fails a required audit stage without committing a phantom artifact', async () => {
@@ -743,7 +979,7 @@ describe('brand generation worker orchestration', () => {
     expect(JSON.stringify(harness.state.job())).not.toContain('Stale generated mission');
   });
 
-  it('restores the prior human review state when a requested revision is cancelled', async () => {
+  it('restores a cancelled ready-item revision as changes requested, never unaudited ready', async () => {
     const revisionItem = itemFixture('mission', 'revising', {
       revision: 1,
       inputSnapshot: {
@@ -765,7 +1001,7 @@ describe('brand generation worker orchestration', () => {
     });
     const harness = installHarness({
       items: [revisionItem],
-      command: commandFixture('revision', 'changes_requested'),
+      command: commandFixture('revision', 'ready_for_human_review'),
       runStatus: 'running',
     });
     const refineCandidate = vi.fn<BrandGenerationWorkerDependencies['refineCandidate']>(async () => {
@@ -792,5 +1028,71 @@ describe('brand generation worker orchestration', () => {
     ]));
     expect(mocks.repository.commitBrandGenerationDeliverableCandidate).not.toHaveBeenCalled();
     expect(mocks.effects.applyBrandGenerationArtifactCommittedEffects).not.toHaveBeenCalled();
+    expect(harness.state.run()).toMatchObject({
+      status: 'completed_with_errors',
+      stage: 'awaiting_operator_review',
+    });
+    expect(harness.state.job()).toMatchObject({
+      status: 'cancelled',
+      result: {
+        runId: 'run-1',
+        terminalStatus: 'completed_with_errors',
+      },
+    });
+  });
+
+  it('keeps a failed human-directed revision retryable as changes requested', async () => {
+    const revisionItem = itemFixture('mission', 'revising', {
+      revision: 1,
+      inputSnapshot: {
+        ...itemFixture('mission').inputSnapshot!,
+        artifactExpectation: {
+          kind: 'update',
+          deliverableId: 'deliverable-mission',
+          expectedVersion: 1,
+        },
+      },
+      artifactExpectation: {
+        kind: 'update',
+        deliverableId: 'deliverable-mission',
+        expectedVersion: 1,
+      },
+      content: 'Human-reviewed mission',
+      committedDeliverableId: 'deliverable-mission',
+      committedDeliverableVersion: 1,
+    });
+    const harness = installHarness({
+      items: [revisionItem],
+      command: commandFixture('revision', 'ready_for_human_review'),
+      runStatus: 'running',
+    });
+
+    await runBrandGenerationJob('job-1', {
+      generateCandidate: vi.fn(),
+      auditCandidate: vi.fn(),
+      refineCandidate: vi.fn(async () => { throw new Error('provider temporarily unavailable'); }),
+    });
+
+    expect(harness.state.items()[0]).toMatchObject({
+      status: 'changes_requested',
+      content: 'Human-reviewed mission',
+      committedDeliverableId: 'deliverable-mission',
+      committedDeliverableVersion: 1,
+      error: {
+        code: 'brand_generation_stage_failed',
+        stage: 'revision',
+      },
+    });
+    expect(harness.state.attempts()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ stage: 'revision', status: 'failed' }),
+    ]));
+    expect(harness.state.run()).toMatchObject({
+      status: 'completed_with_errors',
+      stage: 'awaiting_operator_review',
+    });
+    expect(harness.state.job()).toMatchObject({
+      status: 'error',
+      result: { terminalStatus: 'completed_with_errors' },
+    });
   });
 });

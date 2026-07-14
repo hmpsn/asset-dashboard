@@ -709,6 +709,16 @@
       "tier": "growth",
       "impact": "high",
       "clientFacing": true
+    },
+    {
+      "id": 72,
+      "title": "Grounded Brand Suite Generation",
+      "oneLiner": "Turns an immutable brand intake into bounded, audited drafts through a resumable MCP workflow that pauses for authentic voice finalization and human review",
+      "category": "content",
+      "painPoints": ["brand-voice", "content-quality", "client-collaboration"],
+      "tier": "premium",
+      "impact": "high",
+      "clientFacing": false
     }
   ]
 }

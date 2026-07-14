@@ -66,6 +66,49 @@ function candidate(summary = 'Warm and direct.'): BrandGenerationFoundationCandi
 }
 
 describe('brand generation audits', () => {
+  it('keeps ready-stage evidence gaps visible without deadlocking provisional voice review', () => {
+    const requirement = {
+      id: 'brand-intake:authenticSamples',
+      fieldPath: 'authenticSamples',
+      claim: 'An authentic voice sample exists.',
+      reason: 'A human anchor is required before finalization.',
+      requirementStage: 'ready' as const,
+      claimKind: 'structural' as const,
+      status: 'missing' as const,
+      sourceRefs: [] as [],
+      clientSafePrompt: 'Provide an authentic voice sample.',
+    };
+    const withGap = {
+      ...preflight,
+      attemptOutput: {
+        ...preflight.attemptOutput,
+        requirements: [requirement],
+        placeholders: [{
+          requirementId: requirement.id,
+          token: '[NEEDS CLIENT INPUT: Provide an authentic voice sample.]',
+          prompt: requirement.clientSafePrompt,
+        }],
+      },
+    };
+    const draft = {
+      ...candidate('[NEEDS CLIENT INPUT: Provide an authentic voice sample.]'),
+      requirements: [requirement],
+      placeholders: withGap.attemptOutput.placeholders,
+    };
+    const result = runBrandGenerationDeterministicAudit({
+      frozenInput,
+      preflight: withGap,
+      candidate: draft,
+      revisionCount: 0,
+      now: () => new Date(now),
+    });
+    expect(result).toMatchObject({
+      verdict: 'needs_attention',
+      unresolvedRequirementIds: ['brand-intake:authenticSamples'],
+    });
+    expect(getBrandGenerationAuditDisposition(result, 0)).toBe('needs_attention');
+  });
+
   it('keeps deterministic failure authoritative over a clean model response', () => {
     const bad = candidate('[NEEDS CLIENT INPUT: invented token]');
     const deterministic = runBrandGenerationDeterministicAudit({
@@ -100,6 +143,41 @@ describe('brand generation audits', () => {
     })).toThrow(/unknown affected target/i);
   });
 
+  it('human-gates evidenced inferences and hallucination review for every generated candidate', () => {
+    const withInference: BrandGenerationFoundationCandidateAttemptOutput = {
+      ...candidate(),
+      claims: [{
+        text: 'The intake suggests a focus on clarity.',
+        classification: 'inferred',
+        evidenceKeys: ['brand-intake:brand.tone'],
+        sourceRefs: [{
+          sourceType: 'brand_intake',
+          sourceId: 'intake-1',
+          sourceRevision: 1,
+          fieldPath: 'brand.tone',
+          capturedAt: now,
+        }],
+      }],
+    };
+    const inferredReport = runBrandGenerationDeterministicAudit({
+      frozenInput, preflight, candidate: withInference, revisionCount: 0, now: () => new Date(now),
+    });
+    expect(inferredReport.deterministicChecks).toContainEqual(expect.objectContaining({
+      id: 'factual-claim-evidence', result: 'passed',
+    }));
+    expect(inferredReport.humanRequiredChecks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'factual-accuracy', result: 'needs_human_review' }),
+      expect.objectContaining({ id: 'no-hallucinations', result: 'needs_human_review' }),
+    ]));
+
+    const creativeOnlyReport = runBrandGenerationDeterministicAudit({
+      frozenInput, preflight, candidate: candidate(), revisionCount: 0, now: () => new Date(now),
+    });
+    expect(creativeOnlyReport.humanRequiredChecks).toContainEqual(expect.objectContaining({
+      id: 'no-hallucinations', result: 'needs_human_review',
+    }));
+  });
+
   it('reserves and calls the named OpenAI audit with retries disabled', async () => {
     const reserve = vi.fn();
     const callStructuredAI = vi.fn(async options => {
@@ -127,6 +205,11 @@ describe('brand generation audits', () => {
       operation: 'brand-deliverable-audit', provider: 'openai', providerCalls: 1,
     }));
     expect(result.output.auditReport.verdict).toBe('ready_for_human_review');
-    expect(result.provenance).toMatchObject({ runId: 'audit-run-1', operation: 'brand-deliverable-audit' });
+    const reservation = reserve.mock.calls[0]?.[0];
+    expect(result.provenance).toMatchObject({
+      runId: 'audit-run-1',
+      operation: 'brand-deliverable-audit',
+      inputFingerprint: reservation?.effectiveInputFingerprint,
+    });
   });
 });

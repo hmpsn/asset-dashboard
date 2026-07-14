@@ -66,15 +66,18 @@ describe('brand generation structured output schemas', () => {
     }))).toThrow();
   });
 
-  it('requires evidence keys for every factual claim', () => {
-    expect(() => parseBrandDeliverableAIOutput(JSON.stringify({
-      content: 'We have served 10,000 patients.',
-      claims: [{
-        text: 'We have served 10,000 patients.',
-        classification: 'factual',
-        evidenceKeys: [],
-      }],
-      unresolvedRequirementIds: [],
-    }))).toThrow();
-  });
+  it.each(['factual', 'inferred'] as const)(
+    'requires evidence keys for every %s claim',
+    classification => {
+      expect(() => parseBrandDeliverableAIOutput(JSON.stringify({
+        content: 'We serve dentists nationwide.',
+        claims: [{
+          text: 'We serve dentists nationwide.',
+          classification,
+          evidenceKeys: [],
+        }],
+        unresolvedRequirementIds: [],
+      }))).toThrow();
+    },
+  );
 });

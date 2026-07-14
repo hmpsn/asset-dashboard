@@ -11,6 +11,8 @@ import type {
 } from '../../shared/types/brand-intake.js';
 import { BRAND_INTAKE_FIELD_PATHS } from '../../shared/types/brand-intake.js';
 import type { FinalizedVoiceSnapshot } from '../../shared/types/voice-finalization.js';
+import { BrandGenerationPreconditionError } from '../../server/domains/brand/generation/errors.js';
+import { canonicalBrandGenerationFingerprint } from '../../server/domains/brand/generation/fingerprint.js';
 import {
   hydrateBrandGenerationSnapshot,
   prepareBrandGenerationSnapshots,
@@ -312,5 +314,81 @@ describe('brand generation snapshot authority', () => {
         }],
       })),
     })).toThrow(/no longer matches/i);
+  });
+
+  it('rejects an immutable snapshot field tampered without recomputing its fingerprint', () => {
+    const authority = intake();
+    const [prepared] = prepareBrandGenerationSnapshots({
+      workspaceId: 'ws-1',
+      intake: authority,
+      targets: ['mission'],
+      finalizedVoice: voice(),
+      capturedAt: CAPTURED_AT,
+      deliverables: [],
+    });
+    const getBrandIntakeRevision = vi.fn(() => authority);
+    const tamperedSnapshot = {
+      ...prepared.inputSnapshot,
+      capturedAt: '2026-07-14T12:00:01.000Z',
+    };
+
+    try {
+      hydrateBrandGenerationSnapshot('ws-1', tamperedSnapshot, {
+        getBrandIntakeRevision,
+      });
+      throw new Error('Expected immutable snapshot fingerprint rejection');
+    } catch (error) {
+      expect(error).toBeInstanceOf(BrandGenerationPreconditionError);
+      expect(error).toMatchObject({ reason: 'invalid_lifecycle' });
+      expect((error as Error).message).toMatch(/immutable snapshot fingerprint/i);
+    }
+    expect(getBrandIntakeRevision).not.toHaveBeenCalled();
+  });
+
+  it('rejects an approval fingerprint tampered behind a recomputed outer fingerprint', () => {
+    const authority = intake();
+    const approvedVision = deliverable('vision', {
+      id: 'vision-approved',
+      status: 'approved',
+      version: 1,
+      content: 'The accepted original vision.',
+    });
+    const [prepared] = prepareBrandGenerationSnapshots({
+      workspaceId: 'ws-1',
+      intake: authority,
+      targets: ['mission'],
+      finalizedVoice: voice(),
+      capturedAt: CAPTURED_AT,
+      deliverables: [approvedVision],
+    });
+    const tamperedApproval = {
+      ...prepared.inputSnapshot.approvedDeliverables[0]!,
+      approvalFingerprint: 'f'.repeat(64),
+    };
+    const {
+      fingerprint: _originalFingerprint,
+      ...snapshotWithoutFingerprint
+    } = prepared.inputSnapshot;
+    const tamperedSnapshotWithoutFingerprint = {
+      ...snapshotWithoutFingerprint,
+      approvedDeliverables: [tamperedApproval],
+    };
+    const tamperedSnapshot = {
+      ...tamperedSnapshotWithoutFingerprint,
+      fingerprint: canonicalBrandGenerationFingerprint(tamperedSnapshotWithoutFingerprint),
+    };
+    const getBrandIntakeRevision = vi.fn(() => authority);
+
+    try {
+      hydrateBrandGenerationSnapshot('ws-1', tamperedSnapshot, {
+        getBrandIntakeRevision,
+      });
+      throw new Error('Expected approval fingerprint rejection');
+    } catch (error) {
+      expect(error).toBeInstanceOf(BrandGenerationPreconditionError);
+      expect(error).toMatchObject({ reason: 'invalid_lifecycle' });
+      expect((error as Error).message).toMatch(/approval fingerprint/i);
+    }
+    expect(getBrandIntakeRevision).not.toHaveBeenCalled();
   });
 });

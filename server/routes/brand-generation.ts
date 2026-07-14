@@ -27,6 +27,7 @@ import {
   type StartBrandGenerationResult,
 } from '../../shared/types/brand-generation.js';
 import type { GenerationOperatorAttribution } from '../../shared/types/generation-evidence.js';
+import { brandGenerationCursorSchema } from '../../shared/types/mcp-brand-generation-schemas.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import {
   BrandGenerationApprovedDeliverableError,
@@ -129,8 +130,7 @@ const reviseBrandGenerationBodySchema = z.object({
 }).strict();
 
 const getBrandGenerationQuerySchema = z.object({
-  itemCursor: z.string().trim().min(1).max(BRAND_GENERATION_LIMITS.maxCursorLength)
-    .regex(/^[A-Za-z0-9_-]+$/).optional(),
+  itemCursor: brandGenerationCursorSchema.optional(),
   itemLimit: z.coerce.number().int().min(1).max(BRAND_GENERATION_LIMITS.maxItemPageSize)
     .optional(),
 }).strict();

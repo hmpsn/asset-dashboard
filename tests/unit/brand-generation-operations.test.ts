@@ -7,8 +7,9 @@ import type {
 } from '../../server/domains/brand/generation/preflight.js';
 import {
   generateBrandGenerationCandidate,
+  validateBrandGenerationRequiredStageEnvelopeClosure,
 } from '../../server/domains/brand/generation/operations.js';
-import { FINALIZED_VOICE_PROMPT_BEGIN } from '../../server/domains/brand/generation/prompt.js';
+import * as brandGenerationPrompt from '../../server/domains/brand/generation/prompt.js';
 
 const now = '2026-07-13T12:00:00.000Z';
 
@@ -164,20 +165,99 @@ describe('brand generation AI operations', () => {
     const callCreativeAI = vi.fn(async options => {
       await options.beforeProviderDispatch?.({ provider: 'anthropic', fallback: false });
       await options.beforeProviderDispatch?.({ provider: 'openai', fallback: true });
-      expect(`${options.systemPrompt}\n${options.userPrompt}`.split(FINALIZED_VOICE_PROMPT_BEGIN)).toHaveLength(2);
+      expect(`${options.systemPrompt}\n${options.userPrompt}`.split(brandGenerationPrompt.FINALIZED_VOICE_PROMPT_BEGIN)).toHaveLength(2);
       return aiResult(creativeOutput('Care that makes the next step clear.'), true);
     });
     const result = await generateBrandGenerationCandidate({
       frozenInput: frozenInput(), preflight: preflight(), reserveProviderDispatch: reserve,
       dependencies: { callCreativeAI },
     });
-    expect(reserve.mock.calls.map(call => call[0])).toEqual([
-      expect.objectContaining({ provider: 'anthropic', fallback: false, providerCalls: 1 }),
-      expect.objectContaining({ provider: 'openai', fallback: true, providerCalls: 1 }),
+    const prompt = brandGenerationPrompt.buildBrandGenerationPrompt(frozenInput(), preflight());
+    const reservations = reserve.mock.calls.map(call => call[0]);
+    expect(reservations).toEqual([
+      expect.objectContaining({
+        provider: 'anthropic', fallback: false, providerCalls: 1,
+        inputTokens: expect.any(Number), outputTokens: 2_500,
+        effectiveInputFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+      expect.objectContaining({
+        provider: 'openai', fallback: true, providerCalls: 1,
+        inputTokens: expect.any(Number), outputTokens: 2_500,
+        effectiveInputFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
     ]);
+    expect(reservations[0].effectiveInputFingerprint)
+      .not.toBe(reservations[1].effectiveInputFingerprint);
     expect(result.tokens).toEqual({ prompt: 321, completion: 123, total: 444 });
-    expect(result.provenance).toMatchObject({ runId: 'ai-run-1', provider: 'openai', model: 'gpt-5.5' });
+    expect(result.provenance).toMatchObject({
+      runId: 'ai-run-1',
+      provider: 'openai',
+      model: 'gpt-5.5',
+      inputFingerprint: reservations[1].effectiveInputFingerprint,
+    });
+    expect(result.effectiveInputFingerprint).toBe(reservations[1].effectiveInputFingerprint);
+    expect(result.effectiveInputFingerprint).not.toBe(prompt.effectiveInputFingerprint);
+    expect(result.effectiveInputFingerprint).not.toBe(frozenInput().inputSnapshot.fingerprint);
     expect(result.budgetUsage.providerCalls).toBe(2);
+  });
+
+  it('fails closed when reported provider usage exceeds the pessimistic reservation', async () => {
+    const callCreativeAI = vi.fn(async options => {
+      await options.beforeProviderDispatch?.({ provider: 'openai', fallback: false });
+      return {
+        ...aiResult(creativeOutput('A bounded creative proposal.')),
+        tokens: { prompt: 1_000_000, completion: 123, total: 1_000_123 },
+      };
+    });
+
+    await expect(generateBrandGenerationCandidate({
+      frozenInput: frozenInput(),
+      preflight: preflight(),
+      reserveProviderDispatch: vi.fn(),
+      dependencies: { callCreativeAI },
+    })).rejects.toThrow(/exceeded.*reservation/i);
+  });
+
+  it('rejects a candidate too large to complete the bounded audit pass', async () => {
+    const oversized = 'x'.repeat(9_000);
+    const callCreativeAI = vi.fn(async options => {
+      await options.beforeProviderDispatch?.({ provider: 'openai', fallback: false });
+      return aiResult(creativeOutput(oversized));
+    });
+    await expect(generateBrandGenerationCandidate({
+      frozenInput: frozenInput(),
+      preflight: preflight(),
+      reserveProviderDispatch: vi.fn(),
+      dependencies: { callCreativeAI },
+    })).rejects.toThrow(/failed to parse AI structured output/i);
+  });
+
+  it('sizes related context with a universal quote-first minimal candidate', () => {
+    const buildAuditPrompt = vi.spyOn(brandGenerationPrompt, 'buildBrandGenerationAuditPrompt');
+    try {
+      validateBrandGenerationRequiredStageEnvelopeClosure(
+        frozenInput('naming'),
+        preflight(true),
+      );
+
+      expect(buildAuditPrompt).toHaveBeenCalledTimes(2);
+      for (const call of buildAuditPrompt.mock.calls) {
+        const currentCandidate = call[2];
+        const relatedCandidates = call[4] ?? [];
+        expect(relatedCandidates).toHaveLength(18);
+        expect(relatedCandidates.length).toBeGreaterThan(0);
+        expect(relatedCandidates.every(related => ( // every-ok -- exact non-empty length asserted above
+          related.candidate !== currentCandidate
+          && related.candidate.kind === 'deliverable_candidate'
+          && related.candidate.content.startsWith('"')
+          && related.candidate.claims.length === 0
+          && related.candidate.requirements.length === 0
+          && related.candidate.placeholders.length === 0
+        ))).toBe(true);
+      }
+    } finally {
+      buildAuditPrompt.mockRestore();
+    }
   });
 
   it('rejects unsupported evidence keys and deleted placeholders', async () => {
@@ -202,6 +282,72 @@ describe('brand generation AI operations', () => {
       frozenInput: frozenInput(), preflight: preflight(true), reserveProviderDispatch: vi.fn(),
       dependencies: { callCreativeAI: deleted },
     })).rejects.toThrow(/placeholder/i);
+  });
+
+  it('requires inferred assertions to resolve to fact-capable non-structural evidence', async () => {
+    const supportedInference = vi.fn(async options => {
+      await options.beforeProviderDispatch?.({ provider: 'openai', fallback: false });
+      return aiResult(JSON.stringify({
+        content: 'Care that makes the next step clear.',
+        claims: [
+          {
+            text: 'Care that makes the next step clear.',
+            classification: 'creative_proposal',
+            evidenceKeys: [],
+          },
+          {
+            text: 'The intake suggests a focus on clear care.',
+            classification: 'inferred',
+            evidenceKeys: ['brand-intake:business.businessName'],
+          },
+        ],
+        unresolvedRequirementIds: [],
+      }));
+    });
+    const supported = await generateBrandGenerationCandidate({
+      frozenInput: frozenInput(), preflight: preflight(), reserveProviderDispatch: vi.fn(),
+      dependencies: { callCreativeAI: supportedInference },
+    });
+    expect(supported.output.claims).toContainEqual(expect.objectContaining({
+      classification: 'inferred',
+      evidenceKeys: ['brand-intake:business.businessName'],
+      sourceRefs: [expect.objectContaining({ sourceType: 'brand_intake', sourceId: 'intake-1' })],
+    }));
+
+    const structuralPreflight = preflight();
+    structuralPreflight.evidenceCatalog = [{
+      key: 'content-matrix:cell-1',
+      kind: 'intake_field',
+      fieldPath: 'business.businessName',
+      value: 'Dentist in Austin',
+      supportsFactualClaims: true,
+      sourceRefs: [{
+        sourceType: 'content_matrix', sourceId: 'matrix-1', fieldPath: 'cell-1', capturedAt: now,
+      }],
+    }];
+    const structuralInference = vi.fn(async options => {
+      await options.beforeProviderDispatch?.({ provider: 'openai', fallback: false });
+      return aiResult(JSON.stringify({
+        content: 'Care that makes the next step clear.',
+        claims: [
+          {
+            text: 'Care that makes the next step clear.',
+            classification: 'creative_proposal',
+            evidenceKeys: [],
+          },
+          {
+            text: 'The business serves dentists in Austin.',
+            classification: 'inferred',
+            evidenceKeys: ['content-matrix:cell-1'],
+          },
+        ],
+        unresolvedRequirementIds: [],
+      }));
+    });
+    await expect(generateBrandGenerationCandidate({
+      frozenInput: frozenInput(), preflight: structuralPreflight, reserveProviderDispatch: vi.fn(),
+      dependencies: { callCreativeAI: structuralInference },
+    })).rejects.toThrow(/cannot support business assertions/i);
   });
 
   it('uses one reserved OpenAI repair when Anthropic succeeds with invalid structured output', async () => {

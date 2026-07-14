@@ -57,16 +57,19 @@ describe('187 brand generation run migration', () => {
         id, workspace_id, intake_revision_id, intake_revision, intake_fingerprint,
         selection_json, dispatch_targets_json, status, stage, idempotency_key,
         selection_fingerprint, effective_input_fingerprint,
+        initial_input_fingerprints_json,
         estimated_provider_calls, estimated_input_tokens, estimated_output_tokens,
-        estimated_cost_microusd, max_provider_calls, max_input_tokens,
+        estimated_cost_microusd, estimated_max_concurrency,
+        max_provider_calls, max_input_tokens,
         max_output_tokens, max_cost_microusd, max_concurrency,
         created_by_json, created_at, updated_at
       ) VALUES (
         @id, 'ws-1', 'intake-1', 1, @intake_fingerprint,
         '{"kind":"preset","preset":"full_brand_system"}', '["voice_foundation"]',
         'queued', 'preflight', @idempotency_key, @selection_fingerprint,
-        @effective_input_fingerprint, 4, 10000, 4000, 100000,
-        114, 4000000, 250000, 100000000, 3,
+        @effective_input_fingerprint, @initial_input_fingerprints_json,
+        4, 10000, 4000, 100000, 1,
+        114, 5000000, 250000, 100000000, 3,
         '{"actorType":"operator","actorId":"operator-1"}',
         '2026-07-13T12:00:00.000Z', '2026-07-13T12:00:00.000Z'
       )
@@ -76,6 +79,7 @@ describe('187 brand generation run migration', () => {
       intake_fingerprint: 'a'.repeat(64),
       selection_fingerprint: 'b'.repeat(64),
       effective_input_fingerprint: 'c'.repeat(64),
+      initial_input_fingerprints_json: JSON.stringify(['c'.repeat(64)]),
     });
   }
 
@@ -130,6 +134,7 @@ describe('187 brand generation run migration', () => {
       'brand_generation_items',
       'brand_generation_commands',
       'brand_generation_attempts',
+      'brand_generation_effect_events',
     ]));
   });
 
@@ -166,15 +171,16 @@ describe('187 brand generation run migration', () => {
       INSERT INTO brand_generation_attempts (
         id, item_id, run_id, command_id, attempt_number, stage, status,
         expected_run_revision, expected_item_revision, expected_deliverable_version,
-        effective_input_fingerprint, output_snapshot_json, started_at, completed_at
+        source_input_fingerprint, effective_input_fingerprint,
+        output_snapshot_json, started_at, completed_at
       ) VALUES (
         ?, 'brand-item-mission', 'brand-run-1', 'brand-command-start', 1, 'dependent_generation',
-        'completed', 0, 0, 0, ?, '{"content":"candidate"}',
+        'completed', 0, 0, 0, ?, ?, '{"content":"candidate"}',
         '2026-07-13T12:00:00.000Z', '2026-07-13T12:00:01.000Z'
       )
     `);
-    insertAttempt.run('attempt-1', 'd'.repeat(64));
-    expect(() => insertAttempt.run('attempt-2', 'd'.repeat(64))).toThrow();
+    insertAttempt.run('attempt-1', 'c'.repeat(64), 'd'.repeat(64));
+    expect(() => insertAttempt.run('attempt-2', 'c'.repeat(64), 'd'.repeat(64))).toThrow();
     expect(db.prepare(`
       SELECT output_snapshot_json FROM brand_generation_attempts WHERE id = 'attempt-1'
     `).get()).toEqual({ output_snapshot_json: '{"content":"candidate"}' });

@@ -452,11 +452,14 @@ operator selection proof, and approved identity snapshots freeze
 approval/content fingerprints so a mutable row version alone cannot stand in
 for authority.
 
-Structured output contains content, creative/factual claim classification,
-evidence refs, unresolved requirements, audit findings, effective-input
-fingerprint, and `GenerationProvenance`. Naming output is explicitly a creative
-proposal; legal/domain/trademark availability remains unknown unless separately
-verified.
+Structured output contains content, creative/factual/inferred claim
+classification, evidence refs, unresolved requirements, audit findings,
+effective-input fingerprint, and `GenerationProvenance`. Factual and inferred
+rendered claims both require fact-capable, non-structural accepted evidence;
+factual accuracy is human-required for either, and no-hallucination review is
+human-required for every candidate because the model cannot certify that its
+claim ledger is complete. Naming output is explicitly a creative proposal;
+legal/domain/trademark availability remains unknown unless separately verified.
 
 B2 stores the provisional foundation as a validated structured
 `BrandVoiceFoundationDraft`, not an opaque content string. Public run DTOs redact
@@ -470,16 +473,32 @@ snapshot, result, job, actor, and MCP execution context. Request correlation and
 actor fields are excluded from the business fingerprint, so a replay with a new
 request ID returns the original result instead of conflicting. Attempts reference
 their accepted command; review-directed revisions also freeze direction and the
-prior review state for truthful cancellation recovery.
+prior review state for audit. Because accepting a revision clears the prior
+audit/provenance lineage, cancellation preserves the frozen human content and
+version but returns the item to `changes_requested`, never to an unaudited
+`ready_for_human_review` state. Hydration recomputes the canonical self-hash of
+the immutable frozen input and verifies every approved-input reference
+fingerprint before paid work.
 
-The B2 paid-work ceiling is 114 provider calls, 4,000,000 input tokens, 250,000
+The B2 paid-work ceiling is 114 provider calls, 5,000,000 input tokens, 250,000
 output tokens, USD 100 in estimated-cost micros, and concurrency 3. Callers must
-provide ceilings at or below each platform maximum. Generate, refine, and audit
-operations explicitly disable completed-response caching because every commit
-is tied to exact frozen authority and CAS expectations. A provider call means
-one dispatcher invocation. B2 disables dispatcher-internal retries and reserves
-the pessimistic call/token/cost envelope before each Claude or OpenAI dispatch,
-including fallback; automatic retry/revision is a separately reserved dispatch.
+provide ceilings at or below each platform maximum. Provider instructions are
+capped at 40 KiB with a 512-byte acceptance safety margin; base generation at 24
+KiB; the raw candidate core and compact refine/audit prompt projection at 4 KiB;
+the resolved durable candidate at 256 KiB; the related-candidate digest at 3 KiB;
+and automatic audit-derived revision direction at 512 bytes. Generate, refine,
+and audit operations explicitly disable completed-response caching because every
+commit is tied to exact frozen authority and CAS expectations. A provider call
+means one dispatcher invocation. B2 disables dispatcher-internal retries and
+reserves the pessimistic call/token/cost envelope before each Claude or OpenAI
+dispatch, including fallback; automatic retry/revision is a separately reserved
+dispatch.
+
+Command acceptance, artifact commit, and command completion transactionally
+enqueue `command_accepted`, `artifact_committed`, and `command_completed` effect
+events. Deterministic effect keys make activity writes and MCP paid-call metering
+exactly-once; retryable workspace broadcasts and intelligence-cache invalidation
+are at-least-once.
 
 The additive naming vocabulary remains closed on every legacy paid boundary:
 the legacy service parameter, HTTP schema, frontend API payload, focused editor

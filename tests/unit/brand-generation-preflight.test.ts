@@ -8,6 +8,10 @@ import type {
 import { BRAND_INTAKE_FIELD_PATHS } from '../../shared/types/brand-intake.js';
 import type { BrandGenerationTargetInputSnapshot } from '../../shared/types/brand-generation.js';
 import {
+  BRAND_GENERATION_ATOMIC_TARGETS,
+  BRAND_GENERATION_LIMITS,
+} from '../../shared/types/brand-generation.js';
+import {
   runBrandGenerationPreflight,
   type BrandGenerationFrozenTargetInput,
 } from '../../server/domains/brand/generation/preflight.js';
@@ -130,6 +134,15 @@ describe('brand generation deterministic preflight', () => {
       }),
     ]));
     expect(result.attemptOutput.placeholders[0]?.token).toMatch(/^\[NEEDS CLIENT INPUT:/);
+    expect(result.attemptOutput.estimate.inputTokens).toBe(
+      6 * (
+        BRAND_GENERATION_LIMITS.maxPromptBytes
+        + BRAND_GENERATION_LIMITS.providerPromptFramingTokenCeiling
+      ),
+    );
+    expect(
+      result.attemptOutput.estimate.inputTokens * BRAND_GENERATION_ATOMIC_TARGETS.length,
+    ).toBeLessThanOrEqual(BRAND_GENERATION_LIMITS.maxInputTokens);
   });
 
   it('blocks paid dependent generation when finalized voice is absent', () => {

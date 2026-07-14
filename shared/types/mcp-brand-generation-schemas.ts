@@ -19,9 +19,12 @@ const fingerprintSchema = z.string().regex(
   /^[a-f0-9]{64}$/,
   'must be a lowercase SHA-256 fingerprint',
 );
-const cursorSchema = z.string().trim().min(1)
+export const brandGenerationCursorSchema = z.string().trim().min(1)
   .max(BRAND_GENERATION_LIMITS.maxCursorLength)
-  .regex(/^[A-Za-z0-9_-]+$/, 'item_cursor must be an opaque base64url token');
+  .regex(
+    /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/,
+    'item_cursor must be an opaque signed base64url token',
+  );
 
 const selectionSchema = z.discriminatedUnion('kind', [
   z.object({
@@ -93,7 +96,7 @@ export const getBrandGenerationInputSchema = z.object({
     .describe('Workspace that owns the durable brand-generation run.'),
   run_id: durableIdSchema
     .describe('Durable brand-generation run ID.'),
-  item_cursor: cursorSchema.optional()
+  item_cursor: brandGenerationCursorSchema.optional()
     .describe('Opaque item cursor bound to the workspace, run ID, run revision, and stable position.'),
   item_limit: z.number().int().min(1).max(BRAND_GENERATION_LIMITS.maxItemPageSize).optional()
     .describe(`Item page size; defaults to ${BRAND_GENERATION_LIMITS.defaultItemPageSize} and caps at ${BRAND_GENERATION_LIMITS.maxItemPageSize}.`),

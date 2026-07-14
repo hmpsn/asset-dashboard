@@ -14,7 +14,7 @@ import {
 describe('brand generation budgets', () => {
   const limits = validateBrandGenerationBudgetRequest({
     maxProviderCalls: 114,
-    maxInputTokens: 4_000_000,
+    maxInputTokens: 5_000_000,
     maxOutputTokens: 250_000,
     maxEstimatedCostMicros: 100_000_000,
     maxConcurrency: 3,
@@ -23,17 +23,17 @@ describe('brand generation budgets', () => {
   it('accepts the exact platform ceiling and rejects every overrun dimension', () => {
     expect(limits).toEqual({
       providerCalls: 114,
-      inputTokens: 4_000_000,
+      inputTokens: 5_000_000,
       outputTokens: 250_000,
       maxEstimatedCostMicros: 100_000_000,
       maxConcurrency: 3,
     });
     for (const request of [
-      { maxProviderCalls: 115, maxInputTokens: 4_000_000, maxOutputTokens: 250_000, maxEstimatedCostMicros: 100_000_000, maxConcurrency: 3 },
-      { maxProviderCalls: 114, maxInputTokens: 4_000_001, maxOutputTokens: 250_000, maxEstimatedCostMicros: 100_000_000, maxConcurrency: 3 },
-      { maxProviderCalls: 114, maxInputTokens: 4_000_000, maxOutputTokens: 250_001, maxEstimatedCostMicros: 100_000_000, maxConcurrency: 3 },
-      { maxProviderCalls: 114, maxInputTokens: 4_000_000, maxOutputTokens: 250_000, maxEstimatedCostMicros: 100_000_001, maxConcurrency: 3 },
-      { maxProviderCalls: 114, maxInputTokens: 4_000_000, maxOutputTokens: 250_000, maxEstimatedCostMicros: 100_000_000, maxConcurrency: 4 },
+      { maxProviderCalls: 115, maxInputTokens: 5_000_000, maxOutputTokens: 250_000, maxEstimatedCostMicros: 100_000_000, maxConcurrency: 3 },
+      { maxProviderCalls: 114, maxInputTokens: 5_000_001, maxOutputTokens: 250_000, maxEstimatedCostMicros: 100_000_000, maxConcurrency: 3 },
+      { maxProviderCalls: 114, maxInputTokens: 5_000_000, maxOutputTokens: 250_001, maxEstimatedCostMicros: 100_000_000, maxConcurrency: 3 },
+      { maxProviderCalls: 114, maxInputTokens: 5_000_000, maxOutputTokens: 250_000, maxEstimatedCostMicros: 100_000_001, maxConcurrency: 3 },
+      { maxProviderCalls: 114, maxInputTokens: 5_000_000, maxOutputTokens: 250_000, maxEstimatedCostMicros: 100_000_000, maxConcurrency: 4 },
     ]) {
       expect(() => validateBrandGenerationBudgetRequest(request))
         .toThrow(BrandGenerationBudgetExceededError);

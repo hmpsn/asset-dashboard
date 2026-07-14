@@ -325,26 +325,35 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
     entryRoutes: [
       'server/routes/brand-identity.ts',
       'server/routes/voice-calibration.ts',
+      'server/routes/brand-generation.ts',
+      'server/mcp/tools/brand-generation-actions.ts',
       'server/routes/content-posts.ts',
     ],
     promptAssemblyModules: [
       'server/prompt-assembly.ts',
       'server/voice-calibration.ts',
+      'server/domains/brand/generation/prompt.ts',
+      'server/domains/brand/generation/snapshots.ts',
       'server/content-posts-ai-jobs.ts',
     ],
     dispatcherModules: [
       'server/ai.ts',
       'server/routes/brand-identity.ts',
+      'server/domains/brand/generation/operations.ts',
+      'server/domains/brand/generation/worker.ts',
       'server/content-posts-ai-jobs.ts',
     ],
     parserOrValidationSignals: [
       'researchMode: true',
       'sanitizeErrorMessage',
       'human source review required',
+      'parseBrandDeliverableAIOutput',
+      'runBrandGenerationDeterministicAudit',
     ],
     writeSideEffects: [
       'addActivity',
       'broadcastToWorkspace',
+      'commitBrandGenerationDeliverableCandidate',
       'updatePostField',
     ],
     wsEvents: [
@@ -362,6 +371,9 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
       'tests/integration/voice-calibration-hardening.test.ts',
       'tests/integration/content-posts-ai-fix.test.ts',
       'tests/contract/factual-ai-output-contracts.test.ts',
+      'tests/unit/brand-generation-operations.test.ts',
+      'tests/unit/brand-generation-repository.test.ts',
+      'tests/unit/brand-generation-worker.test.ts',
     ],
   },
 ];
@@ -498,6 +510,23 @@ export const AI_RELIABILITY_SCENARIOS: AiReliabilityScenario[] = [
     ],
     notes: 'Protects provenance-sensitive review gates and voice-quality failure handling.',
   },
+  {
+    id: 'brand-generation-required-stage-no-phantom-artifact',
+    pipelineId: 'brand-voice-provenance',
+    title: 'Brand generation failures and conflicts never produce phantom review-ready artifacts',
+    failureClass: 'side_effect_hygiene',
+    severity: 'hard',
+    evidenceFiles: [
+      'tests/unit/brand-generation-operations.test.ts',
+      'tests/unit/brand-generation-repository.test.ts',
+      'tests/unit/brand-generation-worker.test.ts',
+    ],
+    assertions: [
+      { allOf: ['withholds attention output from legacy deliverables', 'preserves a newer operator artifact'] },
+      { anyOf: ['rejects unsupported evidence keys', 'required-stage failure', 'no phantom artifact'] },
+    ],
+    notes: 'Pins output validation, required-stage failure truth, and version-conditional artifact commits for the B2 pipeline.',
+  },
 ];
 
 export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
@@ -516,6 +545,23 @@ export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
       { allOf: ['Voice profile for this client:', 'Voice guardrails:', "not.toContain('VOICE DNA:')"] },
     ],
     notes: 'Pins the post-voice-sprint authority contract: calibrated voice lives in Layer 2 and prompt-facing context blocks do not duplicate DNA/guardrails.',
+  },
+  {
+    id: 'brand-generation-grounding-and-exact-voice',
+    pipelineId: 'brand-voice-provenance',
+    title: 'Brand generation preserves exact-once voice authority, typed placeholders, and provenance',
+    dimension: 'evidence_grounding',
+    severity: 'hard',
+    evidenceFiles: [
+      'server/domains/brand/generation/prompt.ts',
+      'tests/unit/brand-generation-operations.test.ts',
+      'tests/unit/brand-generation-snapshots.test.ts',
+    ],
+    assertions: [
+      { allOf: ['FINALIZED_VOICE_PROMPT_BEGIN', 'toHaveLength(2)', 'preserves real execution provenance'] },
+      { allOf: ['NEEDS CLIENT INPUT', 'exact non-current voice authority'] },
+    ],
+    notes: 'Deterministically pins the frozen authority and missing-fact contracts without live-model scoring.',
   },
   {
     id: 'universal-prose-quality-layer',

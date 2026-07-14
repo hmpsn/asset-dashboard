@@ -32,11 +32,14 @@ export const brandRawAIClaimSchema = z.object({
   classification: z.enum(['factual', 'inferred', 'creative_proposal']),
   evidenceKeys: evidenceKeysSchema,
 }).strict().superRefine((claim, ctx) => {
-  if (claim.classification === 'factual' && claim.evidenceKeys.length === 0) {
+  if (
+    (claim.classification === 'factual' || claim.classification === 'inferred')
+    && claim.evidenceKeys.length === 0
+  ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['evidenceKeys'],
-      message: 'Factual claims require at least one accepted evidence key.',
+      message: 'Factual and inferred claims require at least one accepted evidence key.',
     });
   }
 });
@@ -51,6 +54,16 @@ const unresolvedRequirementIdsSchema = z.array(boundedId).max(100)
     }
   });
 
+function enforceCandidateSnapshotBytes(value: unknown, ctx: z.RefinementCtx): void {
+  const bytes = new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  if (bytes > BRAND_GENERATION_LIMITS.maxCandidateSnapshotBytes) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `candidate snapshot exceeds ${BRAND_GENERATION_LIMITS.maxCandidateSnapshotBytes} UTF-8 bytes`,
+    });
+  }
+}
+
 export const brandFoundationAIOutputSchema = z.object({
   summary: boundedText,
   voiceDNA: voiceDNASchema,
@@ -58,13 +71,13 @@ export const brandFoundationAIOutputSchema = z.object({
   contextModifiers: z.array(contextModifierSchema).max(20),
   claims: z.array(brandRawAIClaimSchema).max(100),
   unresolvedRequirementIds: unresolvedRequirementIdsSchema,
-}).strict();
+}).strict().superRefine(enforceCandidateSnapshotBytes);
 
 export const brandDeliverableAIOutputSchema = z.object({
   content: boundedText,
   claims: z.array(brandRawAIClaimSchema).max(100),
   unresolvedRequirementIds: unresolvedRequirementIdsSchema,
-}).strict();
+}).strict().superRefine(enforceCandidateSnapshotBytes);
 
 export const brandModelAuditFindingSchema = z.object({
   code: boundedId,

@@ -55,9 +55,12 @@ The evidence policy is typed per requirement:
   copy or a placeholder that the page does not need.
 
 The voice-foundation bootstrap is the only voice exception: it may generate a
-provisional foundation from accepted intake and authentic samples without an
-already-finalized voice profile. The workflow must then pause for review and
-explicit finalization before any dependent brand or content generation.
+provisional foundation from accepted intake without an already-finalized voice
+profile. Missing authentic samples remain a typed `ready` requirement: the
+foundation may be preserved as `needs_attention`, but it cannot become voice
+authority. The workflow pauses at `awaiting_voice_finalization` until an
+operator supplies/selects authentic anchors and finalizes a later immutable
+voice version; no dependent brand or content generation may run first.
 
 Preview returns the selected item count, blockers, placeholder-eligible gaps,
 estimated paid calls/tokens/cost, and an effective-input fingerprint. Start must
@@ -133,8 +136,12 @@ never sufficient to dispatch paid work.
   disjoint preserved/manual and intake-owned sets on every immutable revision.
   Later projection may remove only intake-owned domains; overlap with submitted
   payload text is not provenance.
-- Factual accuracy and no-hallucination checks remain human-review-required;
-  AI review never auto-passes provenance-sensitive items.
+- Rendered factual and inferred claims both require non-empty, fact-capable,
+  non-structural accepted evidence. Factual accuracy remains human-review-
+  required for either classification. No-hallucination review remains human-
+  required for every generated candidate because an AI-authored claim ledger
+  cannot prove that it contains every assertion in the prose; AI review never
+  auto-passes provenance-sensitive items.
 - Local and service page sets require cell-specific grounded value. Pure
   variable substitution cannot pass the substantive-uniqueness audit.
 
@@ -182,6 +189,59 @@ never sufficient to dispatch paid work.
 - Every item checkpoints stages, provenance, evidence, artifact IDs, audit
   results, attempts, and a sanitized error. Cancellation and restart recovery
   leave an honest resumable state.
+- Brand command acceptance precedes generic-job creation and freezes the exact
+  job ID/result. Exact replay/restart recovery may recreate either a missing job
+  or only the exact `initJobs()` restart-error tombstone when that current
+  command has zero attempts and its command-owned items are still at their
+  accepted boundary. Eligibility is scoped to that command, so paid attempts
+  from an earlier completed start do not prevent repair of a never-started
+  resume. A restart never silently repeats interrupted paid work: running
+  attempts/items terminalize honestly and completed candidates survive.
+- Recovery keyset-pages every active and terminal candidate instead of stopping
+  at the first 100 rows. When the durable run already reached a terminal state
+  but its generic job was left as the exact restart tombstone, reconciliation
+  restores the bounded job result from the durable run without changing an
+  artifact or dispatching paid work.
+- Revision acceptance clears the prior audit/provenance lineage. Cancellation
+  or restart interruption therefore preserves the existing content/version
+  but restores the item to `changes_requested`, never to an unaudited
+  `ready_for_human_review` state.
+- Brand batch audits begin only after every selected candidate stage has
+  settled. Candidate ordering is canonical, deterministic audit is its own
+  durable checkpoint before paid model review, and a final commit binds the
+  candidate to its lifecycle-successor audit, command, source fingerprint,
+  artifact expectation, and revision count.
+- Every attempt stores both the frozen authority/source fingerprint and the
+  exact stage-effective fingerprint. Paid stages bind the latter to the final
+  provider-rendered instruction envelope after creative-JSON wrapping,
+  research-mode injection, Anthropic/OpenAI system-message placement, and
+  structured response-format selection. Successful provenance must match the
+  successful reservation's fingerprint; candidate and audit prompts are
+  expected to differ while sharing one source.
+- Provider holds are derived pessimistically from the rendered prompt's UTF-8
+  bytes plus bounded framing overhead, the requested output ceiling, and the
+  selected provider's token rates. Reported successful usage must fit inside
+  that durable hold; fixed token guesses are not a budget boundary.
+- Before command acceptance, brand generation proves the complete required-stage
+  provider closure after JSON/research/message-placement wrapping. Resume and
+  revision acceptance also checks `reserved + command estimate <= run limits`
+  atomically; an accepted command is never knowingly larger than remaining
+  durable capacity.
+- B2 caps the final provider instruction envelope at 40 KiB and reserves a
+  512-byte acceptance safety margin. Base generation is capped at 24 KiB; the
+  raw candidate core and compact refine/audit prompt projection at 4 KiB; the
+  resolved durable candidate at 256 KiB; the complete cross-target audit context
+  at one 3 KiB digest; and automatic audit-derived revision direction at 512
+  bytes. The full-run input ceiling is 5,000,000 tokens. The digest retains every
+  related target ID and full candidate fingerprint plus a bounded excerpt; it
+  never repeats N full candidates inside each of N audit prompts.
+- Every hydrated frozen input verifies its canonical snapshot self-hash plus the
+  fingerprints of its approved-input references before any paid dispatch.
+- Acceptance, artifact commit, and command completion transactionally enqueue
+  `command_accepted`, `artifact_committed`, and `command_completed` effect
+  events. Deterministic effect keys make activity writes and MCP paid-call
+  metering exactly-once; retryable workspace broadcasts and intelligence-cache
+  invalidation are at-least-once.
 - Dedupe is resource-scoped. Independent cells may run concurrently; the same
   source revision and idempotency key may not create duplicate paid work.
 - Free structural matrix reads do not create a generation run. The first run
@@ -200,8 +260,16 @@ never sufficient to dispatch paid work.
 - Paid generation reads the expected artifact revision before dispatch and
   commits only if that revision still matches. A newer operator or client edit
   always wins.
+- A review-ready brand candidate is the only output that may create/update the
+  legacy `BrandDeliverable` row. `needs_attention` and
+  `blocked_missing_evidence` candidates remain in the generation item/attempt
+  ledger so no legacy approval path can bypass the automatic gate.
 - Retry resumes missing/failed stages and never repeats a successful paid stage
   unless explicit replacement was authorized.
+- An explicit human-directed revision that is cancelled, restart-interrupted,
+  or fails an ordinary provider/output/audit/budget stage preserves its human
+  content/version and returns to retryable `changes_requested`. Artifact CAS
+  loss remains `conflict` because the newer human artifact wins.
 - Domain run/item status distinguishes complete, complete-with-errors,
   cancelled, blocked, conflict, and failed. Generic `BackgroundJobStatus`
   remains `pending|running|done|error|cancelled`; its bounded result reports the
@@ -260,6 +328,10 @@ never sufficient to dispatch paid work.
   restart from the first page, never continue a mixed authority snapshot. The
   latest finalization is projected as a summary only, although the server
   strictly validates the bounded frozen detail internally before claiming it.
+- Brand-generation item paging uses the shared opaque signed-cursor contract at
+  both HTTP and MCP boundaries: exactly two non-empty base64url segments joined
+  by one dot. The decoded cursor remains bound to workspace, run revision, and
+  stable position; malformed or stale cursors fail closed.
 - Template-upgrade acceptance binds its idempotency key to the exact proposal
   fingerprint and source revision. The same mutation may replay; reusing the key
   for a different proposal conflicts. Rejection does not mutate the template.
@@ -287,6 +359,11 @@ never sufficient to dispatch paid work.
 - Request-scoped compatibility context may enrich legacy activity writers, but
   every durable generation run snapshots the explicit execution context; a
   restart/resume path must never depend on ambient request state.
+- Every successful MCP brand-generation command response, including an exact
+  replay, records one durable paid-trigger event keyed by the accepted job ID.
+  The event insert and global/workspace counter increments share one immediate
+  transaction: replay cannot double-count, while replay after a crash between
+  command acceptance and metering repairs the missing increment exactly once.
 - Tool registry, discovery, dispatch, schema census, and workspace-argument
   census share one canonical registry and contract test.
 - Registry definitions are immutable snapshots, and production definition names

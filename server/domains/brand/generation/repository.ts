@@ -6,6 +6,7 @@ import {
   BRAND_GENERATION_CONTRACT_VERSION,
   BRAND_GENERATION_LIMITS,
   BRAND_GENERATION_PRESET_POLICY,
+  BRAND_GENERATION_REVISION_SOURCE_STATUSES,
   IDENTITY_MESSAGING_TARGETS,
   type BrandGeneratedClaim,
   type BrandGenerationAcceptedCommandResult,
@@ -14,11 +15,15 @@ import {
   type BrandGenerationBudgetEstimate,
   type BrandGenerationBudgetUsage,
   type BrandGenerationCommand,
+  type BrandGenerationEffectCursor,
+  type BrandGenerationEffectEvent,
+  type BrandGenerationEffectPayload,
   type BrandGenerationItem,
   type BrandGenerationItemPage,
   type BrandGenerationItemStatus,
   type BrandGenerationRun,
   type BrandGenerationRunStatus,
+  type BrandGenerationRevisionSourceStatus,
   type BrandGenerationStage,
   type BrandGenerationTargetInputSnapshot,
   type BrandVoiceReadiness,
@@ -28,6 +33,7 @@ import {
   type ReviseBrandGenerationItemRequest,
   type StartBrandGenerationRequest,
 } from '../../../../shared/types/brand-generation.js';
+import { BACKGROUND_JOB_TYPES } from '../../../../shared/types/background-jobs.js';
 import {
   DEFAULT_TIER_MAP,
   type BrandDeliverable,
@@ -70,6 +76,7 @@ import {
 } from './errors.js';
 import {
   canonicalBrandGenerationFingerprint,
+  brandGenerationSnapshotFingerprintsAreValid,
   resumeBrandGenerationCommandSnapshot,
   reviseBrandGenerationItemCommandSnapshot,
   startBrandGenerationCommandSnapshot,
@@ -82,6 +89,8 @@ import {
   brandGenerationAttemptOutputSchema,
   brandGenerationAuditReportSchema,
   brandGenerationCommandRequestSnapshotSchema,
+  brandGenerationEffectPayloadSchema,
+  brandGenerationFingerprintSchema,
   brandGenerationEvidenceRequirementSchema,
   brandGenerationMcpExecutionContextSchema,
   brandGenerationPlaceholderSchema,
@@ -89,6 +98,7 @@ import {
   brandGenerationSanitizedErrorSchema,
   brandGenerationSelectionSchema,
   brandGenerationTargetInputSnapshotSchema,
+  brandGenerationTimestampSchema,
   brandVoiceFoundationDraftSchema,
   brandVoiceReadinessSchema,
   generationResolverAttributionSchema,
@@ -110,6 +120,8 @@ interface BrandGenerationRunRow {
   idempotency_key: string;
   selection_fingerprint: string;
   effective_input_fingerprint: string;
+  initial_input_fingerprints_json: string;
+  initial_input_fingerprint_count: number | null;
   voice_snapshot_json: string | null;
   current_job_id: string | null;
   selected_count: number;
@@ -127,6 +139,7 @@ interface BrandGenerationRunRow {
   estimated_input_tokens: number;
   estimated_output_tokens: number;
   estimated_cost_microusd: number;
+  estimated_max_concurrency: number;
   max_provider_calls: number;
   max_input_tokens: number;
   max_output_tokens: number;
@@ -189,7 +202,7 @@ interface BrandGenerationCommandRow {
   expected_run_revision: number | null;
   expected_item_revision: number | null;
   expected_deliverable_version: number | null;
-  prior_item_status: 'ready_for_human_review' | 'changes_requested' | null;
+  prior_item_status: BrandGenerationRevisionSourceStatus | null;
   job_id: string;
   result_json: string;
   actor_json: string;
@@ -211,6 +224,7 @@ interface BrandGenerationAttemptRow {
   expected_run_revision: number;
   expected_item_revision: number;
   expected_deliverable_version: number | null;
+  source_input_fingerprint: string;
   effective_input_fingerprint: string;
   reserved_provider_calls: number;
   reserved_input_tokens: number;
@@ -221,6 +235,23 @@ interface BrandGenerationAttemptRow {
   error_json: string | null;
   started_at: string;
   completed_at: string | null;
+}
+
+interface BrandGenerationEffectEventRow {
+  sequence: number;
+  effect_key: string;
+  schema_version: number;
+  workspace_id: string;
+  run_id: string;
+  command_id: string;
+  item_id: string | null;
+  effect_kind: BrandGenerationEffectPayload['kind'];
+  payload_json: string;
+  attempt_count: number;
+  last_attempt_at: string | null;
+  last_error: string | null;
+  applied_at: string | null;
+  created_at: string;
 }
 
 interface DeliverableRow {
@@ -283,6 +314,7 @@ export interface BeginBrandGenerationAttemptInput {
   expectedRunRevision: number;
   expectedItemRevision: number;
   expectedDeliverableVersion: number | null;
+  sourceInputFingerprint: string;
   effectiveInputFingerprint: string;
   reservation: BrandGenerationBudgetUsage;
 }
@@ -294,6 +326,7 @@ export interface ReserveBrandGenerationAttemptBudgetInput {
   attemptId: string;
   expectedRunRevision: number;
   expectedItemRevision: number;
+  effectiveInputFingerprint: string;
   reservation: BrandGenerationBudgetUsage;
 }
 
@@ -347,6 +380,8 @@ export interface TransitionBrandGenerationRunInput {
   currentJobId?: string | null;
   voiceReadiness?: BrandVoiceReadiness;
   completedAt?: string | null;
+  /** Required when this transition ends the current durable command. */
+  completionCommandId?: string;
 }
 
 export interface CommitBrandGenerationCandidateInput {
@@ -373,7 +408,9 @@ export type CommitBrandGenerationDeliverableResult =
   | { kind: 'conflict'; reason: BrandGenerationDeliverableCasConflictReason; item: BrandGenerationItem };
 
 const runSelect = `
-  SELECT run.*, json_array_length(run.dispatch_targets_json) AS dispatch_target_count
+  SELECT run.*,
+    json_array_length(run.dispatch_targets_json) AS dispatch_target_count,
+    json_array_length(run.initial_input_fingerprints_json) AS initial_input_fingerprint_count
   FROM brand_generation_runs run
 `;
 
@@ -393,6 +430,10 @@ const attemptSelect = `
   JOIN brand_generation_commands command
     ON command.id = attempt.command_id AND command.run_id = attempt.run_id
 `;
+
+const RESTART_INTERRUPTED_JOB_MESSAGE = 'Interrupted by server restart';
+const RESTART_INTERRUPTED_JOB_ERROR = 'Server restarted — job interrupted';
+const BRAND_GENERATION_JOB_TYPE = BACKGROUND_JOB_TYPES.BRAND_DELIVERABLE_GENERATION;
 
 const stmts = createStmtCache(() => ({
   intakeRevision: db.prepare(`
@@ -415,12 +456,14 @@ const stmts = createStmtCache(() => ({
       id, schema_version, workspace_id, intake_revision_id, intake_revision,
       intake_fingerprint, selection_json, dispatch_targets_json, status, stage,
       revision, idempotency_key, selection_fingerprint, effective_input_fingerprint,
+      initial_input_fingerprints_json,
       voice_snapshot_json, current_job_id,
       selected_count, queued_count, running_count,
       ready_for_human_review_count, needs_attention_count, blocked_count,
       conflict_count, failed_count, cancelled_count, approved_count,
       changes_requested_count, estimated_provider_calls, estimated_input_tokens,
-      estimated_output_tokens, estimated_cost_microusd, max_provider_calls,
+      estimated_output_tokens, estimated_cost_microusd, estimated_max_concurrency,
+      max_provider_calls,
       max_input_tokens, max_output_tokens, max_cost_microusd, max_concurrency,
       reserved_provider_calls, reserved_input_tokens, reserved_output_tokens,
       reserved_cost_microusd, created_by_json, mcp_execution_context_json,
@@ -429,10 +472,12 @@ const stmts = createStmtCache(() => ({
       @id, 1, @workspace_id, @intake_revision_id, @intake_revision,
       @intake_fingerprint, @selection_json, @dispatch_targets_json, 'queued', 'preflight',
       0, @idempotency_key, @selection_fingerprint, @effective_input_fingerprint,
+      @initial_input_fingerprints_json,
       @voice_snapshot_json, @current_job_id,
       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
       @estimated_provider_calls, @estimated_input_tokens,
-      @estimated_output_tokens, @estimated_cost_microusd, @max_provider_calls,
+      @estimated_output_tokens, @estimated_cost_microusd, @estimated_max_concurrency,
+      @max_provider_calls,
       @max_input_tokens, @max_output_tokens, @max_cost_microusd, @max_concurrency,
       0, 0, 0, 0, @created_by_json, @mcp_execution_context_json,
       @created_at, @updated_at, NULL
@@ -450,6 +495,7 @@ const stmts = createStmtCache(() => ({
       estimated_input_tokens = @estimated_input_tokens,
       estimated_output_tokens = @estimated_output_tokens,
       estimated_cost_microusd = @estimated_cost_microusd,
+      estimated_max_concurrency = @estimated_max_concurrency,
       updated_at = @updated_at,
       completed_at = NULL
     WHERE id = @id AND workspace_id = @workspace_id AND revision = @expected_revision
@@ -541,10 +587,72 @@ const stmts = createStmtCache(() => ({
     WHERE workspace_id = ? AND job_id = ?
     ORDER BY created_at ASC, id ASC
   `),
+  commandAttemptCount: db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM brand_generation_attempts attempt
+    JOIN brand_generation_items item
+      ON item.id = attempt.item_id AND item.run_id = attempt.run_id
+    WHERE attempt.command_id = ? AND attempt.run_id = ? AND item.workspace_id = ?
+  `),
   activeRuns: db.prepare(`${runSelect}
     WHERE run.status IN ('queued', 'running')
+      AND (
+        @after_updated_at IS NULL
+        OR run.updated_at > @after_updated_at
+        OR (run.updated_at = @after_updated_at AND run.id > @after_id)
+      )
     ORDER BY run.updated_at ASC, run.id ASC
-    LIMIT ?
+    LIMIT @limit
+  `),
+  terminalRunsWithInterruptedJobs: db.prepare(`
+    SELECT run.*,
+      json_array_length(run.dispatch_targets_json) AS dispatch_target_count,
+      json_array_length(run.initial_input_fingerprints_json) AS initial_input_fingerprint_count,
+      command.job_id AS recovery_job_id
+    FROM brand_generation_runs run
+    JOIN brand_generation_commands command
+      ON command.run_id = run.id AND command.workspace_id = run.workspace_id
+    JOIN jobs job
+      ON job.id = command.job_id AND job.workspace_id = run.workspace_id
+    WHERE run.status NOT IN ('queued', 'running')
+      AND job.type = @job_type
+      AND job.status = 'error'
+      AND job.message = @restart_message
+      AND job.error = @restart_error
+      AND (
+        @after_updated_at IS NULL
+        OR run.updated_at > @after_updated_at
+        OR (run.updated_at = @after_updated_at AND run.id > @after_id)
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM brand_generation_commands newer_command
+        WHERE newer_command.run_id = command.run_id
+          AND newer_command.workspace_id = command.workspace_id
+          AND (
+            newer_command.created_at > command.created_at
+            OR (
+              newer_command.created_at = command.created_at
+              AND newer_command.id > command.id
+            )
+          )
+      )
+    ORDER BY run.updated_at ASC, run.id ASC
+    LIMIT @limit
+  `),
+  deleteRestartInterruptedJob: db.prepare(`
+    DELETE FROM jobs
+    WHERE id = @job_id
+      AND workspace_id = @workspace_id
+      AND type = @job_type
+      AND status = 'error'
+      AND message = @restart_message
+      AND error = @restart_error
+  `),
+  jobIdentityById: db.prepare(`
+    SELECT workspace_id
+    FROM jobs
+    WHERE id = ?
   `),
   runCommandByIdempotency: db.prepare(`
     SELECT * FROM brand_generation_commands
@@ -570,6 +678,43 @@ const stmts = createStmtCache(() => ({
       @prior_item_status, @job_id, @result_json, @actor_json,
       @mcp_execution_context_json, @created_at
     )
+  `),
+  insertEffectEvent: db.prepare(`
+    INSERT OR IGNORE INTO brand_generation_effect_events (
+      effect_key, schema_version, workspace_id, run_id, command_id,
+      item_id, effect_kind, payload_json, created_at
+    ) VALUES (
+      @effect_key, 1, @workspace_id, @run_id, @command_id,
+      @item_id, @effect_kind, @payload_json, @created_at
+    )
+  `),
+  effectEventByKey: db.prepare(`
+    SELECT * FROM brand_generation_effect_events WHERE effect_key = ?
+  `),
+  pendingEffectEvents: db.prepare(`
+    SELECT * FROM brand_generation_effect_events
+    WHERE applied_at IS NULL AND sequence > @after_sequence
+    ORDER BY sequence ASC
+    LIMIT @limit
+  `),
+  markEffectEventApplied: db.prepare(`
+    UPDATE brand_generation_effect_events SET
+      attempt_count = attempt_count + 1,
+      last_attempt_at = @attempted_at,
+      last_error = NULL,
+      applied_at = @applied_at
+    WHERE effect_key = @effect_key
+      AND workspace_id = @workspace_id
+      AND applied_at IS NULL
+  `),
+  markEffectEventFailed: db.prepare(`
+    UPDATE brand_generation_effect_events SET
+      attempt_count = attempt_count + 1,
+      last_attempt_at = @attempted_at,
+      last_error = @last_error
+    WHERE effect_key = @effect_key
+      AND workspace_id = @workspace_id
+      AND applied_at IS NULL
   `),
   attemptById: db.prepare(`${attemptSelect}
     WHERE attempt.id = ? AND attempt.item_id = ? AND attempt.run_id = ?
@@ -600,14 +745,16 @@ const stmts = createStmtCache(() => ({
     INSERT INTO brand_generation_attempts (
       id, schema_version, item_id, run_id, command_id, attempt_number,
       stage, status, expected_run_revision, expected_item_revision,
-      expected_deliverable_version, effective_input_fingerprint,
+      expected_deliverable_version, source_input_fingerprint,
+      effective_input_fingerprint,
       reserved_provider_calls, reserved_input_tokens, reserved_output_tokens,
       reserved_cost_microusd, output_snapshot_json, provenance_json, error_json,
       started_at, completed_at
     ) VALUES (
       @id, 1, @item_id, @run_id, @command_id, @attempt_number,
       @stage, 'running', @expected_run_revision, @expected_item_revision,
-      @expected_deliverable_version, @effective_input_fingerprint,
+      @expected_deliverable_version, @source_input_fingerprint,
+      @effective_input_fingerprint,
       @reserved_provider_calls, @reserved_input_tokens, @reserved_output_tokens,
       @reserved_cost_microusd, NULL, NULL, NULL, @started_at, NULL
     )
@@ -622,6 +769,7 @@ const stmts = createStmtCache(() => ({
   `),
   reserveAttemptBudget: db.prepare(`
     UPDATE brand_generation_attempts SET
+      effective_input_fingerprint = @effective_input_fingerprint,
       reserved_provider_calls = @provider_calls,
       reserved_input_tokens = @input_tokens,
       reserved_output_tokens = @output_tokens,
@@ -700,6 +848,202 @@ function parseStoredArray<T>(
     throw new BrandGenerationPersistenceContractError(`Stored ${table}.${field} is invalid`);
   }
   return parsed;
+}
+
+function rowToEffectEvent(row: BrandGenerationEffectEventRow): BrandGenerationEffectEvent {
+  if (row.schema_version !== BRAND_GENERATION_CONTRACT_VERSION) {
+    throw new BrandGenerationPersistenceContractError(
+      'Stored brand generation effect schema is unsupported',
+    );
+  }
+  const payload = parseStoredObject(
+    row.payload_json,
+    brandGenerationEffectPayloadSchema,
+    row.workspace_id,
+    'brand_generation_effect_events',
+    'payload_json',
+  );
+  if (!payload || payload.kind !== row.effect_kind) {
+    throw new BrandGenerationPersistenceContractError(
+      'Stored brand generation effect payload does not match its kind',
+    );
+  }
+  const base = {
+    sequence: row.sequence,
+    effectKey: row.effect_key,
+    workspaceId: row.workspace_id,
+    runId: row.run_id,
+    commandId: row.command_id,
+    attemptCount: row.attempt_count,
+    lastAttemptAt: row.last_attempt_at,
+    lastError: row.last_error,
+    appliedAt: row.applied_at,
+    createdAt: row.created_at,
+  };
+  if (payload.kind === 'artifact_committed') {
+    if (!row.item_id) {
+      throw new BrandGenerationPersistenceContractError(
+        'Stored artifact effect is missing its item binding',
+      );
+    }
+    return { ...base, kind: payload.kind, itemId: row.item_id, payload };
+  }
+  if (row.item_id !== null) {
+    throw new BrandGenerationPersistenceContractError(
+      'Stored command effect has an unexpected item binding',
+    );
+  }
+  if (payload.kind === 'command_accepted') {
+    return { ...base, kind: payload.kind, itemId: null, payload };
+  }
+  return { ...base, kind: 'command_completed', itemId: null, payload };
+}
+
+export function brandGenerationAcceptedEffectKey(commandId: string): string {
+  return `accepted:${commandId}`;
+}
+
+export function brandGenerationArtifactEffectKey(
+  commandId: string,
+  itemId: string,
+  deliverableVersion: number,
+): string {
+  return `artifact:${commandId}:${itemId}:${deliverableVersion}`;
+}
+
+export function brandGenerationCompletedEffectKey(commandId: string): string {
+  return `completed:${commandId}`;
+}
+
+interface EnqueueBrandGenerationEffectInput {
+  effectKey: string;
+  workspaceId: string;
+  runId: string;
+  commandId: string;
+  itemId: string | null;
+  payload: BrandGenerationEffectPayload;
+  createdAt: string;
+}
+
+function enqueueBrandGenerationEffect(input: EnqueueBrandGenerationEffectInput): void {
+  const parsed = brandGenerationEffectPayloadSchema.safeParse(input.payload);
+  const keyBytes = new TextEncoder().encode(input.effectKey).byteLength;
+  if (!parsed.success || keyBytes < 1 || keyBytes > 512
+    || (input.payload.kind === 'artifact_committed') !== (input.itemId !== null)) {
+    throw new BrandGenerationPersistenceContractError(
+      'Brand generation effect event is invalid',
+    );
+  }
+  stmts().insertEffectEvent.run({
+    effect_key: input.effectKey,
+    workspace_id: input.workspaceId,
+    run_id: input.runId,
+    command_id: input.commandId,
+    item_id: input.itemId,
+    effect_kind: input.payload.kind,
+    payload_json: JSON.stringify(parsed.data),
+    created_at: input.createdAt,
+  });
+  const row = stmts().effectEventByKey.get(input.effectKey) as
+    BrandGenerationEffectEventRow | undefined;
+  if (!row) {
+    throw new BrandGenerationPersistenceContractError(
+      'Brand generation effect event was not persisted',
+    );
+  }
+  const existing = rowToEffectEvent(row);
+  if (existing.workspaceId !== input.workspaceId
+    || existing.runId !== input.runId
+    || existing.commandId !== input.commandId
+    || existing.itemId !== input.itemId
+    || existing.kind !== input.payload.kind
+    || canonicalBrandGenerationFingerprint(existing.payload)
+      !== canonicalBrandGenerationFingerprint(parsed.data)) {
+    throw new BrandGenerationPersistenceContractError(
+      'Brand generation effect key is bound to different inputs',
+    );
+  }
+}
+
+export function getBrandGenerationEffectEvent(
+  effectKey: string,
+): BrandGenerationEffectEvent | null {
+  const row = stmts().effectEventByKey.get(effectKey) as
+    BrandGenerationEffectEventRow | undefined;
+  return row ? rowToEffectEvent(row) : null;
+}
+
+export function listPendingBrandGenerationEffectEvents(
+  limit = 100,
+  cursor?: BrandGenerationEffectCursor,
+): BrandGenerationEffectEvent[] {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    throw new BrandGenerationPersistenceContractError(
+      'Brand generation effect page limit must be between 1 and 100',
+    );
+  }
+  const afterSequence = cursor?.sequence ?? 0;
+  if (!Number.isSafeInteger(afterSequence) || afterSequence < 0) {
+    throw new BrandGenerationPersistenceContractError(
+      'Brand generation effect cursor is invalid',
+    );
+  }
+  return (stmts().pendingEffectEvents.all({
+    after_sequence: afterSequence,
+    limit,
+  }) as BrandGenerationEffectEventRow[]).map(rowToEffectEvent);
+}
+
+export function markBrandGenerationEffectApplied(
+  workspaceId: string,
+  effectKey: string,
+  attemptedAt = new Date().toISOString(),
+): BrandGenerationEffectEvent {
+  if (!brandGenerationTimestampSchema.safeParse(attemptedAt).success) {
+    throw new BrandGenerationPersistenceContractError(
+      'Brand generation effect attempt timestamp is invalid',
+    );
+  }
+  stmts().markEffectEventApplied.run({
+    workspace_id: workspaceId,
+    effect_key: effectKey,
+    attempted_at: attemptedAt,
+    applied_at: attemptedAt,
+  });
+  const event = getBrandGenerationEffectEvent(effectKey);
+  if (!event || event.workspaceId !== workspaceId) {
+    throw new BrandGenerationPersistenceContractError(
+      'Brand generation effect event was not found',
+    );
+  }
+  return event;
+}
+
+export function markBrandGenerationEffectFailed(
+  workspaceId: string,
+  effectKey: string,
+  lastError: string,
+  attemptedAt = new Date().toISOString(),
+): BrandGenerationEffectEvent {
+  if (!brandGenerationTimestampSchema.safeParse(attemptedAt).success
+    || new TextEncoder().encode(lastError).byteLength > 512) {
+    throw new BrandGenerationPersistenceContractError(
+      'Brand generation effect failure is invalid',
+    );
+  }
+  stmts().markEffectEventFailed.run({
+    workspace_id: workspaceId,
+    effect_key: effectKey,
+    attempted_at: attemptedAt,
+    last_error: lastError,
+  });
+  const event = getBrandGenerationEffectEvent(effectKey);
+  if (!event || event.workspaceId !== workspaceId) {
+    throw new BrandGenerationPersistenceContractError(
+      'Brand generation effect event was not found',
+    );
+  }
+  return event;
 }
 
 function assertAttributionContext(
@@ -883,6 +1227,27 @@ function rowToRun(row: BrandGenerationRunRow): PersistedBrandGenerationRun {
   ) as BrandGenerationItem['target'][];
   if (!selection) throw new BrandGenerationPersistenceContractError('Stored run selection is invalid');
   assertSelectionDispatch(selection, selectedTargets);
+  const initialTargets = expectedInitialTargets(selection);
+  const expectedSelectionFingerprint = canonicalBrandGenerationFingerprint({
+    selection,
+    initialTargets,
+  });
+  const initialInputFingerprints = parseStoredArray(
+    row.initial_input_fingerprints_json,
+    brandGenerationFingerprintSchema,
+    row.initial_input_fingerprint_count,
+    row.workspace_id,
+    'brand_generation_runs',
+    'initial_input_fingerprints_json',
+  );
+  if (row.selection_fingerprint !== expectedSelectionFingerprint
+    || initialInputFingerprints.length !== initialTargets.length
+    || row.effective_input_fingerprint
+      !== canonicalBrandGenerationFingerprint(initialInputFingerprints)) {
+    throw new BrandGenerationPersistenceContractError(
+      'Stored brand generation run fingerprints do not match their immutable inputs',
+    );
+  }
   const voiceReadiness = parseStoredObject(
     row.voice_snapshot_json,
     brandVoiceReadinessSchema,
@@ -923,7 +1288,7 @@ function rowToRun(row: BrandGenerationRunRow): PersistedBrandGenerationRun {
         inputTokens: row.estimated_input_tokens,
         outputTokens: row.estimated_output_tokens,
         estimatedCostMicros: row.estimated_cost_microusd,
-        maxConcurrency: row.max_concurrency,
+        maxConcurrency: row.estimated_max_concurrency,
       },
       limits: {
         providerCalls: row.max_provider_calls,
@@ -1208,6 +1573,7 @@ function rowToAttempt(row: BrandGenerationAttemptRow): BrandGenerationAttempt {
     expectedRunRevision: row.expected_run_revision,
     expectedItemRevision: row.expected_item_revision,
     expectedDeliverableVersion: row.expected_deliverable_version,
+    sourceInputFingerprint: row.source_input_fingerprint,
     effectiveInputFingerprint: row.effective_input_fingerprint,
     budgetUsage: {
       providerCalls: row.reserved_provider_calls,
@@ -1247,7 +1613,9 @@ function validatePreparedItems(
   const seen = new Set<string>();
   for (const item of items) {
     const parsed = brandGenerationTargetInputSnapshotSchema.safeParse(item.inputSnapshot);
-    if (!parsed.success || item.target !== item.inputSnapshot.target) {
+    if (!parsed.success
+      || item.target !== item.inputSnapshot.target
+      || !brandGenerationSnapshotFingerprintsAreValid(item.inputSnapshot)) {
       throw new BrandGenerationPersistenceContractError('Prepared item snapshot is invalid');
     }
     if (item.inputSnapshot.intakeRevision.intakeRevisionId !== ('intakeRevisionId' in request
@@ -1471,18 +1839,158 @@ export function listBrandGenerationCommandsByJob(
     .map(rowToCommand);
 }
 
-export function listActiveBrandGenerationRunsForRecovery(
-  limit = 100,
-): PersistedBrandGenerationRun[] {
+export interface BrandGenerationRecoveryCursor {
+  updatedAt: string;
+  runId: string;
+}
+
+export interface TerminalBrandGenerationRunRecoveryCandidate {
+  run: PersistedBrandGenerationRun;
+  jobId: string;
+}
+
+function validateRecoveryPage(
+  limit: number,
+  cursor?: BrandGenerationRecoveryCursor,
+): void {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
     throw new BrandGenerationPersistenceContractError('Recovery page limit is invalid');
   }
-  return (stmts().activeRuns.all(limit) as BrandGenerationRunRow[]).map(rowToRun);
+  if (cursor && (
+    !brandGenerationTimestampSchema.safeParse(cursor.updatedAt).success
+    || cursor.runId.trim() !== cursor.runId
+    || cursor.runId.length < 1
+    || cursor.runId.length > BRAND_GENERATION_LIMITS.maxIdLength
+  )) {
+    throw new BrandGenerationPersistenceContractError('Recovery cursor is invalid');
+  }
+}
+
+export function listActiveBrandGenerationRunsForRecovery(
+  limit = 100,
+  cursor?: BrandGenerationRecoveryCursor,
+): PersistedBrandGenerationRun[] {
+  validateRecoveryPage(limit, cursor);
+  return (stmts().activeRuns.all({
+    after_updated_at: cursor?.updatedAt ?? null,
+    after_id: cursor?.runId ?? '',
+    limit,
+  }) as BrandGenerationRunRow[]).map(rowToRun);
+}
+
+interface TerminalRecoveryRow extends BrandGenerationRunRow {
+  recovery_job_id: string;
+}
+
+export function listTerminalBrandGenerationRunsForRecovery(
+  limit = 100,
+  cursor?: BrandGenerationRecoveryCursor,
+): TerminalBrandGenerationRunRecoveryCandidate[] {
+  validateRecoveryPage(limit, cursor);
+  return (stmts().terminalRunsWithInterruptedJobs.all({
+    job_type: BRAND_GENERATION_JOB_TYPE,
+    restart_message: RESTART_INTERRUPTED_JOB_MESSAGE,
+    restart_error: RESTART_INTERRUPTED_JOB_ERROR,
+    after_updated_at: cursor?.updatedAt ?? null,
+    after_id: cursor?.runId ?? '',
+    limit,
+  }) as TerminalRecoveryRow[]).map(row => ({
+    run: rowToRun(row),
+    jobId: row.recovery_job_id,
+  }));
+}
+
+export function countBrandGenerationAttemptsForCommand(
+  workspaceId: string,
+  runId: string,
+  commandId: string,
+): number {
+  const row = stmts().commandAttemptCount.get(
+    commandId,
+    runId,
+    workspaceId,
+  ) as { count: number };
+  return row.count;
+}
+
+/**
+ * Deletes only the exact generic restart tombstone so the immutable command's
+ * job id can be recreated. A missing row is also safe: createJob() will replace
+ * any stale in-memory restart tombstone after its SQLite insert succeeds.
+ */
+export function removeRestartInterruptedBrandGenerationJobForRepair(
+  workspaceId: string,
+  jobId: string,
+): boolean {
+  const removed = stmts().deleteRestartInterruptedJob.run({
+    job_id: jobId,
+    workspace_id: workspaceId,
+    job_type: BRAND_GENERATION_JOB_TYPE,
+    restart_message: RESTART_INTERRUPTED_JOB_MESSAGE,
+    restart_error: RESTART_INTERRUPTED_JOB_ERROR,
+  });
+  if (removed.changes === 1) return true;
+  const remaining = stmts().jobIdentityById.get(jobId) as { workspace_id: string | null } | undefined;
+  return remaining === undefined;
+}
+
+/** A command may be requeued only if that exact command never created work. */
+export function isBrandGenerationJobRepairEligible(
+  run: PersistedBrandGenerationRun,
+  command: BrandGenerationCommand,
+  items: readonly BrandGenerationItem[],
+  commandAttemptCount = countBrandGenerationAttemptsForCommand(
+    run.workspaceId,
+    run.id,
+    command.id,
+  ),
+): boolean {
+  if ((run.status !== 'queued' && run.status !== 'running')
+    || run.currentJobId !== command.jobId
+    || command.runId !== run.id
+    || command.workspaceId !== run.workspaceId
+    || command.result.runId !== run.id
+    || command.result.jobId !== command.jobId
+    || commandAttemptCount !== 0) {
+    return false;
+  }
+  const commandTargets = command.kind === 'start'
+    ? command.requestSnapshot.command.selection.kind === 'atomic'
+      ? [command.requestSnapshot.command.selection.target]
+      : BRAND_GENERATION_PRESET_POLICY[
+          command.requestSnapshot.command.selection.preset
+        ].initialTargets
+    : command.kind === 'resume'
+      ? BRAND_GENERATION_PRESET_POLICY.full_brand_system.resumeTargets
+      : [];
+  const targetSet = new Set<BrandGenerationItem['target']>(commandTargets);
+  const commandItems = command.kind === 'revision'
+    ? items.filter(item => item.id === command.itemId)
+    : items.filter(item => targetSet.has(item.target));
+  if (commandItems.length !== command.result.selectionCount || commandItems.length < 1) return false;
+  if (command.kind === 'revision') {
+    return run.status === 'running' && commandItems[0]?.status === 'revising';
+  }
+  if (command.kind === 'resume' && run.status !== 'running') return false;
+  return commandItems.every(item => item.status === 'queued'); // every-ok -- non-empty exact count above
+}
+
+function expectedInitialTargets(
+  selection: StartBrandGenerationRequest['selection'],
+): readonly BrandGenerationItem['target'][] {
+  if (selection.kind === 'atomic') return [selection.target];
+  return BRAND_GENERATION_PRESET_POLICY[selection.preset].initialTargets;
+}
+
+function isBrandGenerationRevisionSourceStatus(
+  status: BrandGenerationItemStatus,
+): status is BrandGenerationRevisionSourceStatus {
+  return (BRAND_GENERATION_REVISION_SOURCE_STATUSES as readonly BrandGenerationItemStatus[])
+    .includes(status);
 }
 
 function expectedStartTargets(request: StartBrandGenerationRequest): readonly BrandGenerationItem['target'][] {
-  if (request.selection.kind === 'atomic') return [request.selection.target];
-  return BRAND_GENERATION_PRESET_POLICY[request.selection.preset].initialTargets;
+  return expectedInitialTargets(request.selection);
 }
 
 function assertEstimateWithinOriginal(
@@ -1500,6 +2008,21 @@ function assertEstimateWithinOriginal(
   }
 }
 
+function assertEstimateFitsRemainingRunBudget(
+  run: PersistedBrandGenerationRun,
+  estimate: BrandGenerationBudgetEstimate,
+): void {
+  assertBrandGenerationReservationFits(
+    addBrandGenerationBudgetUsage(run.budget.reserved, {
+      providerCalls: estimate.providerCalls,
+      inputTokens: estimate.inputTokens,
+      outputTokens: estimate.outputTokens,
+      estimatedCostMicros: estimate.estimatedCostMicros,
+    }),
+    run.budget.limits,
+  );
+}
+
 function validateStartPreparedInputs(input: AcceptBrandGenerationStartCommandInput): void {
   const { request } = input;
   validateActorInput(request.workspaceId, request.createdBy, request.mcpExecutionContext);
@@ -1510,6 +2033,19 @@ function validateStartPreparedInputs(input: AcceptBrandGenerationStartCommandInp
   if (!/^[0-9a-f]{64}$/.test(input.selectionFingerprint)
     || !/^[0-9a-f]{64}$/.test(input.effectiveInputFingerprint)) {
     throw new BrandGenerationPersistenceContractError('Start fingerprints must be canonical SHA-256 values');
+  }
+  const expectedSelectionFingerprint = canonicalBrandGenerationFingerprint({
+    selection: request.selection,
+    initialTargets: expectedStartTargets(request),
+  });
+  const expectedEffectiveInputFingerprint = canonicalBrandGenerationFingerprint(
+    items.map(item => item.inputSnapshot.fingerprint),
+  );
+  if (input.selectionFingerprint !== expectedSelectionFingerprint
+    || input.effectiveInputFingerprint !== expectedEffectiveInputFingerprint) {
+    throw new BrandGenerationPersistenceContractError(
+      'Start fingerprints do not match the ordered prepared inputs',
+    );
   }
   if (!brandVoiceReadinessSchema.safeParse(input.voiceReadiness).success) {
     throw new BrandGenerationPersistenceContractError('Start voice readiness is invalid');
@@ -1569,7 +2105,7 @@ interface InsertCommandInput {
   expectedRunRevision: number | null;
   expectedItemRevision: number | null;
   expectedDeliverableVersion: number | null;
-  priorItemStatus: 'ready_for_human_review' | 'changes_requested' | null;
+  priorItemStatus: BrandGenerationRevisionSourceStatus | null;
   jobId: string;
   result: BrandGenerationAcceptedCommandResult;
   actor: GenerationResolverAttribution;
@@ -1740,12 +2276,16 @@ export function acceptBrandGenerationStartCommand(
       idempotency_key: input.request.idempotencyKey,
       selection_fingerprint: input.selectionFingerprint,
       effective_input_fingerprint: input.effectiveInputFingerprint,
+      initial_input_fingerprints_json: JSON.stringify(
+        input.items.map(item => item.inputSnapshot.fingerprint),
+      ),
       voice_snapshot_json: JSON.stringify(input.voiceReadiness),
       current_job_id: input.jobId,
       estimated_provider_calls: estimate.providerCalls,
       estimated_input_tokens: estimate.inputTokens,
       estimated_output_tokens: estimate.outputTokens,
       estimated_cost_microusd: estimate.estimatedCostMicros,
+      estimated_max_concurrency: estimate.maxConcurrency,
       max_provider_calls: limits.providerCalls,
       max_input_tokens: limits.inputTokens,
       max_output_tokens: limits.outputTokens,
@@ -1786,6 +2326,15 @@ export function acceptBrandGenerationStartCommand(
       result,
       actor: input.request.createdBy,
       context: input.request.mcpExecutionContext,
+      createdAt: now,
+    });
+    enqueueBrandGenerationEffect({
+      effectKey: brandGenerationAcceptedEffectKey(commandId),
+      workspaceId: input.request.workspaceId,
+      runId,
+      commandId,
+      itemId: null,
+      payload: { schemaVersion: 1, kind: 'command_accepted' },
       createdAt: now,
     });
     const run = getPersistedBrandGenerationRun(input.request.workspaceId, runId);
@@ -1844,6 +2393,7 @@ export function acceptBrandGenerationResumeCommand(
     validateTransition('brand_generation_run', BRAND_GENERATION_RUN_TRANSITIONS, run.status, 'running');
     const estimate = validateBrandGenerationBudgetEstimate(input.estimate, run.budget.limits);
     assertEstimateWithinOriginal(estimate, run.budget.estimate);
+    assertEstimateFitsRemainingRunBudget(run, estimate);
     const now = new Date().toISOString();
     const update = stmts().updateRunForCommand.run({
       id: run.id,
@@ -1858,6 +2408,7 @@ export function acceptBrandGenerationResumeCommand(
       estimated_input_tokens: run.budget.estimate.inputTokens,
       estimated_output_tokens: run.budget.estimate.outputTokens,
       estimated_cost_microusd: run.budget.estimate.estimatedCostMicros,
+      estimated_max_concurrency: run.budget.estimate.maxConcurrency,
       updated_at: now,
     });
     if (update.changes !== 1) {
@@ -1881,6 +2432,15 @@ export function acceptBrandGenerationResumeCommand(
       expectedRunRevision: request.expectedRunRevision, expectedItemRevision: null,
       expectedDeliverableVersion: null, priorItemStatus: null, jobId: input.jobId,
       result, actor: request.resumedBy, context: request.mcpExecutionContext, createdAt: now,
+    });
+    enqueueBrandGenerationEffect({
+      effectKey: brandGenerationAcceptedEffectKey(commandId),
+      workspaceId: request.workspaceId,
+      runId: run.id,
+      commandId,
+      itemId: null,
+      payload: { schemaVersion: 1, kind: 'command_accepted' },
+      createdAt: now,
     });
     const persistedRun = getPersistedBrandGenerationRun(request.workspaceId, run.id);
     const command = getBrandGenerationCommand(request.workspaceId, run.id, commandId);
@@ -1943,7 +2503,7 @@ export function acceptBrandGenerationRevisionCommand(
       !== canonicalBrandGenerationFingerprint(authorityCore(item.inputSnapshot))) {
       throw new BrandGenerationPersistenceContractError('Revision snapshot changed frozen authority inputs');
     }
-    if (item.status !== 'ready_for_human_review' && item.status !== 'changes_requested') {
+    if (!isBrandGenerationRevisionSourceStatus(item.status)) {
       throw new BrandGenerationPersistenceContractError('Revision requires a prior review state');
     }
     const deliverable = stmts().deliverableById.get(request.deliverableId, request.workspaceId) as DeliverableRow | undefined;
@@ -1956,13 +2516,22 @@ export function acceptBrandGenerationRevisionCommand(
     validateTransition('brand_generation_run', BRAND_GENERATION_RUN_TRANSITIONS, run.status, 'running');
     const estimate = validateBrandGenerationBudgetEstimate(input.estimate, run.budget.limits);
     assertEstimateWithinOriginal(estimate, run.budget.estimate);
+    assertEstimateFitsRemainingRunBudget(run, estimate);
     const now = new Date().toISOString();
     const itemUpdate = writeItemTransition(itemRow, 'revising', {
       inputSnapshot: input.inputSnapshot,
+      // A human may edit the draft between generation and requesting a revision.
+      // Freeze that exact operator-authored version as the revision input; the
+      // prior generated claims/audit/provenance no longer describe its content.
+      content: deliverable.content,
+      claims: [],
+      placeholders: [],
+      auditReport: null,
+      provenance: null,
       effectiveInputFingerprint: input.inputSnapshot.fingerprint,
       error: null,
       completedAt: null,
-    }, now);
+    }, now, { id: deliverable.id, version: deliverable.version });
     if (itemUpdate.changes !== 1) throw new BrandGenerationRevisionConflictError('item', item.revision, null);
     const runUpdate = stmts().updateRunForCommand.run({
       id: run.id, workspace_id: request.workspaceId, expected_revision: run.revision,
@@ -1972,6 +2541,7 @@ export function acceptBrandGenerationRevisionCommand(
       estimated_input_tokens: run.budget.estimate.inputTokens,
       estimated_output_tokens: run.budget.estimate.outputTokens,
       estimated_cost_microusd: run.budget.estimate.estimatedCostMicros,
+      estimated_max_concurrency: run.budget.estimate.maxConcurrency,
       updated_at: now,
     });
     if (runUpdate.changes !== 1) throw new BrandGenerationRevisionConflictError('run', run.revision, null);
@@ -1989,6 +2559,15 @@ export function acceptBrandGenerationRevisionCommand(
       expectedDeliverableVersion: request.expectedDeliverableVersion, priorItemStatus: item.status,
       jobId: input.jobId, result, actor: request.requestedBy,
       context: request.mcpExecutionContext, createdAt: now,
+    });
+    enqueueBrandGenerationEffect({
+      effectKey: brandGenerationAcceptedEffectKey(commandId),
+      workspaceId: request.workspaceId,
+      runId: run.id,
+      commandId,
+      itemId: null,
+      payload: { schemaVersion: 1, kind: 'command_accepted' },
+      createdAt: now,
     });
     const persistedRun = getPersistedBrandGenerationRun(request.workspaceId, run.id);
     const command = getBrandGenerationCommand(request.workspaceId, run.id, commandId);
@@ -2111,6 +2690,33 @@ export function transitionBrandGenerationRun(
     }
     const next = getPersistedBrandGenerationRun(input.workspaceId, input.runId);
     if (!next) throw new BrandGenerationNotFoundError('run');
+    const commandEnded = input.nextStatus !== 'queued' && input.nextStatus !== 'running';
+    if (commandEnded && !input.completionCommandId) {
+      throw new BrandGenerationPersistenceContractError(
+        'Terminal run transitions require the completed command identity',
+      );
+    }
+    if (!commandEnded && input.completionCommandId) {
+      throw new BrandGenerationPersistenceContractError(
+        'Active run transitions cannot enqueue a completion effect',
+      );
+    }
+    if (commandEnded && input.completionCommandId) {
+      enqueueBrandGenerationEffect({
+        effectKey: brandGenerationCompletedEffectKey(input.completionCommandId),
+        workspaceId: input.workspaceId,
+        runId: input.runId,
+        commandId: input.completionCommandId,
+        itemId: null,
+        payload: {
+          schemaVersion: 1,
+          kind: 'command_completed',
+          status: next.status,
+          counts: next.counts,
+        },
+        createdAt: now,
+      });
+    }
     return next;
   });
   return transition.immediate();
@@ -2214,6 +2820,10 @@ export function beginBrandGenerationAttempt(
   input: BeginBrandGenerationAttemptInput,
 ): BrandGenerationAttempt {
   validateBrandGenerationBudgetUsage(input.reservation);
+  if (!/^[0-9a-f]{64}$/.test(input.sourceInputFingerprint)
+    || !/^[0-9a-f]{64}$/.test(input.effectiveInputFingerprint)) {
+    throw new BrandGenerationPersistenceContractError('Attempt fingerprints must be canonical SHA-256 values');
+  }
   const begin = db.transaction((): BrandGenerationAttempt => {
     const runRow = stmts().runById.get(input.runId, input.workspaceId) as BrandGenerationRunRow | undefined;
     const itemRow = stmts().itemById.get(input.itemId, input.runId, input.workspaceId) as BrandGenerationItemRow | undefined;
@@ -2250,6 +2860,7 @@ export function beginBrandGenerationAttempt(
         || active.expected_run_revision !== input.expectedRunRevision
         || active.expected_item_revision !== input.expectedItemRevision
         || active.expected_deliverable_version !== input.expectedDeliverableVersion
+        || active.source_input_fingerprint !== input.sourceInputFingerprint
         || active.effective_input_fingerprint !== input.effectiveInputFingerprint
         || !isZeroBudgetUsage(input.reservation)) {
         throw new BrandGenerationAttemptCheckpointConflictError();
@@ -2274,6 +2885,7 @@ export function beginBrandGenerationAttempt(
       expected_run_revision: input.expectedRunRevision,
       expected_item_revision: input.expectedItemRevision,
       expected_deliverable_version: input.expectedDeliverableVersion,
+      source_input_fingerprint: input.sourceInputFingerprint,
       effective_input_fingerprint: input.effectiveInputFingerprint,
       reserved_provider_calls: input.reservation.providerCalls,
       reserved_input_tokens: input.reservation.inputTokens,
@@ -2299,6 +2911,9 @@ export function reserveBrandGenerationAttemptBudget(
   input: ReserveBrandGenerationAttemptBudgetInput,
 ): BrandGenerationAttempt {
   validateBrandGenerationBudgetUsage(input.reservation);
+  if (!brandGenerationFingerprintSchema.safeParse(input.effectiveInputFingerprint).success) {
+    throw new BrandGenerationPersistenceContractError('Provider input fingerprint is invalid');
+  }
   const reserve = db.transaction((): BrandGenerationAttempt => {
     const runRow = stmts().runById.get(input.runId, input.workspaceId) as BrandGenerationRunRow | undefined;
     const itemRow = stmts().itemById.get(input.itemId, input.runId, input.workspaceId) as BrandGenerationItemRow | undefined;
@@ -2329,6 +2944,7 @@ export function reserveBrandGenerationAttemptBudget(
       id: input.attemptId,
       item_id: input.itemId,
       run_id: input.runId,
+      effective_input_fingerprint: input.effectiveInputFingerprint,
       provider_calls: nextAttemptUsage.providerCalls,
       input_tokens: nextAttemptUsage.inputTokens,
       output_tokens: nextAttemptUsage.outputTokens,
@@ -2544,10 +3160,12 @@ function loadFinalCandidate(input: CommitBrandGenerationCandidateInput): FinalCa
   if (!candidateRow || !auditRow) throw new BrandGenerationNotFoundError('attempt');
   const candidate = rowToAttempt(candidateRow);
   const audit = rowToAttempt(auditRow);
+  const item = rowToItem(itemRow);
   if (candidate.status !== 'completed' || audit.status !== 'completed'
     || !candidate.output || !audit.output || audit.output.kind !== 'audit'
-    || candidate.effectiveInputFingerprint !== audit.effectiveInputFingerprint
-    || candidate.effectiveInputFingerprint !== itemRow.effective_input_fingerprint) {
+    || !item.inputSnapshot
+    || candidate.sourceInputFingerprint !== audit.sourceInputFingerprint
+    || candidate.sourceInputFingerprint !== item.inputSnapshot.fingerprint) {
     throw new BrandGenerationPersistenceContractError('Final candidate checkpoints do not share one frozen input');
   }
   assertAuditMatchesCandidate(candidate, audit, itemRow.revision);
@@ -2564,7 +3182,7 @@ function loadFinalCandidate(input: CommitBrandGenerationCandidateInput): FinalCa
   return {
     runRow,
     itemRow,
-    item: rowToItem(itemRow),
+    item,
     candidate,
     audit,
     auditReport: audit.output.auditReport,
@@ -2754,6 +3372,26 @@ export function commitBrandGenerationDeliverableCandidate(
       throw new BrandGenerationRevisionConflictError('item', input.expectedItemRevision, null);
     }
     persistDerivedCounts(input.workspaceId, input.runId, now);
+    enqueueBrandGenerationEffect({
+      effectKey: brandGenerationArtifactEffectKey(
+        bundle.candidate.commandId,
+        input.itemId,
+        deliverable.version,
+      ),
+      workspaceId: input.workspaceId,
+      runId: input.runId,
+      commandId: bundle.candidate.commandId,
+      itemId: input.itemId,
+      payload: {
+        schemaVersion: 1,
+        kind: 'artifact_committed',
+        deliverableId: deliverable.id,
+        deliverableType: deliverable.deliverableType,
+        deliverableVersion: deliverable.version,
+        deliverableStatus: deliverable.status,
+      },
+      createdAt: now,
+    });
     const item = getBrandGenerationItem(input.workspaceId, input.runId, input.itemId);
     if (!item) throw new BrandGenerationNotFoundError('item');
     return { kind: 'committed', deliverable, item };

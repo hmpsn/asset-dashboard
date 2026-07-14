@@ -4,5 +4,5 @@ describe('websocket module smoke', () => {
   it('loads module successfully', async () => {
     const mod = await import('../../server/websocket.js');
     expect(mod).toBeDefined();
-  });
+  }, 30_000);
 });

@@ -155,16 +155,17 @@ export const brandGenerationEvidenceRequirementSchema = z.object({
 export const brandGeneratedClaimSchema = z.object({
   text: z.string().min(1).max(10_000),
   classification: z.enum(['factual', 'inferred', 'creative_proposal']),
+  evidenceKeys: z.array(brandGenerationIdSchema).max(100),
   sourceRefs: z.array(evidenceSourceRefSchema).max(100),
 }).strict().superRefine((claim, ctx) => {
-  if (claim.classification === 'factual') {
-    if (claim.sourceRefs.length < 1) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Factual claims require evidence' });
+  if (claim.classification === 'factual' || claim.classification === 'inferred') {
+    if (claim.sourceRefs.length < 1 || claim.evidenceKeys.length < 1) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Factual and inferred claims require evidence' });
     }
     if (claim.sourceRefs.some(source =>
       (STRUCTURAL_ONLY_GENERATION_EVIDENCE_SOURCE_TYPES as readonly string[])
         .includes(source.sourceType))) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Structural sources cannot prove facts' });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Structural sources cannot support factual or inferred generated claims' });
     }
   }
 });
@@ -511,6 +512,41 @@ export const brandGenerationRunStageSchema = z.enum(BRAND_GENERATION_STAGES);
 export const brandGenerationItemStatusSchema = z.enum(BRAND_GENERATION_ITEM_STATUSES);
 export const brandGenerationAttemptStageSchema = z.enum(BRAND_GENERATION_ATTEMPT_STAGES);
 export const brandGenerationAttemptStatusSchema = z.enum(BRAND_GENERATION_ATTEMPT_STATUSES);
+
+const brandGenerationRunCountsSchema = z.object({
+  selected: z.number().int().nonnegative(),
+  queued: z.number().int().nonnegative(),
+  running: z.number().int().nonnegative(),
+  readyForHumanReview: z.number().int().nonnegative(),
+  needsAttention: z.number().int().nonnegative(),
+  blocked: z.number().int().nonnegative(),
+  conflicts: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  cancelled: z.number().int().nonnegative(),
+  approved: z.number().int().nonnegative(),
+  changesRequested: z.number().int().nonnegative(),
+}).strict();
+
+export const brandGenerationEffectPayloadSchema = z.discriminatedUnion('kind', [
+  z.object({
+    schemaVersion: z.literal(BRAND_GENERATION_CONTRACT_VERSION),
+    kind: z.literal('command_accepted'),
+  }).strict(),
+  z.object({
+    schemaVersion: z.literal(BRAND_GENERATION_CONTRACT_VERSION),
+    kind: z.literal('artifact_committed'),
+    deliverableId: brandGenerationIdSchema,
+    deliverableType: z.enum(BRAND_DELIVERABLE_TYPES),
+    deliverableVersion: z.number().int().positive(),
+    deliverableStatus: z.enum(['draft', 'approved']),
+  }).strict(),
+  z.object({
+    schemaVersion: z.literal(BRAND_GENERATION_CONTRACT_VERSION),
+    kind: z.literal('command_completed'),
+    status: brandGenerationRunStatusSchema,
+    counts: brandGenerationRunCountsSchema,
+  }).strict(),
+]);
 
 export function assertAttemptOutputMatchesStage(
   stage: z.infer<typeof brandGenerationAttemptStageSchema>,

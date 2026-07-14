@@ -12,6 +12,7 @@ import type {
   BrandGenerationPreflightAttemptOutput,
   BrandGenerationTargetInputSnapshot,
 } from '../../../../shared/types/brand-generation.js';
+import { BRAND_GENERATION_LIMITS } from '../../../../shared/types/brand-generation.js';
 import type {
   GenerationEvidenceRequirement,
   GenerationEvidenceSourceRef,
@@ -465,11 +466,18 @@ function authenticSampleRequirement(payload: BrandIntakePayload): GenerationEvid
 }
 
 function estimateForOneTarget(): BrandGenerationBudgetEstimate {
+  const providerCalls = 6;
+  const inputTokens = providerCalls * (
+    BRAND_GENERATION_LIMITS.maxPromptBytes
+    + BRAND_GENERATION_LIMITS.providerPromptFramingTokenCeiling
+  );
+  const outputTokens = 13_000;
   return {
-    providerCalls: 6,
-    inputTokens: 50_000,
-    outputTokens: 13_000,
-    estimatedCostMicros: 4_500_000,
+    providerCalls,
+    inputTokens,
+    outputTokens,
+    // Worst-case all-OpenAI reservation using B2's 5/30 micro-dollar rates.
+    estimatedCostMicros: (inputTokens * 5) + (outputTokens * 30),
     maxConcurrency: 1,
   };
 }

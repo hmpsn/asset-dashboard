@@ -10,6 +10,8 @@ import { verifyToken, type JwtPayload } from './auth.js';
 import { verifyAdminToken } from './middleware.js';
 import { getUserById } from './users.js';
 import { recoverStuckDiagnosticReports } from './diagnostic-store.js';
+import { reconcileBrandGenerationRunsAfterRestart } from './domains/brand/generation/recovery.js';
+import { drainBrandGenerationEffectOutbox } from './domains/brand/generation/effects.js';
 import {
   BACKGROUND_JOB_TYPES,
   isSystemJobType,
@@ -244,8 +246,10 @@ export function initWebSocket(server: Server): WebSocketServer {
 
   // Initialise subsystems that depend on broadcast
   initJobs(_broadcastJobEvent);
-  recoverStuckDiagnosticReports();
   initActivityBroadcast(_broadcastToWorkspace);
+  reconcileBrandGenerationRunsAfterRestart();
+  drainBrandGenerationEffectOutbox();
+  recoverStuckDiagnosticReports();
   initAnomalyBroadcast(_broadcastToWorkspace);
   initStripeBroadcast(_broadcastToWorkspace);
   // Skip file watchers in test environment — chokidar exhausts open file descriptor

@@ -17,7 +17,7 @@ const NOW = '2026-07-14T12:00:00.000Z';
 const FINGERPRINT = 'a'.repeat(64);
 
 function runFixture(
-  status: Extract<BrandGenerationRunStatus, 'queued' | 'running'> = 'queued',
+  status: BrandGenerationRunStatus = 'queued',
   target: BrandGenerationItem['target'] = 'mission',
 ): PersistedBrandGenerationRun {
   return {
@@ -31,7 +31,15 @@ function runFixture(
     selection: { kind: 'atomic', target },
     selectedTargets: [target],
     status,
-    stage: status === 'queued' ? 'preflight' : 'dependent_generation',
+    stage: status === 'queued'
+      ? 'preflight'
+      : status === 'running'
+        ? 'dependent_generation'
+        : status === 'awaiting_review'
+          ? 'awaiting_voice_finalization'
+          : status === 'completed' || status === 'cancelled' || status === 'failed'
+            ? 'complete'
+            : 'awaiting_operator_review',
     revision: 1,
     idempotencyKey: 'start-key',
     selectionFingerprint: FINGERPRINT,
@@ -140,7 +148,7 @@ function itemFixture(
   } as BrandGenerationItem;
 }
 
-function commandFixture(kind: 'start' | 'revision' = 'start'): BrandGenerationCommand {
+function commandFixture(kind: 'start' | 'resume' | 'revision' = 'start'): BrandGenerationCommand {
   const common = {
     id: 'command-1',
     runId: 'run-1',
@@ -182,13 +190,31 @@ function commandFixture(kind: 'start' | 'revision' = 'start'): BrandGenerationCo
       priorItemStatus: 'changes_requested',
     } as BrandGenerationCommand;
   }
+  if (kind === 'resume') {
+    return {
+      ...common,
+      kind,
+      requestSnapshot: {
+        schemaVersion: 1,
+        kind,
+        command: {},
+      },
+      itemId: null,
+      expectedRunRevision: 0,
+      expectedItemRevision: null,
+      expectedDeliverableVersion: null,
+      priorItemStatus: null,
+    } as BrandGenerationCommand;
+  }
   return {
     ...common,
     kind,
     requestSnapshot: {
       schemaVersion: 1,
       kind,
-      command: {},
+      command: {
+        selection: { kind: 'atomic', target: 'mission' },
+      },
     },
     itemId: null,
     expectedRunRevision: null,
@@ -238,6 +264,14 @@ function jobFixture(status: Job['status']): Job {
   };
 }
 
+function restartInterruptedJobFixture(): Job {
+  return {
+    ...jobFixture('error'),
+    message: 'Interrupted by server restart',
+    error: 'Server restarted — job interrupted',
+  };
+}
+
 function recoveryHarness(options: {
   run?: PersistedBrandGenerationRun;
   items?: BrandGenerationItem[];
@@ -255,8 +289,14 @@ function recoveryHarness(options: {
   const listActiveRuns = vi.fn(() => (
     run.status === 'queued' || run.status === 'running' ? [run] : []
   ));
+  const listTerminalRuns = vi.fn(() => (
+    [] as ReturnType<BrandGenerationRecoveryDependencies['listTerminalRuns']>
+  ));
   const listItems = vi.fn(() => items);
   const listCommandsByJob = vi.fn(() => command ? [command] : []);
+  const countCommandAttempts = vi.fn(() => (
+    command ? attempts.filter(attempt => attempt.commandId === command.id).length : 0
+  ));
   const listRunningAttempts = vi.fn(() => attempts.filter(attempt => attempt.status === 'running'));
   const failAttempt = vi.fn(input => {
     const current = attempts.find(attempt => attempt.id === input.attemptId);
@@ -271,6 +311,20 @@ function recoveryHarness(options: {
     } as BrandGenerationAttempt;
     attempts = attempts.map(attempt => attempt.id === failed.id ? failed : attempt);
     return failed;
+  });
+  const cancelAttempt = vi.fn(input => {
+    const current = attempts.find(attempt => attempt.id === input.attemptId);
+    if (!current) throw new Error('attempt missing');
+    const cancelled = {
+      ...current,
+      status: 'cancelled',
+      error: input.error!,
+      output: null,
+      provenance: null,
+      completedAt: NOW,
+    } as BrandGenerationAttempt;
+    attempts = attempts.map(attempt => attempt.id === cancelled.id ? cancelled : attempt);
+    return cancelled;
   });
   const transitionItem = vi.fn(input => {
     const current = items.find(item => item.id === input.itemId);
@@ -316,18 +370,33 @@ function recoveryHarness(options: {
     return job;
   });
   const queueJob = vi.fn();
+  const applyCompletedEffects = vi.fn();
+  const updateJob = vi.fn((id: string, update: Partial<Job>) => {
+    const current = jobs.get(id);
+    if (current) jobs.set(id, { ...current, ...update, updatedAt: NOW });
+  });
+  const removeInterruptedJob = vi.fn((_workspaceId: string, id: string) => {
+    jobs.delete(id);
+    return true;
+  });
 
   const dependencies = {
     listActiveRuns,
+    listTerminalRuns,
     listItems,
     listCommandsByJob,
+    countCommandAttempts,
     listRunningAttempts,
     failAttempt,
+    cancelAttempt,
     transitionItem,
     transitionRun,
     getJob,
     createJob,
+    updateJob,
+    removeInterruptedJob,
     queueJob,
+    applyCompletedEffects,
     now: () => new Date(NOW),
   } satisfies BrandGenerationRecoveryDependencies;
 
@@ -343,7 +412,7 @@ function recoveryHarness(options: {
 }
 
 describe('brand generation restart recovery', () => {
-  it('recreates and queues the exact accepted job only when no attempt or reservation exists', () => {
+  it('recreates and queues the exact accepted job only before that command creates an attempt', () => {
     const harness = recoveryHarness();
 
     const first = reconcileBrandGenerationRunsAfterRestart(harness.dependencies);
@@ -363,6 +432,7 @@ describe('brand generation restart recovery', () => {
       }),
     );
     expect(harness.dependencies.queueJob).toHaveBeenCalledOnce();
+    expect(harness.dependencies.applyCompletedEffects).not.toHaveBeenCalled();
 
     const second = reconcileBrandGenerationRunsAfterRestart(harness.dependencies);
 
@@ -377,6 +447,22 @@ describe('brand generation restart recovery', () => {
     expect(harness.dependencies.queueJob).toHaveBeenCalledOnce();
   });
 
+  it('replaces the exact initJobs restart tombstone before safely requeueing zero-attempt work', () => {
+    const harness = recoveryHarness({ job: restartInterruptedJobFixture() });
+
+    const summary = reconcileBrandGenerationRunsAfterRestart(harness.dependencies);
+
+    expect(summary).toMatchObject({ repairedJobs: 1, terminalizedRuns: 0, errors: 0 });
+    expect(harness.dependencies.removeInterruptedJob)
+      .toHaveBeenCalledWith('workspace-1', 'job-1');
+    expect(harness.dependencies.createJob).toHaveBeenCalledWith(
+      'brand-deliverable-generation',
+      expect.objectContaining({ id: 'job-1', workspaceId: 'workspace-1' }),
+    );
+    expect(harness.state.jobs.get('job-1')).toMatchObject({ status: 'pending' });
+    expect(harness.dependencies.queueJob).toHaveBeenCalledWith('job-1');
+  });
+
   it('fails interrupted attempts and active items while preserving completed candidates', () => {
     const active = itemFixture('generating', { attemptCount: 1 });
     const reviewed = itemFixture('ready_for_human_review', { id: 'item-2' });
@@ -385,7 +471,7 @@ describe('brand generation restart recovery', () => {
     const harness = recoveryHarness({
       run,
       items: [active, reviewed],
-      job: jobFixture('error'),
+      job: restartInterruptedJobFixture(),
       attempts: [attemptFixture()],
     });
 
@@ -416,12 +502,19 @@ describe('brand generation restart recovery', () => {
       currentJobId: null,
       completedAt: NOW,
     });
+    expect(harness.dependencies.queueJob).not.toHaveBeenCalled();
+    expect(harness.state.jobs.get('job-1')).toMatchObject({
+      status: 'error',
+      result: { runId: 'run-1', terminalStatus: 'completed_with_errors' },
+    });
+    expect(harness.dependencies.applyCompletedEffects).toHaveBeenCalledOnce();
   });
 
   it('does not repair a queued run once any attempt has been recorded', () => {
     const harness = recoveryHarness({
       items: [itemFixture('queued', { attemptCount: 1 })],
       job: undefined,
+      attempts: [attemptFixture()],
     });
 
     const summary = reconcileBrandGenerationRunsAfterRestart(harness.dependencies);
@@ -432,19 +525,29 @@ describe('brand generation restart recovery', () => {
     expect(harness.state.items()[0].status).toBe('failed');
   });
 
-  it('does not repair a queued run once provider budget has been reserved', () => {
-    const run = runFixture('queued');
+  it('repairs a zero-attempt resume even when prior commands consumed cumulative budget', () => {
+    const run = runFixture('running');
     run.budget.reserved.providerCalls = 1;
-    const harness = recoveryHarness({ run });
+    const priorAttempt = {
+      ...attemptFixture(),
+      commandId: 'prior-command',
+      status: 'completed',
+    } as BrandGenerationAttempt;
+    const harness = recoveryHarness({
+      run,
+      command: commandFixture('resume'),
+      attempts: [priorAttempt],
+    });
 
     const summary = reconcileBrandGenerationRunsAfterRestart(harness.dependencies);
 
-    expect(summary).toMatchObject({ repairedJobs: 0, terminalizedRuns: 1 });
-    expect(harness.dependencies.createJob).not.toHaveBeenCalled();
-    expect(harness.state.run()).toMatchObject({ status: 'failed', currentJobId: null });
+    expect(summary).toMatchObject({ repairedJobs: 1, terminalizedRuns: 0 });
+    expect(harness.dependencies.createJob).toHaveBeenCalledOnce();
+    expect(harness.dependencies.queueJob).toHaveBeenCalledWith('job-1');
+    expect(harness.state.run()).toMatchObject({ status: 'running', currentJobId: 'job-1' });
   });
 
-  it('restores a review-directed revision to its prior review state without replacing its artifact', () => {
+  it('restores an interrupted review-directed revision without replacing its artifact', () => {
     const reviewedContent = 'Operator-reviewed positioning copy';
     const harness = recoveryHarness({
       run: runFixture('running'),
@@ -479,6 +582,54 @@ describe('brand generation restart recovery', () => {
     });
   });
 
+  it('keeps a persisted cancellation truthful and never restores an unaudited revision to ready', () => {
+    const command = {
+      ...commandFixture('revision'),
+      priorItemStatus: 'ready_for_human_review',
+    } as BrandGenerationCommand;
+    const reviewedContent = 'Human-edited positioning snapshot';
+    const harness = recoveryHarness({
+      run: runFixture('running'),
+      items: [itemFixture('auditing_model', {
+        attemptCount: 2,
+        content: reviewedContent,
+      })],
+      command,
+      job: jobFixture('cancelled'),
+      attempts: [attemptFixture()],
+    });
+
+    const summary = reconcileBrandGenerationRunsAfterRestart(harness.dependencies);
+
+    expect(summary).toMatchObject({
+      cancelledRuns: 1,
+      cancelledAttempts: 1,
+      failedAttempts: 0,
+      failedItems: 0,
+      restoredReviewItems: 1,
+    });
+    expect(harness.state.attempts()[0]).toMatchObject({
+      status: 'cancelled',
+      error: { code: 'brand_generation_cancelled', stage: 'cancellation' },
+    });
+    expect(harness.state.items()[0]).toMatchObject({
+      status: 'changes_requested',
+      content: reviewedContent,
+      auditReport: null,
+      provenance: null,
+      error: null,
+    });
+    expect(harness.state.run()).toMatchObject({
+      status: 'completed_with_errors',
+      currentJobId: null,
+    });
+    expect(harness.state.jobs.get('job-1')).toMatchObject({
+      status: 'cancelled',
+      result: { terminalStatus: 'completed_with_errors' },
+      error: undefined,
+    });
+  });
+
   it('preserves a completed voice foundation and pauses honestly for finalization', () => {
     const harness = recoveryHarness({
       run: runFixture('running', 'voice_foundation'),
@@ -506,6 +657,34 @@ describe('brand generation restart recovery', () => {
     });
   });
 
+  it('preserves a needs-attention voice foundation at the same resumable human gate', () => {
+    const harness = recoveryHarness({
+      run: runFixture('running', 'voice_foundation'),
+      items: [itemFixture('needs_attention', { target: 'voice_foundation' })],
+      job: jobFixture('error'),
+    });
+
+    const summary = reconcileBrandGenerationRunsAfterRestart(harness.dependencies);
+
+    expect(summary).toMatchObject({
+      terminalizedRuns: 1,
+      preservedItems: 1,
+      failedItems: 0,
+      errors: 0,
+    });
+    expect(harness.state.run()).toMatchObject({
+      status: 'awaiting_review',
+      stage: 'awaiting_voice_finalization',
+      currentJobId: null,
+      completedAt: null,
+      voiceReadiness: {
+        state: 'provisional',
+        foundationItemId: 'item-1',
+        blockingReasons: [expect.stringMatching(/evidence requirements/i)],
+      },
+    });
+  });
+
   it.each([
     ['blocked_missing_evidence', 'blocked'],
     ['conflict', 'conflict'],
@@ -522,6 +701,80 @@ describe('brand generation restart recovery', () => {
       status: runStatus,
       stage: 'awaiting_operator_review',
       currentJobId: null,
+    });
+  });
+
+  it('repairs a restart-error generic job for an already-terminal durable run without touching artifacts', () => {
+    const run = runFixture('completed');
+    run.currentJobId = null;
+    const item = itemFixture('ready_for_human_review', {
+      content: 'Committed grounded mission',
+    });
+    const harness = recoveryHarness({
+      run,
+      items: [item],
+      job: restartInterruptedJobFixture(),
+    });
+    harness.dependencies.listTerminalRuns.mockReturnValue([{ run, jobId: 'job-1' }]);
+
+    const summary = reconcileBrandGenerationRunsAfterRestart(harness.dependencies);
+
+    expect(summary).toMatchObject({
+      scannedRuns: 1,
+      reconciledTerminalJobs: 1,
+      terminalizedRuns: 0,
+      errors: 0,
+    });
+    expect(harness.dependencies.transitionItem).not.toHaveBeenCalled();
+    expect(harness.dependencies.transitionRun).not.toHaveBeenCalled();
+    expect(harness.state.items()[0]).toEqual(item);
+    expect(harness.state.jobs.get('job-1')).toMatchObject({
+      status: 'done',
+      progress: 1,
+      total: 1,
+      result: { runId: 'run-1', terminalStatus: 'completed' },
+    });
+    expect(harness.dependencies.applyCompletedEffects).toHaveBeenCalledOnce();
+    expect(harness.dependencies.applyCompletedEffects).toHaveBeenCalledWith(run, commandFixture());
+  });
+
+  it('cursor-paginates beyond one hundred active runs', () => {
+    const runs = Array.from({ length: 101 }, (_, index) => ({
+      ...runFixture('running'),
+      id: `run-${index.toString().padStart(3, '0')}`,
+      currentJobId: `job-${index.toString().padStart(3, '0')}`,
+      updatedAt: new Date(Date.parse(NOW) + index).toISOString(),
+    } as PersistedBrandGenerationRun));
+    const listActiveRuns = vi.fn((
+      limit: number,
+      cursor?: { updatedAt: string; runId: string },
+    ) => {
+      const start = cursor
+        ? runs.findIndex(run => run.id === cursor.runId) + 1
+        : 0;
+      return runs.slice(start, start + limit);
+    });
+    const getJob = vi.fn((id: string) => ({
+      ...jobFixture('pending'),
+      id,
+    }));
+    const harness = recoveryHarness({ run: runFixture('completed') });
+
+    const summary = reconcileBrandGenerationRunsAfterRestart({
+      ...harness.dependencies,
+      listActiveRuns,
+      getJob,
+    });
+
+    expect(summary).toMatchObject({
+      scannedRuns: 101,
+      alreadyRecoveredRuns: 101,
+      errors: 0,
+    });
+    expect(listActiveRuns).toHaveBeenCalledTimes(2);
+    expect(listActiveRuns.mock.calls[1]?.[1]).toEqual({
+      updatedAt: runs[99]!.updatedAt,
+      runId: runs[99]!.id,
     });
   });
 });
