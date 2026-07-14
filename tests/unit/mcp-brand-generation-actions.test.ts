@@ -1,11 +1,21 @@
 import type { Tool } from '@modelcontextprotocol/sdk/types';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const h = vi.hoisted(() => ({
+  recordPaidCall: vi.fn(
+    (_increment = 1, _workspaceId?: string): { count: number; warning?: string } => ({ count: 1 }),
+  ),
+}));
 
 vi.mock('../../server/domains/brand/generation/service.js', () => ({
   startBrandGeneration: vi.fn(),
   getBrandGeneration: vi.fn(),
   resumeBrandGeneration: vi.fn(),
   reviseBrandGenerationItem: vi.fn(),
+}));
+
+vi.mock('../../server/mcp/paid-call-counter.js', () => ({
+  recordPaidCall: h.recordPaidCall,
 }));
 
 import type {
@@ -189,6 +199,11 @@ function textPayload(
 }
 
 describe('MCP brand generation actions', () => {
+  beforeEach(() => {
+    h.recordPaidCall.mockReset();
+    h.recordPaidCall.mockReturnValue({ count: 1 });
+  });
+
   it('advertises a dedicated four-tool snake_case JSON-v1 family', () => {
     expect(brandGenerationActionTools.map(tool => tool.name)).toEqual([
       'start_brand_deliverable_generation',
@@ -206,6 +221,10 @@ describe('MCP brand generation actions', () => {
         expect(property.description).toEqual(expect.any(String));
       }
     }
+    expect(brandGenerationActionTools[0]?.description).toMatch(/^\[Paid API\]/);
+    expect(brandGenerationActionTools[1]?.description).not.toMatch(/^\[Paid API\]/);
+    expect(brandGenerationActionTools[2]?.description).toMatch(/^\[Paid API\]/);
+    expect(brandGenerationActionTools[3]?.description).toMatch(/^\[Paid API\]/);
   });
 
   it('starts paid work with exact authority, budget, MCP attribution, and execution context', async () => {
@@ -413,6 +432,148 @@ describe('MCP brand generation actions', () => {
       },
       mcpExecutionContext: context,
     });
+  });
+
+  it('meters each accepted non-replay paid command exactly once and leaves reads free', async () => {
+    const deps = dependencies();
+    const handle = createBrandGenerationActionHandler(deps.value);
+
+    await handle(
+      'start_brand_deliverable_generation',
+      {
+        workspace_id: WORKSPACE_ID,
+        intake_revision_id: 'intake_revision_1',
+        expected_intake_revision: 2,
+        expected_intake_fingerprint: FINGERPRINT,
+        selection: { kind: 'atomic', target: 'mission' },
+        expected_voice_version: 4,
+        expected_voice_fingerprint: VOICE_FINGERPRINT,
+        budget: BUDGET_INPUT,
+        idempotency_key: 'brand-start-metered',
+      },
+      workspaceContext(),
+    );
+    await handle(
+      'get_brand_generation',
+      { workspace_id: WORKSPACE_ID, run_id: RUN_ID },
+      workspaceContext('get_brand_generation'),
+    );
+    await handle(
+      'resume_brand_deliverable_generation',
+      {
+        workspace_id: WORKSPACE_ID,
+        run_id: RUN_ID,
+        expected_run_revision: 3,
+        expected_voice_version: 4,
+        expected_voice_fingerprint: VOICE_FINGERPRINT,
+        idempotency_key: 'brand-resume-metered',
+      },
+      workspaceContext('resume_brand_deliverable_generation'),
+    );
+    await handle(
+      'start_brand_deliverable_revision',
+      {
+        workspace_id: WORKSPACE_ID,
+        run_id: RUN_ID,
+        item_id: ITEM_ID,
+        expected_run_revision: 4,
+        expected_item_revision: 2,
+        deliverable_id: 'deliverable_1',
+        expected_deliverable_version: 3,
+        direction: 'Keep every claim grounded.',
+        idempotency_key: 'brand-revision-metered',
+      },
+      workspaceContext('start_brand_deliverable_revision'),
+    );
+
+    expect(h.recordPaidCall).toHaveBeenCalledTimes(3);
+    expect(h.recordPaidCall).toHaveBeenNthCalledWith(1, 1, WORKSPACE_ID);
+    expect(h.recordPaidCall).toHaveBeenNthCalledWith(2, 1, WORKSPACE_ID);
+    expect(h.recordPaidCall).toHaveBeenNthCalledWith(3, 1, WORKSPACE_ID);
+  });
+
+  it('never meters exact idempotent replays', async () => {
+    const deps = dependencies();
+    deps.startBrandGeneration.mockReturnValue(commandResult(true));
+    deps.resumeBrandGeneration.mockReturnValue(commandResult(true));
+    deps.reviseBrandGenerationItem.mockReturnValue(commandResult(true));
+    const handle = createBrandGenerationActionHandler(deps.value);
+
+    const results = await Promise.all([
+      handle(
+        'start_brand_deliverable_generation',
+        {
+          workspace_id: WORKSPACE_ID,
+          intake_revision_id: 'intake_revision_1',
+          expected_intake_revision: 2,
+          expected_intake_fingerprint: FINGERPRINT,
+          selection: { kind: 'atomic', target: 'mission' },
+          expected_voice_version: 4,
+          expected_voice_fingerprint: VOICE_FINGERPRINT,
+          budget: BUDGET_INPUT,
+          idempotency_key: 'brand-start-replay',
+        },
+        workspaceContext(),
+      ),
+      handle(
+        'resume_brand_deliverable_generation',
+        {
+          workspace_id: WORKSPACE_ID,
+          run_id: RUN_ID,
+          expected_run_revision: 3,
+          expected_voice_version: 4,
+          expected_voice_fingerprint: VOICE_FINGERPRINT,
+          idempotency_key: 'brand-resume-replay',
+        },
+        workspaceContext('resume_brand_deliverable_generation'),
+      ),
+      handle(
+        'start_brand_deliverable_revision',
+        {
+          workspace_id: WORKSPACE_ID,
+          run_id: RUN_ID,
+          item_id: ITEM_ID,
+          expected_run_revision: 4,
+          expected_item_revision: 2,
+          deliverable_id: 'deliverable_1',
+          expected_deliverable_version: 3,
+          direction: 'Keep every claim grounded.',
+          idempotency_key: 'brand-revision-replay',
+        },
+        workspaceContext('start_brand_deliverable_revision'),
+      ),
+    ]);
+
+    expect(h.recordPaidCall).not.toHaveBeenCalled();
+    for (const result of results) {
+      expect(textPayload(result)).toMatchObject({ existing: true });
+    }
+  });
+
+  it('returns the canonical paid-call threshold warning on an accepted command', async () => {
+    const warning = 'paid_call_count: 100 (threshold 100; informational only)';
+    h.recordPaidCall.mockReturnValue({ count: 100, warning });
+    const deps = dependencies();
+
+    const result = await createBrandGenerationActionHandler(deps.value)(
+      'start_brand_deliverable_generation',
+      {
+        workspace_id: WORKSPACE_ID,
+        intake_revision_id: 'intake_revision_1',
+        expected_intake_revision: 2,
+        expected_intake_fingerprint: FINGERPRINT,
+        selection: { kind: 'atomic', target: 'mission' },
+        expected_voice_version: 4,
+        expected_voice_fingerprint: VOICE_FINGERPRINT,
+        budget: BUDGET_INPUT,
+        idempotency_key: 'brand-start-warning',
+      },
+      workspaceContext(),
+    );
+
+    expect(h.recordPaidCall).toHaveBeenCalledOnce();
+    expect(h.recordPaidCall).toHaveBeenCalledWith(1, WORKSPACE_ID);
+    expect(textPayload(result)).toMatchObject({ existing: false, warning });
   });
 
   it.each([

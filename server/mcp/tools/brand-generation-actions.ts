@@ -2,6 +2,7 @@ import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types';
 
 import type {
   BrandGenerationAtomicTarget,
+  BrandGenerationCommandResult,
   BrandGenerationPreset,
   GetBrandGenerationRequest,
   GetBrandGenerationResult,
@@ -40,6 +41,7 @@ import {
 } from '../../domains/brand/generation/service.js';
 import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
+import { recordPaidCall } from '../paid-call-counter.js';
 import { mcpJsonV1Error } from '../tool-errors.js';
 import { mcpSuccess } from '../tool-helpers.js';
 
@@ -49,7 +51,7 @@ export const brandGenerationActionTools: Tool[] = [
   {
     name: 'start_brand_deliverable_generation',
     description:
-      'Start one grounded, review-gated brand target or preset from an exact immutable intake revision. Durable targets require exact finalized voice authority; full_brand_system starts only a provisional voice foundation. This is paid background work and requires explicit bounded budgets plus an idempotency key.',
+      '[Paid API] Start one grounded, review-gated brand target or preset from an exact immutable intake revision. Durable targets require exact finalized voice authority; full_brand_system starts only a provisional voice foundation. This is paid background work and requires explicit bounded budgets plus an idempotency key.',
     inputSchema: toMcpJsonSchema(startBrandDeliverableGenerationInputSchema),
   },
   {
@@ -61,13 +63,13 @@ export const brandGenerationActionTools: Tool[] = [
   {
     name: 'resume_brand_deliverable_generation',
     description:
-      'Resume the dependent targets of a paused full_brand_system run after a human has finalized the exact voice version. Requires the exact run revision, voice fingerprint, and a caller-stable idempotency key.',
+      '[Paid API] Resume the dependent targets of a paused full_brand_system run after a human has finalized the exact voice version. Requires the exact run revision, voice fingerprint, and a caller-stable idempotency key.',
     inputSchema: toMcpJsonSchema(resumeBrandDeliverableGenerationInputSchema),
   },
   {
     name: 'start_brand_deliverable_revision',
     description:
-      'Start one review-directed revision of a generated durable brand deliverable. Requires exact run, item, and deliverable versions; a later human edit wins and generated work never auto-approves.',
+      '[Paid API] Start one review-directed revision of a generated durable brand deliverable. Requires exact run, item, and deliverable versions; a later human edit wins and generated work never auto-approves.',
     inputSchema: toMcpJsonSchema(startBrandDeliverableRevisionInputSchema),
   },
 ];
@@ -138,6 +140,21 @@ function toMcpPayload(value: unknown): unknown {
   return Object.fromEntries(
     Object.entries(value).map(([key, child]) => [snakeCaseKey(key), toMcpPayload(child)]),
   );
+}
+
+function paidCommandSuccess(
+  result: BrandGenerationCommandResult,
+  workspaceId: string,
+): CallToolResult {
+  // The domain service resolves idempotency before returning. Exact replays reuse
+  // accepted work and therefore must not increment the MCP paid-trigger signal.
+  const warning = result.existing
+    ? undefined
+    : recordPaidCall(1, workspaceId).warning;
+  return mcpSuccess(toMcpPayload(projectPublicValue({
+    ...result,
+    ...(warning ? { warning } : {}),
+  })));
 }
 
 function mcpAttribution(context: McpToolExecutionContext) {
@@ -321,7 +338,7 @@ export function createBrandGenerationActionHandler(
         const parsed = startBrandDeliverableGenerationInputSchema.safeParse(args);
         if (!parsed.success) return validationError();
         const result = await dependencies.startBrandGeneration(toStartRequest(parsed.data, context));
-        return mcpSuccess(toMcpPayload(projectPublicValue(result)));
+        return paidCommandSuccess(result, parsed.data.workspace_id);
       }
 
       if (name === 'get_brand_generation') {
@@ -349,7 +366,7 @@ export function createBrandGenerationActionHandler(
           resumedBy: mcpAttribution(context),
           mcpExecutionContext: context,
         });
-        return mcpSuccess(toMcpPayload(projectPublicValue(result)));
+        return paidCommandSuccess(result, parsed.data.workspace_id);
       }
 
       if (name === 'start_brand_deliverable_revision') {
@@ -368,7 +385,7 @@ export function createBrandGenerationActionHandler(
           requestedBy: mcpAttribution(context),
           mcpExecutionContext: context,
         });
-        return mcpSuccess(toMcpPayload(projectPublicValue(result)));
+        return paidCommandSuccess(result, parsed.data.workspace_id);
       }
 
       return unknownToolError();
