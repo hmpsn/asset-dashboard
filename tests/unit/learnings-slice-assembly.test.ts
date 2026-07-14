@@ -19,7 +19,8 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 // vi.mock is hoisted to the top of the file by Vitest. Factories must not close
 // over variables declared in the test module — use vi.fn() directly.
 
-vi.mock('../../server/workspace-learnings.js', () => ({
+vi.mock('../../server/workspace-learnings.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../server/workspace-learnings.js')>()),
   getWorkspaceLearnings: vi.fn().mockReturnValue(null),
 }));
 
@@ -303,7 +304,7 @@ describe('assembleLearnings', () => {
     });
 
     it('forwards playbooks from getPlaybooks', async () => {
-      const playbook = { id: 'pb-1', name: 'Test Playbook' };
+      const playbook = { id: 'pb-1', name: 'Test Playbook', actionSequence: [] };
       vi.mocked(getPlaybooks).mockReturnValue([playbook] as any);
       const result = await assembleLearnings(WS_ID);
       expect(result.playbooks).toEqual([playbook]);
@@ -320,6 +321,7 @@ describe('assembleLearnings', () => {
       const result = await assembleLearnings(WS_ID);
       expect(result.weCalledIt).toHaveLength(1);
       expect(result.weCalledIt![0].score).toBe('strong_win');
+      expect(result.clientProjection?.weCalledIt).toHaveLength(1);
     });
 
     it('does NOT include win (non-strong) outcomes', async () => {

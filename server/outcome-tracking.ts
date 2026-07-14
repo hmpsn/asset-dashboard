@@ -10,6 +10,11 @@ import { rowToTrackedAction, rowToActionOutcome } from './db/outcome-mappers.js'
 import type { TrackedActionRow, ActionOutcomeRow } from './db/outcome-mappers.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { clientActionLabel } from '../shared/types/client-vocabulary.js';
+import {
+  ACTION_CATALOG,
+  isClientVisibleOutcomeAction,
+  toClientSafeOutcomeEventPayload,
+} from '../shared/types/action-catalog.js';
 import type {
   TrackedAction,
   ActionOutcome,
@@ -41,6 +46,12 @@ import { invalidateWorkspaceLearningsCache } from './workspace-learnings-cache.j
 import { clearIntelligenceCache } from './intelligence/cache-clear.js';
 
 const log = createLogger('outcome-tracking');
+
+const CLIENT_HIDDEN_OUTCOME_ACTION_TYPES = Object.entries(ACTION_CATALOG.outcome)
+  .filter(([, entry]) => entry.clientVisible === false)
+  .map(([actionType]) => actionType);
+const CLIENT_HIDDEN_OUTCOME_ACTION_PLACEHOLDERS =
+  CLIENT_HIDDEN_OUTCOME_ACTION_TYPES.map(() => '?').join(', ') || 'NULL';
 
 function broadcastOutcomeEvent(workspaceId: string, event: string, payload: object): void {
   try {
@@ -91,6 +102,7 @@ const stmts = createStmtCache(() => ({
     WHERE ta.workspace_id = ?
       AND ao.score IN ('strong_win', 'win')
       AND ta.attribution != 'not_acted_on'
+      AND ta.action_type NOT IN (${CLIENT_HIDDEN_OUTCOME_ACTION_PLACEHOLDERS})
       AND ao.checkpoint_days = (
         SELECT MAX(ao2.checkpoint_days)
         FROM action_outcomes ao2
@@ -107,6 +119,7 @@ const stmts = createStmtCache(() => ({
     WHERE ta.workspace_id = ?
       AND ao.score IN ('strong_win', 'win')
       AND ta.attribution != 'not_acted_on'
+      AND ta.action_type NOT IN (${CLIENT_HIDDEN_OUTCOME_ACTION_PLACEHOLDERS})
       AND julianday(ao.measured_at) >= julianday(?)
       AND julianday(ao.measured_at) < julianday(?)
       AND ao.checkpoint_days = (
@@ -443,32 +456,37 @@ export function recordAction(params: RecordActionParams): TrackedAction {
     return { modified: related.length };
   });
 
-  // ── Bridge #13: Create analytics annotation ───────────────────────
-  fireBridge('bridge-action-annotation', params.workspaceId, async () => {
-    const { createAnnotation } = await import('./analytics-annotations.js'); // dynamic-import-ok: avoids circular dep
-    const pageCtx = params.pageUrl ? ` (${params.pageUrl})` : '';
-    const date = new Date().toISOString().split('T')[0];
-    const label = `Action: ${params.actionType}${pageCtx}`;
-    createAnnotation({
-      workspaceId: params.workspaceId,
-      date,
-      label,
-      category: 'site_change',
-      createdBy: 'bridge:action-annotation',
+  // ── Bridge #13: Create client-visible analytics annotation ─────────
+  // Analytics annotations have a client-authenticated read path. Internal
+  // workflow milestones must remain in the outcome ledger without creating a
+  // durable annotation or broadcasting their label to client subscribers.
+  if (isClientVisibleOutcomeAction(params.actionType)) {
+    fireBridge('bridge-action-annotation', params.workspaceId, async () => {
+      const { createAnnotation } = await import('./analytics-annotations.js'); // dynamic-import-ok: avoids circular dep
+      const pageCtx = params.pageUrl ? ` (${params.pageUrl})` : '';
+      const date = new Date().toISOString().split('T')[0];
+      const label = `Action: ${params.actionType}${pageCtx}`;
+      createAnnotation({
+        workspaceId: params.workspaceId,
+        date,
+        label,
+        category: 'site_change',
+        createdBy: 'bridge:action-annotation',
+      });
+      // This bridge dispatches a domain-specific ANNOTATION_BRIDGE_CREATED
+      // event, not the generic INSIGHT_BRIDGE_UPDATED that executeBridge()
+      // auto-broadcasts when a BridgeResult is returned. The event payload
+      // includes the date and label for the analytics chart annotation
+      // marker, which the auto path doesn't carry. Keeping the inline
+      // broadcast is intentional.
+      // bridge-broadcast-ok
+      broadcastToWorkspace(params.workspaceId, WS_EVENTS.ANNOTATION_BRIDGE_CREATED, {
+        bridge: 'bridge_13_action_annotation',
+        date,
+        label,
+      });
     });
-    // This bridge dispatches a domain-specific ANNOTATION_BRIDGE_CREATED
-    // event, not the generic INSIGHT_BRIDGE_UPDATED that executeBridge()
-    // auto-broadcasts when a BridgeResult is returned. The event payload
-    // includes the date and label for the analytics chart annotation
-    // marker, which the auto path doesn't carry. Keeping the inline
-    // broadcast is intentional.
-    // bridge-broadcast-ok
-    broadcastToWorkspace(params.workspaceId, WS_EVENTS.ANNOTATION_BRIDGE_CREATED, {
-      bridge: 'bridge_13_action_annotation',
-      date,
-      label,
-    });
-  });
+  }
 
   return rowToTrackedAction(row);
 }
@@ -577,10 +595,17 @@ export function markActionComplete(actionId: string, workspaceId: string): boole
 export function updateActionContext(actionId: string, workspaceId: string, context: ActionContext): boolean {
   const result = stmts().updateContext.run(JSON.stringify(context), actionId, workspaceId);
   if (result.changes > 0) {
-    broadcastOutcomeEvent(workspaceId, WS_EVENTS.OUTCOME_LEARNINGS_UPDATED, {
-      actionId,
-      action: 'context_updated',
-    });
+    const actionRow = stmts().getById.get(actionId) as TrackedActionRow | undefined;
+    broadcastOutcomeEvent(
+      workspaceId,
+      WS_EVENTS.OUTCOME_LEARNINGS_UPDATED,
+      actionRow
+        ? toClientSafeOutcomeEventPayload(actionRow.action_type, {
+            actionId,
+            action: 'context_updated',
+          })
+        : {},
+    );
   }
   return result.changes > 0;
 }
@@ -669,11 +694,15 @@ export function recordOutcome(params: {
     params.score !== 'inconclusive' &&
     (params.checkpointDays === 30 || params.checkpointDays === 60 || params.checkpointDays === 90)
   ) {
-    broadcastOutcomeEvent(actionRowForBroadcast.workspace_id, WS_EVENTS.OUTCOME_LEARNINGS_UPDATED, {
-      actionId: params.actionId,
-      checkpointDays: params.checkpointDays,
-      score: params.score,
-    });
+    broadcastOutcomeEvent(
+      actionRowForBroadcast.workspace_id,
+      WS_EVENTS.OUTCOME_LEARNINGS_UPDATED,
+      toClientSafeOutcomeEventPayload(actionRowForBroadcast.action_type, {
+        actionId: params.actionId,
+        checkpointDays: params.checkpointDays,
+        score: params.score,
+      }),
+    );
   }
 
   // ── Bridge #1: Outcome → reweight insight scores ──────────────────
@@ -925,8 +954,16 @@ export function getTopWinsFromActions(
  * Extracted from routes/outcomes.ts so the intelligence assembler can use it.
  * For callers that already hold the actions list, use getTopWinsFromActions directly.
  */
-export function getTopWinsForWorkspace(workspaceId: string, limit = 10): TopWin[] {
-  return getTopWinsFromActions(getActionsByWorkspace(workspaceId), limit);
+export function getTopWinsForWorkspace(
+  workspaceId: string,
+  limit = 10,
+  opts?: { excludeClientHidden?: boolean },
+): TopWin[] {
+  const allActions = getActionsByWorkspace(workspaceId);
+  const actions = opts?.excludeClientHidden
+    ? allActions.filter((action) => isClientVisibleOutcomeAction(action.actionType))
+    : allActions;
+  return getTopWinsFromActions(actions, limit);
 }
 
 export interface OutcomeValueWin {
@@ -965,12 +1002,16 @@ function rowToOutcomeValueWin(row: WinWithValueRow): OutcomeValueWin {
 }
 
 /**
- * Attribution-honest win-value read path. The underlying statement excludes
- * `not_acted_on`, so proposal outcomes never inflate client-facing or
- * cross-workspace value roll-ups.
+ * Attribution- and visibility-honest win-value read path. The underlying
+ * statement excludes `not_acted_on` proposals and action-catalog entries that
+ * are internal-only, so neither can inflate client outcome/value roll-ups.
  */
 export function getWinsWithValueByWorkspace(workspaceId: string, limit = 100): OutcomeValueWin[] {
-  const rows = stmts().getWinsWithValueByWorkspace.all(workspaceId, limit) as WinWithValueRow[];
+  const rows = stmts().getWinsWithValueByWorkspace.all(
+    workspaceId,
+    ...CLIENT_HIDDEN_OUTCOME_ACTION_TYPES,
+    limit,
+  ) as WinWithValueRow[];
   return rows.map(rowToOutcomeValueWin);
 }
 
@@ -1031,13 +1072,18 @@ export function getROIHighlightsFromOutcomes(
   const rows = (window
     ? stmts().getWinsWithValueByWorkspaceInWindow.all(
         workspaceId,
+        ...CLIENT_HIDDEN_OUTCOME_ACTION_TYPES,
         window.start,
         window.endExclusive,
         window.start,
         window.endExclusive,
         limit,
       )
-    : stmts().getWinsWithValueByWorkspace.all(workspaceId, limit)) as WinRow[];
+    : stmts().getWinsWithValueByWorkspace.all(
+        workspaceId,
+        ...CLIENT_HIDDEN_OUTCOME_ACTION_TYPES,
+        limit,
+      )) as WinRow[];
   return rows.map(row => {
     const delta = parseJsonFallback<{
       primary_metric?: string;

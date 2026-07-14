@@ -7,7 +7,11 @@ import { buildSystemPrompt, guardrailsToPromptInstructions } from './prompt-asse
 import { renderVoiceDNAForPrompt } from './voice-dna-render.js';
 import { parseJsonFallback, parseJsonSafeArray } from './db/json-validation.js';
 import { parseVoiceCalibrationOutput, parseVoiceRefinementOutput } from './schemas/ai-brand-engine.js';
-import { variationFeedbackItemSchema } from './schemas/voice-calibration.js';
+import {
+  updateVoiceProfileSchema,
+  variationFeedbackItemSchema,
+  voiceSampleInputSchema,
+} from './schemas/voice-calibration.js';
 import { VOICE_PROFILE_TRANSITIONS, validateTransition, InvalidTransitionError } from './state-machines.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
@@ -159,10 +163,37 @@ export class VoiceProfileStateTransitionError extends Error {
   }
 }
 
-export function updateVoiceProfile(
+/** Rejects samples that could never satisfy the finalized-anchor contract. */
+export class VoiceSampleValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'VoiceSampleValidationError';
+  }
+}
+
+export class VoiceProfileValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'VoiceProfileValidationError';
+  }
+}
+
+export interface UpdateVoiceProfileResult {
+  profile: VoiceProfile & { samples: VoiceSample[] };
+  changed: boolean;
+}
+
+export function updateVoiceProfileWithResult(
   workspaceId: string,
   updates: { status?: VoiceProfileStatus; voiceDNA?: VoiceDNA; guardrails?: VoiceGuardrails; contextModifiers?: ContextModifier[] },
-): VoiceProfile & { samples: VoiceSample[] } {
+): UpdateVoiceProfileResult {
+  const parsedUpdates = updateVoiceProfileSchema.safeParse(updates);
+  if (!parsedUpdates.success) {
+    throw new VoiceProfileValidationError(
+      parsedUpdates.error.issues[0]?.message ?? 'Voice profile update is invalid',
+    );
+  }
+  const normalizedUpdates = parsedUpdates.data;
   const doUpdate = db.transaction((): {
     profile: VoiceProfile & { samples: VoiceSample[] };
     changed: boolean;
@@ -173,18 +204,18 @@ export function updateVoiceProfile(
     // Finalized authority is created only by finalizeBrandVoice(). The generic
     // editor may reopen/revise a profile, but can never label a mutable draft as
     // calibrated — including a same-status calibrated write.
-    if (updates.status === 'calibrated') {
+    if ((updates as { status?: VoiceProfileStatus }).status === 'calibrated') {
       throw new VoiceProfileStateTransitionError(profile.status, 'calibrated');
     }
 
-    const dnaChanged = updates.voiceDNA !== undefined
-      && JSON.stringify(updates.voiceDNA) !== JSON.stringify(profile.voiceDNA);
-    const guardrailsChanged = updates.guardrails !== undefined
-      && JSON.stringify(updates.guardrails) !== JSON.stringify(profile.guardrails);
-    const modifiersChanged = updates.contextModifiers !== undefined
-      && JSON.stringify(updates.contextModifiers) !== JSON.stringify(profile.contextModifiers);
+    const dnaChanged = normalizedUpdates.voiceDNA !== undefined
+      && JSON.stringify(normalizedUpdates.voiceDNA) !== JSON.stringify(profile.voiceDNA);
+    const guardrailsChanged = normalizedUpdates.guardrails !== undefined
+      && JSON.stringify(normalizedUpdates.guardrails) !== JSON.stringify(profile.guardrails);
+    const modifiersChanged = normalizedUpdates.contextModifiers !== undefined
+      && JSON.stringify(normalizedUpdates.contextModifiers) !== JSON.stringify(profile.contextModifiers);
     const semanticEdit = dnaChanged || guardrailsChanged || modifiersChanged;
-    const targetStatus = updates.status
+    const targetStatus = normalizedUpdates.status
       ?? (semanticEdit && profile.status === 'calibrated' ? 'calibrating' : profile.status);
     const statusChanged = targetStatus !== profile.status;
 
@@ -210,14 +241,14 @@ export function updateVoiceProfile(
       workspace_id: workspaceId,
       expected_revision: profile.revision,
       status: targetStatus,
-      voice_dna_json: updates.voiceDNA !== undefined
-        ? JSON.stringify(updates.voiceDNA)
+      voice_dna_json: normalizedUpdates.voiceDNA !== undefined
+        ? JSON.stringify(normalizedUpdates.voiceDNA)
         : (profile.voiceDNA ? JSON.stringify(profile.voiceDNA) : null),
-      guardrails_json: updates.guardrails !== undefined
-        ? JSON.stringify(updates.guardrails)
+      guardrails_json: normalizedUpdates.guardrails !== undefined
+        ? JSON.stringify(normalizedUpdates.guardrails)
         : (profile.guardrails ? JSON.stringify(profile.guardrails) : null),
-      context_modifiers_json: updates.contextModifiers !== undefined
-        ? JSON.stringify(updates.contextModifiers)
+      context_modifiers_json: normalizedUpdates.contextModifiers !== undefined
+        ? JSON.stringify(normalizedUpdates.contextModifiers)
         : (profile.contextModifiers ? JSON.stringify(profile.contextModifiers) : null),
       updated_at: now,
     });
@@ -228,9 +259,9 @@ export function updateVoiceProfile(
       profile: {
         ...profile,
         status: targetStatus,
-        voiceDNA: updates.voiceDNA ?? profile.voiceDNA,
-        guardrails: updates.guardrails ?? profile.guardrails,
-        contextModifiers: updates.contextModifiers ?? profile.contextModifiers,
+        voiceDNA: normalizedUpdates.voiceDNA ?? profile.voiceDNA,
+        guardrails: normalizedUpdates.guardrails ?? profile.guardrails,
+        contextModifiers: normalizedUpdates.contextModifiers ?? profile.contextModifiers,
         revision: profile.revision + 1,
         updatedAt: now,
       },
@@ -243,7 +274,14 @@ export function updateVoiceProfile(
     invalidateMonthlyDigestCache(workspaceId);
     clearIntelligenceCache(workspaceId);
   }
-  return result.profile;
+  return result;
+}
+
+export function updateVoiceProfile(
+  workspaceId: string,
+  updates: { status?: VoiceProfileStatus; voiceDNA?: VoiceDNA; guardrails?: VoiceGuardrails; contextModifiers?: ContextModifier[] },
+): VoiceProfile & { samples: VoiceSample[] } {
+  return updateVoiceProfileWithResult(workspaceId, updates).profile;
 }
 
 // Takes workspaceId (not profile.id) — resolves profile internally.
@@ -254,9 +292,16 @@ export function addVoiceSample(
   workspaceId: string, content: string,
   contextTag?: VoiceSampleContext, source?: VoiceSampleSource,
 ): VoiceSample {
+  const parsed = voiceSampleInputSchema.safeParse({ content, contextTag, source });
+  if (!parsed.success) {
+    throw new VoiceSampleValidationError(
+      parsed.error.issues[0]?.message ?? 'Voice sample is invalid',
+    );
+  }
+  const normalized = parsed.data;
   const id = `vs_${randomUUID().slice(0, 8)}`;
   const now = new Date().toISOString();
-  const effectiveSource = source ?? 'manual';
+  const effectiveSource = normalized.source ?? 'manual';
 
   const doAdd = db.transaction((): { voiceProfileId: string; sortOrder: number } => {
     const profile = getVoiceProfile(workspaceId);
@@ -267,8 +312,8 @@ export function addVoiceSample(
     const { max } = stmts().maxSampleSortOrder.get(profile.id) as { max: number };
     const sortOrder = max + 1;
     stmts().insertSample.run({
-      id, voice_profile_id: profile.id, content,
-      context_tag: contextTag ?? null, source: effectiveSource,
+      id, voice_profile_id: profile.id, content: normalized.content,
+      context_tag: normalized.contextTag ?? null, source: effectiveSource,
       sort_order: sortOrder, created_at: now,
     });
     const touched = stmts().touchProfileAfterSampleMutation.run({
@@ -286,7 +331,15 @@ export function addVoiceSample(
   const { voiceProfileId, sortOrder } = doAdd.immediate();
   invalidateMonthlyDigestCache(workspaceId);
   clearIntelligenceCache(workspaceId);
-  return { id, voiceProfileId, content, contextTag, source: effectiveSource, sortOrder, createdAt: now };
+  return {
+    id,
+    voiceProfileId,
+    content: normalized.content,
+    contextTag: normalized.contextTag,
+    source: effectiveSource,
+    sortOrder,
+    createdAt: now,
+  };
 }
 
 export function deleteVoiceSample(workspaceId: string, sampleId: string): boolean {

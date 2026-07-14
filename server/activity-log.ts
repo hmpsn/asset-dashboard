@@ -258,15 +258,17 @@ function toClientSafeActivityEntry(entry: ActivityEntry): ActivityEntry {
   };
 }
 
-/** Key-management audit detail is admin-only even though the WS channel is shared. */
+/**
+ * Client and admin subscribers share the workspace channel. Only activities
+ * exposed by the client activity read boundary may include their entry data on
+ * that channel. Admin-only activity events are invalidation signals; operators
+ * can refetch the durable activity log through the admin read boundary.
+ */
 function toWorkspaceBroadcastActivityPayload(entry: ActivityEntry): ActivityEntry | Record<string, never> {
-  if (entry.type !== 'mcp_key_created' && entry.type !== 'mcp_key_revoked') {
+  if (CLIENT_VISIBLE_TYPES.has(entry.type)) {
     return toClientSafeActivityEntry(entry);
   }
 
-  // Client and admin subscribers share this workspace channel. The event itself
-  // is only an invalidation signal: key-management identity and even the audit
-  // entry's existence/details stay behind the admin activity read boundary.
   return {};
 }
 
@@ -386,7 +388,8 @@ export function addActivity(workspaceId: string, type: ActivityType, title: stri
     created_at: entry.createdAt,
   });
 
-  // Workspace broadcasts are shared with client subscribers. Keep MCP key identity internal.
+  // Workspace broadcasts are shared with client subscribers. Keep every
+  // admin-only activity's details behind the admin read boundary.
   _broadcastFn?.(workspaceId, WS_EVENTS.ACTIVITY_NEW, toWorkspaceBroadcastActivityPayload(entry));
 
   return entry;

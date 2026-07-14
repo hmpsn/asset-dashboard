@@ -146,7 +146,9 @@ beforeAll(async () => {
   `).run(learningId, readyLearningsWs.workspaceId, JSON.stringify({
     // A1: cached learnings blobs carry a logic-version stamp; an unstamped blob
     // is treated as pre-A1 corrupted cache and recomputed from tracked actions.
-    // This test wants the CACHED aggregate served, so stamp the current version.
+    // The admin slice serves this current-version cached aggregate. The public
+    // endpoint deliberately recomputes its clientProjection from the live,
+    // catalog-visible action rows below, so its rate need not mirror this blob.
     logicVersion: LEARNINGS_LOGIC_VERSION,
     confidence: 'medium',
     totalScoredActions: 12,
@@ -907,8 +909,10 @@ describe('growth tier — learningHighlights shape', () => {
     const body = await res.json();
 
     expect(body.learningHighlights).toEqual({
-      overallWinRate: 0.75,
-      topActionType: 'content_refreshed',
+      // One live client-visible strong win is authoritative for the public
+      // projection. The cached admin summary above is 75% across historical rows.
+      overallWinRate: 1,
+      topActionType: null,
       recentWins: 1,
     });
     expect(body.weCalledIt).toHaveLength(1);

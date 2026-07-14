@@ -220,6 +220,41 @@ describe('Suite 1: Public client summary endpoint', () => {
       fresh.cleanup();
     }
   });
+
+  it('excludes internal-only action-catalog entries from the client scorecard', async () => {
+    const fresh = seedWorkspace({ clientPassword: '' });
+    const freshWsId = fresh.workspaceId;
+    try {
+      const clientVisible = await postJson(`/api/outcomes/${freshWsId}/actions`, {
+        actionType: 'meta_updated',
+        sourceType: 'client-visibility-test',
+        sourceId: `visible-${RUN_ID}`,
+        attribution: 'platform_executed',
+        baselineSnapshot: { clicks: 10 },
+      });
+      expect(clientVisible.status).toBe(200);
+
+      const internalOnly = await postJson(`/api/outcomes/${freshWsId}/actions`, {
+        actionType: 'voice_calibrated',
+        sourceType: 'client-visibility-test',
+        sourceId: `internal-${RUN_ID}`,
+        attribution: 'platform_executed',
+        baselineSnapshot: {},
+      });
+      expect(internalOnly.status).toBe(200);
+
+      const res = await api(`/api/public/outcomes/${freshWsId}/summary`);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+
+      expect(body.totalTracked).toBe(1);
+      expect(body.byCategory).toEqual([
+        expect.objectContaining({ actionType: 'meta_updated', count: 1 }),
+      ]);
+    } finally {
+      fresh.cleanup();
+    }
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -295,6 +330,72 @@ describe('Suite 2: Public client wins endpoint', () => {
     expect(win).toHaveProperty('detectedAt');
     expect(['win', 'strong_win']).toContain(win.score);
     expect(typeof win.recommendation).toBe('string');
+  });
+
+  it('never surfaces an internal-only action as a client win', async () => {
+    const fresh = seedWorkspace({ clientPassword: '' });
+    const freshWsId = fresh.workspaceId;
+    try {
+      const internalOnly = await postJson(`/api/outcomes/${freshWsId}/actions`, {
+        actionType: 'voice_calibrated',
+        sourceType: 'client-visibility-win-test',
+        sourceId: `internal-win-${RUN_ID}`,
+        attribution: 'platform_executed',
+        baselineSnapshot: {},
+      });
+      expect(internalOnly.status).toBe(200);
+      insertOutcomeRow({ actionId: (await internalOnly.json()).action.id, score: 'strong_win' });
+
+      const visible = await postJson(`/api/outcomes/${freshWsId}/actions`, {
+        actionType: 'meta_updated',
+        sourceType: 'client-visibility-win-test',
+        sourceId: `visible-win-${RUN_ID}`,
+        attribution: 'platform_executed',
+        baselineSnapshot: { clicks: 10 },
+      });
+      expect(visible.status).toBe(200);
+      insertOutcomeRow({ actionId: (await visible.json()).action.id, score: 'win' });
+
+      const res = await api(`/api/public/outcomes/${freshWsId}/wins`);
+      expect(res.status).toBe(200);
+      const wins = await res.json();
+
+      expect(wins.map((win: { actionType: string }) => win.actionType)).toEqual(['meta_updated']);
+    } finally {
+      fresh.cleanup();
+    }
+  });
+
+  it('preserves an unknown historical action without crashing the client wins read', async () => {
+    const fresh = seedWorkspace({ clientPassword: '' });
+    const freshWsId = fresh.workspaceId;
+    try {
+      const created = await postJson(`/api/outcomes/${freshWsId}/actions`, {
+        actionType: 'meta_updated',
+        sourceType: 'historical-action-test',
+        sourceId: `historical-${RUN_ID}`,
+        attribution: 'platform_executed',
+        baselineSnapshot: { clicks: 10 },
+      });
+      expect(created.status).toBe(200);
+      const actionId = (await created.json()).action.id;
+
+      // Persisted rows predate the closed ActionType vocabulary in some workspaces;
+      // the mapper deliberately tolerates those historical strings.
+      db.prepare(`UPDATE tracked_actions SET action_type = ? WHERE id = ? AND workspace_id = ?`)
+        .run('legacy_imported_action', actionId, freshWsId);
+      insertOutcomeRow({ actionId, score: 'win' });
+
+      const res = await api(`/api/public/outcomes/${freshWsId}/wins`);
+      expect(res.status).toBe(200);
+      const wins = await res.json();
+
+      expect(wins).toEqual([
+        expect.objectContaining({ actionId, actionType: 'legacy_imported_action' }),
+      ]);
+    } finally {
+      fresh.cleanup();
+    }
   });
 
   it('P1 manual ingestion: a manually-recorded platform_executed post surfaces as a client win with its real title', async () => {

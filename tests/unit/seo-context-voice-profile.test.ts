@@ -91,6 +91,11 @@ function seedWorkspaceWithLegacyVoice(): SeededWs {
   return { workspaceId, cleanup };
 }
 
+function markLegacyProfileCalibrated(workspaceId: string): void {
+  db.prepare(`UPDATE voice_profiles SET status = 'calibrated' WHERE workspace_id = ?`) // status-ok: compatibility fixture for pre-B1 calibrated authority
+    .run(workspaceId);
+}
+
 describe('seoContext slice — voice profile authority vs legacy brand voice', () => {
   let seeded: SeededWs | null = null;
 
@@ -125,13 +130,12 @@ describe('seoContext slice — voice profile authority vs legacy brand voice', (
     seeded = seedWorkspaceWithLegacyVoice();
     createVoiceProfile(seeded.workspaceId);
     addVoiceSample(seeded.workspaceId, SAMPLE_TEXT, 'body', 'manual');
-    // State machine enforces draft → calibrating → calibrated — cannot skip calibrating.
-    updateVoiceProfile(seeded.workspaceId, { status: 'calibrating' });
     updateVoiceProfile(seeded.workspaceId, {
-      status: 'calibrated',
+      status: 'calibrating',
       voiceDNA: SENTINEL_DNA,
       guardrails: SENTINEL_GUARDRAILS,
     });
+    markLegacyProfileCalibrated(seeded.workspaceId);
     expect(isWorkspaceVoiceProfileAuthoritative(seeded.workspaceId)).toBe(true);
     invalidateIntelligenceCache(seeded.workspaceId);
 
@@ -155,13 +159,12 @@ describe('seoContext slice — voice profile authority vs legacy brand voice', (
     // legacy block in the USER prompt alongside calibrated Layer 2 content.
     seeded = seedWorkspaceWithLegacyVoice();
     createVoiceProfile(seeded.workspaceId);
-    // State machine enforces draft → calibrating → calibrated — cannot skip calibrating.
-    updateVoiceProfile(seeded.workspaceId, { status: 'calibrating' });
     updateVoiceProfile(seeded.workspaceId, {
-      status: 'calibrated',
+      status: 'calibrating',
       voiceDNA: SENTINEL_DNA,
       guardrails: SENTINEL_GUARDRAILS,
     });
+    markLegacyProfileCalibrated(seeded.workspaceId);
     expect(isWorkspaceVoiceProfileAuthoritative(seeded.workspaceId)).toBe(true);
     invalidateIntelligenceCache(seeded.workspaceId);
 
@@ -241,12 +244,9 @@ describe('seoContext slice — voice profile authority vs legacy brand voice', (
 });
 
 /**
- * State-machine guard tests for `updateVoiceProfile`. PR #168 review I5:
- * the admin UI (and any future caller) must never be able to jump a profile
- * directly from `draft` to `calibrated`, because `buildSystemPrompt` layer-2
- * voice injection branches on `status === 'calibrated'` and will emit empty
- * DNA/guardrails blocks if those fields weren't populated during the skipped
- * `calibrating` phase.
+ * State-machine guard tests for `updateVoiceProfile`. B1 reserves every write
+ * of `calibrated` for the revision-safe finalization service; the generic
+ * editor may prepare or reopen a profile but cannot assert human authority.
  *
  * The guard lives inside `updateVoiceProfile` so every write path — route
  * handler, internal flow, test — flows through it.
@@ -295,28 +295,27 @@ describe('updateVoiceProfile — state machine guard', () => {
     expect(result.status).toBe('calibrating');
   });
 
-  it('allows legal calibrating → calibrated', () => {
+  it('rejects generic calibrating → calibrated because finalization owns it', () => {
     seeded = seedWorkspaceWithLegacyVoice();
     createVoiceProfile(seeded.workspaceId);
     updateVoiceProfile(seeded.workspaceId, { status: 'calibrating' });
 
-    const result = updateVoiceProfile(seeded.workspaceId, {
+    expect(() => updateVoiceProfile(seeded!.workspaceId, {
       status: 'calibrated',
       voiceDNA: SENTINEL_DNA,
       guardrails: SENTINEL_GUARDRAILS,
-    });
-    expect(result.status).toBe('calibrated');
+    })).toThrow(VoiceProfileStateTransitionError);
   });
 
   it('allows calibrated → draft reset', () => {
     seeded = seedWorkspaceWithLegacyVoice();
     createVoiceProfile(seeded.workspaceId);
-    updateVoiceProfile(seeded.workspaceId, { status: 'calibrating' });
     updateVoiceProfile(seeded.workspaceId, {
-      status: 'calibrated',
+      status: 'calibrating',
       voiceDNA: SENTINEL_DNA,
       guardrails: SENTINEL_GUARDRAILS,
     });
+    markLegacyProfileCalibrated(seeded.workspaceId);
 
     const result = updateVoiceProfile(seeded.workspaceId, { status: 'draft' });
     expect(result.status).toBe('draft');

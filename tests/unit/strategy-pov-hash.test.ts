@@ -59,7 +59,8 @@ describe('buildStrategyPovHash', () => {
     try {
       createVoiceProfile(seeded.workspaceId);
       updateVoiceProfile(seeded.workspaceId, { status: 'calibrating', voiceDNA: dna, guardrails });
-      updateVoiceProfile(seeded.workspaceId, { status: 'calibrated' });
+      db.prepare(`UPDATE voice_profiles SET status = 'calibrated' WHERE workspace_id = ?`) // status-ok: compatibility fixture for calibrated prompt hashing
+        .run(seeded.workspaceId);
 
       const effectiveVoice = buildEffectiveBrandVoiceBlock(seeded.workspaceId);
       const system = buildSystemPrompt(seeded.workspaceId, 'Draft a strategy POV.');

@@ -145,6 +145,24 @@ function countCalibrationActivities(workspaceId: string): number {
   `).get(workspaceId) as { count: number }).count;
 }
 
+function countVoiceFinalizationActions(workspaceId: string): number {
+  return (db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM tracked_actions
+    WHERE workspace_id = ?
+      AND action_type = 'voice_calibrated'
+      AND source_type = 'brand_voice'
+      AND source_id = ?
+  `).get(workspaceId, workspaceId) as { count: number }).count;
+}
+
+function finalizationEvents() {
+  return broadcastState.calls.filter(call => (
+    call.event === WS_EVENTS.VOICE_PROFILE_UPDATED
+    || call.event === WS_EVENTS.OUTCOME_ACTION_RECORDED
+  ));
+}
+
 beforeAll(async () => {
   delete process.env.APP_PASSWORD;
   const { createApp } = await import('../../server/app.js');
@@ -202,7 +220,16 @@ afterAll(async () => {
 
 describe('brand voice finalization HTTP routes', () => {
   it('reads readiness without exposing private intake payloads', async () => {
-    const res = await api(`/api/voice/${directFixture.workspaceId}/readiness`, {
+    const added = await postJson(`/api/voice/${directFixture.workspaceId}/samples`, {
+      content: 'A second authentic sample for bounded HTTP paging.',
+      contextTag: 'cta',
+      source: 'manual',
+    });
+    expect(added.status).toBe(200);
+    const addedSample = await added.json() as { id: string };
+    directFixture.profileRevision += 1;
+
+    const res = await api(`/api/voice/${directFixture.workspaceId}/readiness?anchorLimit=1`, {
       headers: operatorHeaders(),
     });
     expect(res.status).toBe(200);
@@ -215,8 +242,52 @@ describe('brand voice finalization HTTP routes', () => {
       },
       readiness: { state: 'missing' },
     });
-    expect(body).toHaveProperty('eligibleAnchors');
+    const firstPage = body.eligibleAnchors as {
+      items: Array<{ selector: { voiceSampleId?: string } }>;
+      nextCursor: string | null;
+      hasMore: boolean;
+    };
+    expect(firstPage.items).toHaveLength(1);
+    expect(firstPage.hasMore).toBe(true);
+    expect(firstPage.nextCursor).toEqual(expect.any(String));
+    const next = await api(
+      `/api/voice/${directFixture.workspaceId}/readiness?anchorLimit=1&anchorCursor=${encodeURIComponent(firstPage.nextCursor!)}`,
+      { headers: operatorHeaders() },
+    );
+    expect(next.status).toBe(200);
+    const nextBody = await next.json() as {
+      eligibleAnchors: {
+        items: Array<{ selector: { voiceSampleId?: string } }>;
+        nextCursor: string | null;
+        hasMore: boolean;
+      };
+    };
+    expect(nextBody.eligibleAnchors).toMatchObject({
+      nextCursor: null,
+      hasMore: false,
+    });
+    expect([
+      ...firstPage.items,
+      ...nextBody.eligibleAnchors.items,
+    ].map(item => item.selector.voiceSampleId)).toEqual([
+      directFixture.sampleId,
+      addedSample.id,
+    ]);
     expect(JSON.stringify(body)).not.toContain('authenticSamples');
+  });
+
+  it('rejects invalid HTTP anchor paging input without reading unbounded state', async () => {
+    const invalidLimit = await api(
+      `/api/voice/${directFixture.workspaceId}/readiness?anchorLimit=0`,
+      { headers: operatorHeaders() },
+    );
+    expect(invalidLimit.status).toBe(400);
+
+    const invalidCursor = await api(
+      `/api/voice/${directFixture.workspaceId}/readiness?anchorCursor=not%20base64url`,
+      { headers: operatorHeaders() },
+    );
+    expect(invalidCursor.status).toBe(400);
   });
 
   it('creates a server-attributed finalization, replays without effects, and invalidates once', async () => {
@@ -229,6 +300,10 @@ describe('brand voice finalization HTTP routes', () => {
     db.prepare(`
       DELETE FROM activity_log
       WHERE workspace_id = ? AND type = 'voice_calibrated'
+    `).run(workspaceId);
+    db.prepare(`
+      DELETE FROM tracked_actions
+      WHERE workspace_id = ? AND action_type = 'voice_calibrated'
     `).run(workspaceId);
 
     const request = finalizationBody(directFixture, 'voice-finalization-route-create');
@@ -278,6 +353,16 @@ describe('brand voice finalization HTTP routes', () => {
       revision: createdBody.profileRevision,
     });
     expect(countCalibrationActivities(workspaceId)).toBe(1);
+    expect(countVoiceFinalizationActions(workspaceId)).toBe(1);
+    expect(db.prepare(`
+      SELECT attribution, baseline_snapshot AS baselineSnapshot
+      FROM tracked_actions
+      WHERE workspace_id = ? AND action_type = 'voice_calibrated'
+      ORDER BY created_at DESC LIMIT 1
+    `).get(workspaceId)).toMatchObject({
+      attribution: 'platform_executed',
+      baselineSnapshot: expect.stringContaining('captured_at'),
+    });
     expect(db.prepare(`
       SELECT actor_id AS actorId, actor_name AS actorName,
         json_extract(metadata, '$.finalizationId') AS finalizationId
@@ -294,21 +379,25 @@ describe('brand voice finalization HTTP routes', () => {
       WHERE workspace_id = ? AND cache_key = ?
     `).get(workspaceId, cacheKey)).toMatchObject({ invalidatedAt: expect.any(String) });
 
-    const createdEvents = broadcastState.calls.filter(
-      call => call.event === WS_EVENTS.VOICE_PROFILE_UPDATED,
-    );
-    expect(createdEvents).toEqual([{
-      workspaceId,
-      event: WS_EVENTS.VOICE_PROFILE_UPDATED,
-      payload: {
+    expect(finalizationEvents()).toEqual(expect.arrayContaining([
+      {
         workspaceId,
-        voiceProfileId: directFixture.profileId,
-        finalizationId: createdBody.snapshot.id,
-        profileRevision: createdBody.profileRevision,
-        voiceVersion: 1,
-        status: 'calibrated',
+        event: WS_EVENTS.OUTCOME_ACTION_RECORDED,
+        payload: {},
       },
-    }]);
+      {
+        workspaceId,
+        event: WS_EVENTS.VOICE_PROFILE_UPDATED,
+        payload: {
+          workspaceId,
+          voiceProfileId: directFixture.profileId,
+          finalizationId: createdBody.snapshot.id,
+          profileRevision: createdBody.profileRevision,
+          voiceVersion: 1,
+          status: 'calibrated',
+        },
+      },
+    ]));
 
     db.prepare(`
       UPDATE intelligence_sub_cache SET invalidated_at = NULL
@@ -323,7 +412,8 @@ describe('brand voice finalization HTTP routes', () => {
       snapshot: { id: createdBody.snapshot.id },
     });
     expect(countCalibrationActivities(workspaceId)).toBe(1);
-    expect(broadcastState.calls).toEqual([]);
+    expect(countVoiceFinalizationActions(workspaceId)).toBe(1);
+    expect(finalizationEvents()).toEqual([]);
     expect(db.prepare(`
       SELECT invalidated_at AS invalidatedAt
       FROM intelligence_sub_cache
@@ -342,7 +432,8 @@ describe('brand voice finalization HTTP routes', () => {
       code: 'voice_finalization_idempotency_conflict',
     });
     expect(countCalibrationActivities(workspaceId)).toBe(1);
-    expect(broadcastState.calls).toEqual([]);
+    expect(countVoiceFinalizationActions(workspaceId)).toBe(1);
+    expect(finalizationEvents()).toEqual([]);
   });
 
   it('creates non-recoverable authorization tokens for exact operator-approved commands', async () => {

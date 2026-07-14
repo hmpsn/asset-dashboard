@@ -14,6 +14,8 @@ import { describe, it, expect } from 'vitest';
 import {
   ACTION_CATALOG,
   getActionCatalogEntry,
+  isClientVisibleOutcomeAction,
+  toClientSafeOutcomeEventPayload,
   type ActionCatalogContext,
 } from '../../shared/types/action-catalog.js';
 import type { ActionType } from '../../shared/types/outcome-tracking.js';
@@ -171,6 +173,23 @@ describe('ACTION_CATALOG completeness', () => {
         expect(ACTION_TYPES, `recommendation/${key}.outcomeActionType`).toContain(entry.outcomeActionType);
       }
     }
+  });
+
+  it('projects shared outcome-event payloads through the catalog visibility boundary', () => {
+    const visiblePayload = { actionId: 'visible-action', score: 'win' };
+    expect(isClientVisibleOutcomeAction('content_published')).toBe(true);
+    expect(toClientSafeOutcomeEventPayload('content_published', visiblePayload)).toBe(visiblePayload);
+
+    expect(isClientVisibleOutcomeAction('voice_calibrated')).toBe(false);
+    expect(toClientSafeOutcomeEventPayload('voice_calibrated', {
+      actionId: 'private-action',
+      score: 'strong_win',
+    })).toEqual({});
+
+    const historicalPayload = { actionId: 'historical-action' };
+    expect(isClientVisibleOutcomeAction('legacy_unknown_action')).toBe(true);
+    expect(toClientSafeOutcomeEventPayload('legacy_unknown_action', historicalPayload))
+      .toBe(historicalPayload);
   });
 });
 

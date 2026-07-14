@@ -30,7 +30,17 @@ export const VOICE_FINALIZATION_LIMITS = {
   maxTextLength: 10_000,
   maxSnapshotJsonBytes: 512 * 1024,
   maxAuthorizationJsonBytes: 512 * 1024,
+  defaultEligibleAnchorPageSize: 25,
+  maxEligibleAnchorPageSize: 100,
+  maxAnchorCursorLength: 2_048,
+  maxMutableProfileJsonBytes: 128 * 1024,
   authorizationTtlSeconds: 15 * 60,
+} as const;
+
+/** Frozen persistence codecs. Add a new version instead of mutating version 1. */
+export const VOICE_FINALIZATION_SCHEMA_VERSIONS = {
+  snapshot: 1,
+  authorizationRequest: 1,
 } as const;
 
 /** Caller addresses only durable candidate rows; the server derives evidence refs. */
@@ -70,6 +80,13 @@ export interface FinalizedVoiceAnchorSnapshot {
   evidenceRef: AuthenticVoiceAnchorRef;
 }
 
+export type VoiceFinalizationExecutionAttribution = Omit<
+  GenerationResolverAttribution,
+  'actorType'
+> & {
+  actorType: 'operator' | 'mcp';
+};
+
 /** Immutable versioned authority consumed by downstream generation. */
 export interface FinalizedVoiceSnapshot extends FinalizedVoiceSnapshotRef {
   id: string;
@@ -80,7 +97,7 @@ export interface FinalizedVoiceSnapshot extends FinalizedVoiceSnapshotRef {
   contextModifiers: ContextModifier[];
   anchors: [FinalizedVoiceAnchorSnapshot, ...FinalizedVoiceAnchorSnapshot[]];
   calibrationSelections: VoiceCalibrationSelectionSnapshot[];
-  executionActor: GenerationResolverAttribution;
+  executionActor: VoiceFinalizationExecutionAttribution;
   createdAt: string;
 }
 
@@ -97,7 +114,7 @@ export interface VoiceProfileFinalizationInput {
 export interface FinalizeBrandVoiceRequest extends VoiceProfileFinalizationInput {
   workspaceId: string;
   finalizedBy: GenerationOperatorAttribution;
-  executionActor: GenerationResolverAttribution;
+  executionActor: VoiceFinalizationExecutionAttribution;
   authorizationId?: string;
 }
 
@@ -135,6 +152,59 @@ export interface GetBrandVoiceResult {
   latestSnapshot: FinalizedVoiceSnapshot | null;
 }
 
+/** Bounded immutable-authority reference returned by the default MCP read. */
+export interface FinalizedVoiceSnapshotSummary {
+  id: string;
+  voiceProfileId: string;
+  profileRevision: number;
+  voiceVersion: number;
+  fingerprint: string;
+  finalizedBy: GenerationOperatorAttribution;
+  finalizedAt: string;
+  anchorCount: number;
+  calibrationSelectionCount: number;
+}
+
+export type BrandVoiceAuthorityReadiness =
+  | Extract<BrandVoiceReadiness, { state: 'missing' }>
+  | {
+      state: 'finalized' | 'stale';
+      snapshot: FinalizedVoiceSnapshotSummary;
+      blockingReasons: string[];
+    };
+
+export interface BrandVoiceAuthorityProfileRef {
+  id: string;
+  revision: number;
+  status: VoiceProfileStatus;
+}
+
+export interface GetBrandVoiceAuthoritySummaryResult {
+  profile: BrandVoiceAuthorityProfileRef | null;
+  readiness: BrandVoiceAuthorityReadiness;
+  latestSnapshot: FinalizedVoiceSnapshotSummary | null;
+}
+
+export interface EligibleVoiceAnchorPage {
+  items: EligibleVoiceAnchor[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+/** Shared bounded readiness contract used by the HTTP and MCP read surfaces. */
+export interface GetBrandVoicePageRequest {
+  workspaceId: string;
+  anchorLimit?: number;
+  anchorCursor?: string;
+}
+
+export interface GetBrandVoicePageResult {
+  profile: BrandVoiceProfileSummary | null;
+  readiness: BrandVoiceAuthorityReadiness;
+  eligibleAnchors: EligibleVoiceAnchorPage;
+  latestSnapshot: FinalizedVoiceSnapshotSummary | null;
+}
+
 /** Exact operator-approved command stored before an MCP key may execute it. */
 export interface CreateVoiceFinalizationAuthorizationRequest
   extends VoiceProfileFinalizationInput {
@@ -163,5 +233,8 @@ export interface CreateVoiceFinalizationAuthorizationResult {
 export interface ConsumeVoiceFinalizationAuthorizationRequest {
   workspaceId: string;
   authorizationToken: string;
-  executionActor: GenerationResolverAttribution;
+  /** Delegated authorization consumption is an MCP-only execution seam. */
+  executionActor: Omit<VoiceFinalizationExecutionAttribution, 'actorType'> & {
+    actorType: 'mcp';
+  };
 }

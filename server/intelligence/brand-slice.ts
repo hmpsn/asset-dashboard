@@ -3,6 +3,8 @@ import { buildEffectiveBrandVoiceBlock, getRawBrandVoice, safeBrandEngineRead } 
 import { getVoiceProfile } from '../voice-profile-read-model.js';
 import { listDeliverables } from '../brand-deliverable-read-model.js';
 import { voiceDNAToPromptInstructions, guardrailsToPromptInstructions } from '../voice-dna-layer2.js';
+import { getBrandVoiceAuthoritySummary } from '../domains/brand/voice-finalization.js';
+import db from '../db/index.js';
 
 const IDENTITY_FIELDS = [
   ['mission', 'Mission'], ['vision', 'Vision'], ['values', 'Values'],
@@ -23,9 +25,43 @@ export async function assembleBrand(workspaceId: string): Promise<BrandSlice> {
   // (seo-context-slice.ts) — both call the SAME buildEffectiveBrandVoiceBlock(). The safeBrandEngineRead
   // wrapper only diverges on a thrown error (→ ''). Enforced by
   // tests/contract/voice-block-slice-parity.test.ts — don't change one source without the other.
-  const voicePromptBlock = safeBrandEngineRead('brand.voiceBlock', workspaceId, () => buildEffectiveBrandVoiceBlock(workspaceId), '');
-  const profile = safeBrandEngineRead('brand.voiceProfile', workspaceId, () => getVoiceProfile(workspaceId), null);
-  const legacyVoice = safeBrandEngineRead('brand.rawVoice', workspaceId, () => getRawBrandVoice(workspaceId), '');
+  const readVoiceState = () => ({
+    voicePromptBlock: safeBrandEngineRead(
+      'brand.voiceBlock',
+      workspaceId,
+      () => buildEffectiveBrandVoiceBlock(workspaceId),
+      '',
+    ),
+    profile: safeBrandEngineRead(
+      'brand.voiceProfile',
+      workspaceId,
+      () => getVoiceProfile(workspaceId),
+      null,
+    ),
+    finalization: safeBrandEngineRead(
+      'brand.voiceFinalization',
+      workspaceId,
+      () => getBrandVoiceAuthoritySummary(workspaceId),
+      null,
+    ),
+    legacyVoice: safeBrandEngineRead(
+      'brand.rawVoice',
+      workspaceId,
+      () => getRawBrandVoice(workspaceId),
+      '',
+    ),
+  });
+  // The prompt block and its authority metadata are one trust decision. Fence
+  // every voice read in the same SQLite snapshot so an edit+refinalize cannot
+  // pair an old block with a newly finalized revision/version.
+  const {
+    voicePromptBlock,
+    profile,
+    finalization,
+    legacyVoice,
+  } = db.inTransaction
+    ? readVoiceState()
+    : db.transaction(readVoiceState).deferred();
   // Coarse hint only (calibrated vs raw-legacy-text vs none). A configured-but-not-calibrated
   // profile can still yield a non-empty voicePromptBlock while this reports 'none' — treat
   // voicePromptBlock / availability, not voice.status, as authoritative for "is there voice".
@@ -66,5 +102,17 @@ export async function assembleBrand(workspaceId: string): Promise<BrandSlice> {
   const availability: BrandSlice['availability'] =
     (idLines.length > 0 || voicePromptBlock.trim()) ? 'ready' : 'no_data';
 
-  return { availability, identity, voice: { status }, voicePromptBlock, voiceDnaBlock, identityPromptBlock };
+  return {
+    availability,
+    identity,
+    voice: {
+      status,
+      readiness: finalization?.readiness.state ?? 'unavailable',
+      profileRevision: finalization?.profile?.revision ?? profile?.revision ?? null,
+      voiceVersion: finalization?.latestSnapshot?.voiceVersion ?? null,
+    },
+    voicePromptBlock,
+    voiceDnaBlock,
+    identityPromptBlock,
+  };
 }

@@ -179,6 +179,46 @@ describe('brand voice finalization domain', () => {
     });
   });
 
+  it('keeps direct finalization operator-only and delegated execution behind authorization', () => {
+    const { seeded, sample } = profileWithSample();
+    const request = finalizationRequest(seeded.workspaceId, sample.id);
+    const before = getVoiceProfile(seeded.workspaceId)!;
+    const unauthorizedRequests: FinalizeBrandVoiceRequest[] = [
+      {
+        ...request,
+        executionActor: mcpActor,
+      },
+      {
+        ...request,
+        executionActor: {
+          actorType: 'operator',
+          actorId: 'different-operator',
+          actorLabel: 'Different Operator',
+        },
+      },
+      {
+        ...request,
+        authorizationId: `vfa_${randomUUID()}`,
+      },
+    ];
+
+    for (const unauthorized of unauthorizedRequests) {
+      expect(() => finalizeBrandVoice(unauthorized))
+        .toThrow(VoiceFinalizationAuthorizationError);
+    }
+    expect(getVoiceProfile(seeded.workspaceId)).toMatchObject({
+      revision: before.revision,
+      status: before.status,
+    });
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM voice_profile_finalizations
+      WHERE workspace_id = ?
+    `).get(seeded.workspaceId)).toEqual({ count: 0 });
+
+    expect(finalizeBrandVoice(request)).toMatchObject({ created: true, replayed: false });
+  });
+
   it('replays exactly, rejects key mutation, and rejects a second finalization key', () => {
     const { seeded, sample } = profileWithSample();
     const request = finalizationRequest(seeded.workspaceId, sample.id);

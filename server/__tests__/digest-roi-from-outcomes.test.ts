@@ -325,6 +325,53 @@ describe('getROIHighlightsFromOutcomes', () => {
     expect(highlights.some(h => h.pageUrl === '/proposal-page')).toBe(false);
   });
 
+  it('excludes internal-only action-catalog entries from digest and value highlights', () => {
+    const ws = `${WS_BASE}-client-hidden`;
+    seedWorkspace(ws);
+
+    const internalOnly = recordAction({ // recordAction-ok — isolated outcome fixture cleaned in afterAll
+      attribution: 'platform_executed',
+      workspaceId: ws,
+      actionType: 'voice_calibrated',
+      sourceType: 'test',
+      sourceId: crypto.randomUUID(),
+      baselineSnapshot: { captured_at: new Date().toISOString() },
+    });
+    recordOutcome({
+      actionId: internalOnly.id,
+      checkpointDays: 30,
+      metricsSnapshot: { captured_at: new Date().toISOString() },
+      score: 'strong_win',
+      deltaSummary: WIN_DELTA,
+      attributedValue: 999,
+      valueBasis: 'manual',
+    });
+
+    const visible = recordAction({ // recordAction-ok — isolated outcome fixture cleaned in afterAll
+      attribution: 'platform_executed',
+      workspaceId: ws,
+      actionType: 'content_published',
+      sourceType: 'test',
+      sourceId: crypto.randomUUID(),
+      pageUrl: '/visible-win',
+      baselineSnapshot: { captured_at: new Date().toISOString(), clicks: 10 },
+    });
+    recordOutcome({
+      actionId: visible.id,
+      checkpointDays: 30,
+      metricsSnapshot: { captured_at: new Date().toISOString(), clicks: 50 },
+      score: 'win',
+      deltaSummary: WIN_DELTA,
+      attributedValue: 100,
+      valueBasis: 'clicks_delta_x_cpc',
+    });
+
+    const highlights = getROIHighlightsFromOutcomes(ws, 10);
+
+    expect(highlights).toHaveLength(1);
+    expect(highlights[0]).toMatchObject({ pageUrl: '/visible-win', attributedValue: 100 });
+  });
+
   // FIX 4: dedup — an action with win outcomes at BOTH the 30-day and 60-day
   // checkpoints must yield exactly ONE highlight (the higher checkpoint wins).
   it('deduplicates: one action with wins at two checkpoints yields exactly one highlight', () => {

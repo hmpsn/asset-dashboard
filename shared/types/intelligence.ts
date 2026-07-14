@@ -12,6 +12,7 @@ import type { SiteInventorySlice } from './site-inventory.js';
 import type { EntityResolutionSlice } from './entity-resolution.js';
 import type { EeatAsset, EeatAssetType } from './eeat-assets.js';
 import type { StoredGenerationQuality } from './generation-quality.js';
+import type { BrandVoiceReadinessState } from './brand-generation.js';
 import type {
   TrackedAction,
   ActionOutcome,
@@ -336,7 +337,19 @@ export interface LearningsSlice {
     primary_metric: string;
     thresholds: { strong_win: number; win: number; neutral_band: number };
   }>>;
+  /**
+   * Audience-safe projection for public/client consumers. It is recomputed from
+   * catalog-visible actions using the canonical learnings math; internal/admin
+   * fields above remain unchanged. Missing means an older/custom assembler did
+   * not provide a projection and public consumers must fail closed.
+   */
+  clientProjection?: ClientSafeLearningsProjection | null;
 }
+
+export type ClientSafeLearningsProjection = Omit<
+  LearningsSlice,
+  'clientProjection' | 'platformPriors' | 'forPage'
+>;
 
 export interface PageProfileSlice {
   pagePath: string;
@@ -708,8 +721,18 @@ export interface BrandSlice {
     elevatorPitch?: string;
     positioning?: string;
   };
-  /** Voice metadata. P1: status only (structured tone/guardrails deferred to a later phase). */
-  voice: { status: 'calibrated' | 'legacy' | 'none' };
+  /**
+   * Voice metadata. `status` preserves the legacy prompt-compatibility signal; only
+   * `readiness === 'finalized'` proves that the current revision has an immutable,
+   * operator-approved authority snapshot. `unavailable` means the readiness read
+   * failed and must never be interpreted as finalized.
+   */
+  voice: {
+    status: 'calibrated' | 'legacy' | 'none';
+    readiness: BrandVoiceReadinessState | 'unavailable';
+    profileRevision: number | null;
+    voiceVersion: number | null;
+  };
   /** Authority-resolved voice block — inject directly; never re-derive from structured fields.
    *  INVARIANT: byte-identical to `SeoContextSlice.effectiveBrandVoiceBlock` (both sourced from
    *  `buildEffectiveBrandVoiceBlock(workspaceId)`). The duplication across two slices is

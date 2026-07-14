@@ -64,7 +64,8 @@ function seedVoiceFixture(variant: 'calibrated' | 'draft-samples-only' | 'draft-
       voiceDNA: makeDNA(),
       guardrails: makeGuardrails(),
     });
-    updateVoiceProfile(seeded.workspaceId, { status: 'calibrated' });
+    db.prepare(`UPDATE voice_profiles SET status = 'calibrated' WHERE workspace_id = ?`) // status-ok: compatibility fixture for calibrated Layer-2 prompt behavior
+      .run(seeded.workspaceId);
   }
 
   if (variant === 'draft-samples-only') {

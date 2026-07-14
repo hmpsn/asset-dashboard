@@ -195,13 +195,13 @@ describe('MCP plumbing — new tools dispatch over real HTTP', () => {
     const payload = JSON.parse(body.result!.content[0].text) as {
       profile: unknown;
       readiness: { state: string };
-      eligible_anchors: unknown[];
+      eligible_anchors: { items: unknown[]; next_cursor: string | null; has_more: boolean };
       latest_snapshot: unknown;
     };
     expect(payload).toMatchObject({
       profile: null,
       readiness: { state: 'missing' },
-      eligible_anchors: [],
+      eligible_anchors: { items: [], next_cursor: null, has_more: false },
       latest_snapshot: null,
     });
     expect(JSON.stringify(payload)).not.toContain('raw_intake');

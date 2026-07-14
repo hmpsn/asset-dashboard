@@ -31,6 +31,7 @@ import type {
 import { isProgrammingError } from './errors.js';
 import { getPageKeyword } from './page-keywords.js';
 import { normalizePageUrl } from './utils/page-address.js';
+import { toClientSafeOutcomeEventPayload } from '../shared/types/action-catalog.js';
 
 const log = createLogger('outcome-measurement');
 
@@ -396,13 +397,17 @@ function recordUnmeasurableOutcome(
     { actionId: action.id, checkpointDays, primaryMetric, score, completed: Boolean(opts.completeAction) },
     reason,
   );
-  broadcastToWorkspace(action.workspaceId, WS_EVENTS.OUTCOME_SCORED, {
-    actionId: action.id,
-    checkpointDays,
-    score: outcome.score,
-    earlySignal: outcome.earlySignal,
-    deltaSummary: outcome.deltaSummary,
-  });
+  broadcastToWorkspace(
+    action.workspaceId,
+    WS_EVENTS.OUTCOME_SCORED,
+    toClientSafeOutcomeEventPayload(action.actionType, {
+      actionId: action.id,
+      checkpointDays,
+      score: outcome.score,
+      earlySignal: outcome.earlySignal,
+      deltaSummary: outcome.deltaSummary,
+    }),
+  );
 }
 
 /** Result of scoring one checkpoint. `short_circuited` = the action was marked
@@ -576,13 +581,17 @@ async function scoreActionAtCheckpoint(
     'Action scored',
   );
 
-  broadcastToWorkspace(action.workspaceId, WS_EVENTS.OUTCOME_SCORED, {
-    actionId: action.id,
-    checkpointDays,
-    score: outcome.score,
-    earlySignal: outcome.earlySignal,
-    deltaSummary: outcome.deltaSummary,
-  });
+  broadcastToWorkspace(
+    action.workspaceId,
+    WS_EVENTS.OUTCOME_SCORED,
+    toClientSafeOutcomeEventPayload(action.actionType, {
+      actionId: action.id,
+      checkpointDays,
+      score: outcome.score,
+      earlySignal: outcome.earlySignal,
+      deltaSummary: outcome.deltaSummary,
+    }),
+  );
   return 'scored';
 }
 

@@ -27,7 +27,7 @@ Follow this checklist for EVERY feature, bug fix, or modification that touches d
 - [ ] **External module broadcast**: If the write happens outside `index.ts`, use the `initMyModuleBroadcast` callback pattern (see `data-flow.md` Rule 4)
 - [ ] **Public endpoint safety**: `/api/public/*` endpoints don't leak tokens, passwords, or admin-only config
 - [ ] **Activity logging**: Significant actions call `addActivity()` with the correct type
-- [ ] **New activity type?**: If adding a new `ActivityType`, add it to the union in `activity-log.ts`. If clients should see it, add to `CLIENT_VISIBLE_TYPES` in `listClientActivity()`
+- [ ] **New activity type?**: If adding a new `ActivityType`, add it to the union in `activity-log.ts`. If clients should see it, add to `CLIENT_VISIBLE_TYPES` in `listClientActivity()`; otherwise its shared `activity:new` payload must stay an opaque `{}` invalidation signal
 - [ ] **New event name?**: Register it in `server/ws-events.ts`
 
 ## During Implementation — Frontend Side

@@ -137,7 +137,10 @@ export async function detectAllWorkspacePlaybooks(): Promise<void> {
     if (discovered > 0) {
       invalidateMonthlyDigestCache(ws.id);
       clearIntelligenceCache(ws.id);
-      broadcastToWorkspace(ws.id, WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED, { discovered });
+      // Detected playbooks can include client-hidden action sequences. The
+      // shared channel carries only an invalidation signal; readers refetch the
+      // appropriate admin or client-safe projection.
+      broadcastToWorkspace(ws.id, WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED, {});
     }
   }
   log.info({ workspaceCount: workspaces.length, totalDiscovered }, 'Playbook detection ran across all workspaces');

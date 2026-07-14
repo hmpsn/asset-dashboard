@@ -7,7 +7,7 @@ import {
 import type {
   FinalizeBrandVoiceResult,
   FinalizedVoiceSnapshot,
-  GetBrandVoiceResult,
+  GetBrandVoicePageResult,
 } from '../../shared/types/voice-finalization.js';
 import {
   VoiceFinalizationAuthorizationError,
@@ -15,6 +15,8 @@ import {
   VoiceFinalizationIdempotencyConflictError,
   VoiceFinalizationNotFoundError,
   VoiceFinalizationPreconditionError,
+  VoiceFinalizationReadConflictError,
+  VoiceFinalizationReadCursorError,
 } from '../../server/domains/brand/voice-finalization.js';
 import {
   brandVoiceActionTools,
@@ -22,7 +24,6 @@ import {
   type BrandVoiceActionDependencies,
 } from '../../server/mcp/tools/brand-voice-actions.js';
 import { isValidatedMcpJsonV1ErrorResult } from '../../server/mcp/tool-errors.js';
-import { WS_EVENTS } from '../../server/ws-events.js';
 
 const WORKSPACE_ID = 'ws_brand_voice';
 const OPERATOR = {
@@ -142,7 +143,7 @@ function finalizationResult(
   };
 }
 
-function readResult(): GetBrandVoiceResult {
+function readResult(): GetBrandVoicePageResult {
   return {
     profile: {
       id: 'voice_profile_1',
@@ -157,45 +158,41 @@ function readResult(): GetBrandVoiceResult {
       state: 'missing',
       blockingReasons: ['Brand voice has not been finalized.'],
     },
-    eligibleAnchors: [{
-      selector: { kind: 'voice_sample', voiceSampleId: 'voice_sample_1' },
-      content: 'You deserve a clear explanation before deciding.',
-      context: 'body',
-      sourceLabel: 'Manual voice sample',
-      capturedAt: '2026-07-14T12:00:00.000Z',
-    }],
+    eligibleAnchors: {
+      items: [{
+        selector: { kind: 'voice_sample', voiceSampleId: 'voice_sample_1' },
+        content: 'You deserve a clear explanation before deciding.',
+        context: 'body',
+        sourceLabel: 'Manual voice sample',
+        capturedAt: '2026-07-14T12:00:00.000Z',
+      }],
+      nextCursor: 'opaque-next-cursor',
+      hasMore: true,
+    },
     latestSnapshot: null,
   };
 }
 
 function dependencies() {
-  const getBrandVoiceReadiness = vi.fn<
-    BrandVoiceActionDependencies['getBrandVoiceReadiness']
+  const getBrandVoicePage = vi.fn<
+    BrandVoiceActionDependencies['getBrandVoicePage']
   >(() => readResult());
   const consumeVoiceFinalizationAuthorization = vi.fn<
     BrandVoiceActionDependencies['consumeVoiceFinalizationAuthorization']
   >(request => finalizationResult(request.executionActor));
-  const addActivity = vi.fn<BrandVoiceActionDependencies['addActivity']>();
-  const broadcastToWorkspace = vi.fn<
-    BrandVoiceActionDependencies['broadcastToWorkspace']
-  >();
-  const invalidateIntelligenceCache = vi.fn<
-    BrandVoiceActionDependencies['invalidateIntelligenceCache']
+  const applyVoiceFinalizationPostCommitEffects = vi.fn<
+    BrandVoiceActionDependencies['applyVoiceFinalizationPostCommitEffects']
   >();
   const value: BrandVoiceActionDependencies = {
-    getBrandVoiceReadiness,
+    getBrandVoicePage,
     consumeVoiceFinalizationAuthorization,
-    addActivity,
-    broadcastToWorkspace,
-    invalidateIntelligenceCache,
+    applyVoiceFinalizationPostCommitEffects,
   };
   return {
     value,
-    getBrandVoiceReadiness,
+    getBrandVoicePage,
     consumeVoiceFinalizationAuthorization,
-    addActivity,
-    broadcastToWorkspace,
-    invalidateIntelligenceCache,
+    applyVoiceFinalizationPostCommitEffects,
   };
 }
 
@@ -228,9 +225,14 @@ describe('MCP brand voice actions', () => {
 
   it('returns only the safe readiness projection in snake_case', async () => {
     const deps = dependencies();
-    deps.getBrandVoiceReadiness.mockReturnValue({
+    const fullSnapshot = snapshot();
+    deps.getBrandVoicePage.mockReturnValue({
       ...readResult(),
-      latestSnapshot: snapshot(),
+      latestSnapshot: {
+        ...fullSnapshot,
+        anchorCount: fullSnapshot.anchors.length,
+        calibrationSelectionCount: fullSnapshot.calibrationSelections.length,
+      },
       rawIntake: { privateAnswers: ['must not escape'] },
     } as never);
     const result = await createBrandVoiceActionHandler(deps.value)(
@@ -240,7 +242,11 @@ describe('MCP brand voice actions', () => {
     );
 
     expect(result.isError).not.toBe(true);
-    expect(deps.getBrandVoiceReadiness).toHaveBeenCalledWith(WORKSPACE_ID);
+    expect(deps.getBrandVoicePage).toHaveBeenCalledWith({
+      workspaceId: WORKSPACE_ID,
+      anchorLimit: undefined,
+      anchorCursor: undefined,
+    });
     expect(textPayload(result)).toMatchObject({
       profile: {
         id: 'voice_profile_1',
@@ -250,21 +256,92 @@ describe('MCP brand voice actions', () => {
         },
       },
       readiness: { state: 'missing' },
-      eligible_anchors: [{
-        selector: { kind: 'voice_sample', voice_sample_id: 'voice_sample_1' },
-        source_label: 'Manual voice sample',
-      }],
+      eligible_anchors: {
+        items: [{
+          selector: { kind: 'voice_sample', voice_sample_id: 'voice_sample_1' },
+          source_label: 'Manual voice sample',
+        }],
+        next_cursor: 'opaque-next-cursor',
+        has_more: true,
+      },
       latest_snapshot: {
         id: 'voice_finalization_1',
         voice_profile_id: 'voice_profile_1',
+        anchor_count: 1,
       },
     });
-    const serialized = JSON.stringify(textPayload(result));
+    const payload = textPayload(result);
+    const serialized = JSON.stringify(payload);
     expect(serialized).not.toContain('raw_intake');
     expect(serialized).not.toContain('privateAnswers');
     expect(serialized).not.toContain('execution_actor');
     expect(serialized).not.toContain('mcp_key_voice_1');
     expect(serialized).not.toContain('Voice automation');
+    expect(payload.latest_snapshot).not.toHaveProperty('voice_dna');
+    expect(payload.latest_snapshot).not.toHaveProperty('guardrails');
+    expect(payload.latest_snapshot).not.toHaveProperty('anchors');
+    expect(payload.latest_snapshot).not.toHaveProperty('calibration_selections');
+  });
+
+  it('forwards the bounded anchor page contract and rejects oversized input', async () => {
+    const deps = dependencies();
+    const handle = createBrandVoiceActionHandler(deps.value);
+    const valid = await handle('get_brand_voice', {
+      workspace_id: WORKSPACE_ID,
+      anchor_limit: 100,
+      anchor_cursor: 'opaque_cursor_1',
+    }, workspaceContext());
+
+    expect(valid.isError).not.toBe(true);
+    expect(deps.getBrandVoicePage).toHaveBeenCalledWith({
+      workspaceId: WORKSPACE_ID,
+      anchorLimit: 100,
+      anchorCursor: 'opaque_cursor_1',
+    });
+
+    deps.getBrandVoicePage.mockClear();
+    const invalid = await handle('get_brand_voice', {
+      workspace_id: WORKSPACE_ID,
+      anchor_limit: 101,
+    }, workspaceContext());
+    expect(textPayload(invalid)).toEqual({
+      code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
+      message: 'The tool input is invalid.',
+      retryable: false,
+    });
+    expect(deps.getBrandVoicePage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      label: 'invalid or cross-workspace cursor',
+      error: new VoiceFinalizationReadCursorError(),
+      expected: {
+        code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
+        message: 'The tool input is invalid.',
+        retryable: false,
+      },
+    },
+    {
+      label: 'stale authority cursor',
+      error: new VoiceFinalizationReadConflictError(),
+      expected: {
+        code: MCP_TOOL_ERROR_CODES.CONFLICT,
+        message: 'The brand voice changed after this cursor was issued. Re-read it from the first anchor page.',
+        retryable: true,
+      },
+    },
+  ])('maps $label to a stable read error', async ({ error, expected }) => {
+    const deps = dependencies();
+    deps.getBrandVoicePage.mockImplementation(() => { throw error; });
+    const result = await createBrandVoiceActionHandler(deps.value)(
+      'get_brand_voice',
+      { workspace_id: WORKSPACE_ID, anchor_cursor: 'opaque_cursor_1' },
+      workspaceContext(),
+    );
+
+    expect(isValidatedMcpJsonV1ErrorResult(result)).toBe(true);
+    expect(textPayload(result)).toEqual(expected);
   });
 
   it('consumes stored operator authorization with MCP execution attribution and emits effects once', async () => {
@@ -310,39 +387,17 @@ describe('MCP brand voice actions', () => {
       },
     });
     expect(textPayload(replayed)).toMatchObject({ created: false, replayed: true });
-    expect(deps.addActivity).toHaveBeenCalledTimes(1);
-    expect(deps.broadcastToWorkspace).toHaveBeenCalledTimes(1);
-    expect(deps.invalidateIntelligenceCache).toHaveBeenCalledTimes(1);
-    expect(deps.addActivity).toHaveBeenCalledWith(
+    expect(deps.applyVoiceFinalizationPostCommitEffects).toHaveBeenCalledTimes(2);
+    expect(deps.applyVoiceFinalizationPostCommitEffects).toHaveBeenNthCalledWith(
+      1,
       WORKSPACE_ID,
-      'voice_calibrated',
-      'Finalized brand voice',
-      'Finalized voice profile revision 4.',
-      {
-        voiceProfileId: 'voice_profile_1',
-        finalizationId: 'voice_finalization_1',
-        profileRevision: 4,
-        voiceVersion: 1,
-        fingerprint: 'a'.repeat(64),
-      },
-      { id: 'operator_1', name: 'Brand strategist' },
+      expect.objectContaining({ created: true, replayed: false }),
     );
-    expect(deps.broadcastToWorkspace).toHaveBeenCalledWith(
+    expect(deps.applyVoiceFinalizationPostCommitEffects).toHaveBeenNthCalledWith(
+      2,
       WORKSPACE_ID,
-      WS_EVENTS.VOICE_PROFILE_UPDATED,
-      {
-        workspaceId: WORKSPACE_ID,
-        voiceProfileId: 'voice_profile_1',
-        finalizationId: 'voice_finalization_1',
-        profileRevision: 4,
-        voiceVersion: 1,
-        status: 'calibrated',
-      },
+      expect.objectContaining({ created: false, replayed: true }),
     );
-    expect(deps.addActivity.mock.invocationCallOrder[0])
-      .toBeLessThan(deps.broadcastToWorkspace.mock.invocationCallOrder[0]!);
-    expect(deps.broadcastToWorkspace.mock.invocationCallOrder[0])
-      .toBeLessThan(deps.invalidateIntelligenceCache.mock.invocationCallOrder[0]!);
     expect(JSON.stringify(textPayload(created))).not.toContain('authorization_token');
     expect(JSON.stringify(textPayload(created))).not.toContain('one-time-authorization-secret');
     expect(JSON.stringify(textPayload(created))).not.toContain('execution_actor');
@@ -397,11 +452,8 @@ describe('MCP brand voice actions', () => {
     expect(deps.consumeVoiceFinalizationAuthorization).not.toHaveBeenCalled();
   });
 
-  it('continues later post-commit effects when one best-effort effect fails', async () => {
+  it('delegates a newly created result to the shared post-commit effect spine', async () => {
     const deps = dependencies();
-    deps.addActivity.mockImplementation(() => {
-      throw new Error('activity store unavailable');
-    });
     const result = await createBrandVoiceActionHandler(deps.value)(
       'finalize_brand_voice',
       {
@@ -412,9 +464,7 @@ describe('MCP brand voice actions', () => {
     );
 
     expect(result.isError).not.toBe(true);
-    expect(deps.addActivity).toHaveBeenCalledTimes(1);
-    expect(deps.broadcastToWorkspace).toHaveBeenCalledTimes(1);
-    expect(deps.invalidateIntelligenceCache).toHaveBeenCalledTimes(1);
+    expect(deps.applyVoiceFinalizationPostCommitEffects).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -483,14 +533,12 @@ describe('MCP brand voice actions', () => {
     expect(textPayload(result)).toEqual(expected);
     expect(JSON.stringify(textPayload(result))).not.toContain('must-not-escape');
     expect(JSON.stringify(textPayload(result))).not.toContain('raw');
-    expect(deps.addActivity).not.toHaveBeenCalled();
-    expect(deps.broadcastToWorkspace).not.toHaveBeenCalled();
-    expect(deps.invalidateIntelligenceCache).not.toHaveBeenCalled();
+    expect(deps.applyVoiceFinalizationPostCommitEffects).not.toHaveBeenCalled();
   });
 
   it('sanitizes unexpected failures and returns a branded internal error', async () => {
     const deps = dependencies();
-    deps.getBrandVoiceReadiness.mockImplementation(() => {
+    deps.getBrandVoicePage.mockImplementation(() => {
       throw new Error('private intake and stack must not escape');
     });
     const result = await createBrandVoiceActionHandler(deps.value)(
@@ -521,7 +569,7 @@ describe('MCP brand voice actions', () => {
       message: 'Unknown brand voice tool: the requested tool does not exist.',
       retryable: false,
     });
-    expect(deps.getBrandVoiceReadiness).not.toHaveBeenCalled();
+    expect(deps.getBrandVoicePage).not.toHaveBeenCalled();
     expect(deps.consumeVoiceFinalizationAuthorization).not.toHaveBeenCalled();
   });
 });

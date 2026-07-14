@@ -244,13 +244,17 @@ new revision.
 ## Durable Voice Finalization Authority
 
 **Files:** `shared/types/voice-finalization.ts`,
-`server/domains/brand/voice-finalization.ts`, migration 186.
+`server/domains/brand/voice-finalization.ts`,
+`server/domains/brand/voice-finalization-effects.ts`, migration 186.
 
 A `status === 'calibrated'` profile remains prompt-compatible for historical
 workspaces, but status alone is not generation authority. B2/M1 generation must
-consume `getBrandVoiceReadiness()` and require a `finalized` immutable snapshot.
-Legacy calibrated rows have no fabricated operator or anchor history and return
-`missing` readiness until truthfully finalized.
+consume a strict snapshot-only authority reader and require the exact current
+immutable version; it must not use the operator-facing candidate enumeration as
+generation preflight. `getBrandVoiceAuthoritySummary()` is bounded metadata, not
+the frozen generation payload. Legacy calibrated rows have no fabricated
+operator or anchor history and return `missing` readiness until truthfully
+finalized.
 
 Each immutable voice version freezes:
 
@@ -260,10 +264,33 @@ Each immutable voice version freezes:
 - finalizing operator, separate execution actor, timestamp, and SHA-256
   fingerprint.
 
+The storage codec is explicitly versioned. Migration 186 writes snapshot
+`schema_version = 1` and authorization `request_schema_version = 1`; readers
+dispatch through frozen V1 codecs and fail closed on unknown versions. Never
+tighten a shipped V1 required field in place. A breaking shape change requires
+a new version/parser while old versions remain readable and replayable.
+
 Only `manual` and `transcript_extraction` voice samples may anchor a final voice.
 An exact immutable `BrandIntakeAuthenticSample` may also anchor it. Generated
 calibration-loop, identity-approved, and copy-approved samples can inform a
 draft but cannot establish authenticity.
+
+Every mutable write is bounded before persistence and every authority read
+revalidates the raw stored shape. DNA, guardrails, and context-modifier JSON are
+limited to 128 KiB each with bounded item counts/text. Manual voice samples are
+trimmed, non-empty, at most 10,000 characters and 10,000 UTF-8 bytes. Raw legacy
+or corrupt samples that fail the same contract are neither counted nor returned
+as eligible anchors and cannot be finalized by addressing their IDs directly.
+
+External readiness reads are paged through `getBrandVoicePage()`: default 25,
+maximum 100 eligible anchors. The opaque cursor is authenticated and bound to
+workspace, profile ID/revision, intake revision, and offset. Callers follow
+`nextCursor` while `hasMore` is true; a revision conflict restarts at page one.
+The default response returns only a bounded latest-finalization summary, never
+frozen anchor/calibration content. Internally the summary reader still strictly
+parses and fingerprints the bounded full snapshot before claiming authority;
+this intentional integrity check prevents corrupt JSON from masquerading as a
+valid scalar summary.
 
 An authenticated HTTP operator may finalize directly. MCP keys are execution
 identities, not people: `finalize_brand_voice` must consume a short-lived,
@@ -272,6 +299,17 @@ complete command and expected revision. Persist only the token digest; never
 accept a caller-authored operator identity or reinterpret a key as a human.
 Exact idempotent replay returns the existing version without activity/event
 duplication. Only a newly committed finalization may record `voice_calibrated`.
+The consumed authorization row is immutable audit proof: consumed timestamp,
+linked finalization, and MCP execution actor are filled atomically. Authoritative
+MCP snapshots must link back to the matching consumed operator command, exact
+profile revision/fingerprint/finalizer, and original MCP executor. A later exact
+authorization may link to an already-existing direct/other-MCP artifact as
+redundant proof without rewriting that artifact's frozen executor.
+HTTP and MCP must both delegate post-commit work to
+`applyVoiceFinalizationPostCommitEffects()`: it owns the activity, truthful
+outcome action, redacted workspace events, workspace-intelligence invalidation,
+and monthly-digest invalidation. Transport-local copies of those effects are
+forbidden because they drift on replay and privacy semantics.
 
 Approved `voice_guidelines` and `tone_examples` are legacy draft/evidence inputs.
 When a calibrated profile already owns the voice layer, copy generation excludes

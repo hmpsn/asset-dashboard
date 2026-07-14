@@ -155,7 +155,7 @@ const OUTCOME_CATALOG = {
     phase: 'prove',
     outcomeActionType: 'voice_calibrated',
     clientVisible: false,
-    note: 'Producer: server/workspace-context-generation-job.ts.',
+    note: 'Producer: server/domains/brand/voice-finalization-effects.ts after a real immutable operator finalization.',
   },
   competitor_gap_closed: {
     label: 'Keyword Gap Closed',
@@ -512,4 +512,28 @@ export function getActionCatalogEntry(
 ): ActionCatalogEntry | undefined {
   const contextCatalog = ACTION_CATALOG[context] as Record<string, ActionCatalogEntry> | undefined;
   return contextCatalog?.[action];
+}
+
+/**
+ * Client-safe outcome boundary. Explicitly hidden workflow milestones are not
+ * client results and must not feed client-visible wins, annotations, or outcome
+ * learnings. Unknown historical values remain readable for compatibility.
+ */
+export function isClientVisibleOutcomeAction(action: string): boolean {
+  return getActionCatalogEntry('outcome', action)?.clientVisible !== false;
+}
+
+/**
+ * Preserve rich workspace-event payloads for client-visible outcomes while
+ * reducing internal-only outcome events to opaque invalidation signals. The
+ * workspace WebSocket channel is shared by admin and client subscribers, so a
+ * hidden action ID, score, checkpoint, or delta must never cross that boundary.
+ * Unknown historical action values remain visible for compatibility, matching
+ * `isClientVisibleOutcomeAction()`.
+ */
+export function toClientSafeOutcomeEventPayload<T extends object>(
+  action: string,
+  payload: T,
+): T | Record<string, never> {
+  return isClientVisibleOutcomeAction(action) ? payload : {};
 }

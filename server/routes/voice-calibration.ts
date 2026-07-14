@@ -5,7 +5,7 @@
  *   voice_profile_finalizations, voice_finalization_authorizations
  * @writes voice_profiles, voice_samples, voice_calibration_sessions,
  *   voice_profile_finalizations, voice_finalization_authorizations, activity_log,
- *   intelligence_cache
+ *   tracked_actions, intelligence_cache, monthly_digest_cache
  */
 import { Router, type Request, type Response } from 'express';
 
@@ -20,7 +20,7 @@ import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import {
-  getVoiceProfile, createVoiceProfile, updateVoiceProfile,
+  getVoiceProfile, createVoiceProfile, updateVoiceProfileWithResult,
   VoiceProfileStateTransitionError,
   addVoiceSample, deleteVoiceSample,
   listCalibrationSessions,
@@ -36,7 +36,10 @@ import {
   createVoiceFinalizationAuthorizationBodySchema,
   createVoiceProfileSchema,
   finalizeBrandVoiceBodySchema,
+  getBrandVoiceReadinessQuerySchema,
   saveVariationFeedbackSchema,
+  updateVoiceProfileSchema,
+  voiceSampleInputSchema,
   type CreateVoiceFinalizationAuthorizationBody,
   type FinalizeBrandVoiceBody,
 } from '../schemas/voice-calibration.js';
@@ -44,13 +47,16 @@ import { createLogger } from '../logger.js';
 import {
   createVoiceFinalizationAuthorization,
   finalizeBrandVoice,
-  getBrandVoiceReadiness,
+  getBrandVoicePage,
   VoiceFinalizationAuthorizationError,
   VoiceFinalizationConflictError,
   VoiceFinalizationIdempotencyConflictError,
   VoiceFinalizationNotFoundError,
   VoiceFinalizationPreconditionError,
+  VoiceFinalizationReadConflictError,
+  VoiceFinalizationReadCursorError,
 } from '../domains/brand/voice-finalization.js';
+import { applyVoiceFinalizationPostCommitEffects } from '../domains/brand/voice-finalization-effects.js';
 
 const router = Router();
 const log = createLogger('voice-calibration-routes');
@@ -88,45 +94,6 @@ function operatorFromRequest(req: Request): GenerationOperatorAttribution {
     actorId: 'admin-hmac',
     actorLabel: 'Admin operator',
   };
-}
-
-function applyFinalizationPostCommitEffects(
-  workspaceId: string,
-  result: ReturnType<typeof finalizeBrandVoice>,
-): void {
-  const metadata = {
-    voiceProfileId: result.snapshot.voiceProfileId,
-    finalizationId: result.snapshot.id,
-    profileRevision: result.profileRevision,
-    voiceVersion: result.snapshot.voiceVersion,
-    fingerprint: result.snapshot.fingerprint,
-  };
-  runVoicePostCommitEffect(workspaceId, 'activity', () => {
-    addActivity(
-      workspaceId,
-      'voice_calibrated',
-      'Finalized brand voice',
-      `Finalized voice profile revision ${result.profileRevision}.`,
-      metadata,
-      {
-        id: result.snapshot.finalizedBy.actorId,
-        name: result.snapshot.finalizedBy.actorLabel,
-      },
-    );
-  });
-  runVoicePostCommitEffect(workspaceId, 'broadcast', () => {
-    broadcastToWorkspace(workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, {
-      workspaceId,
-      voiceProfileId: result.snapshot.voiceProfileId,
-      finalizationId: result.snapshot.id,
-      profileRevision: result.profileRevision,
-      voiceVersion: result.snapshot.voiceVersion,
-      status: 'calibrated',
-    });
-  });
-  runVoicePostCommitEffect(workspaceId, 'intelligence-cache', () => {
-    invalidateIntelligenceCache(workspaceId);
-  });
 }
 
 function applyAuthorizationPostCommitEffects(
@@ -193,60 +160,18 @@ function sendVoiceFinalizationError(
     });
     return true;
   }
+  if (err instanceof VoiceFinalizationReadCursorError) {
+    res.status(400).json({ error: err.message, code: err.code });
+    return true;
+  }
+  if (err instanceof VoiceFinalizationReadConflictError) {
+    res.status(409).json({ error: err.message, code: err.code });
+    return true;
+  }
   return false;
 }
 
 // ── Zod schemas ─────────────────────────────────────────────────────────────
-
-const voiceSampleContextSchema = z.enum(['headline', 'body', 'cta', 'about', 'service', 'social', 'seo']);
-const voiceSampleSourceSchema = z.enum([
-  'manual', 'transcript_extraction', 'calibration_loop', 'identity_approved', 'copy_approved',
-]);
-// A profile becomes calibrated only through the revision-safe finalization route.
-// Generic edits may move it between draft and calibrating, but cannot assert that
-// the voice is finalized.
-const voiceProfileStatusSchema = z.enum(['draft', 'calibrating']);
-
-const toneSpectrumSchema = z.object({
-  formal_casual: z.number().min(1).max(10),
-  serious_playful: z.number().min(1).max(10),
-  technical_accessible: z.number().min(1).max(10),
-});
-
-const voiceDNASchema = z.object({
-  personalityTraits: z.array(z.string()),
-  toneSpectrum: toneSpectrumSchema,
-  sentenceStyle: z.string(),
-  vocabularyLevel: z.string(),
-  // Optional to match `VoiceDNA.humorStyle?: string` — clearing the field in
-  // the UI sends an empty string; allow both omission and empty.
-  humorStyle: z.string().optional(),
-});
-
-const voiceGuardrailsSchema = z.object({
-  forbiddenWords: z.array(z.string()),
-  requiredTerminology: z.array(z.object({ use: z.string(), insteadOf: z.string() })),
-  toneBoundaries: z.array(z.string()),
-  antiPatterns: z.array(z.string()),
-});
-
-const contextModifierSchema = z.object({
-  context: z.string(),
-  description: z.string(),
-});
-
-const updateVoiceProfileSchema = z.object({
-  status: voiceProfileStatusSchema.optional(),
-  voiceDNA: voiceDNASchema.optional(),
-  guardrails: voiceGuardrailsSchema.optional(),
-  contextModifiers: z.array(contextModifierSchema).optional(),
-}).strict(); // .strict() rejects unknown keys — tighter than the default strip behavior
-
-const addSampleSchema = z.object({
-  content: z.string().min(1),
-  contextTag: voiceSampleContextSchema.optional(),
-  source: voiceSampleSourceSchema.optional(),
-});
 
 const calibrateSchema = z.object({
   promptType: z.string().min(1),
@@ -269,10 +194,18 @@ router.get('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), (re
 router.get('/api/voice/:workspaceId/readiness', requireWorkspaceAccess('workspaceId'), (req, res) => {
   const workspaceId = req.params.workspaceId;
   try {
+    const query = getBrandVoiceReadinessQuerySchema.safeParse(req.query);
+    if (!query.success) {
+      return res.status(400).json({ error: 'Invalid brand voice readiness query' });
+    }
     if (!getWorkspace(workspaceId)) {
       throw new VoiceFinalizationNotFoundError('Workspace not found');
     }
-    res.json(getBrandVoiceReadiness(workspaceId));
+    res.json(getBrandVoicePage({
+      workspaceId,
+      anchorLimit: query.data.anchorLimit,
+      anchorCursor: query.data.anchorCursor,
+    }));
   } catch (err) {
     if (sendVoiceFinalizationError(res, err)) return;
     log.error({ err, workspaceId }, 'failed to read brand voice readiness');
@@ -285,10 +218,18 @@ router.post('/api/voice/:workspaceId',
   requireWorkspaceAccess('workspaceId'),
   validate(createVoiceProfileSchema),
   (req, res) => {
+    const workspaceId = req.params.workspaceId;
     try {
-      const profile = createVoiceProfile(req.params.workspaceId);
-      addActivity(req.params.workspaceId, 'voice_profile_created', 'Created voice profile');
-      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, {});
+      const profile = createVoiceProfile(workspaceId);
+      runVoicePostCommitEffect(workspaceId, 'activity', () => {
+        addActivity(workspaceId, 'voice_profile_created', 'Created voice profile');
+      });
+      runVoicePostCommitEffect(workspaceId, 'broadcast', () => {
+        broadcastToWorkspace(workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, {});
+      });
+      runVoicePostCommitEffect(workspaceId, 'intelligence-cache', () => {
+        invalidateIntelligenceCache(workspaceId);
+      });
       res.status(201).json(profile);
     } catch (err) {
       if (err instanceof Error && /already exists/.test(err.message)) {
@@ -302,17 +243,26 @@ router.post('/api/voice/:workspaceId',
 // Update voice profile (DNA, guardrails, modifiers, status)
 router.patch('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(updateVoiceProfileSchema), (req, res) => {
   try {
-    const result = updateVoiceProfile(req.params.workspaceId, req.body);
-    addActivity(req.params.workspaceId, 'voice_profile_updated', 'Updated voice profile');
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { workspaceId: req.params.workspaceId });
-    invalidateIntelligenceCache(req.params.workspaceId);
-    res.json(result);
+    const result = updateVoiceProfileWithResult(req.params.workspaceId, req.body);
+    if (result.changed) {
+      runVoicePostCommitEffect(req.params.workspaceId, 'activity', () => {
+        addActivity(req.params.workspaceId, 'voice_profile_updated', 'Updated voice profile');
+      });
+      runVoicePostCommitEffect(req.params.workspaceId, 'broadcast', () => {
+        broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { workspaceId: req.params.workspaceId });
+      });
+      runVoicePostCommitEffect(req.params.workspaceId, 'intelligence-cache', () => {
+        invalidateIntelligenceCache(req.params.workspaceId);
+      });
+    }
+    res.json(result.profile);
   } catch (err) {
     if (err instanceof Error && err.message === 'No voice profile exists for this workspace') {
       return res.status(404).json({ error: 'Voice profile not found. Create one first via POST /api/voice/:workspaceId' });
     }
     // Domain transition failures are user-input errors, not server failures.
-    // The edge schema separately reserves `calibrated` for POST /finalize.
+    // The domain deliberately reserves `calibrated` for POST /finalize so
+    // internal callers receive the same typed transition error as HTTP callers.
     if (err instanceof VoiceProfileStateTransitionError) {
       return res.status(400).json({ error: err.message, from: err.from, to: err.to });
     }
@@ -340,9 +290,7 @@ router.post(
         executionActor: finalizedBy,
       };
       const result = finalizeBrandVoice(request);
-      if (result.created) {
-        applyFinalizationPostCommitEffects(workspaceId, result);
-      }
+      applyVoiceFinalizationPostCommitEffects(workspaceId, result);
       res.status(result.created ? 201 : 200).json(result);
     } catch (err) {
       if (sendVoiceFinalizationError(res, err)) return;
@@ -388,13 +336,20 @@ router.get('/api/voice/:workspaceId/sessions', requireWorkspaceAccess('workspace
 });
 
 // Add voice sample
-router.post('/api/voice/:workspaceId/samples', requireWorkspaceAccess('workspaceId'), validate(addSampleSchema), (req, res) => {
+router.post('/api/voice/:workspaceId/samples', requireWorkspaceAccess('workspaceId'), validate(voiceSampleInputSchema), (req, res) => {
   const { content, contextTag, source } = req.body;
+  const workspaceId = req.params.workspaceId;
   try {
-    const sample = addVoiceSample(req.params.workspaceId, content, contextTag, source);
-    addActivity(req.params.workspaceId, 'voice_sample_added', `Added voice sample${contextTag ? ` (${contextTag})` : ''}`);
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sampleId: sample.id });
-    invalidateIntelligenceCache(req.params.workspaceId);
+    const sample = addVoiceSample(workspaceId, content, contextTag, source);
+    runVoicePostCommitEffect(workspaceId, 'activity', () => {
+      addActivity(workspaceId, 'voice_sample_added', `Added voice sample${contextTag ? ` (${contextTag})` : ''}`);
+    });
+    runVoicePostCommitEffect(workspaceId, 'broadcast', () => {
+      broadcastToWorkspace(workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sampleId: sample.id });
+    });
+    runVoicePostCommitEffect(workspaceId, 'intelligence-cache', () => {
+      invalidateIntelligenceCache(workspaceId);
+    });
     res.json(sample);
   } catch (err) {
     if (err instanceof Error && err.message === 'No voice profile exists for this workspace') {
@@ -406,11 +361,18 @@ router.post('/api/voice/:workspaceId/samples', requireWorkspaceAccess('workspace
 
 // Delete voice sample
 router.delete('/api/voice/:workspaceId/samples/:sampleId', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  const ok = deleteVoiceSample(req.params.workspaceId, req.params.sampleId);
+  const workspaceId = req.params.workspaceId;
+  const ok = deleteVoiceSample(workspaceId, req.params.sampleId);
   if (!ok) return res.status(404).json({ error: 'Not found' });
-  addActivity(req.params.workspaceId, 'voice_sample_deleted', 'Deleted voice sample');
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sampleId: req.params.sampleId, deleted: true });
-  invalidateIntelligenceCache(req.params.workspaceId);
+  runVoicePostCommitEffect(workspaceId, 'activity', () => {
+    addActivity(workspaceId, 'voice_sample_deleted', 'Deleted voice sample');
+  });
+  runVoicePostCommitEffect(workspaceId, 'broadcast', () => {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sampleId: req.params.sampleId, deleted: true });
+  });
+  runVoicePostCommitEffect(workspaceId, 'intelligence-cache', () => {
+    invalidateIntelligenceCache(workspaceId);
+  });
   res.json({ deleted: true });
 });
 

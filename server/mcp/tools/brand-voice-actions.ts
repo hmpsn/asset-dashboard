@@ -14,22 +14,21 @@ import type {
 import type {
   FinalizeBrandVoiceResult,
   FinalizedVoiceSnapshot,
-  GetBrandVoiceResult,
+  GetBrandVoicePageResult,
 } from '../../../shared/types/voice-finalization.js';
-import { addActivity } from '../../activity-log.js';
-import { broadcastToWorkspace } from '../../broadcast.js';
 import {
   consumeVoiceFinalizationAuthorization,
-  getBrandVoiceReadiness,
+  getBrandVoicePage,
   VoiceFinalizationAuthorizationError,
   VoiceFinalizationConflictError,
   VoiceFinalizationIdempotencyConflictError,
   VoiceFinalizationNotFoundError,
   VoiceFinalizationPreconditionError,
+  VoiceFinalizationReadConflictError,
+  VoiceFinalizationReadCursorError,
 } from '../../domains/brand/voice-finalization.js';
-import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
+import { applyVoiceFinalizationPostCommitEffects } from '../../domains/brand/voice-finalization-effects.js';
 import { createLogger } from '../../logger.js';
-import { WS_EVENTS } from '../../ws-events.js';
 import { toMcpJsonSchema } from '../json-schema.js';
 import { mcpJsonV1Error } from '../tool-errors.js';
 import { mcpSuccess } from '../tool-helpers.js';
@@ -40,7 +39,7 @@ export const brandVoiceActionTools: Tool[] = [
   {
     name: 'get_brand_voice',
     description:
-      'Read structured brand-voice readiness, the current profile, eligible authentic anchor samples, and the latest immutable finalization snapshot. Never returns the raw brand intake or creates an authorization.',
+      'Read structured brand-voice readiness, a byte-bounded current profile, one bounded page of eligible authentic anchors, and a summary of the latest immutable finalization. The opaque anchor cursor is bound to the workspace plus current voice-profile and brand-intake revisions. Never returns raw brand intake or frozen snapshot content and never creates an authorization.',
     inputSchema: toMcpJsonSchema(getBrandVoiceInputSchema),
   },
   {
@@ -54,23 +53,19 @@ export const brandVoiceActionTools: Tool[] = [
 type MaybePromise<T> = T | Promise<T>;
 
 export interface BrandVoiceActionDependencies {
-  getBrandVoiceReadiness: (
-    workspaceId: string,
-  ) => MaybePromise<GetBrandVoiceResult>;
+  getBrandVoicePage: (
+    request: Parameters<typeof getBrandVoicePage>[0],
+  ) => MaybePromise<GetBrandVoicePageResult>;
   consumeVoiceFinalizationAuthorization: (
     request: Parameters<typeof consumeVoiceFinalizationAuthorization>[0],
   ) => MaybePromise<FinalizeBrandVoiceResult>;
-  addActivity: typeof addActivity;
-  broadcastToWorkspace: typeof broadcastToWorkspace;
-  invalidateIntelligenceCache: typeof invalidateIntelligenceCache;
+  applyVoiceFinalizationPostCommitEffects: typeof applyVoiceFinalizationPostCommitEffects;
 }
 
 const defaultDependencies: BrandVoiceActionDependencies = {
-  getBrandVoiceReadiness,
+  getBrandVoicePage,
   consumeVoiceFinalizationAuthorization,
-  addActivity,
-  broadcastToWorkspace,
-  invalidateIntelligenceCache,
+  applyVoiceFinalizationPostCommitEffects,
 };
 
 function snakeCaseKey(key: string): string {
@@ -116,12 +111,53 @@ function projectReadiness(readiness: BrandVoiceReadiness): BrandVoiceReadiness {
   return readiness;
 }
 
-function projectBrandVoiceReadiness(result: GetBrandVoiceResult) {
+function projectSnapshotSummary(
+  snapshot: GetBrandVoicePageResult['latestSnapshot'],
+) {
+  if (!snapshot) return null;
   return {
-    profile: result.profile,
-    readiness: projectReadiness(result.readiness),
-    eligibleAnchors: result.eligibleAnchors,
-    latestSnapshot: projectSnapshot(result.latestSnapshot),
+    id: snapshot.id,
+    voiceProfileId: snapshot.voiceProfileId,
+    profileRevision: snapshot.profileRevision,
+    voiceVersion: snapshot.voiceVersion,
+    fingerprint: snapshot.fingerprint,
+    finalizedBy: snapshot.finalizedBy,
+    finalizedAt: snapshot.finalizedAt,
+    anchorCount: snapshot.anchorCount,
+    calibrationSelectionCount: snapshot.calibrationSelectionCount,
+  };
+}
+
+function projectBrandVoiceReadiness(result: GetBrandVoicePageResult) {
+  const profile = result.profile
+    ? {
+        id: result.profile.id,
+        revision: result.profile.revision,
+        status: result.profile.status,
+        voiceDNA: result.profile.voiceDNA,
+        guardrails: result.profile.guardrails,
+        contextModifiers: result.profile.contextModifiers,
+        updatedAt: result.profile.updatedAt,
+      }
+    : null;
+  const readiness = result.readiness.state === 'finalized' || result.readiness.state === 'stale'
+    ? { ...result.readiness, snapshot: projectSnapshotSummary(result.readiness.snapshot) }
+    : result.readiness;
+  return {
+    profile,
+    readiness,
+    eligibleAnchors: {
+      items: result.eligibleAnchors.items.map(anchor => ({
+        selector: anchor.selector,
+        content: anchor.content,
+        context: anchor.context,
+        sourceLabel: anchor.sourceLabel,
+        capturedAt: anchor.capturedAt,
+      })),
+      nextCursor: result.eligibleAnchors.nextCursor,
+      hasMore: result.eligibleAnchors.hasMore,
+    },
+    latestSnapshot: projectSnapshotSummary(result.latestSnapshot),
   };
 }
 
@@ -178,6 +214,14 @@ function revisionConflictError(error: VoiceFinalizationConflictError): CallToolR
   });
 }
 
+function readConflictError(): CallToolResult {
+  return mcpJsonV1Error({
+    code: MCP_TOOL_ERROR_CODES.CONFLICT,
+    message: 'The brand voice changed after this cursor was issued. Re-read it from the first anchor page.',
+    retryable: true,
+  });
+}
+
 function idempotencyConflictError(): CallToolResult {
   return mcpJsonV1Error({
     code: MCP_TOOL_ERROR_CODES.CONFLICT,
@@ -218,60 +262,6 @@ function unknownToolError(): CallToolResult {
   });
 }
 
-function applyPostCommitEffects(
-  workspaceId: string,
-  result: FinalizeBrandVoiceResult,
-  dependencies: BrandVoiceActionDependencies,
-): void {
-  const bestEffort = (effect: string, run: () => void): void => {
-    try {
-      run();
-    } catch (_error) {
-      log.error(
-        { workspaceId, effect, failureClass: 'post_commit_effect' },
-        'Brand voice MCP post-commit effect failed',
-      );
-    }
-  };
-  const snapshot = result.snapshot;
-
-  bestEffort('activity', () => {
-    // mcp-action-must-tag-source-ok: ambient MCP execution context records the exact key, tool, and request; generic chat attribution is forbidden for this new write.
-    dependencies.addActivity(
-      workspaceId,
-      'voice_calibrated',
-      'Finalized brand voice',
-      `Finalized voice profile revision ${result.profileRevision}.`,
-      {
-        voiceProfileId: snapshot.voiceProfileId,
-        finalizationId: snapshot.id,
-        profileRevision: result.profileRevision,
-        voiceVersion: snapshot.voiceVersion,
-        fingerprint: snapshot.fingerprint,
-      },
-      {
-        id: snapshot.finalizedBy.actorId,
-        name: snapshot.finalizedBy.actorLabel,
-      },
-    );
-  });
-  bestEffort('workspace_broadcast', () => dependencies.broadcastToWorkspace(
-    workspaceId,
-    WS_EVENTS.VOICE_PROFILE_UPDATED,
-    {
-      workspaceId,
-      voiceProfileId: snapshot.voiceProfileId,
-      finalizationId: snapshot.id,
-      profileRevision: result.profileRevision,
-      voiceVersion: snapshot.voiceVersion,
-      status: 'calibrated',
-    },
-  ));
-  bestEffort('intelligence_invalidation', () => {
-    dependencies.invalidateIntelligenceCache(workspaceId);
-  });
-}
-
 export function createBrandVoiceActionHandler(
   dependencies: BrandVoiceActionDependencies = defaultDependencies,
 ) {
@@ -284,7 +274,11 @@ export function createBrandVoiceActionHandler(
       if (name === 'get_brand_voice') {
         const parsed = getBrandVoiceInputSchema.safeParse(args);
         if (!parsed.success) return validationError();
-        const result = await dependencies.getBrandVoiceReadiness(parsed.data.workspace_id);
+        const result = await dependencies.getBrandVoicePage({
+          workspaceId: parsed.data.workspace_id,
+          anchorLimit: parsed.data.anchor_limit,
+          anchorCursor: parsed.data.anchor_cursor,
+        });
         return mcpSuccess(toMcpPayload(projectBrandVoiceReadiness(result)));
       }
 
@@ -296,14 +290,17 @@ export function createBrandVoiceActionHandler(
           authorizationToken: parsed.data.authorization_token,
           executionActor: executionActor(context),
         });
-        if (result.created) {
-          applyPostCommitEffects(parsed.data.workspace_id, result, dependencies);
-        }
+        dependencies.applyVoiceFinalizationPostCommitEffects(
+          parsed.data.workspace_id,
+          result,
+        );
         return mcpSuccess(toMcpPayload(projectFinalizationResult(result)));
       }
 
       return unknownToolError();
     } catch (error) {
+      if (error instanceof VoiceFinalizationReadCursorError) return validationError();
+      if (error instanceof VoiceFinalizationReadConflictError) return readConflictError();
       if (error instanceof VoiceFinalizationNotFoundError) return notFoundError();
       if (error instanceof VoiceFinalizationConflictError) return revisionConflictError(error);
       if (error instanceof VoiceFinalizationIdempotencyConflictError) {

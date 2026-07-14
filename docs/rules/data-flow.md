@@ -91,6 +91,30 @@ Every significant write action should call `addActivity()` to log the event. Thi
 
 Client-visible types are filtered by `CLIENT_VISIBLE_TYPES` in `listClientActivity()`. If adding a new activity type that clients should see, add it to that set.
 
+The workspace WebSocket channel is shared by admin and client subscribers. For
+that reason, `activity:new` includes a full client-safe entry only when its type
+is in `CLIENT_VISIBLE_TYPES`; every admin-only activity broadcasts `{}` as an
+invalidation signal. Never broaden the broadcast payload independently of the
+client activity read boundary. Admin consumers refetch the durable activity log
+for operator identity, metadata, and other internal detail.
+
+Client-facing outcome learnings use the same fail-closed projection discipline.
+`LearningsSlice.clientProjection` is derived separately from catalog-visible
+executed actions, filtering before caps and reusing the canonical learnings
+computation. Public serializers and client prompt builders must consume only
+that projection and must never fall back to the admin slice when it is missing.
+The normal learnings slice remains the internal/admin authority so operational
+milestones can still improve internal recommendations without becoming client
+wins, ROI claims, annotations, summaries, or chat grounding.
+
+The same catalog boundary applies to shared outcome WebSocket payloads through
+`toClientSafeOutcomeEventPayload()`. Client-visible action types may retain their
+action/score payload; `clientVisible: false` action types emit `{}` for recorded,
+context, scored, learnings, and external-detection events. Aggregate learnings
+and playbook events are always opaque invalidation signals because their admin
+counts may mix visible and hidden action types. Frontend consumers refetch their
+audience-appropriate read model and must not depend on those opaque payloads.
+
 ## Rule 8: Client-facing copy MUST use STUDIO_NAME constant
 
 Any user-facing text that references the studio, team, or agency name MUST use the `STUDIO_NAME` constant. Never hardcode "your team", "Web Team", "SEO team", "our team", "your web team", or "hmpsn studio".

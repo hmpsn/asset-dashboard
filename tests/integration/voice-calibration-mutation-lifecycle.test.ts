@@ -590,8 +590,9 @@ describe('Status machine — finalization authority stays on POST /finalize', ()
     expect(body.status).toBe('draft');
   });
 
-  it('draft → calibrated is rejected by the HTTP schema before mutation', async () => {
-    // cycleWsId is now draft; all generic attempts to set calibrated are invalid.
+  it('draft → calibrated is rejected by the domain transition boundary', async () => {
+    // The edge schema accepts the complete status vocabulary, but only explicit
+    // finalization may claim calibrated authority; generic domain updates reject it.
     const res = await patchJson(`/api/voice/${cycleWsId}`, { status: 'calibrated' });
     expect(res.status).toBe(400);
     const body = await res.json() as Record<string, unknown>;

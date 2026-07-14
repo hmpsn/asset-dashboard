@@ -171,14 +171,14 @@ increments the paid-call counter.
 ### brand-voice-actions (`tools/brand-voice-actions.ts`) — operator-authorized voice authority
 | Tool | R/W | Purpose |
 |------|-----|---------|
-| `get_brand_voice` | R | Read the current profile, readiness, eligible authentic anchor samples, and latest immutable snapshot without returning raw intake. |
+| `get_brand_voice` | R | Read the current profile, authority readiness, one bounded page of eligible authentic anchors, and a bounded latest-finalization summary without returning raw intake or frozen snapshot detail. |
 | `finalize_brand_voice` | W | Consume a short-lived, one-time authorization created by a human operator and bound to the exact profile revision, voice fields, anchors, ratings, and idempotency key. The MCP key remains internal execution provenance only and is never returned. |
 
 Voice finalization is deliberately a two-boundary workflow:
 
-1. Call `get_brand_voice` and present the current readiness plus eligible authentic samples to the operator. Generated calibration-loop, identity-approved, and copy-approved samples are forbidden as anchors.
+1. Call `get_brand_voice` and present the current readiness plus eligible authentic samples to the operator. It returns one page in `eligible_anchors.items`; while `eligible_anchors.has_more` is true, pass `eligible_anchors.next_cursor` back as `anchor_cursor`. Generated calibration-loop, identity-approved, and copy-approved samples are forbidden as anchors.
 2. A human operator creates the exact, short-lived authorization through the authenticated `POST /api/voice/:workspaceId/finalization-authorizations` HTTP boundary. MCP cannot create it or submit a caller-authored operator identity.
-3. Call `finalize_brand_voice` with only `workspace_id` and the one-time `authorization_token`. A replay returns the original finalization without duplicating activity or broadcasts. On a revision conflict, call `get_brand_voice` again and request a new authorization; never retry the stale authorization.
+3. Call `finalize_brand_voice` with only `workspace_id` and the one-time `authorization_token`. A replay returns the original finalization without duplicating activity or broadcasts. On a revision conflict, or when an anchor cursor conflicts because its profile/intake revision changed, restart `get_brand_voice` from the first page and request a new authorization; never retry the stale authorization.
 
 ### clients (`tools/clients.ts`) — inbox / client signals
 | Tool | R/W | Purpose |

@@ -29,9 +29,11 @@ import {
   createVoiceProfile,
   getVoiceProfile,
   updateVoiceProfile,
+  updateVoiceProfileWithResult,
   addVoiceSample,
   deleteVoiceSample,
   listCalibrationSessions,
+  VoiceProfileValidationError,
   VoiceProfileStateTransitionError,
 } from '../../server/voice-calibration.js';
 import db from '../../server/db/index.js';
@@ -216,8 +218,11 @@ describe('updateVoiceProfile — legal state transitions', () => {
   });
 
   it('draft → draft is a legal no-op', () => {
-    const result = updateVoiceProfile(ws.workspaceId, { status: 'draft' });
-    expect(result.status).toBe('draft');
+    const before = getVoiceProfile(ws.workspaceId)!;
+    const result = updateVoiceProfileWithResult(ws.workspaceId, { status: 'draft' });
+    expect(result.profile.status).toBe('draft');
+    expect(result.changed).toBe(false);
+    expect(result.profile.revision).toBe(before.revision);
   });
 
   it('calibrating → calibrating is a legal no-op', () => {
@@ -369,6 +374,34 @@ describe('updateVoiceProfile — field updates', () => {
       updateVoiceProfile('nonexistent-ws-xyz', { voiceDNA: SAMPLE_DNA }),
     ).toThrow(/no voice profile/i);
   });
+
+  it('rejects count, text, and UTF-8 JSON overflow before mutating the profile', () => {
+    const before = getVoiceProfile(ws.workspaceId)!;
+    const assertUnchanged = (): void => {
+      const after = getVoiceProfile(ws.workspaceId)!;
+      expect(after.revision).toBe(before.revision);
+      expect(after.status).toBe(before.status);
+      expect(after.updatedAt).toBe(before.updatedAt);
+    };
+
+    expect(() => updateVoiceProfile(ws.workspaceId, {
+      voiceDNA: { ...SAMPLE_DNA, personalityTraits: Array.from({ length: 21 }, (_, index) => `Trait ${index}`) },
+    })).toThrow(VoiceProfileValidationError);
+    assertUnchanged();
+
+    expect(() => updateVoiceProfile(ws.workspaceId, {
+      voiceDNA: { ...SAMPLE_DNA, sentenceStyle: 'x'.repeat(10_001) },
+    })).toThrow(VoiceProfileValidationError);
+    assertUnchanged();
+
+    expect(() => updateVoiceProfile(ws.workspaceId, {
+      contextModifiers: Array.from({ length: 20 }, (_, index) => ({
+        context: `Context ${index}`,
+        description: 'é'.repeat(4_000),
+      })),
+    })).toThrow(VoiceProfileValidationError);
+    assertUnchanged();
+  });
 });
 
 // ─── addVoiceSample ───────────────────────────────────────────────────────────
@@ -385,6 +418,26 @@ describe('addVoiceSample', () => {
   it('returns a sample with the provided content', () => {
     const sample = addVoiceSample(ws.workspaceId, 'Stop guessing at your SEO strategy.');
     expect(sample.content).toBe('Stop guessing at your SEO strategy.');
+  });
+
+  it('normalizes bounded sample content once at the domain write boundary', () => {
+    const sample = addVoiceSample(ws.workspaceId, '  Exact authentic wording.  ');
+    expect(sample.content).toBe('Exact authentic wording.');
+    expect(getVoiceProfile(ws.workspaceId)!.samples.find(item => item.id === sample.id)?.content)
+      .toBe('Exact authentic wording.');
+  });
+
+  it('rejects whitespace-only, oversized, and multibyte-overflow samples without advancing the profile', () => {
+    const before = getVoiceProfile(ws.workspaceId)!;
+    const beforeCount = before.samples.length;
+
+    expect(() => addVoiceSample(ws.workspaceId, '   ')).toThrow();
+    expect(() => addVoiceSample(ws.workspaceId, 'x'.repeat(10_001))).toThrow();
+    expect(() => addVoiceSample(ws.workspaceId, 'é'.repeat(5_001))).toThrow();
+
+    const after = getVoiceProfile(ws.workspaceId)!;
+    expect(after.revision).toBe(before.revision);
+    expect(after.samples).toHaveLength(beforeCount);
   });
 
   it('first sample gets sortOrder 0', () => {
