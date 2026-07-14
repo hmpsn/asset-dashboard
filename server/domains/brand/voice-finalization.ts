@@ -48,6 +48,7 @@ import type {
   GetBrandVoicePageRequest,
   GetBrandVoicePageResult,
   GetBrandVoiceResult,
+  GetFinalizedVoiceSnapshotForGenerationRequest,
   VoiceCalibrationSelectionSnapshot,
   VoiceProfileFinalizationInput,
   VoiceFinalizationAuthorizationRef,
@@ -154,6 +155,19 @@ export class VoiceFinalizationReadConflictError extends Error {
   constructor() {
     super('The brand-voice authority changed after the eligible-anchor cursor was issued');
     this.name = 'VoiceFinalizationReadConflictError';
+  }
+}
+
+export class VoiceGenerationAuthorityConflictError extends Error {
+  readonly code = 'voice_generation_authority_conflict';
+  readonly expectedVoiceVersion: number;
+  readonly actualVoiceVersion: number | null;
+
+  constructor(expectedVoiceVersion: number, actualVoiceVersion: number | null) {
+    super('The finalized brand-voice authority does not match the requested version');
+    this.name = 'VoiceGenerationAuthorityConflictError';
+    this.expectedVoiceVersion = expectedVoiceVersion;
+    this.actualVoiceVersion = actualVoiceVersion;
   }
 }
 
@@ -381,6 +395,11 @@ const stmts = createStmtCache(() => ({
     ${FINALIZATION_SELECT}
     WHERE workspace_id = ?
     ORDER BY voice_version DESC, id DESC
+    LIMIT 1
+  `),
+  finalizationByVersion: db.prepare(`
+    ${FINALIZATION_SELECT}
+    WHERE workspace_id = ? AND voice_version = ?
     LIMIT 1
   `),
   finalizationById: db.prepare(`
@@ -1117,6 +1136,65 @@ export function getBrandVoiceAuthoritySummary(
       ...summary
     } = readAuthoritySummary(workspaceId);
     return summary;
+  });
+}
+
+/**
+ * Read one exact immutable voice snapshot for paid generation.
+ *
+ * Start/resume callers set `requireCurrentAuthority` so a legacy, stale, or
+ * mutable-profile mismatch fails before paid work. An already-running worker
+ * sets it false and re-reads the exact frozen version/fingerprint, preventing a
+ * later operator finalization from silently changing the run's voice input.
+ * This seam deliberately never enumerates candidate anchors.
+ */
+export function getFinalizedVoiceSnapshotForGeneration(
+  request: GetFinalizedVoiceSnapshotForGenerationRequest,
+): FinalizedVoiceSnapshot {
+  return coherentAuthorityRead(() => {
+    if (!stmts().workspaceExists.get(request.workspaceId)) {
+      throw new VoiceFinalizationNotFoundError('Workspace not found');
+    }
+    if (
+      !Number.isSafeInteger(request.expectedVoiceVersion)
+      || request.expectedVoiceVersion < 1
+      || !/^[a-f0-9]{64}$/.test(request.expectedFingerprint)
+    ) {
+      throw new VoiceFinalizationPreconditionError(
+        'A valid finalized voice version and fingerprint are required for generation',
+      );
+    }
+
+    const row = stmts().finalizationByVersion.get(
+      request.workspaceId,
+      request.expectedVoiceVersion,
+    ) as VoiceFinalizationRow | undefined;
+    if (!row) {
+      const latest = latestSnapshot(request.workspaceId);
+      throw new VoiceGenerationAuthorityConflictError(
+        request.expectedVoiceVersion,
+        latest?.voiceVersion ?? null,
+      );
+    }
+    const snapshot = rowToSnapshot(row);
+    if (snapshot.fingerprint !== request.expectedFingerprint) {
+      throw new VoiceGenerationAuthorityConflictError(
+        request.expectedVoiceVersion,
+        snapshot.voiceVersion,
+      );
+    }
+
+    if (request.requireCurrentAuthority) {
+      const profileRow = getProfileReadRow(request.workspaceId);
+      const profile = profileRow ? rowToProfileSummary(profileRow) : null;
+      const readiness = fullReadiness(profile, snapshot);
+      if (readiness.state !== 'finalized') {
+        throw new VoiceFinalizationPreconditionError(
+          'The requested voice version is not the current finalized authority',
+        );
+      }
+    }
+    return snapshot;
   });
 }
 

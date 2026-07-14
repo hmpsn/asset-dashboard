@@ -12,6 +12,7 @@ import {
   createVoiceFinalizationAuthorization,
   consumeVoiceFinalizationAuthorization,
   finalizeBrandVoice,
+  getFinalizedVoiceSnapshotForGeneration,
   getBrandVoiceReadiness,
   VoiceFinalizationAuthorizationError,
   VoiceFinalizationConflictError,
@@ -19,6 +20,7 @@ import {
   VoiceFinalizationNotFoundError,
   VoiceFinalizationPreconditionError,
   VoiceFinalizationPersistenceContractError,
+  VoiceGenerationAuthorityConflictError,
 } from '../../server/domains/brand/voice-finalization.js';
 import { submitBrandIntake } from '../../server/domains/brand/intake/service.js';
 import {
@@ -391,6 +393,69 @@ describe('brand voice finalization domain', () => {
     expect(db.prepare(`
       SELECT COUNT(*) AS count FROM voice_profile_finalizations WHERE workspace_id = ?
     `).get(seeded.workspaceId)).toEqual({ count: 2 });
+  });
+
+  it('reads only the exact current finalized voice authority for paid generation', () => {
+    const { seeded, sample } = profileWithSample();
+    const finalized = finalizeBrandVoice(finalizationRequest(seeded.workspaceId, sample.id));
+
+    expect(getFinalizedVoiceSnapshotForGeneration({
+      workspaceId: seeded.workspaceId,
+      expectedVoiceVersion: finalized.snapshot.voiceVersion,
+      expectedFingerprint: finalized.snapshot.fingerprint,
+      requireCurrentAuthority: true,
+    })).toEqual(finalized.snapshot);
+    expect(() => getFinalizedVoiceSnapshotForGeneration({
+      workspaceId: seeded.workspaceId,
+      expectedVoiceVersion: finalized.snapshot.voiceVersion + 1,
+      expectedFingerprint: finalized.snapshot.fingerprint,
+      requireCurrentAuthority: true,
+    })).toThrow(VoiceGenerationAuthorityConflictError);
+    expect(() => getFinalizedVoiceSnapshotForGeneration({
+      workspaceId: seeded.workspaceId,
+      expectedVoiceVersion: finalized.snapshot.voiceVersion,
+      expectedFingerprint: 'f'.repeat(64),
+      requireCurrentAuthority: true,
+    })).toThrow(VoiceGenerationAuthorityConflictError);
+  });
+
+  it('lets an in-flight worker re-read its frozen voice while new starts require current authority', () => {
+    const { seeded, sample } = profileWithSample();
+    const first = finalizeBrandVoice(finalizationRequest(seeded.workspaceId, sample.id));
+    const edited = updateVoiceProfile(seeded.workspaceId, {
+      guardrails: { ...guardrails, forbiddenWords: ['miracle', 'guaranteed'] },
+    });
+
+    expect(() => getFinalizedVoiceSnapshotForGeneration({
+      workspaceId: seeded.workspaceId,
+      expectedVoiceVersion: first.snapshot.voiceVersion,
+      expectedFingerprint: first.snapshot.fingerprint,
+      requireCurrentAuthority: true,
+    })).toThrow(VoiceFinalizationPreconditionError);
+    expect(getFinalizedVoiceSnapshotForGeneration({
+      workspaceId: seeded.workspaceId,
+      expectedVoiceVersion: first.snapshot.voiceVersion,
+      expectedFingerprint: first.snapshot.fingerprint,
+      requireCurrentAuthority: false,
+    })).toEqual(first.snapshot);
+
+    const second = finalizeBrandVoice(finalizationRequest(
+      seeded.workspaceId,
+      sample.id,
+      edited.revision,
+    ));
+    expect(() => getFinalizedVoiceSnapshotForGeneration({
+      workspaceId: seeded.workspaceId,
+      expectedVoiceVersion: first.snapshot.voiceVersion,
+      expectedFingerprint: first.snapshot.fingerprint,
+      requireCurrentAuthority: true,
+    })).toThrow(VoiceFinalizationPreconditionError);
+    expect(getFinalizedVoiceSnapshotForGeneration({
+      workspaceId: seeded.workspaceId,
+      expectedVoiceVersion: second.snapshot.voiceVersion,
+      expectedFingerprint: second.snapshot.fingerprint,
+      requireCurrentAuthority: true,
+    })).toEqual(second.snapshot);
   });
 
   it('reads compatibility-only calibrated rows as missing until truthfully finalized', () => {

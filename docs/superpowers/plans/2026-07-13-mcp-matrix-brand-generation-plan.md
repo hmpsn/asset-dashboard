@@ -470,6 +470,30 @@ generation, or provider-specific AI helpers.
   on all new writes. Keep legacy `update_brand_deliverable.expectedVersion`
   optional with deprecation logging; do not break existing clients in this PR.
 
+B2 implementation lock (pre-implementation amendment):
+
+- Persist a validated structured `BrandVoiceFoundationDraft`; foundation items
+  never reuse the durable-deliverable content/link shape.
+- Split public and persisted runs. Public DTOs redact idempotency and MCP key
+  context; persisted runs retain both. Freeze intake, original selection,
+  effective input, and resume-command fingerprints separately.
+- Add an immutable normalized command ledger for start/resume/revision with the
+  exact business-input snapshot, original result/job, actor, MCP context, and
+  prior review state. Attempts reference a command. Fingerprints exclude actor,
+  idempotency, and fresh request-correlation fields.
+- Enforce hard maxima of 114 provider calls, 4,000,000 input tokens, 250,000
+  output tokens, 100,000,000 estimated-cost micros, and concurrency 3. Every
+  start supplies equal-or-lower caller ceilings, reserved before paid work.
+- All three named B2 operations use explicit completed-response cache policy
+  `none`. Candidate output remains only in the attempt ledger if artifact CAS
+  loses to a newer human edit.
+- Count one provider call per dispatcher invocation. B2 sets dispatcher retries
+  to zero and uses the creative-dispatch reservation hook before both Claude and
+  OpenAI fallback, reserving pessimistic call/token/cost envelopes first.
+- Existing approved deliverables block B2 generation. Human status reversion to
+  draft is the only B2 replacement authorization; MCP expected-version input
+  alone cannot replace approved work.
+
 Red first: missing facts/placeholders, name clearance claims, schema/provider
 failure, voice-bootstrap without an existing profile, every mapped dependent
 direct start rejected before finalization, unknown target census failure,

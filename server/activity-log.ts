@@ -119,6 +119,10 @@ export type ActivityType =
   | 'voice_refined'
   | 'voice_profile_created'
   | 'voice_profile_updated'
+  | 'brand_generation_started'          // admin-only: durable B2 run created
+  | 'brand_generation_resumed'          // admin-only: exact finalized voice unlocked dependents
+  | 'brand_generation_revision_started' // admin-only: review-directed revision job created
+  | 'brand_generation_completed'        // admin-only: automatic gates reached a truthful terminal outcome
   | 'brand_deliverable_generated'
   | 'brand_deliverable_refined'
   | 'brand_deliverable_approved'

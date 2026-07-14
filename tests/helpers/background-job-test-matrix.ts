@@ -150,6 +150,15 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
     },
     'tests/integration/workspace-context-job-mutation-safety.test.ts',
   ),
+  [BACKGROUND_JOB_TYPES.BRAND_DELIVERABLE_GENERATION]: entry(
+    'BRAND_DELIVERABLE_GENERATION',
+    {
+      expectedLabel: 'Brand Deliverable Generation',
+      expectedCancellable: true,
+      expectedResultBehavior: 'domain-store-and-result',
+    },
+    'tests/contract/brand-generation-b2-contracts.test.ts',
+  ),
   [BACKGROUND_JOB_TYPES.PERSONA_GENERATION]: entry(
     'PERSONA_GENERATION',
     {

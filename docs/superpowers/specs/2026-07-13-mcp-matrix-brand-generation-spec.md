@@ -458,6 +458,29 @@ fingerprint, and `GenerationProvenance`. Naming output is explicitly a creative
 proposal; legal/domain/trademark availability remains unknown unless separately
 verified.
 
+B2 stores the provisional foundation as a validated structured
+`BrandVoiceFoundationDraft`, not an opaque content string. Public run DTOs redact
+idempotency and persisted MCP execution identity; the internal run record keeps
+both for replay and audit. Start identity freezes separate intake, selection,
+and effective-input fingerprints, while resume has its own immutable command
+fingerprint. Existing approved deliverables are never replaced by generation;
+an operator must first return one to draft through the existing human workflow.
+An immutable command ledger records every start/resume/revision business-input
+snapshot, result, job, actor, and MCP execution context. Request correlation and
+actor fields are excluded from the business fingerprint, so a replay with a new
+request ID returns the original result instead of conflicting. Attempts reference
+their accepted command; review-directed revisions also freeze direction and the
+prior review state for truthful cancellation recovery.
+
+The B2 paid-work ceiling is 114 provider calls, 4,000,000 input tokens, 250,000
+output tokens, USD 100 in estimated-cost micros, and concurrency 3. Callers must
+provide ceilings at or below each platform maximum. Generate, refine, and audit
+operations explicitly disable completed-response caching because every commit
+is tied to exact frozen authority and CAS expectations. A provider call means
+one dispatcher invocation. B2 disables dispatcher-internal retries and reserves
+the pessimistic call/token/cost envelope before each Claude or OpenAI dispatch,
+including fallback; automatic retry/revision is a separately reserved dispatch.
+
 The additive naming vocabulary remains closed on every legacy paid boundary:
 the legacy service parameter, HTTP schema, frontend API payload, focused editor
 prop, and released 17-generator census. B2 is the first phase allowed to open

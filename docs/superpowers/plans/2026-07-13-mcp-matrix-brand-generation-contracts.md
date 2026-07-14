@@ -357,6 +357,35 @@ generic string ID cannot satisfy a different gate.
   API payload type, focus prop, and rendered generator census until B2.
 - Brand generation/refinement uses named structured operations and conditional
   saves against the version read before the paid call.
+- The provisional foundation is a schema-validated structured
+  `BrandVoiceFoundationDraft`, never an opaque content string or a durable
+  `BrandDeliverable`. Foundation and durable item persistence shapes are
+  mutually exclusive.
+- Persisted brand runs retain the idempotency key and full explicit
+  `McpToolExecutionContext`; public run DTOs omit both and project MCP/system
+  creators to actor type only. Intake, original selection, effective input, and
+  resume-command fingerprints are separate immutable identities.
+- Every accepted start/resume/revision has one immutable command-ledger row with
+  its business-input snapshot, original result/job, actor, MCP context, and (for
+  revisions) prior review state. Attempts reference that command. Business
+  fingerprints exclude idempotency, attribution, and fresh request IDs so an
+  identical replay returns the original job/result. The stored accepted result
+  omits the transport-only replay marker; adapters add `existing: true` only
+  when projecting an idempotent replay.
+- B2 hard ceilings are 114 provider calls, 4,000,000 input tokens, 250,000 output
+  tokens, 100,000,000 estimated-cost micros, and concurrency 3. Caller budgets
+  must be explicit and no greater than those values; reservations happen before
+  each paid call.
+- B2 generate/refine/audit operations use completed-response cache policy
+  `none`. A CAS-losing candidate remains attributable in the attempt ledger but
+  never overwrites the durable artifact.
+- A provider call means one dispatcher invocation. B2 disables internal
+  dispatcher retries and reserves a pessimistic call/token/cost envelope before
+  every Claude/OpenAI invocation (including fallback); revisions/retries are
+  separate reserved dispatches.
+- Existing approved deliverables block generation until a human returns them to
+  draft. An MCP expected-version tuple is concurrency evidence, not replacement
+  authorization.
 - Existing `update_brand_deliverable.expectedVersion` stays optional for wire
   compatibility during this program and logs omission as a deprecation. Every
   new generation/revision mutation requires an expected revision. Legacy

@@ -1490,7 +1490,7 @@ const LEXICON_DUPLICATE_ALLOWLIST_NAMES = new Set(DUPLICATE_NAME_ALLOWLIST.map((
 /**
  * ActivityType minting guard baseline — the frozen snapshot of `ActivityType`
  * union members already registered against `shared/types/lexicon.ts`'s single
- * `historical`-class `ActivityType` entry as of R1-PR2 (150 members, matching
+ * `historical`-class `ActivityType` entry as of B2 (154 members, matching
  * `server/activity-log.ts` at this commit).
  *
  * The lexicon deliberately never re-declares a union (see docs/rules/lexicon.md
@@ -1534,6 +1534,8 @@ export const ACTIVITY_TYPE_LEXICON_BASELINE = new Set<string>([
   'brandscript_imported', 'brandscript_completed', 'brandscript_sections_updated', 'discovery_source_added',
   'discovery_source_deleted', 'discovery_processed', 'voice_sample_added', 'voice_sample_deleted',
   'voice_calibrated', 'voice_refined', 'voice_profile_created', 'voice_profile_updated',
+  'brand_generation_started', 'brand_generation_resumed',
+  'brand_generation_revision_started', 'brand_generation_completed',
   'brand_deliverable_generated', 'brand_deliverable_refined', 'brand_deliverable_approved', 'brand_deliverable_reverted',
   'brand_intake_submitted', 'brand_intake_evidence_resolved',
   'blueprint_created', 'blueprint_updated', 'blueprint_deleted', 'blueprint_generated',
