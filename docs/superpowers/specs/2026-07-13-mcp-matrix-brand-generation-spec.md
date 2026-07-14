@@ -513,14 +513,24 @@ The internal audit checks grounding, placeholder completeness, voice fit,
 persona fit, internal consistency, and cross-deliverable contradictions. One
 bounded revision is allowed. Operator send creates one grouped Inbox review.
 That review contains one item per source `BrandDeliverable` with independent
-approve/changes-requested decisions. Approval commits only the expected source
-version; changes requested preserves the note and leaves/returns the source in
-draft. Only an operator or client can decide an item; system/MCP actors cannot
-auto-approve, and a changes request requires a note. The bundle is `partial`
-until all items are terminal and `approved` only
-when all items are approved. Voice review is a separate bundle/gate and client
-approval never finalizes the profile. Only approved source deliverables enter
-`BrandSlice` and `ClientBrandSummary`.
+approve/changes-requested decisions. Its private review contract evolves
+separately from generation, discriminates foundation from durable suite, and
+freezes both generation-item revision and source-deliverable version. Approval
+or changes requested commits the source, generation item/run counts, and mirror
+child atomically; the generic mirror-first response and whole-bundle decline are
+not valid brand-review paths. A changes request preserves its note and
+leaves/returns the source in draft. Only an operator or client can decide an
+item; system/MCP actors cannot auto-approve. The bundle is `partial` until all
+items are terminal and `approved` only when all items are approved.
+
+Review identity is `brand_generation:<reviewKind>:<runId>` so foundation and
+suite cannot collide and a same-run revision cannot duplicate the bundle.
+Resend preserves approved children plus database-authoritative child IDs and
+timestamps, replacing only a revised child. Voice review is a separate
+bundle/gate; client approval records human-review evidence but neither mutates
+the provisional generation item nor finalizes the profile. Client projections
+strip private run/source/revision/actor/evidence data. Only approved source
+deliverables enter `BrandSlice` and `ClientBrandSummary`.
 
 ## 10. Orchestration lifecycle
 
@@ -572,7 +582,9 @@ for that proof. A workflow waiting on humans has no running generic job.
   in the same PR.
 - Client Inbox review reuses `WS_EVENTS.DELIVERABLE_SENT`/
   `DELIVERABLE_UPDATED` and invalidates existing admin workspace-deliverables and
-  client unified-Inbox keys. Brief/post commits also reuse `BRIEF_UPDATED`/
+  client unified-Inbox keys plus the admin brand-run prefix and client brand
+  summary. Brand-identity and voice-profile events also invalidate the client
+  brand summary. Brief/post commits also reuse `BRIEF_UPDATED`/
   `POST_UPDATED`; job progress reuses `JOB_CREATED`/`JOB_UPDATED`.
 
 ## 12. Test ownership

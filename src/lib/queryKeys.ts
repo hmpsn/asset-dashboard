@@ -167,6 +167,9 @@ export const queryKeys = {
     brandIntake: (wsId: string) => ['admin-brand-intake', wsId] as const,
     voiceProfile: (wsId: string) => ['admin-voice-profile', wsId] as const,
     brandIdentity: (wsId: string) => ['admin-brand-identity', wsId] as const,
+    brandGenerationAll: (wsId: string) => ['admin-brand-generation', wsId] as const,
+    brandGeneration: (wsId: string, runId: string) =>
+      ['admin-brand-generation', wsId, runId] as const,
 
     // Brand Engine — Discovery
     discoverySources: (wsId: string) => ['admin-discovery-sources', wsId] as const,
@@ -301,6 +304,7 @@ export const queryKeys = {
     contentRequests: (wsId: string) => ['client-content-requests', wsId] as const,
     // Unified client inbox (PR-2a) — GET /api/public/deliverables/:workspaceId
     unifiedInbox: (wsId: string) => ['client-unified-inbox', wsId] as const,
+    brandSummary: (wsId: string) => ['client-brand-summary', wsId] as const,
     auditSummary: (wsId: string) => ['client-audit-summary', wsId] as const,
     auditDetail: (wsId: string) => ['client-audit-detail', wsId] as const,
     schemaPlan: (wsId: string) => ['client-schema-plan', wsId] as const,

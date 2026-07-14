@@ -386,17 +386,26 @@ never sufficient to dispatch paid work.
 - Brand client review reuses the unified `ClientDeliverable` spine; it does not
   create a parallel approval system. A grouped bundle has one typed item per
   source `BrandDeliverable` and records approve/changes-requested per item.
+- Foundation and durable-suite review are separate, independently versioned
+  payload variants with stable `brand_generation:<reviewKind>:<runId>` natural
+  keys. A same-run revision preserves approved children and database-owned item
+  identity metadata; it cannot duplicate the bundle or reset prior approvals.
 - Drafts, raw intake, prompts, internal evidence, and audit reasoning are never
-  exposed by client serializers.
+  exposed by client serializers. Private run/source IDs, revisions, actor data,
+  requirements, provenance, and MCP identity are projected away too.
 - Item approval updates only that source row through its legal state machine and
-  only when the expected version matches. Changes requested preserves the note,
-  keeps/returns that source in draft, and opens a version-safe revision path.
+  only when both the frozen generation-item revision and source version match.
+  The source, generation item/run counts, and mirror child commit atomically;
+  the generic mirror-first response path is forbidden. Changes requested
+  preserves the note, keeps/returns that source in draft, and opens a
+  version-safe revision path.
   Only operator/client actors may decide an item; system/MCP actors cannot
   auto-approve, and `changes_requested` always carries its note.
   The bundle stays `partial` until all items are terminal and becomes `approved`
   only when all are approved.
 - Voice-foundation review is a separate gate. Client approval of a voice item
-  never finalizes a `VoiceProfile`; an operator explicitly finalizes after
+  never finalizes a `VoiceProfile` and never mutates the provisional B2 item; it
+  records human-review evidence only. An operator explicitly finalizes after
   selecting authentic anchors.
 - Only approved, explicitly client-visible brand fields pre-seed the client
   dashboard and downstream brand slice.

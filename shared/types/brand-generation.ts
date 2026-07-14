@@ -889,9 +889,25 @@ export interface BrandGenerationJobResult {
 export const BRAND_REVIEW_ITEM_DECISIONS = ['approve', 'changes_requested'] as const;
 export type BrandReviewDecision = (typeof BRAND_REVIEW_ITEM_DECISIONS)[number];
 
+/** Evolves independently from the paid-generation persistence contract above. */
+export const BRAND_REVIEW_CONTRACT_VERSION = 1 as const;
+
+export const BRAND_REVIEW_BUNDLE_KINDS = ['voice_foundation', 'brand_suite'] as const;
+export type BrandReviewBundleKind = (typeof BRAND_REVIEW_BUNDLE_KINDS)[number];
+
+export const BRAND_REVIEW_MIRROR_ITEM_STATUSES = [
+  'awaiting_client',
+  'approved',
+  'changes_requested',
+] as const;
+export type BrandReviewMirrorItemStatus =
+  (typeof BRAND_REVIEW_MIRROR_ITEM_STATUSES)[number];
+
 interface BrandReviewItemDecisionBase {
   runId: string;
   itemId: string;
+  expectedGenerationItemRevision: number;
+  resultingGenerationItemRevision: number;
   deliverableId: string;
   deliverableType: BrandDeliverableType;
   expectedDeliverableVersion: number;
@@ -909,6 +925,190 @@ export type BrandReviewItemDecision = BrandReviewItemDecisionBase & (
       decision: 'changes_requested';
       note: string;
       decidedBy: GenerationHumanReviewerAttribution;
+    }
+);
+
+interface BrandVoiceFoundationReviewDecisionBase {
+  runId: string;
+  itemId: string;
+  expectedGenerationItemRevision: number;
+  resultingGenerationItemRevision: number;
+  decidedAt: string;
+}
+
+/**
+ * Client feedback on the provisional foundation is durable review evidence only.
+ * It never approves or finalizes a VoiceProfile and never masquerades as a
+ * BrandDeliverable decision.
+ */
+export type BrandVoiceFoundationReviewDecision =
+  BrandVoiceFoundationReviewDecisionBase & (
+    | {
+        decision: 'approve';
+        note?: string;
+        decidedBy: GenerationHumanReviewerAttribution;
+      }
+    | {
+        decision: 'changes_requested';
+        note: string;
+        decidedBy: GenerationHumanReviewerAttribution;
+      }
+  );
+
+export type BrandReviewPersistedDecision =
+  | BrandReviewItemDecision
+  | BrandVoiceFoundationReviewDecision;
+
+/** The only client-authored decision shape accepted by the review boundary. */
+export type BrandReviewClientDecisionRequest =
+  | {
+      deliverableItemId: string;
+      decision: 'approve';
+      note?: string;
+    }
+  | {
+      deliverableItemId: string;
+      decision: 'changes_requested';
+      note: string;
+    };
+
+/**
+ * Version-frozen server input consumed by the unified deliverable adapter.
+ * Requirement IDs are validation-only and are deliberately not serialized into
+ * the client-facing projection.
+ */
+interface BrandReviewMirrorItemInputBase {
+  clientItemId?: string;
+  createdAt?: string;
+  generationItemId: string;
+  generationItemRevision: number;
+  content: string;
+  mirrorStatus: BrandReviewMirrorItemStatus;
+  unresolvedRequirementIds: string[];
+  hasCanonicalPlaceholder: boolean;
+}
+
+export interface BrandVoiceFoundationReviewMirrorItemInput
+  extends BrandReviewMirrorItemInputBase {
+  target: 'voice_foundation';
+  generationStatus: 'ready_for_human_review';
+  sourceDeliverableId: null;
+  sourceDeliverableVersion: null;
+  sourceDeliverableStatus: null;
+  decision: BrandVoiceFoundationReviewDecision | null;
+}
+
+export interface BrandSuiteReviewMirrorItemInput extends BrandReviewMirrorItemInputBase {
+  target: BrandDeliverableType;
+  generationStatus: Extract<
+    BrandGenerationItemStatus,
+    'ready_for_human_review' | 'approved' | 'changes_requested'
+  >;
+  sourceDeliverableId: string;
+  sourceDeliverableVersion: number;
+  sourceDeliverableStatus: BrandDeliverableStatus;
+  decision: BrandReviewItemDecision | null;
+}
+
+export type BrandReviewMirrorItemInput =
+  | BrandVoiceFoundationReviewMirrorItemInput
+  | BrandSuiteReviewMirrorItemInput;
+
+interface BrandReviewDeliverableInputBase {
+  runId: string;
+  runRevision: number;
+}
+
+export type BrandReviewDeliverableInput = BrandReviewDeliverableInputBase & (
+  | {
+      reviewKind: 'voice_foundation';
+      items: [BrandVoiceFoundationReviewMirrorItemInput];
+    }
+  | {
+      reviewKind: 'brand_suite';
+      items: [BrandSuiteReviewMirrorItemInput, ...BrandSuiteReviewMirrorItemInput[]];
+    }
+);
+
+/** Private persisted payload; public serializers must project the safe types below. */
+export interface BrandReviewBundlePayload {
+  schemaVersion: typeof BRAND_REVIEW_CONTRACT_VERSION;
+  family: 'brand_generation';
+  reviewKind: BrandReviewBundleKind;
+  runId: string;
+  runRevision: number;
+}
+
+interface BrandReviewItemPayloadBase extends BrandReviewBundlePayload {
+  generationItemId: string;
+  generationItemRevision: number;
+}
+
+/** Private persisted child payload used for source/generation CAS decisions. */
+export type BrandReviewItemPayload = BrandReviewItemPayloadBase & (
+  | {
+      reviewKind: 'voice_foundation';
+      target: 'voice_foundation';
+      sourceDeliverableId: null;
+      expectedDeliverableVersion: null;
+      decision: BrandVoiceFoundationReviewDecision | null;
+    }
+  | {
+      reviewKind: 'brand_suite';
+      target: BrandDeliverableType;
+      sourceDeliverableId: string;
+      expectedDeliverableVersion: number;
+      decision: BrandReviewItemDecision | null;
+    }
+);
+
+interface ClientBrandReviewPayloadBase {
+  schemaVersion: typeof BRAND_REVIEW_CONTRACT_VERSION;
+  family: 'brand_generation';
+}
+
+/** Safe payload exposed through the authenticated client Inbox read. */
+export type ClientBrandReviewBundlePayload = ClientBrandReviewPayloadBase & (
+  | { reviewKind: 'voice_foundation' }
+  | { reviewKind: 'brand_suite' }
+);
+
+/** Safe child metadata; excludes run/source IDs, versions, actor data, and evidence. */
+export type ClientBrandReviewItemPayload = ClientBrandReviewPayloadBase & (
+  | { reviewKind: 'voice_foundation'; target: 'voice_foundation' }
+  | { reviewKind: 'brand_suite'; target: BrandDeliverableType }
+);
+
+export interface BrandReviewDeliverableReceipt {
+  deliverableId: string;
+  reviewKind: BrandReviewBundleKind;
+  runId: string;
+  runRevision: number;
+  status: 'awaiting_client' | 'partial' | 'approved' | 'changes_requested';
+  itemCount: number;
+  existing: boolean;
+}
+
+interface BrandReviewDecisionReceiptBase {
+  reviewDeliverableId: string;
+  runId: string;
+  runRevision: number;
+  previousGenerationItemRevision: number;
+  generationItemRevision: number;
+  bundleStatus: 'partial' | 'approved' | 'changes_requested';
+}
+
+/** Durable, kind-safe human-review evidence for the future onboarding orchestrator. */
+export type BrandReviewDecisionReceipt = BrandReviewDecisionReceiptBase & (
+  | {
+      reviewKind: 'voice_foundation';
+      sourceDeliverableVersion: null;
+      decision: BrandVoiceFoundationReviewDecision;
+    }
+  | {
+      reviewKind: 'brand_suite';
+      sourceDeliverableVersion: number;
+      decision: BrandReviewItemDecision;
     }
 );
 

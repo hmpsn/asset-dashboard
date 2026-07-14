@@ -8,7 +8,8 @@
  *
  *   sendToClient guarantees:
  *     0. adapter.validateSendable(input) — reject not-ready inputs before anything else
- *     1. state-machine-guarded insert (draft → awaiting_client), sets sent_at
+ *     1. state-machine-guarded insert/resend (normally → awaiting_client; grouped
+ *        review adapters may honestly retain partial), sets sent_at
  *     2. adapter.buildPayload(input) — typed payload (+ child items)
  *     3. client notification (email + broadcast DELIVERABLE_SENT)
  *     4. (response time) team notification on EVERY outcome + apply only if the adapter opted in
@@ -99,30 +100,34 @@ export async function sendToClient<TInput>(
   // per-type machine (notification types are never sendable through this path):
   //   (a) FRESH send: the new row is born at draft → awaiting_client.
   //   (b) RESEND (sourceRef collides with an existing row): upsertDeliverable's
-  //       ON CONFLICT DO UPDATE will overwrite the existing row's status back to
-  //       awaiting_client. We MUST therefore guard from the row's ACTUAL current
-  //       status — a resend onto a still-pending awaiting_client/changes_requested row
-  //       is the intended "supersede", but a resend onto a terminal
+  //       ON CONFLICT DO UPDATE will overwrite the existing row's status with the
+  //       adapter-resolved send state. We MUST therefore guard from the row's ACTUAL current
+  //       status — a resend onto a still-pending row is the intended "supersede",
+  //       and grouped reviews may remain partial when approved children survive;
+  //       a resend onto a terminal
   //       approved/applied/declined/completed row must throw InvalidTransitionError
   //       rather than silently revert (and null decided_at/applied_at/note).
   const transitions = getDeliverableTransitions(type);
   const sourceRef = adapter.sourceRef(input);
   const existing = sourceRef != null ? findBySourceRef(workspaceId, type, sourceRef) : null;
-  validateTransition('deliverable', transitions, existing ? existing.status : 'draft', 'awaiting_client');
+  const sendStatus = adapter.resolveSendStatus?.(input, existing) ?? 'awaiting_client';
+  validateTransition('deliverable', transitions, existing ? existing.status : 'draft', sendStatus);
 
   const nowIso = opts.sentAt ?? new Date().toISOString();
   const upsertInput: UpsertDeliverableInput = {
     workspaceId,
     type,
     kind: built.kind,
-    status: 'awaiting_client',
+    status: sendStatus,
     title: built.title,
     summary: built.summary ?? null,
     payload: built.payload,
-    note: opts.note ?? null,
+    note: opts.note ?? (sendStatus === 'partial' ? existing?.note ?? null : null),
+    clientResponseNote: sendStatus === 'partial' ? existing?.clientResponseNote ?? null : null,
     externalRef: built.externalRef ?? null,
     parentDeliverableId: built.parentDeliverableId ?? null,
     sentAt: nowIso,
+    decidedAt: sendStatus === 'partial' ? existing?.decidedAt ?? null : null,
     generatedAt: nowIso,
     source: opts.source ?? null,
     sourceRef,
@@ -189,9 +194,11 @@ export async function respondToDeliverable(
   // The adapter deliberately has NO respondToSource, so a generic respond here would flip ONLY
   // the mirror — no content request, no attribution TrackedAction — a dead greenlight that can
   // also desync mirror vs. rec (rec-approved / mirror-declined). Reject before any mutation.
-  if (current.type === 'recommendation') {
+  if (current.type === 'recommendation' || current.type === 'brand_generation') {
     throw new SendToClientError(
-      'Recommendations are responded to via the act-on route, not the generic deliverable respond endpoint.',
+      current.type === 'recommendation'
+        ? 'Recommendations are responded to via the act-on route, not the generic deliverable respond endpoint.'
+        : 'Brand generation reviews require a per-item decision, not a whole-deliverable response.',
       409,
     );
   }
