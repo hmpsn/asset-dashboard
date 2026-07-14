@@ -55,6 +55,13 @@ export interface VoiceCalibrationSelection {
   feedback?: string;
 }
 
+/** Immutable server-derived copy of the exact generated variation evaluated. */
+export interface VoiceCalibrationSelectionSnapshot
+  extends VoiceCalibrationSelection {
+  promptType: string;
+  variationText: string;
+}
+
 /** Frozen authentic content and its derived evidence identity. */
 export interface FinalizedVoiceAnchorSnapshot {
   selector: VoiceAnchorSelector;
@@ -72,7 +79,7 @@ export interface FinalizedVoiceSnapshot extends FinalizedVoiceSnapshotRef {
   guardrails: VoiceGuardrails;
   contextModifiers: ContextModifier[];
   anchors: [FinalizedVoiceAnchorSnapshot, ...FinalizedVoiceAnchorSnapshot[]];
-  calibrationSelections: VoiceCalibrationSelection[];
+  calibrationSelections: VoiceCalibrationSelectionSnapshot[];
   executionActor: GenerationResolverAttribution;
   createdAt: string;
 }
@@ -96,7 +103,8 @@ export interface FinalizeBrandVoiceRequest extends VoiceProfileFinalizationInput
 
 export interface FinalizeBrandVoiceResult {
   snapshot: FinalizedVoiceSnapshot;
-  readiness: Extract<BrandVoiceReadiness, { state: 'finalized' }>;
+  /** Current readiness; an exact replay after a later edit truthfully returns stale. */
+  readiness: BrandVoiceReadiness;
   profileRevision: number;
   created: boolean;
   replayed: boolean;

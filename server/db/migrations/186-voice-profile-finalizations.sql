@@ -137,7 +137,7 @@ CREATE TABLE voice_finalization_authorizations (
   issued_at TEXT NOT NULL CHECK (length(issued_at) > 0),
   expires_at TEXT NOT NULL CHECK (length(expires_at) > 0),
   consumed_at TEXT,
-  finalization_id TEXT UNIQUE,
+  finalization_id TEXT,
 
   UNIQUE (id, workspace_id),
   FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,

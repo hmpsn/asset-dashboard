@@ -90,6 +90,11 @@ export const voiceCalibrationSelectionSchema = z.object({
   feedback: z.string().trim().min(1).max(2_000).optional(),
 }).strict();
 
+export const voiceCalibrationSelectionSnapshotSchema = voiceCalibrationSelectionSchema.extend({
+  promptType: shortText,
+  variationText: contentText,
+}).strict();
+
 function selectorIdentity(selector: z.infer<typeof voiceAnchorSelectorSchema>): string {
   return selector.kind === 'voice_sample'
     ? `voice_sample:${selector.voiceSampleId}`
@@ -211,7 +216,7 @@ export const finalizedVoiceSnapshotSchema = finalizedVoiceSnapshotRefSchema.exte
   anchors: z.array(finalizedVoiceAnchorSnapshotSchema)
     .min(1)
     .max(VOICE_FINALIZATION_LIMITS.maxAnchors),
-  calibrationSelections: z.array(voiceCalibrationSelectionSchema)
+  calibrationSelections: z.array(voiceCalibrationSelectionSnapshotSchema)
     .max(VOICE_FINALIZATION_LIMITS.maxCalibrationSelections),
   executionActor: generationResolverAttributionSchema,
   createdAt: timestamp,

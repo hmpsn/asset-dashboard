@@ -16,7 +16,7 @@ The brand engine has three phases:
 
 Data flow: raw source material (transcripts, docs) is ingested and extracted into voice patterns and story elements. Those feed a `VoiceProfile` (DNA + guardrails + samples) and a `Brandscript`. Brand Identity deliverables are generated from both. Approved deliverables and approved copy sections feed back as voice samples for the next calibration cycle.
 
-Workspace intelligence assembles the SEO context in `server/intelligence/seo-context-slice.ts`. Raw brand/knowledge reads and voice-profile authority live in `server/intelligence/seo-context-source.ts`. Prompt layer injection lives in `server/prompt-assembly.ts`. State machine enforcement lives in `server/voice-calibration.ts`.
+Workspace intelligence assembles the SEO context in `server/intelligence/seo-context-slice.ts`. Raw brand/knowledge reads and voice-profile authority live in `server/intelligence/seo-context-source.ts`. Prompt layer injection lives in `server/prompt-assembly.ts`. Mutable-profile state enforcement lives in `server/voice-calibration.ts`; durable generation readiness and finalization history live in `server/domains/brand/voice-finalization.ts`.
 
 ---
 
@@ -215,7 +215,7 @@ Controls how much voice profile context is emitted. Defaults to `'full'`. Token-
 
 ## VoiceProfile State Machine
 
-**File:** `server/voice-calibration.ts`
+**Files:** `server/voice-calibration.ts`, `server/domains/brand/voice-finalization.ts`
 
 Status values: `'draft'` → `'calibrating'` → `'calibrated'`
 
@@ -227,11 +227,55 @@ Legal transitions:
 | `calibrating` | `calibrating`, `draft`, `calibrated` |
 | `calibrated` | `calibrated`, `draft`, `calibrating` |
 
-`draft → calibrated` is illegal. The only path to `calibrated` is through `calibrating`, which runs the calibration pipeline that populates `voiceDNA` and `guardrails`. Skipping to `calibrated` without running the pipeline would let `buildSystemPrompt` Layer 2 inject `null` DNA and guardrails into every system prompt.
+`draft → calibrated` remains an illegal direct edge. The finalization service may
+validate and commit the legal `draft → calibrating → calibrated` path inside one
+transaction, but only after validating non-empty DNA, substantive guardrails,
+and at least one durable authentic anchor. Generic profile PATCH may never set
+`calibrated`.
 
 Illegal transitions throw `VoiceProfileStateTransitionError` (exported from `server/voice-calibration.ts`). Callers should catch this and return HTTP 400.
 
-The transition guard is enforced in `updateVoiceProfile()`, which is the only write path. All callers — route handlers, internal flows, test harnesses — flow through it.
+Every mutable profile has a monotonic `revision`. DNA, guardrail, modifier, and
+sample mutations use optimistic concurrency and increment it. Editing a
+calibrated profile reopens it to `calibrating`; the prior immutable snapshot
+remains readable but readiness becomes `stale` until an operator finalizes the
+new revision.
+
+## Durable Voice Finalization Authority
+
+**Files:** `shared/types/voice-finalization.ts`,
+`server/domains/brand/voice-finalization.ts`, migration 186.
+
+A `status === 'calibrated'` profile remains prompt-compatible for historical
+workspaces, but status alone is not generation authority. B2/M1 generation must
+consume `getBrandVoiceReadiness()` and require a `finalized` immutable snapshot.
+Legacy calibrated rows have no fabricated operator or anchor history and return
+`missing` readiness until truthfully finalized.
+
+Each immutable voice version freezes:
+
+- exact profile revision, DNA, guardrails, and context modifiers;
+- selected authentic anchor content plus durable source identity;
+- calibration ratings/selections;
+- finalizing operator, separate execution actor, timestamp, and SHA-256
+  fingerprint.
+
+Only `manual` and `transcript_extraction` voice samples may anchor a final voice.
+An exact immutable `BrandIntakeAuthenticSample` may also anchor it. Generated
+calibration-loop, identity-approved, and copy-approved samples can inform a
+draft but cannot establish authenticity.
+
+An authenticated HTTP operator may finalize directly. MCP keys are execution
+identities, not people: `finalize_brand_voice` must consume a short-lived,
+one-time bearer authorization created at the operator boundary and bound to the
+complete command and expected revision. Persist only the token digest; never
+accept a caller-authored operator identity or reinterpret a key as a human.
+Exact idempotent replay returns the existing version without activity/event
+duplication. Only a newly committed finalization may record `voice_calibrated`.
+
+Approved `voice_guidelines` and `tone_examples` are legacy draft/evidence inputs.
+When a calibrated profile already owns the voice layer, copy generation excludes
+those deliverables from the identity block so they cannot compete with Layer 2.
 
 ---
 
