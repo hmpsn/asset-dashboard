@@ -26,6 +26,8 @@ export {
 } from './brand-engine.ts';
 export * from './generation-evidence.ts';
 export * from './brand-intake.ts';
+export * from './brand-intake-schemas.ts';
+export * from './mcp-brand-intake-schemas.ts';
 export * from './brand-generation.ts';
 export * from './matrix-generation.ts';
 export * from './brand-content-onboarding.ts';
