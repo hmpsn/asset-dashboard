@@ -3,7 +3,7 @@
  * Entries are broadcast in real time via WebSocket.
  */
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
@@ -119,6 +119,10 @@ export type ActivityType =
   | 'voice_refined'
   | 'voice_profile_created'
   | 'voice_profile_updated'
+  | 'brand_generation_started'          // admin-only: durable B2 run created
+  | 'brand_generation_resumed'          // admin-only: exact finalized voice unlocked dependents
+  | 'brand_generation_revision_started' // admin-only: review-directed revision job created
+  | 'brand_generation_completed'        // admin-only: automatic gates reached a truthful terminal outcome
   | 'brand_deliverable_generated'
   | 'brand_deliverable_refined'
   | 'brand_deliverable_approved'
@@ -313,6 +317,16 @@ const stmts = createStmtCache(() => ({
         VALUES (@id, @workspace_id, @type, @title, @description, @metadata,
           @actor_id, @actor_name, @created_at)
       `),
+  insertIgnore: db.prepare(`
+        INSERT OR IGNORE INTO activity_log (
+          id, workspace_id, type, title, description, metadata,
+          actor_id, actor_name, created_at
+        ) VALUES (
+          @id, @workspace_id, @type, @title, @description, @metadata,
+          @actor_id, @actor_name, @created_at
+        )
+      `),
+  selectById: db.prepare('SELECT * FROM activity_log WHERE id = ?'),
   selectByWorkspace: db.prepare(
     'SELECT * FROM activity_log WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ?',
   ),
@@ -393,6 +407,71 @@ export function addActivity(workspaceId: string, type: ActivityType, title: stri
   _broadcastFn?.(workspaceId, WS_EVENTS.ACTIVITY_NEW, toWorkspaceBroadcastActivityPayload(entry));
 
   return entry;
+}
+
+export interface AddActivityOnceInput {
+  effectKey: string;
+  workspaceId: string;
+  type: ActivityType;
+  title: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+  actor?: { id?: string; name?: string };
+  createdAt: string;
+}
+
+/**
+ * Persist one outbox-backed activity exactly once and broadcast it at least
+ * once. Retrying after an insert/broadcast crash reuses the deterministic row
+ * while emitting a fresh invalidation signal.
+ */
+export function addActivityOnce(input: AddActivityOnceInput): ActivityEntry {
+  const effectKey = input.effectKey.trim();
+  if (!effectKey || new TextEncoder().encode(effectKey).byteLength > 512) {
+    throw new Error('activity effect key must be between 1 and 512 UTF-8 bytes');
+  }
+  const entry: ActivityEntry = {
+    id: `act_bge_${createHash('sha256').update(effectKey).digest('hex')}`,
+    workspaceId: input.workspaceId,
+    type: input.type,
+    title: input.title,
+    description: input.description,
+    metadata: input.metadata,
+    actorId: input.actor?.id,
+    actorName: input.actor?.name,
+    createdAt: input.createdAt,
+  };
+  stmts().insertIgnore.run({
+    id: entry.id,
+    workspace_id: entry.workspaceId,
+    type: entry.type,
+    title: entry.title,
+    description: entry.description ?? null,
+    metadata: entry.metadata ? JSON.stringify(entry.metadata) : null,
+    actor_id: entry.actorId ?? null,
+    actor_name: entry.actorName ?? null,
+    created_at: entry.createdAt,
+  });
+  const storedRow = stmts().selectById.get(entry.id) as ActivityRow | undefined;
+  if (!storedRow) throw new Error('idempotent activity was not persisted');
+  const stored = rowToEntry(storedRow);
+  if (stored.workspaceId !== entry.workspaceId
+    || stored.type !== entry.type
+    || stored.title !== entry.title
+    || stored.description !== entry.description
+    || stored.actorId !== entry.actorId
+    || stored.actorName !== entry.actorName
+    || stored.createdAt !== entry.createdAt
+    || JSON.stringify(stored.metadata ?? null) !== JSON.stringify(entry.metadata ?? null)) {
+    throw new Error('activity effect key is bound to different activity inputs');
+  }
+  if (!_broadcastFn) throw new Error('activity broadcast is not initialized');
+  _broadcastFn(
+    input.workspaceId,
+    WS_EVENTS.ACTIVITY_NEW,
+    toWorkspaceBroadcastActivityPayload(stored),
+  );
+  return stored;
 }
 
 export function pruneActivityLogRetention(): number {

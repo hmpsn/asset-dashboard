@@ -54,6 +54,30 @@ export interface AICallResult {
   execution: AIExecutionMetadata;
 }
 
+export type AIRenderedMessage = {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+};
+
+/**
+ * Exact instruction payload handed to a provider helper after callAI applies
+ * research-mode and provider-specific system-message placement.
+ *
+ * High-integrity generation paths fingerprint this shape so provenance follows
+ * the actual dispatched instructions rather than a caller's pre-wrapper prompt.
+ */
+export type AIRenderedProviderInput =
+  | {
+      provider: 'anthropic';
+      system: string | undefined;
+      messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+    }
+  | {
+      provider: 'openai';
+      system: undefined;
+      messages: AIRenderedMessage[];
+    };
+
 export const RESEARCH_MODE_INSTRUCTIONS = `RESEARCH MODE:
 - Make factual claims only when they are supported by the provided context.
 - If the context does not contain enough evidence, say what is missing instead of guessing.
@@ -67,6 +91,26 @@ export const RESEARCH_MODE_INSTRUCTIONS = `RESEARCH MODE:
 function applyResearchMode(system: string | undefined, enabled: boolean | undefined): string | undefined {
   if (!enabled) return system;
   return [system, RESEARCH_MODE_INSTRUCTIONS].filter(Boolean).join('\n\n');
+}
+
+export function renderAIProviderInput(input: {
+  provider: 'anthropic' | 'openai';
+  system?: string;
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  researchMode?: boolean;
+}): AIRenderedProviderInput {
+  const effectiveSystem = applyResearchMode(input.system, input.researchMode);
+  if (input.provider === 'anthropic') {
+    return {
+      provider: 'anthropic',
+      system: effectiveSystem,
+      messages: input.messages,
+    };
+  }
+  const messages: AIRenderedMessage[] = [];
+  if (effectiveSystem) messages.push({ role: 'system', content: effectiveSystem });
+  messages.push(...input.messages);
+  return { provider: 'openai', system: undefined, messages };
 }
 
 /**
@@ -87,15 +131,21 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
   const timeoutMs = opts.timeoutMs ?? operationDefaults?.defaultTimeoutMs;
   const responseFormat = opts.responseFormat ?? operationDefaults?.defaultResponseFormat;
   const researchMode = opts.researchMode ?? operationDefaults?.defaultResearchMode ?? false;
-  const effectiveSystem = applyResearchMode(opts.system, researchMode);
   const operation = opts.operation ?? feature;
   const cachePolicy = opts.signal ? { mode: 'none' } as const : (operationDefaults?.cachePolicy ?? { mode: 'inflight' } as const);
+  const renderedInput = renderAIProviderInput({
+    provider,
+    system: opts.system,
+    messages: opts.messages,
+    researchMode,
+  });
 
   if (provider === 'anthropic') {
+    if (renderedInput.provider !== 'anthropic') throw new Error('Anthropic input rendering failed');
     const result = await callAnthropic({
       model: model as Parameters<typeof callAnthropic>[0]['model'],
-      system: effectiveSystem,
-      messages: opts.messages,
+      system: renderedInput.system,
+      messages: renderedInput.messages,
       maxTokens: opts.maxTokens,
       temperature: opts.temperature,
       feature,
@@ -134,13 +184,11 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
   }
 
   // OpenAI: inject system message as first message
-  const openaiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
-  if (effectiveSystem) openaiMessages.push({ role: 'system', content: effectiveSystem });
-  openaiMessages.push(...opts.messages);
+  if (renderedInput.provider !== 'openai') throw new Error('OpenAI input rendering failed');
 
   const result = await callOpenAI({
     model: model as Parameters<typeof callOpenAI>[0]['model'],
-    messages: openaiMessages,
+    messages: renderedInput.messages,
     maxTokens: opts.maxTokens,
     temperature: opts.temperature,
     feature,

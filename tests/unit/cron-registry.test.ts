@@ -3,9 +3,8 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 // This test asserts the CRON_METADATA registry has complete, well-formed
 // metadata for every registered cron AND that constructing/importing the
 // registry module never starts a real timer (lazy construction — see
-// server/cron-registry.ts header comment + tests/unit/startup.test.ts, which
-// only mocks 15 of 20 scheduler imports; eager construction would start the
-// other 5 for real inside vitest).
+// server/cron-registry.ts header comment; eager construction would start
+// unmocked transitive scheduler imports for real inside vitest).
 
 // Warm the transitive module graph once, off the per-test 5s budget. The very
 // first `await import('../../server/cron-registry.js')` cold-transforms ~20
@@ -66,10 +65,10 @@ describe('cron-registry: lazy construction', () => {
   //
   // What MUST be true: CRON_METADATA's own construction — the object literal
   // in cron-registry.ts — never itself invokes any registered start()/stop().
-  // That is the property tests/unit/startup.test.ts's incomplete 15/20 mock
-  // coverage depends on: if constructing CRON_METADATA eagerly called (say)
-  // startInsightRecomputeCron() or startStrategyIssueCron() — two of the 5
-  // modules that test does NOT mock — real timers would start inside vitest.
+  // That is the property partial scheduler mocks depend on: if constructing
+  // CRON_METADATA eagerly called (say)
+  // startInsightRecomputeCron() or startStrategyIssueCron() — representative
+  // transitive modules that tests may not mock — real timers would start inside vitest.
   it('never calls any registered start() as a side effect of importing the module', async () => {
     vi.resetModules();
     const { CRON_METADATA } = await import('../../server/cron-registry.js');

@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import db from '../../server/db/index.js';
 import {
   addActivity,
+  addActivityOnce,
   getClientActivitySummary,
   listActivity,
   listClientActivity,
@@ -60,6 +61,33 @@ describe('addActivity', () => {
 
     expect(entry.actorId).toBe('usr_1');
     expect(entry.actorName).toBe('John');
+  });
+
+  it('persists an outbox activity exactly once while rebroadcasting a retry', () => {
+    const workspaceId = `ws_activity_once_${Date.now()}`;
+    const broadcastFn = vi.fn();
+    initActivityBroadcast(broadcastFn);
+    const input = {
+      effectKey: 'accepted:brand-command-1',
+      workspaceId,
+      type: 'brand_generation_started' as const,
+      title: 'Started grounded brand generation',
+      metadata: { runId: 'brand-run-1' },
+      actor: { id: 'operator-1', name: 'Operator' },
+      createdAt: '2026-07-14T12:00:00.000Z',
+    };
+
+    const first = addActivityOnce(input);
+    const replay = addActivityOnce(input);
+
+    expect(replay).toEqual(first);
+    expect(listActivity(workspaceId)).toEqual([first]);
+    expect(broadcastFn).toHaveBeenCalledTimes(2);
+    expect(() => addActivityOnce({ ...input, title: 'Different binding' }))
+      .toThrow(/different activity inputs/i);
+
+    db.prepare('DELETE FROM activity_log WHERE workspace_id = ?').run(workspaceId);
+    initActivityBroadcast(() => {});
   });
 
   it('broadcasts the complete client-safe entry for a client-visible activity', () => {

@@ -22,6 +22,7 @@ vi.mock('../../server/broadcast.js', () => ({
 
 vi.mock('../../server/activity-log.js', () => ({
   addActivity: (...args: unknown[]) => addActivity(...args),
+  addActivityOnce: vi.fn(),
 }));
 
 async function startTestServer(): Promise<{

@@ -30,21 +30,25 @@ describe('MCP deliverable-generation rollout flags', () => {
     }
   });
 
-  it('keeps both flags reserved with complete staging lifecycle metadata', () => {
+  it('keeps both flags OFF with phase-correct staging lifecycle metadata', () => {
     for (const key of GENERATION_FLAGS) {
       const entry = FEATURE_FLAG_CATALOG[key];
       expect(entry.group).toBe('Platform Intelligence Enhancements');
       expect(entry.lifecycle).toMatchObject({
         owner: EXPECTED_OWNER[key],
-        status: 'reserved',
         createdAt: '2026-07-13',
         rolloutTarget: 'staging-validation',
         linkedRoadmapItemId: EXPECTED_ROADMAP_ITEM[key],
         staleAuditCadence: 'weekly',
         lastReviewedAt: '2026-07-13',
       });
-      expect(entry.lifecycle.removalCondition).toContain('2026-08-03');
     }
+    expect(FEATURE_FLAG_CATALOG['content-matrix-generation'].lifecycle.status).toBe('reserved');
+    expect(FEATURE_FLAG_CATALOG['content-matrix-generation'].lifecycle.removalCondition)
+      .toContain('2026-08-03');
+    expect(FEATURE_FLAG_CATALOG['brand-deliverable-generation'].lifecycle.status).toBe('active');
+    expect(FEATURE_FLAG_CATALOG['brand-deliverable-generation'].lifecycle.removalCondition)
+      .toContain('B3');
   });
 
   it('uses the existing platform-intelligence group and adds no composite flag', () => {

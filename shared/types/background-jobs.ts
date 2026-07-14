@@ -15,6 +15,7 @@ export const BACKGROUND_JOB_TYPES = {
   COPY_BATCH_GENERATION: 'copy-batch-generation',
   KNOWLEDGE_BASE_GENERATION: 'knowledge-base-generation',
   BRAND_VOICE_GENERATION: 'brand-voice-generation',
+  BRAND_DELIVERABLE_GENERATION: 'brand-deliverable-generation',
   PERSONA_GENERATION: 'persona-generation',
   SEO_BULK_ANALYZE: 'seo-bulk-analyze',
   SEO_BULK_REWRITE: 'seo-bulk-rewrite',
@@ -202,6 +203,13 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
     description: 'Crawls a site and prepares a brand voice draft for review.',
     cancellable: false,
     resultBehavior: 'ephemeral',
+    class: 'user',
+  },
+  [BACKGROUND_JOB_TYPES.BRAND_DELIVERABLE_GENERATION]: {
+    label: 'Brand Deliverable Generation',
+    description: 'Generates a grounded brand foundation or reviewed brand deliverable suite.',
+    cancellable: true,
+    resultBehavior: 'domain-store-and-result',
     class: 'user',
   },
   [BACKGROUND_JOB_TYPES.PERSONA_GENERATION]: {

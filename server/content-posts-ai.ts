@@ -3,7 +3,7 @@
  * Handles creative writing with Claude/GPT, page-type-specific prompts,
  * unification passes, and SEO meta generation.
  */
-import { callAI } from './ai.js';
+import { callAI, type AICallOptions, type AICallResult } from './ai.js';
 import type { AIOperationId } from './ai-operation-registry.js';
 import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structured-output.js';
 import { isAnthropicConfigured } from './anthropic-helpers.js';
@@ -79,7 +79,7 @@ function stripCodeFence(text: string): string {
  * prompt-level instruction; both paths run the result through `stripCodeFence`
  * so callers can use `parseJsonFallback` / `JSON.parse` directly.
  */
-export async function callCreativeAI(opts: {
+export interface CreativeAICallOptions {
   operation?: AIOperationId;
   systemPrompt: string;
   userPrompt: string;
@@ -98,7 +98,45 @@ export async function callCreativeAI(opts: {
   researchMode?: boolean;
   /** Optional caller cancellation signal. */
   signal?: AbortSignal;
-}): Promise<string> {
+  /** Optional quality-tier fallback for complex cross-context creative work. */
+  openAIModel?: 'gpt-5.4' | 'gpt-5.5';
+  /** B2 sets zero so every paid dispatcher invocation is reserved explicitly. */
+  maxRetries?: number;
+  /** Called before each Claude/OpenAI dispatch; throwing blocks that paid call. */
+  beforeProviderDispatch?: (dispatch: {
+    provider: 'anthropic' | 'openai';
+    fallback: boolean;
+  }) => void | Promise<void>;
+}
+
+export const CREATIVE_JSON_ONLY_INSTRUCTION = 'IMPORTANT: Return ONLY a single valid JSON object. No prose, no preamble, no markdown code fences. The response must start with { and end with }.';
+
+/**
+ * Provider-specific callAI input for the creative wrapper. Exported so strict
+ * provenance callers can fingerprint the same instruction shape this function
+ * actually dispatches without reimplementing its Claude/OpenAI adaptation.
+ */
+export function renderCreativeProviderCallInput(
+  input: Pick<CreativeAICallOptions, 'systemPrompt' | 'userPrompt' | 'json'>,
+  provider: 'anthropic' | 'openai',
+): Pick<AICallOptions, 'system' | 'messages'> {
+  const effectiveSystem = input.json === true
+    ? `${input.systemPrompt}\n\n${CREATIVE_JSON_ONLY_INSTRUCTION}`
+    : input.systemPrompt;
+  return provider === 'anthropic'
+    ? {
+        system: effectiveSystem,
+        messages: [{ role: 'user', content: input.userPrompt }],
+      }
+    : {
+        messages: [{ role: 'user', content: `${effectiveSystem}\n\n${input.userPrompt}` }],
+      };
+}
+
+/** Claude-preferred creative dispatch that preserves execution/token provenance. */
+export async function callCreativeAIWithMetadata(
+  opts: CreativeAICallOptions,
+): Promise<AICallResult> {
   const { systemPrompt, userPrompt, maxTokens, feature, workspaceId } = opts;
   const temperature = opts.temperature ?? CLAUDE_TEMP;
   const json = opts.json === true;
@@ -106,24 +144,20 @@ export async function callCreativeAI(opts: {
   const executionChainId = randomUUID();
   let claudeAttemptFailed = false;
 
-  // Claude has no structured JSON mode — lean on the system prompt instead.
-  const effectiveSystem = json
-    ? `${systemPrompt}\n\nIMPORTANT: Return ONLY a single valid JSON object. No prose, no preamble, no markdown code fences. The response must start with { and end with }.`
-    : systemPrompt;
-
   if (isAnthropicConfigured()) {
+    await opts.beforeProviderDispatch?.({ provider: 'anthropic', fallback: false });
     try {
+      const providerInput = renderCreativeProviderCallInput({ systemPrompt, userPrompt, json }, 'anthropic');
       const result = await callAI({
         operation: opts.operation,
         provider: 'anthropic',
         model: CLAUDE_MODEL,
-        system: effectiveSystem,
-        messages: [{ role: 'user', content: userPrompt }],
+        ...providerInput,
         maxTokens,
         temperature,
         feature,
         workspaceId,
-        maxRetries: 3,      // patient retries — quality over speed
+        maxRetries: opts.maxRetries,
         timeoutMs: 90_000,
         researchMode: opts.researchMode,
         signal: opts.signal,
@@ -131,7 +165,7 @@ export async function callCreativeAI(opts: {
       });
       log.info(`[${featureLabel}] Generated with Claude`);
       const text = result.text.trim();
-      return json ? stripCodeFence(text) : text;
+      return { ...result, text: json ? stripCodeFence(text) : text };
     } catch (err) {
       if (opts.signal?.aborted) throw err;
       claudeAttemptFailed = true;
@@ -140,14 +174,21 @@ export async function callCreativeAI(opts: {
   }
 
   // Fallback to GPT (or primary if no Anthropic key)
+  await opts.beforeProviderDispatch?.({
+    provider: 'openai',
+    fallback: claudeAttemptFailed,
+  });
+  const providerInput = renderCreativeProviderCallInput({ systemPrompt, userPrompt, json }, 'openai');
   const result = await callAI({
     operation: opts.operation,
-    model: CONTENT_MODEL,
-    messages: [{ role: 'user', content: `${effectiveSystem}\n\n${userPrompt}` }],
+    provider: 'openai',
+    model: opts.openAIModel ?? CONTENT_MODEL,
+    ...providerInput,
     maxTokens,
     temperature,
     feature,
     workspaceId,
+    maxRetries: opts.maxRetries,
     researchMode: opts.researchMode,
     signal: opts.signal,
     executionChainId,
@@ -156,7 +197,11 @@ export async function callCreativeAI(opts: {
   });
   log.info(`[${featureLabel}] Generated with GPT`);
   const text = result.text.trim();
-  return json ? stripCodeFence(text) : text;
+  return { ...result, text: json ? stripCodeFence(text) : text };
+}
+
+export async function callCreativeAI(opts: CreativeAICallOptions): Promise<string> {
+  return (await callCreativeAIWithMetadata(opts)).text;
 }
 
 export async function buildVoiceContext(workspaceId: string): Promise<string> {

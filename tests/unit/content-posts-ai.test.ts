@@ -28,7 +28,13 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
   formatPageMapForPrompt: vi.fn(() => ''),
 }));
 
-import { callCreativeAI, generateSeoMeta, scoreVoiceMatch, unifyPost } from '../../server/content-posts-ai.js';
+import {
+  callCreativeAI,
+  callCreativeAIWithMetadata,
+  generateSeoMeta,
+  scoreVoiceMatch,
+  unifyPost,
+} from '../../server/content-posts-ai.js';
 
 function makeBrief(): ContentBrief {
   return {
@@ -102,7 +108,11 @@ describe('callCreativeAI fallback correlation', () => {
     const gpt = callAIMock.mock.calls[1][0];
     expect(claude).toMatchObject({ provider: 'anthropic', executionChainId: expect.any(String) });
     expect(claude).not.toHaveProperty('fallbackUsed');
-    expect(gpt).toMatchObject({ executionChainId: claude.executionChainId, fallbackUsed: true });
+    expect(gpt).toMatchObject({
+      provider: 'openai',
+      executionChainId: claude.executionChainId,
+      fallbackUsed: true,
+    });
   });
 
   it('preserves the shared chain when the fallback also fails', async () => {
@@ -113,6 +123,7 @@ describe('callCreativeAI fallback correlation', () => {
 
     await expect(callCreativeAI(opts)).rejects.toThrow('GPT unavailable');
     expect(callAIMock.mock.calls[1][0]).toMatchObject({
+      provider: 'openai',
       executionChainId: callAIMock.mock.calls[0][0].executionChainId,
       fallbackUsed: true,
     });
@@ -122,8 +133,64 @@ describe('callCreativeAI fallback correlation', () => {
     callAIMock.mockResolvedValueOnce({ text: 'Primary GPT draft' });
     await expect(callCreativeAI(opts)).resolves.toBe('Primary GPT draft');
     expect(callAIMock).toHaveBeenCalledOnce();
-    expect(callAIMock).toHaveBeenCalledWith(expect.objectContaining({ executionChainId: expect.any(String) }));
+    expect(callAIMock).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'openai',
+      executionChainId: expect.any(String),
+    }));
     expect(callAIMock.mock.calls[0][0]).not.toHaveProperty('fallbackUsed');
+  });
+
+  it('lets budgeted callers reserve every dispatcher invocation with retries disabled', async () => {
+    isAnthropicConfiguredMock.mockReturnValue(true);
+    const execution = {
+      runId: 'ai-run-fallback',
+      executionChainId: 'chain-fallback',
+      operation: 'copy-generation',
+      provider: 'openai' as const,
+      model: 'gpt-5.4-mini',
+      attempts: 1,
+      fallbackUsed: true,
+      cacheOutcome: 'bypass' as const,
+      startedAt: '2026-07-13T12:00:00.000Z',
+      completedAt: '2026-07-13T12:00:01.000Z',
+      durationMs: 1000,
+    };
+    callAIMock
+      .mockRejectedValueOnce(new Error('Claude unavailable'))
+      .mockResolvedValueOnce({
+        text: 'GPT draft',
+        tokens: { prompt: 20, completion: 5, total: 25 },
+        execution,
+      });
+    const beforeProviderDispatch = vi.fn();
+
+    await expect(callCreativeAIWithMetadata({
+      ...opts,
+      maxRetries: 0,
+      beforeProviderDispatch,
+    })).resolves.toEqual({
+      text: 'GPT draft',
+      tokens: { prompt: 20, completion: 5, total: 25 },
+      execution,
+    });
+    expect(beforeProviderDispatch.mock.calls).toEqual([
+      [{ provider: 'anthropic', fallback: false }],
+      [{ provider: 'openai', fallback: true }],
+    ]);
+    expect(callAIMock.mock.calls[0][0]).toMatchObject({ maxRetries: 0 });
+    expect(callAIMock.mock.calls[1][0]).toMatchObject({ maxRetries: 0 });
+  });
+
+  it('never dispatches a provider when its reservation is rejected', async () => {
+    isAnthropicConfiguredMock.mockReturnValue(true);
+    const budgetError = new Error('brand generation budget exhausted');
+
+    await expect(callCreativeAIWithMetadata({
+      ...opts,
+      maxRetries: 0,
+      beforeProviderDispatch: () => { throw budgetError; },
+    })).rejects.toThrow(budgetError);
+    expect(callAIMock).not.toHaveBeenCalled();
   });
 });
 

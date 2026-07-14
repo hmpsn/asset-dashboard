@@ -48,6 +48,7 @@ const BOOT_WIRED_SCHEDULER_MODULES = [
   'server/strategy-issue-cron.js',
   'server/return-hook-cron.js',
   'server/money-frame-cron.js',
+  'server/domains/brand/generation/effects.js',
 ] as const;
 
 // Module-level timers that fire outside startSchedulers()/startup.ts entirely

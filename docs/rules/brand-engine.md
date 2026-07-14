@@ -415,3 +415,66 @@ The `copy_approved` value is forward-declared in Phase 1's shared types so Phase
 Every `UPDATE`, `DELETE`, and non-PK `SELECT` on a brand-engine table must include `AND workspace_id = ?`. Tables without a direct `workspace_id` column (e.g. `voice_samples` which scopes through `voice_profile_id`) must JOIN through to the workspace or derive the profile ID from a workspace-scoped read.
 
 Brand-engine tables: `brandscripts`, `brandscript_sections`, `discovery_sources`, `discovery_extractions`, `voice_profiles`, `voice_samples`, `voice_calibration_sessions`, `brand_identity_deliverables`, `brand_identity_versions`, `site_blueprints`, `blueprint_entries`, `copy_sections`.
+
+---
+
+## Grounded Brand Deliverable Generation
+
+**Files:** `shared/types/brand-generation.ts`, migrations 187–188,
+`server/domains/brand/generation/`, `server/routes/brand-generation.ts`, and
+`server/mcp/{paid-call-counter,tools/brand-generation-actions}.ts`.
+
+B2 is the only first-class paid brand-suite generation path. It consumes an
+exact immutable intake revision and, for every durable target, an exact current
+operator-finalized voice snapshot. `full_brand_system` is deliberately two
+commands: foundation-only start, then a finalized-voice resume after the human
+gate. The provisional foundation is structured item/attempt state and never a
+`BrandDeliverable` or generation authority.
+
+The run, item, command, and attempt ledgers own idempotency, budgets, stage
+checkpoints, sanitized errors, evidence, audit lineage, and restart truth. Every
+provider dispatch reserves a prompt-derived pessimistic hold first. Attempts
+separate the shared frozen-source fingerprint from the exact final
+provider-rendered instruction fingerprint (including creative JSON/research
+wrappers, provider-specific message placement, and structured response mode),
+and successful provider provenance must match the successful reservation.
+Acceptance proves the complete required-stage provider closure before creating
+the durable command; resume/revision also prove their full estimate fits the
+run's remaining budget inside the acceptance transaction. The provider
+instruction ceiling is 40 KiB, with a 512-byte acceptance safety margin. Base
+generation is capped at 24 KiB; the raw candidate core and compact refine/audit
+prompt projection are capped at 4 KiB; the resolved durable candidate is capped
+at 256 KiB; and the whole related-candidate audit digest is capped at 3 KiB so
+full-suite review cannot grow quadratically. Automatic audit-derived revision
+direction is capped at 512 bytes, and the full-run input ceiling is 5,000,000
+tokens.
+
+A missing authentic sample does not invite invented voice evidence: the
+provisional foundation remains `needs_attention` at the human finalization gate
+until an operator supplies/selects authentic anchors and creates a later
+immutable voice version. Every rendered factual or inferred claim requires at
+least one fact-capable, non-structural accepted evidence key/source. Factual
+accuracy remains human-required for either classification, and every generated
+candidate keeps no-hallucination review human-required because its AI-authored
+claim ledger cannot prove completeness. Every legacy deliverable write is a final,
+version-conditional commit after deterministic plus model review; attention or
+missing-evidence output stays in the generation ledger. Approved deliverables
+block replacement until a human returns them to draft. Revision cancellation,
+restart, or ordinary stage failure preserves content but returns the item to
+retryable `changes_requested` because its prior audit lineage was invalidated.
+Generated output stops at
+`ready_for_human_review`; B2 never approves, sends, publishes, pre-seeds a client
+surface, or treats an MCP key as a human reviewer.
+
+Hydration recomputes the immutable frozen input's canonical self-hash and
+verifies every approved-input fingerprint before paid dispatch.
+Accepted-command repair is current-command scoped. It may recreate a missing
+job or the exact server-restart tombstone only before that command has an
+attempt; recovery keyset-pages beyond 100 active/terminal rows and reconciles a
+terminal durable run back into its bounded generic-job result without touching
+artifacts. HTTP and MCP share the same two-segment signed item cursor. MCP paid
+effects use a transactional outbox with `command_accepted`,
+`artifact_committed`, and `command_completed` events. Deterministic effect keys
+make activity writes and MCP paid-call metering exactly-once; workspace
+broadcasts and intelligence-cache invalidation are intentionally at-least-once
+under retry.

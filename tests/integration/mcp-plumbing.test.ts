@@ -122,6 +122,9 @@ describe('MCP plumbing — P1+P2 tools are registered', () => {
       'get_brand_intake', 'resolve_brand_intake_evidence',
       // B1 operator-authorized brand voice
       'get_brand_voice', 'finalize_brand_voice',
+      // B2 grounded brand deliverable generation
+      'start_brand_deliverable_generation', 'get_brand_generation',
+      'resume_brand_deliverable_generation', 'start_brand_deliverable_revision',
     ];
     for (const t of expected) {
       expect(names, `tools/list is missing ${t}`).toContain(t);
@@ -206,6 +209,20 @@ describe('MCP plumbing — new tools dispatch over real HTTP', () => {
     });
     expect(JSON.stringify(payload)).not.toContain('raw_intake');
     expect(JSON.stringify(payload)).not.toContain('authorization_token');
+  });
+
+  it('dispatches brand-generation reads through the registered json_v1 family', async () => {
+    const body = await callTool(
+      'get_brand_generation',
+      { workspace_id: wsA.workspaceId, run_id: 'missing-brand-run' },
+      MASTER_KEY,
+    );
+    expect(body.result?.isError).toBe(true);
+    const payload = JSON.parse(body.result!.content[0].text) as {
+      code: string;
+      retryable: boolean;
+    };
+    expect(payload).toMatchObject({ code: 'not_found', retryable: false });
   });
 });
 

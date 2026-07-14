@@ -216,11 +216,26 @@ export function initJobs(broadcastJob: JobBroadcastFn) {
   loadJobsFromDb();
 }
 
-export function createJob(type: BackgroundJobType | string, opts?: { message?: string; total?: number; workspaceId?: string }): Job {
+export interface CreateJobOptions {
+  message?: string;
+  total?: number;
+  workspaceId?: string;
+  /**
+   * Trusted domain-owned identity for ledgers that accept a command before the
+   * generic job row exists. Never expose this as caller-controlled HTTP/MCP input.
+   */
+  id?: string;
+}
+
+export function createJob(type: BackgroundJobType | string, opts?: CreateJobOptions): Job {
   pruneOldJobs();
   const now = new Date().toISOString();
+  const id = opts?.id ?? randomUUID();
+  if (id.trim() !== id || id.length < 1 || id.length > 200) {
+    throw new Error('Background job id must be a non-empty, trimmed string of at most 200 characters');
+  }
   const job: Job = {
-    id: randomUUID(),
+    id,
     type,
     status: 'pending',
     progress: 0,

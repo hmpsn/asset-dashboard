@@ -136,6 +136,15 @@ last; template blocks cannot use either reserved system ID.
 - `conflicting`: sources disagree and require resolution;
 - `creative_proposal`: non-factual option such as a tagline or name.
 
+This generic requirement status may describe structural inference. The tighter
+rendered-brand-output contract does not: every `BrandGeneratedClaim` classified
+as `factual` or `inferred` cites at least one fact-capable, non-structural
+accepted evidence key/source. Inferred prose remains an interpretation, never
+an established fact. Because a model can omit an assertion from its own claim
+ledger, every generated brand candidate keeps `no-hallucinations` human-
+required; `factual-accuracy` is also human-required when factual or inferred
+claims are present.
+
 Each requirement has a stable ID, field/claim, reason, source refs,
 `claimKind`, `requirementStage`, and optional client-safe prompt. Factual refs
 exclude structural-only `content_matrix`, `content_matrix_cell`, and
@@ -357,6 +366,43 @@ generic string ID cannot satisfy a different gate.
   API payload type, focus prop, and rendered generator census until B2.
 - Brand generation/refinement uses named structured operations and conditional
   saves against the version read before the paid call.
+- The provisional foundation is a schema-validated structured
+  `BrandVoiceFoundationDraft`, never an opaque content string or a durable
+  `BrandDeliverable`. Foundation and durable item persistence shapes are
+  mutually exclusive.
+- Persisted brand runs retain the idempotency key and full explicit
+  `McpToolExecutionContext`; public run DTOs omit both and project MCP/system
+  creators to actor type only. Intake, original selection, effective input, and
+  resume-command fingerprints are separate immutable identities.
+- Every accepted start/resume/revision has one immutable command-ledger row with
+  its business-input snapshot, original result/job, actor, MCP context, and (for
+  revisions) prior review state. Attempts reference that command. Once revision
+  acceptance invalidates old audit/provenance lineage, cancellation preserves
+  content/version but returns `changes_requested`, never an unaudited ready
+  state. Business fingerprints exclude idempotency, attribution, and fresh
+  request IDs so an identical replay returns the original job/result. The stored
+  accepted result omits the transport-only replay marker; adapters add
+  `existing: true` only when projecting an idempotent replay.
+- Every hydrated frozen input recomputes its canonical snapshot self-hash and
+  verifies the fingerprints of all approved-input references before paid work.
+- B2 hard ceilings are 114 provider calls, 5,000,000 input tokens, 250,000 output
+  tokens, 100,000,000 estimated-cost micros, and concurrency 3. Caller budgets
+  must be explicit and no greater than those values; reservations happen before
+  each paid call. Provider instructions are capped at 40 KiB with a 512-byte
+  acceptance safety margin; base generation is capped at 24 KiB; the raw
+  candidate core and compact refine/audit prompt projection at 4 KiB; the
+  resolved durable candidate at 256 KiB; the related-candidate digest at 3 KiB;
+  and automatic audit-derived revision direction at 512 bytes.
+- B2 generate/refine/audit operations use completed-response cache policy
+  `none`. A CAS-losing candidate remains attributable in the attempt ledger but
+  never overwrites the durable artifact.
+- A provider call means one dispatcher invocation. B2 disables internal
+  dispatcher retries and reserves a pessimistic call/token/cost envelope before
+  every Claude/OpenAI invocation (including fallback); revisions/retries are
+  separate reserved dispatches.
+- Existing approved deliverables block generation until a human returns them to
+  draft. An MCP expected-version tuple is concurrency evidence, not replacement
+  authorization.
 - Existing `update_brand_deliverable.expectedVersion` stays optional for wire
   compatibility during this program and logs omission as a deprecation. Every
   new generation/revision mutation requires an expected revision. Legacy
@@ -374,6 +420,11 @@ generic string ID cannot satisfy a different gate.
   not grow the matrix/intake JSON.
 - JSON snapshots use shared typed interfaces, Zod schemas matching the stored
   shape, and the repository JSON validation helpers.
+- Command acceptance, artifact commit, and command completion transactionally
+  enqueue `command_accepted`, `artifact_committed`, and `command_completed`
+  effect events. Deterministic effect keys make activity writes and MCP paid-call
+  metering exactly-once; retryable workspace broadcasts and intelligence-cache
+  invalidation are at-least-once.
 - A successful item commit atomically records artifact content/status,
   generation revision/provenance, run/item result, source link, and legal cell
   projection. Conflicts change none of those writes.

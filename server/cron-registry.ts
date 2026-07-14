@@ -18,15 +18,12 @@
  * only ever invoked by `startAllRegisteredCrons()` / `stopAllRegisteredCrons()`,
  * which callers (server/startup.ts, server/index.ts) invoke explicitly.
  *
- * This matters at import time, not just at call time: tests/unit/startup.test.ts
- * uses `vi.mock` to replace 15 of the 20 scheduler modules startup.ts imports
- * with no-op mocks; the other 5 (insight-recompute-cron, ga4-conversion-
- * snapshot-scheduler, webflow-form-poller, strategy-issue-cron,
- * return-hook-cron) are NOT mocked there. If constructing CRON_METADATA ever
- * called those modules' real startX() eagerly, importing this file inside
- * that test would start real timers inside vitest. Keeping construction
- * (the object literal below) side-effect-free, and gating all invocation
- * behind the exported start/stop helpers, avoids that entirely.
+ * This matters at import time, not just at call time: scheduler tests may
+ * partially mock the registry's transitive modules. If constructing
+ * CRON_METADATA ever called a real startX() eagerly, importing this file would
+ * start real timers inside vitest. Keeping construction (the object literal
+ * below) side-effect-free, and gating all invocation behind the exported
+ * start/stop helpers, avoids that entirely.
  *
  * Adoption scope (R10-PR1, this file): registers every boot-wired scheduler
  * subsystem and known module-level timer as metadata. It does NOT migrate
@@ -87,6 +84,11 @@ import { startBriefingCron, stopBriefingCron } from './briefing-cron.js';
 import { startStrategyIssueCron, stopStrategyIssueCron } from './strategy-issue-cron.js';
 import { startReturnHookCron, stopReturnHookCron } from './return-hook-cron.js';
 import { startAdminMoneyFrameCron, stopAdminMoneyFrameCron } from './money-frame-cron.js';
+import {
+  BRAND_GENERATION_EFFECT_RETRY_INTERVAL_MS,
+  startBrandGenerationEffectRetryCron,
+  stopBrandGenerationEffectRetryCron,
+} from './domains/brand/generation/effects.js';
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -116,6 +118,7 @@ export type CronId =
   | 'strategy-issue-cron'
   | 'return-hook-cron'
   | 'admin-money-frame-cron'
+  | 'brand-generation-effect-retry'
   | 'mcp-handle-ttl-sweeper'
   | 'middleware-rate-limit-cleanup'
   | 'middleware-login-lockout-cleanup'
@@ -329,6 +332,16 @@ export const CRON_METADATA: Record<CronId, CronMetadataEntry> = {
     stopHook: true,
     start: startReturnHookCron,
     stop: stopReturnHookCron,
+  },
+  'brand-generation-effect-retry': {
+    label: 'Brand Generation Effect Retry',
+    module: 'server/domains/brand/generation/effects.js',
+    intervalMs: BRAND_GENERATION_EFFECT_RETRY_INTERVAL_MS,
+    description:
+      'Retries a bounded batch of pending transactional brand-generation effects every minute.',
+    stopHook: true,
+    start: startBrandGenerationEffectRetryCron,
+    stop: stopBrandGenerationEffectRetryCron,
   },
   'admin-money-frame-cron': {
     label: 'Admin Money Frame Cron',

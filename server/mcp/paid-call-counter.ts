@@ -31,12 +31,46 @@ const stmts = createStmtCache(() => ({
   get: db.prepare<[workspaceId: string]>(
     `SELECT count FROM mcp_paid_call_counts WHERE workspace_id = ?`,
   ),
+  insertEvent: db.prepare<[
+    eventKey: string,
+    workspaceId: string | null,
+    increment: number,
+    recordedAt: string,
+  ]>(`
+    INSERT OR IGNORE INTO mcp_paid_call_events (
+      event_key, workspace_id, increment, recorded_at
+    ) VALUES (?, ?, ?, ?)
+  `),
+  eventByKey: db.prepare<[eventKey: string]>(`
+    SELECT workspace_id, increment
+    FROM mcp_paid_call_events
+    WHERE event_key = ?
+  `),
+  truncateEvents: db.prepare(`DELETE FROM mcp_paid_call_events`), // ws-scope-ok: test-only full-table reset of the paid-call event ledger
   truncate: db.prepare(`DELETE FROM mcp_paid_call_counts`), // ws-scope-ok: test-only full-table reset of the informational paid-call counter
 }));
 
 function readCount(workspaceId: string): number {
   const row = stmts().get.get(workspaceId) as { count: number } | undefined;
   return row?.count ?? 0;
+}
+
+function resultForCount(count: number): { count: number; warning?: string } {
+  const threshold = getWarnThreshold();
+  if (count >= threshold) {
+    return {
+      count,
+      warning: `paid_call_count: ${count} (threshold ${threshold}; informational only)`,
+    };
+  }
+  return { count };
+}
+
+function incrementCounters(increment: number, workspaceId: string | undefined, at: string): void {
+  stmts().upsert.run(GLOBAL_KEY, increment, at);
+  if (workspaceId && workspaceId !== GLOBAL_KEY) {
+    stmts().upsert.run(workspaceId, increment, at);
+  }
 }
 
 /**
@@ -51,20 +85,66 @@ export function recordPaidCall(
   workspaceId?: string,
 ): { count: number; warning?: string } {
   const updatedAt = new Date().toISOString();
-  stmts().upsert.run(GLOBAL_KEY, increment, updatedAt);
-  if (workspaceId && workspaceId !== GLOBAL_KEY) {
-    stmts().upsert.run(workspaceId, increment, updatedAt);
+  incrementCounters(increment, workspaceId, updatedAt);
+  return resultForCount(readCount(GLOBAL_KEY));
+}
+
+const recordPaidCallOnceTransaction = db.transaction((
+  eventKey: string,
+  increment: number,
+  workspaceId: string | undefined,
+): { count: number; warning?: string } => {
+  const recordedAt = new Date().toISOString();
+  const inserted = stmts().insertEvent.run(
+    eventKey,
+    workspaceId ?? null,
+    increment,
+    recordedAt,
+  ).changes === 1;
+
+  if (inserted) {
+    incrementCounters(increment, workspaceId, recordedAt);
+  } else {
+    const existing = stmts().eventByKey.get(eventKey) as {
+      workspace_id: string | null;
+      increment: number;
+    } | undefined;
+    if (!existing
+      || existing.workspace_id !== (workspaceId ?? null)
+      || existing.increment !== increment) {
+      throw new Error('paid-call event key is already bound to different metering inputs');
+    }
   }
 
-  const count = readCount(GLOBAL_KEY);
-  const threshold = getWarnThreshold();
-  if (count >= threshold) {
-    return {
-      count,
-      warning: `paid_call_count: ${count} (threshold ${threshold}; informational only)`,
-    };
+  return resultForCount(readCount(GLOBAL_KEY));
+});
+
+/**
+ * Record one accepted paid-work event exactly once.
+ *
+ * The durable event insert and both counter increments share one IMMEDIATE
+ * transaction. Replaying the same namespaced event key is therefore a read of
+ * the current global signal, while a crash-repair replay whose event was never
+ * committed records the missing increment exactly once.
+ */
+export function recordPaidCallOnce(
+  eventKey: string,
+  increment = 1,
+  workspaceId?: string,
+): { count: number; warning?: string } {
+  const normalizedEventKey = eventKey.trim();
+  if (!normalizedEventKey) throw new Error('paid-call event key must not be empty');
+  if (new TextEncoder().encode(normalizedEventKey).byteLength > 512) {
+    throw new Error('paid-call event key must not exceed 512 UTF-8 bytes');
   }
-  return { count };
+  if (!Number.isSafeInteger(increment) || increment <= 0) {
+    throw new Error('paid-call event increment must be a positive safe integer');
+  }
+  return recordPaidCallOnceTransaction.immediate(
+    normalizedEventKey,
+    increment,
+    workspaceId,
+  );
 }
 
 /**
@@ -77,5 +157,8 @@ export function getPaidCallCount(workspaceId?: string): number {
 
 /** Test-only: clear counter state between tests. */
 export function __resetPaidCallCounterForTests(): void {
-  stmts().truncate.run();
+  db.transaction(() => {
+    stmts().truncateEvents.run();
+    stmts().truncate.run();
+  }).immediate();
 }

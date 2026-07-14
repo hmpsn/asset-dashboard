@@ -1,9 +1,14 @@
 import type { GenerationProvenance } from './ai-execution.js';
 import {
   BRAND_DELIVERABLE_TYPES,
+  type BrandDeliverableStatus,
+  type ContextModifier,
   type BrandDeliverableType,
+  type VoiceDNA,
+  type VoiceGuardrails,
 } from './brand-engine.js';
 import type { BrandIntakeRevisionRef } from './brand-intake.js';
+import type { McpToolExecutionContext } from './mcp-runtime.js';
 import {
   type AuthenticVoiceEvidenceSourceRef,
   GENERATION_RUN_STATUSES,
@@ -19,6 +24,48 @@ import {
   type GenerationRunCounts,
   type GenerationSanitizedError,
 } from './generation-evidence.js';
+
+export const BRAND_GENERATION_CONTRACT_VERSION = 1 as const;
+
+/**
+ * Hard public and paid-work bounds for the first brand-generation runtime.
+ * The provider/token ceilings cover the largest supported 19-target
+ * bootstrap-plus-durable suite with generate/fallback + audit + one
+ * revision/fallback + post-revision audit, while remaining a
+ * finite reservation that can be enforced before every provider call.
+ */
+export const BRAND_GENERATION_LIMITS = {
+  defaultItemPageSize: 25,
+  maxItemPageSize: 100,
+  maxTargets: BRAND_DELIVERABLE_TYPES.length + 1,
+  maxProviderCalls: (BRAND_DELIVERABLE_TYPES.length + 1) * 6,
+  maxInputTokens: 5_000_000,
+  maxOutputTokens: 250_000,
+  maxEstimatedUsdMicros: 100_000_000,
+  maxConcurrency: 3,
+  maxIdLength: 200,
+  maxIdempotencyKeyLength: 200,
+  maxCursorLength: 2_048,
+  maxDirectionBytes: 2 * 1_024,
+  /** Internal audit-derived direction after control stripping; human input keeps the larger bound. */
+  maxAutomaticDirectionBytes: 512,
+  maxContentBytes: 64 * 1_024,
+  maxFoundationBytes: 128 * 1_024,
+  maxSnapshotBytes: 512 * 1_024,
+  /** Maximum exact provider instruction payload for any one reserved dispatch. */
+  maxPromptBytes: 40 * 1_024,
+  /** Acceptance keeps this much provider-envelope slack for finite wrapper/report drift. */
+  providerStageClosureSafetyBytes: 512,
+  /** Base generation prompt cap leaves deterministic headroom for audit/refinement. */
+  maxBasePromptBytes: 24 * 1_024,
+  /** Candidate core projected into refine/audit prompts; frozen requirements are supplied once. */
+  maxCandidateSnapshotBytes: 4 * 1_024,
+  /** Normalized durable candidate may also carry the frozen requirement/placeholder snapshot. */
+  maxResolvedCandidateSnapshotBytes: 256 * 1_024,
+  /** Cross-target consistency context is a bounded digest, never N full candidates. */
+  maxRelatedCandidateContextBytes: 3 * 1_024,
+  providerPromptFramingTokenCeiling: 512,
+} as const;
 
 export const BRAND_GENERATION_ATOMIC_TARGETS = [
   'voice_foundation',
@@ -209,6 +256,37 @@ export interface BrandGenerationRunCounts extends GenerationRunCounts {
   changesRequested: number;
 }
 
+export interface BrandGenerationBudgetEstimate {
+  providerCalls: number;
+  inputTokens: number;
+  outputTokens: number;
+  /** Integer micro-dollars for the bounded reservation, not an invoice. */
+  estimatedCostMicros: number;
+  maxConcurrency: number;
+}
+
+export interface BrandGenerationBudgetLimits {
+  providerCalls: number;
+  inputTokens: number;
+  outputTokens: number;
+  maxEstimatedCostMicros: number;
+  maxConcurrency: number;
+}
+
+/** Durable committed reservation. Provider work must reserve before dispatch. */
+export interface BrandGenerationBudgetUsage {
+  providerCalls: number;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCostMicros: number;
+}
+
+export interface BrandGenerationBudget {
+  estimate: BrandGenerationBudgetEstimate;
+  limits: BrandGenerationBudgetLimits;
+  reserved: BrandGenerationBudgetUsage;
+}
+
 export const BRAND_GENERATION_STAGES = [
   'preflight',
   'voice_foundation_generation',
@@ -263,37 +341,108 @@ interface BrandGenerationRunBase {
   status: BrandGenerationRunStatus;
   stage: BrandGenerationStage;
   revision: number;
-  idempotencyKey: string;
+  /** Immutable start/selection identity; never overwritten by resume. */
+  selectionFingerprint: string;
+  /** Immutable effective input identity captured by the initial command. */
   effectiveInputFingerprint: string;
-  jobId: string | null;
+  /** Current execution pointer only; immutable command jobs live in the command ledger. */
+  currentJobId: string | null;
   voiceReadiness: BrandVoiceReadiness;
   counts: BrandGenerationRunCounts;
-  createdBy: GenerationResolverAttribution;
+  budget: BrandGenerationBudget;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
 }
 
-export type BrandGenerationRun = BrandGenerationRunBase & BrandGenerationRunSelectionPlan;
+interface PublicIdentifiedBrandGenerationCreator {
+  actorId: string;
+  actorLabel?: string;
+}
+
+/** Public run attribution never exposes MCP key identity or system internals. */
+export type PublicBrandGenerationCreatorAttribution =
+  | (PublicIdentifiedBrandGenerationCreator & { actorType: 'operator' })
+  | (PublicIdentifiedBrandGenerationCreator & { actorType: 'client' })
+  | { actorType: 'mcp' }
+  | { actorType: 'system' };
+
+/** Safe HTTP/MCP projection. Operational idempotency and key context are omitted. */
+export type BrandGenerationRun = BrandGenerationRunBase
+  & BrandGenerationRunSelectionPlan
+  & { createdBy: PublicBrandGenerationCreatorAttribution };
+
+/** Internal durable run. It must be projected before crossing a public boundary. */
+export type PersistedBrandGenerationRun = BrandGenerationRunBase
+  & BrandGenerationRunSelectionPlan
+  & {
+    idempotencyKey: string;
+    createdBy: GenerationResolverAttribution;
+    mcpExecutionContext: McpToolExecutionContext | null;
+  };
 
 export type BrandGeneratedClaim =
   | {
       text: string;
       classification: 'factual';
+      evidenceKeys: [string, ...string[]];
       sourceRefs: [GenerationFactualEvidenceSourceRef, ...GenerationFactualEvidenceSourceRef[]];
     }
   | {
       text: string;
-      classification: 'inferred' | 'creative_proposal';
+      classification: 'inferred';
+      evidenceKeys: [string, ...string[]];
+      sourceRefs: [GenerationFactualEvidenceSourceRef, ...GenerationFactualEvidenceSourceRef[]];
+    }
+  | {
+      text: string;
+      classification: 'creative_proposal';
+      evidenceKeys: string[];
       sourceRefs: GenerationEvidenceSourceRef[];
     };
+
+/** Structured provisional voice output. It is never a durable BrandDeliverable. */
+export interface BrandVoiceFoundationDraft {
+  schemaVersion: typeof BRAND_GENERATION_CONTRACT_VERSION;
+  summary: string;
+  voiceDNA: VoiceDNA;
+  guardrails: VoiceGuardrails;
+  contextModifiers: ContextModifier[];
+  evidenceRequirementIds: string[];
+  fingerprint: string;
+}
+
+export type BrandDeliverableWriteExpectation =
+  | {
+      kind: 'create';
+      deliverableId: null;
+      expectedVersion: 0;
+    }
+  | {
+      kind: 'update';
+      deliverableId: string;
+      expectedVersion: number;
+    };
+
+/** Small immutable authority envelope used to rebuild the exact paid prompt. */
+export interface BrandGenerationTargetInputSnapshot {
+  schemaVersion: typeof BRAND_GENERATION_CONTRACT_VERSION;
+  target: BrandGenerationAtomicTarget;
+  intakeRevision: BrandIntakeRevisionRef;
+  voiceSnapshot: FinalizedVoiceSnapshotRef | null;
+  approvedDeliverables: ApprovedBrandDeliverableRef[];
+  evidenceRequirementIds: string[];
+  artifactExpectation: BrandDeliverableWriteExpectation | null;
+  capturedAt: string;
+  fingerprint: string;
+}
 
 interface BrandGenerationItemBase {
   id: string;
   runId: string;
   status: BrandGenerationItemStatus;
   revision: number;
-  content: string | null;
+  inputSnapshot: BrandGenerationTargetInputSnapshot | null;
   claims: BrandGeneratedClaim[];
   requirements: GenerationEvidenceRequirement[];
   placeholders: GenerationPlaceholderProjection[];
@@ -308,32 +457,433 @@ interface BrandGenerationItemBase {
   completedAt: string | null;
 }
 
-type DurableBrandDeliverableLink =
-  | { deliverableId: null; expectedDeliverableVersion: null }
-  | { deliverableId: string; expectedDeliverableVersion: number };
+type DurableBrandDeliverableCommit =
+  | {
+      committedDeliverableId: null;
+      committedDeliverableVersion: null;
+    }
+  | {
+      committedDeliverableId: string;
+      committedDeliverableVersion: number;
+    };
 
 /** A provisional foundation can never masquerade as a durable BrandDeliverable. */
 export type BrandGenerationItem =
   | (BrandGenerationItemBase & {
       target: 'voice_foundation';
-      deliverableId: null;
-      expectedDeliverableVersion: null;
+      content: null;
+      foundationDraft: BrandVoiceFoundationDraft | null;
+      artifactExpectation: null;
+      committedDeliverableId: null;
+      committedDeliverableVersion: null;
     })
   | (BrandGenerationItemBase & {
       target: BrandDeliverableType;
-    } & DurableBrandDeliverableLink);
+      content: string | null;
+      foundationDraft: null;
+      artifactExpectation: BrandDeliverableWriteExpectation;
+    } & DurableBrandDeliverableCommit);
 
-export interface BrandGenerationAttempt {
+export const BRAND_GENERATION_ATTEMPT_STAGES = [
+  'preflight',
+  'voice_foundation_generation',
+  'dependent_generation',
+  'deterministic_audit',
+  'model_audit',
+  'revision',
+] as const;
+
+export type BrandGenerationAttemptStage =
+  (typeof BRAND_GENERATION_ATTEMPT_STAGES)[number];
+
+export const BRAND_GENERATION_ATTEMPT_STATUSES = [
+  'running',
+  'completed',
+  'failed',
+  'cancelled',
+] as const;
+
+export type BrandGenerationAttemptStatus =
+  (typeof BRAND_GENERATION_ATTEMPT_STATUSES)[number];
+
+export interface BrandGenerationPreflightAttemptOutput {
+  kind: 'preflight';
+  readyForPaidWork: boolean;
+  blockingRequirementIds: string[];
+  requirements: GenerationEvidenceRequirement[];
+  placeholders: GenerationPlaceholderProjection[];
+  estimate: BrandGenerationBudgetEstimate;
+}
+
+interface BrandGenerationCandidateAttemptOutputBase {
+  claims: BrandGeneratedClaim[];
+  requirements: GenerationEvidenceRequirement[];
+  placeholders: GenerationPlaceholderProjection[];
+}
+
+export type BrandGenerationFoundationCandidateAttemptOutput =
+  BrandGenerationCandidateAttemptOutputBase & {
+    kind: 'foundation_candidate';
+    content: null;
+    foundationDraft: BrandVoiceFoundationDraft;
+  };
+
+export type BrandGenerationDeliverableCandidateAttemptOutput =
+  BrandGenerationCandidateAttemptOutputBase & {
+    kind: 'deliverable_candidate';
+    content: string;
+    foundationDraft: null;
+  };
+
+/** Paid candidate retained even when the artifact CAS later conflicts. */
+export type BrandGenerationCandidateAttemptOutput =
+  | BrandGenerationFoundationCandidateAttemptOutput
+  | BrandGenerationDeliverableCandidateAttemptOutput;
+
+export interface BrandGenerationAuditAttemptOutput {
+  kind: 'audit';
+  auditReport: GenerationAuditReport;
+}
+
+interface BrandGenerationAttemptBase {
   id: string;
+  runId: string;
   itemId: string;
+  commandId: string;
+  jobId: string;
   attemptNumber: number;
-  stage: BrandGenerationStage;
-  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  expectedRunRevision: number;
+  expectedItemRevision: number;
+  expectedDeliverableVersion: number | null;
+  /** Frozen authority/source snapshot shared by candidate and audit stages. */
+  sourceInputFingerprint: string;
+  /** Exact rendered prompt or deterministic stage input for this attempt. */
   effectiveInputFingerprint: string;
+  budgetUsage: BrandGenerationBudgetUsage;
   provenance: GenerationProvenance | null;
-  error: GenerationSanitizedError | null;
   startedAt: string;
-  completedAt: string | null;
+}
+
+type BrandGenerationAttemptStageCheckpoint =
+  | (BrandGenerationAttemptBase & {
+      stage: 'preflight';
+      output: BrandGenerationPreflightAttemptOutput | null;
+    })
+  | (BrandGenerationAttemptBase & {
+      stage: 'voice_foundation_generation';
+      output: BrandGenerationFoundationCandidateAttemptOutput | null;
+    })
+  | (BrandGenerationAttemptBase & {
+      stage: 'dependent_generation' | 'revision';
+      output: BrandGenerationDeliverableCandidateAttemptOutput | null;
+    })
+  | (BrandGenerationAttemptBase & {
+      stage: 'deterministic_audit' | 'model_audit';
+      output: BrandGenerationAuditAttemptOutput | null;
+    });
+
+type BrandGenerationAttemptLifecycle =
+  | { status: 'running'; output: null; error: null; completedAt: null }
+  | {
+      status: 'completed';
+      output:
+        | BrandGenerationPreflightAttemptOutput
+        | BrandGenerationCandidateAttemptOutput
+        | BrandGenerationAuditAttemptOutput;
+      error: null;
+      completedAt: string;
+    }
+  | {
+      status: 'failed';
+      output: null;
+      error: GenerationSanitizedError;
+      completedAt: string;
+    }
+  | {
+      status: 'cancelled';
+      output: null;
+      error: GenerationSanitizedError | null;
+      completedAt: string;
+    };
+
+/** Stage output and lifecycle truth are both discriminated and must agree. */
+export type BrandGenerationAttempt =
+  BrandGenerationAttemptStageCheckpoint & BrandGenerationAttemptLifecycle;
+
+type BootstrapBrandGenerationStartSelection =
+  | {
+      selection: { kind: 'atomic'; target: 'voice_foundation' };
+      expectedVoiceVersion?: never;
+      expectedVoiceFingerprint?: never;
+    }
+  | {
+      selection: { kind: 'preset'; preset: 'full_brand_system' };
+      expectedVoiceVersion?: never;
+      expectedVoiceFingerprint?: never;
+    };
+
+type FinalizedVoiceBrandGenerationStartSelection =
+  | {
+      selection: {
+        kind: 'atomic';
+        target: Exclude<BrandGenerationAtomicTarget, 'voice_foundation'>;
+      };
+      expectedVoiceVersion: number;
+      expectedVoiceFingerprint: string;
+    }
+  | {
+      selection: { kind: 'preset'; preset: Exclude<BrandGenerationPreset, 'full_brand_system'> };
+      expectedVoiceVersion: number;
+      expectedVoiceFingerprint: string;
+    };
+
+export interface BrandGenerationBudgetRequest {
+  maxProviderCalls: number;
+  maxInputTokens: number;
+  maxOutputTokens: number;
+  maxEstimatedCostMicros: number;
+  maxConcurrency: number;
+}
+
+interface StartBrandGenerationRequestBase {
+  workspaceId: string;
+  intakeRevisionId: string;
+  expectedIntakeRevision: number;
+  expectedIntakeFingerprint: string;
+  budget: BrandGenerationBudgetRequest;
+  idempotencyKey: string;
+  createdBy: GenerationResolverAttribution;
+  mcpExecutionContext: McpToolExecutionContext | null;
+}
+
+/** Bootstrap starts omit voice; every durable direct/preset start requires an exact version. */
+export type StartBrandGenerationRequest = StartBrandGenerationRequestBase & (
+  | BootstrapBrandGenerationStartSelection
+  | FinalizedVoiceBrandGenerationStartSelection
+);
+
+export interface BrandGenerationCommandResult {
+  runId: string;
+  runRevision: number;
+  jobId: string;
+  selectionCount: number;
+  estimate: BrandGenerationBudgetEstimate;
+  dashboardUrl: string;
+  /** True only on an idempotent projection of an already-accepted command. */
+  existing: boolean;
+}
+
+/** Immutable accepted result; replay adds `existing: true` at the response edge. */
+export type BrandGenerationAcceptedCommandResult = Omit<
+  BrandGenerationCommandResult,
+  'existing'
+>;
+
+export const BRAND_GENERATION_COMMAND_KINDS = ['start', 'resume', 'revision'] as const;
+export type BrandGenerationCommandKind = (typeof BRAND_GENERATION_COMMAND_KINDS)[number];
+
+export const BRAND_GENERATION_REVISION_SOURCE_STATUSES = [
+  'ready_for_human_review',
+  'changes_requested',
+  'needs_attention',
+  'conflict',
+] as const satisfies readonly BrandGenerationItemStatus[];
+
+export type BrandGenerationRevisionSourceStatus =
+  (typeof BRAND_GENERATION_REVISION_SOURCE_STATUSES)[number];
+
+type DistributiveOmit<T, Keys extends PropertyKey> = T extends unknown
+  ? Omit<T, Extract<keyof T, Keys>>
+  : never;
+
+/** Business identity only; actor, request correlation, and idempotency live beside it. */
+export type StartBrandGenerationCommandSnapshot = DistributiveOmit<
+  StartBrandGenerationRequest,
+  'idempotencyKey' | 'createdBy' | 'mcpExecutionContext'
+>;
+export type ResumeBrandGenerationCommandSnapshot = DistributiveOmit<
+  ResumeBrandGenerationRequest,
+  'idempotencyKey' | 'resumedBy' | 'mcpExecutionContext'
+>;
+export type ReviseBrandGenerationItemCommandSnapshot = DistributiveOmit<
+  ReviseBrandGenerationItemRequest,
+  'idempotencyKey' | 'requestedBy' | 'mcpExecutionContext'
+>;
+
+interface BrandGenerationCommandBase {
+  id: string;
+  runId: string;
+  workspaceId: string;
+  kind: BrandGenerationCommandKind;
+  idempotencyKey: string;
+  requestFingerprint: string;
+  jobId: string;
+  result: BrandGenerationAcceptedCommandResult;
+  actor: GenerationResolverAttribution;
+  mcpExecutionContext: McpToolExecutionContext | null;
+  createdAt: string;
+}
+
+/** Immutable command/result ledger makes every accepted write exactly replayable. */
+export type BrandGenerationCommand =
+  | (BrandGenerationCommandBase & {
+      kind: 'start';
+      requestSnapshot: {
+        schemaVersion: typeof BRAND_GENERATION_CONTRACT_VERSION;
+        kind: 'start';
+        command: StartBrandGenerationCommandSnapshot;
+      };
+      itemId: null;
+      expectedRunRevision: null;
+      expectedItemRevision: null;
+      expectedDeliverableVersion: null;
+      priorItemStatus: null;
+    })
+  | (BrandGenerationCommandBase & {
+      kind: 'resume';
+      requestSnapshot: {
+        schemaVersion: typeof BRAND_GENERATION_CONTRACT_VERSION;
+        kind: 'resume';
+        command: ResumeBrandGenerationCommandSnapshot;
+      };
+      itemId: null;
+      expectedRunRevision: number;
+      expectedItemRevision: null;
+      expectedDeliverableVersion: null;
+      priorItemStatus: null;
+    })
+  | (BrandGenerationCommandBase & {
+      kind: 'revision';
+      requestSnapshot: {
+        schemaVersion: typeof BRAND_GENERATION_CONTRACT_VERSION;
+        kind: 'revision';
+        command: ReviseBrandGenerationItemCommandSnapshot;
+      };
+      itemId: string;
+      expectedRunRevision: number;
+      expectedItemRevision: number;
+      expectedDeliverableVersion: number;
+      priorItemStatus: BrandGenerationRevisionSourceStatus;
+    });
+
+export const BRAND_GENERATION_EFFECT_KINDS = [
+  'command_accepted',
+  'artifact_committed',
+  'command_completed',
+] as const;
+
+export type BrandGenerationEffectKind =
+  (typeof BRAND_GENERATION_EFFECT_KINDS)[number];
+
+export type BrandGenerationEffectPayload =
+  | {
+      schemaVersion: typeof BRAND_GENERATION_CONTRACT_VERSION;
+      kind: 'command_accepted';
+    }
+  | {
+      schemaVersion: typeof BRAND_GENERATION_CONTRACT_VERSION;
+      kind: 'artifact_committed';
+      deliverableId: string;
+      deliverableType: BrandDeliverableType;
+      deliverableVersion: number;
+      deliverableStatus: BrandDeliverableStatus;
+    }
+  | {
+      schemaVersion: typeof BRAND_GENERATION_CONTRACT_VERSION;
+      kind: 'command_completed';
+      status: BrandGenerationRunStatus;
+      counts: BrandGenerationRunCounts;
+    };
+
+interface BrandGenerationEffectEventBase {
+  sequence: number;
+  effectKey: string;
+  workspaceId: string;
+  runId: string;
+  commandId: string;
+  attemptCount: number;
+  lastAttemptAt: string | null;
+  lastError: string | null;
+  appliedAt: string | null;
+  createdAt: string;
+}
+
+/** Durable transactional-outbox event for post-commit activity and invalidation. */
+export type BrandGenerationEffectEvent =
+  | (BrandGenerationEffectEventBase & {
+      kind: 'command_accepted';
+      itemId: null;
+      payload: Extract<BrandGenerationEffectPayload, { kind: 'command_accepted' }>;
+    })
+  | (BrandGenerationEffectEventBase & {
+      kind: 'artifact_committed';
+      itemId: string;
+      payload: Extract<BrandGenerationEffectPayload, { kind: 'artifact_committed' }>;
+    })
+  | (BrandGenerationEffectEventBase & {
+      kind: 'command_completed';
+      itemId: null;
+      payload: Extract<BrandGenerationEffectPayload, { kind: 'command_completed' }>;
+    });
+
+export interface BrandGenerationEffectCursor {
+  sequence: number;
+}
+
+export type StartBrandGenerationResult = BrandGenerationCommandResult;
+
+export interface ResumeBrandGenerationRequest {
+  workspaceId: string;
+  runId: string;
+  expectedRunRevision: number;
+  expectedVoiceVersion: number;
+  expectedVoiceFingerprint: string;
+  idempotencyKey: string;
+  resumedBy: GenerationResolverAttribution;
+  mcpExecutionContext: McpToolExecutionContext | null;
+}
+
+export type ResumeBrandGenerationResult = BrandGenerationCommandResult;
+
+export interface GetBrandGenerationRequest {
+  workspaceId: string;
+  runId: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface BrandGenerationItemPage {
+  items: BrandGenerationItem[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export interface GetBrandGenerationResult {
+  run: BrandGenerationRun;
+  itemPage: BrandGenerationItemPage;
+}
+
+export interface ReviseBrandGenerationItemRequest {
+  workspaceId: string;
+  runId: string;
+  itemId: string;
+  expectedRunRevision: number;
+  expectedItemRevision: number;
+  deliverableId: string;
+  expectedDeliverableVersion: number;
+  direction: string;
+  idempotencyKey: string;
+  requestedBy: GenerationResolverAttribution;
+  mcpExecutionContext: McpToolExecutionContext | null;
+}
+
+export type ReviseBrandGenerationItemResult = BrandGenerationCommandResult;
+
+/** The generic background job never stores generated content or audit reports. */
+export interface BrandGenerationJobResult {
+  runId: string;
+  counts: BrandGenerationRunCounts;
+  terminalStatus: BrandGenerationRunStatus;
 }
 
 export const BRAND_REVIEW_ITEM_DECISIONS = ['approve', 'changes_requested'] as const;

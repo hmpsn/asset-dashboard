@@ -205,6 +205,15 @@ export interface GetBrandVoicePageResult {
   latestSnapshot: FinalizedVoiceSnapshotSummary | null;
 }
 
+/** Strict B2 seam: exact immutable authority only, never eligible candidates. */
+export interface GetFinalizedVoiceSnapshotForGenerationRequest {
+  workspaceId: string;
+  expectedVoiceVersion: number;
+  expectedFingerprint: string;
+  /** Start/resume require current parity; an active worker consumes its frozen version. */
+  requireCurrentAuthority: boolean;
+}
+
 /** Exact operator-approved command stored before an MCP key may execute it. */
 export interface CreateVoiceFinalizationAuthorizationRequest
   extends VoiceProfileFinalizationInput {
