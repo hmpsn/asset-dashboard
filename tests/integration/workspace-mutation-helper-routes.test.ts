@@ -32,6 +32,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createTemplate } from '../../server/content-templates.js';
 import db from '../../server/db/index.js';
 
 const ctx = createEphemeralTestContext(import.meta.url);
@@ -196,10 +197,20 @@ describe('content-templates via workspace-mutation-helper', () => {
 // ── Content Matrices ───────────────────────────────────────────────────────────
 
 describe('content-matrices via workspace-mutation-helper', () => {
+  let matrixTemplateId = '';
+
+  beforeAll(() => {
+    matrixTemplateId = createTemplate(wsId, {
+      name: 'Mutation helper matrix template',
+      pageType: 'service',
+      schemaTypes: ['Service'],
+    }).id;
+  });
+
   it('POST creates a matrix and returns 201', async () => {
     const res = await postJson(`/api/content-matrices/${wsId}`, {
       name: 'City Matrix',
-      templateId: 'tpl_city',
+      templateId: matrixTemplateId,
       dimensions: [{ variableName: 'city', values: ['Austin', 'Dallas'] }],
       urlPattern: '/city/{city}',
       keywordPattern: '{city} seo',
@@ -240,7 +251,7 @@ describe('content-matrices via workspace-mutation-helper', () => {
   it('GET /api/content-matrices/:workspaceId/:matrixId returns 200 for existing matrix', async () => {
     const created = await postJson(`/api/content-matrices/${wsId}`, {
       name: 'Get By Id Matrix',
-      templateId: 'tpl_service',
+      templateId: matrixTemplateId,
       dimensions: [{ variableName: 'service', values: ['SEO'] }],
       urlPattern: '/service/{service}',
       keywordPattern: '{service}',
@@ -261,7 +272,7 @@ describe('content-matrices via workspace-mutation-helper', () => {
   it('PUT updates a matrix and returns 200', async () => {
     const created = await postJson(`/api/content-matrices/${wsId}`, {
       name: 'Before Matrix Update',
-      templateId: 'tpl_update',
+      templateId: matrixTemplateId,
       dimensions: [],
       urlPattern: '/update/{x}',
       keywordPattern: 'update {x}',
@@ -279,7 +290,7 @@ describe('content-matrices via workspace-mutation-helper', () => {
   it('DELETE removes the matrix and returns { ok: true }', async () => {
     const created = await postJson(`/api/content-matrices/${wsId}`, {
       name: 'Delete Me Matrix',
-      templateId: 'tpl_del',
+      templateId: matrixTemplateId,
       dimensions: [{ variableName: 'x', values: ['a'] }],
       urlPattern: '/del/{x}',
       keywordPattern: 'del {x}',

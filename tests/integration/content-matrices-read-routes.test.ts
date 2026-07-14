@@ -17,11 +17,13 @@ vi.mock('../../server/broadcast.js', () => ({
 }));
 import type { AddressInfo } from 'net';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createTemplate, deleteTemplate } from '../../server/content-templates.js';
 import db from '../../server/db/index.js';
 
 let baseUrl = '';
 let server: http.Server | undefined;
 let workspaceId = '';
+let templateId = '';
 
 async function startTestServer(): Promise<void> {
   delete process.env.APP_PASSWORD;
@@ -56,10 +58,16 @@ async function postJson(path: string, body: unknown): Promise<Response> {
 beforeAll(async () => {
   await startTestServer();
   workspaceId = createWorkspace('Content Matrices Read WS 13658').id;
+  templateId = createTemplate(workspaceId, {
+    name: 'Read route template',
+    pageType: 'location',
+    schemaTypes: ['LocalBusiness'],
+  }).id;
 }, 60_000);
 
 afterAll(async () => {
   db.prepare('DELETE FROM content_matrices WHERE workspace_id = ?').run(workspaceId);
+  deleteTemplate(workspaceId, templateId);
   deleteWorkspace(workspaceId);
   await stopTestServer();
 });
@@ -105,7 +113,7 @@ describe('POST /api/content-matrices/:workspaceId validation', () => {
   it('creates a matrix and it appears in GET list and GET by ID', async () => {
     const res = await postJson(`/api/content-matrices/${workspaceId}`, {
       name: 'Read Route Matrix',
-      templateId: 'tpl_read_route_test',
+      templateId,
       dimensions: [{ variableName: 'city', values: ['Austin', 'Dallas'] }],
       urlPattern: '/locations/{city}',
       keywordPattern: 'services in {city}',
@@ -116,6 +124,7 @@ describe('POST /api/content-matrices/:workspaceId validation', () => {
     expect(body.name).toBe('Read Route Matrix');
     // 2 cities → 2 cells
     expect(body.cells).toHaveLength(2);
+    expect(body.cells[0].expectedSchemaTypes).toEqual(['LocalBusiness']);
 
     const listRes = await getJson(`/api/content-matrices/${workspaceId}`);
     expect(listRes.status).toBe(200);

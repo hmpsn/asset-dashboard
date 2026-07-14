@@ -195,7 +195,7 @@ describe('workspace mutation helper (content templates + content matrices)', () 
 
     const res = await patchJson(
       `/api/content-matrices/${workspaceA}/${matrix.id}/cells/${cellId}`,
-      { status: 'keyword_validated' },
+      { status: 'keyword_validated', expectedCellRevision: matrix.cells[0].revision },
     );
 
     expect(res.status).toBe(200);

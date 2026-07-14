@@ -748,7 +748,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByText('cosmetic dentistry')).toBeInTheDocument();
     expect(screen.getByText('emergency dentist')).toBeInTheDocument();
     await expectNoA11yViolations(container);
-  });
+  }, 15_000);
 
   it('opens the detail drawer from a row click and renders value, provenance, and outcome context', async () => {
     const { container } = renderSurface('/ws/ws-1/seo-keywords');

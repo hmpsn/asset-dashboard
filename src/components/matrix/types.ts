@@ -9,6 +9,7 @@ export type { TemplateSection };
 export interface ContentTemplate {
   id: string;
   workspaceId: string;
+  revision?: number;
   name: string;
   description?: string;
   pageType: ContentPageType;
@@ -21,6 +22,7 @@ export interface ContentTemplate {
   cmsFieldMap?: Record<string, string>;
   toneAndStyle?: string;
   schemaTypes?: string[];
+  generationContractVersion?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +36,7 @@ export interface TemplateVariable {
 export interface ContentMatrix {
   id: string;
   workspaceId: string;
+  revision?: number;
   name: string;
   templateId: string;
   dimensions: MatrixDimension[];
@@ -68,6 +71,7 @@ export interface StatusHistoryEntry {
 
 export interface MatrixCell {
   id: string;
+  revision?: number;
   variableValues: Record<string, string>;
   targetKeyword: string;
   customKeyword?: string;

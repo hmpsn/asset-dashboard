@@ -15,6 +15,7 @@ import {
   ExternalFetchError,
   fetchExternal,
   fetchPublicWebText,
+  fetchPublicWebTextBounded,
   normalizeExternalUrl,
 } from '../../server/external-fetch.js';
 
@@ -144,5 +145,26 @@ describe('external-fetch failure-path behavior', () => {
       statusText: 'Bad Gateway',
       responseBodySnippet: 'x'.repeat(300),
     });
+  });
+
+  it('times out and cancels a bounded response body that stalls after headers', async () => {
+    const cancel = vi.fn();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('<urlset>'));
+      },
+      pull: () => new Promise<void>(() => {}),
+      cancel,
+    });
+    mocks.fetchMock.mockResolvedValueOnce(new Response(stream, { status: 200 }));
+
+    await expect(fetchPublicWebTextBounded({
+      url: 'https://example.com/stalled-sitemap.xml',
+      timeoutMs: 20,
+    }, 1_024)).rejects.toMatchObject({
+      kind: 'timeout',
+      url: 'https://example.com/stalled-sitemap.xml',
+    });
+    expect(cancel).toHaveBeenCalledOnce();
   });
 });

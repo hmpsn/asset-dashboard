@@ -48,6 +48,7 @@ export type * from './briefing.ts';
 export * from './background-jobs.ts';
 export * from './action-catalog.ts';
 export * from './mcp-runtime.ts';
+export * from './mcp-matrix-schemas.ts';
 export * from './analytics-contract.ts';
 export type * from './platform-observability.ts';
 export type * from './workspace-overview.ts';

@@ -16,7 +16,8 @@
 //   - RecType                       → shared/types/recommendations.ts
 //   - ClientActionSourceType        → shared/types/client-actions.ts
 //   - KeywordCommandCenterActionType → shared/types/keyword-command-center.ts
-//   - MCP action verbs              → shared/types/mcp-action-schemas.ts (NOT server/mcp/tools/*)
+//   - MCP action verbs              → shared/types/mcp-action-schemas.ts and
+//                                     shared/types/mcp-matrix-schemas.ts (NOT server/mcp/tools/*)
 //
 // Existing seam mappers (RecType → ActionType, ClientActionSourceType → ActionType,
 // StrategySignal → RecType) are UNCHANGED by this file — the catalog documents their
@@ -403,14 +404,15 @@ const KCC_CATALOG = {
   ActionCatalogEntry
 >;
 
-// ── mcp context — the wire-level action verbs from shared/types/mcp-action-schemas.ts ──
+// ── mcp context — wire-level action verbs from shared/types MCP schemas ──
 //
 // MCP action vocabulary is NOT a TypeScript union — it's inline `z.enum([...])` literals
-// on the Zod input schemas (applyRecommendationInputSchema.action, etc.), verified live in
-// shared/types/mcp-action-schemas.ts (NOT server/mcp/tools/* — those files only consume the
+// on the Zod input schemas (applyRecommendationInputSchema.action,
+// acceptContentTemplateGenerationUpgradeInputSchema.decision, etc.), verified live in the
+// shared/types MCP schema modules (NOT server/mcp/tools/* — those files only consume the
 // schemas). Completeness for this context is checked by the contract test reading the real
-// zod schema `.options` at runtime rather than a `satisfies` mapped type (Zod enums don't
-// produce a importable union alias here). Additive-only: 61 MCP tools + long-lived
+// Zod schema `.options` at runtime rather than a `satisfies` mapped type (Zod enums don't
+// produce an importable union alias here). Additive-only: 65 MCP tools + long-lived
 // per-workspace API keys mean these keys must never be renamed once shipped.
 
 const MCP_CATALOG: Record<string, ActionCatalogEntry> = {
@@ -469,6 +471,20 @@ const MCP_CATALOG: Record<string, ActionCatalogEntry> = {
     phase: 'decide',
     clientVisible: true,
     note: 'respondToApprovalItemInputSchema is decline-only by design — an MCP agent can never approve on the client\'s behalf.',
+  },
+  // acceptContentTemplateGenerationUpgradeInputSchema.decision — namespaced because
+  // accept/reject are specific to the deterministic template-generation upgrade proposal.
+  'template_generation_upgrade:accept': {
+    label: 'Accept Template Generation Upgrade',
+    phase: 'decide',
+    clientVisible: false,
+    note: 'Accepts the exact revision-bound deterministic proposal before any v1 contract write.',
+  },
+  'template_generation_upgrade:reject': {
+    label: 'Reject Template Generation Upgrade',
+    phase: 'decide',
+    clientVisible: false,
+    note: 'Rejects the proposal and returns a no-op response without changing the source template.',
   },
 };
 

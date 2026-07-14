@@ -16,6 +16,8 @@ import {
   getContentVelocityTrend,
   savePost,
   getPost,
+  getPublishedPostPagePathCensus,
+  listPublishedPostPagePaths,
   updatePostField,
   snapshotPostVersion,
   listPostVersions,
@@ -333,6 +335,46 @@ describe('savePost persistence integrity', () => {
     expect(fromDb?.publishedSlug).toBe('/published-first-pass');
     expect(fromDb?.webflowItemId).toBe('wf-item-1');
     expect(fromDb?.webflowCollectionId).toBe('wf-col-1');
+  });
+
+  it('marks the published-page census incomplete when a durable publish lacks a slug', () => {
+    const baseline = getPublishedPostPagePathCensus(ws.workspaceId);
+    const validId = randomUUID();
+    const missingId = randomUUID();
+    const valid = makePost(validId, ws.workspaceId, '2026-06-02T00:00:00Z', 'approved');
+    valid.publishedSlug = '/published-census-valid';
+    const missing = makePost(missingId, ws.workspaceId, '2026-06-03T00:00:00Z', 'approved');
+    missing.publishedSlug = undefined;
+    missing.webflowItemId = 'wf-published-without-slug';
+    savePost(ws.workspaceId, valid);
+    savePost(ws.workspaceId, missing);
+
+    const census = getPublishedPostPagePathCensus(ws.workspaceId);
+
+    expect(census.paths).toContain('/published-census-valid');
+    expect(census.totalCount).toBe(baseline.totalCount + 2);
+    expect(census.validCount).toBe(baseline.validCount + 1);
+    expect(census.complete).toBe(false);
+  });
+
+  it('preserves exact published paths and leaves bare CMS slugs unresolved', () => {
+    const exactId = randomUUID();
+    const bareId = randomUUID();
+    const exact = makePost(exactId, ws.workspaceId, '2026-06-04T00:00:00Z', 'approved');
+    exact.publishedSlug = '/blog/audits';
+    const bare = makePost(bareId, ws.workspaceId, '2026-06-05T00:00:00Z', 'approved');
+    bare.publishedSlug = 'cms-item';
+    savePost(ws.workspaceId, exact);
+    savePost(ws.workspaceId, bare);
+
+    const census = getPublishedPostPagePathCensus(ws.workspaceId);
+
+    expect(census.paths).toContain('/blog/audits');
+    expect(census.paths).not.toContain('/services/audits');
+    expect(census.unresolvedSlugs).toContain('cms-item');
+    expect(census.complete).toBe(false);
+    expect(listPublishedPostPagePaths(ws.workspaceId)).toContain('audits');
+    expect(listPublishedPostPagePaths(ws.workspaceId)).toContain('cms-item');
   });
 
   it('falls back safely when sections/review_checklist JSON is malformed', () => {

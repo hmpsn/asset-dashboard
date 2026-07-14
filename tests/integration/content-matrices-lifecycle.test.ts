@@ -45,6 +45,8 @@ vi.mock('../../server/email.js', () => ({
 // ── Server bootstrap ─────────────────────────────────────────────────────────
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createTemplate } from '../../server/content-templates.js';
+import db from '../../server/db/index.js';
 
 let baseUrl = '';
 let server: http.Server | undefined;
@@ -104,9 +106,8 @@ function del(path: string): Promise<Response> {
 // ── Fixture data ─────────────────────────────────────────────────────────────
 
 /** Minimal valid POST body that produces 2 cells (1 service × 2 cities). */
-const MATRIX_PAYLOAD = {
+const MATRIX_PAYLOAD_BASE = {
   name: 'Lifecycle Test Matrix',
-  templateId: 'tpl_lifecycle_001',
   dimensions: [
     { variableName: 'service', values: ['Plumbing'] },
     { variableName: 'city', values: ['Austin', 'Dallas'] },
@@ -114,6 +115,21 @@ const MATRIX_PAYLOAD = {
   urlPattern: '/services/{city}/{service}',
   keywordPattern: '{service} in {city}',
 };
+
+const templateByWorkspace = new Map<string, string>(); // map-dup-ok: one fixture template per workspace
+
+function matrixPayload(workspaceId: string) {
+  let templateId = templateByWorkspace.get(workspaceId);
+  if (!templateId) {
+    templateId = createTemplate(workspaceId, {
+      name: 'Lifecycle matrix template',
+      pageType: 'service',
+      schemaTypes: ['Service'],
+    }).id;
+    templateByWorkspace.set(workspaceId, templateId);
+  }
+  return { ...MATRIX_PAYLOAD_BASE, templateId };
+}
 
 // ── Workspace state ──────────────────────────────────────────────────────────
 
@@ -127,6 +143,10 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
+  for (const workspaceId of templateByWorkspace.keys()) {
+    db.prepare('DELETE FROM content_matrices WHERE workspace_id = ?').run(workspaceId);
+    db.prepare('DELETE FROM content_templates WHERE workspace_id = ?').run(workspaceId);
+  }
   deleteWorkspace(wsA);
   deleteWorkspace(wsB);
   await stopTestServer();
@@ -138,12 +158,13 @@ afterAll(async () => {
 
 describe('POST /api/content-matrices/:workspaceId — create matrix', () => {
   it('creates a matrix and returns 201 with id and key fields', async () => {
-    const res = await postJson(`/api/content-matrices/${wsA}`, MATRIX_PAYLOAD);
+    const payload = matrixPayload(wsA);
+    const res = await postJson(`/api/content-matrices/${wsA}`, payload);
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.id).toMatch(/^mtx_/);
-    expect(body.name).toBe(MATRIX_PAYLOAD.name);
-    expect(body.templateId).toBe(MATRIX_PAYLOAD.templateId);
+    expect(body.name).toBe(MATRIX_PAYLOAD_BASE.name);
+    expect(body.templateId).toBe(payload.templateId);
     expect(Array.isArray(body.dimensions)).toBe(true);
     expect(body.dimensions).toHaveLength(2);
     // 1 service × 2 cities = 2 cells
@@ -154,7 +175,7 @@ describe('POST /api/content-matrices/:workspaceId — create matrix', () => {
   it('returns matrix in subsequent GET list', async () => {
     // Create a fresh matrix so this test is self-contained
     const createRes = await postJson(`/api/content-matrices/${wsA}`, {
-      ...MATRIX_PAYLOAD,
+      ...matrixPayload(wsA),
       name: 'Lifecycle List Test',
     });
     expect(createRes.status).toBe(201);
@@ -191,7 +212,10 @@ describe('POST /api/content-matrices/:workspaceId — create matrix', () => {
     // The create route does not validate workspace existence; the row is simply
     // written with the supplied workspace_id.  This test documents the current
     // contract so regressions are caught if validation is added later.
-    const res = await postJson('/api/content-matrices/ws_does_not_exist_xyz', MATRIX_PAYLOAD);
+    const res = await postJson('/api/content-matrices/ws_does_not_exist_xyz', {
+      ...MATRIX_PAYLOAD_BASE,
+      templateId: 'tpl_missing_workspace',
+    });
     // Either 201 (row written) or 404/400 if workspace validation is ever added.
     expect([201, 400, 404]).toContain(res.status);
   });
@@ -221,7 +245,7 @@ describe('GET /api/content-matrices/:workspaceId — list', () => {
   });
 
   it('returns created matrix in list', async () => {
-    const createRes = await postJson(`/api/content-matrices/${freshWs}`, MATRIX_PAYLOAD);
+    const createRes = await postJson(`/api/content-matrices/${freshWs}`, matrixPayload(freshWs));
     expect(createRes.status).toBe(201);
     const created = await createRes.json();
 
@@ -243,7 +267,8 @@ describe('GET /api/content-matrices/:workspaceId/:matrixId — get one', () => {
 
   beforeAll(async () => {
     freshWs = createWorkspace('Content Matrices Lifecycle Get WS').id;
-    const res = await postJson(`/api/content-matrices/${freshWs}`, MATRIX_PAYLOAD);
+    const payload = matrixPayload(freshWs);
+    const res = await postJson(`/api/content-matrices/${freshWs}`, payload);
     const body = await res.json();
     matrixId = body.id;
   });
@@ -257,7 +282,7 @@ describe('GET /api/content-matrices/:workspaceId/:matrixId — get one', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.id).toBe(matrixId);
-    expect(body.name).toBe(MATRIX_PAYLOAD.name);
+    expect(body.name).toBe(MATRIX_PAYLOAD_BASE.name);
     expect(Array.isArray(body.cells)).toBe(true);
     expect(body.cells.length).toBeGreaterThan(0);
     // Each cell should have expected fields
@@ -296,7 +321,7 @@ describe('PUT /api/content-matrices/:workspaceId/:matrixId — update', () => {
   beforeAll(async () => {
     freshWs = createWorkspace('Content Matrices Lifecycle Put WS').id;
     broadcastState.calls = [];
-    const res = await postJson(`/api/content-matrices/${freshWs}`, MATRIX_PAYLOAD);
+    const res = await postJson(`/api/content-matrices/${freshWs}`, matrixPayload(freshWs));
     const body = await res.json();
     matrixId = body.id;
     broadcastState.calls = []; // reset after create
@@ -349,14 +374,16 @@ describe('PUT /api/content-matrices/:workspaceId/:matrixId — update', () => {
 describe('PATCH /api/content-matrices/:workspaceId/:matrixId/cells/:cellId — update cell', () => {
   let matrixId = '';
   let cellId = '';
+  let cellRevision = 0;
   let freshWs = '';
 
   beforeAll(async () => {
     freshWs = createWorkspace('Content Matrices Lifecycle Patch WS').id;
-    const res = await postJson(`/api/content-matrices/${freshWs}`, MATRIX_PAYLOAD);
+    const res = await postJson(`/api/content-matrices/${freshWs}`, matrixPayload(freshWs));
     const body = await res.json();
     matrixId = body.id;
     cellId = body.cells[0].id;
+    cellRevision = body.cells[0].revision;
   });
 
   afterAll(() => {
@@ -366,7 +393,7 @@ describe('PATCH /api/content-matrices/:workspaceId/:matrixId/cells/:cellId — u
   it('updates a cell keyword and returns updated cell data', async () => {
     const res = await patchJson(
       `/api/content-matrices/${freshWs}/${matrixId}/cells/${cellId}`,
-      { targetKeyword: 'emergency plumber Austin TX' },
+      { targetKeyword: 'emergency plumber Austin TX', expectedCellRevision: cellRevision },
     );
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -374,16 +401,35 @@ describe('PATCH /api/content-matrices/:workspaceId/:matrixId/cells/:cellId — u
     const updatedCell = body.cells.find((c: { id: string }) => c.id === cellId);
     expect(updatedCell).toBeDefined();
     expect(updatedCell.targetKeyword).toBe('emergency plumber Austin TX');
+    cellRevision = updatedCell.revision;
   });
 
   it('returns 404 for nonexistent cellId', async () => {
     const res = await patchJson(
       `/api/content-matrices/${freshWs}/${matrixId}/cells/cell_nonexistent_xyz`,
-      { targetKeyword: 'anything' },
+      { targetKeyword: 'anything', expectedCellRevision: 0 },
     );
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toBeDefined();
+  });
+
+  it('requires the target cell revision and rejects a stale same-cell write', async () => {
+    const missing = await patchJson(
+      `/api/content-matrices/${freshWs}/${matrixId}/cells/${cellId}`,
+      { targetKeyword: 'missing revision' },
+    );
+    expect(missing.status).toBe(400);
+
+    const stale = await patchJson(
+      `/api/content-matrices/${freshWs}/${matrixId}/cells/${cellId}`,
+      { targetKeyword: 'stale overwrite', expectedCellRevision: cellRevision - 1 },
+    );
+    expect(stale.status).toBe(409);
+    const current = await getJson(`/api/content-matrices/${freshWs}/${matrixId}`);
+    const body = await current.json();
+    expect(body.cells.find((cell: { id: string }) => cell.id === cellId).targetKeyword)
+      .toBe('emergency plumber Austin TX');
   });
 });
 
@@ -397,7 +443,7 @@ describe('DELETE /api/content-matrices/:workspaceId/:matrixId', () => {
 
   beforeAll(async () => {
     freshWs = createWorkspace('Content Matrices Lifecycle Delete WS').id;
-    const res = await postJson(`/api/content-matrices/${freshWs}`, MATRIX_PAYLOAD);
+    const res = await postJson(`/api/content-matrices/${freshWs}`, matrixPayload(freshWs));
     const body = await res.json();
     matrixId = body.id;
   });
@@ -440,7 +486,7 @@ describe('Workspace isolation', () => {
 
   beforeAll(async () => {
     const res = await postJson(`/api/content-matrices/${wsA}`, {
-      ...MATRIX_PAYLOAD,
+      ...matrixPayload(wsA),
       name: 'WsA Isolation Matrix',
     });
     const body = await res.json();

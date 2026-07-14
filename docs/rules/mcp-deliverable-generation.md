@@ -19,6 +19,18 @@ deliverables, especially multi-item runs. It complements
 - Batch starts carry one full source-revision envelope per item. Generation-
   owned projection for one item must not advance a shared definition revision
   and falsely stale its siblings.
+- Before any JSON-backed matrix/template mutation reserializes a whole stored
+  array or object, compare the raw persisted census with the validated hydrated
+  shape inside the same transaction. Missing/dropped/normalized fields fail
+  closed; an unrelated rename or cell edit must never erase a corrupt sibling.
+- When a matrix definition edit changes a matched cell's effective template,
+  rendered URL, keyword, variables, or schema target, preserve only its explicit
+  keyword-research inputs and reset lifecycle, review flags, history, and linked
+  brief/post IDs to `planned`. Never relabel an old published artifact as the
+  newly rendered target.
+- External URL discovery happens before the authoritative matrix/template/cell
+  snapshot, or the source is re-read and CAS-checked after discovery. No awaited
+  network work may sit between the final source snapshot and structural resolve.
 
 ## 2. Preflight before paid work
 
@@ -71,6 +83,13 @@ never sufficient to dispatch paid work.
 - Matrix dimension values are targeting labels, not evidence. A `location`
   value does not prove an office, service area, landmark relationship, review,
   license, availability, or local experience.
+- Planned-URL collision checks use a complete authoritative path census: durable
+  analysis paths, exact published-post paths, every other matrix cell, fresh
+  Webflow pages, and the complete same-site sitemap (including CMS items).
+  Discovery failure, stale fallback data, malformed URL identities, and bare CMS
+  slugs that cannot resolve to exactly one sitemap path all block preflight.
+  Collision equality is exact canonical path equality, never leaf-slug equality
+  across unrelated directories.
 
 ## 4. Evidence and placeholder honesty
 
@@ -145,6 +164,16 @@ never sufficient to dispatch paid work.
   leave an honest resumable state.
 - Dedupe is resource-scoped. Independent cells may run concurrently; the same
   source revision and idempotency key may not create duplicate paid work.
+- Free structural matrix reads do not create a generation run. The first run
+  repository accepts only an already-previewed non-empty selection; structural
+  code must never manufacture a preview fingerprint to exercise the ledger.
+- Matrix run uniqueness is workspace + matrix + idempotency key. Replaying the
+  same selection fingerprint returns the existing run; reusing the key for a
+  different fingerprint conflicts. Durable run snapshots survive matrix or
+  template deletion, while workspace deletion may cascade them.
+- Cell evidence is append-only/versioned with exact source revision and
+  current/superseded linkage. Never model evidence as one destructively
+  overwritten row per requirement.
 
 ## 7. Conditional commits and truthful completion
 
@@ -200,6 +229,14 @@ never sufficient to dispatch paid work.
 
 - New action tools use snake_case inputs, stable JSON error codes, authoritative
   IDs, bounded selections, explicit revisions, and idempotency keys.
+- Matrix list/detail cursors bind their filter/source revision and use hard
+  page limits. List cursors also bind the workspace, and list summaries expose
+  bounded counts rather than unbounded nested dimension values. A changed matrix
+  conflicts instead of mixing two cell snapshots; multi-cell structural
+  resolution rejects duplicate or oversized selections.
+- Template-upgrade acceptance binds its idempotency key to the exact proposal
+  fingerprint and source revision. The same mutation may replay; reusing the key
+  for a different proposal conflicts. Rejection does not mutate the template.
 - Workspace authorization is checked against the workspace field declared by
   the called tool schema. Conflicting `workspaceId` and `workspace_id` aliases
   are invalid for every caller.
@@ -208,6 +245,9 @@ never sufficient to dispatch paid work.
 - MCP key ID/label attribution is internal operational evidence. Preserve it in
   full admin activity and durable run provenance, but remove it from workspace
   broadcasts and client-visible activity projections.
+- Public matrix-run DTOs omit both the idempotency key and full MCP execution
+  context. Project MCP/system creators to `{ actorType }`; retain operator/client
+  IDs and optional labels only for human review history.
 - Request-scoped compatibility context may enrich legacy activity writers, but
   every durable generation run snapshots the explicit execution context; a
   restart/resume path must never depend on ambient request state.

@@ -24,6 +24,7 @@ import {
   applyRecommendationInputSchema,
   respondToClientActionInputSchema,
 } from '../../shared/types/mcp-action-schemas.js';
+import { acceptContentTemplateGenerationUpgradeInputSchema } from '../../shared/types/mcp-matrix-schemas.js';
 
 // Real union values, sourced from the owning files (not re-typed by hand) — see the file
 // headers for canonical member counts: ActionType (18), RecType (15), ClientActionSourceType (5).
@@ -103,6 +104,16 @@ describe('ACTION_CATALOG completeness', () => {
     }
   });
 
+  it('has an entry for every MCP template-generation upgrade decision verb (mcp context)', () => {
+    const decisions = acceptContentTemplateGenerationUpgradeInputSchema.shape.decision.options as readonly string[];
+    for (const decision of decisions) {
+      expect(
+        getActionCatalogEntry('mcp', `template_generation_upgrade:${decision}`),
+        `mcp/template_generation_upgrade:${decision}`,
+      ).toBeDefined();
+    }
+  });
+
   it('never carries a catalog key outside its declared source union', () => {
     const validByContext: Record<ActionCatalogContext, Set<string>> = {
       outcome: new Set(ACTION_TYPES),
@@ -113,6 +124,9 @@ describe('ACTION_CATALOG completeness', () => {
         ...(applyRecommendationInputSchema.shape.action.options as readonly string[]),
         ...(respondToClientActionInputSchema.shape.status.options as readonly string[]).map(
           (s) => `respond_client_action:${s}`,
+        ),
+        ...(acceptContentTemplateGenerationUpgradeInputSchema.shape.decision.options as readonly string[]).map(
+          (decision) => `template_generation_upgrade:${decision}`,
         ),
         'decline_approval_item',
       ]),

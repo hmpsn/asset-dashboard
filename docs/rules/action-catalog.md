@@ -20,7 +20,7 @@ vocabularies:
 | `recommendation` | `RecType` (15 members) | `shared/types/recommendations.ts` |
 | `client_action` | `ClientActionSourceType` (5 members) | `shared/types/client-actions.ts` |
 | `keyword_command_center` | `KEYWORD_COMMAND_CENTER_ACTIONS` (7 verbs) | `shared/types/keyword-command-center.ts` |
-| `mcp` | wire-level action verbs (`send`/`throttle`/`strike`, `respond_client_action:*`, `decline_approval_item`) | `shared/types/mcp-action-schemas.ts` |
+| `mcp` | wire-level action verbs (`send`/`throttle`/`strike`, `respond_client_action:*`, `decline_approval_item`, `template_generation_upgrade:*`) | `shared/types/mcp-action-schemas.ts`, `shared/types/mcp-matrix-schemas.ts` |
 
 The catalog is modeled on `BACKGROUND_JOB_METADATA`
 (`shared/types/background-jobs.ts:79`) — a `{ [K in Union]: Metadata }` mapped
@@ -66,7 +66,9 @@ zod schema's `.options`) instead of a `satisfies` clause.
    `docs/rules/seo-generation-quality.md`).
 2. **Add the catalog entry in the matching context object.** TypeScript will
    refuse to compile until you do, for the four `satisfies`-checked contexts.
-   For `mcp`, add the entry to `MCP_CATALOG` and update
+   For `mcp`, use a stable operation namespace when a generic verb could collide
+   (for example `template_generation_upgrade:accept`), add the entry to
+   `MCP_CATALOG`, and update
    `tests/contract/action-catalog.test.ts` if you introduced a new schema
    the test doesn't yet read.
 3. **Pick the right `phase`:**
@@ -85,7 +87,7 @@ zod schema's `.options`) instead of a `satisfies` clause.
 5. **Label wording follows the R1 word classes and
    [`docs/workflows/ui-vocabulary.md`](../workflows/ui-vocabulary.md)** —
    canonical admin-facing wording, not ad hoc phrasing.
-6. **MCP context is additive-only.** 61 MCP tools and long-lived
+6. **MCP context is additive-only.** 65 MCP tools and long-lived
    per-workspace API keys (migration 163) depend on the wire vocabulary never
    changing shape. Never rename an existing `mcp` catalog key or the verb it
    documents — that is a breaking change to persisted integrations, out of
