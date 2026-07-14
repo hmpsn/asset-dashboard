@@ -398,9 +398,11 @@ export async function buildCopyGenerationContext(
   // ── Layer 2: Voice DNA (user-prompt portion) ──
   // buildSystemPrompt() handles Layer 2 auto-injection for calibrated profiles.
   // Here we include samples + draft DNA for non-calibrated profiles.
+  let calibratedVoiceAuthority = false;
   try {
     const profile = getVoiceProfile(wsId);
     if (profile) {
+      calibratedVoiceAuthority = profile.status === 'calibrated';
       const { samplesText, dnaText, guardrailsText } = buildVoiceCalibrationContext(profile);
       const voiceParts = [samplesText, dnaText, guardrailsText].filter(Boolean);
       if (voiceParts.length > 0) {
@@ -414,7 +416,11 @@ export async function buildCopyGenerationContext(
 
   // ── Layer 3: Brand Identity (approved deliverables) ──
   try {
-    const deliverables = listDeliverables(wsId).filter(d => d.status === 'approved');
+    const deliverables = listDeliverables(wsId).filter(d => (
+      d.status === 'approved'
+      && (!calibratedVoiceAuthority
+        || (d.deliverableType !== 'voice_guidelines' && d.deliverableType !== 'tone_examples'))
+    ));
     if (deliverables.length > 0) {
       const deliverableLines = deliverables
         .map(d => `[${d.deliverableType}] ${d.content}`)

@@ -813,6 +813,41 @@ describe('buildCopyGenerationContext — brand layers', () => {
     expect(ctx).not.toContain('Draft mission statement');
   });
 
+  it('does not let approved voice deliverables compete with calibrated profile authority', async () => {
+    vi.mocked(getVoiceProfile).mockReturnValueOnce({
+      id: 'vp-1',
+      workspaceId: WORKSPACE_ID,
+      revision: 3,
+      status: 'calibrated',
+      samples: [],
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+    vi.mocked(listDeliverables).mockReturnValueOnce([
+      {
+        id: 'del-voice', workspaceId: WORKSPACE_ID, deliverableType: 'voice_guidelines',
+        content: 'Competing legacy voice instructions', status: 'approved', version: 1,
+        tier: 'essentials', createdAt: '', updatedAt: '',
+      },
+      {
+        id: 'del-tone', workspaceId: WORKSPACE_ID, deliverableType: 'tone_examples',
+        content: 'Competing legacy tone examples', status: 'approved', version: 1,
+        tier: 'professional', createdAt: '', updatedAt: '',
+      },
+      {
+        id: 'del-tagline', workspaceId: WORKSPACE_ID, deliverableType: 'tagline',
+        content: 'Keep the useful identity.', status: 'approved', version: 1,
+        tier: 'essentials', createdAt: '', updatedAt: '',
+      },
+    ]);
+
+    const ctx = await buildCopyGenerationContext(WORKSPACE_ID, makeBlueprint(), makeEntry());
+
+    expect(ctx).toContain('[tagline] Keep the useful identity.');
+    expect(ctx).not.toContain('Competing legacy voice instructions');
+    expect(ctx).not.toContain('Competing legacy tone examples');
+  });
+
   it('omits brand identity block when no approved deliverables exist', async () => {
     vi.mocked(listDeliverables).mockReturnValueOnce([
       { id: 'del-1', workspaceId: WORKSPACE_ID, deliverableType: 'tagline', content: 'Draft tagline', status: 'draft', createdAt: '', updatedAt: '' },
