@@ -1,5 +1,6 @@
 // ── Content domain types ────────────────────────────────────────
 
+import type { GenerationProvenance, GenerationTrackedArtifact } from './ai-execution.js';
 import type { OutcomeReadback } from './outcome-tracking.js';
 
 export const CONTENT_GENERATION_STYLES = ['standard', 'concise', 'hybrid'] as const;
@@ -69,7 +70,14 @@ export interface ContentBrief {
   sourceEvidence?: BriefSourceEvidence;
   // W2.5 lineage: set to the new brief's id when this brief is superseded by a regeneration
   supersededBy?: string;
+  /** Internal concurrency token. Public/client serializers must omit this field. */
+  generationRevision?: number;
+  /** Internal generation attribution. Public/client serializers must omit this field. */
+  generationProvenance?: GenerationProvenance | null;
 }
+
+/** Internal persisted brief shape returned by server storage adapters. */
+export type PersistedContentBrief = ContentBrief & GenerationTrackedArtifact;
 
 export interface BriefTemplateCrossrefSection {
   id: string;
@@ -315,9 +323,16 @@ export interface GeneratedPost {
    * read-side decoration. Positions are honest (lower=better); trust `direction`.
    */
   outcome?: OutcomeReadback;
+  /** Internal concurrency token. Public/client serializers must omit this field. */
+  generationRevision?: number;
+  /** Internal generation attribution. Public/client serializers must omit this field. */
+  generationProvenance?: GenerationProvenance | null;
   createdAt: string;
   updatedAt: string;
 }
+
+/** Internal persisted post shape returned by server storage adapters. */
+export type PersistedGeneratedPost = GeneratedPost & GenerationTrackedArtifact;
 
 export interface ContentRequestComment {
   id: string;

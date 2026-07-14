@@ -1,13 +1,8 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonSafe } from './db/json-validation.js';
-import { z } from 'zod';
 import type { GenerationProvenance } from '../shared/types/ai-execution.js';
-
-const provenanceSchema = z.object({
-  runId: z.string(), operation: z.string(), provider: z.enum(['openai', 'anthropic']), model: z.string(),
-  inputFingerprint: z.string(), evidenceCapturedAt: z.string().optional(), startedAt: z.string(), completedAt: z.string(),
-});
+import { generationProvenanceSchema } from './schemas/generation-provenance.js';
 
 const stmts = createStmtCache(() => ({
   get: db.prepare('SELECT keyword_strategy_generation_revision AS revision, keyword_strategy_input_fingerprint AS fingerprint, keyword_strategy_generation_provenance AS provenance FROM workspaces WHERE id = ?'),
@@ -25,7 +20,7 @@ export function getKeywordStrategyGenerationState(workspaceId: string): KeywordS
   if (!row) return { revision: 0, fingerprint: null, provenance: null };
   return {
     revision: row.revision, fingerprint: row.fingerprint,
-    provenance: row.provenance ? parseJsonSafe(row.provenance, provenanceSchema, null, { table: 'workspaces', field: 'keyword_strategy_generation_provenance', workspaceId }) : null,
+    provenance: row.provenance ? parseJsonSafe(row.provenance, generationProvenanceSchema, null, { table: 'workspaces', field: 'keyword_strategy_generation_provenance', workspaceId }) : null,
   };
 }
 

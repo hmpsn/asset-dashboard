@@ -25,6 +25,7 @@ Names below are the required semantic contracts; the shared-contract task must r
 ### Durable generation provenance
 
 - `GenerationProvenance`: run ID, named operation, provider/model, canonical effective-input fingerprint, evidence captured/observed time where applicable, and generation start/completion times.
+- For composite artifacts, the top-level run/provider/model identify the accepted execution that authorizes the adopted output; `executionChainId` links the logical job, and an ordered bounded `executions` list retains each accepted contributing run and exact effective-input fingerprint. Rejected attempts remain trace-only. The composite fingerprint hashes the ordered accepted fingerprints plus deterministic authority inputs.
 - `generationRevision`: monotonic artifact revision used in compare-and-swap saves; it is distinct from the input fingerprint and provider retry count.
 - A force-refresh nonce may bypass caches but never becomes the persisted canonical fingerprint.
 - A successful conditional save records execution metadata and increments revision atomically. A stale save changes nothing and returns an explicit conflict result.
@@ -156,6 +157,7 @@ The existing `strategy-divergence-sweep` gate may protect S2 repair only after a
 ## Job, Event, and Cache Contracts
 
 - Long AI/provider workflows use the background-job platform. Resource identity participates in dedupe; unrelated resources in one workspace may run concurrently.
+- Multi-resource work atomically claims every canonical resource before paid work. Active uniqueness spans job types for the same resource. Cancellation retains claims until the worker abort path drains; terminal completion/error and restart recovery release them transactionally.
 - S3 owns ordering between intelligence and recommendation jobs. Other phases must not enqueue an independent competing follow-on.
 - Mutations broadcast canonical events only after committed durable state. Every workspace event has an existing/new `useWorkspaceEvents` invalidation for the owning query keys.
 - KCC `/initial` seeds summary/row caches; subsequent interaction reads rows only. Workspace mutation invalidates both without forcing summary work for local table controls.

@@ -3,8 +3,8 @@
  * Handles creative writing with Claude/GPT, page-type-specific prompts,
  * unification passes, and SEO meta generation.
  */
-import { callAI, type AICallOptions, type AICallResult } from './ai.js';
-import type { AIOperationId } from './ai-operation-registry.js';
+import { callAI, renderAIProviderInput, type AICallOptions, type AICallResult } from './ai.js';
+import { getAIOperationRuntimeDefaults, type AIOperationId } from './ai-operation-registry.js';
 import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structured-output.js';
 import { isAnthropicConfigured } from './anthropic-helpers.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
@@ -22,6 +22,10 @@ import {
 } from './page-type-copy-contract.js';
 import { buildSeoPromptContext } from './intelligence/generation-context-builders.js';
 import { countVisibleHtmlWords, visibleTextFromHtml } from '../shared/content-post-integrity.js';
+import {
+  fingerprintRenderedAIInput,
+  type AcceptedGenerationExecution,
+} from './generation-provenance.js';
 export { CREATIVE_WRITING_RULES, WRITING_QUALITY_RULES } from './writing-quality.js';
 
 const log = createLogger('content-posts-ai');
@@ -107,6 +111,10 @@ export interface CreativeAICallOptions {
     provider: 'anthropic' | 'openai';
     fallback: boolean;
   }) => void | Promise<void>;
+  /** Logical workflow/job correlation shared across composite content stages. */
+  executionChainId?: string;
+  /** Receives each successful provider result; callers retain it only if that output is adopted. */
+  onExecution?: (execution: AcceptedGenerationExecution) => void;
 }
 
 export const CREATIVE_JSON_ONLY_INSTRUCTION = 'IMPORTANT: Return ONLY a single valid JSON object. No prose, no preamble, no markdown code fences. The response must start with { and end with }.';
@@ -141,14 +149,17 @@ export async function callCreativeAIWithMetadata(
   const temperature = opts.temperature ?? CLAUDE_TEMP;
   const json = opts.json === true;
   const featureLabel = feature ?? opts.operation ?? 'creative-ai';
-  const executionChainId = randomUUID();
+  const executionChainId = opts.executionChainId ?? randomUUID();
+  const researchMode = opts.researchMode
+    ?? (opts.operation ? getAIOperationRuntimeDefaults(opts.operation).defaultResearchMode : false);
   let claudeAttemptFailed = false;
 
   if (isAnthropicConfigured()) {
     await opts.beforeProviderDispatch?.({ provider: 'anthropic', fallback: false });
+    const providerInput = renderCreativeProviderCallInput({ systemPrompt, userPrompt, json }, 'anthropic');
+    let result: AICallResult | undefined;
     try {
-      const providerInput = renderCreativeProviderCallInput({ systemPrompt, userPrompt, json }, 'anthropic');
-      const result = await callAI({
+      result = await callAI({
         operation: opts.operation,
         provider: 'anthropic',
         model: CLAUDE_MODEL,
@@ -159,17 +170,27 @@ export async function callCreativeAIWithMetadata(
         workspaceId,
         maxRetries: opts.maxRetries,
         timeoutMs: 90_000,
-        researchMode: opts.researchMode,
+        researchMode,
         signal: opts.signal,
         executionChainId,
       });
-      log.info(`[${featureLabel}] Generated with Claude`);
-      const text = result.text.trim();
-      return { ...result, text: json ? stripCodeFence(text) : text };
     } catch (err) {
       if (opts.signal?.aborted) throw err;
       claudeAttemptFailed = true;
       log.info(`[${featureLabel}] Claude failed (${err instanceof Error ? err.message : err}), falling back to GPT`);
+    }
+    if (result) {
+      opts.onExecution?.({
+        execution: result.execution,
+        inputFingerprint: fingerprintRenderedAIInput(renderAIProviderInput({
+          provider: 'anthropic',
+          ...providerInput,
+          researchMode,
+        })),
+      });
+      log.info(`[${featureLabel}] Generated with Claude`);
+      const text = result.text.trim();
+      return { ...result, text: json ? stripCodeFence(text) : text };
     }
   }
 
@@ -189,11 +210,19 @@ export async function callCreativeAIWithMetadata(
     feature,
     workspaceId,
     maxRetries: opts.maxRetries,
-    researchMode: opts.researchMode,
+    researchMode,
     signal: opts.signal,
     executionChainId,
     ...(claudeAttemptFailed ? { fallbackUsed: true } : {}),
     ...(json ? { responseFormat: { type: 'json_object' as const } } : {}),
+  });
+  opts.onExecution?.({
+    execution: result.execution,
+    inputFingerprint: fingerprintRenderedAIInput(renderAIProviderInput({
+      provider: 'openai',
+      ...providerInput,
+      researchMode,
+    })),
   });
   log.info(`[${featureLabel}] Generated with GPT`);
   const text = result.text.trim();

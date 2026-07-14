@@ -72,6 +72,14 @@ Every durable generated artifact brought under this contract by its owning imple
 - evidence captured/freshness time when evidence is used;
 - generation start and completion times.
 
+For a multi-call artifact, the top-level run/provider/model identify the accepted
+execution that authorizes the adopted output. Store an `executionChainId` for
+the logical workflow and an ordered bounded list of accepted contributing
+executions, each with its exact effective-input fingerprint. The artifact-level
+fingerprint is a canonical digest of those ordered fingerprints plus any
+deterministic authority inputs. Rejected, malformed, or superseded attempts stay
+in execution traces and must not be presented as adopted artifact provenance.
+
 The fingerprint covers the exact rendered system and user inputs, excluding only an explicit force-refresh nonce. Join job traces, provider attempts, token/cost records, and the artifact through the run ID. Do not store raw prompts or secrets in telemetry. Provenance is internal unless a separate public contract explicitly exposes a safe projection.
 
 ## 7. Feature flags protect semantics, not correctness

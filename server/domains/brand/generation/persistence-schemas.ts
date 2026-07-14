@@ -27,6 +27,7 @@ import {
   voiceDNASchema,
   voiceGuardrailsSchema,
 } from '../../../../shared/types/voice-finalization-schemas.js';
+import { canonicalGenerationProvenanceSchema } from '../../../schemas/generation-provenance.js';
 
 export const brandGenerationIdSchema = z.string().min(1).max(BRAND_GENERATION_LIMITS.maxIdLength);
 export const brandGenerationFingerprintSchema = z.string().regex(/^[0-9a-f]{64}$/);
@@ -226,16 +227,7 @@ export const brandGenerationAuditReportSchema = z.discriminatedUnion('verdict', 
   }).strict(),
 ]);
 
-export const brandGenerationProvenanceSchema = z.object({
-  runId: brandGenerationIdSchema,
-  operation: z.string().min(1).max(200),
-  provider: z.enum(['openai', 'anthropic', 'deterministic']),
-  model: z.string().min(1).max(200),
-  inputFingerprint: brandGenerationFingerprintSchema,
-  evidenceCapturedAt: brandGenerationTimestampSchema.optional(),
-  startedAt: brandGenerationTimestampSchema,
-  completedAt: brandGenerationTimestampSchema,
-}).strict();
+export const brandGenerationProvenanceSchema = canonicalGenerationProvenanceSchema;
 
 export const brandGenerationSanitizedErrorSchema = z.object({
   code: z.string().min(1).max(200),

@@ -95,6 +95,14 @@ Define a shared internal `GenerationProvenance` envelope containing:
 - evidence captured/freshness timestamp when evidence is used;
 - generation start and completion timestamps.
 
+For a multi-call artifact, `runId`/provider/model identify the accepted execution
+that authorizes the adopted output, while optional `executionChainId` correlates
+the logical job and an ordered bounded `executions` list records every accepted
+contributing execution with its own exact effective-input fingerprint. The
+artifact-level fingerprint is the canonical digest of those ordered fingerprints
+plus deterministic authority inputs. Rejected or superseded attempts remain in
+execution traces and are never mislabeled as adopted artifact provenance.
+
 Content posts, content briefs, copy sections, recommendation sets, and keyword strategy gain an additive monotonic `generation_revision` and typed provenance JSON. Strategy POV retains its existing edit-safe fingerprint/version behavior and joins the shared run-correlation envelope. The revision is read before paid/long-running work and checked in the final write transaction. A mismatch means the newer durable state wins.
 
 - Content conflict: do not save generated output; fail with a safe conflict result that tells the operator the draft changed.
