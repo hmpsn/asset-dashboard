@@ -1,0 +1,816 @@
+import { afterEach, describe, expect, it } from 'vitest';
+
+import db from '../../server/db/index.js';
+import {
+  acceptBrandGenerationRevisionCommand,
+  acceptBrandGenerationResumeCommand,
+  acceptBrandGenerationStartCommand,
+  beginBrandGenerationAttempt,
+  cancelBrandGenerationAttempt,
+  commitBrandGenerationDeliverableCandidate,
+  completeBrandGenerationAttempt,
+  failBrandGenerationAttempt,
+  getBrandGenerationAttempt,
+  getBrandGenerationItem,
+  getBrandGenerationRun,
+  getPersistedBrandGenerationRun,
+  listBrandGenerationItemsPage,
+  lookupBrandGenerationStartReplay,
+  reserveBrandGenerationAttemptBudget,
+  transitionBrandGenerationItem,
+  transitionBrandGenerationRun,
+  type AcceptBrandGenerationStartCommandInput,
+  type AcceptBrandGenerationResumeCommandInput,
+  type AcceptBrandGenerationRevisionCommandInput,
+  type BrandGenerationPreparedItem,
+} from '../../server/domains/brand/generation/repository.js';
+import {
+  BrandGenerationApprovedDeliverableError,
+  BrandGenerationBudgetExceededError,
+  BrandGenerationConcurrencyLimitError,
+  BrandGenerationCursorError,
+  BrandGenerationIdempotencyConflictError,
+  BrandGenerationPersistenceContractError,
+  BrandGenerationRevisionConflictError,
+} from '../../server/domains/brand/generation/errors.js';
+import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import type {
+  BrandGenerationAttempt,
+  BrandGenerationTargetInputSnapshot,
+  FinalizedVoiceSnapshotRef,
+  StartBrandGenerationRequest,
+} from '../../shared/types/brand-generation.js';
+import { BRAND_GENERATION_PRESET_POLICY } from '../../shared/types/brand-generation.js';
+import type { BrandIntakeRevisionRef } from '../../shared/types/brand-intake.js';
+
+const cleanup: string[] = [];
+const FINGERPRINTS = Array.from({ length: 20 }, (_, index) =>
+  (index + 1).toString(16).padStart(64, '0'));
+
+afterEach(() => {
+  for (const workspaceId of cleanup.splice(0)) deleteWorkspace(workspaceId);
+});
+
+function seedWorkspace(label: string): { workspaceId: string; intake: BrandIntakeRevisionRef } {
+  const workspaceId = createWorkspace(`${label} ${Date.now()} ${Math.random()}`).id;
+  cleanup.push(workspaceId);
+  const intake = {
+    intakeRevisionId: `bir_${workspaceId.slice(-8)}_${Math.random().toString(16).slice(2)}`,
+    revision: 1,
+    fingerprint: FINGERPRINTS[0]!,
+  };
+  db.prepare(`
+    INSERT INTO brand_intake_revisions (
+      id, workspace_id, revision, schema_version, payload_json,
+      evidence_resolutions_json, projection_state_json, fingerprint, source,
+      submitter_json, mutation_kind, mutation_fingerprint, idempotency_key,
+      supersedes_revision_id, created_at
+    ) VALUES (?, ?, 1, 1, '{}', '[]',
+      '{"preservedCompetitorDomains":[],"intakeOwnedCompetitorDomains":[]}',
+      ?, 'admin', '{"actorType":"operator","actorId":"op-test"}',
+      'submission', ?, NULL, NULL, ?)
+  `).run(intake.intakeRevisionId, workspaceId, intake.fingerprint, FINGERPRINTS[1], new Date().toISOString());
+  return { workspaceId, intake };
+}
+
+const finalizedVoice: FinalizedVoiceSnapshotRef = {
+  voiceProfileId: 'vp-test',
+  voiceVersion: 3,
+  finalizedBy: { actorType: 'operator', actorId: 'op-voice', actorLabel: 'Voice lead' },
+  finalizedAt: '2026-07-14T00:00:00.000Z',
+  fingerprint: FINGERPRINTS[2]!,
+  anchorEvidenceRefs: [{
+    sourceType: 'client_submission',
+    sourceId: 'sample-1',
+    capturedAt: '2026-07-13T00:00:00.000Z',
+    selectedBy: { actorType: 'operator', actorId: 'op-voice' },
+    selectedAt: '2026-07-14T00:00:00.000Z',
+  }],
+};
+
+function preparedItem(
+  intake: BrandIntakeRevisionRef,
+  target: BrandGenerationPreparedItem['target'],
+  artifactExpectation: BrandGenerationTargetInputSnapshot['artifactExpectation'],
+  fingerprint = FINGERPRINTS[3]!,
+): BrandGenerationPreparedItem {
+  return {
+    target,
+    inputSnapshot: {
+      schemaVersion: 1,
+      target,
+      intakeRevision: intake,
+      voiceSnapshot: target === 'voice_foundation' ? null : finalizedVoice,
+      approvedDeliverables: [],
+      evidenceRequirementIds: [],
+      artifactExpectation,
+      capturedAt: '2026-07-14T01:00:00.000Z',
+      fingerprint,
+    },
+  };
+}
+
+function mcpAttribution(workspaceId: string, requestId = 'request-1') {
+  return {
+    createdBy: { actorType: 'mcp' as const, actorId: 'key-1', actorLabel: 'Automation' },
+    mcpExecutionContext: {
+      requestId,
+      toolName: 'start_brand_deliverable_generation',
+      targetWorkspaceId: workspaceId,
+      caller: {
+        kind: 'workspace_key' as const,
+        scope: workspaceId,
+        workspaceId,
+        keyId: 'key-1',
+        keyLabel: 'Automation',
+      },
+    },
+  };
+}
+
+const maxBudget = {
+  maxProviderCalls: 114,
+  maxInputTokens: 4_000_000,
+  maxOutputTokens: 250_000,
+  maxEstimatedCostMicros: 100_000_000,
+  maxConcurrency: 3,
+};
+
+const maxEstimate = {
+  providerCalls: 114,
+  inputTokens: 4_000_000,
+  outputTokens: 250_000,
+  estimatedCostMicros: 100_000_000,
+  maxConcurrency: 3,
+};
+
+type BrandGenerationAttemptOutput = Exclude<BrandGenerationAttempt['output'], null>;
+
+function foundationStart(
+  workspaceId: string,
+  intake: BrandIntakeRevisionRef,
+  key = 'start-foundation',
+  requestId = 'request-1',
+): AcceptBrandGenerationStartCommandInput {
+  const request: StartBrandGenerationRequest = {
+    workspaceId,
+    intakeRevisionId: intake.intakeRevisionId,
+    expectedIntakeRevision: intake.revision,
+    expectedIntakeFingerprint: intake.fingerprint,
+    selection: { kind: 'preset', preset: 'full_brand_system' },
+    budget: maxBudget,
+    idempotencyKey: key,
+    ...mcpAttribution(workspaceId, requestId),
+  };
+  return {
+    request,
+    items: [preparedItem(intake, 'voice_foundation', null)],
+    voiceReadiness: { state: 'missing', blockingReasons: ['Voice foundation must be finalized'] },
+    selectionFingerprint: FINGERPRINTS[4]!,
+    effectiveInputFingerprint: FINGERPRINTS[5]!,
+    jobId: `job-${key}`,
+    estimate: maxEstimate,
+    dashboardUrl: `/ws/${workspaceId}/brand`,
+  };
+}
+
+function durableStart(
+  workspaceId: string,
+  intake: BrandIntakeRevisionRef,
+  target: 'mission' | 'vision' = 'mission',
+  key = `start-${target}`,
+): AcceptBrandGenerationStartCommandInput {
+  const request: StartBrandGenerationRequest = {
+    workspaceId,
+    intakeRevisionId: intake.intakeRevisionId,
+    expectedIntakeRevision: intake.revision,
+    expectedIntakeFingerprint: intake.fingerprint,
+    selection: { kind: 'atomic', target },
+    expectedVoiceVersion: finalizedVoice.voiceVersion,
+    expectedVoiceFingerprint: finalizedVoice.fingerprint,
+    budget: maxBudget,
+    idempotencyKey: key,
+    createdBy: { actorType: 'operator', actorId: 'op-test' },
+    mcpExecutionContext: null,
+  };
+  return {
+    request,
+    items: [preparedItem(intake, target, { kind: 'create', deliverableId: null, expectedVersion: 0 })],
+    voiceReadiness: { state: 'finalized', snapshot: finalizedVoice, blockingReasons: [] },
+    selectionFingerprint: FINGERPRINTS[6]!,
+    effectiveInputFingerprint: FINGERPRINTS[7]!,
+    jobId: `job-${key}`,
+    estimate: { providerCalls: 6, inputTokens: 10_000, outputTokens: 5_000, estimatedCostMicros: 500_000, maxConcurrency: 1 },
+    dashboardUrl: `/ws/${workspaceId}/brand`,
+  };
+}
+
+function audienceStart(
+  workspaceId: string,
+  intake: BrandIntakeRevisionRef,
+): AcceptBrandGenerationStartCommandInput {
+  const targets = ['personas', 'customer_journey', 'objection_handling', 'emotional_triggers'] as const;
+  const request: StartBrandGenerationRequest = {
+    workspaceId,
+    intakeRevisionId: intake.intakeRevisionId,
+    expectedIntakeRevision: intake.revision,
+    expectedIntakeFingerprint: intake.fingerprint,
+    selection: { kind: 'preset', preset: 'audience' },
+    expectedVoiceVersion: finalizedVoice.voiceVersion,
+    expectedVoiceFingerprint: finalizedVoice.fingerprint,
+    budget: maxBudget,
+    idempotencyKey: 'start-audience',
+    createdBy: { actorType: 'operator', actorId: 'op-test' },
+    mcpExecutionContext: null,
+  };
+  return {
+    request,
+    items: targets.map((target, index) => preparedItem(
+      intake,
+      target,
+      { kind: 'create', deliverableId: null, expectedVersion: 0 },
+      FINGERPRINTS[8 + index]!,
+    )) as [BrandGenerationPreparedItem, ...BrandGenerationPreparedItem[]],
+    voiceReadiness: { state: 'finalized', snapshot: finalizedVoice, blockingReasons: [] },
+    selectionFingerprint: FINGERPRINTS[12]!,
+    effectiveInputFingerprint: FINGERPRINTS[13]!,
+    jobId: 'job-audience',
+    estimate: { providerCalls: 24, inputTokens: 100_000, outputTokens: 30_000, estimatedCostMicros: 2_000_000, maxConcurrency: 3 },
+    dashboardUrl: `/ws/${workspaceId}/brand`,
+  };
+}
+
+function candidateOutput(content = 'A grounded mission.'): BrandGenerationAttemptOutput {
+  return {
+    kind: 'deliverable_candidate',
+    content,
+    foundationDraft: null,
+    claims: [{ text: content, classification: 'creative_proposal', sourceRefs: [] }],
+    requirements: [],
+    placeholders: [],
+  };
+}
+
+function auditOutput(verdict: 'ready_for_human_review' | 'needs_attention'): BrandGenerationAttemptOutput {
+  return {
+    kind: 'audit',
+    auditReport: {
+      verdict,
+      deterministicChecks: [],
+      unresolvedRequirementIds: [],
+      modelFindings: [],
+      humanRequiredChecks: [],
+      revisionCount: 0,
+      auditedAt: '2026-07-14T02:00:00.000Z',
+    },
+  };
+}
+
+const provenance = {
+  runId: 'ai-run-1',
+  operation: 'brand-deliverable-generate',
+  provider: 'anthropic' as const,
+  model: 'claude-opus-4-6',
+  inputFingerprint: FINGERPRINTS[3]!,
+  startedAt: '2026-07-14T01:00:00.000Z',
+  completedAt: '2026-07-14T01:01:00.000Z',
+};
+
+const zeroReservation = {
+  providerCalls: 0,
+  inputTokens: 0,
+  outputTokens: 0,
+  estimatedCostMicros: 0,
+};
+
+function stageDurableCandidate(
+  workspaceId: string,
+  intake: BrandIntakeRevisionRef,
+  verdict: 'ready_for_human_review' | 'needs_attention',
+  key: string,
+) {
+  const accepted = acceptBrandGenerationStartCommand(durableStart(workspaceId, intake, 'mission', key));
+  const running = transitionBrandGenerationRun({
+    workspaceId,
+    runId: accepted.run.id,
+    expectedRevision: 0,
+    nextStatus: 'running',
+    nextStage: 'dependent_generation',
+  });
+  let item = transitionBrandGenerationItem({
+    workspaceId,
+    runId: accepted.run.id,
+    itemId: accepted.items[0]!.id,
+    expectedRevision: 0,
+    nextStatus: 'preflighting',
+  });
+  item = transitionBrandGenerationItem({
+    workspaceId,
+    runId: accepted.run.id,
+    itemId: item.id,
+    expectedRevision: item.revision,
+    nextStatus: 'generating',
+  });
+  const candidate = beginBrandGenerationAttempt({
+    workspaceId,
+    runId: accepted.run.id,
+    itemId: item.id,
+    commandId: accepted.command.id,
+    jobId: accepted.command.jobId,
+    stage: 'dependent_generation',
+    expectedRunRevision: running.revision,
+    expectedItemRevision: item.revision,
+    expectedDeliverableVersion: 0,
+    effectiveInputFingerprint: item.effectiveInputFingerprint!,
+    reservation: zeroReservation,
+  });
+  completeBrandGenerationAttempt({
+    workspaceId,
+    runId: accepted.run.id,
+    itemId: item.id,
+    attemptId: candidate.id,
+    output: candidateOutput(),
+    provenance: { ...provenance, inputFingerprint: item.effectiveInputFingerprint! },
+  });
+  item = transitionBrandGenerationItem({
+    workspaceId,
+    runId: accepted.run.id,
+    itemId: item.id,
+    expectedRevision: item.revision,
+    nextStatus: 'auditing_deterministic',
+  });
+  const audit = beginBrandGenerationAttempt({
+    workspaceId,
+    runId: accepted.run.id,
+    itemId: item.id,
+    commandId: accepted.command.id,
+    jobId: accepted.command.jobId,
+    stage: 'deterministic_audit',
+    expectedRunRevision: running.revision,
+    expectedItemRevision: item.revision,
+    expectedDeliverableVersion: 0,
+    effectiveInputFingerprint: item.effectiveInputFingerprint!,
+    reservation: zeroReservation,
+  });
+  completeBrandGenerationAttempt({
+    workspaceId,
+    runId: accepted.run.id,
+    itemId: item.id,
+    attemptId: audit.id,
+    output: auditOutput(verdict),
+    provenance: null,
+  });
+  return { accepted, running, item, candidate, audit };
+}
+
+describe('brand generation repository', () => {
+  it('persists immutable start command lineage and redacts MCP/idempotency data publicly', () => {
+    const { workspaceId, intake } = seedWorkspace('brand repository replay');
+    const input = foundationStart(workspaceId, intake);
+    const accepted = acceptBrandGenerationStartCommand(input);
+
+    expect(accepted.existing).toBe(false);
+    expect(accepted.run).toMatchObject({
+      workspaceId,
+      selection: { kind: 'preset', preset: 'full_brand_system' },
+      selectedTargets: ['voice_foundation'],
+      counts: { selected: 1, queued: 1 },
+      currentJobId: input.jobId,
+    });
+    expect(accepted.command).toMatchObject({
+      runId: accepted.run.id,
+      kind: 'start',
+      jobId: input.jobId,
+      result: { runId: accepted.run.id, selectionCount: 1 },
+    });
+    expect(accepted.items[0]?.inputSnapshot).toEqual(input.items[0].inputSnapshot);
+
+    const publicRun = getBrandGenerationRun(workspaceId, accepted.run.id);
+    expect(publicRun?.createdBy).toEqual({ actorType: 'mcp' });
+    expect(publicRun).not.toHaveProperty('idempotencyKey');
+    expect(publicRun).not.toHaveProperty('mcpExecutionContext');
+    expect(JSON.stringify(publicRun)).not.toContain('key-1');
+
+    const replayRequest = {
+      ...input.request,
+      ...mcpAttribution(workspaceId, 'a-new-server-request-id'),
+    } as StartBrandGenerationRequest;
+    const replay = lookupBrandGenerationStartReplay(replayRequest);
+    expect(replay).toMatchObject({ existing: true, result: accepted.result });
+    expect(replay?.command.id).toBe(accepted.command.id);
+
+    const changedBusinessRequest: StartBrandGenerationRequest = {
+      ...replayRequest,
+      selection: { kind: 'atomic', target: 'voice_foundation' },
+    };
+    expect(() => lookupBrandGenerationStartReplay(changedBusinessRequest))
+      .toThrow(BrandGenerationIdempotencyConflictError);
+  });
+
+  it('scopes every read to workspace and fails closed on corrupt stored JSON', () => {
+    const first = seedWorkspace('brand repository scope first');
+    const second = seedWorkspace('brand repository scope second');
+    const accepted = acceptBrandGenerationStartCommand(foundationStart(first.workspaceId, first.intake));
+
+    expect(getPersistedBrandGenerationRun(second.workspaceId, accepted.run.id)).toBeNull();
+    expect(getBrandGenerationItem(second.workspaceId, accepted.run.id, accepted.items[0]!.id)).toBeNull();
+
+    db.pragma('ignore_check_constraints = ON');
+    try {
+      db.prepare(`UPDATE brand_generation_items SET claims_json = '[{"bad":true}]' WHERE id = ?`)
+        .run(accepted.items[0]!.id);
+    } finally {
+      db.pragma('ignore_check_constraints = OFF');
+    }
+    expect(() => getBrandGenerationItem(first.workspaceId, accepted.run.id, accepted.items[0]!.id))
+      .toThrow(BrandGenerationPersistenceContractError);
+  });
+
+  it('rechecks that intake is current and refuses approved deliverables inside start transaction', () => {
+    const { workspaceId, intake } = seedWorkspace('brand repository current authority');
+    db.prepare(`
+      INSERT INTO brand_intake_revisions (
+        id, workspace_id, revision, schema_version, payload_json,
+        evidence_resolutions_json, projection_state_json, fingerprint, source,
+        submitter_json, mutation_kind, mutation_fingerprint, idempotency_key,
+        supersedes_revision_id, created_at
+      ) VALUES (?, ?, 2, 1, '{}', '[]',
+        '{"preservedCompetitorDomains":[],"intakeOwnedCompetitorDomains":[]}',
+        ?, 'admin', '{"actorType":"operator","actorId":"op-test"}',
+        'submission', ?, NULL, ?, ?)
+    `).run(`bir_successor_${Math.random()}`, workspaceId, FINGERPRINTS[14], FINGERPRINTS[15], intake.intakeRevisionId, new Date().toISOString());
+    expect(() => acceptBrandGenerationStartCommand(foundationStart(workspaceId, intake)))
+      .toThrow(BrandGenerationRevisionConflictError);
+
+    const current = { intakeRevisionId: db.prepare(`
+      SELECT id FROM brand_intake_revisions WHERE workspace_id = ? AND revision = 2
+    `).get(workspaceId) as { id: string }, revision: 2, fingerprint: FINGERPRINTS[14]! };
+    const currentRef: BrandIntakeRevisionRef = {
+      intakeRevisionId: current.intakeRevisionId.id,
+      revision: current.revision,
+      fingerprint: current.fingerprint,
+    };
+    db.prepare(`
+      INSERT INTO brand_identity_deliverables (
+        id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at
+      ) VALUES ('approved-mission', ?, 'mission', 'Human mission', 'approved', 1, 'essentials', ?, ?)
+    `).run(workspaceId, new Date().toISOString(), new Date().toISOString());
+    expect(() => acceptBrandGenerationStartCommand(durableStart(workspaceId, currentRef)))
+      .toThrow(BrandGenerationApprovedDeliverableError);
+  });
+
+  it('derives counts from item rows and lets siblings progress without bumping shared run revision', () => {
+    const { workspaceId, intake } = seedWorkspace('brand repository sibling progress');
+    const accepted = acceptBrandGenerationStartCommand(audienceStart(workspaceId, intake));
+    const running = transitionBrandGenerationRun({
+      workspaceId,
+      runId: accepted.run.id,
+      expectedRevision: 0,
+      nextStatus: 'running',
+      nextStage: 'dependent_generation',
+    });
+    const [first, second] = accepted.items;
+    transitionBrandGenerationItem({
+      workspaceId, runId: accepted.run.id, itemId: first!.id,
+      expectedRevision: 0, nextStatus: 'preflighting',
+    });
+    transitionBrandGenerationItem({
+      workspaceId, runId: accepted.run.id, itemId: second!.id,
+      expectedRevision: 0, nextStatus: 'preflighting',
+    });
+    const after = getPersistedBrandGenerationRun(workspaceId, accepted.run.id);
+    expect(after?.revision).toBe(running.revision);
+    expect(after?.counts).toMatchObject({ selected: 4, queued: 2, running: 2 });
+  });
+
+  it('enforces concurrency, reserves every provider dispatch, and allocates retry numbers transactionally', () => {
+    const { workspaceId, intake } = seedWorkspace('brand repository attempt budget');
+    const accepted = acceptBrandGenerationStartCommand(audienceStart(workspaceId, intake));
+    const running = transitionBrandGenerationRun({
+      workspaceId,
+      runId: accepted.run.id,
+      expectedRevision: 0,
+      nextStatus: 'running',
+      nextStage: 'dependent_generation',
+    });
+    const items = accepted.items.map(item => transitionBrandGenerationItem({
+      workspaceId,
+      runId: accepted.run.id,
+      itemId: item.id,
+      expectedRevision: 0,
+      nextStatus: 'preflighting',
+    }));
+    const begin = (item: (typeof items)[number]) => beginBrandGenerationAttempt({
+      workspaceId,
+      runId: accepted.run.id,
+      itemId: item.id,
+      commandId: accepted.command.id,
+      jobId: accepted.command.jobId,
+      stage: 'preflight',
+      expectedRunRevision: running.revision,
+      expectedItemRevision: item.revision,
+      expectedDeliverableVersion: 0,
+      effectiveInputFingerprint: item.effectiveInputFingerprint!,
+      reservation: zeroReservation,
+    });
+    const attempts = items.slice(0, 3).map(begin);
+    expect(attempts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ commandId: accepted.command.id, jobId: accepted.command.jobId, attemptNumber: 1 }),
+    ]));
+    expect(() => begin(items[3]!)).toThrow(BrandGenerationConcurrencyLimitError);
+
+    const reserved = reserveBrandGenerationAttemptBudget({
+      workspaceId,
+      runId: accepted.run.id,
+      itemId: items[0]!.id,
+      attemptId: attempts[0]!.id,
+      expectedRunRevision: running.revision,
+      expectedItemRevision: items[0]!.revision,
+      reservation: { ...zeroReservation, providerCalls: 114 },
+    });
+    expect(reserved.budgetUsage.providerCalls).toBe(114);
+    expect(() => reserveBrandGenerationAttemptBudget({
+      workspaceId,
+      runId: accepted.run.id,
+      itemId: items[0]!.id,
+      attemptId: attempts[0]!.id,
+      expectedRunRevision: running.revision,
+      expectedItemRevision: items[0]!.revision,
+      reservation: { ...zeroReservation, providerCalls: 1 },
+    })).toThrow(BrandGenerationBudgetExceededError);
+
+    failBrandGenerationAttempt({
+      workspaceId,
+      runId: accepted.run.id,
+      itemId: items[0]!.id,
+      attemptId: attempts[0]!.id,
+      error: { code: 'provider_timeout', message: 'Provider timed out', retryable: true, stage: 'preflight' },
+    });
+    const retry = begin(items[0]!);
+    expect(retry.attemptNumber).toBe(2);
+    for (const [attempt, item] of [[attempts[1]!, items[1]!], [attempts[2]!, items[2]!], [retry, items[0]!]] as const) {
+      cancelBrandGenerationAttempt({
+        workspaceId,
+        runId: accepted.run.id,
+        itemId: item.id,
+        attemptId: attempt.id,
+      });
+    }
+  });
+
+  it('signs item cursors and rejects tampering or a stale item revision snapshot', () => {
+    const { workspaceId, intake } = seedWorkspace('brand repository cursor');
+    const accepted = acceptBrandGenerationStartCommand(audienceStart(workspaceId, intake));
+    const firstPage = listBrandGenerationItemsPage(workspaceId, accepted.run.id, { limit: 2 });
+    expect(firstPage.items).toHaveLength(2);
+    expect(firstPage.hasMore).toBe(true);
+    expect(firstPage.nextCursor).toBeTruthy();
+    const cursor = firstPage.nextCursor!;
+    const tampered = `${cursor.slice(0, -2)}xx`;
+    expect(() => listBrandGenerationItemsPage(workspaceId, accepted.run.id, { cursor: tampered, limit: 2 }))
+      .toThrow(BrandGenerationCursorError);
+
+    transitionBrandGenerationItem({
+      workspaceId,
+      runId: accepted.run.id,
+      itemId: accepted.items[0]!.id,
+      expectedRevision: 0,
+      nextStatus: 'preflighting',
+    });
+    expect(() => listBrandGenerationItemsPage(workspaceId, accepted.run.id, { cursor, limit: 2 }))
+      .toThrow(BrandGenerationCursorError);
+  });
+
+  it('commits only audited review-ready output and withholds attention output from legacy deliverables', () => {
+    const readyWorkspace = seedWorkspace('brand repository ready commit');
+    const ready = stageDurableCandidate(
+      readyWorkspace.workspaceId,
+      readyWorkspace.intake,
+      'ready_for_human_review',
+      'ready-commit',
+    );
+    const committed = commitBrandGenerationDeliverableCandidate({
+      workspaceId: readyWorkspace.workspaceId,
+      runId: ready.accepted.run.id,
+      itemId: ready.item.id,
+      candidateAttemptId: ready.candidate.id,
+      finalAuditAttemptId: ready.audit.id,
+      expectedRunRevision: ready.running.revision,
+      expectedItemRevision: ready.item.revision,
+      nextStatus: 'ready_for_human_review',
+    });
+    expect(committed).toMatchObject({
+      kind: 'committed',
+      deliverable: { content: 'A grounded mission.', status: 'draft', version: 1 },
+      item: { status: 'ready_for_human_review', committedDeliverableVersion: 1 },
+    });
+
+    const attentionWorkspace = seedWorkspace('brand repository withheld commit');
+    const attention = stageDurableCandidate(
+      attentionWorkspace.workspaceId,
+      attentionWorkspace.intake,
+      'needs_attention',
+      'attention-commit',
+    );
+    const withheld = commitBrandGenerationDeliverableCandidate({
+      workspaceId: attentionWorkspace.workspaceId,
+      runId: attention.accepted.run.id,
+      itemId: attention.item.id,
+      candidateAttemptId: attention.candidate.id,
+      finalAuditAttemptId: attention.audit.id,
+      expectedRunRevision: attention.running.revision,
+      expectedItemRevision: attention.item.revision,
+      nextStatus: 'needs_attention',
+    });
+    expect(withheld).toMatchObject({ kind: 'withheld', item: { status: 'needs_attention' } });
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count FROM brand_identity_deliverables
+      WHERE workspace_id = ? AND deliverable_type = 'mission'
+    `).get(attentionWorkspace.workspaceId)).toEqual({ count: 0 });
+  });
+
+  it('preserves a newer operator artifact and both paid checkpoints on CAS loss', () => {
+    const { workspaceId, intake } = seedWorkspace('brand repository cas conflict');
+    const staged = stageDurableCandidate(workspaceId, intake, 'ready_for_human_review', 'cas-conflict');
+    const now = new Date().toISOString();
+    const manualId = `manual-mission-${Math.random()}`;
+    db.prepare(`
+      INSERT INTO brand_identity_deliverables (
+        id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at
+      ) VALUES (?, ?, 'mission', 'Operator-authored mission', 'draft', 1, 'essentials', ?, ?)
+    `).run(manualId, workspaceId, now, now);
+
+    const result = commitBrandGenerationDeliverableCandidate({
+      workspaceId,
+      runId: staged.accepted.run.id,
+      itemId: staged.item.id,
+      candidateAttemptId: staged.candidate.id,
+      finalAuditAttemptId: staged.audit.id,
+      expectedRunRevision: staged.running.revision,
+      expectedItemRevision: staged.item.revision,
+      nextStatus: 'ready_for_human_review',
+    });
+    expect(result).toMatchObject({ kind: 'conflict', reason: 'deliverable_created', item: { status: 'conflict' } });
+    expect(db.prepare(`SELECT content FROM brand_identity_deliverables WHERE id = ?`).get(manualId))
+      .toEqual({ content: 'Operator-authored mission' });
+    expect(getBrandGenerationAttempt(workspaceId, staged.accepted.run.id, staged.item.id, staged.candidate.id)?.output)
+      .toEqual(candidateOutput());
+    expect(getBrandGenerationAttempt(workspaceId, staged.accepted.run.id, staged.item.id, staged.audit.id)?.output)
+      .toEqual(auditOutput('ready_for_human_review'));
+  });
+
+  it('keeps the original full-suite estimate cumulative while resume returns a command-local estimate', () => {
+    const { workspaceId, intake } = seedWorkspace('brand repository resume budget');
+    const initial = acceptBrandGenerationStartCommand(foundationStart(workspaceId, intake, 'resume-budget-start'));
+    const running = transitionBrandGenerationRun({
+      workspaceId,
+      runId: initial.run.id,
+      expectedRevision: 0,
+      nextStatus: 'running',
+      nextStage: 'voice_foundation_generation',
+    });
+    const paused = transitionBrandGenerationRun({
+      workspaceId,
+      runId: initial.run.id,
+      expectedRevision: running.revision,
+      nextStatus: 'awaiting_review',
+      nextStage: 'awaiting_voice_finalization',
+    });
+    const resumeEstimate = {
+      providerCalls: 80,
+      inputTokens: 2_000_000,
+      outputTokens: 200_000,
+      estimatedCostMicros: 80_000_000,
+      maxConcurrency: 3,
+    };
+    const resumeInput: AcceptBrandGenerationResumeCommandInput = {
+      request: {
+        workspaceId,
+        runId: initial.run.id,
+        expectedRunRevision: paused.revision,
+        expectedVoiceVersion: finalizedVoice.voiceVersion,
+        expectedVoiceFingerprint: finalizedVoice.fingerprint,
+        idempotencyKey: 'resume-budget-command',
+        resumedBy: { actorType: 'operator', actorId: 'op-test' },
+        mcpExecutionContext: null,
+      },
+      items: BRAND_GENERATION_PRESET_POLICY.full_brand_system.resumeTargets.map((target, index) => preparedItem(
+        intake,
+        target,
+        { kind: 'create', deliverableId: null, expectedVersion: 0 },
+        FINGERPRINTS[(index % (FINGERPRINTS.length - 1)) + 1]!,
+      )) as [BrandGenerationPreparedItem, ...BrandGenerationPreparedItem[]],
+      voiceReadiness: { state: 'finalized', snapshot: finalizedVoice, blockingReasons: [] },
+      jobId: 'job-resume-budget',
+      estimate: resumeEstimate,
+      dashboardUrl: `/ws/${workspaceId}/brand`,
+    };
+    const resumed = acceptBrandGenerationResumeCommand(resumeInput);
+    expect(resumed.result.estimate).toEqual(resumeEstimate);
+    expect(resumed.command.result.estimate).toEqual(resumeEstimate);
+    expect(resumed.run.budget.estimate).toEqual(maxEstimate);
+    expect(resumed.run.counts.selected).toBe(19);
+  });
+
+  it('accepts revision only against exact run, item, and deliverable versions with a replacement snapshot', () => {
+    const { workspaceId, intake } = seedWorkspace('brand repository revision cas');
+    const staged = stageDurableCandidate(workspaceId, intake, 'ready_for_human_review', 'revision-source');
+    const committed = commitBrandGenerationDeliverableCandidate({
+      workspaceId,
+      runId: staged.accepted.run.id,
+      itemId: staged.item.id,
+      candidateAttemptId: staged.candidate.id,
+      finalAuditAttemptId: staged.audit.id,
+      expectedRunRevision: staged.running.revision,
+      expectedItemRevision: staged.item.revision,
+      nextStatus: 'ready_for_human_review',
+    });
+    expect(committed.kind).toBe('committed');
+    if (committed.kind !== 'committed') throw new Error('Expected committed revision fixture');
+    const completedRun = transitionBrandGenerationRun({
+      workspaceId,
+      runId: staged.accepted.run.id,
+      expectedRevision: staged.running.revision,
+      nextStatus: 'completed',
+      nextStage: 'complete',
+      completedAt: new Date().toISOString(),
+    });
+    const replacementSnapshot: BrandGenerationTargetInputSnapshot = {
+      ...committed.item.inputSnapshot!,
+      artifactExpectation: {
+        kind: 'update',
+        deliverableId: committed.deliverable.id,
+        expectedVersion: committed.deliverable.version,
+      },
+      capturedAt: '2026-07-14T03:00:00.000Z',
+      fingerprint: FINGERPRINTS[18]!,
+    };
+    const base: AcceptBrandGenerationRevisionCommandInput = {
+      request: {
+        workspaceId,
+        runId: staged.accepted.run.id,
+        itemId: committed.item.id,
+        expectedRunRevision: completedRun.revision,
+        expectedItemRevision: committed.item.revision,
+        deliverableId: committed.deliverable.id,
+        expectedDeliverableVersion: committed.deliverable.version,
+        direction: 'Make the mission more specific.',
+        idempotencyKey: 'revision-success',
+        requestedBy: { actorType: 'operator', actorId: 'op-test' },
+        mcpExecutionContext: null,
+      },
+      inputSnapshot: replacementSnapshot,
+      jobId: 'job-revision-success',
+      estimate: {
+        providerCalls: 3,
+        inputTokens: 5_000,
+        outputTokens: 2_500,
+        estimatedCostMicros: 250_000,
+        maxConcurrency: 1,
+      },
+      dashboardUrl: `/ws/${workspaceId}/brand`,
+    };
+
+    expect(() => acceptBrandGenerationRevisionCommand({
+      ...base,
+      request: { ...base.request, expectedRunRevision: completedRun.revision - 1, idempotencyKey: 'stale-run' },
+    })).toThrow(BrandGenerationRevisionConflictError);
+    expect(() => acceptBrandGenerationRevisionCommand({
+      ...base,
+      request: { ...base.request, expectedItemRevision: committed.item.revision - 1, idempotencyKey: 'stale-item' },
+    })).toThrow(BrandGenerationRevisionConflictError);
+    expect(() => acceptBrandGenerationRevisionCommand({
+      ...base,
+      request: {
+        ...base.request,
+        expectedDeliverableVersion: committed.deliverable.version + 1,
+        idempotencyKey: 'stale-deliverable',
+      },
+      inputSnapshot: {
+        ...replacementSnapshot,
+        artifactExpectation: {
+          kind: 'update',
+          deliverableId: committed.deliverable.id,
+          expectedVersion: committed.deliverable.version + 1,
+        },
+        fingerprint: FINGERPRINTS[19]!,
+      },
+    })).toThrow(BrandGenerationRevisionConflictError);
+
+    const accepted = acceptBrandGenerationRevisionCommand(base);
+    expect(accepted).toMatchObject({
+      existing: false,
+      run: { status: 'running', stage: 'revision' },
+      command: {
+        kind: 'revision',
+        priorItemStatus: 'ready_for_human_review',
+        expectedDeliverableVersion: committed.deliverable.version,
+      },
+    });
+    expect(accepted.items.find(item => item.id === committed.item.id)).toMatchObject({
+      status: 'revising',
+      inputSnapshot: replacementSnapshot,
+      artifactExpectation: replacementSnapshot.artifactExpectation,
+    });
+  });
+});
