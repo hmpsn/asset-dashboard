@@ -12,7 +12,8 @@ const mocks = vi.hoisted(() => ({
   logDebug: vi.fn(),
 }));
 
-vi.mock('../../server/workspace-learnings.js', () => ({
+vi.mock('../../server/workspace-learnings.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../server/workspace-learnings.js')>()),
   getWorkspaceLearnings: mocks.getWorkspaceLearnings,
 }));
 
@@ -59,7 +60,7 @@ beforeEach(() => {
       recentTrend: 'improving',
     },
   });
-  mocks.getPlaybooks.mockReturnValue([{ name: 'Refresh decaying pages' }]);
+  mocks.getPlaybooks.mockReturnValue([{ name: 'Refresh decaying pages', actionSequence: [] }]);
 
   // roiAttribution and weCalledIt now come from action_outcomes (live table), not roi_attributions.
   // action_1 has a strong_win outcome with clicks data → contributes to both roiAttribution and weCalledIt.
@@ -139,7 +140,7 @@ describe('assembleLearnings', () => {
     ]);
     expect(result.overallWinRate).toBe(0.67);
     expect(result.recentTrend).toBe('improving');
-    expect(result.playbooks).toEqual([{ name: 'Refresh decaying pages' }]);
+    expect(result.playbooks).toEqual([{ name: 'Refresh decaying pages', actionSequence: [] }]);
 
     // roiAttribution now reads from the live action_outcomes table (Task 2.3).
     // action_1 (schema_fix on /pricing) has a strong_win with clicks 120→200.
@@ -176,6 +177,10 @@ describe('assembleLearnings', () => {
         thresholds: { strong_win: 30, win: 10, neutral_band: 5 },
       },
     });
+    expect(result.clientProjection).toEqual(expect.objectContaining({
+      availability: 'ready',
+      weCalledIt: [expect.objectContaining({ actionId: 'action_1' })],
+    }));
   });
 
   it('returns default-on no_data baseline when learnings are unavailable', async () => {
@@ -222,7 +227,7 @@ describe('assembleLearnings', () => {
     expect(result.topActionTypes).toEqual([]);
     expect(result.overallWinRate).toBe(0);
     expect(result.recentTrend).toBeNull();
-    expect(result.playbooks).toEqual([{ name: 'Refresh decaying pages' }]);
+    expect(result.playbooks).toEqual([{ name: 'Refresh decaying pages', actionSequence: [] }]);
     expect(result.roiAttribution).toEqual([]);
     expect(result.topWins).toEqual([]);
     expect(result.weCalledIt).toEqual([]);

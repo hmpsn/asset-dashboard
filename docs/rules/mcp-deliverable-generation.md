@@ -254,6 +254,12 @@ never sufficient to dispatch paid work.
   bounded counts rather than unbounded nested dimension values. A changed matrix
   conflicts instead of mixing two cell snapshots; multi-cell structural
   resolution rejects duplicate or oversized selections.
+- Brand-voice anchor reads use the same bounded-cursor discipline. Follow
+  `eligible_anchors.next_cursor` while `has_more` is true. The cursor binds the
+  workspace plus current voice-profile and intake revisions; a conflict means
+  restart from the first page, never continue a mixed authority snapshot. The
+  latest finalization is projected as a summary only, although the server
+  strictly validates the bounded frozen detail internally before claiming it.
 - Template-upgrade acceptance binds its idempotency key to the exact proposal
   fingerprint and source revision. The same mutation may replay; reusing the key
   for a different proposal conflicts. Rejection does not mutate the template.
@@ -262,6 +268,16 @@ never sufficient to dispatch paid work.
   are invalid for every caller.
 - The authenticated MCP key ID/label and tool name flow into activity and run
   attribution. A generic `mcp-chat` source is not sufficient for new writes.
+- Human authority never comes from an MCP key. When an action requires operator
+  attribution, the tool consumes a short-lived one-time authorization created
+  through an authenticated operator boundary and bound to the exact resource
+  revision and mutation payload. Persist only the bearer-token digest, derive
+  the operator from that authorization, record the MCP key separately as the
+  executor, and make replay return the already-committed result. The consumed
+  authorization tuple (timestamp, finalization backlink, execution actor) is
+  immutable audit proof and must validate against the finalization's versioned
+  stored command; a pair of matching unverified fingerprint strings is not
+  sufficient authority.
 - MCP key ID/label attribution is internal operational evidence. Preserve it in
   full admin activity and durable run provenance, but remove it from workspace
   broadcasts and client-visible activity projections.

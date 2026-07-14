@@ -67,6 +67,18 @@ describe('MCP server instructions', () => {
     expect(MCP_SERVER_INSTRUCTIONS).toMatch(/never mutates.+in place/i);
   });
 
+  it('explains the human-authorized brand-voice finalization workflow', () => {
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('get_brand_voice');
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('finalize_brand_voice');
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('authorization_token');
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/human operator/i);
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/HTTP boundary/i);
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/MCP key is only the executor/i);
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/generated.+forbidden as anchors/i);
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/re-fetch.+new authorization/i);
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/never retry a stale authorization/i);
+  });
+
   it('flags the paid tools and that start_* tools are polled jobs', () => {
     expect(MCP_SERVER_INSTRUCTIONS).toContain('research_keywords');
     expect(MCP_SERVER_INSTRUCTIONS).toContain('start_local_seo_refresh');

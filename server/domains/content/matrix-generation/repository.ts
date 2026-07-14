@@ -14,14 +14,13 @@ import type {
   GenerationRunCounts,
 } from '../../../../shared/types/generation-evidence.js';
 import {
-  AUTHENTIC_VOICE_EVIDENCE_SOURCE_TYPES,
   GENERATION_EVIDENCE_SOURCE_TYPES,
   STRUCTURAL_ONLY_GENERATION_EVIDENCE_SOURCE_TYPES,
 } from '../../../../shared/types/generation-evidence.js';
 import {
-  AUTHENTIC_VOICE_SAMPLE_SOURCES,
   BRAND_DELIVERABLE_TYPES,
 } from '../../../../shared/types/brand-engine.js';
+import { finalizedVoiceSnapshotRefSchema } from '../../../../shared/types/voice-finalization-schemas.js';
 import db from '../../../db/index.js';
 import { parseJsonSafe } from '../../../db/json-validation.js';
 import { createStmtCache } from '../../../db/stmt-cache.js';
@@ -101,10 +100,6 @@ const resolverAttributionSchema = z.object({
   actorId: z.string().min(1),
   actorLabel: z.string().optional(),
 }).strict();
-
-const operatorAttributionSchema = resolverAttributionSchema.extend({
-  actorType: z.literal('operator'),
-});
 
 const masterCallerSchema = z.object({
   kind: z.literal('master_key'),
@@ -423,39 +418,7 @@ const resolvedStructuralTargetSchema = z.object({
 });
 
 const previewTargetSchema = resolvedStructuralTargetSchema.extend({
-  voiceSnapshot: z.object({
-    voiceProfileId: z.string().min(1),
-    voiceVersion: z.number().int().nonnegative(),
-    finalizedBy: operatorAttributionSchema,
-    finalizedAt: z.string().min(1),
-    fingerprint: z.string().min(1),
-    anchorEvidenceRefs: z.array(z.union([
-      z.object({
-        sourceType: z.enum(AUTHENTIC_VOICE_EVIDENCE_SOURCE_TYPES)
-          .refine(sourceType => sourceType !== 'voice_sample'),
-        sourceId: z.string().min(1),
-        sourceRevision: z.number().int().nonnegative().optional(),
-        fieldPath: z.string().optional(),
-        label: z.string().optional(),
-        uri: z.string().optional(),
-        capturedAt: z.string().min(1),
-        selectedBy: operatorAttributionSchema,
-        selectedAt: z.string().min(1),
-      }).strict(),
-      z.object({
-        sourceType: z.literal('voice_sample'),
-        sourceId: z.string().min(1),
-        sourceRevision: z.number().int().nonnegative().optional(),
-        fieldPath: z.string().optional(),
-        label: z.string().optional(),
-        uri: z.string().optional(),
-        capturedAt: z.string().min(1),
-        voiceSampleSource: z.enum(AUTHENTIC_VOICE_SAMPLE_SOURCES),
-        selectedBy: operatorAttributionSchema,
-        selectedAt: z.string().min(1),
-      }).strict(),
-    ])).min(1),
-  }),
+  voiceSnapshot: finalizedVoiceSnapshotRefSchema,
   identitySnapshot: z.array(z.object({
     deliverableId: z.string().min(1),
     deliverableType: z.enum(BRAND_DELIVERABLE_TYPES),

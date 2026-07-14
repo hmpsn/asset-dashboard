@@ -27,6 +27,11 @@ export interface GenerationContextBuilderOptions {
   enrichWithBacklinks?: boolean;
   includeLocalSeo?: boolean;
   includeRankMovers?: boolean;
+  /**
+   * Client formatting uses the explicit client-safe learnings projection. It
+   * never falls back to admin learnings when that projection is unavailable.
+   */
+  audience?: 'internal' | 'client';
 }
 
 export interface GenerationContextResult {
@@ -74,7 +79,10 @@ async function buildGenerationContext(
     learningsDomain: opts.learningsDomain,
     enrichWithBacklinks: opts.enrichWithBacklinks,
   });
-  const promptContext = formatForPrompt(intelligence, {
+  const formattedIntelligence = opts.audience === 'client'
+    ? projectIntelligenceForClientPrompt(intelligence)
+    : intelligence;
+  const promptContext = formatForPrompt(formattedIntelligence, {
     verbosity: opts.verbosity,
     sections: slices,
     tokenBudget: opts.tokenBudget,
@@ -82,15 +90,28 @@ async function buildGenerationContext(
     includeRankMovers: opts.includeRankMovers,
   });
   return {
-    intelligence,
+    intelligence: formattedIntelligence,
     slices,
     promptContext,
     pagePath: opts.pagePath,
     learningsDomain: opts.learningsDomain,
     learningsAvailability: slices.includes('learnings')
-      ? (intelligence.learnings?.availability ?? 'degraded')
+      ? (formattedIntelligence.learnings?.availability
+        ?? (opts.audience === 'client' ? 'no_data' : 'degraded'))
       : 'not_requested',
   };
+}
+
+function projectIntelligenceForClientPrompt(
+  intelligence: WorkspaceIntelligence,
+): WorkspaceIntelligence {
+  if (!intelligence.learnings) return intelligence;
+
+  const { learnings: _adminLearnings, ...withoutLearnings } = intelligence;
+  const clientLearnings = intelligence.learnings.clientProjection;
+  return clientLearnings
+    ? { ...withoutLearnings, learnings: clientLearnings }
+    : withoutLearnings;
 }
 
 /**

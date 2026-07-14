@@ -38,6 +38,10 @@ import {
   brandIntakeActionTools,
   handleBrandIntakeActionTool,
 } from './tools/brand-intake-actions.js';
+import {
+  brandVoiceActionTools,
+  handleBrandVoiceActionTool,
+} from './tools/brand-voice-actions.js';
 import { schemaActionTools, handleSchemaActionTool } from './tools/schema-actions.js';
 import {
   analyticsReadActionTools,
@@ -360,6 +364,12 @@ const MCP_TOOL_FAMILY_REGISTRATIONS: readonly McpToolFamilyRegistration[] = Obje
     family: 'brand-intake-actions',
     tools: brandIntakeActionTools,
     handler: handleBrandIntakeActionTool,
+    errorContract: jsonV1Contract,
+  },
+  {
+    family: 'brand-voice-actions',
+    tools: brandVoiceActionTools,
+    handler: handleBrandVoiceActionTool,
     errorContract: jsonV1Contract,
   },
   {

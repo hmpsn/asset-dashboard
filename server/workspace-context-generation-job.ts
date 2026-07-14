@@ -1,6 +1,5 @@
 import { randomUUID } from 'crypto';
 import { callAI } from './ai.js';
-import { broadcastToWorkspace } from './broadcast.js';
 import { isProgrammingError } from './errors.js';
 import {
   createJob,
@@ -10,10 +9,8 @@ import {
 import { withWorkspaceLock } from './bridge-infrastructure.js';
 import { createLogger } from './logger.js';
 import { parseAIJson } from './openai-helpers.js';
-import { getActionBySource, recordAction } from './outcome-tracking.js';
 import { decrementUsage, incrementIfAllowed } from './usage-tracking.js';
 import { computeEffectiveTier, getWorkspace } from './workspaces.js';
-import { WS_EVENTS } from './ws-events.js';
 import { scrapeWorkspaceSite } from './workspace-site-scrape.js';
 import {
   BACKGROUND_JOB_TYPES,
@@ -233,30 +230,6 @@ Rules:
   return { kind: 'personas', personas: normalizePersonaResults(aiResult.text), pagesScraped: scraped.length };
 }
 
-function recordBrandVoiceOutcome(workspaceId: string): void {
-  try {
-    if (!getActionBySource('brand_voice', workspaceId)) {
-      const action = recordAction({ // recordAction-ok: workspaceId was validated before job creation.
-        workspaceId,
-        actionType: 'voice_calibrated',
-        sourceType: 'brand_voice',
-        sourceId: workspaceId,
-        pageUrl: null,
-        targetKeyword: null,
-        baselineSnapshot: { captured_at: new Date().toISOString() },
-        attribution: 'platform_executed',
-        // R6 (B11): no `source` — brand-voice calibration is a workspace SELF-ref with no
-        // ephemeral titled producer to snapshot. The honest generic label ("Calibrated
-        // brand voice") is the correct display (FM-2: never fabricate a title). Columns
-        // stay NULL; the site still records a valid action.
-      });
-      broadcastToWorkspace(workspaceId, WS_EVENTS.OUTCOME_ACTION_RECORDED, { actionId: action.id });
-    }
-  } catch (err) {
-    log.warn({ err }, 'Failed to record outcome action for brand voice update');
-  }
-}
-
 export async function startWorkspaceContextGenerationJob(type: BackgroundJobType, workspaceId: string): Promise<{ jobId: string }> {
   if (!Object.prototype.hasOwnProperty.call(JOB_LABELS, type)) {
     throw new WorkspaceContextJobStartError('Unknown workspace context generation job type', 400);
@@ -330,8 +303,6 @@ async function runWorkspaceContextGenerationJob(opts: {
       total: 100,
     });
     const result = await generateWorkspaceContextResult(opts.type, opts.workspaceId);
-
-    if (result.kind === 'brandVoice') recordBrandVoiceOutcome(opts.workspaceId);
 
     updateJob(opts.jobId, {
       status: 'done',

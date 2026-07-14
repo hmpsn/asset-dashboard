@@ -22,15 +22,62 @@ import type { AddressInfo } from 'net';
 // reference the tests use.
 const broadcastState = vi.hoisted(() => ({
   calls: [] as Array<{ workspaceId: string; event: string; payload: unknown }>,
+  failNext: false,
+  failEvent: null as string | null,
+}));
+
+const activityState = vi.hoisted(() => ({ failNext: false }));
+const cacheState = vi.hoisted(() => ({
+  calls: [] as string[],
+  failNext: false,
 }));
 
 vi.mock('../../server/broadcast.js', () => ({
   setBroadcast: vi.fn(),
   broadcast: vi.fn(),
   broadcastToWorkspace: vi.fn((workspaceId: string, event: string, payload: unknown) => {
+    if (
+      broadcastState.failNext
+      && (broadcastState.failEvent === null || broadcastState.failEvent === event)
+    ) {
+      broadcastState.failNext = false;
+      broadcastState.failEvent = null;
+      throw new Error('simulated broadcast failure');
+    }
     broadcastState.calls.push({ workspaceId, event, payload });
   }),
 }));
+
+vi.mock('../../server/activity-log.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../server/activity-log.js')>();
+  return {
+    ...actual,
+    addActivity: (...args: Parameters<typeof actual.addActivity>) => {
+      if (activityState.failNext) {
+        activityState.failNext = false;
+        throw new Error('simulated activity failure');
+      }
+      return actual.addActivity(...args);
+    },
+  };
+});
+
+vi.mock('../../server/intelligence/cache-invalidation.js', async importOriginal => {
+  const actual = await importOriginal<
+    typeof import('../../server/intelligence/cache-invalidation.js')
+  >();
+  return {
+    ...actual,
+    invalidateIntelligenceCache: (workspaceId: string) => {
+      cacheState.calls.push(workspaceId);
+      if (cacheState.failNext) {
+        cacheState.failNext = false;
+        throw new Error('simulated intelligence-cache failure');
+      }
+      return actual.invalidateIntelligenceCache(workspaceId);
+    },
+  };
+});
 
 // Prevent any real email sends during mutation tests
 vi.mock('../../server/email.js', () => ({
@@ -46,6 +93,7 @@ vi.mock('../../server/email.js', () => ({
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
+import { listActivity } from '../../server/activity-log.js';
 
 // ── In-process server setup ───────────────────────────────────────────────────
 
@@ -120,6 +168,63 @@ afterAll(async () => {
 
 beforeEach(() => {
   broadcastState.calls = [];
+  broadcastState.failNext = false;
+  broadcastState.failEvent = null;
+  activityState.failNext = false;
+  cacheState.calls = [];
+  cacheState.failNext = false;
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/voice/:workspaceId — create profile
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('POST /api/voice/:workspaceId — create profile', () => {
+  it('returns the committed profile when post-commit activity fails', async () => {
+    const workspaceId = createWorkspace('Voice Profile Effect Isolation').id;
+    try {
+      activityState.failNext = true;
+
+      const response = await postJson(`/api/voice/${workspaceId}`, {});
+      expect(response.status).toBe(201);
+      const created = await response.json() as { workspaceId: string; revision: number };
+      expect(created).toMatchObject({ workspaceId, revision: 1 });
+
+      const read = await api(`/api/voice/${workspaceId}`);
+      expect(read.status).toBe(200);
+      await expect(read.json()).resolves.toMatchObject({ workspaceId, revision: 1 });
+      expect(broadcastState.calls).toContainEqual(expect.objectContaining({
+        workspaceId,
+        event: WS_EVENTS.VOICE_PROFILE_UPDATED,
+      }));
+      expect(cacheState.calls).toContain(workspaceId);
+
+      // The successful response prevents a false retry. A deliberate duplicate
+      // request sees the already-committed profile rather than creating another.
+      const retry = await postJson(`/api/voice/${workspaceId}`, {});
+      expect(retry.status).toBe(409);
+    } finally {
+      deleteWorkspace(workspaceId);
+    }
+  });
+
+  it('returns the committed profile when intelligence-cache invalidation fails', async () => {
+    const workspaceId = createWorkspace('Voice Profile Cache Effect Isolation').id;
+    try {
+      cacheState.failNext = true;
+
+      const response = await postJson(`/api/voice/${workspaceId}`, {});
+      expect(response.status).toBe(201);
+      await expect(response.json()).resolves.toMatchObject({ workspaceId, revision: 1 });
+      expect(cacheState.calls).toEqual([workspaceId]);
+
+      const read = await api(`/api/voice/${workspaceId}`);
+      expect(read.status).toBe(200);
+      await expect(read.json()).resolves.toMatchObject({ workspaceId, revision: 1 });
+    } finally {
+      deleteWorkspace(workspaceId);
+    }
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -138,13 +243,16 @@ describe('PATCH /api/voice/:workspaceId — update profile', () => {
     await patchJson(`/api/voice/${wsId}`, { status: 'draft' });
   });
 
-  it('updates status field (draft → calibrated) and returns the updated profile', async () => {
-    // Move to calibrating first (draft → calibrating is a valid forward transition)
+  it('rejects calibrated status even after the profile enters calibrating', async () => {
+    // Only the finalization endpoint may assert calibrated authority.
     await patchJson(`/api/voice/${wsId}`, { status: 'calibrating' });
     const res = await patchJson(`/api/voice/${wsId}`, { status: 'calibrated' });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
     const body = await res.json() as Record<string, unknown>;
-    expect(body.status).toBe('calibrated');
+    expect(body).toHaveProperty('error');
+    const getRes = await api(`/api/voice/${wsId}`);
+    const profile = await getRes.json() as Record<string, unknown>;
+    expect(profile.status).toBe('calibrating');
     // Reset to draft for subsequent tests
     await patchJson(`/api/voice/${wsId}`, { status: 'draft' });
   });
@@ -174,6 +282,81 @@ describe('PATCH /api/voice/:workspaceId — update profile', () => {
     expect(res.status).toBe(400);
     const body = await res.json() as Record<string, unknown>;
     expect(body).toHaveProperty('error');
+  });
+
+  it('does not create audit or broadcast noise for an exact no-op PATCH', async () => {
+    const beforeActivityCount = listActivity(wsId).length;
+    const beforeProfileResponse = await api(`/api/voice/${wsId}`);
+    const beforeProfile = await beforeProfileResponse.json() as { revision: number; status: string };
+    broadcastState.calls = [];
+
+    const response = await patchJson(`/api/voice/${wsId}`, { status: beforeProfile.status });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      revision: beforeProfile.revision,
+      status: beforeProfile.status,
+    });
+    expect(listActivity(wsId)).toHaveLength(beforeActivityCount);
+    expect(broadcastState.calls).toEqual([]);
+  });
+
+  it('returns the committed update when one post-commit effect fails and continues later effects', async () => {
+    const beforeActivityCount = listActivity(wsId).length;
+    const beforeProfileResponse = await api(`/api/voice/${wsId}`);
+    const beforeProfile = await beforeProfileResponse.json() as { status: string; revision: number };
+    const targetStatus = beforeProfile.status === 'draft' ? 'calibrating' : 'draft';
+    broadcastState.failNext = true;
+
+    const response = await patchJson(`/api/voice/${wsId}`, { status: targetStatus });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      status: targetStatus,
+      revision: beforeProfile.revision + 1,
+    });
+    expect(listActivity(wsId)).toHaveLength(beforeActivityCount + 1);
+    expect(broadcastState.calls).toContainEqual(expect.objectContaining({
+      workspaceId: wsId,
+      event: WS_EVENTS.INTELLIGENCE_CACHE_UPDATED,
+    }));
+  });
+
+  it('rejects bounded-profile overflow without advancing revision or status', async () => {
+    const beforeResponse = await api(`/api/voice/${wsId}`);
+    const before = await beforeResponse.json() as { revision: number; status: string; updatedAt: string };
+    const dnaBase = {
+      toneSpectrum: { formal_casual: 5, serious_playful: 5, technical_accessible: 5 },
+      sentenceStyle: 'Clear sentences.',
+      vocabularyLevel: 'Accessible.',
+    };
+
+    const overCount = await patchJson(`/api/voice/${wsId}`, {
+      voiceDNA: {
+        ...dnaBase,
+        personalityTraits: Array.from({ length: 21 }, (_, index) => `Trait ${index}`),
+      },
+    });
+    expect(overCount.status).toBe(400);
+
+    const overText = await patchJson(`/api/voice/${wsId}`, {
+      voiceDNA: {
+        ...dnaBase,
+        personalityTraits: ['Clear'],
+        sentenceStyle: 'x'.repeat(10_001),
+      },
+    });
+    expect(overText.status).toBe(400);
+
+    const overUtf8Bytes = await patchJson(`/api/voice/${wsId}`, {
+      contextModifiers: Array.from({ length: 20 }, (_, index) => ({
+        context: `Context ${index}`,
+        description: 'é'.repeat(4_000),
+      })),
+    });
+    expect(overUtf8Bytes.status).toBe(400);
+
+    const afterResponse = await api(`/api/voice/${wsId}`);
+    const after = await afterResponse.json() as { revision: number; status: string; updatedAt: string };
+    expect(after).toEqual(expect.objectContaining(before));
   });
 });
 
@@ -226,6 +409,29 @@ describe('POST /api/voice/:workspaceId/samples — add sample', () => {
     expect(body).toHaveProperty('error');
   });
 
+  it('normalizes content and rejects samples that cannot become bounded anchors', async () => {
+    const normalized = await postJson(`/api/voice/${wsId}/samples`, {
+      content: '  Calm, exact language.  ',
+    });
+    expect(normalized.status).toBe(200);
+    await expect(normalized.json()).resolves.toMatchObject({
+      content: 'Calm, exact language.',
+    });
+
+    const whitespace = await postJson(`/api/voice/${wsId}/samples`, { content: '   ' });
+    expect(whitespace.status).toBe(400);
+
+    const oversized = await postJson(`/api/voice/${wsId}/samples`, {
+      content: 'x'.repeat(10_001),
+    });
+    expect(oversized.status).toBe(400);
+
+    const multibyteOverflow = await postJson(`/api/voice/${wsId}/samples`, {
+      content: 'é'.repeat(5_001),
+    });
+    expect(multibyteOverflow.status).toBe(400);
+  });
+
   it('returns 404 for unknown workspaceId', async () => {
     const res = await postJson('/api/voice/nonexistent-ws-99999/samples', {
       content: 'This workspace does not exist.',
@@ -233,6 +439,56 @@ describe('POST /api/voice/:workspaceId/samples — add sample', () => {
     expect(res.status).toBe(404);
     const body = await res.json() as Record<string, unknown>;
     expect(body).toHaveProperty('error');
+  });
+
+  it('returns one committed sample when the activity effect fails', async () => {
+    const uniqueContent = `Activity-effect sample ${Date.now()}`;
+    const beforeActivityCount = listActivity(wsId).length;
+    activityState.failNext = true;
+
+    const response = await postJson(`/api/voice/${wsId}/samples`, {
+      content: uniqueContent,
+    });
+    expect(response.status).toBe(200);
+    const added = await response.json() as { id: string; content: string };
+    expect(added.content).toBe(uniqueContent);
+    expect(listActivity(wsId)).toHaveLength(beforeActivityCount);
+
+    const read = await api(`/api/voice/${wsId}`);
+    const profile = await read.json() as { samples: Array<{ id: string; content: string }> };
+    expect(profile.samples.filter(sample => sample.content === uniqueContent)).toEqual([added]);
+    expect(cacheState.calls).toContain(wsId);
+    expect(broadcastState.calls).toContainEqual(expect.objectContaining({
+      workspaceId: wsId,
+      event: WS_EVENTS.VOICE_PROFILE_UPDATED,
+    }));
+  });
+
+  it('returns one committed sample when the workspace broadcast effect fails', async () => {
+    const uniqueContent = `Broadcast-effect sample ${Date.now()}`;
+    const beforeResponse = await api(`/api/voice/${wsId}`);
+    const before = await beforeResponse.json() as { revision: number };
+    broadcastState.failNext = true;
+    broadcastState.failEvent = WS_EVENTS.VOICE_PROFILE_UPDATED;
+
+    const response = await postJson(`/api/voice/${wsId}/samples`, {
+      content: uniqueContent,
+    });
+    expect(response.status).toBe(200);
+    const added = await response.json() as { id: string; content: string };
+
+    const read = await api(`/api/voice/${wsId}`);
+    const profile = await read.json() as {
+      revision: number;
+      samples: Array<{ id: string; content: string }>;
+    };
+    expect(profile.revision).toBe(before.revision + 1);
+    expect(profile.samples.filter(sample => sample.content === uniqueContent)).toEqual([added]);
+    expect(cacheState.calls).toContain(wsId);
+    expect(broadcastState.calls).toContainEqual(expect.objectContaining({
+      workspaceId: wsId,
+      event: WS_EVENTS.INTELLIGENCE_CACHE_UPDATED,
+    }));
   });
 });
 
@@ -287,6 +543,38 @@ describe('DELETE /api/voice/:workspaceId/samples/:sampleId', () => {
     expect(res.status).toBe(404);
     const body = await res.json() as Record<string, unknown>;
     expect(body).toHaveProperty('error');
+  });
+
+  it('returns the committed delete when intelligence-cache invalidation fails', async () => {
+    const content = `Cache-effect delete sample ${Date.now()}`;
+    const addResponse = await postJson(`/api/voice/${wsId}/samples`, { content });
+    expect(addResponse.status).toBe(200);
+    const added = await addResponse.json() as { id: string };
+    const beforeResponse = await api(`/api/voice/${wsId}`);
+    const before = await beforeResponse.json() as { revision: number };
+    cacheState.calls = [];
+    cacheState.failNext = true;
+
+    const response = await del(`/api/voice/${wsId}/samples/${added.id}`);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ deleted: true });
+    expect(cacheState.calls).toEqual([wsId]);
+
+    const read = await api(`/api/voice/${wsId}`);
+    const profile = await read.json() as {
+      revision: number;
+      samples: Array<{ id: string }>;
+    };
+    expect(profile.revision).toBe(before.revision + 1);
+    expect(profile.samples.some(sample => sample.id === added.id)).toBe(false);
+
+    // The first response truthfully reported success; a deliberate repeat sees
+    // the already-applied delete and cannot advance the revision again.
+    const retry = await del(`/api/voice/${wsId}/samples/${added.id}`);
+    expect(retry.status).toBe(404);
+    const afterRetryResponse = await api(`/api/voice/${wsId}`);
+    const afterRetry = await afterRetryResponse.json() as { revision: number };
+    expect(afterRetry.revision).toBe(profile.revision);
   });
 });
 
@@ -355,7 +643,7 @@ describe('Full mutation chain', () => {
     expect(remaining).toBeUndefined();
   });
 
-  it('create profile → PATCH to calibrated → GET shows calibrated status', async () => {
+  it('create profile → generic PATCH cannot claim calibrated authority', async () => {
     // A separate workspace so status mutations don't bleed across tests
     const chainWsId = createWorkspace('Voice Chain Test WS').id;
     try {
@@ -365,15 +653,15 @@ describe('Full mutation chain', () => {
       const patchCalibrating = await patchJson(`/api/voice/${chainWsId}`, { status: 'calibrating' });
       expect(patchCalibrating.status).toBe(200);
 
-      // calibrating → calibrated
+      // calibrating → calibrated is reserved for POST /finalize.
       const patchCalibrated = await patchJson(`/api/voice/${chainWsId}`, { status: 'calibrated' });
-      expect(patchCalibrated.status).toBe(200);
+      expect(patchCalibrated.status).toBe(400);
 
-      // GET should reflect calibrated
+      // GET preserves the last legal status.
       const getRes = await api(`/api/voice/${chainWsId}`);
       expect(getRes.status).toBe(200);
       const profile = await getRes.json() as Record<string, unknown>;
-      expect(profile.status).toBe('calibrated');
+      expect(profile.status).toBe('calibrating');
     } finally {
       deleteWorkspace(chainWsId);
     }

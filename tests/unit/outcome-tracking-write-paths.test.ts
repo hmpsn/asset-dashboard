@@ -90,6 +90,7 @@ import {
   WIN_SCORES,
 } from '../../server/outcome-tracking.js';
 import { broadcastToWorkspace } from '../../server/broadcast.js';
+import { fireBridge } from '../../server/bridge-infrastructure.js';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -144,6 +145,7 @@ describe('outcome-tracking write paths', () => {
   });
 
   afterEach(() => {
+    vi.mocked(fireBridge).mockClear();
     vi.mocked(broadcastToWorkspace).mockClear();
     mockInvalidateMonthlyDigestCache.mockClear();
     mockInvalidateWorkspaceLearningsCache.mockClear();
@@ -162,6 +164,33 @@ describe('outcome-tracking write paths', () => {
   // ── recordAction ────────────────────────────────────────────────────────────
 
   describe('recordAction', () => {
+    it('creates annotation bridges only for client-visible outcome actions', () => {
+      recordAction({
+        workspaceId: ws.workspaceId,
+        actionType: 'voice_calibrated',
+        sourceType: 'brand_voice',
+        sourceId: ws.workspaceId,
+        baselineSnapshot: {},
+        attribution: 'platform_executed',
+      });
+
+      expect(vi.mocked(fireBridge).mock.calls.some(([name]) => name === 'bridge-action-annotation'))
+        .toBe(false);
+
+      vi.mocked(fireBridge).mockClear();
+      recordAction({
+        workspaceId: ws.workspaceId,
+        actionType: 'meta_updated',
+        sourceType: 'insight',
+        sourceId: 'visible-annotation-action',
+        baselineSnapshot: BASELINE,
+        attribution: 'platform_executed',
+      });
+
+      expect(vi.mocked(fireBridge).mock.calls.some(([name]) => name === 'bridge-action-annotation'))
+        .toBe(true);
+    });
+
     it('persists a row and returns a TrackedAction with correct scalar fields', () => {
       const action = recordAction({
         workspaceId: ws.workspaceId,
@@ -549,7 +578,7 @@ describe('outcome-tracking write paths', () => {
       expect(updated!.context.detectionChecks).toBeUndefined();
     });
 
-    it('broadcasts learnings invalidation when context changes', () => {
+    it('broadcasts an opaque learnings invalidation when hidden-action context changes', () => {
       const action = recordAction({
         attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws.workspaceId,
@@ -563,7 +592,7 @@ describe('outcome-tracking write paths', () => {
       expect(broadcastToWorkspace).toHaveBeenCalledWith(
         ws.workspaceId,
         'outcome_learnings_updated',
-        expect.objectContaining({ actionId: action.id, action: 'context_updated' }),
+        {},
       );
     });
 
@@ -682,6 +711,33 @@ describe('outcome-tracking write paths', () => {
         'outcome_learnings_updated',
         expect.objectContaining({ actionId: action.id, checkpointDays: 30, score: 'win' }),
       );
+    });
+
+    it('broadcasts only an opaque learnings invalidation for a hidden scored action', () => {
+      const action = recordAction({
+        attribution: 'platform_executed',
+        workspaceId: ws.workspaceId,
+        actionType: 'voice_calibrated',
+        sourceType: 'brand_voice',
+        sourceId: ws.workspaceId,
+        baselineSnapshot: BASELINE,
+      });
+
+      recordOutcome({
+        actionId: action.id,
+        checkpointDays: 30,
+        metricsSnapshot: makeBaseline({ clicks: 150 }),
+        score: 'strong_win',
+        deltaSummary: DELTA,
+      });
+
+      expect(broadcastToWorkspace).toHaveBeenCalledWith(
+        ws.workspaceId,
+        'outcome_learnings_updated',
+        {},
+      );
+      expect(JSON.stringify(vi.mocked(broadcastToWorkspace).mock.calls))
+        .not.toContain(action.id);
     });
 
     it('90-day checkpoint marks the action complete', () => {

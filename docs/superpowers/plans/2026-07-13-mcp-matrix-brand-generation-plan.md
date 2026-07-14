@@ -90,7 +90,7 @@ helpers inside its owned directory but may not rename or duplicate a locked seam
 | R1 | `McpToolDefinition`, `McpToolExecutionContext`, `McpToolErrorEnvelope` | `MCP_TOOL_REGISTRY`, `getDeclaredWorkspaceField()`, `executeMcpTool()` | existing `/mcp`; no product tool yet |
 | M0 | `MATRIX_READ_LIMITS`, bounded matrix read/resolve/upgrade DTOs, internal `PersistedMatrixGenerationRun`; revisions on `content_matrices`/`content_templates`; cell `revision`; `content_matrix_generation_runs`, `_items`, `_attempts`; versioned `content_matrix_cell_evidence` | `resolveMatrixStructure()`, `acceptTemplateGenerationUpgrade()`, `createMatrixGenerationRun()`, `listMatrixGenerationItems()` | `POST /api/content-templates/:workspaceId/:templateId/accept-generation-upgrade`; MCP `list_content_matrices`, `get_content_matrix`, `resolve_content_matrix_cells`, `accept_content_template_generation_upgrade` |
 | B0 | `brand_intake_revisions` | `submitBrandIntake()`, `getBrandIntakeRevision()`, `resolveBrandIntakeEvidence()` | existing `POST /api/public/onboarding/:id`; `GET /api/brand-intake/:workspaceId`; `POST /api/brand-intake/:workspaceId/:revisionId/evidence-resolutions`; MCP `get_brand_intake`, `resolve_brand_intake_evidence` |
-| B1 | voice anchor/finalization persistence selected against current migration head | `finalizeBrandVoice()`, `getBrandVoiceReadiness()` | `POST /api/voice/:workspaceId/finalize`; MCP `get_brand_voice`, `finalize_brand_voice` |
+| B1 | voice anchor/finalization persistence selected against current migration head | `finalizeBrandVoice()`, bounded `getBrandVoicePage()`, `getBrandVoiceAuthoritySummary()`; B2 adds a strict snapshot-only generation reader (never candidate enumeration) | `POST /api/voice/:workspaceId/finalize`; MCP `get_brand_voice`, `finalize_brand_voice` |
 | B2 | `brand_generation_runs`, `_items`, `_attempts` | `startBrandGeneration()`, `resumeBrandGeneration()`, `getBrandGeneration()`, `reviseBrandGenerationItem()` | `/api/brand-generation/:workspaceId/runs[/:runId]`; `/resume`; `/items/:itemId/revisions`; four matching MCP actions |
 | M1 | M0 ledger/evidence store only; no new history blob | `previewMatrixGeneration()`, `generateMatrixCell()`, `resolveContentMatrixEvidence()` | `POST /api/content-matrices/:workspaceId/:matrixId/generation-preview`; `PATCH /api/content-matrices/:workspaceId/:matrixId/cells/:cellId/evidence/:requirementId`; MCP `preview_content_matrix_generation`, `resolve_content_matrix_evidence` |
 | M2 | typed item audit/attempt snapshot in M0 ledger | `auditMatrixGenerationItem()`, `reviseMatrixGenerationItem()` | no new public route/tool |
@@ -411,6 +411,12 @@ provisional foundation, dependent brand pieces, or content.
 
 - Add one domain service for finalization requiring non-empty DNA, guardrails,
   and selected authentic anchor evidence; persist ratings/selections.
+- MCP keys are execution identities, not human operators. `finalize_brand_voice`
+  consumes a short-lived one-time authorization created by an authenticated
+  operator and bound to the exact workspace/profile revision, DNA, guardrails,
+  modifiers, anchor selectors, ratings, and idempotency key. Storage retains
+  only the authorization-token digest. Direct authenticated HTTP finalization
+  remains available; neither path may accept a caller-authored operator ID.
 - Use legal voice transitions and optimistic concurrency. Record/broadcast
   calibration only after real finalization; correct legacy actions that call a
   generated draft “calibrated.”

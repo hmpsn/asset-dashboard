@@ -9,6 +9,7 @@ import type { VoiceGuardrails } from '../shared/types/brand-engine.js';
 import type { CopyIntelligencePattern, IntelligencePatternType } from '../shared/types/copy-pipeline.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
+import { addActivity } from './activity-log.js';
 
 const log = createLogger('copy-intelligence');
 const INTELLIGENCE_PATTERN_TYPES = new Set<IntelligencePatternType>([
@@ -233,14 +234,33 @@ export function promoteToGuardrail(
   // Do NOT wrap updateVoiceProfile in safeVoiceRead — if the write fails,
   // the transaction must roll back so the pattern is not deactivated without
   // the guardrail being saved (silent data loss).
+  let updatedRevision: number;
   try {
     db.transaction(() => {
-      updateVoiceProfile(wsId, { guardrails: updatedGuardrails });
+      const updatedProfile = updateVoiceProfile(wsId, { guardrails: updatedGuardrails });
+      updatedRevision = updatedProfile.revision;
       stmts().togglePattern.run(0, patternId, wsId);
     })();
   } catch (err) {
     log.error({ err, wsId, patternId }, 'Failed to promote pattern to guardrail');
     return { success: false, error: 'Could not update voice profile guardrails' };
+  }
+
+  try {
+    addActivity(
+      wsId,
+      'voice_profile_updated',
+      'Updated voice guardrails',
+      'Promoted a recurring copy-intelligence pattern into the voice guardrails.',
+      {
+        patternId,
+        patternType: pattern.patternType,
+        source: 'copy_intelligence_guardrail',
+        profileRevision: updatedRevision!,
+      },
+    );
+  } catch (err) {
+    log.warn({ err, wsId, patternId }, 'Failed to record guardrail promotion activity');
   }
 
   broadcastToWorkspace(wsId, WS_EVENTS.VOICE_PROFILE_UPDATED, {

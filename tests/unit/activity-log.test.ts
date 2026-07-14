@@ -62,11 +62,18 @@ describe('addActivity', () => {
     expect(entry.actorName).toBe('John');
   });
 
-  it('calls broadcast function when registered', () => {
+  it('broadcasts the complete client-safe entry for a client-visible activity', () => {
     const broadcastFn = vi.fn();
     initActivityBroadcast(broadcastFn);
 
-    const entry = addActivity('ws_broadcast', 'note', 'Test broadcast');
+    const entry = addActivity(
+      'ws_broadcast',
+      'audit_completed',
+      'Audit completed',
+      'Reviewed five pages',
+      { pages: 5 },
+      { id: 'operator-visible-id', name: 'Visible Operator' },
+    );
 
     expect(broadcastFn).toHaveBeenCalledWith('ws_broadcast', WS_EVENTS.ACTIVITY_NEW, entry);
 
@@ -194,6 +201,51 @@ describe('addActivity', () => {
     expect(JSON.stringify(broadcastFn.mock.calls)).not.toMatch(
       /mcp_key_created|mcp_key_revoked|act_|mcp_key_private_id|Private automation label|Private operator context|Private Operator|operator-private-id/,
     );
+
+    initActivityBroadcast(() => {});
+  });
+
+  it('emits only an opaque invalidation for operator-only voice finalization activity', () => {
+    const workspaceId = `ws_voice_finalization_broadcast_${Date.now()}`;
+    const broadcastFn = vi.fn();
+    initActivityBroadcast(broadcastFn);
+
+    const entry = addActivity(
+      workspaceId,
+      'voice_calibrated',
+      'Brand voice finalized by Private Operator',
+      'Private finalization rationale',
+      {
+        finalizationId: 'voice_finalization_private_id',
+        authorizationId: 'voice_authorization_private_id',
+        operatorEmail: 'private-operator@example.com',
+      },
+      { id: 'operator-private-id', name: 'Private Operator' },
+    );
+
+    expect(broadcastFn).toHaveBeenCalledWith(
+      workspaceId,
+      WS_EVENTS.ACTIVITY_NEW,
+      {},
+    );
+    expect(JSON.stringify(broadcastFn.mock.calls)).not.toMatch(
+      /voice_calibrated|act_|Brand voice finalized|Private finalization rationale|voice_finalization_private_id|voice_authorization_private_id|private-operator@example\.com|Private Operator|operator-private-id/,
+    );
+
+    // The full audit record remains durable and available to the admin read path.
+    expect(listActivity(workspaceId)[0]).toMatchObject({
+      id: entry.id,
+      type: 'voice_calibrated',
+      title: 'Brand voice finalized by Private Operator',
+      description: 'Private finalization rationale',
+      metadata: {
+        finalizationId: 'voice_finalization_private_id',
+        authorizationId: 'voice_authorization_private_id',
+        operatorEmail: 'private-operator@example.com',
+      },
+      actorId: 'operator-private-id',
+      actorName: 'Private Operator',
+    });
 
     initActivityBroadcast(() => {});
   });

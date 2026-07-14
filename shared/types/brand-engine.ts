@@ -150,6 +150,8 @@ export interface ContextModifier {
 export interface VoiceProfile {
   id: string;
   workspaceId: string;
+  /** Monotonic mutable-profile revision used for optimistic concurrency. */
+  revision: number;
   status: VoiceProfileStatus;
   voiceDNA?: VoiceDNA;
   guardrails?: VoiceGuardrails;

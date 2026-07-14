@@ -14,6 +14,7 @@ import {
 import { createVoiceProfile, getVoiceProfile, updateVoiceProfile } from '../../server/voice-calibration.js';
 import { callOpenAI } from '../../server/openai-helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
+import { listActivityByType } from '../../server/activity-log.js';
 
 const mockBroadcastToWorkspace = vi.hoisted(() => vi.fn());
 
@@ -51,18 +52,19 @@ function clearWorkspaceData(...workspaceIds: string[]): void {
   `).run(...workspaceIds);
 }
 
-function calibrateVoiceProfile(workspaceId: string): void {
+function calibrateVoiceProfile(workspaceId: string, antiPatterns: string[] = []): void {
   createVoiceProfile(workspaceId);
-  updateVoiceProfile(workspaceId, { status: 'calibrating' });
   updateVoiceProfile(workspaceId, {
-    status: 'calibrated',
+    status: 'calibrating',
     guardrails: {
       forbiddenWords: [],
       requiredTerminology: [],
       toneBoundaries: [],
-      antiPatterns: [],
+      antiPatterns,
     },
   });
+  db.prepare(`UPDATE voice_profiles SET status = 'calibrated' WHERE workspace_id = ?`) // status-ok: compatibility fixture for a pre-B1 calibrated profile
+    .run(workspaceId);
 }
 
 beforeEach(() => {
@@ -219,6 +221,7 @@ describe('copy-intelligence guardrail promotion', () => {
     });
     addPattern(wsId, { patternType: 'tone', pattern: 'Sound precise without getting stiff' });
     addPattern(wsId, { patternType: 'tone', pattern: 'Sound precise without getting stiff' });
+    const beforeProfile = getVoiceProfile(wsId)!;
 
     expect(promoteToGuardrail(pattern.id, wsId)).toEqual({
       success: true,
@@ -229,6 +232,21 @@ describe('copy-intelligence guardrail promotion', () => {
     expect(getVoiceProfile(wsId)?.guardrails?.toneBoundaries).toEqual([
       'Sound precise without getting stiff',
     ]);
+    expect(getVoiceProfile(wsId)).toMatchObject({
+      status: 'calibrating',
+      revision: beforeProfile.revision + 1,
+    });
+    expect(listActivityByType(wsId, 'voice_profile_updated')).toContainEqual(
+      expect.objectContaining({
+        title: 'Updated voice guardrails',
+        metadata: expect.objectContaining({
+          patternId: pattern.id,
+          patternType: 'tone',
+          source: 'copy_intelligence_guardrail',
+          profileRevision: beforeProfile.revision + 1,
+        }),
+      }),
+    );
     expect(mockBroadcastToWorkspace).toHaveBeenCalledWith(
       wsId,
       'voice:updated',
@@ -237,15 +255,7 @@ describe('copy-intelligence guardrail promotion', () => {
   });
 
   it('promotes non-tone patterns to anti-pattern guardrails without duplicating existing text', () => {
-    calibrateVoiceProfile(wsId);
-    updateVoiceProfile(wsId, {
-      guardrails: {
-        forbiddenWords: [],
-        requiredTerminology: [],
-        toneBoundaries: [],
-        antiPatterns: ['Avoid vague proof points'],
-      },
-    });
+    calibrateVoiceProfile(wsId, ['Avoid vague proof points']);
     const pattern = addPattern(wsId, {
       patternType: 'structure',
       pattern: 'Avoid vague proof points',
@@ -253,6 +263,7 @@ describe('copy-intelligence guardrail promotion', () => {
     addPattern(wsId, { patternType: 'structure', pattern: 'Avoid vague proof points' });
     addPattern(wsId, { patternType: 'structure', pattern: 'Avoid vague proof points' });
 
+    const beforeActivityCount = listActivityByType(wsId, 'voice_profile_updated').length;
     expect(promoteToGuardrail(pattern.id, wsId)).toEqual({
       success: true,
       guardrailText: 'Avoid vague proof points',
@@ -260,6 +271,7 @@ describe('copy-intelligence guardrail promotion', () => {
 
     expect(getAllPatterns(wsId)[0].active).toBe(false);
     expect(getVoiceProfile(wsId)?.guardrails?.antiPatterns).toEqual(['Avoid vague proof points']);
+    expect(listActivityByType(wsId, 'voice_profile_updated')).toHaveLength(beforeActivityCount);
   });
 });
 

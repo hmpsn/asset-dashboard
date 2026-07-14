@@ -129,7 +129,8 @@ describe('briefing prompt voice authority', () => {
       voiceDNA: DNA,
       guardrails: GUARDRAILS,
     });
-    updateVoiceProfile(seeded!.workspaceId, { status: 'calibrated' });
+    db.prepare(`UPDATE voice_profiles SET status = 'calibrated' WHERE workspace_id = ?`) // status-ok: compatibility fixture for Layer-2 legacy prompt behavior
+      .run(seeded!.workspaceId);
 
     const system = await captureSystemPrompt(seeded!.workspaceId);
 

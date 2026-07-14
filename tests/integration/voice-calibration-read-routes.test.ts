@@ -65,6 +65,7 @@ describe('POST then GET /api/voice/:workspaceId', () => {
     const body = await res.json() as Record<string, unknown>;
     expect(typeof body.id).toBe('string');
     expect(body.workspaceId).toBe(wsId);
+    expect(body.revision).toBe(1);
     expect(body.status).toBe('draft');
     expect(Array.isArray(body.samples)).toBe(true);
     expect((body.samples as unknown[]).length).toBe(0);
@@ -77,6 +78,7 @@ describe('POST then GET /api/voice/:workspaceId', () => {
     expect(body).not.toBeNull();
     expect(typeof body.id).toBe('string');
     expect(body.workspaceId).toBe(wsId);
+    expect(body.revision).toBe(1);
     expect(body.status).toBe('draft');
     expect(Array.isArray(body.samples)).toBe(true);
     expect(typeof body.createdAt).toBe('string');

@@ -81,7 +81,7 @@ describe('mcp content action tools', () => {
       brand: {
         availability: 'ready',
         identity: { mission: 'Help homeowners', values: 'Be bold' },
-        voice: { status: 'calibrated' },
+        voice: { status: 'calibrated', readiness: 'finalized', profileRevision: 4, voiceVersion: 1 },
         voicePromptBlock: '\n\nBRAND VOICE PROFILE:\nsamples',
         voiceDnaBlock: '\n\nBRAND VOICE RULES (you MUST follow these — do not deviate):\nVoice profile for this client:',
         identityPromptBlock: '\n\nBRAND IDENTITY (ground the brand\'s positioning in these):\nMission: Help homeowners',
@@ -704,7 +704,7 @@ describe('mcp content action tools', () => {
       brand: {
         availability: 'no_data',
         identity: {},
-        voice: { status: 'none' },
+        voice: { status: 'none', readiness: 'missing', profileRevision: null, voiceVersion: null },
         voicePromptBlock: '',
         voiceDnaBlock: '',
         identityPromptBlock: '',

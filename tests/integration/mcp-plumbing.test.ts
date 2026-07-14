@@ -120,6 +120,8 @@ describe('MCP plumbing — P1+P2 tools are registered', () => {
       'resolve_content_matrix_cells', 'accept_content_template_generation_upgrade',
       // B0 durable brand intake
       'get_brand_intake', 'resolve_brand_intake_evidence',
+      // B1 operator-authorized brand voice
+      'get_brand_voice', 'finalize_brand_voice',
     ];
     for (const t of expected) {
       expect(names, `tools/list is missing ${t}`).toContain(t);
@@ -181,6 +183,29 @@ describe('MCP plumbing — new tools dispatch over real HTTP', () => {
     };
     expect(payload.revision).toBeNull();
     expect(payload.field_evidence).toEqual([]);
+  });
+
+  it('reads missing brand-voice readiness without exposing raw intake', async () => {
+    const body = await callTool(
+      'get_brand_voice',
+      { workspace_id: wsA.workspaceId },
+      MASTER_KEY,
+    );
+    expect(body.result?.isError).toBeFalsy();
+    const payload = JSON.parse(body.result!.content[0].text) as {
+      profile: unknown;
+      readiness: { state: string };
+      eligible_anchors: { items: unknown[]; next_cursor: string | null; has_more: boolean };
+      latest_snapshot: unknown;
+    };
+    expect(payload).toMatchObject({
+      profile: null,
+      readiness: { state: 'missing' },
+      eligible_anchors: { items: [], next_cursor: null, has_more: false },
+      latest_snapshot: null,
+    });
+    expect(JSON.stringify(payload)).not.toContain('raw_intake');
+    expect(JSON.stringify(payload)).not.toContain('authorization_token');
   });
 });
 

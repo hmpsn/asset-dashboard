@@ -67,10 +67,10 @@ function parseErrorText(result: Awaited<ReturnType<ReturnType<typeof createMcpTo
 const masterAuth = { scope: 'all' as const, label: 'master' };
 
 describe('canonical MCP tool registry', () => {
-  it('is the sole 15-family, 67-tool discovery source with exact global tools', () => {
+  it('is the sole 16-family, 69-tool discovery source with exact global tools', () => {
     const definitions = listMcpToolDefinitions();
-    expect(definitions).toHaveLength(67);
-    expect(new Set([...MCP_TOOL_REGISTRY.values()].map(entry => entry.family)).size).toBe(15);
+    expect(definitions).toHaveLength(69);
+    expect(new Set([...MCP_TOOL_REGISTRY.values()].map(entry => entry.family)).size).toBe(16);
     expect(
       [...MCP_TOOL_REGISTRY.values()]
         .filter(entry => entry.scope === 'global')
@@ -85,6 +85,8 @@ describe('canonical MCP tool registry', () => {
   it('records each declared workspace field and the explicit legacy/json compatibility split', () => {
     expect(getDeclaredWorkspaceField('get_workspace_overview')).toBe('workspaceId');
     expect(getDeclaredWorkspaceField('update_workspace')).toBe('workspace_id');
+    expect(getDeclaredWorkspaceField('get_brand_voice')).toBe('workspace_id');
+    expect(getDeclaredWorkspaceField('finalize_brand_voice')).toBe('workspace_id');
     expect(getDeclaredWorkspaceField('list_workspaces')).toBeUndefined();
     const entries = [...MCP_TOOL_REGISTRY.values()];
     expect(entries.length).toBeGreaterThan(0);
@@ -100,6 +102,8 @@ describe('canonical MCP tool registry', () => {
       'accept_content_template_generation_upgrade',
       'get_brand_intake',
       'resolve_brand_intake_evidence',
+      'get_brand_voice',
+      'finalize_brand_voice',
     ]);
   });
 

@@ -806,6 +806,11 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   // LearningsSlice
   // availability is control-plane metadata for callers; it intentionally does not render into prompt text
   'availability', 'forPage', 'winRateByActionType',
+  // clientProjection is a transport-only, fail-closed public boundary. The client
+  // view model and audience-aware generation-context builder select it before the
+  // normal formatter runs; rendering it from the admin slice would duplicate data
+  // and defeat that boundary. Covered by client-hidden-outcome-learning-boundary.
+  'clientProjection',
   // platformPriors (A6, audit #22): the anonymized cross-workspace fallback tier. It is NOT
   // rendered by the learnings slice formatter — it is surfaced as a clearly-labeled benchmark
   // through the default-path helpers (buildPlatformPriorPromptNote / buildOutcomeLearningStatusNote)

@@ -35,6 +35,10 @@ import { getBrief } from '../content-brief.js';
 import { getPost } from '../content-posts-db.js';
 import { getContentRequest } from '../content-requests.js';
 import { clientActionLabel } from '../../shared/types/client-vocabulary.js';
+import {
+  getActionCatalogEntry,
+  toClientSafeOutcomeEventPayload,
+} from '../../shared/types/action-catalog.js';
 import type {
   ActionType,
   Attribution,
@@ -67,12 +71,24 @@ const router = Router();
  * deliberately include not_acted_on for full-funnel visibility — see the /overview
  * parity contract). The PUBLIC summary route passes true. This mirrors the A1
  * exclusion already applied to the wins surfaces (getTopWinsFromActions).
+ *
+ * `excludeClientHidden` keeps internal-only platform milestones (for example,
+ * voice-authority finalization) out of client-facing counts. Unknown historical
+ * action values remain visible rather than being silently discarded.
  */
-function computeScorecard(workspaceId: string, opts?: { excludeNotActedOn?: boolean }): OutcomeScorecard {
+function computeScorecard(
+  workspaceId: string,
+  opts?: { excludeNotActedOn?: boolean; excludeClientHidden?: boolean },
+): OutcomeScorecard {
   const allActions = getActionsByWorkspace(workspaceId);
-  const actions = opts?.excludeNotActedOn
-    ? allActions.filter(a => a.attribution !== 'not_acted_on')
-    : allActions;
+  const actions = allActions.filter(action => {
+    if (opts?.excludeNotActedOn && action.attribution === 'not_acted_on') return false;
+    if (opts?.excludeClientHidden) {
+      const catalogEntry = getActionCatalogEntry('outcome', action.actionType);
+      if (catalogEntry?.clientVisible === false) return false;
+    }
+    return true;
+  });
 
   // Group by action type
   const byType = new Map<ActionType, { wins: number; strongWins: number; scored: number; total: number }>();
@@ -368,7 +384,11 @@ router.post(
           source: req.body.source,
         });
 
-        broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.OUTCOME_ACTION_RECORDED, { actionId: action.id });
+        broadcastToWorkspace(
+          req.params.workspaceId,
+          WS_EVENTS.OUTCOME_ACTION_RECORDED,
+          toClientSafeOutcomeEventPayload(action.actionType, { actionId: action.id }),
+        );
         invalidateIntelligenceCache(req.params.workspaceId);
         return { success: true, action } as const;
       });
@@ -462,10 +482,13 @@ router.get('/api/public/outcomes/:workspaceId/summary', requireClientPortalAuth(
     //
     // C4 (attribution honesty): exclude `not_acted_on` actions — unexecuted proposals
     // the workspace never acted on — from the CLIENT win-rate and confirmed-wins counts.
-    // Including them would inflate the client's win rate with outcomes for work nobody
-    // did. The admin summary/overview routes deliberately keep them (admin parity); this
-    // is the client-only honest variant.
-    const scorecard = computeScorecard(req.params.workspaceId, { excludeNotActedOn: true });
+    // Internal-only platform milestones are excluded for the same reason: they remain
+    // useful in admin diagnostics but are not client outcome claims. Admin routes retain
+    // the full ledger for operational visibility.
+    const scorecard = computeScorecard(req.params.workspaceId, {
+      excludeNotActedOn: true,
+      excludeClientHidden: true,
+    });
     res.json(scorecard);
   } catch (err) {
     log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get client summary');
@@ -549,7 +572,7 @@ function resolveWinTitle(workspaceId: string, win: TopWin, getRecSet: () => Reco
 router.get('/api/public/outcomes/:workspaceId/wins', requireClientPortalAuth(), (req, res) => {
   try {
     const workspaceId = req.params.workspaceId;
-    const wins = getTopWinsForWorkspace(workspaceId, 10);
+    const wins = getTopWinsForWorkspace(workspaceId, 10, { excludeClientHidden: true });
     // Lazy once-per-request recommendation set for title resolution
     let recSet: RecommendationSet | null | undefined;
     const getRecSet = () => {
