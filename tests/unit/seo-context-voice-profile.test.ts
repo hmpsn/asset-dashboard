@@ -31,6 +31,7 @@ import {
   VoiceProfileStateTransitionError,
 } from '../../server/voice-calibration.js';
 import type { VoiceDNA, VoiceGuardrails } from '../../shared/types/brand-engine.js';
+import { isWorkspaceVoiceProfileAuthoritative } from '../../server/intelligence/seo-context-source.js';
 
 const LEGACY_VOICE_TEXT = 'Professional but warm. Active voice. No filler.';
 const SAMPLE_TEXT = 'Stop guessing at your SEO strategy — we map it out for you.';
@@ -98,6 +99,12 @@ describe('seoContext slice — voice profile authority vs legacy brand voice', (
     seeded = null;
   });
 
+  it('reports no authoritative profile before one exists', () => {
+    seeded = seedWorkspaceWithLegacyVoice();
+
+    expect(isWorkspaceVoiceProfileAuthoritative(seeded.workspaceId)).toBe(false);
+  });
+
   it('preserves legacy brand voice when only a draft profile exists (explicitly created)', async () => {
     // Simulates: admin has workspace.brandVoice set, creates a voice profile via
     // POST /api/voice/:id. Pre-fix, the mere existence of that draft row caused
@@ -106,6 +113,7 @@ describe('seoContext slice — voice profile authority vs legacy brand voice', (
     const profile = createVoiceProfile(seeded.workspaceId);
     expect(profile.status).toBe('draft');
     expect(profile.samples).toHaveLength(0);
+    expect(isWorkspaceVoiceProfileAuthoritative(seeded.workspaceId)).toBe(false);
     invalidateIntelligenceCache(seeded.workspaceId);
 
     const effectiveBlock = await getEffectiveBrandVoiceBlock(seeded.workspaceId);
@@ -124,6 +132,7 @@ describe('seoContext slice — voice profile authority vs legacy brand voice', (
       voiceDNA: SENTINEL_DNA,
       guardrails: SENTINEL_GUARDRAILS,
     });
+    expect(isWorkspaceVoiceProfileAuthoritative(seeded.workspaceId)).toBe(true);
     invalidateIntelligenceCache(seeded.workspaceId);
 
     const effectiveBlock = await getEffectiveBrandVoiceBlock(seeded.workspaceId);
@@ -153,6 +162,7 @@ describe('seoContext slice — voice profile authority vs legacy brand voice', (
       voiceDNA: SENTINEL_DNA,
       guardrails: SENTINEL_GUARDRAILS,
     });
+    expect(isWorkspaceVoiceProfileAuthoritative(seeded.workspaceId)).toBe(true);
     invalidateIntelligenceCache(seeded.workspaceId);
 
     const effectiveBlock = await getEffectiveBrandVoiceBlock(seeded.workspaceId);
@@ -178,6 +188,8 @@ describe('seoContext slice — voice profile authority vs legacy brand voice', (
     // No DNA, no guardrails, no status change — pure "uploaded one sample".
     invalidateIntelligenceCache(seeded.workspaceId);
 
+    expect(isWorkspaceVoiceProfileAuthoritative(seeded.workspaceId)).toBe(false);
+
     const effectiveBlock = await getEffectiveBrandVoiceBlock(seeded.workspaceId);
 
     // Legacy MUST still be present — the admin hasn't committed to the new path yet.
@@ -195,12 +207,36 @@ describe('seoContext slice — voice profile authority vs legacy brand voice', (
     updateVoiceProfile(seeded.workspaceId, { voiceDNA: SENTINEL_DNA });
     invalidateIntelligenceCache(seeded.workspaceId);
 
+    expect(isWorkspaceVoiceProfileAuthoritative(seeded.workspaceId)).toBe(true);
+
     const effectiveBlock = await getEffectiveBrandVoiceBlock(seeded.workspaceId);
 
     // Legacy is gone — the admin's DNA save was the commitment signal.
     expect(effectiveBlock).not.toContain(LEGACY_VOICE_TEXT);
     // The voice profile block is now active and contains the sample text.
     expect(effectiveBlock).toContain(SAMPLE_TEXT);
+  });
+
+  it('treats draft DNA as authoritative even with zero samples', async () => {
+    seeded = seedWorkspaceWithLegacyVoice();
+    createVoiceProfile(seeded.workspaceId);
+    updateVoiceProfile(seeded.workspaceId, { voiceDNA: SENTINEL_DNA });
+
+    expect(isWorkspaceVoiceProfileAuthoritative(seeded.workspaceId)).toBe(true);
+    const effectiveBlock = await getEffectiveBrandVoiceBlock(seeded.workspaceId);
+    expect(effectiveBlock).not.toContain(LEGACY_VOICE_TEXT);
+    expect(effectiveBlock).toContain('VOICE DNA:');
+  });
+
+  it('treats draft guardrails as authoritative even with zero samples or DNA', async () => {
+    seeded = seedWorkspaceWithLegacyVoice();
+    createVoiceProfile(seeded.workspaceId);
+    updateVoiceProfile(seeded.workspaceId, { guardrails: SENTINEL_GUARDRAILS });
+
+    expect(isWorkspaceVoiceProfileAuthoritative(seeded.workspaceId)).toBe(true);
+    const effectiveBlock = await getEffectiveBrandVoiceBlock(seeded.workspaceId);
+    expect(effectiveBlock).not.toContain(LEGACY_VOICE_TEXT);
+    expect(effectiveBlock).toContain('Never use: synergy');
   });
 });
 

@@ -50,12 +50,12 @@ beforeAll(async () => {
   const created = createMcpApiKey(wsA.workspaceId, 'plumbing-test-key');
   perWsKey = created.plaintextKeyOnceShown;
   perWsKeyId = created.id;
-});
+}, 30_000);
 
 afterAll(async () => {
-  revokeMcpApiKey(perWsKeyId);
-  wsA.cleanup();
-  wsB.cleanup();
+  if (perWsKeyId) revokeMcpApiKey(perWsKeyId);
+  wsA?.cleanup();
+  wsB?.cleanup();
   await ctx.stopServer();
   delete process.env.MCP_API_KEY;
 });
@@ -118,6 +118,8 @@ describe('MCP plumbing — P1+P2 tools are registered', () => {
       // M0 matrix structural planning
       'list_content_matrices', 'get_content_matrix',
       'resolve_content_matrix_cells', 'accept_content_template_generation_upgrade',
+      // B0 durable brand intake
+      'get_brand_intake', 'resolve_brand_intake_evidence',
     ];
     for (const t of expected) {
       expect(names, `tools/list is missing ${t}`).toContain(t);
@@ -164,6 +166,21 @@ describe('MCP plumbing — new tools dispatch over real HTTP', () => {
     };
     expect(detailPayload.matrix.id).toBe(matrixId);
     expect(detailPayload.cells.items).toHaveLength(1);
+  });
+
+  it('reads an empty durable brand intake through the registered json_v1 family', async () => {
+    const body = await callTool(
+      'get_brand_intake',
+      { workspace_id: wsA.workspaceId },
+      MASTER_KEY,
+    );
+    expect(body.result?.isError).toBeFalsy();
+    const payload = JSON.parse(body.result!.content[0].text) as {
+      revision: unknown;
+      field_evidence: unknown[];
+    };
+    expect(payload.revision).toBeNull();
+    expect(payload.field_evidence).toEqual([]);
   });
 });
 

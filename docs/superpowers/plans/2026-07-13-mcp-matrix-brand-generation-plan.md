@@ -364,10 +364,28 @@ existing public response compatibility assertion.
 - Persist immutable fingerprinted intake revisions before projection.
 - Add version-safe intake evidence resolution that creates/reuses a superseding
   immutable revision; older runs remain stale rather than mutating in place.
+- Address each evidence requirement as `brand-intake:<fieldPath>` and reject
+  mismatched requirement/field pairs at every shared HTTP/MCP boundary.
+- Preserve `''` for an omitted buying stage and treat `mixed` only as the
+  explicit “All stages” answer so evidence availability never comes from a
+  normalization default.
+- Bound every immutable evidence snapshot to the 22-field census and 1 MiB of
+  UTF-8 JSON in both shared validation and storage; the full legal multibyte
+  census must persist.
 - Replace append-only legacy text/persona mutation with an idempotent projection
   that preserves compatibility and authentic source provenance.
+- Persist explicit competitor projection ownership per revision so later
+  submissions remove only intake-owned domains and never infer ownership from
+  overlap with a predecessor payload.
 - Preserve reference URLs/evidence classification; broadcast and invalidate
   brand/intelligence/client workspace caches after commit.
+- Keep activity attribution truthful: actual client-portal submission retains
+  `client_onboarding_submitted`; operator/MCP submission and evidence mutation
+  use their distinct admin-only brand-intake activity types.
+- Treat normalized answers as an identical retry only when source, actor type,
+  and actor ID also match; client confirmation after an admin/MCP pre-seed must
+  create a traceable revision. Enforce the canonical source/actor pair matrix
+  inside the domain service.
 - Wire Brandscript prefill to the typed revision or explicitly retire the
   stranded label-parser path; never maintain both authorities.
 - Expose `get_brand_intake` through a thin MCP adapter over the intake read

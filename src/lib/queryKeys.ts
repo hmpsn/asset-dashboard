@@ -164,6 +164,7 @@ export const queryKeys = {
     brandscriptTemplates: () => ['admin-brandscript-templates'] as const,
 
     // Brand Engine — Voice & Identity
+    brandIntake: (wsId: string) => ['admin-brand-intake', wsId] as const,
     voiceProfile: (wsId: string) => ['admin-voice-profile', wsId] as const,
     brandIdentity: (wsId: string) => ['admin-brand-identity', wsId] as const,
 

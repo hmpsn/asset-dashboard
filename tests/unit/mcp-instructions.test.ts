@@ -54,6 +54,19 @@ describe('MCP server instructions', () => {
     expect(MCP_SERVER_INSTRUCTIONS).toMatch(/does not.+create a generation run/i);
   });
 
+  it('explains the immutable, evidence-addressed brand-intake workflow', () => {
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('get_brand_intake');
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('resolve_brand_intake_evidence');
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('intake_revision_id');
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('expected_revision');
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('requirement_id');
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('field_path');
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('idempotency_key');
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/correct or evidence-resolve/i);
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/superseding revision/i);
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/never mutates.+in place/i);
+  });
+
   it('flags the paid tools and that start_* tools are polled jobs', () => {
     expect(MCP_SERVER_INSTRUCTIONS).toContain('research_keywords');
     expect(MCP_SERVER_INSTRUCTIONS).toContain('start_local_seo_refresh');

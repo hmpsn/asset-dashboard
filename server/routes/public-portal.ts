@@ -2,7 +2,7 @@
  * public-portal routes — extracted from server/index.ts
  *
  * @reads workspaces, snapshots, keyword_feedback, client_business_priorities, content_gap_votes, copy_sections, briefing_store, recommendations, stripe_products, search_console, google_analytics
- * @writes workspaces, keyword_feedback, rank_tracking_config, client_business_priorities, content_gap_votes, copy_sections, client_suggestions, activities, intelligence_cache
+ * @writes workspaces, brand_intake_revisions, keyword_feedback, rank_tracking_config, client_business_priorities, content_gap_votes, copy_sections, client_suggestions, activities, intelligence_cache
  */
 import { Router, type RequestHandler } from 'express';
 
@@ -12,7 +12,13 @@ import { validate, z } from '../middleware/validate.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { hasClientUsers, verifyClientToken } from '../client-users.js';
-import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
+import {
+  getClientActor,
+  requireAuthenticatedClientPortalAuth,
+  requireClientPortalAuth,
+  verifyAdminToken,
+  verifyClientSession,
+} from '../middleware.js';
 
 import { getLatestSnapshotBefore } from '../reports.js';
 import { getEffectiveAudit, getLatestEffectiveSnapshot, listEffectiveSnapshotSummaries } from '../audit-snapshot-views.js';
@@ -28,6 +34,10 @@ import { addActivity } from '../activity-log.js';
 import { debouncedStrategyInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { getBookingUrl } from '../studio-config.js';
+import {
+  submitBrandIntake,
+  type BrandIntakePostCommitEffect,
+} from '../domains/brand/intake/index.js';
 import { listBlueprints } from '../page-strategy.js';
 import {
   clearKeywordFeedback,
@@ -62,9 +72,17 @@ import { computeTrialState } from '../billing/trial-state.js';
 import { toPublicWorkspaceView } from '../serializers/client-safe.js';
 import { isFeatureEnabled } from '../feature-flags.js';
 import { keywordIdentityKeyV2 } from '../../shared/keyword-normalization.js';
-import { getVoiceProfile } from '../voice-calibration.js';
 import { sendSanitizedProviderError } from '../provider-error-sanitizer.js';
 import { buildMatricesExportRows, MATRICES_EXPORT_HEADERS, sendExport } from './data-export.js';
+import {
+  BRAND_INTAKE_SCHEMA_VERSION,
+  type BrandIntakeSource,
+  type BrandIntakeSubmitter,
+} from '../../shared/types/brand-intake.js';
+import {
+  publicOnboardingQuestionnaireSchema,
+  type NormalizedPublicOnboardingQuestionnaire,
+} from '../../shared/types/brand-intake-schemas.js';
 import type {
   BusinessPrioritiesConflictResponse,
   BusinessPrioritiesResponse,
@@ -72,6 +90,101 @@ import type {
 } from '../../shared/types/business-priorities.js';
 
 const log = createLogger('public-portal');
+
+function runBrandIntakePostCommitEffect(
+  workspaceId: string,
+  effectName: 'activity' | 'workspace-broadcast' | 'intelligence-cache',
+  run: () => void,
+): void {
+  try {
+    run();
+  } catch (err) {
+    log.warn({ err, workspaceId, effectName }, 'brand intake post-commit effect failed');
+  }
+}
+
+function applyBrandIntakePostCommitEffect(
+  workspaceId: string,
+  effect: BrandIntakePostCommitEffect,
+  actor?: { id?: string; name?: string },
+): void {
+  runBrandIntakePostCommitEffect(workspaceId, 'activity', () => {
+    addActivity(
+      workspaceId,
+      effect.activity.type,
+      effect.activity.title,
+      effect.activity.description,
+      { ...effect.workspaceUpdated },
+      actor,
+    );
+  });
+  runBrandIntakePostCommitEffect(workspaceId, 'workspace-broadcast', () => {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, effect.workspaceUpdated);
+  });
+  runBrandIntakePostCommitEffect(workspaceId, 'intelligence-cache', () => {
+    invalidateIntelligenceCache(workspaceId);
+  });
+}
+
+interface BrandIntakeRequestIdentity {
+  source: Extract<BrandIntakeSource, 'client_portal' | 'admin'>;
+  submitter: BrandIntakeSubmitter;
+  activityActor: { id?: string; name?: string };
+}
+
+/** Mirror the auth guard's priority so operator writes never count as client engagement. */
+function brandIntakeRequestIdentity(
+  req: Parameters<typeof getClientActor>[0],
+  workspaceId: string,
+): BrandIntakeRequestIdentity {
+  const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
+  if (adminToken && verifyAdminToken(adminToken)) {
+    return {
+      source: 'admin',
+      submitter: {
+        actorType: 'operator',
+        actorId: 'admin-hmac',
+        actorLabel: 'Admin operator',
+      },
+      activityActor: { id: 'admin-hmac', name: 'Admin operator' },
+    };
+  }
+
+  const clientActor = getClientActor(req, workspaceId);
+  if (clientActor) {
+    const actorId = clientActor.id ?? `client:${workspaceId}`;
+    const actorLabel = clientActor.name ?? 'Client portal';
+    return {
+      source: 'client_portal',
+      submitter: { actorType: 'client', actorId, actorLabel },
+      activityActor: { id: actorId, name: actorLabel },
+    };
+  }
+
+  const legacySession = req.cookies?.[`client_session_${workspaceId}`];
+  if (legacySession && verifyClientSession(workspaceId, legacySession)) {
+    const actorId = `client:${workspaceId}`;
+    return {
+      source: 'client_portal',
+      submitter: { actorType: 'client', actorId, actorLabel: 'Legacy client portal' },
+      activityActor: { id: actorId, name: 'Legacy client portal' },
+    };
+  }
+
+  if (req.user) {
+    return {
+      source: 'admin',
+      submitter: {
+        actorType: 'operator',
+        actorId: req.user.id,
+        actorLabel: req.user.name,
+      },
+      activityActor: { id: req.user.id, name: req.user.name },
+    };
+  }
+
+  throw new Error('Authenticated brand-intake actor could not be derived');
+}
 
 const attachClientEmail: RequestHandler = (req, res, next) => {
   const wsId = req.params.workspaceId;
@@ -99,115 +212,44 @@ router.get('/api/public/workspace/:id', (req, res) => { // portal-auth-public-ok
   }));
 });
 
-// Public onboarding questionnaire submission — transforms responses into KB, brand voice, personas
-router.post('/api/public/onboarding/:id', requireAuthenticatedClientPortalAuth('id'), async (req, res) => {
-  try {
-    const ws = getWorkspace(req.params.id);
-    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+// Public onboarding questionnaire submission — durable source of truth with compatibility projection.
+router.post( // activity-ok — the durable post-commit effect calls addActivity exactly once for a created revision.
+  '/api/public/onboarding/:id',
+  requireAuthenticatedClientPortalAuth('id'),
+  validate(publicOnboardingQuestionnaireSchema),
+  (req, res) => {
+    try {
+      const ws = getWorkspace(req.params.id);
+      if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-    const { business, audience, brand, competitors } = req.body;
+      const questionnaire = req.body as NormalizedPublicOnboardingQuestionnaire;
+      const identity = brandIntakeRequestIdentity(req, ws.id);
+      const result = submitBrandIntake({
+        workspaceId: ws.id,
+        payload: {
+          schemaVersion: BRAND_INTAKE_SCHEMA_VERSION,
+          ...questionnaire,
+          authenticSamples: [],
+        },
+        source: identity.source,
+        submitter: identity.submitter,
+      });
 
-    // 1. Build knowledge base from business info
-    const kbParts: string[] = [];
-    if (business?.businessName) kbParts.push(`Business Name: ${business.businessName}`);
-    if (business?.industry) kbParts.push(`Industry: ${business.industry}`);
-    if (business?.description) kbParts.push(`About: ${business.description}`);
-    if (business?.services) kbParts.push(`Key Services/Products:\n${business.services}`);
-    if (business?.locations) kbParts.push(`Service Locations: ${business.locations}`);
-    if (business?.differentiators) kbParts.push(`Differentiators: ${business.differentiators}`);
-    if (business?.website) kbParts.push(`Website: ${business.website}`);
-    if (competitors?.competitors) kbParts.push(`Competitors:\n${competitors.competitors}`);
-    if (competitors?.whatTheyDoBetter) kbParts.push(`Competitor Strengths: ${competitors.whatTheyDoBetter}`);
-    if (competitors?.whatYouDoBetter) kbParts.push(`Our Advantages: ${competitors.whatYouDoBetter}`);
-
-    // Merge with existing knowledge base (don't overwrite)
-    const existingKb = ws.knowledgeBase || '';
-    const onboardingKb = kbParts.join('\n\n');
-    const mergedKb = existingKb
-      ? `${existingKb}\n\n--- Client Onboarding Responses ---\n${onboardingKb}`
-      : onboardingKb;
-
-    // 2. Build brand voice from brand info
-    const voiceParts: string[] = [];
-    if (brand?.personality?.length) voiceParts.push(`Brand Personality: ${brand.personality.join(', ')}`);
-    if (brand?.tone) voiceParts.push(`Tone: ${brand.tone}`);
-    if (brand?.avoidWords) voiceParts.push(`Words to Avoid: ${brand.avoidWords}`);
-    if (brand?.contentFormats?.length) voiceParts.push(`Preferred Content Formats: ${brand.contentFormats.join(', ')}`);
-    if (brand?.existingExamples) voiceParts.push(`Reference Examples:\n${brand.existingExamples}`);
-
-    const existingVoice = ws.brandVoice || '';
-    const onboardingVoice = voiceParts.join('\n');
-    const mergedVoice = existingVoice
-      ? `${existingVoice}\n\n--- Client Onboarding Responses ---\n${onboardingVoice}`
-      : onboardingVoice;
-
-    // 3. Build personas from audience info
-    const personas = [...(ws.personas || [])];
-    if (audience?.primaryAudience || audience?.painPoints || audience?.goals) {
-      const primaryPersona = {
-        id: `persona_onboard_${Date.now()}`,
-        name: audience.primaryAudience?.split(/[,.\n]/)[0]?.trim()?.slice(0, 60) || 'Primary Audience',
-        description: audience.primaryAudience || '',
-        painPoints: audience.painPoints ? audience.painPoints.split('\n').map((s: string) => s.trim()).filter(Boolean) : [],
-        goals: audience.goals ? audience.goals.split('\n').map((s: string) => s.trim()).filter(Boolean) : [],
-        objections: audience.objections ? audience.objections.split('\n').map((s: string) => s.trim()).filter(Boolean) : [],
-        preferredContentFormat: brand?.contentFormats?.join(', ') || undefined,
-        buyingStage: (audience.buyingStage === 'mixed' ? undefined : audience.buyingStage) as 'awareness' | 'consideration' | 'decision' | undefined,
-      };
-      personas.push(primaryPersona);
-    }
-    if (audience?.secondaryAudience) {
-      const secondaryPersona = {
-        id: `persona_onboard2_${Date.now()}`,
-        name: audience.secondaryAudience.split(/[,.\n]/)[0]?.trim()?.slice(0, 60) || 'Secondary Audience',
-        description: audience.secondaryAudience,
-        painPoints: [] as string[],
-        goals: [] as string[],
-        objections: [] as string[],
-      };
-      personas.push(secondaryPersona);
-    }
-
-    // 4. Save competitor domains if provided
-    const competitorDomains = [...(ws.competitorDomains || [])];
-    if (competitors?.competitors) {
-      const urls = competitors.competitors.split('\n')
-        .map((line: string) => {
-          const match = line.match(/https?:\/\/([^/\s]+)/);
-          return match ? match[1].replace(/^www\./, '') : null;
-        })
-        .filter(Boolean) as string[];
-      for (const d of urls) {
-        if (!competitorDomains.includes(d)) competitorDomains.push(d);
+      if (result.created && result.postCommitEffect) {
+        applyBrandIntakePostCommitEffect(
+          ws.id,
+          result.postCommitEffect,
+          identity.activityActor,
+        );
       }
-    }
 
-    // 5. Update workspace — route brand voice through authority chain
-    const voiceProfile = getVoiceProfile(req.params.id);
-    const voiceProfileIsAuthoritative = voiceProfile?.status === 'calibrated';
-    const updates: Record<string, unknown> = {
-      knowledgeBase: voiceProfileIsAuthoritative
-        ? `${mergedKb}\n\n--- Brand Voice (from onboarding) ---\n${onboardingVoice}`
-        : mergedKb,
-      personas,
-      competitorDomains: competitorDomains.length > 0 ? competitorDomains : ws.competitorDomains,
-      onboardingCompleted: true,
-    };
-    if (!voiceProfileIsAuthoritative) {
-      updates.brandVoice = mergedVoice;
-    } else {
-      log.info({ workspaceId: req.params.id }, 'Voice profile is calibrated — onboarding brand voice data folded into knowledgeBase instead of brandVoice');
+      res.json({ ok: true, message: 'Onboarding responses saved successfully' });
+    } catch (err) {
+      log.error({ err }, 'Error saving responses');
+      res.status(500).json({ error: 'Failed to save onboarding responses' });
     }
-    updateWorkspace(req.params.id, updates);
-
-    // client-visibility-ok: onboarding completion is internal audit history, not client timeline content.
-    addActivity(ws.id, 'client_onboarding_submitted', 'Client completed onboarding questionnaire', 'Via client portal');
-    res.json({ ok: true, message: 'Onboarding responses saved successfully' });
-  } catch (err) {
-    log.error({ err: err }, 'Error saving responses');
-    res.status(500).json({ error: 'Failed to save onboarding responses' });
-  }
-});
+  },
+);
 
 // Public tier endpoint — returns effective tier for a workspace
 router.get('/api/public/tier/:id', (req, res) => { // portal-auth-public-ok — login screen bootstrap endpoint

@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { queryKeys } from '../../src/lib/queryKeys';
 
 describe('brand engine factory entries', () => {
+  it('brandIntake key is workspace-scoped', () => {
+    expect(queryKeys.admin.brandIntake('ws-1')).toEqual(['admin-brand-intake', 'ws-1']);
+  });
+
   it('voiceProfile key matches legacy literal', () => {
     expect(queryKeys.admin.voiceProfile('ws-1')).toEqual(['admin-voice-profile', 'ws-1']);
   });

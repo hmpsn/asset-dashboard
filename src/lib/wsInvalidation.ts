@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { BRAND_INTAKE_WORKSPACE_EVENT_DOMAIN } from '../../shared/types/brand-intake';
 import { queryKeys } from './queryKeys';
 import { invalidateMany, type QueryInvalidationKey } from './queryInvalidation';
 import { WS_EVENTS, type WsEventName } from './wsEvents';
@@ -211,6 +212,7 @@ function adminInvalidationKeys(
       ] as const;
     case WS_EVENTS.WORKSPACE_UPDATED:
       return [
+        queryKeys.admin.brandIntake(workspaceId),
         queryKeys.admin.workspaceHome(workspaceId),
         queryKeys.admin.workspaceDetail(workspaceId),
         queryKeys.admin.workspaceOverview(),
@@ -675,6 +677,7 @@ function clientDashboardInvalidationKeys(
         queryKeys.client.roi(workspaceId),
         queryKeys.client.monthlyDigest(workspaceId),
         ...(readBooleanField(data, 'googleConnectionChanged')
+          || readStringField(data, 'domain') === BRAND_INTAKE_WORKSPACE_EVENT_DOMAIN
           ? [queryKeys.client.intelligence(workspaceId)]
           : []),
       ] as const;
