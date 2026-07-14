@@ -26,6 +26,7 @@ import {
 } from '../../server/domains/brand/generation/repository.js';
 import {
   BrandGenerationApprovedDeliverableError,
+  BrandGenerationAttemptCheckpointConflictError,
   BrandGenerationBudgetExceededError,
   BrandGenerationConcurrencyLimitError,
   BrandGenerationCursorError,
@@ -33,6 +34,7 @@ import {
   BrandGenerationPersistenceContractError,
   BrandGenerationRevisionConflictError,
 } from '../../server/domains/brand/generation/errors.js';
+import { brandGenerationPreflightAttemptOutputSchema } from '../../server/domains/brand/generation/persistence-schemas.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import type {
   BrandGenerationAttempt,
@@ -288,6 +290,7 @@ function stageDurableCandidate(
   intake: BrandIntakeRevisionRef,
   verdict: 'ready_for_human_review' | 'needs_attention',
   key: string,
+  generatedCandidate: BrandGenerationAttemptOutput = candidateOutput(),
 ) {
   const accepted = acceptBrandGenerationStartCommand(durableStart(workspaceId, intake, 'mission', key));
   const running = transitionBrandGenerationRun({
@@ -329,7 +332,7 @@ function stageDurableCandidate(
     runId: accepted.run.id,
     itemId: item.id,
     attemptId: candidate.id,
-    output: candidateOutput(),
+    output: generatedCandidate,
     provenance: { ...provenance, inputFingerprint: item.effectiveInputFingerprint! },
   });
   item = transitionBrandGenerationItem({
@@ -364,6 +367,31 @@ function stageDurableCandidate(
 }
 
 describe('brand generation repository', () => {
+  it('rejects internally inconsistent paid-work preflight checkpoints', () => {
+    const output = {
+      kind: 'preflight' as const,
+      readyForPaidWork: true,
+      blockingRequirementIds: ['required-proof'],
+      requirements: [{
+        id: 'required-proof',
+        fieldPath: 'claims.proof',
+        claim: 'A required fact',
+        reason: 'Paid work needs this evidence',
+        requirementStage: 'preflight' as const,
+        claimKind: 'factual' as const,
+        status: 'missing' as const,
+        sourceRefs: [],
+      }],
+      placeholders: [],
+      estimate: maxEstimate,
+    };
+    expect(brandGenerationPreflightAttemptOutputSchema.safeParse(output).success).toBe(false);
+    expect(brandGenerationPreflightAttemptOutputSchema.safeParse({
+      ...output,
+      readyForPaidWork: false,
+    }).success).toBe(true);
+  });
+
   it('persists immutable start command lineage and redacts MCP/idempotency data publicly', () => {
     const { workspaceId, intake } = seedWorkspace('brand repository replay');
     const input = foundationStart(workspaceId, intake);
@@ -493,6 +521,19 @@ describe('brand generation repository', () => {
       nextStatus: 'running',
       nextStage: 'dependent_generation',
     });
+    expect(() => beginBrandGenerationAttempt({
+      workspaceId,
+      runId: accepted.run.id,
+      itemId: accepted.items[0]!.id,
+      commandId: accepted.command.id,
+      jobId: accepted.command.jobId,
+      stage: 'dependent_generation',
+      expectedRunRevision: running.revision,
+      expectedItemRevision: 0,
+      expectedDeliverableVersion: 0,
+      effectiveInputFingerprint: accepted.items[0]!.effectiveInputFingerprint!,
+      reservation: zeroReservation,
+    })).toThrow(BrandGenerationPersistenceContractError);
     const items = accepted.items.map(item => transitionBrandGenerationItem({
       workspaceId,
       runId: accepted.run.id,
@@ -518,6 +559,19 @@ describe('brand generation repository', () => {
       expect.objectContaining({ commandId: accepted.command.id, jobId: accepted.command.jobId, attemptNumber: 1 }),
     ]));
     expect(() => begin(items[3]!)).toThrow(BrandGenerationConcurrencyLimitError);
+    expect(() => beginBrandGenerationAttempt({
+      workspaceId,
+      runId: accepted.run.id,
+      itemId: items[0]!.id,
+      commandId: accepted.command.id,
+      jobId: accepted.command.jobId,
+      stage: 'preflight',
+      expectedRunRevision: running.revision,
+      expectedItemRevision: items[0]!.revision,
+      expectedDeliverableVersion: 0,
+      effectiveInputFingerprint: items[0]!.effectiveInputFingerprint!,
+      reservation: { ...zeroReservation, providerCalls: 1 },
+    })).toThrow(BrandGenerationAttemptCheckpointConflictError);
 
     const reserved = reserveBrandGenerationAttemptBudget({
       workspaceId,
@@ -627,6 +681,138 @@ describe('brand generation repository', () => {
       SELECT COUNT(*) AS count FROM brand_identity_deliverables
       WHERE workspace_id = ? AND deliverable_type = 'mission'
     `).get(attentionWorkspace.workspaceId)).toEqual({ count: 0 });
+  });
+
+  it('refuses review-ready commit when the candidate still has unresolved ready evidence', () => {
+    const { workspaceId, intake } = seedWorkspace('brand repository unresolved ready evidence');
+    const candidate = {
+      ...candidateOutput(),
+      requirements: [{
+        id: 'missing-ready-proof',
+        fieldPath: 'mission.proof',
+        claim: 'A client-specific proof point',
+        reason: 'The client must supply this fact',
+        requirementStage: 'ready' as const,
+        claimKind: 'factual' as const,
+        status: 'missing' as const,
+        sourceRefs: [],
+        clientSafePrompt: 'Please provide the proof point.',
+      }],
+      placeholders: [{
+        requirementId: 'missing-ready-proof',
+        token: '[NEEDS CLIENT INPUT: proof point]' as const,
+        prompt: 'Please provide the proof point.',
+      }],
+    };
+    const staged = stageDurableCandidate(
+      workspaceId,
+      intake,
+      'ready_for_human_review',
+      'unresolved-ready',
+      candidate,
+    );
+    expect(() => commitBrandGenerationDeliverableCandidate({
+      workspaceId,
+      runId: staged.accepted.run.id,
+      itemId: staged.item.id,
+      candidateAttemptId: staged.candidate.id,
+      finalAuditAttemptId: staged.audit.id,
+      expectedRunRevision: staged.running.revision,
+      expectedItemRevision: staged.item.revision,
+      nextStatus: 'ready_for_human_review',
+    })).toThrow(BrandGenerationPersistenceContractError);
+  });
+
+  it('binds the final audit to its exact lifecycle-successor candidate and provenance fingerprint', () => {
+    const { workspaceId, intake } = seedWorkspace('brand repository exact audit lineage');
+    const staged = stageDurableCandidate(workspaceId, intake, 'ready_for_human_review', 'audit-lineage');
+    let item = transitionBrandGenerationItem({
+      workspaceId,
+      runId: staged.accepted.run.id,
+      itemId: staged.item.id,
+      expectedRevision: staged.item.revision,
+      nextStatus: 'revising',
+    });
+    const revisedCandidate = beginBrandGenerationAttempt({
+      workspaceId,
+      runId: staged.accepted.run.id,
+      itemId: item.id,
+      commandId: staged.accepted.command.id,
+      jobId: staged.accepted.command.jobId,
+      stage: 'revision',
+      expectedRunRevision: staged.running.revision,
+      expectedItemRevision: item.revision,
+      expectedDeliverableVersion: 0,
+      effectiveInputFingerprint: item.effectiveInputFingerprint!,
+      reservation: zeroReservation,
+    });
+    expect(() => completeBrandGenerationAttempt({
+      workspaceId,
+      runId: staged.accepted.run.id,
+      itemId: item.id,
+      attemptId: revisedCandidate.id,
+      output: candidateOutput('A revised grounded mission.'),
+      provenance: { ...provenance, inputFingerprint: FINGERPRINTS[17]! },
+    })).toThrow(BrandGenerationPersistenceContractError);
+    completeBrandGenerationAttempt({
+      workspaceId,
+      runId: staged.accepted.run.id,
+      itemId: item.id,
+      attemptId: revisedCandidate.id,
+      output: candidateOutput('A revised grounded mission.'),
+      provenance: { ...provenance, inputFingerprint: item.effectiveInputFingerprint! },
+    });
+    item = transitionBrandGenerationItem({
+      workspaceId,
+      runId: staged.accepted.run.id,
+      itemId: item.id,
+      expectedRevision: item.revision,
+      nextStatus: 'auditing_deterministic',
+    });
+    const revisedAudit = beginBrandGenerationAttempt({
+      workspaceId,
+      runId: staged.accepted.run.id,
+      itemId: item.id,
+      commandId: staged.accepted.command.id,
+      jobId: staged.accepted.command.jobId,
+      stage: 'deterministic_audit',
+      expectedRunRevision: staged.running.revision,
+      expectedItemRevision: item.revision,
+      expectedDeliverableVersion: 0,
+      effectiveInputFingerprint: item.effectiveInputFingerprint!,
+      reservation: zeroReservation,
+    });
+    completeBrandGenerationAttempt({
+      workspaceId,
+      runId: staged.accepted.run.id,
+      itemId: item.id,
+      attemptId: revisedAudit.id,
+      output: auditOutput('ready_for_human_review'),
+      provenance: null,
+    });
+    expect(() => commitBrandGenerationDeliverableCandidate({
+      workspaceId,
+      runId: staged.accepted.run.id,
+      itemId: item.id,
+      candidateAttemptId: staged.candidate.id,
+      finalAuditAttemptId: revisedAudit.id,
+      expectedRunRevision: staged.running.revision,
+      expectedItemRevision: item.revision,
+      nextStatus: 'ready_for_human_review',
+    })).toThrow(BrandGenerationPersistenceContractError);
+    expect(commitBrandGenerationDeliverableCandidate({
+      workspaceId,
+      runId: staged.accepted.run.id,
+      itemId: item.id,
+      candidateAttemptId: revisedCandidate.id,
+      finalAuditAttemptId: revisedAudit.id,
+      expectedRunRevision: staged.running.revision,
+      expectedItemRevision: item.revision,
+      nextStatus: 'ready_for_human_review',
+    })).toMatchObject({
+      kind: 'committed',
+      deliverable: { content: 'A revised grounded mission.' },
+    });
   });
 
   it('preserves a newer operator artifact and both paid checkpoints on CAS loss', () => {

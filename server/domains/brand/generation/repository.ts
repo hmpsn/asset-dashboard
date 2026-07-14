@@ -2166,28 +2166,55 @@ function reserveRunBudget(
   return next;
 }
 
+function isZeroBudgetUsage(usage: BrandGenerationBudgetUsage): boolean {
+  return usage.providerCalls === 0
+    && usage.inputTokens === 0
+    && usage.outputTokens === 0
+    && usage.estimatedCostMicros === 0;
+}
+
+function expectedArtifactVersion(item: BrandGenerationItem): number | null {
+  if (item.target === 'voice_foundation') return null;
+  return item.artifactExpectation.expectedVersion;
+}
+
+function assertAttemptStageAllowed(
+  run: BrandGenerationRunRow,
+  item: BrandGenerationItemRow,
+  command: BrandGenerationCommandRow,
+  stage: BrandGenerationAttemptStage,
+): void {
+  const expectedRunStage = command.command_kind === 'revision'
+    ? 'revision'
+    : item.target === 'voice_foundation'
+      ? 'voice_foundation_generation'
+      : 'dependent_generation';
+  const itemStageAllowed = (
+    (stage === 'preflight' && (
+      item.status === 'preflighting'
+      || (command.command_kind === 'revision' && item.status === 'revising')
+    ))
+    || (stage === 'voice_foundation_generation'
+      && item.target === 'voice_foundation' && item.status === 'generating')
+    || (stage === 'dependent_generation'
+      && item.target !== 'voice_foundation' && item.status === 'generating')
+    || (stage === 'revision'
+      && item.target !== 'voice_foundation' && item.status === 'revising')
+    || (stage === 'deterministic_audit' && item.status === 'auditing_deterministic')
+    || (stage === 'model_audit' && item.status === 'auditing_model')
+  );
+  if (run.stage !== expectedRunStage || !itemStageAllowed) {
+    throw new BrandGenerationPersistenceContractError(
+      'Attempt stage is not legal for the current run and item lifecycle',
+    );
+  }
+}
+
 export function beginBrandGenerationAttempt(
   input: BeginBrandGenerationAttemptInput,
 ): BrandGenerationAttempt {
   validateBrandGenerationBudgetUsage(input.reservation);
   const begin = db.transaction((): BrandGenerationAttempt => {
-    const active = stmts().activeAttemptForCommandStage.get(
-      input.itemId,
-      input.runId,
-      input.workspaceId,
-      input.commandId,
-      input.stage,
-    ) as BrandGenerationAttemptRow | undefined;
-    if (active) {
-      if (active.job_id !== input.jobId
-        || active.expected_run_revision !== input.expectedRunRevision
-        || active.expected_item_revision !== input.expectedItemRevision
-        || active.expected_deliverable_version !== input.expectedDeliverableVersion
-        || active.effective_input_fingerprint !== input.effectiveInputFingerprint) {
-        throw new BrandGenerationAttemptCheckpointConflictError();
-      }
-      return rowToAttempt(active);
-    }
     const runRow = stmts().runById.get(input.runId, input.workspaceId) as BrandGenerationRunRow | undefined;
     const itemRow = stmts().itemById.get(input.itemId, input.runId, input.workspaceId) as BrandGenerationItemRow | undefined;
     const commandRow = stmts().commandById.get(input.commandId, input.runId, input.workspaceId) as BrandGenerationCommandRow | undefined;
@@ -2200,12 +2227,35 @@ export function beginBrandGenerationAttempt(
     if (itemRow.revision !== input.expectedItemRevision) {
       throw new BrandGenerationRevisionConflictError('item', input.expectedItemRevision, itemRow.revision);
     }
-    if (runRow.status !== 'running' || commandRow.job_id !== input.jobId
+    if (runRow.status !== 'running' || runRow.current_job_id !== input.jobId
+      || commandRow.job_id !== input.jobId
       || (commandRow.item_id !== null && commandRow.item_id !== input.itemId)) {
       throw new BrandGenerationPersistenceContractError('Attempt command is not active for this item');
     }
     const item = rowToItem(itemRow);
     assertArtifactStillMatchesItem(input.workspaceId, item);
+    if (input.expectedDeliverableVersion !== expectedArtifactVersion(item)) {
+      throw new BrandGenerationAttemptCheckpointConflictError();
+    }
+    assertAttemptStageAllowed(runRow, itemRow, commandRow, input.stage);
+    const active = stmts().activeAttemptForCommandStage.get(
+      input.itemId,
+      input.runId,
+      input.workspaceId,
+      input.commandId,
+      input.stage,
+    ) as BrandGenerationAttemptRow | undefined;
+    if (active) {
+      if (active.job_id !== input.jobId
+        || active.expected_run_revision !== input.expectedRunRevision
+        || active.expected_item_revision !== input.expectedItemRevision
+        || active.expected_deliverable_version !== input.expectedDeliverableVersion
+        || active.effective_input_fingerprint !== input.effectiveInputFingerprint
+        || !isZeroBudgetUsage(input.reservation)) {
+        throw new BrandGenerationAttemptCheckpointConflictError();
+      }
+      return rowToAttempt(active);
+    }
     const running = stmts().runningAttemptCount.get(input.runId, input.workspaceId) as { count: number };
     if (running.count >= runRow.max_concurrency) {
       throw new BrandGenerationConcurrencyLimitError(running.count, runRow.max_concurrency);
@@ -2306,10 +2356,17 @@ export function completeBrandGenerationAttempt(
       input.attemptId, input.itemId, input.runId, input.workspaceId,
     ) as BrandGenerationAttemptRow | undefined;
     if (!row) throw new BrandGenerationNotFoundError('attempt');
+    if (input.provenance && input.provenance.inputFingerprint !== row.effective_input_fingerprint) {
+      throw new BrandGenerationPersistenceContractError(
+        'Attempt provenance does not match the frozen input fingerprint',
+      );
+    }
     if (row.status === 'completed') {
       const existing = rowToAttempt(row);
       if (canonicalBrandGenerationFingerprint(existing.output)
-        !== canonicalBrandGenerationFingerprint(input.output)) {
+          !== canonicalBrandGenerationFingerprint(input.output)
+        || canonicalBrandGenerationFingerprint(existing.provenance)
+          !== canonicalBrandGenerationFingerprint(input.provenance)) {
         throw new BrandGenerationAttemptCheckpointConflictError();
       }
       return existing;
@@ -2406,6 +2463,64 @@ interface FinalCandidateBundle {
   auditReport: GenerationAuditReport;
 }
 
+function assertAuditMatchesCandidate(
+  candidate: BrandGenerationAttempt,
+  audit: BrandGenerationAttempt,
+  currentItemRevision: number,
+): void {
+  if (!candidate.output || (candidate.output.kind !== 'foundation_candidate'
+      && candidate.output.kind !== 'deliverable_candidate')
+    || !audit.output || audit.output.kind !== 'audit') {
+    throw new BrandGenerationPersistenceContractError('Final checkpoints have invalid output kinds');
+  }
+  const expectedAuditRevisionDelta = audit.stage === 'deterministic_audit' ? 1 : 2;
+  if (candidate.commandId !== audit.commandId
+    || candidate.expectedRunRevision !== audit.expectedRunRevision
+    || candidate.expectedDeliverableVersion !== audit.expectedDeliverableVersion
+    || audit.expectedItemRevision !== candidate.expectedItemRevision + expectedAuditRevisionDelta
+    || audit.expectedItemRevision !== currentItemRevision
+    || !candidate.completedAt
+    || candidate.completedAt > audit.startedAt) {
+    throw new BrandGenerationPersistenceContractError(
+      'Final audit is not the lifecycle successor of the selected candidate',
+    );
+  }
+  const unresolvedRequirementIds = candidate.output.requirements
+    .filter(requirement => (
+      requirement.requirementStage === 'ready'
+      && (requirement.status === 'missing' || requirement.status === 'conflicting')
+    ))
+    .map(requirement => requirement.id)
+    .sort();
+  const declaredUnresolvedIds = [...audit.output.auditReport.unresolvedRequirementIds].sort();
+  if (JSON.stringify(unresolvedRequirementIds) !== JSON.stringify(declaredUnresolvedIds)) {
+    throw new BrandGenerationPersistenceContractError(
+      'Final audit unresolved evidence does not match the selected candidate',
+    );
+  }
+  const expectedPlaceholderIds = candidate.output.requirements
+    .filter(requirement => (
+      requirement.requirementStage === 'ready' && requirement.status === 'missing'
+    ))
+    .map(requirement => requirement.id)
+    .sort();
+  const declaredPlaceholderIds = candidate.output.placeholders
+    .map(placeholder => placeholder.requirementId)
+    .sort();
+  if (new Set(declaredPlaceholderIds).size !== declaredPlaceholderIds.length
+    || JSON.stringify(expectedPlaceholderIds) !== JSON.stringify(declaredPlaceholderIds)) {
+    throw new BrandGenerationPersistenceContractError(
+      'Final candidate placeholders do not match its unresolved evidence',
+    );
+  }
+  if (audit.output.auditReport.verdict === 'ready_for_human_review'
+    && audit.output.auditReport.modelFindings.some(finding => finding.severity !== 'info')) {
+    throw new BrandGenerationPersistenceContractError(
+      'Review-ready audit cannot retain warning or error model findings',
+    );
+  }
+}
+
 function loadFinalCandidate(input: CommitBrandGenerationCandidateInput): FinalCandidateBundle {
   const runRow = stmts().runById.get(input.runId, input.workspaceId) as BrandGenerationRunRow | undefined;
   const itemRow = stmts().itemById.get(input.itemId, input.runId, input.workspaceId) as BrandGenerationItemRow | undefined;
@@ -2435,6 +2550,7 @@ function loadFinalCandidate(input: CommitBrandGenerationCandidateInput): FinalCa
     || candidate.effectiveInputFingerprint !== itemRow.effective_input_fingerprint) {
     throw new BrandGenerationPersistenceContractError('Final candidate checkpoints do not share one frozen input');
   }
+  assertAuditMatchesCandidate(candidate, audit, itemRow.revision);
   const expectedStatus = audit.output.auditReport.verdict;
   if (expectedStatus !== input.nextStatus) {
     throw new BrandGenerationPersistenceContractError('Final item status does not match the audit verdict');

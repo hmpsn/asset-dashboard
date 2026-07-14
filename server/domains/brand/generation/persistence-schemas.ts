@@ -416,7 +416,7 @@ export const brandGenerationAcceptedCommandResultSchema = z.object({
   dashboardUrl: z.string().min(1).max(2_048),
 }).strict();
 
-export const brandGenerationPreflightAttemptOutputSchema = z.object({
+const brandGenerationPreflightAttemptOutputBaseSchema = z.object({
   kind: z.literal('preflight'),
   readyForPaidWork: z.boolean(),
   blockingRequirementIds: z.array(brandGenerationIdSchema).max(100),
@@ -424,6 +424,53 @@ export const brandGenerationPreflightAttemptOutputSchema = z.object({
   placeholders: z.array(brandGenerationPlaceholderSchema).max(100),
   estimate: brandGenerationBudgetEstimateSchema,
 }).strict();
+
+function refinePreflightOutput(
+  output: z.infer<typeof brandGenerationPreflightAttemptOutputBaseSchema>,
+  ctx: z.RefinementCtx,
+): void {
+  const expectedBlockers = output.requirements
+    .filter(requirement => (
+      requirement.requirementStage === 'preflight'
+      && requirement.status !== 'verified'
+    ))
+    .map(requirement => requirement.id)
+    .sort();
+  const declaredBlockers = [...output.blockingRequirementIds].sort();
+  if (new Set(declaredBlockers).size !== declaredBlockers.length
+    || JSON.stringify(declaredBlockers) !== JSON.stringify(expectedBlockers)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Preflight blockers must exactly match unresolved preflight requirements',
+    });
+  }
+  if (output.readyForPaidWork !== (expectedBlockers.length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Paid-work readiness must agree with the preflight blocker set',
+    });
+  }
+  const expectedPlaceholderIds = output.requirements
+    .filter(requirement => (
+      requirement.requirementStage === 'ready'
+      && requirement.status === 'missing'
+    ))
+    .map(requirement => requirement.id)
+    .sort();
+  const declaredPlaceholderIds = output.placeholders
+    .map(placeholder => placeholder.requirementId)
+    .sort();
+  if (new Set(declaredPlaceholderIds).size !== declaredPlaceholderIds.length
+    || JSON.stringify(declaredPlaceholderIds) !== JSON.stringify(expectedPlaceholderIds)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Preflight placeholders must exactly match missing ready-stage requirements',
+    });
+  }
+}
+
+export const brandGenerationPreflightAttemptOutputSchema =
+  brandGenerationPreflightAttemptOutputBaseSchema.superRefine(refinePreflightOutput);
 
 const candidateOutputBase = {
   claims: z.array(brandGeneratedClaimSchema).max(200),
@@ -451,11 +498,13 @@ export const brandGenerationAuditAttemptOutputSchema = z.object({
 }).strict();
 
 export const brandGenerationAttemptOutputSchema = z.discriminatedUnion('kind', [
-  brandGenerationPreflightAttemptOutputSchema,
+  brandGenerationPreflightAttemptOutputBaseSchema,
   brandGenerationFoundationCandidateOutputSchema,
   brandGenerationDeliverableCandidateOutputSchema,
   brandGenerationAuditAttemptOutputSchema,
-]);
+]).superRefine((output, ctx) => {
+  if (output.kind === 'preflight') refinePreflightOutput(output, ctx);
+});
 
 export const brandGenerationRunStatusSchema = z.enum(BRAND_GENERATION_RUN_STATUSES);
 export const brandGenerationRunStageSchema = z.enum(BRAND_GENERATION_STAGES);
