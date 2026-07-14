@@ -51,6 +51,10 @@ import {
   handleBrandIntakeActionTool,
 } from '../../server/mcp/tools/brand-intake-actions.js';
 import {
+  brandVoiceActionTools,
+  handleBrandVoiceActionTool,
+} from '../../server/mcp/tools/brand-voice-actions.js';
+import {
   schemaActionTools,
   handleSchemaActionTool,
 } from '../../server/mcp/tools/schema-actions.js';
@@ -128,6 +132,11 @@ const EXPECTED_FAMILY_REGISTRATIONS: readonly ExpectedFamilyRegistration[] = [
     handler: handleBrandIntakeActionTool,
   },
   {
+    family: 'brand-voice-actions',
+    toolNames: brandVoiceActionTools.map(tool => tool.name),
+    handler: handleBrandVoiceActionTool,
+  },
+  {
     family: 'schema-actions',
     toolNames: schemaActionTools.map(tool => tool.name),
     handler: handleSchemaActionTool,
@@ -185,7 +194,7 @@ async function assertDefinitionIsDispatched(entry: McpToolRegistryEntry): Promis
 
 describe('MCP definition-to-handler dispatch census', () => {
   it('pairs every production family definition with its exact family handler', () => {
-    expect(EXPECTED_FAMILY_REGISTRATIONS).toHaveLength(15);
+    expect(EXPECTED_FAMILY_REGISTRATIONS).toHaveLength(16);
 
     for (const expected of EXPECTED_FAMILY_REGISTRATIONS) {
       const entries = [...MCP_TOOL_REGISTRY.values()]
@@ -225,7 +234,7 @@ describe('MCP definition-to-handler dispatch census', () => {
   });
 
   it('routes every registered production definition into its family handler', async () => {
-    expect(MCP_TOOL_REGISTRY.size).toBe(67);
+    expect(MCP_TOOL_REGISTRY.size).toBe(69);
     for (const entry of MCP_TOOL_REGISTRY.values()) {
       await assertDefinitionIsDispatched(entry);
     }
