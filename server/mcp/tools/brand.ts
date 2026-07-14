@@ -12,7 +12,7 @@ import {
 } from '../../brand-identity.js';
 import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
-import { WS_EVENTS } from '../../ws-events.js';
+import { BRAND_IDENTITY_UPDATED_PAYLOAD, WS_EVENTS } from '../../ws-events.js';
 import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
 import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
@@ -139,10 +139,11 @@ async function handleUpdateBrandDeliverable(args: Record<string, unknown>): Prom
         undefined,
         { source: 'mcp-chat', deliverableId, action: 'mcp_brand_deliverable_updated' },
       );
-      broadcastToWorkspace(workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, {
-        deliverableId,
-        contentUpdated: true,
-      });
+      broadcastToWorkspace(
+        workspaceId,
+        WS_EVENTS.BRAND_IDENTITY_UPDATED,
+        BRAND_IDENTITY_UPDATED_PAYLOAD,
+      );
       invalidateIntelligenceCache(workspaceId);
     }
 

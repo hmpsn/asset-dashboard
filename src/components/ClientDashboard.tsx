@@ -29,6 +29,7 @@ import { useClientAuth } from '../hooks/useClientAuth';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useClientSearch } from '../hooks/client/useClientSearch';
 import { useClientGA4 } from '../hooks/client/useClientGA4';
+import { useBrandSummary } from '../hooks/client/useBrandSummary';
 import {
   useClientActivity,
   useClientRankHistory,
@@ -131,6 +132,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const pricingQ = useClientPricing(workspaceId, dataEnabled);
   const contentPlanQ = useClientContentPlan(workspaceId, dataEnabled);
   const copyEntriesQ = useClientCopyEntries(workspaceId, dataEnabled);
+  const brandSummaryQ = useBrandSummary(workspaceId, dataEnabled);
 
   // ── Client IA v2 flag ──
   // Read unconditionally at the top level (Rules of Hooks). Drives the nav
@@ -380,6 +382,8 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     [WS_EVENTS.COPY_SECTION_UPDATED]: () => invalidateClientEvent(WS_EVENTS.COPY_SECTION_UPDATED),
     // ws-invalidation-ok — client dashboard keeps voice-backed intelligence fresh when Brand is not mounted
     [WS_EVENTS.VOICE_PROFILE_UPDATED]: () => invalidateClientEvent(WS_EVENTS.VOICE_PROFILE_UPDATED),
+    // ws-invalidation-ok — client dashboard keeps approved brand pieces fresh when Brand is not mounted
+    [WS_EVENTS.BRAND_IDENTITY_UPDATED]: () => invalidateClientEvent(WS_EVENTS.BRAND_IDENTITY_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.POST_UPDATED]: () => invalidateClientEvent(WS_EVENTS.POST_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
@@ -658,6 +662,10 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     <ErrorBoundary label="Brand">
       <BrandTab
         businessProfile={ws?.businessProfile ?? undefined}
+        brandSummary={brandSummaryQ.data}
+        brandSummaryLoading={brandSummaryQ.isLoading}
+        brandSummaryError={brandSummaryQ.isError}
+        onRetryBrandSummary={() => { void brandSummaryQ.refetch(); }}
         onSaveBusinessProfile={async (profile) => {
           const res = await patch<{ businessProfile: BusinessProfile }>(`/api/public/workspaces/${workspaceId}/business-profile`, profile);
           if (res?.businessProfile) {

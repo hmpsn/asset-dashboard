@@ -37,6 +37,7 @@ import { listBlueprints } from '../../page-strategy.js';
 import { listContentRequests } from '../../content-requests.js';
 import { copySectionAdapter } from './deliverable-adapters/copy-section.js';
 import { contentRequestAdapter } from './deliverable-adapters/content-request.js';
+import { projectClientBrandReviewDeliverable } from '../brand/review-contracts.js';
 import type {
   ClientDeliverable,
   DeliverableStatus,
@@ -182,7 +183,11 @@ function assembleAllDeliverables(workspaceId: string): ClientDeliverable[] {
  * projected (copy/content_request), filtered to client-facing statuses, newest-sent first.
  */
 export function listClientFacingDeliverables(workspaceId: string): ClientDeliverable[] {
-  const all = assembleAllDeliverables(workspaceId).filter(isClientFacingDeliverable);
+  const all = assembleAllDeliverables(workspaceId)
+    .filter(isClientFacingDeliverable)
+    .map(deliverable => deliverable.type === 'brand_generation'
+      ? projectClientBrandReviewDeliverable(deliverable)
+      : deliverable);
 
   log.debug(
     { workspaceId, clientFacing: all.length },

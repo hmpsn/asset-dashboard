@@ -3,7 +3,7 @@ import { requireWorkspaceAccess } from '../auth.js';
 import { validate, z } from '../middleware/validate.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
-import { WS_EVENTS } from '../ws-events.js';
+import { BRAND_IDENTITY_UPDATED_PAYLOAD, WS_EVENTS } from '../ws-events.js';
 import {
   listDeliverables, getDeliverable,
   generateDeliverable, refineDeliverable,
@@ -130,7 +130,7 @@ router.post('/api/brand-identity/:workspaceId/generate', requireWorkspaceAccess(
     addActivity(req.params.workspaceId, 'brand_deliverable_generated', `Generated ${deliverableType.replace(/_/g, ' ')} deliverable`);
   });
   runBrandIdentityPostCommitEffect(req.params.workspaceId, 'broadcast', () => {
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableType });
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, BRAND_IDENTITY_UPDATED_PAYLOAD);
   });
   runBrandIdentityPostCommitEffect(req.params.workspaceId, 'intelligence-cache', () => {
     invalidateIntelligenceCache(req.params.workspaceId);
@@ -168,7 +168,7 @@ router.post('/api/brand-identity/:workspaceId/:id/refine', requireWorkspaceAcces
     addActivity(req.params.workspaceId, 'brand_deliverable_refined', `Refined ${result.deliverableType.replace(/_/g, ' ')} deliverable`);
   });
   runBrandIdentityPostCommitEffect(req.params.workspaceId, 'broadcast', () => {
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId: req.params.id });
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, BRAND_IDENTITY_UPDATED_PAYLOAD);
   });
   runBrandIdentityPostCommitEffect(req.params.workspaceId, 'intelligence-cache', () => {
     invalidateIntelligenceCache(req.params.workspaceId);
@@ -207,7 +207,7 @@ router.patch('/api/brand-identity/:workspaceId/:id', requireWorkspaceAccess('wor
   }
 
   if (!result) return res.status(404).json({ error: 'Not found' });
-  broadcastToWorkspace(workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId, status, contentUpdated: typeof content !== 'undefined' });
+  broadcastToWorkspace(workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, BRAND_IDENTITY_UPDATED_PAYLOAD);
   invalidateIntelligenceCache(workspaceId);
   res.json(result);
 });

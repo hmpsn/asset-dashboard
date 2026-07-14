@@ -16,12 +16,14 @@
  * A per-type guard resolver (requireClientCopyReviewAuth for copy, etc.) is added where a
  * type needs stricter client access than the base guard.
  */
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
 import {
   requireAuthenticatedClientPortalAuth,
   requireClientPortalAuth,
   getClientActor,
+  verifyAdminToken,
+  verifyClientSession,
 } from '../middleware.js';
 import { validate, z } from '../middleware/validate.js';
 import { addActivity } from '../activity-log.js';
@@ -45,11 +47,20 @@ import {
   DELIVERABLE_TYPES,
 } from '../../shared/types/client-deliverable.js';
 import { DELIVERABLE_STATUS_AXES } from '../../shared/types/admin-deliverable-view.js';
+import type { GenerationHumanReviewerAttribution } from '../../shared/types/generation-evidence.js';
+import {
+  applyBrandReviewDecision,
+  BrandReviewServiceError,
+} from '../domains/brand/review-service.js';
+import {
+  brandReviewClientDecisionRequestSchema,
+  projectClientBrandReviewDecisionReceipt,
+} from '../domains/brand/review-contracts.js';
 
 const router = Router();
 const log = createLogger('routes:deliverables');
 
-const respondSchema = z
+const genericRespondSchema = z
   .object({
     decision: z.enum(['approved', 'changes_requested', 'declined']),
     note: z.string().max(2000).optional(),
@@ -74,6 +85,63 @@ const respondSchema = z
       .optional(),
   })
   .strict();
+
+// Brand reviews share the canonical /respond URL but use an intentionally
+// separate per-item contract. The service owns the atomic source + generation
+// ledger + mirror commit; the generic whole-deliverable path remains forbidden.
+const respondSchema = z.union([
+  brandReviewClientDecisionRequestSchema,
+  genericRespondSchema,
+]);
+
+/** Mirror requireAuthenticatedClientPortalAuth's priority into durable review attribution. */
+function brandReviewerFromRequest(
+  req: Request,
+  workspaceId: string,
+): GenerationHumanReviewerAttribution {
+  const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
+  if (adminToken && verifyAdminToken(adminToken)) {
+    return {
+      actorType: 'operator',
+      actorId: 'admin-hmac',
+      actorLabel: 'Admin operator',
+    };
+  }
+
+  const clientActor = getClientActor(req, workspaceId);
+  if (clientActor) {
+    return {
+      actorType: 'client',
+      actorId: clientActor.id ?? `client:${workspaceId}`,
+      actorLabel: clientActor.name ?? 'Client portal',
+    };
+  }
+
+  const legacySession = req.cookies?.[`client_session_${workspaceId}`];
+  if (legacySession && verifyClientSession(workspaceId, legacySession)) {
+    return {
+      actorType: 'client',
+      actorId: `client:${workspaceId}`,
+      actorLabel: 'Legacy client portal',
+    };
+  }
+
+  if (req.user) {
+    return {
+      actorType: 'operator',
+      actorId: req.user.id,
+      actorLabel: req.user.name,
+    };
+  }
+
+  // The auth middleware should make this unreachable. Fail closed if a future
+  // authentication path does not also provide a human attribution source.
+  throw new BrandReviewServiceError(
+    'invalid_request',
+    'Brand review decisions require an authenticated human reviewer',
+    401,
+  );
+}
 
 // Response shape for GET /api/public/deliverables/:workspaceId. A defensive Zod schema asserts
 // the assembled list matches the ClientDeliverable contract (drift guard — the assembly mixes
@@ -216,6 +284,18 @@ router.patch(
     const { workspaceId, id } = req.params;
     const actor = getClientActor(req, workspaceId);
     try {
+      if ('deliverableItemId' in req.body) {
+        const receipt = applyBrandReviewDecision(
+          workspaceId,
+          id,
+          req.body,
+          brandReviewerFromRequest(req, workspaceId),
+        );
+        return res.json(projectClientBrandReviewDecisionReceipt(
+          receipt,
+          req.body.deliverableItemId,
+        ));
+      }
       const updated = await respondToDeliverable(workspaceId, id, req.body);
       addActivity(
         workspaceId,
@@ -227,6 +307,9 @@ router.patch(
       );
       res.json(updated);
     } catch (err) {
+      if (err instanceof BrandReviewServiceError) {
+        return res.status(err.status).json({ error: err.message, code: err.code });
+      }
       if (err instanceof SendToClientError) {
         return res.status(err.status).json({ error: err.message });
       }

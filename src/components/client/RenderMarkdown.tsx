@@ -1,8 +1,49 @@
 import { inlineMarkdownToHtml } from '../../lib/inline-markdown';
 import { ChartBlock, DataTableBlock, MetricBlock, SparklineBlock } from '../ChatBlocks';
 
-export function RenderMarkdown({ text }: { text: string }) {
-  const inlineMd = (s: string) => inlineMarkdownToHtml(s);
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** Preserve evidence URLs as inert, escaped text while retaining ordinary inline formatting. */
+function proseInlineMarkdownToHtml(raw: string): string {
+  const visibleUrls: string[] = [];
+  const stashUrl = (url: string): string => {
+    const token = `\uE000${visibleUrls.length}\uE001`;
+    visibleUrls.push(url);
+    return token;
+  };
+
+  const tokenizedLinks = raw.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    (_match, label: string, destination: string) => `${label} (${stashUrl(destination)})`,
+  );
+  const tokenizedUrls = tokenizedLinks.replace(/https?:\/\/\S+/g, stashUrl);
+  const formatted = inlineMarkdownToHtml(tokenizedUrls);
+
+  return formatted.replace(/\uE000(\d+)\uE001/g, (_match, index: string) => (
+    escapeHtml(visibleUrls[Number(index)] ?? '')
+  ));
+}
+
+interface RenderMarkdownProps {
+  text: string;
+  /**
+   * Brand and other authored prose must not execute assistant-only rich-block conventions.
+   * Reserved fences remain readable code in this mode, even when their JSON is valid.
+   */
+  mode?: 'rich' | 'prose';
+}
+
+export function RenderMarkdown({ text, mode = 'rich' }: RenderMarkdownProps) {
+  const inlineMd = (s: string) => (
+    mode === 'prose' ? proseInlineMarkdownToHtml(s) : inlineMarkdownToHtml(s)
+  );
   const stripBold = (s: string) => s.replace(/\*\*/g, '').trim();
   const lines = text.split('\n');
   const elements: React.ReactElement[] = [];
@@ -26,7 +67,10 @@ export function RenderMarkdown({ text }: { text: string }) {
       const blockContent = blockLines.join('\n').trim();
 
       // Rich blocks: metric, chart, datatable, sparkline
-      if (lang === 'metric' || lang === 'chart' || lang === 'datatable' || lang === 'sparkline') {
+      if (
+        mode === 'rich'
+        && (lang === 'metric' || lang === 'chart' || lang === 'datatable' || lang === 'sparkline')
+      ) {
         let parsed: unknown = null;
         try { parsed = JSON.parse(blockContent); } catch { /* invalid JSON */ }
 

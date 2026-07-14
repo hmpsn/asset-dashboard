@@ -289,7 +289,10 @@ export const brandGenerationAdapter: DeliverableAdapter<BrandReviewDeliverableIn
   buildPayload,
   sourceRef,
   resolveSendStatus(input) {
-    return input.items.some(item => item.mirrorStatus === 'approved')
+    // validateSendable guarantees at least one awaiting child. Any retained
+    // terminal sibling — approved OR changes-requested — makes the grouped
+    // review honestly partial on resend.
+    return input.items.some(item => item.mirrorStatus !== 'awaiting_client')
       ? 'partial'
       : 'awaiting_client';
   },

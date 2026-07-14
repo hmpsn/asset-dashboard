@@ -53,10 +53,14 @@ vi.mock('../../server/domains/content/publish-post-to-webflow.js', () => {
 vi.mock('../../server/domains/content/on-content-request-live.js', () => ({
   onContentRequestLive: vi.fn(),
 }));
+vi.mock('../../server/domains/brand/review-service.js', () => ({
+  createBrandReviewDeliverable: vi.fn(),
+}));
 
 import { getWorkspace } from '../../server/workspaces.js';
 import { publishPostToWebflow, PublishPostError } from '../../server/domains/content/publish-post-to-webflow.js';
 import { onContentRequestLive } from '../../server/domains/content/on-content-request-live.js';
+import { createBrandReviewDeliverable } from '../../server/domains/brand/review-service.js';
 import { buildContentGenerationContext } from '../../server/intelligence/generation-context-builders.js';
 import { buildWorkspaceIntelligence } from '../../server/workspace-intelligence.js';
 import { deleteBrief, getBrief, listBriefs, updateBrief, upsertBrief } from '../../server/content-brief.js';
@@ -140,6 +144,15 @@ describe('mcp content action tools', () => {
     (deletePost as ReturnType<typeof vi.fn>).mockReturnValue(true);
     (listPostVersions as ReturnType<typeof vi.fn>).mockReturnValue([]);
     (revertToVersion as ReturnType<typeof vi.fn>).mockReturnValue(null);
+    (createBrandReviewDeliverable as ReturnType<typeof vi.fn>).mockResolvedValue({
+      deliverableId: 'cd_brand_review',
+      reviewKind: 'brand_suite',
+      runId: 'bgr_1',
+      runRevision: 4,
+      status: 'awaiting_client',
+      itemCount: 3,
+      existing: false,
+    });
   });
 
   it('registers content action tool names', () => {
@@ -165,6 +178,36 @@ describe('mcp content action tools', () => {
       'list_post_versions',
       'revert_post_version',
     ]);
+  });
+
+  it('send_to_client sends an exact brand-generation run through the grouped review service', async () => {
+    const result = await handleContentActionTool('send_to_client', {
+      workspace_id: 'ws-1',
+      brand_generation: {
+        run_id: 'bgr_1',
+        expected_run_revision: 4,
+        review_kind: 'brand_suite',
+      },
+      note: 'Please review the brand system.',
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(createBrandReviewDeliverable).toHaveBeenCalledWith(
+      'ws-1',
+      'bgr_1',
+      4,
+      'brand_suite',
+      { note: 'Please review the brand system.', source: 'mcp-chat' },
+    );
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      target: 'brand_generation',
+      review_deliverable_id: 'cd_brand_review',
+      review_kind: 'brand_suite',
+      run_revision: 4,
+      status: 'awaiting_client',
+      item_count: 3,
+      dashboard_url: expect.stringMatching(/\/ws\/ws-1\/requests\?tab=deliverables$/),
+    });
   });
 
   it('lists, gets, and creates content requests', async () => {

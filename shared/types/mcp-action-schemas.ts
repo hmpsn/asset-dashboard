@@ -4,6 +4,7 @@ import {
   LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP,
 } from './local-seo.js';
 import { CONTENT_GENERATION_STYLES } from './content.js';
+import { BRAND_REVIEW_BUNDLE_KINDS } from './brand-generation.js';
 import { hasVisibleHtmlContent } from '../content-post-integrity.js';
 
 // --- Shared building blocks -------------------------------------------------
@@ -512,18 +513,35 @@ export const updatePostInputSchema = z.object({
 export const sendToClientInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   brief_handle: handleIdSchema.optional()
-    .describe('Target a brief by its save_brief handle. Provide EXACTLY ONE of brief_handle, post_handle, brief_id, or post_id.'),
+    .describe('Target a brief by its save_brief handle. Provide exactly one supported send target.'),
   post_handle: handleIdSchema.optional()
-    .describe('Target a post by its save_post handle. Provide EXACTLY ONE of brief_handle, post_handle, brief_id, or post_id.'),
+    .describe('Target a post by its save_post handle. Provide exactly one supported send target.'),
   brief_id: z.string().min(1).optional()
-    .describe('Target an already-saved brief by id. Provide EXACTLY ONE of brief_handle, post_handle, brief_id, or post_id.'),
+    .describe('Target an already-saved brief by id. Provide exactly one supported send target.'),
   post_id: z.string().min(1).optional()
-    .describe('Target an already-saved post by id. Provide EXACTLY ONE of brief_handle, post_handle, brief_id, or post_id.'),
+    .describe('Target an already-saved post by id. Provide exactly one supported send target.'),
+  brand_generation: z.object({
+    run_id: z.string().trim().min(1)
+      .describe('The durable brand-generation run to send as one grouped Inbox review.'),
+    expected_run_revision: z.number().int().nonnegative()
+      .describe('The exact run revision returned by get_brand_generation. Re-read on conflict.'),
+    review_kind: z.enum(BRAND_REVIEW_BUNDLE_KINDS)
+      .describe("Send either the provisional 'voice_foundation' gate or the durable 'brand_suite' review; they are separate bundles."),
+  }).strict().optional()
+    .describe('Target a completed brand-generation review set with exact revision authority.'),
   note: z.string().optional()
-    .describe('Optional note to the client included with the content request.'),
+    .describe('Optional note to the client included with the review request.'),
 }).refine(
-  (data) => [data.brief_handle, data.post_handle, data.brief_id, data.post_id].filter(Boolean).length === 1,
-  { message: 'must provide exactly one target: brief_handle, post_handle, brief_id, or post_id' },
+  (data) => [
+    data.brief_handle,
+    data.post_handle,
+    data.brief_id,
+    data.post_id,
+    data.brand_generation,
+  ].filter(Boolean).length === 1,
+  {
+    message: 'must provide exactly one target: brief_handle, post_handle, brief_id, post_id, or brand_generation',
+  },
 );
 
 export const listContentRequestsInputSchema = z.object({

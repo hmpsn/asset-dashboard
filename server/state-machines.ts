@@ -255,7 +255,7 @@ const DELIVERABLE_TYPE_OVERRIDES: Record<string, Record<string, readonly string[
     // final source is approved. There is no whole-bundle decline or apply edge.
     awaiting_client: ['awaiting_client', 'changes_requested', 'partial', 'approved', 'expired', 'cancelled'],
     changes_requested: ['awaiting_client', 'changes_requested', 'partial', 'approved', 'expired', 'cancelled'],
-    partial: ['partial', 'approved', 'changes_requested', 'expired', 'cancelled'],
+    partial: ['awaiting_client', 'partial', 'approved', 'changes_requested', 'expired', 'cancelled'],
     approved: [],
   },
   // (briefing is handled by NOTIFICATION_DELIVERABLE_TYPES below; an override entry here

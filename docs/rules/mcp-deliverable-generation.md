@@ -390,11 +390,27 @@ never sufficient to dispatch paid work.
   payload variants with stable `brand_generation:<reviewKind>:<runId>` natural
   keys. A same-run revision preserves approved children and database-owned item
   identity metadata; it cannot duplicate the bundle or reset prior approvals.
+- Stable client item IDs are identity, not concurrency authority. Every public
+  item projection carries an opaque review token bound to the exact sent
+  revision/content; item decisions must echo it and fail with `409` when a
+  resend rotated the token. The pre-decision token remains valid for an exact
+  lost-response replay after a terminal commit.
+- An exact pending send retry returns the persisted receipt without a second
+  email, send timestamp, or deliverable event. A real revision or note change
+  uses the same row, rotates the review token, and sends a new notification.
+  Send activity always derives its note from that persisted row so a partial
+  resend that inherits prior instructions has byte-identical idempotency inputs.
+  Notification, deliverable broadcast, and cache invalidation are isolated after
+  the authoritative send write; one failed effect cannot report the durable send
+  as failed or suppress the effects that follow it.
 - Drafts, raw intake, prompts, internal evidence, and audit reasoning are never
   exposed by client serializers. Private run/source IDs, revisions, actor data,
   requirements, provenance, and MCP identity are projected away too.
 - Item approval updates only that source row through its legal state machine and
   only when both the frozen generation-item revision and source version match.
+  Version identity is necessary but not sufficient: the reviewed mirror bytes,
+  generation candidate bytes, and durable source bytes must also match exactly
+  at send and decision time. Any divergence fails closed before authority moves.
   The source, generation item/run counts, and mirror child commit atomically;
   the generic mirror-first response path is forbidden. Changes requested
   preserves the note, keeps/returns that source in draft, and opens a
@@ -402,13 +418,30 @@ never sufficient to dispatch paid work.
   Only operator/client actors may decide an item; system/MCP actors cannot
   auto-approve, and `changes_requested` always carries its note.
   The bundle stays `partial` until all items are terminal and becomes `approved`
-  only when all are approved.
+  only when all are approved. If the only terminal child is revised while its
+  siblings remain pending, the parent may legally return from `partial` to
+  `awaiting_client`.
+- Bespoke atomic review responses still satisfy the unified spine's team-
+  notification guarantee. Notification, activity, workspace broadcasts, and
+  cache invalidation are isolated post-commit effects so one failure cannot
+  turn a committed decision into an HTTP failure or suppress later effects.
+  Notification copy is derived from the persisted human reviewer and must not
+  call an operator decision a client decision.
+  Decision activity uses a deterministic effect key and is reconciled on an
+  exact terminal replay, so a post-commit insert failure can be repaired once
+  without repeating team email or domain broadcasts.
+- `BRAND_IDENTITY_UPDATED` is a client-shared invalidation event and always uses
+  the canonical empty payload. Source deliverable IDs, versions, statuses, and
+  draft types stay behind authenticated read projections.
 - Voice-foundation review is a separate gate. Client approval of a voice item
   never finalizes a `VoiceProfile` and never mutates the provisional B2 item; it
   records human-review evidence only. An operator explicitly finalizes after
   selecting authentic anchors.
 - Only approved, explicitly client-visible brand fields pre-seed the client
-  dashboard and downstream brand slice.
+  dashboard and downstream brand slice. A client-visible voice summary comes
+  only from the current immutable finalization snapshot; a legacy calibrated
+  profile or a profile edited after finalization is not voice authority and is
+  omitted.
 - An intake-to-brand-to-content orchestration is a durable workflow that pauses
   at review/approval boundaries. Human gates are resumable states, not long-
   running jobs and not bypasses hidden behind “one click.”

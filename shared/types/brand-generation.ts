@@ -963,11 +963,15 @@ export type BrandReviewPersistedDecision =
 export type BrandReviewClientDecisionRequest =
   | {
       deliverableItemId: string;
+      /** Opaque CAS token for the exact review projection the client saw. */
+      reviewToken: string;
       decision: 'approve';
       note?: string;
     }
   | {
       deliverableItemId: string;
+      /** Opaque CAS token for the exact review projection the client saw. */
+      reviewToken: string;
       decision: 'changes_requested';
       note: string;
     };
@@ -1075,8 +1079,8 @@ export type ClientBrandReviewBundlePayload = ClientBrandReviewPayloadBase & (
 
 /** Safe child metadata; excludes run/source IDs, versions, actor data, and evidence. */
 export type ClientBrandReviewItemPayload = ClientBrandReviewPayloadBase & (
-  | { reviewKind: 'voice_foundation'; target: 'voice_foundation' }
-  | { reviewKind: 'brand_suite'; target: BrandDeliverableType }
+  | { reviewKind: 'voice_foundation'; target: 'voice_foundation'; reviewToken: string }
+  | { reviewKind: 'brand_suite'; target: BrandDeliverableType; reviewToken: string }
 );
 
 export interface BrandReviewDeliverableReceipt {
@@ -1111,6 +1115,18 @@ export type BrandReviewDecisionReceipt = BrandReviewDecisionReceiptBase & (
       decision: BrandReviewItemDecision;
     }
 );
+
+/**
+ * Explicit allowlist returned to the authenticated client after one item-level
+ * decision. Run/source identities, revisions, evidence, and reviewer attribution
+ * remain private to the durable review ledger.
+ */
+export interface ClientBrandReviewDecisionReceipt {
+  reviewDeliverableId: string;
+  deliverableItemId: string;
+  itemStatus: 'approved' | 'changes_requested';
+  bundleStatus: 'partial' | 'approved' | 'changes_requested';
+}
 
 /** Deliberately excludes intake, prompts, evidence internals, and draft output. */
 export interface ClientBrandSummary {

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   BRAND_REVIEW_BUNDLE_KINDS,
   BRAND_REVIEW_ITEM_DECISIONS,
@@ -34,6 +36,7 @@ describe('B3 brand review contract root', () => {
     expect(transitions.awaiting_client).not.toContain('declined');
     expect(transitions.changes_requested).not.toContain('declined');
     expect(transitions.partial).toContain('partial');
+    expect(transitions.partial).toContain('awaiting_client');
     expect(transitions.partial).toContain('approved');
     expect(transitions.partial).toContain('expired');
     expect(transitions.approved).toEqual([]);
@@ -49,6 +52,26 @@ describe('B3 brand review contract root', () => {
       'client-brand-summary',
       'ws-1',
     ]);
+  });
+
+  it('uses the payload-free brand identity invalidation on every shared workspace producer', () => {
+    const producerFiles = [
+      'server/routes/brand-identity.ts',
+      'server/mcp/tools/brand.ts',
+      'server/domains/brand/generation/effects.ts',
+      'server/domains/brand/review-service.ts',
+    ];
+    for (const file of producerFiles) {
+      const source = readFileSync(resolve(process.cwd(), file), 'utf8'); // readFile-ok: contract census for client-shared brand identity event payloads
+      const callIndexes = Array.from(
+        source.matchAll(/WS_EVENTS\.BRAND_IDENTITY_UPDATED,/g),
+        match => match.index,
+      );
+      expect(callIndexes.length, file).toBeGreaterThan(0);
+      for (const index of callIndexes) {
+        expect(source.slice(index, index + 180), file).toContain('BRAND_IDENTITY_UPDATED_PAYLOAD');
+      }
+    }
   });
 
   it('keeps review and authority mutations fresh on both admin and client surfaces', () => {
@@ -114,6 +137,7 @@ describe('B3 brand review contract root', () => {
     }).success).toBe(false);
     expect(brandReviewClientDecisionRequestSchema.safeParse({
       deliverableItemId: 'item-1',
+      reviewToken: 'a'.repeat(64),
       decision: 'changes_requested',
       note: '   ',
     }).success).toBe(false);

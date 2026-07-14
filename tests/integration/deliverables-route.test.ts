@@ -97,6 +97,43 @@ describe('PATCH /api/public/deliverables/:workspaceId/:id/respond auth', () => {
     expect(res.status).toBe(404);
   });
 
+  it('routes the strict per-item brand decision shape through the specialized service', async () => {
+    const res = await clientFetch(
+      `/api/public/deliverables/${pwless.workspaceId}/cd_missing_brand_review/respond`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          deliverableItemId: 'cdi_missing_brand_item',
+          reviewToken: 'a'.repeat(64),
+          decision: 'approve',
+        }),
+      },
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({
+      error: 'Brand review deliverable not found',
+      code: 'not_found',
+    });
+  });
+
+  it('rejects a blank per-item brand changes request at the route boundary', async () => {
+    const res = await clientFetch(
+      `/api/public/deliverables/${pwless.workspaceId}/cd_missing_brand_review/respond`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          deliverableItemId: 'cdi_missing_brand_item',
+          reviewToken: 'a'.repeat(64),
+          decision: 'changes_requested',
+          note: '   ',
+        }),
+      },
+    );
+
+    expect(res.status).toBe(400);
+  });
+
   it('rejects an invalid decision value with 400 (Zod validation runs before the handler)', async () => {
     const res = await clientFetch(`/api/public/deliverables/${pwless.workspaceId}/cd_x/respond`, {
       method: 'PATCH',
@@ -191,6 +228,31 @@ describe('PATCH /api/public/deliverables/:workspaceId/:id/respond auth', () => {
     const body = await res.json();
     expect(body.error).toMatch(/act-on/i);
     // The mirror must NOT have been mutated by the generic respond path.
+    expect(getDeliverable(deliverable.id)?.status).toBe('awaiting_client');
+  });
+
+  it('rejects a whole-bundle response for a brand-generation review', async () => {
+    const now = new Date().toISOString();
+    const deliverable = upsertDeliverable({
+      workspaceId: pwless.workspaceId,
+      type: 'brand_generation',
+      kind: 'review',
+      status: 'awaiting_client',
+      title: 'Brand system review',
+      summary: 'Review each brand piece independently.',
+      payload: {},
+      sentAt: now,
+      generatedAt: now,
+      sourceRef: `brand_generation:brand_suite:test-${randomUUID()}`,
+    });
+
+    const res = await clientFetch(
+      `/api/public/deliverables/${pwless.workspaceId}/${deliverable.id}/respond`,
+      { method: 'PATCH', body: JSON.stringify({ decision: 'approved' }) },
+    );
+
+    expect(res.status).toBe(409);
+    expect((await res.json() as { error: string }).error).toMatch(/per-item decision/i);
     expect(getDeliverable(deliverable.id)?.status).toBe('awaiting_client');
   });
 });

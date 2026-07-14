@@ -12,7 +12,7 @@ import { broadcastToWorkspace } from '../../../broadcast.js';
 import { clearIntelligenceCache } from '../../../intelligence/cache-clear.js';
 import { createLogger } from '../../../logger.js';
 import { recordPaidCallOnce } from '../../../mcp/paid-call-counter.js';
-import { WS_EVENTS } from '../../../ws-events.js';
+import { BRAND_IDENTITY_UPDATED_PAYLOAD, WS_EVENTS } from '../../../ws-events.js';
 import {
   brandGenerationAcceptedEffectKey,
   brandGenerationArtifactEffectKey,
@@ -168,13 +168,11 @@ function applyEvent(
       actor: activityActor(command),
       createdAt: event.createdAt,
     });
-    deps.broadcastToWorkspace(event.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, {
-      workspaceId: event.workspaceId,
-      deliverableId: event.payload.deliverableId,
-      deliverableType: event.payload.deliverableType,
-      version: event.payload.deliverableVersion,
-      status: event.payload.deliverableStatus,
-    });
+    deps.broadcastToWorkspace(
+      event.workspaceId,
+      WS_EVENTS.BRAND_IDENTITY_UPDATED,
+      BRAND_IDENTITY_UPDATED_PAYLOAD,
+    );
     deps.clearIntelligenceCache(event.workspaceId);
     deps.broadcastToWorkspace(event.workspaceId, WS_EVENTS.INTELLIGENCE_CACHE_UPDATED, {
       workspaceId: event.workspaceId,

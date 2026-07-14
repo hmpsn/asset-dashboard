@@ -44,6 +44,7 @@ import {
 } from '../../content-posts-db.js';
 import { countHtmlWords } from '../../content-posts-ai.js';
 import { sendPostToClientForReview, PostNotFoundError } from '../../domains/content/send-post-to-client.js';
+import { createBrandReviewDeliverable } from '../../domains/brand/review-service.js';
 import { publishPostToWebflow, PublishPostError } from '../../domains/content/publish-post-to-webflow.js';
 import { onContentRequestLive } from '../../domains/content/on-content-request-live.js';
 import { sanitizeInlinePromptText } from '../../utils/text.js';
@@ -154,7 +155,8 @@ export const contentActionTools: Tool[] = [
   },
   {
     name: 'send_to_client',
-    description: 'Create or update client-facing content requests from a saved brief/post handle or id.',
+    description:
+      'Send exactly one saved brief, post, or ready brand-generation run to the client. Brand generation requires an exact run revision and creates one grouped, per-item Inbox review; it never approves on the client\'s behalf.',
     inputSchema: toMcpJsonSchema(sendToClientInputSchema),
   },
   {
@@ -1297,12 +1299,35 @@ async function handleSendToClient(
     post_handle: postHandle,
     brief_id: briefId,
     post_id: postId,
+    brand_generation: brandGeneration,
     note,
   } = parsed.data;
   const workspace = requireWorkspace(workspaceId);
   if ('isError' in workspace) return workspace;
 
   try {
+    if (brandGeneration) {
+      const review = await createBrandReviewDeliverable(
+        workspaceId,
+        brandGeneration.run_id,
+        brandGeneration.expected_run_revision,
+        brandGeneration.review_kind,
+        { note, source: 'mcp-chat' },
+      );
+      return mcpSuccess({
+        ok: true,
+        target: 'brand_generation',
+        review_deliverable_id: review.deliverableId,
+        review_kind: review.reviewKind,
+        run_id: review.runId,
+        run_revision: review.runRevision,
+        status: review.status,
+        item_count: review.itemCount,
+        existing: review.existing,
+        dashboard_url: `${buildDashboardUrl(workspaceId, 'requests')}?tab=deliverables`,
+      });
+    }
+
     if (briefHandle || briefId) {
       let payload: BriefSavedPayload | null = null;
       if (briefHandle) {

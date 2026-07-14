@@ -62,6 +62,7 @@ vi.mock('../../server/broadcast.js', () => ({ broadcastToWorkspace: h.broadcastT
 vi.mock('../../server/intelligence/cache-invalidation.js', () => ({ invalidateIntelligenceCache: h.invalidateIntelligenceCache }));
 vi.mock('../../server/ws-events.js', () => ({
   WS_EVENTS: { BRAND_IDENTITY_UPDATED: 'brand-identity:updated' },
+  BRAND_IDENTITY_UPDATED_PAYLOAD: {},
 }));
 
 // ─── Imports (after mocks) ────────────────────────────────────────────────────
@@ -153,7 +154,7 @@ describe('update_brand_deliverable MCP tool', () => {
       undefined,
       expect.objectContaining({ source: 'mcp-chat', deliverableId: id }),
     );
-    expect(h.broadcastToWorkspace).toHaveBeenCalledWith(ws.workspaceId, 'brand-identity:updated', expect.objectContaining({ deliverableId: id, contentUpdated: true }));
+    expect(h.broadcastToWorkspace).toHaveBeenCalledWith(ws.workspaceId, 'brand-identity:updated', {});
     expect(h.invalidateIntelligenceCache).toHaveBeenCalledWith(ws.workspaceId);
     expect(h.logger.warn).not.toHaveBeenCalled();
   });

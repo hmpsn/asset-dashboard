@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { z } from '../../middleware/validate.js';
 import {
   BRAND_DELIVERABLE_TYPES,
@@ -8,8 +10,10 @@ import {
   BRAND_REVIEW_MIRROR_ITEM_STATUSES,
   type BrandReviewBundlePayload,
   type BrandReviewClientDecisionRequest,
+  type BrandReviewDecisionReceipt,
   type BrandReviewItemPayload,
   type ClientBrandReviewBundlePayload,
+  type ClientBrandReviewDecisionReceipt,
   type ClientBrandReviewItemPayload,
 } from '../../../shared/types/brand-generation.js';
 import type { ClientDeliverable } from '../../../shared/types/client-deliverable.js';
@@ -18,6 +22,7 @@ import { generationResolverAttributionSchema } from '../../../shared/types/voice
 const idSchema = z.string().min(1).max(BRAND_GENERATION_LIMITS.maxIdLength);
 const revisionSchema = z.number().int().positive();
 const timestampSchema = z.string().datetime();
+const reviewTokenSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const optionalReviewNoteSchema = z.string().max(4_000).optional();
 const requiredReviewNoteSchema = z.string().min(1).max(4_000).refine(
   note => note.trim().length > 0,
@@ -160,11 +165,13 @@ export const brandReviewItemPayloadSchema = z.discriminatedUnion('reviewKind', [
 export const brandReviewClientDecisionRequestSchema = z.discriminatedUnion('decision', [
   z.object({
     deliverableItemId: idSchema,
+    reviewToken: reviewTokenSchema,
     decision: z.literal('approve'),
     note: optionalReviewNoteSchema,
   }).strict(),
   z.object({
     deliverableItemId: idSchema,
+    reviewToken: reviewTokenSchema,
     decision: z.literal('changes_requested'),
     note: requiredReviewNoteSchema,
   }).strict(),
@@ -189,6 +196,65 @@ export class BrandReviewProjectionError extends Error {
     super(message);
     this.name = 'BrandReviewProjectionError';
   }
+}
+
+function aggregateProjectedReviewStatus(
+  items: Array<{ status: string }>,
+): 'awaiting_client' | 'partial' | 'approved' | 'changes_requested' {
+  if (items.every(item => item.status === 'approved')) return 'approved';
+  if (items.every(item => item.status === 'changes_requested')) return 'changes_requested';
+  if (items.every(item => item.status === 'awaiting_client')) return 'awaiting_client';
+  return 'partial';
+}
+
+export const clientBrandReviewDecisionReceiptSchema = z.object({
+  reviewDeliverableId: idSchema,
+  deliverableItemId: idSchema,
+  itemStatus: z.enum(['approved', 'changes_requested']),
+  bundleStatus: z.enum(['partial', 'approved', 'changes_requested']),
+}).strict();
+
+/**
+ * Opaque client CAS token for exactly one sent review projection. It deliberately
+ * excludes terminal decision fields so a lost-response retry remains idempotent,
+ * while sentAt/note/content/frozen source lineage rotate on every real resend.
+ */
+export function brandReviewClientToken(
+  deliverable: ClientDeliverable,
+  item: NonNullable<ClientDeliverable['items']>[number],
+  payload: BrandReviewItemPayload,
+): string {
+  return createHash('sha256').update(JSON.stringify({
+    contract: BRAND_REVIEW_CONTRACT_VERSION,
+    reviewDeliverableId: deliverable.id,
+    reviewKind: payload.reviewKind,
+    sentAt: deliverable.sentAt,
+    note: deliverable.note?.trim() || null,
+    clientItemId: item.id,
+    clientItemCreatedAt: item.createdAt,
+    target: payload.target,
+    content: item.proposedValue,
+    runId: payload.runId,
+    runRevision: payload.runRevision,
+    generationItemId: payload.generationItemId,
+    reviewGenerationRevision:
+      payload.decision?.expectedGenerationItemRevision ?? payload.generationItemRevision,
+    sourceDeliverableId: payload.sourceDeliverableId,
+    expectedDeliverableVersion: payload.expectedDeliverableVersion,
+  })).digest('hex');
+}
+
+/** Public response projection for the item-level review mutation. */
+export function projectClientBrandReviewDecisionReceipt(
+  receipt: BrandReviewDecisionReceipt,
+  deliverableItemId: string,
+): ClientBrandReviewDecisionReceipt {
+  return clientBrandReviewDecisionReceiptSchema.parse({
+    reviewDeliverableId: receipt.reviewDeliverableId,
+    deliverableItemId,
+    itemStatus: receipt.decision.decision === 'approve' ? 'approved' : 'changes_requested',
+    bundleStatus: receipt.bundleStatus,
+  }) as ClientBrandReviewDecisionReceipt;
 }
 
 /**
@@ -245,12 +311,14 @@ export function projectClientBrandReviewDeliverable(
           family: 'brand_generation',
           reviewKind: 'voice_foundation',
           target: 'voice_foundation',
+          reviewToken: brandReviewClientToken(deliverable, item, payload),
         } satisfies ClientBrandReviewItemPayload)
       : ({
           schemaVersion: BRAND_REVIEW_CONTRACT_VERSION,
           family: 'brand_generation',
           reviewKind: 'brand_suite',
           target: payload.target,
+          reviewToken: brandReviewClientToken(deliverable, item, payload),
         } satisfies ClientBrandReviewItemPayload);
     return {
       id: item.id,
@@ -275,6 +343,10 @@ export function projectClientBrandReviewDeliverable(
     family: 'brand_generation',
     reviewKind: parent.reviewKind,
   } satisfies ClientBrandReviewBundlePayload;
+  const expectedStatus = aggregateProjectedReviewStatus(items);
+  if (deliverable.status !== expectedStatus) {
+    throw new BrandReviewProjectionError('Brand review parent status does not match its children');
+  }
   return {
     id: deliverable.id,
     workspaceId: deliverable.workspaceId,

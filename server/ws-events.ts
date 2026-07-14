@@ -184,6 +184,13 @@ export const WS_EVENTS = {
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];
 
+/**
+ * BRAND_IDENTITY_UPDATED is shared with client subscribers and is invalidation-only.
+ * Brand deliverable ids, versions, statuses, and draft types stay behind authenticated
+ * read boundaries; every producer must emit this canonical empty payload.
+ */
+export const BRAND_IDENTITY_UPDATED_PAYLOAD: Readonly<Record<string, never>> = Object.freeze({});
+
 // --- Admin-global events (broadcast to all admin connections) ---
 
 export const ADMIN_EVENTS = {

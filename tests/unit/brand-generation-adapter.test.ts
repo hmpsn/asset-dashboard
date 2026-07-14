@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type {
   BrandReviewDeliverableInput,
+  BrandReviewDecisionReceipt,
   BrandSuiteReviewMirrorItemInput,
   BrandVoiceFoundationReviewMirrorItemInput,
 } from '../../shared/types/brand-generation.js';
@@ -10,6 +11,7 @@ import '../../server/domains/inbox/deliverable-adapters/index.js';
 import {
   brandReviewBundlePayloadSchema,
   brandReviewItemPayloadSchema,
+  projectClientBrandReviewDecisionReceipt,
   projectClientBrandReviewDeliverable,
 } from '../../server/domains/brand/review-contracts.js';
 
@@ -171,6 +173,7 @@ describe('brand generation deliverable adapter', () => {
       family: 'brand_generation',
       reviewKind: 'brand_suite',
       target: 'tagline',
+      reviewToken: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
     expect(projected).toMatchObject({
       externalRef: null,
@@ -182,6 +185,44 @@ describe('brand generation deliverable adapter', () => {
     expect(serialized).not.toContain('bgr_review');
     expect(serialized).not.toContain('bd_tagline');
     expect(serialized).not.toContain('generationItemRevision');
+    expect(() => projectClientBrandReviewDeliverable({
+      ...raw,
+      status: 'approved',
+    })).toThrow('Brand review parent status does not match its children');
+  });
+
+  it('projects an item decision receipt without private run, source, revision, or actor data', () => {
+    const privateReceipt: BrandReviewDecisionReceipt = {
+      reviewDeliverableId: 'cd_brand_review',
+      reviewKind: 'brand_suite',
+      runId: 'private-run',
+      runRevision: 8,
+      previousGenerationItemRevision: 2,
+      generationItemRevision: 3,
+      sourceDeliverableVersion: 4,
+      bundleStatus: 'partial',
+      decision: {
+        runId: 'private-run',
+        itemId: 'private-generation-item',
+        expectedGenerationItemRevision: 2,
+        resultingGenerationItemRevision: 3,
+        deliverableId: 'private-brand-source',
+        deliverableType: 'tagline',
+        expectedDeliverableVersion: 4,
+        decision: 'approve',
+        decidedAt: '2026-07-13T12:00:00.000Z',
+        decidedBy: { actorType: 'client', actorId: 'private-client' },
+      },
+    };
+
+    const projected = projectClientBrandReviewDecisionReceipt(privateReceipt, 'cdi_brand_tagline');
+    expect(projected).toEqual({
+      reviewDeliverableId: 'cd_brand_review',
+      deliverableItemId: 'cdi_brand_tagline',
+      itemStatus: 'approved',
+      bundleStatus: 'partial',
+    });
+    expect(JSON.stringify(projected)).not.toMatch(/private-|runId|revision|decidedBy/i);
   });
 
   it('keeps a resend partial when an approved child is retained and rejects bad CAS lineage', () => {
@@ -229,6 +270,44 @@ describe('brand generation deliverable adapter', () => {
           : { ...approved.decision, resultingGenerationItemRevision: 4 },
       }, awaiting],
     }).ok).toBe(false);
+  });
+
+  it('keeps a resend partial when a changes-requested child is retained', () => {
+    const adapter = getAdapter('brand_generation');
+    const changesRequested = suiteItem({
+      generationItemRevision: 3,
+      generationStatus: 'changes_requested',
+      sourceDeliverableStatus: 'draft',
+      mirrorStatus: 'changes_requested',
+      decision: {
+        runId: 'bgr_review',
+        itemId: 'bgi_tagline',
+        expectedGenerationItemRevision: 2,
+        resultingGenerationItemRevision: 3,
+        deliverableId: 'bd_tagline',
+        deliverableType: 'tagline',
+        expectedDeliverableVersion: 2,
+        decidedAt: '2026-07-13T12:00:00.000Z',
+        decidedBy: { actorType: 'client', actorId: 'client-1' },
+        decision: 'changes_requested',
+        note: 'Please revise this.',
+      },
+    });
+    const awaiting = suiteItem({
+      clientItemId: 'cdi_brand_values',
+      generationItemId: 'bgi_values',
+      target: 'values',
+      sourceDeliverableId: 'bd_values',
+    });
+    const input: BrandReviewDeliverableInput = {
+      reviewKind: 'brand_suite',
+      runId: 'bgr_review',
+      runRevision: 5,
+      items: [changesRequested, awaiting],
+    };
+
+    expect(adapter.validateSendable(input)).toEqual({ ok: true });
+    expect(adapter.resolveSendStatus?.(input, null)).toBe('partial');
   });
 
   it('rejects unresolved facts and impossible source states before a send', () => {
