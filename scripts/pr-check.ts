@@ -33,6 +33,7 @@ import {
   stripBlockCommentsAndTemplateLiterals,
 } from './lexicon-registry.js';
 import { DUPLICATE_NAME_ALLOWLIST } from '../shared/types/lexicon.js';
+import { DELIVERABLE_TYPES } from '../shared/types/client-deliverable.js';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const SCAN_ALL = process.argv.includes('--all');
@@ -317,6 +318,17 @@ const ROUTE_CONTRACT_REQUIRED_BASENAMES = new Set([
 // ─── Check definitions ────────────────────────────────────────────────────────
 
 export type CustomCheckMatch = { file: string; line: number; text: string };
+
+/** Canonical adapter census shared by the rule and its fail-loud regression test. */
+export function findMissingDeliverableAdapters(
+  adaptersDir: string,
+  deliverableTypes: readonly string[] = DELIVERABLE_TYPES,
+): string[] {
+  return deliverableTypes.filter(type => {
+    const adapterPath = path.join(adaptersDir, `${type.replace(/_/g, '-')}.ts`);
+    return !existsSync(adapterPath);
+  });
+}
 
 export type Check = {
   name: string;
@@ -9040,44 +9052,20 @@ export const CHECKS: Check[] = [
       'A deliverable type has no adapter file under ' +
       'server/domains/inbox/deliverable-adapters/<type>.ts. Add the adapter (with registerAdapter) ' +
       'and its import line in deliverable-adapters/index.ts. Add // deliverable-adapter-ok if intentional.',
-    severity: 'warn',
+    severity: 'error',
     excludeLines: ['deliverable-adapter-ok'],
     rationale:
       'sendToClient() resolves an adapter per type; any deliverable type without one throws at send time.',
     claudeMdRef: '#code-conventions',
     customCheck: () => {
       const hits: CustomCheckMatch[] = [];
-      const deliverableTypes = [
-        'seo_edit',
-        'audit_issue',
-        'schema_item',
-        'schema_plan',
-        'redirect',
-        'internal_link',
-        'aeo_change',
-        'content_decay',
-        'cannibalization',
-        'content_plan_sample',
-        'content_plan_template',
-        'work_order',
-        'briefing',
-        'copy_section',
-        'content_request',
-        'recommendation',
-      ];
       const adaptersDir = path.join(ROOT, 'server/domains/inbox/deliverable-adapters');
-      for (const type of deliverableTypes) {
-        // Adapter files use the hyphenated convention (copy_section → copy-section.ts,
-        // schema_plan → schema-plan.ts, …), so normalize the underscore type id before
-        // resolving the file.
-        const adapterPath = path.join(adaptersDir, `${type.replace(/_/g, '-')}.ts`);
-        if (!existsSync(adapterPath)) {
-          hits.push({
-            file: path.join(ROOT, 'shared/types/client-deliverable.ts'),
-            line: 1,
-            text: `deliverable type '${type}' has no adapter file`,
-          });
-        }
+      for (const type of findMissingDeliverableAdapters(adaptersDir)) {
+        hits.push({
+          file: path.join(ROOT, 'shared/types/client-deliverable.ts'),
+          line: 1,
+          text: `deliverable type '${type}' has no adapter file`,
+        });
       }
       return hits;
     },

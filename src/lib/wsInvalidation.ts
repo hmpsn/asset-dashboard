@@ -269,7 +269,10 @@ function adminInvalidationKeys(
       ] as const;
     case WS_EVENTS.DELIVERABLE_SENT:
     case WS_EVENTS.DELIVERABLE_UPDATED:
-      return [queryKeys.admin.workspaceDeliverables(workspaceId)] as const;
+      return [
+        queryKeys.admin.workspaceDeliverables(workspaceId),
+        queryKeys.admin.brandGenerationAll(workspaceId),
+      ] as const;
     case WS_EVENTS.INSIGHT_RESOLVED:
       return [
         queryKeys.admin.intelligenceAll(workspaceId),
@@ -523,9 +526,14 @@ function adminInvalidationKeys(
         queryKeys.admin.intelligence(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.client.monthlyDigest(workspaceId),
+        queryKeys.client.brandSummary(workspaceId),
       ] as const;
     case WS_EVENTS.BRAND_IDENTITY_UPDATED:
-      return [queryKeys.admin.brandIdentity(workspaceId)] as const;
+      return [
+        queryKeys.admin.brandIdentity(workspaceId),
+        queryKeys.admin.brandGenerationAll(workspaceId),
+        queryKeys.client.brandSummary(workspaceId),
+      ] as const;
     case WS_EVENTS.BLUEPRINT_UPDATED:
       return [
         queryKeys.admin.blueprints(workspaceId),
@@ -653,6 +661,7 @@ function clientDashboardInvalidationKeys(
         queryKeys.client.unifiedInbox(workspaceId),
         queryKeys.client.theIssue(workspaceId),
         queryKeys.client.recResponses(workspaceId),
+        queryKeys.client.brandSummary(workspaceId),
       ] as const;
     case WS_EVENTS.COPY_SECTION_UPDATED:
       return [
@@ -685,7 +694,10 @@ function clientDashboardInvalidationKeys(
       return [
         queryKeys.client.intelligence(workspaceId),
         queryKeys.client.monthlyDigest(workspaceId),
+        queryKeys.client.brandSummary(workspaceId),
       ] as const;
+    case WS_EVENTS.BRAND_IDENTITY_UPDATED:
+      return [queryKeys.client.brandSummary(workspaceId)] as const;
     case WS_EVENTS.FORM_CAPTURE_CONFIG_UPDATED:
       // client.roi carries the outcomeVerdict provenance label; saving tracked forms can flip it to
       // measured_action before the next capture poll.

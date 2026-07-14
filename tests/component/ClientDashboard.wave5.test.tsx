@@ -106,6 +106,14 @@ vi.mock('../../src/hooks/client/useClientGA4', () => ({
     ga4NewVsReturning: [], ga4Organic: null, ga4LandingPages: [], sectionError: null, hasGA4: false,
   })),
 }));
+vi.mock('../../src/hooks/client/useBrandSummary', () => ({
+  useBrandSummary: vi.fn(() => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  })),
+}));
 
 // ── Heavy children / providers ───────────────────────────────────────────────
 vi.mock('../../src/components/client/ClientAuthGate', () => ({ ClientAuthGate: () => <div data-testid="client-auth-gate" /> }));
@@ -252,11 +260,10 @@ describe('ClientDashboard Wave 5 — flag ON: 4-tab shell', () => {
 
     // Deep Dive holds Performance + Health + Strategy (rankings).
     renderDashboard({ initialTab: 'deep-dive' });
-    await waitFor(() => expect(screen.getByTestId('deep-dive-tab')).toBeInTheDocument());
-    const deepDive = screen.getByTestId('deep-dive-tab');
-    expect(within(deepDive).getByTestId('performance-tab')).toBeInTheDocument();
-    expect(within(deepDive).getByTestId('health-tab')).toBeInTheDocument();
-    expect(within(deepDive).getByTestId('strategy-tab')).toBeInTheDocument();
+    const deepDive = await screen.findByTestId('deep-dive-tab');
+    expect(await within(deepDive).findByTestId('performance-tab')).toBeInTheDocument();
+    expect(await within(deepDive).findByTestId('health-tab')).toBeInTheDocument();
+    expect(await within(deepDive).findByTestId('strategy-tab')).toBeInTheDocument();
   });
 
   it('reaches Brand + Plans within the Settings home', async () => {

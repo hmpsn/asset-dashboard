@@ -60,6 +60,7 @@ vi.mock('../../server/ws-events.js', () => ({
     VOICE_PROFILE_UPDATED: 'voice:updated',
     BRAND_IDENTITY_UPDATED: 'brand-identity:updated',
   },
+  BRAND_IDENTITY_UPDATED_PAYLOAD: {},
 }));
 
 vi.mock('../../server/errors.js', () => ({

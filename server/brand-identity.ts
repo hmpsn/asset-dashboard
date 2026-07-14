@@ -33,7 +33,7 @@ const stmts = createStmtCache(() => ({
   insert: db.prepare(`INSERT INTO brand_identity_deliverables (id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at) VALUES (@id, @workspace_id, @deliverable_type, @content, @status, @version, @tier, @created_at, @updated_at)`),
   updateContent: db.prepare(`UPDATE brand_identity_deliverables SET content = @content, status = @status, version = @version, tier = @tier, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: content-edit always resets to 'draft' (a content-reset side-effect, not a lifecycle transition); the guarded lifecycle write is setDeliverableStatus()
   updateContentIfVersion: db.prepare(`UPDATE brand_identity_deliverables SET content = @content, status = @status, version = @version, tier = @tier, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id AND version = @expected_version`), // status-ok: content-edit always resets to 'draft'; expected_version is the atomic optimistic-concurrency guard
-  updateStatus: db.prepare(`UPDATE brand_identity_deliverables SET status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: BRAND_DELIVERABLE_TRANSITIONS guard runs in setDeliverableStatus() before this write (draft↔approved)
+  updateStatusIfVersionAndStatus: db.prepare(`UPDATE brand_identity_deliverables SET status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id AND version = @expected_version AND status = @expected_status`), // status-ok: BRAND_DELIVERABLE_TRANSITIONS guard runs in setDeliverableStatusCasInTransaction() before this CAS write
   insertVersion: db.prepare(`INSERT INTO brand_identity_versions (id, deliverable_id, content, steering_notes, version, created_at) VALUES (@id, @deliverable_id, @content, @steering_notes, @version, @created_at)`),
 }));
 
@@ -57,6 +57,22 @@ export class BrandDeliverableVersionConflictError extends Error {
     this.name = 'BrandDeliverableVersionConflictError';
     this.expectedVersion = expectedVersion;
     this.actualVersion = actualVersion;
+  }
+}
+
+export class BrandDeliverableStatusConflictError extends Error {
+  readonly code = 'conflict' as const;
+  readonly expectedStatus: BrandDeliverable['status'];
+  readonly actualStatus: BrandDeliverable['status'];
+
+  constructor(
+    expectedStatus: BrandDeliverable['status'],
+    actualStatus: BrandDeliverable['status'],
+  ) {
+    super(`Brand deliverable status conflict: expected ${expectedStatus}, actual ${actualStatus}`);
+    this.name = 'BrandDeliverableStatusConflictError';
+    this.expectedStatus = expectedStatus;
+    this.actualStatus = actualStatus;
   }
 }
 
@@ -342,6 +358,78 @@ export function approveDeliverable(workspaceId: string, id: string): BrandDelive
   return setDeliverableStatus(workspaceId, id, 'approved');
 }
 
+export interface BrandDeliverableStatusCasResult {
+  deliverable: BrandDeliverable;
+  autoSampleFrom: BrandDeliverableType | null;
+}
+
+/**
+ * Version/status-conditional brand status mutation for a caller-owned transaction.
+ *
+ * This deliberately performs no broadcast or cache invalidation. Review workflows
+ * compose it with their other source/mirror writes inside one outer IMMEDIATE
+ * transaction, then publish effects only after that transaction commits.
+ */
+export function setDeliverableStatusCasInTransaction(
+  workspaceId: string,
+  id: string,
+  expectedVersion: number,
+  expectedStatus: BrandDeliverable['status'],
+  status: 'approved' | 'draft',
+): BrandDeliverableStatusCasResult | null {
+  const row = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
+  if (!row) return null;
+  const priorStatus = row.status as BrandDeliverable['status'];
+  if (row.version !== expectedVersion) {
+    throw new BrandDeliverableVersionConflictError(expectedVersion, row.version);
+  }
+  if (priorStatus !== expectedStatus) {
+    throw new BrandDeliverableStatusConflictError(expectedStatus, priorStatus);
+  }
+
+  if (priorStatus !== status) {
+    validateTransition('brand_deliverable', BRAND_DELIVERABLE_TRANSITIONS, priorStatus, status);
+  }
+  const now = new Date().toISOString();
+  const updated = stmts().updateStatusIfVersionAndStatus.run({
+    id,
+    workspace_id: workspaceId,
+    status,
+    expected_version: expectedVersion,
+    expected_status: expectedStatus,
+    updated_at: now,
+  });
+  if (updated.changes !== 1) {
+    throw new BrandDeliverableVersionConflictError(expectedVersion, row.version);
+  }
+  log.info({ workspaceId, deliverableType: row.deliverable_type, status }, 'deliverable status updated');
+
+  let autoSampleFrom: BrandDeliverableType | null = null;
+  if (status === 'approved' && priorStatus !== 'approved') {
+    const type = row.deliverable_type as BrandDeliverableType;
+    const voiceSampleMap: Partial<Record<BrandDeliverableType, VoiceSampleContext>> = {
+      tagline: 'headline',
+      elevator_pitch: 'body',
+      tone_examples: 'body',
+    };
+    const contextTag = voiceSampleMap[type];
+    if (contextTag) {
+      try {
+        addVoiceSample(workspaceId, row.content.slice(0, 500), contextTag, 'identity_approved');
+        log.info({ workspaceId, deliverableType: type }, 'auto-created voice sample from approved deliverable');
+        autoSampleFrom = type;
+      } catch (err) {
+        log.error({ err, workspaceId, deliverableType: type }, 'failed to auto-create voice sample');
+      }
+    }
+  }
+
+  return {
+    deliverable: { ...rowToDeliverable(row), status, updatedAt: now },
+    autoSampleFrom,
+  };
+}
+
 /**
  * Set a deliverable's status to either `approved` or `draft`.
  *
@@ -372,61 +460,13 @@ export function setDeliverableStatus(
   const txResult = db.transaction(() => {
     const row = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
     if (!row) return null;
-
-    // Capture the pre-update status BEFORE writing — we need to know whether
-    // this is a first-time approval (draft → approved) vs a re-approval
-    // (already approved, no-op on status). The auto-sample side effect must
-    // only run on the transition.
-    const priorStatus = row.status;
-    // Guard the two-state approve/revert lifecycle only on an actual change. Re-approval
-    // (approved → approved) is a no-op handled below via the priorStatus short-circuit,
-    // so it never reaches the guard as a self-edge. An out-of-union prior status throws
-    // InvalidTransitionError (route maps to 4xx).
-    if (priorStatus !== status) {
-      validateTransition('brand_deliverable', BRAND_DELIVERABLE_TRANSITIONS, priorStatus, status);
-    }
-    const now = new Date().toISOString();
-    stmts().updateStatus.run({ id, workspace_id: workspaceId, status, updated_at: now });
-    log.info({ workspaceId, deliverableType: row.deliverable_type, status }, 'deliverable status updated');
-
-    if (status !== 'approved') {
-      return { row, now, autoSampleFrom: null as BrandDeliverableType | null };
-    }
-
-    // Re-approval of an already-approved deliverable must NOT duplicate the
-    // voice sample. Without this guard, every idempotent PATCH (e.g. a client
-    // retry, or an admin clicking "Approve" twice) inserts another copy of
-    // the same content into the voice samples table. The transaction makes
-    // this check race-free: two concurrent callers are serialized and only
-    // one sees `priorStatus === 'draft'`.
-    if (priorStatus === 'approved') {
-      return { row, now, autoSampleFrom: null as BrandDeliverableType | null };
-    }
-
-    // Spec Addendum §5: auto-create voice sample for approved identity
-    // deliverables. `addVoiceSample` has its own transaction which becomes a
-    // nested SAVEPOINT here; if it throws we catch, log, and let the outer
-    // transaction commit — approval is the primary effect and must succeed
-    // even if the downstream sample insert fails.
-    const type = row.deliverable_type as BrandDeliverableType;
-    const voiceSampleMap: Partial<Record<BrandDeliverableType, VoiceSampleContext>> = {
-      tagline: 'headline',
-      elevator_pitch: 'body',
-      tone_examples: 'body',
-    };
-    const contextTag = voiceSampleMap[type];
-    if (!contextTag) {
-      return { row, now, autoSampleFrom: null as BrandDeliverableType | null };
-    }
-
-    try {
-      addVoiceSample(workspaceId, row.content.slice(0, 500), contextTag, 'identity_approved');
-      log.info({ workspaceId, deliverableType: type }, 'auto-created voice sample from approved deliverable');
-      return { row, now, autoSampleFrom: type };
-    } catch (err) {
-      log.error({ err, workspaceId, deliverableType: type }, 'failed to auto-create voice sample');
-      return { row, now, autoSampleFrom: null as BrandDeliverableType | null };
-    }
+    return setDeliverableStatusCasInTransaction(
+      workspaceId,
+      id,
+      row.version,
+      row.status as BrandDeliverable['status'],
+      status,
+    );
   }).immediate();
 
   if (!txResult) return null;
@@ -438,7 +478,7 @@ export function setDeliverableStatus(
     broadcastToWorkspace(workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { autoSampleFrom: txResult.autoSampleFrom });
   }
 
-  return { ...rowToDeliverable(txResult.row), status, updatedAt: txResult.now };
+  return txResult.deliverable;
 }
 
 export function exportDeliverables(workspaceId: string, tier?: DeliverableTier): string {

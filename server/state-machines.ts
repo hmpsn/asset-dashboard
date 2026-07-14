@@ -249,6 +249,15 @@ const DELIVERABLE_TYPE_OVERRIDES: Record<string, Record<string, readonly string[
     changes_requested: ['draft', 'awaiting_client'],
     approved: [], // terminal — copy approve has no apply step
   },
+  brand_generation: {
+    // One client decision may leave other suite items unresolved. Repeated
+    // item decisions therefore keep the parent honestly partial until the
+    // final source is approved. There is no whole-bundle decline or apply edge.
+    awaiting_client: ['awaiting_client', 'changes_requested', 'partial', 'approved', 'expired', 'cancelled'],
+    changes_requested: ['awaiting_client', 'changes_requested', 'partial', 'approved', 'expired', 'cancelled'],
+    partial: ['awaiting_client', 'partial', 'approved', 'changes_requested', 'expired', 'cancelled'],
+    approved: [],
+  },
   // (briefing is handled by NOTIFICATION_DELIVERABLE_TYPES below; an override entry here
   // would be dead — getDeliverableTransitions short-circuits to {} before reading this map.)
 };

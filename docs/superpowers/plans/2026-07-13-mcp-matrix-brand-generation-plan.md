@@ -95,7 +95,7 @@ helpers inside its owned directory but may not rename or duplicate a locked seam
 | M1 | M0 ledger/evidence store only; no new history blob | `previewMatrixGeneration()`, `generateMatrixCell()`, `resolveContentMatrixEvidence()` | `POST /api/content-matrices/:workspaceId/:matrixId/generation-preview`; `PATCH /api/content-matrices/:workspaceId/:matrixId/cells/:cellId/evidence/:requirementId`; MCP `preview_content_matrix_generation`, `resolve_content_matrix_evidence` |
 | M2 | typed item audit/attempt snapshot in M0 ledger | `auditMatrixGenerationItem()`, `reviseMatrixGenerationItem()` | no new public route/tool |
 | M3 | M0 ledger extended with batch selection/set findings and page-review evidence | `startContentMatrixGenerationRun()`, `getContentMatrixGenerationRun()`, `retryContentMatrixGenerationRun()`, `auditMatrixGenerationSet()`, `approveMatrixPageForPublishReadiness()` | `POST /api/content-matrices/:workspaceId/:matrixId/generation-runs`; `GET .../generation-runs/:runId`; `POST .../:runId/retry`; `POST .../:runId/items/:itemId/review-approval`; matching start/get/retry MCP actions; approval remains human HTTP action |
-| B3 | `brand_generation` in `DELIVERABLE_TYPES`; typed per-item decisions | `createBrandReviewDeliverable()`, `applyBrandReviewDecision()`, `getClientBrandSummary()` | existing deliverable send/respond routes; authenticated `GET /api/public/brand-summary/:workspaceId` |
+| B3 | `brand_generation` in `DELIVERABLE_TYPES`; `BRAND_REVIEW_CONTRACT_VERSION`; discriminated foundation/suite payloads; typed CAS decisions/receipts | `createBrandReviewDeliverable()`, `applyBrandReviewDecision()`, `getClientBrandSummary()` | existing deliverable send/respond routes; authenticated `GET /api/public/brand-summary/:workspaceId` |
 | M4 | existing blueprint/matrix source refs | `createMatrixFromPseoPlan()` | `POST /api/page-strategy/:workspaceId/:blueprintId/entries/:entryId/content-matrix`; MCP `create_content_matrix_from_pseo_plan`; generation stays separate |
 | O1 | `brand_content_onboarding_runs` | `startBrandContentOnboarding()`, `getBrandContentOnboarding()`, `resumeBrandContentOnboarding()` | `/api/brand-content-onboarding/:workspaceId/runs[/:runId]`; three matching MCP actions |
 
@@ -652,18 +652,34 @@ generation prompts/runs, or expose raw intake/evidence/audit/provenance.
   `send_to_client`; do not add a parallel send action.
 - Block send while factual requirements are unresolved. Group the suite into one
   Reviews artifact with one typed item per source deliverable and safe summaries.
-- Per-item approval moves only the expected source draft→approved. Per-item
+- Freeze both the generation-item revision and source-deliverable version in a
+  separately versioned, strictly validated private review payload. Foundation
+  and suite inputs/payloads are discriminated: they cannot mix targets or source
+  identities. Public serializers project a safe payload rather than returning
+  the private envelope.
+- Use stable `brand_generation:<reviewKind>:<runId>` identity. A same-run
+  revision replaces only the revised child while preserving approved children,
+  client-item IDs, original timestamps, and their decisions; foundation and
+  suite bundles never collide.
+- Per-item approval atomically moves only the expected source draft→approved,
+  its expected generation item→approved, and the mirror child. Per-item
   changes requested preserves the note, keeps/returns the source in draft, and
-  updates the run item. Bundle status is `partial` until every item is terminal
-  and `approved` only when all items are approved.
+  atomically updates the run item and mirror child. The generic mirror-first
+  response path and whole-bundle decline are forbidden. Bundle status is
+  `partial` until every item is terminal and `approved` only when all items are
+  approved.
 - Keep voice-foundation review as a separate bundle/gate. Client approval never
-  finalizes a voice profile; B1 operator finalization owns that transition.
+  finalizes a voice profile or mutates the B2 foundation item; it records a
+  typed human-review receipt for later O1 consumption. B1 operator finalization
+  owns voice authority.
 - Add `ClientBrandSummary` containing approved/client-visible fields only and
   wire client workspace serialization, Brand surface, and event invalidation.
 
 Red first: source/mirror divergence, partial decisions, changes-requested note,
-stale source version, placeholder send block, draft/raw-evidence leakage,
-cross-workspace access, public endpoint actual read path, and client render.
+stale source or generation-item revision, mixed foundation/suite payload,
+same-run revision preserving approved siblings and timestamps, placeholder send
+block, private payload/draft/raw-evidence leakage, cross-workspace access, public
+endpoint actual read path, event invalidation, and client render.
 
 Acceptance: operator and client see one coherent per-item review with honest
 partial state; voice is not implicitly finalized; drafts/prompts/intake/audit

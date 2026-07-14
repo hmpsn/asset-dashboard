@@ -32,6 +32,8 @@ describe('MCP server instructions', () => {
     expect(MCP_SERVER_INSTRUCTIONS).toContain('brief_request_handle');
     expect(MCP_SERVER_INSTRUCTIONS).toContain('save_brief');
     expect(MCP_SERVER_INSTRUCTIONS).toContain('send_to_client');
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('expected_run_revision');
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('separate grouped Inbox reviews');
     expect(MCP_SERVER_INSTRUCTIONS.toLowerCase()).toContain('single-use');
   });
 

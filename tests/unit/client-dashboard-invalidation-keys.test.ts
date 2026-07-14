@@ -99,6 +99,10 @@ describe('clientDashboardInvalidationKeys leak coverage', () => {
     expect(keysFor(WS_EVENTS.VOICE_PROFILE_UPDATED)).toEqual([
       queryKeys.client.intelligence(WS),
       queryKeys.client.monthlyDigest(WS),
+      queryKeys.client.brandSummary(WS),
+    ]);
+    expect(keysFor(WS_EVENTS.BRAND_IDENTITY_UPDATED)).toEqual([
+      queryKeys.client.brandSummary(WS),
     ]);
   });
 

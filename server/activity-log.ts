@@ -249,15 +249,29 @@ function rowToEntry(row: ActivityRow): ActivityEntry {
   };
 }
 
-/** Remove internal MCP key identity before an activity crosses a client-visible seam. */
-function toClientSafeActivityEntry(entry: ActivityEntry): ActivityEntry {
-  if (!entry.metadata || !Object.prototype.hasOwnProperty.call(entry.metadata, 'mcpCaller')) {
-    return entry;
-  }
+const CLIENT_PRIVATE_ACTIVITY_METADATA_KEYS = new Set([
+  'mcpCaller',
+  'brandGenerationReview',
+]);
 
-  const { mcpCaller: _internalMcpCaller, ...clientSafeMetadata } = entry.metadata;
+/** Remove internal execution/ledger identity before an activity crosses a client-visible seam. */
+function toClientSafeActivityEntry(entry: ActivityEntry): ActivityEntry {
+  const isBrandGenerationReview = entry.metadata?.brandGenerationReview != null;
+  if (!entry.metadata && !isBrandGenerationReview) return entry;
+  const clientSafeMetadata = Object.fromEntries(
+    Object.entries(entry.metadata ?? {}).filter(([key]) => !CLIENT_PRIVATE_ACTIVITY_METADATA_KEYS.has(key)),
+  );
+  if (
+    !isBrandGenerationReview
+    && Object.keys(clientSafeMetadata).length === Object.keys(entry.metadata ?? {}).length
+  ) return entry;
+  const clientSafeEntry = { ...entry };
+  if (isBrandGenerationReview) {
+    delete clientSafeEntry.actorId;
+    delete clientSafeEntry.actorName;
+  }
   return {
-    ...entry,
+    ...clientSafeEntry,
     metadata: Object.keys(clientSafeMetadata).length > 0 ? clientSafeMetadata : undefined,
   };
 }

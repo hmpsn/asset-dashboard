@@ -97,6 +97,7 @@ import discoveryIngestionRoutes from './routes/discovery-ingestion.js';
 import brandIdentityRoutes from './routes/brand-identity.js';
 import brandIntakeRoutes from './routes/brand-intake.js';
 import brandGenerationRoutes from './routes/brand-generation.js';
+import brandSummaryRoutes from './routes/brand-summary.js';
 import pageStrategyRoutes from './routes/page-strategy.js';
 import copyPipelineRoutes from './routes/copy-pipeline.js';
 import diagnosticsRoutes from './routes/diagnostics.js';
@@ -402,6 +403,7 @@ export function createApp(): express.Express {
   app.use(brandIdentityRoutes);
   app.use(brandIntakeRoutes);
   app.use(brandGenerationRoutes);
+  app.use(brandSummaryRoutes);
   app.use(pageStrategyRoutes);
   app.use(copyPipelineRoutes);
   app.use(diagnosticsRoutes);

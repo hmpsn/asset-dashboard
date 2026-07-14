@@ -535,17 +535,31 @@ generic string ID cannot satisfy a different gate.
 
 - Brand review uses one grouped `brand_generation` adapter with one typed item
   per source `BrandDeliverable` and per-item `approve|changes_requested`.
+- Review persistence has its own `BRAND_REVIEW_CONTRACT_VERSION`. The private
+  parent/child payloads are strict runtime-validated discriminated unions:
+  `voice_foundation` has exactly one foundation item and no durable source;
+  `brand_suite` is non-empty and every item freezes a durable source ID/version.
+  Decision identity must equal its run/item/source envelope.
 - Review decisions require a human operator/client actor; automatic/system/MCP
   approval is not a valid shared shape, and `changes_requested` requires a note.
-- Unresolved `ready` evidence prevents send. Item approval updates that source
-  draft→approved only when its expected version matches. Changes requested
-  preserves the note, keeps/returns the source in draft, and marks that run item
-  accordingly. The group is `partial` until all items are terminal and is
-  `approved` only when all items are approved.
+- Unresolved `ready` evidence prevents send. Each item freezes its generation
+  revision as well as its source version. Approval or changes requested commits
+  the source, generation item, run counts, and mirror child in one transaction;
+  no generic mirror-first response or whole-bundle decline is legal. The group
+  is `partial` until all items are terminal and is `approved` only when all
+  items are approved.
+- Review identity is `brand_generation:<reviewKind>:<runId>` and deliberately
+  excludes run revision. A same-run revision preserves already-approved child
+  decisions plus database-authoritative item IDs/timestamps and replaces only
+  the revised child; the foundation and suite remain distinct rows.
 - Voice foundation uses a separate review bundle/gate. Client approval never
-  finalizes voice; operator anchor selection plus `finalize_brand_voice` does.
+  finalizes voice or changes the B2 foundation item. It records typed durable
+  human-review evidence (including foundation item revision) for future O1;
+  operator anchor selection plus `finalize_brand_voice` owns authority.
 - Drafts, raw intake, internal evidence/audit, prompts, and provenance never
-  enter public/client serializers.
+  enter public/client serializers. Run/source IDs, expected revisions, actor
+  attribution, requirements, MCP identity, and private item payloads are also
+  stripped; only the explicit review content and safe target metadata remain.
 - `ClientBrandSummary` contains only approved/client-visible resolved fields and
   a safe voice summary.
 - Every committed workspace mutation logs activity and broadcasts a canonical
@@ -556,7 +570,9 @@ generic string ID cannot satisfy a different gate.
   deliverable, and job events unless this contract is amended first.
 - Matrix/brief/post mutations invalidate existing content keys; brand/intake
   mutations invalidate brand/voice/intelligence and client-safe workspace keys;
-  Inbox uses existing deliverable invalidation.
+  Inbox uses existing deliverable invalidation. Deliverable mutations also
+  invalidate the admin brand-run prefix and client brand summary; brand-identity
+  and voice-profile mutations invalidate the client summary as well.
 
 ## Feature flags
 

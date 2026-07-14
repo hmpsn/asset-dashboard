@@ -233,6 +233,25 @@ describe('mcp-action-schemas', () => {
     it('accepts brief_id', () => {
       expect(sendToClientInputSchema.safeParse({ workspace_id: 'ws-1', brief_id: 'brief_1' }).success).toBe(true);
     });
+    it('accepts an exact brand-generation review target', () => {
+      expect(sendToClientInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        brand_generation: {
+          run_id: 'brand-run-1',
+          expected_run_revision: 4,
+          review_kind: 'brand_suite',
+        },
+      }).success).toBe(true);
+    });
+    it('rejects a brand-generation target without revision authority', () => {
+      expect(sendToClientInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        brand_generation: {
+          run_id: 'brand-run-1',
+          review_kind: 'voice_foundation',
+        },
+      }).success).toBe(false);
+    });
     it('rejects providing both brief_handle and post_handle', () => {
       expect(sendToClientInputSchema.safeParse({
         workspace_id: 'ws-1',
@@ -245,6 +264,17 @@ describe('mcp-action-schemas', () => {
         workspace_id: 'ws-1',
         brief_handle: validBriefHandle,
         brief_id: 'brief_1',
+      }).success).toBe(false);
+    });
+    it('rejects mixing content and brand-generation targets', () => {
+      expect(sendToClientInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        post_id: 'post_1',
+        brand_generation: {
+          run_id: 'brand-run-1',
+          expected_run_revision: 2,
+          review_kind: 'brand_suite',
+        },
       }).success).toBe(false);
     });
   });

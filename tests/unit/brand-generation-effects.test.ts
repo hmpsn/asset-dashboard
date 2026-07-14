@@ -195,7 +195,7 @@ describe('brand generation transactional effect outbox', () => {
       1,
       'ws-1',
       WS_EVENTS.BRAND_IDENTITY_UPDATED,
-      expect.objectContaining({ deliverableId: 'deliverable-1', version: 2 }),
+      {},
     );
     expect(deps.broadcastToWorkspace).toHaveBeenNthCalledWith(
       2,

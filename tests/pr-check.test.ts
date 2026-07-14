@@ -38,6 +38,7 @@ import {
   findJsonArrayColumnSites,
   extractDbPrepareArg,
   findUnrenderedSliceFields,
+  findMissingDeliverableAdapters,
   compareStudioConstants,
   getChangedFiles,
   getFiles,
@@ -53,6 +54,7 @@ import {
   type CustomCheckMatch,
 } from '../scripts/pr-check.js';
 import { renderAutomatedRulesDoc } from '../scripts/generate-rules-doc.js';
+import { DELIVERABLE_TYPES } from '../shared/types/client-deliverable.js';
 
 let TMPDIR: string;
 
@@ -10840,16 +10842,24 @@ describe('Rule: no-direct-insert-to-client_deliverable-outside-store', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// Rule: every-active-type-has-an-adapter (warn, phase-aware)
+// Rule: every-active-type-has-an-adapter (error, canonical census)
 // ════════════════════════════════════════════════════════════════════════════
 
 describe('Rule: every-active-type-has-an-adapter', () => {
   const RULE = 'every-active-type-has-an-adapter';
 
-  it('returns no hits in Phase 0 (all phase-group flags default false)', () => {
-    // The customCheck ignores its file args and reads FEATURE_FLAGS from disk; with every
-    // unified-deliverables-* flag false, no type is active so nothing is required yet.
+  it('returns no hits when every canonical type has an adapter', () => {
     expect(runRule(RULE, [])).toHaveLength(0);
+  });
+
+  it('uses the canonical deliverable type census, including newer review families', () => {
+    const emptyAdaptersDir = path.join(TMPDIR, 'empty-deliverable-adapters');
+    mkdirSync(emptyAdaptersDir, { recursive: true });
+
+    expect(findMissingDeliverableAdapters(emptyAdaptersDir)).toEqual([...DELIVERABLE_TYPES]);
+    expect(findMissingDeliverableAdapters(emptyAdaptersDir)).toEqual(
+      expect.arrayContaining(['gbp_review_response', 'brand_generation']),
+    );
   });
 });
 

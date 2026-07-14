@@ -222,7 +222,7 @@ Brand generation is a durable background workflow, not a synchronous copy endpoi
 | `save_brief` | W | Persist a brief (consumes `brief_request_handle`); **issues `brief_handle`**. |
 | `prepare_post_context` | R | Build post-drafting context from a saved brief; **issues `post_request_handle`**. |
 | `save_post` | W | Persist a post (consumes `post_request_handle`); **issues `post_handle`**. |
-| `send_to_client` | W | Turn a saved brief/post into a client-facing request **and email the client**. |
+| `send_to_client` | W | Turn a saved brief/post into a client-facing request, or send an exact ready brand-generation run as a grouped Inbox review; **emails the client**. |
 | `list_content_requests` | R | List content topic requests. |
 | `get_content_request` | R | One content request by id. |
 | `create_content_request` | W | Create a content topic request. |
@@ -287,7 +287,9 @@ giant inline blob; a follow-up tool redeems it. Implemented in `server/mcp/handl
 - **Issuers:** `research_keywords` (`keyword-research`), `prepare_brief_context` (`brief-request`),
   `save_brief` (`brief`), `prepare_post_context` (`post-request`), `save_post` (`post`).
 - **Consumers:** `add_keyword_to_strategy` (research handle), `save_brief` (brief-request handle),
-  `save_post` (post-request handle), `send_to_client` (brief/post handle).
+  `save_post` (post-request handle), `send_to_client` (brief/post handle). The independent
+  `send_to_client.brand_generation` target uses durable run identity and an exact revision, not a
+  handle.
 
 Canonical content-authoring flow:
 

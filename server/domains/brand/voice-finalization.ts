@@ -1139,6 +1139,38 @@ export function getBrandVoiceAuthoritySummary(
   });
 }
 
+export interface CurrentFinalizedVoiceAuthority {
+  voiceDNA: VoiceDNA;
+  finalizedAt: string;
+}
+
+/**
+ * Read the current immutable voice authority for trusted server consumers.
+ *
+ * This deliberately returns only the frozen fields needed to render a safe
+ * summary. It does not enumerate eligible anchors or expose guardrails,
+ * calibration evidence, provenance, or mutable profile data. Legacy calibrated
+ * profiles and profiles edited after finalization fail closed as unavailable.
+ */
+export function getCurrentFinalizedVoiceAuthority(
+  workspaceId: string,
+): CurrentFinalizedVoiceAuthority | null {
+  return coherentAuthorityRead(() => {
+    if (!stmts().workspaceExists.get(workspaceId)) {
+      throw new VoiceFinalizationNotFoundError('Workspace not found');
+    }
+    const profileRow = getProfileReadRow(workspaceId);
+    const profile = profileRow ? rowToProfileSummary(profileRow) : null;
+    const snapshot = latestSnapshot(workspaceId);
+    const readiness = fullReadiness(profile, snapshot);
+    if (readiness.state !== 'finalized' || !snapshot) return null;
+    return {
+      voiceDNA: snapshot.voiceDNA,
+      finalizedAt: snapshot.finalizedAt,
+    };
+  });
+}
+
 /**
  * Read one exact immutable voice snapshot for paid generation.
  *

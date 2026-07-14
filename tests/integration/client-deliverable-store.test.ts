@@ -112,6 +112,53 @@ describe('client_deliverable store round-trip', () => {
     expect(got.payload).toEqual({ links: [{ from: '/x', to: '/y' }] });
   });
 
+  it('preserves child identity metadata across delete-and-reinsert resends', () => {
+    const sourceRef = 'brand_generation:brand_suite:run-metadata';
+    const itemId = 'cdi_brand_metadata';
+    const originalCreatedAt = '2026-07-01T00:00:00.000Z';
+    const first = upsertDeliverable({
+      workspaceId: WS,
+      type: 'brand_generation',
+      kind: 'review',
+      status: 'awaiting_client',
+      title: 'Brand system review',
+      payload: { runRevision: 1 },
+      sourceRef,
+      items: [{
+        id: itemId,
+        createdAt: originalCreatedAt,
+        status: 'awaiting_client',
+        proposedValue: 'First version',
+        sortOrder: 7,
+      }],
+    });
+
+    const second = upsertDeliverable({
+      workspaceId: WS,
+      type: 'brand_generation',
+      kind: 'review',
+      status: 'awaiting_client',
+      title: 'Brand system review',
+      payload: { runRevision: 2 },
+      sourceRef,
+      items: [{
+        id: itemId,
+        createdAt: '2026-07-12T00:00:00.000Z',
+        status: 'awaiting_client',
+        proposedValue: 'Revised version',
+      }],
+    });
+
+    expect(second.id).toBe(first.id);
+    expect(second.items).toHaveLength(1);
+    expect(second.items![0]).toMatchObject({
+      id: itemId,
+      createdAt: originalCreatedAt,
+      proposedValue: 'Revised version',
+      sortOrder: 7,
+    });
+  });
+
   it('listDeliverables returns the workspace rows', () => {
     const rows = listDeliverables(WS);
     expect(rows.length).toBeGreaterThanOrEqual(1);

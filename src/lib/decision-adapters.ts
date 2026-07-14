@@ -88,6 +88,7 @@ const DELIVERABLE_TYPE_BADGES: Record<DeliverableType, string> = {
   content_request:       'Content',
   recommendation:        'Recommendation',
   gbp_review_response:   'Google Review',
+  brand_generation:      'Brand',
 };
 
 export function deliverableTypeBadge(type: DeliverableType | string): string {
