@@ -468,7 +468,7 @@ describe('MCP matrix + brand generation shared contracts', () => {
 
   it('preserves evidence cardinality for intake projections and factual claims', () => {
     const missingRequirement: GenerationEvidenceRequirement = {
-      id: 'req-location-proof',
+      id: 'brand-intake:business.locations',
       claimKind: 'factual',
       status: 'missing',
       fieldPath: 'business.locations',
@@ -480,7 +480,7 @@ describe('MCP matrix + brand generation shared contracts', () => {
     const intakeEvidence: BrandIntakeEvidenceRef = {
       intakeRevisionId: 'intake-1',
       section: 'business',
-      fieldPath: 'locations',
+      fieldPath: 'business.locations',
       requirement: missingRequirement,
     };
     const factualClaim: BrandGeneratedClaim = {
@@ -493,6 +493,8 @@ describe('MCP matrix + brand generation shared contracts', () => {
       }],
     };
     expect(intakeEvidence.requirement.sourceRefs).toEqual([]);
+    expect(intakeEvidence.requirement.id).toBe('brand-intake:business.locations');
+    expect(intakeEvidence.fieldPath).toBe('business.locations');
     expect(factualClaim.sourceRefs).toHaveLength(1);
   });
 

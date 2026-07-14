@@ -4,8 +4,12 @@ import {
   BRAND_INTAKE_FIELD_POLICY,
   BRAND_INTAKE_LIMITS,
   BRAND_INTAKE_RESOLUTION_SOURCE_TYPES,
+  brandIntakeEvidenceRequirementId,
 } from './brand-intake.js';
-import { brandIntakeEvidenceValueSchema } from './brand-intake-schemas.js';
+import {
+  brandIntakeEvidenceRequirementIdSchema,
+  brandIntakeEvidenceValueSchema,
+} from './brand-intake-schemas.js';
 
 const workspaceIdSchema = z.string().trim().min(1, 'workspace_id is required')
   .max(BRAND_INTAKE_LIMITS.maxIdLength)
@@ -34,7 +38,7 @@ export const resolveBrandIntakeEvidenceInputSchema = z.object({
     .describe('Exact immutable intake revision that owns the unresolved field.'),
   expected_revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER)
     .describe('Exact monotonic intake revision used to prepare this resolution.'),
-  requirement_id: durableIdSchema
+  requirement_id: brandIntakeEvidenceRequirementIdSchema
     .describe('Stable requirement identity supplied by the intake evidence read model.'),
   field_path: z.enum(BRAND_INTAKE_FIELD_PATHS)
     .describe('Finite questionnaire field path; arbitrary JSON paths are rejected.'),
@@ -51,6 +55,13 @@ export const resolveBrandIntakeEvidenceInputSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['value', 'kind'],
       message: `${value.field_path} requires evidence value kind ${expectedKind}`,
+    });
+  }
+  if (value.requirement_id !== brandIntakeEvidenceRequirementId(value.field_path)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['requirement_id'],
+      message: `requirement_id must address ${value.field_path}`,
     });
   }
 });

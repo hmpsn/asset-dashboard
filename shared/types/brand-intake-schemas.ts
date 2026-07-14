@@ -2,10 +2,13 @@ import { z } from 'zod';
 import {
   BRAND_INTAKE_BUYING_STAGES,
   BRAND_INTAKE_FIELD_PATHS,
+  BRAND_INTAKE_FIELD_POLICY,
   BRAND_INTAKE_LIMITS,
   BRAND_INTAKE_RESOLUTION_SOURCE_TYPES,
   BRAND_INTAKE_SCHEMA_VERSION,
   BRAND_INTAKE_SOURCES,
+  brandIntakeEvidenceRequirementId,
+  type BrandIntakeEvidenceRequirementId,
 } from './brand-intake.js';
 import { AUTHENTIC_VOICE_SAMPLE_SOURCES } from './brand-engine.js';
 import { AUTHENTIC_VOICE_EVIDENCE_SOURCE_TYPES } from './generation-evidence.js';
@@ -92,8 +95,8 @@ const audienceSchema = z.object({
   goals: clearableText(BRAND_INTAKE_LIMITS.maxTextLength),
   objections: clearableText(BRAND_INTAKE_LIMITS.maxTextLength),
   buyingStage: z.preprocess(
-    value => (value == null || value === '' ? 'mixed' : value),
-    z.enum(BRAND_INTAKE_BUYING_STAGES),
+    value => (value == null ? '' : typeof value === 'string' ? value.trim() : value),
+    z.union([z.enum(BRAND_INTAKE_BUYING_STAGES), z.literal('')]),
   ),
   secondaryAudience: clearableText(BRAND_INTAKE_LIMITS.maxTextLength),
 }).strict();
@@ -113,7 +116,9 @@ const competitorSchema = z.object({
   referenceUrls: referenceUrlsSchema,
 }).strict();
 
-function sectionOrEmpty<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
+function sectionOrEmpty<TSchema extends z.AnyZodObject>(
+  schema: TSchema,
+): z.ZodEffects<TSchema, z.output<TSchema>, unknown> {
   return z.preprocess(value => normalizeEmpty(value, {}), schema);
 }
 
@@ -176,11 +181,28 @@ export const brandIntakePayloadSchema = publicOnboardingQuestionnaireSchema.exte
 
 export const brandIntakeEvidenceValueSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('text'), value: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxTextLength) }).strict(),
-  z.object({ kind: z.literal('text_list'), value: normalizedStringList() }).strict(),
+  z.object({
+    kind: z.literal('text_list'),
+    value: z.array(z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxListItemLength))
+      .min(1)
+      .max(BRAND_INTAKE_LIMITS.maxListItems)
+      .transform(values => [...new Set(values)]),
+  }).strict(),
   z.object({ kind: z.literal('url'), value: httpUrlSchema }).strict(),
   z.object({ kind: z.literal('url_list'), value: z.array(httpUrlSchema).min(1).max(BRAND_INTAKE_LIMITS.maxListItems) }).strict(),
   z.object({ kind: z.literal('buying_stage'), value: z.enum(BRAND_INTAKE_BUYING_STAGES) }).strict(),
 ]);
+
+export const brandIntakeEvidenceRequirementIdSchema = z.string()
+  .trim()
+  .min(1)
+  .max(BRAND_INTAKE_LIMITS.maxIdLength)
+  .refine(
+    (value): value is BrandIntakeEvidenceRequirementId => BRAND_INTAKE_FIELD_PATHS.some(
+      fieldPath => value === brandIntakeEvidenceRequirementId(fieldPath),
+    ),
+    'must be a stable brand-intake field requirement ID',
+  );
 
 export const brandIntakeResolutionSourceRefSchema = z.object({
   sourceType: z.enum(BRAND_INTAKE_RESOLUTION_SOURCE_TYPES),
@@ -201,7 +223,7 @@ export const brandIntakeResolverAttributionSchema = z.object({
 
 export const brandIntakeEvidenceResolutionSchema = z.object({
   id: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxIdLength),
-  requirementId: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxIdLength),
+  requirementId: brandIntakeEvidenceRequirementIdSchema,
   fieldPath: z.enum(BRAND_INTAKE_FIELD_PATHS),
   value: brandIntakeEvidenceValueSchema,
   sourceRef: brandIntakeResolutionSourceRefSchema,
@@ -209,7 +231,98 @@ export const brandIntakeEvidenceResolutionSchema = z.object({
   expectedSourceRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   expectedArtifactRevisions: z.tuple([]),
   resolvedAt: z.string().datetime(),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  const expectedKind = BRAND_INTAKE_FIELD_POLICY[value.fieldPath].valueKind;
+  if (value.value.kind !== expectedKind) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['value', 'kind'],
+      message: `${value.fieldPath} requires evidence value kind ${expectedKind}`,
+    });
+  }
+  if (value.requirementId !== brandIntakeEvidenceRequirementId(value.fieldPath)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['requirementId'],
+      message: `requirementId must address ${value.fieldPath}`,
+    });
+  }
+});
+
+export const brandIntakeEvidenceResolutionsSchema = z.array(
+  brandIntakeEvidenceResolutionSchema,
+).max(BRAND_INTAKE_LIMITS.maxEvidenceResolutions).superRefine((value, ctx) => {
+  const size = new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  if (size > BRAND_INTAKE_LIMITS.maxEvidenceSnapshotBytes) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `brand intake evidence snapshot exceeds ${BRAND_INTAKE_LIMITS.maxEvidenceSnapshotBytes} UTF-8 bytes`,
+    });
+  }
+});
+
+export const brandIntakeCompatibilityProjectionStateSchema = z.object({
+  preservedCompetitorDomains: z.array(
+    z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxUrlLength),
+  ),
+  intakeOwnedCompetitorDomains: z.array(
+    z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxUrlLength),
+  ),
+}).strict().superRefine((value, ctx) => {
+  for (const [field, domains] of Object.entries(value) as Array<
+    [keyof typeof value, string[]]
+  >) {
+    if (new Set(domains).size !== domains.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [field],
+        message: 'projection domain snapshots must not contain duplicates',
+      });
+    }
+  }
+  const preserved = new Set(value.preservedCompetitorDomains);
+  const overlap = value.intakeOwnedCompetitorDomains.find(domain => preserved.has(domain));
+  if (overlap) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['intakeOwnedCompetitorDomains'],
+      message: 'a projected competitor domain cannot be both preserved and intake-owned',
+    });
+  }
+  const size = new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  if (size > BRAND_INTAKE_LIMITS.maxPayloadBytes) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `brand intake projection state exceeds ${BRAND_INTAKE_LIMITS.maxPayloadBytes} UTF-8 bytes`,
+    });
+  }
+});
+
+/** Authenticated admin evidence-resolution body; workspace/revision identity stays in the URL. */
+export const resolveBrandIntakeEvidenceBodySchema = z.object({
+  expectedRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  requirementId: brandIntakeEvidenceRequirementIdSchema,
+  fieldPath: z.enum(BRAND_INTAKE_FIELD_PATHS),
+  value: brandIntakeEvidenceValueSchema,
+  sourceRef: brandIntakeResolutionSourceRefSchema,
+  idempotencyKey: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxIdempotencyKeyLength),
+}).strict().superRefine((value, ctx) => {
+  const expectedKind = BRAND_INTAKE_FIELD_POLICY[value.fieldPath].valueKind;
+  if (value.value.kind !== expectedKind) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['value', 'kind'],
+      message: `${value.fieldPath} requires evidence value kind ${expectedKind}`,
+    });
+  }
+  if (value.requirementId !== brandIntakeEvidenceRequirementId(value.fieldPath)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['requirementId'],
+      message: `requirementId must address ${value.fieldPath}`,
+    });
+  }
+});
 
 export const brandIntakeSourceSchema = z.enum(BRAND_INTAKE_SOURCES);
 
@@ -218,4 +331,7 @@ export type PublicOnboardingQuestionnaireInput = z.input<
 >;
 export type NormalizedPublicOnboardingQuestionnaire = z.output<
   typeof publicOnboardingQuestionnaireSchema
+>;
+export type ResolveBrandIntakeEvidenceBody = z.infer<
+  typeof resolveBrandIntakeEvidenceBodySchema
 >;

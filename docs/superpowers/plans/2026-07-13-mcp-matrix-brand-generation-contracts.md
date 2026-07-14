@@ -278,9 +278,33 @@ generic string ID cannot satisfy a different gate.
 
 - `BrandIntakePayload` is shared, Zod-validated, schema-versioned, immutable per
   revision, and stored before compatibility projection.
+- Every intake evidence requirement has the stable identity
+  `brand-intake:<fieldPath>`. Resolution input must carry that exact identity
+  and matching finite field path; adapters never accept an arbitrary JSON path
+  or a requirement ID that addresses a different field.
+- A revision carries at most 22 evidence resolutions and at most 1 MiB of
+  UTF-8 evidence-snapshot JSON. The aggregate shared schema and database byte
+  constraint must remain aligned so every legal full-census snapshot persists.
+- The durable buying-stage field preserves `''` for omitted legacy/public input;
+  `mixed` means the client explicitly selected “All stages.” Evidence reads
+  therefore never infer submitted intent from a normalization default.
 - Resubmission creates or reuses one fingerprinted revision and updates legacy
   projections idempotently; it never append-duplicates personas or labeled KB
   blocks.
+- Each immutable revision snapshots compatibility-projection ownership for
+  competitor domains as disjoint preserved/manual and intake-owned sets. A
+  later resubmission may remove only the intake-owned set; payload coincidence
+  is never treated as proof that a pre-existing manual domain belongs to the
+  intake projection.
+- Client-portal submission retains `client_onboarding_submitted`; operator/MCP
+  intake submission uses admin-only `brand_intake_submitted`, and evidence
+  mutation uses admin-only `brand_intake_evidence_resolved`. The latter two do
+  not enter client-engagement metrics or client-visible activity.
+- Submission provenance is part of retry identity. Identical normalized answers
+  are a no-op only for the same source, actor type, and actor ID; an admin/MCP
+  pre-seed followed by client confirmation creates a new immutable revision.
+  Source/actor pairing is exact: client_portal/client, admin/operator, mcp/mcp,
+  and migration/system.
 - Authentic client examples and accepted source excerpts outrank generated
   prose. Generated taglines/examples cannot silently calibrate their own source
   model. Authentic-sample source refs exclude generated deliverables, profiles,

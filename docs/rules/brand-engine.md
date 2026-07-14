@@ -170,7 +170,7 @@ This helper is the only correct way to build voice context for user prompts. Pha
 
 ## Voice Profile Authority Rule
 
-**Where it lives:** `isVoiceProfileAuthoritative()` in `server/intelligence/seo-context-source.ts` (not exported — internal to that module)
+**Where it lives:** `isVoiceProfileAuthoritative()` in `server/intelligence/seo-context-source.ts` (internal profile/block predicate) plus exported `isWorkspaceVoiceProfileAuthoritative(workspaceId)` for compatibility writers that need the same resolved decision.
 
 **Rule:** the modern voice profile replaces the legacy `workspace.brandVoice` + brand-docs block only when one of two conditions is met:
 

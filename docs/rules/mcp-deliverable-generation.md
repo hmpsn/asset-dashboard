@@ -113,6 +113,26 @@ never sufficient to dispatch paid work.
   preview/audit before readiness can change. Content evidence resolution is
   cell-scoped and does not require a run/item, because `preflight` evidence can
   block before any run exists.
+- Brand-intake requirement identity is `brand-intake:<fieldPath>`. Shared
+  schemas validate the finite field path, the value kind assigned to that
+  field, and the exact requirement/field pairing before any adapter reaches the
+  domain service.
+- The immutable intake evidence array has both a 22-field census and a 1 MiB
+  UTF-8 aggregate bound enforced in shared validation and storage. Per-item
+  validity alone is insufficient because every individually legal resolution
+  must still fit the accumulated revision snapshot.
+- Brand-intake normalization must preserve evidence intent: an omitted buying
+  stage is the durable empty sentinel, while `mixed` is the explicit “All
+  stages” answer. Do not use a valid answer as a missing-value default.
+- Brand-intake replay identity includes submission provenance. Reuse an
+  identical revision only for the same source, actor type, and actor ID;
+  otherwise persist the confirmation as a successor. Enforce the exact source
+  pairs client_portal/client, admin/operator, mcp/mcp, migration/system before
+  activity classification.
+- Brand-intake compatibility projection snapshots competitor ownership as
+  disjoint preserved/manual and intake-owned sets on every immutable revision.
+  Later projection may remove only intake-owned domains; overlap with submitted
+  payload text is not provenance.
 - Factual accuracy and no-hallucination checks remain human-review-required;
   AI review never auto-passes provenance-sensitive items.
 - Local and service page sets require cell-specific grounded value. Pure

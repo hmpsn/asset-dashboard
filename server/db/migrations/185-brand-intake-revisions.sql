@@ -17,9 +17,14 @@ CREATE TABLE brand_intake_revisions (
   ),
   evidence_resolutions_json TEXT NOT NULL DEFAULT '[]' -- json-array-column-ok: bounded immutable per-revision evidence snapshot; never filtered or sorted in SQL
   CHECK (
-    length(evidence_resolutions_json) <= 131072
+    length(CAST(evidence_resolutions_json AS BLOB)) <= 1048576
     AND json_valid(evidence_resolutions_json)
     AND json_type(evidence_resolutions_json) = 'array'
+  ),
+  projection_state_json TEXT NOT NULL DEFAULT '{"preservedCompetitorDomains":[],"intakeOwnedCompetitorDomains":[]}' CHECK (
+    length(projection_state_json) <= 131072
+    AND json_valid(projection_state_json)
+    AND json_type(projection_state_json) = 'object'
   ),
   fingerprint TEXT NOT NULL CHECK (
     length(fingerprint) = 64
@@ -51,6 +56,10 @@ CREATE TABLE brand_intake_revisions (
     (mutation_kind = 'submission' AND idempotency_key IS NULL)
     OR (mutation_kind = 'evidence_resolution' AND idempotency_key IS NOT NULL)
   ),
+  CHECK (
+    (revision = 1 AND supersedes_revision_id IS NULL)
+    OR (revision > 1 AND supersedes_revision_id IS NOT NULL)
+  ),
   UNIQUE (workspace_id, revision),
   UNIQUE (id, workspace_id),
   FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -60,6 +69,10 @@ CREATE TABLE brand_intake_revisions (
 
 -- A revision may have at most one successor. Reverse supersession is computed
 -- from this edge so predecessor rows remain immutable.
+CREATE UNIQUE INDEX idx_brand_intake_revision_root
+  ON brand_intake_revisions(workspace_id)
+  WHERE supersedes_revision_id IS NULL;
+
 CREATE UNIQUE INDEX idx_brand_intake_revision_successor
   ON brand_intake_revisions(workspace_id, supersedes_revision_id)
   WHERE supersedes_revision_id IS NOT NULL;
@@ -70,3 +83,36 @@ CREATE UNIQUE INDEX idx_brand_intake_revision_idempotency
 
 CREATE INDEX idx_brand_intake_revision_latest
   ON brand_intake_revisions(workspace_id, revision DESC, id);
+
+-- The immutable lineage must be contiguous. The FK proves the predecessor
+-- exists; this trigger proves it is exactly the immediately prior revision.
+CREATE TRIGGER brand_intake_revision_contiguous_insert
+BEFORE INSERT ON brand_intake_revisions
+WHEN NEW.revision > 1
+  AND NOT EXISTS (
+    SELECT 1
+    FROM brand_intake_revisions predecessor
+    WHERE predecessor.workspace_id = NEW.workspace_id
+      AND predecessor.id = NEW.supersedes_revision_id
+      AND predecessor.revision = NEW.revision - 1
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'brand intake predecessor must be the immediately prior revision');
+END;
+
+CREATE TRIGGER brand_intake_revision_immutable_update
+BEFORE UPDATE ON brand_intake_revisions
+BEGIN
+  SELECT RAISE(ABORT, 'brand intake revisions are immutable');
+END;
+
+-- Direct history deletion is forbidden. During ON DELETE CASCADE the parent
+-- workspace row is already absent, so workspace deletion can still clean up.
+CREATE TRIGGER brand_intake_revision_immutable_delete
+BEFORE DELETE ON brand_intake_revisions
+WHEN EXISTS (
+  SELECT 1 FROM workspaces WHERE id = OLD.workspace_id
+)
+BEGIN
+  SELECT RAISE(ABORT, 'brand intake revisions are immutable');
+END;

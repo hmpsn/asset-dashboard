@@ -1530,6 +1530,7 @@ export const ACTIVITY_TYPE_LEXICON_BASELINE = new Set<string>([
   'discovery_source_deleted', 'discovery_processed', 'voice_sample_added', 'voice_sample_deleted',
   'voice_calibrated', 'voice_refined', 'voice_profile_created', 'voice_profile_updated',
   'brand_deliverable_generated', 'brand_deliverable_refined', 'brand_deliverable_approved', 'brand_deliverable_reverted',
+  'brand_intake_submitted', 'brand_intake_evidence_resolved',
   'blueprint_created', 'blueprint_updated', 'blueprint_deleted', 'blueprint_generated',
   'blueprint_entry_added', 'blueprint_entry_updated', 'blueprint_entry_deleted', 'copy_generated',
   'copy_approved', 'copy_batch_started', 'copy_batch_complete', 'copy_exported',

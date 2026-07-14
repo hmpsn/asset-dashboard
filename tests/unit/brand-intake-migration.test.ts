@@ -10,7 +10,11 @@ const migrationSql = fs.readFileSync(
 
 interface InsertRevisionOptions {
   id: string;
+  workspaceId?: string;
   revision: number;
+  payloadJson?: string;
+  evidenceResolutionsJson?: string;
+  projectionStateJson?: string;
   fingerprint?: string;
   mutationFingerprint?: string;
   idempotencyKey?: string | null;
@@ -34,18 +38,24 @@ describe('brand intake revision migration', () => {
     db.prepare(`
       INSERT INTO brand_intake_revisions (
         id, workspace_id, revision, schema_version, payload_json,
-        evidence_resolutions_json, fingerprint, source, submitter_json,
+        evidence_resolutions_json, projection_state_json, fingerprint, source, submitter_json,
         mutation_kind, mutation_fingerprint, idempotency_key,
         supersedes_revision_id, created_at
       ) VALUES (
-        @id, 'workspace-1', @revision, 1, '{}', '[]', @fingerprint,
+        @id, @workspace_id, @revision, 1, @payload_json,
+        @evidence_resolutions_json, @projection_state_json, @fingerprint,
         'admin', '{"actorType":"operator","actorId":"operator-1"}',
         @mutation_kind, @mutation_fingerprint, @idempotency_key,
         @supersedes_revision_id, '2026-07-13T12:00:00.000Z'
       )
     `).run({
       id: options.id,
+      workspace_id: options.workspaceId ?? 'workspace-1',
       revision: options.revision,
+      payload_json: options.payloadJson ?? '{}',
+      evidence_resolutions_json: options.evidenceResolutionsJson ?? '[]',
+      projection_state_json: options.projectionStateJson
+        ?? '{"preservedCompetitorDomains":[],"intakeOwnedCompetitorDomains":[]}',
       fingerprint: options.fingerprint ?? options.revision.toString(16).padStart(64, '0'),
       mutation_kind: options.idempotencyKey ? 'evidence_resolution' : 'submission',
       mutation_fingerprint:
@@ -68,6 +78,16 @@ describe('brand intake revision migration', () => {
       id: 'intake-second-successor',
       revision: 3,
       supersedesRevisionId: 'intake-a',
+    })).toThrow();
+    expect(() => insertRevision({
+      id: 'intake-disconnected-root',
+      revision: 3,
+      supersedesRevisionId: null,
+    })).toThrow();
+    expect(() => insertRevision({
+      id: 'intake-noncontiguous-successor',
+      revision: 4,
+      supersedesRevisionId: 'intake-b',
     })).toThrow();
   });
 
@@ -117,16 +137,52 @@ describe('brand intake revision migration', () => {
 
   it('rejects malformed JSON/fingerprints and cascades workspace deletion', () => {
     insertRevision({ id: 'intake-a', revision: 1 });
+    db.prepare('INSERT INTO workspaces (id) VALUES (?), (?), (?)')
+      .run('workspace-payload', 'workspace-fingerprint', 'workspace-projection');
+    expect(() => insertRevision({
+      id: 'intake-invalid-payload', workspaceId: 'workspace-payload', revision: 1,
+      payloadJson: 'not-json',
+    })).toThrow();
+    expect(() => insertRevision({
+      id: 'intake-invalid-fingerprint', workspaceId: 'workspace-fingerprint', revision: 1,
+      fingerprint: 'A'.repeat(64),
+    })).toThrow();
+    expect(() => insertRevision({
+      id: 'intake-invalid-projection', workspaceId: 'workspace-projection', revision: 1,
+      projectionStateJson: '[]',
+    })).toThrow();
     expect(() => db.prepare(`
-      UPDATE brand_intake_revisions SET payload_json = 'not-json' WHERE id = 'intake-a'
-    `).run()).toThrow();
+      UPDATE brand_intake_revisions SET payload_json = '{}' WHERE id = 'intake-a'
+    `).run()).toThrow(/immutable/);
     expect(() => db.prepare(`
-      UPDATE brand_intake_revisions SET fingerprint = ? WHERE id = 'intake-a'
-    `).run('A'.repeat(64))).toThrow();
+      DELETE FROM brand_intake_revisions WHERE id = 'intake-a'
+    `).run()).toThrow(/immutable/);
 
     db.prepare('DELETE FROM workspaces WHERE id = ?').run('workspace-1');
     expect(
       db.prepare('SELECT COUNT(*) AS count FROM brand_intake_revisions').get(),
     ).toEqual({ count: 0 });
+  });
+
+  it('enforces the evidence snapshot limit in UTF-8 bytes while allowing legal growth past 128 KiB', () => {
+    const withinLimit = JSON.stringify(['界'.repeat(200_000)]);
+    const overLimit = JSON.stringify(['界'.repeat(400_000)]);
+
+    expect(Buffer.byteLength(withinLimit, 'utf8')).toBeGreaterThan(128 * 1024);
+    expect(Buffer.byteLength(withinLimit, 'utf8')).toBeLessThanOrEqual(
+      1024 * 1024,
+    );
+    db.prepare('INSERT INTO workspaces (id) VALUES (?)').run('workspace-over-limit');
+    insertRevision({
+      id: 'intake-within-limit',
+      revision: 1,
+      evidenceResolutionsJson: withinLimit,
+    });
+    expect(() => insertRevision({
+      id: 'intake-over-limit',
+      workspaceId: 'workspace-over-limit',
+      revision: 1,
+      evidenceResolutionsJson: overLimit,
+    })).toThrow();
   });
 });

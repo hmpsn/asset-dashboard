@@ -123,6 +123,8 @@ export type ActivityType =
   | 'brand_deliverable_refined'
   | 'brand_deliverable_approved'
   | 'brand_deliverable_reverted'
+  | 'brand_intake_submitted'
+  | 'brand_intake_evidence_resolved'
   | 'blueprint_created'
   | 'blueprint_updated'
   | 'blueprint_deleted'

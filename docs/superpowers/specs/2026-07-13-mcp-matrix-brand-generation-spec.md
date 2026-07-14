@@ -170,6 +170,12 @@ human.
 validation, typed durable revision persistence, idempotent compatibility
 projection, activity, broadcast, and intelligence invalidation. No new public
 write endpoint is needed for MCP; MCP adapters call domain services directly.
+Omitted buying stage normalizes to the durable empty sentinel; `mixed` remains
+the explicit client answer “All stages” and counts as submitted evidence.
+An identical retry is reusable only for the same source plus actor type/ID;
+client confirmation after an admin/MCP pre-seed is a new revision. Submission
+source/actor pairs are fixed as client_portal/client, admin/operator, mcp/mcp,
+and migration/system so internal callers cannot mint client engagement.
 
 ## 6. Shared contracts and persistence
 
@@ -195,7 +201,15 @@ Contracts land before consumers:
 Additive domain-owned storage:
 
 - `brand_intake_revisions`: immutable schema-versioned payload, fingerprint,
-  source/submitter, supersession, timestamps;
+  source/submitter, supersession, timestamps, and a compatibility-projection
+  ownership snapshot that separates preserved/manual competitor domains from
+  intake-owned domains;
+
+- Brand-intake field evidence uses the stable identity
+  `brand-intake:<fieldPath>`; every resolution boundary validates the exact
+  requirement/field pair. Its accumulated immutable snapshot is capped at 1
+  MiB of UTF-8 JSON, large enough for the full legal 22-field census including
+  multibyte input, and the shared schema and database enforce the same bound;
 - `brand_generation_runs` + `brand_generation_items` +
   `brand_generation_attempts`;
 - `content_matrix_generation_runs` + `content_matrix_generation_items`;

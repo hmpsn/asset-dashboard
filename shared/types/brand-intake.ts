@@ -7,6 +7,8 @@ import type {
 } from './generation-evidence.js';
 
 export const BRAND_INTAKE_SCHEMA_VERSION = 1 as const;
+export const BRAND_INTAKE_WORKSPACE_EVENT_DOMAIN = 'brand-intake' as const;
+export const BRAND_INTAKE_WORKSPACE_EVENT_ACTION = 'revision_created' as const;
 
 export const BRAND_INTAKE_LIMITS = {
   maxPayloadBytes: 128 * 1024,
@@ -21,6 +23,7 @@ export const BRAND_INTAKE_LIMITS = {
   maxListItemLength: 100,
   maxAuthenticSamples: 25,
   maxEvidenceResolutions: 22,
+  maxEvidenceSnapshotBytes: 1024 * 1024,
   maxActorLabelLength: 200,
 } as const;
 
@@ -48,7 +51,8 @@ export interface BrandIntakeAudienceInfo {
   painPoints: string;
   goals: string;
   objections: string;
-  buyingStage: BrandIntakeBuyingStage;
+  /** Empty means the legacy/public input omitted this field; `mixed` is an explicit All stages answer. */
+  buyingStage: BrandIntakeBuyingStage | '';
   secondaryAudience: string;
 }
 
@@ -101,6 +105,14 @@ export const BRAND_INTAKE_FIELD_PATHS = [
 ] as const;
 
 export type BrandIntakeFieldPath = (typeof BRAND_INTAKE_FIELD_PATHS)[number];
+
+export type BrandIntakeEvidenceRequirementId = `brand-intake:${BrandIntakeFieldPath}`;
+
+export function brandIntakeEvidenceRequirementId(
+  fieldPath: BrandIntakeFieldPath,
+): BrandIntakeEvidenceRequirementId {
+  return `brand-intake:${fieldPath}`;
+}
 
 export type BrandIntakeFieldValueKind =
   | 'text'
@@ -176,6 +188,13 @@ export interface BrandIntakeSubmitter {
   actorLabel?: string;
 }
 
+export const BRAND_INTAKE_SOURCE_ACTOR_POLICY = {
+  client_portal: 'client',
+  admin: 'operator',
+  mcp: 'mcp',
+  migration: 'system',
+} as const satisfies Record<BrandIntakeSource, BrandIntakeSubmitter['actorType']>;
+
 export type BrandIntakeResolutionSourceRef = Omit<
   GenerationFactualEvidenceSourceRef,
   'sourceType'
@@ -199,8 +218,9 @@ export type BrandIntakeEvidenceValue =
 
 export type BrandIntakeEvidenceResolution = Omit<
   GenerationEvidenceResolution<number, []>,
-  'value' | 'sourceRef' | 'resolvedBy'
+  'requirementId' | 'value' | 'sourceRef' | 'resolvedBy'
 > & {
+  requirementId: BrandIntakeEvidenceRequirementId;
   fieldPath: BrandIntakeFieldPath;
   value: BrandIntakeEvidenceValue;
   sourceRef: BrandIntakeResolutionSourceRef;
@@ -248,10 +268,24 @@ export type BrandIntakeEvidenceAvailability =
   (typeof BRAND_INTAKE_EVIDENCE_AVAILABILITIES)[number];
 
 export interface BrandIntakeFieldEvidence {
+  requirementId: BrandIntakeEvidenceRequirementId;
   fieldPath: BrandIntakeFieldPath;
   availability: BrandIntakeEvidenceAvailability;
   sourceRefs: GenerationFactualEvidenceSourceRef[];
   resolution: BrandIntakeEvidenceResolution | null;
+}
+
+/**
+ * Internal compatibility-projection ownership snapshot.
+ *
+ * Workspace competitor domains predate durable intake and have no row-level
+ * provenance. Freezing both sets per immutable revision lets a later intake
+ * remove only domains that B0 actually added, without deleting a manual domain
+ * that happened to overlap a submitted competitor.
+ */
+export interface BrandIntakeCompatibilityProjectionState {
+  preservedCompetitorDomains: string[];
+  intakeOwnedCompetitorDomains: string[];
 }
 
 export interface BrandIntakeSubmissionRequest {
@@ -281,7 +315,7 @@ export interface ResolveBrandIntakeEvidenceRequest {
   workspaceId: string;
   intakeRevisionId: string;
   expectedRevision: number;
-  requirementId: string;
+  requirementId: BrandIntakeEvidenceRequirementId;
   fieldPath: BrandIntakeFieldPath;
   value: BrandIntakeEvidenceValue;
   sourceRef: BrandIntakeResolutionSourceRef;
@@ -302,8 +336,8 @@ export interface PublicOnboardingSaveResponse {
 
 /** Safe metadata for the existing WORKSPACE_UPDATED event. */
 export interface BrandIntakeWorkspaceUpdatedMetadata {
-  domain: 'brand-intake';
-  action: 'revision_created';
+  domain: typeof BRAND_INTAKE_WORKSPACE_EVENT_DOMAIN;
+  action: typeof BRAND_INTAKE_WORKSPACE_EVENT_ACTION;
   cause: BrandIntakeMutationKind;
   intakeRevisionId: string;
   revision: number;
