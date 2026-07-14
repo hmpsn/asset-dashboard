@@ -1,4 +1,19 @@
-import { Router } from 'express';
+/**
+ * Voice calibration and finalization HTTP adapters.
+ *
+ * @reads workspaces, voice_profiles, voice_samples, voice_calibration_sessions,
+ *   voice_profile_finalizations, voice_finalization_authorizations
+ * @writes voice_profiles, voice_samples, voice_calibration_sessions,
+ *   voice_profile_finalizations, voice_finalization_authorizations, activity_log,
+ *   intelligence_cache
+ */
+import { Router, type Request, type Response } from 'express';
+
+import type { GenerationOperatorAttribution } from '../../shared/types/generation-evidence.js';
+import type {
+  CreateVoiceFinalizationAuthorizationRequest,
+  FinalizeBrandVoiceRequest,
+} from '../../shared/types/voice-finalization.js';
 import { requireWorkspaceAccess } from '../auth.js';
 import { validate, z } from '../middleware/validate.js';
 import { addActivity } from '../activity-log.js';
@@ -18,10 +33,24 @@ import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 import { sanitizeErrorMessage } from '../utils/text.js';
 import { computeEffectiveTier, getWorkspace } from '../workspaces.js';
 import {
+  createVoiceFinalizationAuthorizationBodySchema,
   createVoiceProfileSchema,
+  finalizeBrandVoiceBodySchema,
   saveVariationFeedbackSchema,
+  type CreateVoiceFinalizationAuthorizationBody,
+  type FinalizeBrandVoiceBody,
 } from '../schemas/voice-calibration.js';
 import { createLogger } from '../logger.js';
+import {
+  createVoiceFinalizationAuthorization,
+  finalizeBrandVoice,
+  getBrandVoiceReadiness,
+  VoiceFinalizationAuthorizationError,
+  VoiceFinalizationConflictError,
+  VoiceFinalizationIdempotencyConflictError,
+  VoiceFinalizationNotFoundError,
+  VoiceFinalizationPreconditionError,
+} from '../domains/brand/voice-finalization.js';
 
 const router = Router();
 const log = createLogger('voice-calibration-routes');
@@ -46,13 +75,137 @@ function refundVoiceUsage(workspaceId: string): void {
   }
 }
 
+function operatorFromRequest(req: Request): GenerationOperatorAttribution {
+  if (req.user) {
+    return {
+      actorType: 'operator',
+      actorId: req.user.id,
+      actorLabel: req.user.name,
+    };
+  }
+  return {
+    actorType: 'operator',
+    actorId: 'admin-hmac',
+    actorLabel: 'Admin operator',
+  };
+}
+
+function applyFinalizationPostCommitEffects(
+  workspaceId: string,
+  result: ReturnType<typeof finalizeBrandVoice>,
+): void {
+  const metadata = {
+    voiceProfileId: result.snapshot.voiceProfileId,
+    finalizationId: result.snapshot.id,
+    profileRevision: result.profileRevision,
+    voiceVersion: result.snapshot.voiceVersion,
+    fingerprint: result.snapshot.fingerprint,
+  };
+  runVoicePostCommitEffect(workspaceId, 'activity', () => {
+    addActivity(
+      workspaceId,
+      'voice_calibrated',
+      'Finalized brand voice',
+      `Finalized voice profile revision ${result.profileRevision}.`,
+      metadata,
+      {
+        id: result.snapshot.finalizedBy.actorId,
+        name: result.snapshot.finalizedBy.actorLabel,
+      },
+    );
+  });
+  runVoicePostCommitEffect(workspaceId, 'broadcast', () => {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, {
+      workspaceId,
+      voiceProfileId: result.snapshot.voiceProfileId,
+      finalizationId: result.snapshot.id,
+      profileRevision: result.profileRevision,
+      voiceVersion: result.snapshot.voiceVersion,
+      status: 'calibrated',
+    });
+  });
+  runVoicePostCommitEffect(workspaceId, 'intelligence-cache', () => {
+    invalidateIntelligenceCache(workspaceId);
+  });
+}
+
+function applyAuthorizationPostCommitEffects(
+  workspaceId: string,
+  result: ReturnType<typeof createVoiceFinalizationAuthorization>,
+): void {
+  const { authorization } = result;
+  runVoicePostCommitEffect(workspaceId, 'activity', () => {
+    addActivity(
+      workspaceId,
+      'voice_profile_updated',
+      'Authorized voice finalization',
+      `Authorized voice profile revision ${authorization.expectedProfileRevision} for MCP finalization.`,
+      {
+        authorizationId: authorization.authorizationId,
+        profileRevision: authorization.expectedProfileRevision,
+        expiresAt: authorization.expiresAt,
+      },
+      {
+        id: authorization.authorizedBy.actorId,
+        name: authorization.authorizedBy.actorLabel,
+      },
+    );
+  });
+  runVoicePostCommitEffect(workspaceId, 'broadcast', () => {
+    // Workspace broadcasts are shared with client subscribers. Keep this to an
+    // invalidation-only payload: authorization identity and bearer material stay
+    // behind the admin boundary.
+    broadcastToWorkspace(workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { workspaceId });
+  });
+}
+
+function sendVoiceFinalizationError(
+  res: Response,
+  err: unknown,
+): boolean {
+  if (err instanceof VoiceFinalizationNotFoundError) {
+    res.status(404).json({ error: err.message, code: err.code });
+    return true;
+  }
+  if (err instanceof VoiceFinalizationConflictError) {
+    res.status(409).json({
+      error: err.message,
+      code: err.code,
+      expectedRevision: err.expected,
+      actualRevision: err.actual,
+    });
+    return true;
+  }
+  if (err instanceof VoiceFinalizationIdempotencyConflictError) {
+    res.status(409).json({ error: err.message, code: err.code });
+    return true;
+  }
+  if (err instanceof VoiceFinalizationPreconditionError) {
+    res.status(422).json({ error: err.message, code: err.code });
+    return true;
+  }
+  if (err instanceof VoiceFinalizationAuthorizationError) {
+    // Keep invalid, expired, consumed, and cross-workspace token failures
+    // indistinguishable so this endpoint cannot become an authorization-state oracle.
+    res.status(401).json({
+      error: 'Voice finalization authorization is invalid or expired',
+      code: err.code,
+    });
+    return true;
+  }
+  return false;
+}
+
 // ── Zod schemas ─────────────────────────────────────────────────────────────
 
 const voiceSampleContextSchema = z.enum(['headline', 'body', 'cta', 'about', 'service', 'social', 'seo']);
 const voiceSampleSourceSchema = z.enum([
   'manual', 'transcript_extraction', 'calibration_loop', 'identity_approved', 'copy_approved',
 ]);
-const voiceProfileStatusSchema = z.enum(['draft', 'calibrating', 'calibrated']);
+// A profile becomes calibrated only through the revision-safe finalization route.
+// Generic edits may move it between draft and calibrating, but cannot assert that
+// the voice is finalized.
+const voiceProfileStatusSchema = z.enum(['draft', 'calibrating']);
 
 const toneSpectrumSchema = z.object({
   formal_casual: z.number().min(1).max(10),
@@ -112,6 +265,21 @@ router.get('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), (re
   res.json(getVoiceProfile(req.params.workspaceId) ?? null);
 });
 
+// Read finalization readiness without exposing private intake questionnaire data.
+router.get('/api/voice/:workspaceId/readiness', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const workspaceId = req.params.workspaceId;
+  try {
+    if (!getWorkspace(workspaceId)) {
+      throw new VoiceFinalizationNotFoundError('Workspace not found');
+    }
+    res.json(getBrandVoiceReadiness(workspaceId));
+  } catch (err) {
+    if (sendVoiceFinalizationError(res, err)) return;
+    log.error({ err, workspaceId }, 'failed to read brand voice readiness');
+    res.status(500).json({ error: 'Failed to read brand voice readiness' });
+  }
+});
+
 // Explicitly create voice profile (A5: no longer auto-created on GET)
 router.post('/api/voice/:workspaceId',
   requireWorkspaceAccess('workspaceId'),
@@ -143,15 +311,76 @@ router.patch('/api/voice/:workspaceId', requireWorkspaceAccess('workspaceId'), v
     if (err instanceof Error && err.message === 'No voice profile exists for this workspace') {
       return res.status(404).json({ error: 'Voice profile not found. Create one first via POST /api/voice/:workspaceId' });
     }
-    // Illegal status transitions (e.g. draft → calibrated) are user-input errors,
-    // not server failures. Return 400 with a descriptive message so the client
-    // can surface "finish calibration first" rather than a generic 500.
+    // Domain transition failures are user-input errors, not server failures.
+    // The edge schema separately reserves `calibrated` for POST /finalize.
     if (err instanceof VoiceProfileStateTransitionError) {
       return res.status(400).json({ error: err.message, from: err.from, to: err.to });
     }
     throw err;
   }
 });
+
+// Finalize a brand voice directly as the authenticated human operator.
+router.post(
+  '/api/voice/:workspaceId/finalize',
+  requireWorkspaceAccess('workspaceId'),
+  validate(finalizeBrandVoiceBodySchema),
+  (req, res) => {
+    const workspaceId = req.params.workspaceId;
+    try {
+      const finalizedBy = operatorFromRequest(req);
+      const body = req.body as FinalizeBrandVoiceBody;
+      // Zod v3 types `.min(1)` as an array even though validation guarantees a
+      // non-empty list. Narrow only that field at this validated boundary.
+      const request: FinalizeBrandVoiceRequest = {
+        workspaceId,
+        ...body,
+        anchorSelectors: body.anchorSelectors as FinalizeBrandVoiceRequest['anchorSelectors'],
+        finalizedBy,
+        executionActor: finalizedBy,
+      };
+      const result = finalizeBrandVoice(request);
+      if (result.created) {
+        applyFinalizationPostCommitEffects(workspaceId, result);
+      }
+      res.status(result.created ? 201 : 200).json(result);
+    } catch (err) {
+      if (sendVoiceFinalizationError(res, err)) return;
+      log.error({ err, workspaceId }, 'failed to finalize brand voice');
+      res.status(500).json({ error: 'Failed to finalize brand voice' });
+    }
+  },
+);
+
+// Create a short-lived, exact, one-time authorization for MCP execution. The
+// bearer token is returned by the domain only at creation and is never persisted
+// in recoverable form.
+router.post(
+  '/api/voice/:workspaceId/finalization-authorizations',
+  requireWorkspaceAccess('workspaceId'),
+  validate(createVoiceFinalizationAuthorizationBodySchema),
+  (req, res) => {
+    const workspaceId = req.params.workspaceId;
+    try {
+      const authorizedBy = operatorFromRequest(req);
+      const body = req.body as CreateVoiceFinalizationAuthorizationBody;
+      const request: CreateVoiceFinalizationAuthorizationRequest = {
+        workspaceId,
+        ...body,
+        anchorSelectors: body.anchorSelectors as
+          CreateVoiceFinalizationAuthorizationRequest['anchorSelectors'],
+        authorizedBy,
+      };
+      const result = createVoiceFinalizationAuthorization(request);
+      applyAuthorizationPostCommitEffects(workspaceId, result);
+      res.status(201).json(result);
+    } catch (err) {
+      if (sendVoiceFinalizationError(res, err)) return;
+      log.error({ err, workspaceId }, 'failed to create voice finalization authorization');
+      res.status(500).json({ error: 'Failed to create voice finalization authorization' });
+    }
+  },
+);
 
 // List calibration sessions
 router.get('/api/voice/:workspaceId/sessions', requireWorkspaceAccess('workspaceId'), (req, res) => {
@@ -211,7 +440,12 @@ router.post('/api/voice/:workspaceId/calibrate',
     }
 
     runVoicePostCommitEffect(req.params.workspaceId, 'activity', () => {
-      addActivity(req.params.workspaceId, 'voice_calibrated', `Generated voice calibration variations for ${promptType}`);
+      addActivity(
+        req.params.workspaceId,
+        'voice_profile_updated',
+        'Generated voice calibration variations',
+        `Generated draft voice variations for ${promptType}.`,
+      );
     });
     runVoicePostCommitEffect(req.params.workspaceId, 'broadcast', () => {
       broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { sessionId: session.id });

@@ -138,13 +138,16 @@ describe('PATCH /api/voice/:workspaceId — update profile', () => {
     await patchJson(`/api/voice/${wsId}`, { status: 'draft' });
   });
 
-  it('updates status field (draft → calibrated) and returns the updated profile', async () => {
-    // Move to calibrating first (draft → calibrating is a valid forward transition)
+  it('rejects calibrated status even after the profile enters calibrating', async () => {
+    // Only the finalization endpoint may assert calibrated authority.
     await patchJson(`/api/voice/${wsId}`, { status: 'calibrating' });
     const res = await patchJson(`/api/voice/${wsId}`, { status: 'calibrated' });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
     const body = await res.json() as Record<string, unknown>;
-    expect(body.status).toBe('calibrated');
+    expect(body).toHaveProperty('error');
+    const getRes = await api(`/api/voice/${wsId}`);
+    const profile = await getRes.json() as Record<string, unknown>;
+    expect(profile.status).toBe('calibrating');
     // Reset to draft for subsequent tests
     await patchJson(`/api/voice/${wsId}`, { status: 'draft' });
   });
@@ -355,7 +358,7 @@ describe('Full mutation chain', () => {
     expect(remaining).toBeUndefined();
   });
 
-  it('create profile → PATCH to calibrated → GET shows calibrated status', async () => {
+  it('create profile → generic PATCH cannot claim calibrated authority', async () => {
     // A separate workspace so status mutations don't bleed across tests
     const chainWsId = createWorkspace('Voice Chain Test WS').id;
     try {
@@ -365,15 +368,15 @@ describe('Full mutation chain', () => {
       const patchCalibrating = await patchJson(`/api/voice/${chainWsId}`, { status: 'calibrating' });
       expect(patchCalibrating.status).toBe(200);
 
-      // calibrating → calibrated
+      // calibrating → calibrated is reserved for POST /finalize.
       const patchCalibrated = await patchJson(`/api/voice/${chainWsId}`, { status: 'calibrated' });
-      expect(patchCalibrated.status).toBe(200);
+      expect(patchCalibrated.status).toBe(400);
 
-      // GET should reflect calibrated
+      // GET preserves the last legal status.
       const getRes = await api(`/api/voice/${chainWsId}`);
       expect(getRes.status).toBe(200);
       const profile = await getRes.json() as Record<string, unknown>;
-      expect(profile.status).toBe('calibrated');
+      expect(profile.status).toBe('calibrating');
     } finally {
       deleteWorkspace(chainWsId);
     }

@@ -1,5 +1,14 @@
 import { z } from '../middleware/validate.js';
 
+export {
+  createVoiceFinalizationAuthorizationBodySchema,
+  finalizeBrandVoiceBodySchema,
+} from '../../shared/types/voice-finalization-schemas.js';
+export type {
+  CreateVoiceFinalizationAuthorizationBody,
+  FinalizeBrandVoiceBody,
+} from '../../shared/types/voice-finalization-schemas.js';
+
 export const createVoiceProfileSchema = z.object({}).strict();
 
 export const saveVariationFeedbackSchema = z.object({
