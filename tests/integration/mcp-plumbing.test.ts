@@ -12,6 +12,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createMcpApiKey, revokeMcpApiKey } from '../../server/mcp/api-keys.js';
+import { createTemplate } from '../../server/content-templates.js';
+import { createMatrix } from '../../server/content-matrices.js';
 
 const MASTER_KEY = 'plumbing-master-key-xyz';
 const ctx = createEphemeralTestContext(import.meta.url);
@@ -20,12 +22,31 @@ let wsA: ReturnType<typeof seedWorkspace>;
 let wsB: ReturnType<typeof seedWorkspace>;
 let perWsKey: string;
 let perWsKeyId: string;
+let matrixId: string;
 
 beforeAll(async () => {
   process.env.MCP_API_KEY = MASTER_KEY;
   await ctx.startServer();
   wsA = seedWorkspace();
   wsB = seedWorkspace();
+  const template = createTemplate(wsA.workspaceId, {
+    name: 'MCP matrix plumbing template',
+    pageType: 'service',
+    variables: [{ name: 'service', label: 'Service' }],
+    sections: [],
+    urlPattern: '/services/{service}',
+    keywordPattern: '{service}',
+    titlePattern: '{service}',
+    metaDescPattern: 'Learn about {service}.',
+  });
+  const matrix = createMatrix(wsA.workspaceId, {
+    name: 'MCP matrix plumbing matrix',
+    templateId: template.id,
+    dimensions: [{ variableName: 'service', values: ['Consulting'] }],
+    urlPattern: template.urlPattern,
+    keywordPattern: template.keywordPattern,
+  });
+  matrixId = matrix.id;
   const created = createMcpApiKey(wsA.workspaceId, 'plumbing-test-key');
   perWsKey = created.plaintextKeyOnceShown;
   perWsKeyId = created.id;
@@ -94,6 +115,9 @@ describe('MCP plumbing — P1+P2 tools are registered', () => {
       'generate_schema', 'validate_schema', 'publish_schema',
       'start_brief_generation', 'start_post_generation',
       'get_search_performance',
+      // M0 matrix structural planning
+      'list_content_matrices', 'get_content_matrix',
+      'resolve_content_matrix_cells', 'accept_content_template_generation_upgrade',
     ];
     for (const t of expected) {
       expect(names, `tools/list is missing ${t}`).toContain(t);
@@ -114,6 +138,32 @@ describe('MCP plumbing — new tools dispatch over real HTTP', () => {
     const body = await callTool('get_search_performance', { workspace_id: wsA.workspaceId }, MASTER_KEY);
     expect(body.result?.isError).toBe(true);
     expect(body.result!.content[0].text).toMatch(/Google Search Console|Google is not connected/i);
+  });
+
+  it('lists and reads content matrices through the registered json_v1 family', async () => {
+    const listed = await callTool(
+      'list_content_matrices',
+      { workspace_id: wsA.workspaceId },
+      MASTER_KEY,
+    );
+    expect(listed.result?.isError).toBeFalsy();
+    const listPayload = JSON.parse(listed.result!.content[0].text) as {
+      items: Array<{ id: string }>;
+    };
+    expect(listPayload.items.some(item => item.id === matrixId)).toBe(true);
+
+    const detail = await callTool(
+      'get_content_matrix',
+      { workspace_id: wsA.workspaceId, matrix_id: matrixId },
+      MASTER_KEY,
+    );
+    expect(detail.result?.isError).toBeFalsy();
+    const detailPayload = JSON.parse(detail.result!.content[0].text) as {
+      matrix: { id: string };
+      cells: { items: Array<{ id: string }> };
+    };
+    expect(detailPayload.matrix.id).toBe(matrixId);
+    expect(detailPayload.cells.items).toHaveLength(1);
   });
 });
 

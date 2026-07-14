@@ -549,10 +549,13 @@ describe('contentMatrices.update', () => {
 
 describe('contentMatrices.updateCell', () => {
   it('calls patch with cell path', async () => {
-    await contentMatrices.updateCell('ws-1', 'matrix-1', 'cell-1', { keyword: 'austin seo' });
+    await contentMatrices.updateCell('ws-1', 'matrix-1', 'cell-1', {
+      customKeyword: 'austin seo',
+      expectedCellRevision: 3,
+    });
     expect(mockPatch).toHaveBeenCalledWith(
       '/api/content-matrices/ws-1/matrix-1/cells/cell-1',
-      { keyword: 'austin seo' },
+      { customKeyword: 'austin seo', expectedCellRevision: 3 },
     );
   });
 });

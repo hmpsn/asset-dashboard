@@ -192,8 +192,8 @@ canonical terms are added), and generated rules are consistent.
 
 **Owner:** `platform-foundation`; GPT-5.5. **Depends:** P0.
 
-**Status:** implemented on a fresh branch from the green P0 `origin/staging`
-merge; independent adversarial findings are fixed before PR/CI integration.
+**Status:** merged to `staging` in PR #1531; PR and post-merge staging CI are
+green.
 
 Exclusive ownership: `server/mcp/server.ts`, `server/mcp/auth.ts`, `server/mcp/instructions.ts`,
 `server/mcp/README.md`, new canonical registry/context/error modules, and MCP
@@ -300,9 +300,9 @@ M0 contract lock (pre-implementation amendment):
   URL/keyword/title/meta patterns, CMS mapping, tone/style, and schema types);
   name/description-only edits do not stale. Target cell revision covers variable
   values, keyword choice/research, planned URL, typed evidence, status, and
-  artifact projection. Generic HTTP PUT no longer accepts a wholesale `cells`
-  replacement without an expected matrix revision; cell writes merge one target
-  into the latest array transactionally.
+  artifact projection. Generic HTTP PUT rejects wholesale `cells` replacement;
+  every cell write uses the cell endpoint to merge one target into the latest
+  array transactionally and preserve lifecycle history/side effects.
 - New matrices/templates/cells start at revision `1`; legacy absence reads as
   `0`. Same-cell concurrent commits have one winner; sibling-cell commits from
   one source snapshot remain independently valid.
@@ -315,8 +315,9 @@ M0 contract lock (pre-implementation amendment):
   source revision, typed value/source/resolver snapshots, idempotency identity,
   and current/superseded markers. M1 owns the first evidence write.
 - Matrix list order is `updated_at DESC, id ASC`; its opaque cursor is bound to
-  the template filter. Cell cursors are bound to matrix ID + matrix revision and
-  conflict after a source edit. Page size defaults to `25`, caps at `100`, and a
+  the template filter. Cell cursors are bound to matrix ID + matrix revision +
+  an exact cell-snapshot fingerprint and conflict after a cell-only or matrix
+  source edit. Page size defaults to `25`, caps at `100`, and a
   resolve request caps at `25` unique cell IDs. Matrix list filters by template
   only; there is no invented matrix-level status.
 - Structural keyword precedence is non-empty `custom` → `target` →
@@ -330,6 +331,10 @@ M0 contract lock (pre-implementation amendment):
   unresolved braces, empty segments, and canonical collisions block.
 - The four M0 tools form a dedicated `content-matrix-actions` family, use
   `json_v1`, and move the production census from 13/61 to 14/65.
+- Accepted template upgrades durably bind their idempotency key to the exact
+  proposal fingerprint and source revision. An identical replay returns the
+  accepted result, while key reuse for a different proposal conflicts; rejection
+  remains a template no-op.
 
 Red first: duplicate keyword selects wrong cell; missing/unknown variables,
 unresolved braces, invalid/duplicate URLs, stale matrix/template/cell revision,

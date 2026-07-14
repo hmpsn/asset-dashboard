@@ -6,18 +6,55 @@ import {
 import { SectionCard, Badge, Button, IconButton, ClickableRow, FormInput, FormSelect, FormTextarea } from '../ui';
 import type { ContentTemplate, TemplateVariable, TemplateSection } from './types';
 import { MOCK_TEMPLATE } from './mockData';
+import { MATRIX_GENERATION_CONTRACT_VERSION } from '../../../shared/types/matrix-generation';
+import { BRIEF_PAGE_TYPES } from '../../../shared/types/content';
 
 interface TemplateEditorProps {
   workspaceId: string;
   templateId?: string;
+  template?: ContentTemplate;
   onSave: (template: ContentTemplate) => void;
   onCancel: () => void;
 }
 
-const PAGE_TYPES: ContentTemplate['pageType'][] = [
-  'blog', 'landing', 'service', 'location', 'product',
-  'pillar', 'resource', 'provider-profile', 'procedure-guide', 'pricing-page',
+const PAGE_TYPES = [...BRIEF_PAGE_TYPES] satisfies ContentTemplate['pageType'][];
+const GENERATION_PAGE_TYPE_SET = new Set<ContentTemplate['pageType']>(PAGE_TYPES);
+
+type TemplateSectionGenerationRole = NonNullable<TemplateSection['generationRole']>;
+type TemplateSectionAeoMode = NonNullable<TemplateSection['aeoContract']>['modes'][number];
+
+const GENERATION_ROLE_OPTIONS: Array<{ value: TemplateSectionGenerationRole; label: string }> = [
+  { value: 'body', label: 'Body' },
+  { value: 'answer_first', label: 'Answer first' },
+  { value: 'definition', label: 'Definition' },
+  { value: 'proof', label: 'Proof' },
+  { value: 'process', label: 'Process' },
+  { value: 'faq', label: 'FAQ' },
+  { value: 'cta', label: 'Call to action' },
 ];
+
+const GENERATION_AEO_MODES: Partial<Record<
+  TemplateSectionGenerationRole,
+  TemplateSectionAeoMode[]
+>> = {
+  answer_first: ['answer_first'],
+  definition: ['definition'],
+  faq: ['faq', 'paa'],
+};
+
+/** Explicit builder defaults; section names never infer generation behavior. */
+function generationContractForRole(role: TemplateSectionGenerationRole): Pick<
+  TemplateSection,
+  'generationRole' | 'aeoContract' | 'ctaContract'
+> {
+  const modes = GENERATION_AEO_MODES[role] ?? [];
+  const isCta = role === 'cta';
+  return {
+    generationRole: role,
+    aeoContract: { modes, required: modes.length > 0 },
+    ctaContract: { role: isCta ? 'primary' : 'none', required: isCta },
+  };
+}
 
 const SAMPLE_VALUES: Record<string, string> = {
   city: 'Austin',
@@ -141,6 +178,18 @@ function SectionItem({
               className="w-full mt-1 px-2.5 py-1.5 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] text-xs text-[var(--brand-text)] placeholder-[var(--brand-text-muted)] resize-none focus:border-teal-500/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 transition-colors"
             />
           </div>
+          <div>
+            <label className="t-caption text-[var(--brand-text-muted)] font-medium">Generation Role</label>
+            <FormSelect
+              value={section.generationRole ?? 'body'}
+              onChange={value => onUpdate(generationContractForRole(value as TemplateSectionGenerationRole))}
+              options={GENERATION_ROLE_OPTIONS}
+              className="w-full mt-1 transition-colors"
+            />
+            <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
+              Sets this section&apos;s explicit answer and call-to-action requirements.
+            </p>
+          </div>
           <div className="flex items-center gap-3">
             <div className="flex-1">
               <label className="t-caption text-[var(--brand-text-muted)] font-medium">Word Count Target</label>
@@ -174,7 +223,7 @@ function SectionItem({
   );
 }
 
-export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: TemplateEditorProps) {
+export function TemplateEditor({ workspaceId, templateId, template, onSave, onCancel }: TemplateEditorProps) {
   const [loading, setLoading] = useState(false);
 
   const initialTemplate = useMemo(() => {
@@ -189,22 +238,37 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
         sections: [] as TemplateSection[],
         urlPattern: '',
         keywordPattern: '',
+        generationContractVersion: MATRIX_GENERATION_CONTRACT_VERSION,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
     }
-    // Mock fetch: return MOCK_TEMPLATE for dev
+    if (template) return template;
+    // Compatibility fallback for isolated story/dev renders without planner data.
     return { ...MOCK_TEMPLATE };
-  }, [templateId, workspaceId]);
+  }, [template, templateId, workspaceId]);
 
-  const [name, setName] = useState(initialTemplate.name);
-  const [description, setDescription] = useState(initialTemplate.description ?? '');
-  const [pageType, setPageType] = useState(initialTemplate.pageType);
-  const [variables, setVariables] = useState<TemplateVariable[]>(initialTemplate.variables);
-  const [sections, setSections] = useState<TemplateSection[]>(initialTemplate.sections);
-  const [urlPattern, setUrlPattern] = useState(initialTemplate.urlPattern);
-  const [keywordPattern, setKeywordPattern] = useState(initialTemplate.keywordPattern);
-  const [toneAndStyle, setToneAndStyle] = useState(initialTemplate.toneAndStyle ?? '');
+  // The editor is an optimistic-concurrency draft. Keep the source revision from
+  // the moment it opened even if React Query receives a newer MCP/admin update.
+  const openedTemplate = useRef(initialTemplate).current;
+
+  const [name, setName] = useState(openedTemplate.name);
+  const [description, setDescription] = useState(openedTemplate.description ?? '');
+  const [pageType, setPageType] = useState(openedTemplate.pageType);
+  const [variables, setVariables] = useState<TemplateVariable[]>(openedTemplate.variables);
+  const [sections, setSections] = useState<TemplateSection[]>(openedTemplate.sections);
+  const [urlPattern, setUrlPattern] = useState(openedTemplate.urlPattern);
+  const [keywordPattern, setKeywordPattern] = useState(openedTemplate.keywordPattern);
+  const [titlePattern, setTitlePattern] = useState(openedTemplate.titlePattern ?? '');
+  const [metaDescPattern, setMetaDescPattern] = useState(openedTemplate.metaDescPattern ?? '');
+  const [toneAndStyle, setToneAndStyle] = useState(openedTemplate.toneAndStyle ?? '');
+
+  // Existing legacy templates keep their historical page type visible for
+  // repair, while every new-template choice comes from the generation-supported
+  // brief page-type contract.
+  const availablePageTypes = useMemo<ContentTemplate['pageType'][]>(() => (
+    GENERATION_PAGE_TYPE_SET.has(pageType) ? PAGE_TYPES : [pageType, ...PAGE_TYPES]
+  ), [pageType]);
 
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [newVarName, setNewVarName] = useState('');
@@ -243,6 +307,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
       guidance: '',
       wordCountTarget: 150,
       order,
+      ...generationContractForRole('body'),
     }]);
     setExpandedSection(id);
   }, [sections.length]);
@@ -286,6 +351,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
     const template: ContentTemplate = {
       id: templateId ?? `tpl_${Date.now()}`,
       workspaceId,
+      revision: openedTemplate.revision,
       name: name.trim(),
       description: description.trim() || undefined,
       pageType,
@@ -293,8 +359,11 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
       sections,
       urlPattern,
       keywordPattern,
+      titlePattern: titlePattern.trim() || undefined,
+      metaDescPattern: metaDescPattern.trim() || undefined,
       toneAndStyle: toneAndStyle.trim() || undefined,
-      createdAt: initialTemplate.createdAt,
+      generationContractVersion: openedTemplate.generationContractVersion,
+      createdAt: openedTemplate.createdAt,
       updatedAt: new Date().toISOString(),
     };
     // Mock save — in production this would POST/PUT to the API
@@ -302,7 +371,10 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
       setLoading(false);
       onSave(template);
     }, 300);
-  }, [name, description, pageType, variables, sections, urlPattern, keywordPattern, toneAndStyle, templateId, workspaceId, initialTemplate.createdAt, onSave]);
+  }, [name, description, pageType, variables, sections, urlPattern, keywordPattern, titlePattern, metaDescPattern, toneAndStyle, templateId, workspaceId, openedTemplate.revision, openedTemplate.generationContractVersion, openedTemplate.createdAt, onSave]);
+
+  const requiresGenerationContract = !templateId
+    || openedTemplate.generationContractVersion === MATRIX_GENERATION_CONTRACT_VERSION;
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-6 space-y-8">
@@ -341,7 +413,7 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
             <FormSelect
               value={pageType}
               onChange={value => setPageType(value as ContentTemplate['pageType'])}
-              options={PAGE_TYPES.map(pt => ({
+              options={availablePageTypes.map(pt => ({
                 value: pt,
                 label: pt.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
               }))}
@@ -438,6 +510,40 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
                 />
                 {keywordPattern && (
                   <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5 font-mono">{replaceVariables(keywordPattern, variables)}</p>
+                )}
+              </div>
+              <div>
+                <label className="t-caption text-[var(--brand-text-muted)] font-medium flex items-center gap-1">
+                  <Type className="w-3 h-3" /> Title Pattern
+                </label>
+                <FormInput
+                  type="text"
+                  value={titlePattern}
+                  onChange={setTitlePattern}
+                  placeholder="SEO title: {service} in {city}"
+                  className="w-full mt-1 transition-colors"
+                />
+                {titlePattern && (
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
+                    Preview: {replaceVariables(titlePattern, variables)}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="t-caption text-[var(--brand-text-muted)] font-medium flex items-center gap-1">
+                  <FileText className="w-3 h-3" /> Meta Description Pattern
+                </label>
+                <FormTextarea
+                  value={metaDescPattern}
+                  onChange={setMetaDescPattern}
+                  placeholder="Explore {service} options in {city}."
+                  rows={2}
+                  className="w-full mt-1 transition-colors"
+                />
+                {metaDescPattern && (
+                  <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
+                    Preview: {replaceVariables(metaDescPattern, variables)}
+                  </p>
                 )}
               </div>
               <div>
@@ -541,7 +647,13 @@ export function TemplateEditor({ workspaceId, templateId, onSave, onCancel }: Te
           size="lg"
           icon={Save}
           onClick={handleSave}
-          disabled={!name.trim() || loading}
+          disabled={!name.trim()
+            || loading
+            || (requiresGenerationContract && (
+              sections.length === 0
+              || titlePattern.trim().length === 0
+              || metaDescPattern.trim().length === 0
+            ))}
           loading={loading}
         >
           {loading ? 'Saving...' : 'Save Template'}

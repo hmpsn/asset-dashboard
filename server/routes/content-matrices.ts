@@ -9,7 +9,17 @@ import {
   updateMatrix,
   updateMatrixCell,
   deleteMatrix,
+  ContentMatrixRevisionConflictError,
+  ContentMatrixRevisionRequiredError,
+  ContentMatrixBulkCellWriteUnsupportedError,
+  ContentMatrixSourceIntegrityError,
+  ContentMatrixPatternRenderError,
+  MatrixCellRevisionConflictError,
+  MatrixCellRevisionRequiredError,
+  MatrixTemplateIntegrityError,
 } from '../content-matrices.js';
+import { matrixCellSchema, matrixDimensionSchema } from '../content-matrix-read-model.js';
+import { ContentTemplateRevisionConflictError } from '../content-templates.js';
 import { getKeywordRecommendations } from '../keyword-recommendations.js';
 import { detectMatrixCannibalization, checkKeywordCannibalization } from '../cannibalization-detection.js';
 import { createLogger } from '../logger.js';
@@ -26,9 +36,116 @@ import {
 
 import { requireWorkspaceAccess } from '../auth.js';
 import { InvalidTransitionError } from '../state-machines.js';
+import { validate, z } from '../middleware/validate.js';
+import {
+  MATRIX_GENERATION_SOURCE_LIMITS,
+  MatrixGenerationSchemaTypeContractError,
+  MatrixGenerationSourceLimitError,
+  matrixGenerationUtf8Bytes,
+} from '../../shared/types/matrix-generation.js';
 
 const log = createLogger('routes:content-matrices');
 const router = Router();
+
+function boundedUtf8String(limit: number, label: string, minimum = 0) {
+  return z.string().min(minimum).refine(
+    value => matrixGenerationUtf8Bytes(value) <= limit,
+    `${label} exceeds the ${limit}-byte generation-source limit`,
+  );
+}
+
+const boundedDimensionSchema = matrixDimensionSchema.extend({
+  variableName: boundedUtf8String(
+    MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxDimensionNameBytes,
+    'variableName',
+    1,
+  ),
+  values: z.array(boundedUtf8String(
+    MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxDimensionValueBytes,
+    'dimension value',
+  )).max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxValuesPerDimension),
+});
+
+function addGeneratedCellProductIssue(
+  value: { dimensions?: Array<{ values: string[] }> },
+  ctx: z.RefinementCtx,
+): void {
+  if (!value.dimensions || value.dimensions.length === 0) return;
+  let product = 1;
+  for (const dimension of value.dimensions) {
+    product *= dimension.values.length;
+    if (product > MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxGeneratedCells) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['dimensions'],
+        message: `Dimensions generate more than ${MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxGeneratedCells} cells`,
+      });
+      return;
+    }
+  }
+}
+
+const createMatrixSchema = z.object({
+  name: boundedUtf8String(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxNameBytes, 'name', 1),
+  templateId: boundedUtf8String(
+    MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxTemplateIdBytes,
+    'templateId',
+    1,
+  ),
+  dimensions: z.array(boundedDimensionSchema)
+    .max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxDimensions)
+    .optional()
+    .default([]),
+  urlPattern: boundedUtf8String(
+    MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxPatternBytes,
+    'urlPattern',
+  ).optional().default(''),
+  keywordPattern: boundedUtf8String(
+    MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxPatternBytes,
+    'keywordPattern',
+  ).optional().default(''),
+}).superRefine(addGeneratedCellProductIssue);
+
+const updateMatrixSchema = z.object({
+  name: boundedUtf8String(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxNameBytes, 'name', 1).optional(),
+  templateId: boundedUtf8String(
+    MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxTemplateIdBytes,
+    'templateId',
+    1,
+  ).optional(),
+  dimensions: z.array(boundedDimensionSchema)
+    .max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxDimensions)
+    .optional(),
+  urlPattern: boundedUtf8String(
+    MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxPatternBytes,
+    'urlPattern',
+  ).optional(),
+  keywordPattern: boundedUtf8String(
+    MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxPatternBytes,
+    'keywordPattern',
+  ).optional(),
+  expectedMatrixRevision: z.number().int().nonnegative().optional(),
+}).strict().superRefine((value, ctx) => {
+  addGeneratedCellProductIssue(value, ctx);
+  const changesDefinition = value.templateId !== undefined
+    || value.dimensions !== undefined
+    || value.urlPattern !== undefined
+    || value.keywordPattern !== undefined;
+  if (changesDefinition && value.expectedMatrixRevision === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['expectedMatrixRevision'],
+      message: 'Required for generation-effective matrix changes',
+    });
+  }
+});
+
+const updateMatrixCellSchema = matrixCellSchema
+  .omit({ id: true, revision: true, statusHistory: true })
+  .partial()
+  .extend({
+    expectedCellRevision: z.number().int().nonnegative(),
+  });
 
 /**
  * Map an illegal status transition (thrown by updateMatrix / updateMatrixCell via the cell state
@@ -37,6 +154,29 @@ const router = Router();
 function mapTransitionError(err: unknown): { status: number; error: string } | null {
   if (err instanceof InvalidTransitionError) {
     return { status: 409, error: err.message };
+  }
+  if (err instanceof ContentMatrixRevisionConflictError
+    || err instanceof MatrixCellRevisionConflictError
+    || err instanceof ContentTemplateRevisionConflictError) {
+    return { status: 409, error: err.message };
+  }
+  if (err instanceof ContentMatrixRevisionRequiredError
+    || err instanceof MatrixCellRevisionRequiredError
+    || err instanceof ContentMatrixBulkCellWriteUnsupportedError
+    || err instanceof ContentMatrixPatternRenderError) {
+    return { status: 400, error: err.message };
+  }
+  if (err instanceof MatrixGenerationSourceLimitError) {
+    return { status: 400, error: err.message };
+  }
+  if (err instanceof MatrixGenerationSchemaTypeContractError) {
+    return { status: 400, error: err.message };
+  }
+  if (err instanceof MatrixTemplateIntegrityError) {
+    return { status: 404, error: err.message };
+  }
+  if (err instanceof ContentMatrixSourceIntegrityError) {
+    return { status: 422, error: err.message };
   }
   return null;
 }
@@ -52,6 +192,9 @@ router.get('/api/content-matrices/:workspaceId', requireWorkspaceAccess('workspa
     const matrices = listMatrices(req.params.workspaceId);
     res.json(matrices);
   } catch (err) {
+    if (err instanceof MatrixGenerationSourceLimitError) {
+      return res.status(422).json({ error: err.message });
+    }
     log.error({ err }, 'Failed to list matrices');
     res.status(500).json({ error: 'Failed to list matrices' });
   }
@@ -64,28 +207,29 @@ router.get('/api/content-matrices/:workspaceId/:matrixId', requireWorkspaceAcces
     if (!matrix) return res.status(404).json({ error: 'Matrix not found' });
     res.json(matrix);
   } catch (err) {
+    if (err instanceof MatrixGenerationSourceLimitError) {
+      return res.status(422).json({ error: err.message });
+    }
     log.error({ err }, 'Failed to get matrix');
     res.status(500).json({ error: 'Failed to get matrix' });
   }
 });
 
 // Create a new matrix
-router.post('/api/content-matrices/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.post('/api/content-matrices/:workspaceId', requireWorkspaceAccess('workspaceId'), validate(createMatrixSchema), (req, res) => {
   const { name, templateId, dimensions, urlPattern, keywordPattern } = req.body;
-  if (!name) return res.status(400).json({ error: 'name is required' });
-  if (!templateId) return res.status(400).json({ error: 'templateId is required' });
-
   try {
     const matrix = runWorkspaceMutation({
       workspaceId: req.params.workspaceId,
       defaultErrorMessage: 'Failed to create matrix',
+      mapError: mapTransitionError,
       mutate: ({ workspaceId }) => createMatrix(workspaceId, {
         name,
         templateId,
         dimensions: dimensions || [],
         urlPattern: urlPattern || '',
         keywordPattern: keywordPattern || '',
-      }),
+      }, { validateTemplate: true }),
       onActivity: ({ workspaceId, result }) => {
         addActivity(
           workspaceId,
@@ -104,20 +248,25 @@ router.post('/api/content-matrices/:workspaceId', requireWorkspaceAccess('worksp
     if (err instanceof WorkspaceMutationError) {
       return res.status(err.status).json({ error: err.message });
     }
+    const mapped = mapTransitionError(err);
+    if (mapped) return res.status(mapped.status).json({ error: mapped.error });
     log.error({ err }, 'Failed to create matrix');
     res.status(500).json({ error: 'Failed to create matrix' });
   }
 });
 
 // Update a matrix (name, dimensions, patterns)
-router.put('/api/content-matrices/:workspaceId/:matrixId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.put('/api/content-matrices/:workspaceId/:matrixId', requireWorkspaceAccess('workspaceId'), validate(updateMatrixSchema), (req, res) => {
   try {
+    const { expectedMatrixRevision, ...updates } = req.body;
     const updated = runWorkspaceMutation({
       workspaceId: req.params.workspaceId,
       defaultErrorMessage: 'Failed to update matrix',
       mapError: mapTransitionError,
       mutate: ({ workspaceId }) => {
-        const next = updateMatrix(workspaceId, req.params.matrixId, req.body);
+        const next = updateMatrix(workspaceId, req.params.matrixId, updates, {
+          expectedMatrixRevision,
+        });
         if (!next) throw mutationError(404, 'Matrix not found');
         return next;
       },
@@ -145,37 +294,49 @@ router.put('/api/content-matrices/:workspaceId/:matrixId', requireWorkspaceAcces
 });
 
 // Update a single cell within a matrix
-router.patch('/api/content-matrices/:workspaceId/:matrixId/cells/:cellId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.patch('/api/content-matrices/:workspaceId/:matrixId/cells/:cellId', requireWorkspaceAccess('workspaceId'), validate(updateMatrixCellSchema), (req, res) => {
   try {
+    const { expectedCellRevision, ...updates } = req.body;
     const updated = runWorkspaceMutation({
       workspaceId: req.params.workspaceId,
       defaultErrorMessage: 'Failed to update matrix cell',
       mapError: mapTransitionError,
-      mutate: ({ workspaceId }) => {
+      readBeforeWrite: ({ workspaceId }) => getMatrix(workspaceId, req.params.matrixId),
+      mutate: ({ workspaceId, existing }) => {
+        if (!existing) throw mutationError(404, 'Matrix or cell not found');
         const next = updateMatrixCell(
           workspaceId,
           req.params.matrixId,
           req.params.cellId,
-          req.body,
+          updates,
+          { expectedCellRevision, requireExpectedCellRevision: true },
         );
         if (!next) throw mutationError(404, 'Matrix or cell not found');
         return next;
       },
-      onActivity: ({ workspaceId, result }) => {
+      onActivity: ({ workspaceId, existing, result }) => {
         const cell = result.cells.find(c => c.id === req.params.cellId);
-        const statusChanged = typeof req.body.status === 'string';
-        if (statusChanged || req.body.clientFlag || req.body.keywordValidation) {
-          addActivity(
-            workspaceId,
-            'content_updated',
-            `Updated content plan page "${cell?.targetKeyword || req.params.cellId}"`,
-            statusChanged ? `Status: ${req.body.status}` : undefined,
-            { matrixId: result.id, cellId: req.params.cellId, action: 'matrix_cell_updated', status: cell?.status },
-          );
-        }
+        const previousCell = existing?.cells.find(c => c.id === req.params.cellId);
+        if ((cell?.revision ?? 0) === (previousCell?.revision ?? 0)) return;
+        const statusChanged = typeof updates.status === 'string';
+        addActivity(
+          workspaceId,
+          'content_updated',
+          `Updated content plan page "${cell?.targetKeyword || req.params.cellId}"`,
+          statusChanged ? `Status: ${updates.status}` : undefined,
+          {
+            matrixId: result.id,
+            cellId: req.params.cellId,
+            action: 'matrix_cell_updated',
+            status: cell?.status,
+            changedFields: Object.keys(updates).sort(),
+          },
+        );
       },
-      onBroadcast: ({ workspaceId, result }) => {
+      onBroadcast: ({ workspaceId, existing, result }) => {
         const cell = result.cells.find(c => c.id === req.params.cellId);
+        const previousCell = existing?.cells.find(c => c.id === req.params.cellId);
+        if ((cell?.revision ?? 0) === (previousCell?.revision ?? 0)) return;
         notifyContentPlanUpdated(workspaceId, {
           matrixId: result.id,
           cellId: req.params.cellId,
@@ -187,7 +348,7 @@ router.patch('/api/content-matrices/:workspaceId/:matrixId/cells/:cellId', requi
     res.json(updated);
 
     // Regenerate llms.txt when a cell is marked published (new content is live)
-    if (req.body.status === 'published') {
+    if (updates.status === 'published') {
       queueLlmsTxtRegeneration(req.params.workspaceId, 'content_published');
     }
   } catch (err) {

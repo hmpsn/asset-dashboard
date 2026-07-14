@@ -30,6 +30,10 @@ import {
   contentGenerationActionTools,
   handleContentGenerationActionTool,
 } from './tools/content-generation-actions.js';
+import {
+  contentMatrixActionTools,
+  handleContentMatrixActionTool,
+} from './tools/content-matrix-actions.js';
 import { schemaActionTools, handleSchemaActionTool } from './tools/schema-actions.js';
 import {
   analyticsReadActionTools,
@@ -278,6 +282,7 @@ export function buildMcpToolRegistry(
 }
 
 const legacyContract = MCP_TOOL_ERROR_CONTRACTS.LEGACY_TEXT;
+const jsonV1Contract = MCP_TOOL_ERROR_CONTRACTS.JSON_V1;
 
 const MCP_TOOL_FAMILY_REGISTRATIONS: readonly McpToolFamilyRegistration[] = Object.freeze([
   {
@@ -340,6 +345,12 @@ const MCP_TOOL_FAMILY_REGISTRATIONS: readonly McpToolFamilyRegistration[] = Obje
     tools: contentGenerationActionTools,
     handler: handleContentGenerationActionTool,
     errorContract: legacyContract,
+  },
+  {
+    family: 'content-matrix-actions',
+    tools: contentMatrixActionTools,
+    handler: handleContentMatrixActionTool,
+    errorContract: jsonV1Contract,
   },
   {
     family: 'schema-actions',

@@ -15,6 +15,7 @@ import {
   type GenerationEvidenceRequirement,
   type GenerationEvidenceSourceRef,
   type GenerationFactualEvidenceSourceRef,
+  type GenerationResolverAttribution,
 } from '../../shared/types/generation-evidence.js';
 import {
   BRAND_INTAKE_SCHEMA_VERSION,
@@ -54,6 +55,7 @@ import {
   RESOLVED_SYSTEM_BLOCK_IDS,
   type AcceptContentTemplateGenerationUpgradeRequest,
   type CreateMatrixGenerationRunRequest,
+  type GetContentMatrixResult,
   type MatrixArtifactRevisionExpectations,
   type MatrixGenerationInputSelection,
   type MatrixGenerationItem,
@@ -61,6 +63,7 @@ import {
   type MatrixGenerationSelection,
   type MatrixGenerationReplacementAuthorization,
   type MatrixGenerationPreviewTarget,
+  type PublicMatrixGenerationCreatorAttribution,
   type MatrixSourceRevision,
   type PersistedMatrixGenerationRun,
   type ResolveMatrixGenerationEvidenceRequest,
@@ -674,8 +677,18 @@ describe('MCP matrix + brand generation shared contracts', () => {
   it('locks M0 bounded reads, explicit upgrade decisions, and internal run attribution', () => {
     type ResolveSelection = ResolveMatrixStructuresRequest['selections'];
     type UpgradeDecision = AcceptContentTemplateGenerationUpgradeRequest['decision'];
+    type UpgradeIdempotency = AcceptContentTemplateGenerationUpgradeRequest['idempotencyKey'];
     type PersistedExecutionContext = PersistedMatrixGenerationRun['mcpExecutionContext'];
+    type PersistedCreator = PersistedMatrixGenerationRun['createdBy'];
+    type PublicCreator = MatrixGenerationRun['createdBy'];
+    type PublicMcpCreator = Extract<PublicCreator, { actorType: 'mcp' }>;
+    type ItemStructuralFingerprint = MatrixGenerationItem['structuralFingerprint'];
+    type ItemPreviewFingerprint = MatrixGenerationItem['previewFingerprint'];
+    type ReadMatrixRevision = GetContentMatrixResult['matrix']['revision'];
+    type ReadCellRevision = GetContentMatrixResult['cells']['items'][number]['revision'];
     type PublicRunLeaksExecutionContext = HasKey<MatrixGenerationRun, 'mcpExecutionContext'>;
+    type PublicMcpLeaksActorId = HasKey<PublicMcpCreator, 'actorId'>;
+    type PublicMcpLeaksActorLabel = HasKey<PublicMcpCreator, 'actorLabel'>;
 
     const resolveSelectionIsNonEmpty: AssertTrue<
       ResolveSelection extends readonly [unknown, ...unknown[]] ? true : false
@@ -684,11 +697,33 @@ describe('MCP matrix + brand generation shared contracts', () => {
       UpgradeDecision,
       'accept' | 'reject'
     >> = true;
+    const upgradeIdempotencyIsRequired: AssertTrue<IsExact<
+      UpgradeIdempotency,
+      string
+    >> = true;
     const internalContextIsExact: AssertTrue<IsExact<
       PersistedExecutionContext,
       McpToolExecutionContext | null
     >> = true;
+    const internalCreatorIsExact: AssertTrue<IsExact<
+      PersistedCreator,
+      GenerationResolverAttribution
+    >> = true;
+    const publicCreatorIsExact: AssertTrue<IsExact<
+      PublicCreator,
+      PublicMatrixGenerationCreatorAttribution
+    >> = true;
+    const itemFingerprintsAreRequiredStrings: AssertTrue<IsExact<
+      [ItemStructuralFingerprint, ItemPreviewFingerprint],
+      [string, string]
+    >> = true;
+    const readRevisionsAreRequiredNumbers: AssertTrue<IsExact<
+      [ReadMatrixRevision, ReadCellRevision],
+      [number, number]
+    >> = true;
     const publicRunDoesNotLeakContext: AssertFalse<PublicRunLeaksExecutionContext> = false;
+    const publicMcpDoesNotLeakActorId: AssertFalse<PublicMcpLeaksActorId> = false;
+    const publicMcpDoesNotLeakActorLabel: AssertFalse<PublicMcpLeaksActorLabel> = false;
 
     expect(MATRIX_GENERATION_CONTRACT_VERSION).toBe(1);
     expect(MATRIX_GENERATION_ATTEMPT_STATUSES).toEqual([
@@ -705,13 +740,27 @@ describe('MCP matrix + brand generation shared contracts', () => {
     expect({
       resolveSelectionIsNonEmpty,
       decisionIsExplicit,
+      upgradeIdempotencyIsRequired,
       internalContextIsExact,
+      internalCreatorIsExact,
+      publicCreatorIsExact,
+      itemFingerprintsAreRequiredStrings,
+      readRevisionsAreRequiredNumbers,
       publicRunDoesNotLeakContext,
+      publicMcpDoesNotLeakActorId,
+      publicMcpDoesNotLeakActorLabel,
     }).toEqual({
       resolveSelectionIsNonEmpty: true,
       decisionIsExplicit: true,
+      upgradeIdempotencyIsRequired: true,
       internalContextIsExact: true,
+      internalCreatorIsExact: true,
+      publicCreatorIsExact: true,
+      itemFingerprintsAreRequiredStrings: true,
+      readRevisionsAreRequiredNumbers: true,
       publicRunDoesNotLeakContext: false,
+      publicMcpDoesNotLeakActorId: false,
+      publicMcpDoesNotLeakActorLabel: false,
     });
   });
 

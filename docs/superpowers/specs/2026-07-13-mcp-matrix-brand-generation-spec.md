@@ -1,6 +1,6 @@
 # MCP Matrix + Brand Deliverable Generation Specification
 
-**Status:** P0 merged and green; R1 runtime foundation implemented
+**Status:** P0 and R1 merged with green staging CI; M0 implemented and pending PR/CI
 **Date:** 2026-07-13
 **Target:** `staging`, one PR per phase
 **Primary contexts:** `content-pipeline`, `brand-engine`
@@ -105,7 +105,10 @@ The canonical runtime registry is the sole authority for discovery, dispatch,
 schema census, and workspace authorization. Authenticated MCP key ID/label and
 request/tool identity are retained for internal activity and durable run
 attribution, but key identity is excluded from workspace broadcasts and every
-client-visible activity projection.
+client-visible activity projection. Public matrix-run DTOs also omit the
+idempotency key and full MCP execution context; MCP/system creators project to
+actor type only, while operator/client IDs and optional labels remain available
+for human review history.
 Definitions are immutable registry snapshots, every production definition is
 censused against its exact family handler and any pre-dispatch handled-name
 manifest, and error compatibility is selected per tool. Caller correlation is
@@ -247,8 +250,9 @@ create a generation run. M0 only lands the future-ready run repository primitive
 which accepts an already previewed non-empty paid selection for M1/M3.
 
 Matrix list cursors use stable `updated_at DESC, id ASC` ordering and bind the
-template filter. Cell cursors bind matrix ID plus matrix revision so a changed
-snapshot conflicts rather than mixing pages. The default/max page sizes are
+template filter. Cell cursors bind matrix ID, matrix revision, and the exact
+cell-snapshot fingerprint so a changed snapshot conflicts rather than mixing
+pages. The default/max page sizes are
 25/100 and structural resolution accepts at most 25 unique cells. Slug rendering
 uses Unicode NFKD, removes combining marks, lowercases to ASCII alphanumerics,
 collapses hyphens, and blocks values that normalize empty. Query/fragment/full
@@ -294,9 +298,10 @@ It accepts the full `MatrixSourceRevision`; it does not require a run/item, so a
 stable requirement returned by structural preflight can be resolved before any
 run is created.
 
-New templates declare `generationContractVersion` and explicit generation roles
-for every page block. Structural resolution of a legacy template returns a
-deterministic upgrade proposal: system wrappers plus unambiguous role mappings.
+New generation-ready templates declare `generationContractVersion` and
+explicit generation roles for every page block. Unversioned creates remain a
+compatible legacy input; structural resolution returns a deterministic upgrade
+proposal with system wrappers plus unambiguous role mappings.
 An operator must explicitly accept/save that proposal. Ambiguous AEO/CTA roles
 block generation. A template page type outside the current `BRIEF_PAGE_TYPES`
 allow-list returns `unsupported_page_type` with an actionable upgrade path; it
@@ -307,7 +312,10 @@ Acceptance uses `expected_template_revision` plus the proposal fingerprint at
 `POST /api/content-templates/:workspaceId/:templateId/accept-generation-upgrade`
 or the matching MCP action. It writes `generationContractVersion` and explicit
 roles only when the proposal still matches. Rejecting a proposal is a no-op;
-stale acceptance returns conflict.
+stale acceptance returns conflict. An accepted mutation durably binds its
+idempotency key to that proposal fingerprint and source revision: an identical
+replay returns the accepted result, while key reuse for another proposal
+conflicts.
 
 The page artifact is the existing `ContentBrief` followed by `GeneratedPost`.
 The generator consumes the post-C2 conditional-save/provenance contract and the
@@ -322,9 +330,11 @@ legal lifecycle projection commit with the artifact/run result.
 Run idempotency is scoped by workspace + matrix + idempotency key; reuse with a
 different selection fingerprint conflicts. Run snapshots retain source IDs after
 matrix/template deletion and persist an explicitly passed internal MCP execution
-context for restart-safe audit. That key identity is never part of public run
-DTOs, broadcasts, or client activity. Cell evidence is append-only/versioned;
-M1 owns the first resolution write.
+context for restart-safe audit. Public run DTOs omit both that context and the
+idempotency key. MCP/system creator attribution exposes only the actor type;
+operator/client IDs and optional labels remain for human review. Key identity is
+never part of public run DTOs, broadcasts, or client activity. Cell evidence is
+append-only/versioned; M1 owns the first resolution write.
 
 Human page approval uses `approveMatrixPageForPublishReadiness()` at
 `POST /api/content-matrices/:workspaceId/:matrixId/generation-runs/:runId/items/:itemId/review-approval`.

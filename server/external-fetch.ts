@@ -38,6 +38,18 @@ export class ExternalFetchError extends Error {
   }
 }
 
+export class ExternalResponseSizeError extends Error {
+  readonly maxBytes: number;
+  readonly observedBytes: number;
+
+  constructor(maxBytes: number, observedBytes: number) {
+    super(`External response exceeded the ${maxBytes}-byte limit`);
+    this.name = 'ExternalResponseSizeError';
+    this.maxBytes = maxBytes;
+    this.observedBytes = observedBytes;
+  }
+}
+
 export function isExternalFetchError(value: unknown): value is ExternalFetchError {
   return value instanceof ExternalFetchError;
 }
@@ -540,6 +552,79 @@ export async function fetchPublicWeb(options: ExternalFetchOptions): Promise<Res
 export async function fetchPublicWebText(options: ExternalFetchOptions): Promise<string> {
   const response = await fetchPublicWeb(options);
   return response.text();
+}
+
+/** Reads a public response incrementally and aborts before buffering beyond maxBytes. */
+export async function fetchPublicWebTextBounded(
+  options: ExternalFetchOptions,
+  maxBytes: number,
+): Promise<string> {
+  if (!Number.isInteger(maxBytes) || maxBytes < 1) {
+    throw new Error('maxBytes must be a positive integer');
+  }
+  const startedAt = Date.now();
+  const timeoutMs = options.timeoutMs ?? 10_000;
+  const response = await fetchPublicWeb(options);
+  const advertisedLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(advertisedLength) && advertisedLength > maxBytes) {
+    try {
+      await response.body?.cancel();
+    } catch { // catch-ok: the size contract still fails even if transport cleanup fails.
+      // Best-effort cleanup prevents oversized responses from retaining sockets.
+    }
+    throw new ExternalResponseSizeError(maxBytes, advertisedLength);
+  }
+  if (!response.body) return '';
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  const parts: string[] = [];
+  let observedBytes = 0;
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  let abortFromOuter: (() => void) | undefined;
+  const normalizedUrl = normalizeExternalUrl(options.url, { safety: 'public-web' });
+  const cancelReader = (): void => {
+    void reader.cancel().catch(() => {}); // catch-ok: cleanup is best-effort after an authoritative failure.
+  };
+  const bodyDeadline = new Promise<never>((_resolve, reject) => {
+    const rejectAsTimeout = (): void => {
+      reject(new ExternalFetchError({
+        kind: 'timeout',
+        message: `Timed out fetching ${normalizedUrl}`,
+        url: normalizedUrl,
+      }));
+      cancelReader();
+    };
+    if (timeoutMs > 0) {
+      const remainingMs = Math.max(0, timeoutMs - (Date.now() - startedAt));
+      deadlineTimer = setTimeout(rejectAsTimeout, remainingMs);
+    }
+    if (options.signal) {
+      abortFromOuter = rejectAsTimeout;
+      if (options.signal.aborted) rejectAsTimeout();
+      else options.signal.addEventListener('abort', abortFromOuter, { once: true });
+    }
+  });
+  try {
+    for (;;) {
+      const chunk = await Promise.race([reader.read(), bodyDeadline]);
+      if (chunk.done) break;
+      observedBytes += chunk.value.byteLength;
+      if (observedBytes > maxBytes) {
+        cancelReader();
+        throw new ExternalResponseSizeError(maxBytes, observedBytes);
+      }
+      parts.push(decoder.decode(chunk.value, { stream: true }));
+    }
+    parts.push(decoder.decode());
+    return parts.join('');
+  } finally {
+    if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
+    if (options.signal && abortFromOuter) {
+      options.signal.removeEventListener('abort', abortFromOuter);
+    }
+    reader.releaseLock();
+  }
 }
 
 export async function fetchProviderJson<T>(options: ExternalFetchOptions): Promise<T> {

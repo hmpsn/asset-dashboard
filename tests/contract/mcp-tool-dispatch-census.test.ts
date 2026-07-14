@@ -43,6 +43,10 @@ import {
   handleContentGenerationActionTool,
 } from '../../server/mcp/tools/content-generation-actions.js';
 import {
+  contentMatrixActionTools,
+  handleContentMatrixActionTool,
+} from '../../server/mcp/tools/content-matrix-actions.js';
+import {
   schemaActionTools,
   handleSchemaActionTool,
 } from '../../server/mcp/tools/schema-actions.js';
@@ -110,6 +114,11 @@ const EXPECTED_FAMILY_REGISTRATIONS: readonly ExpectedFamilyRegistration[] = [
     handler: handleContentGenerationActionTool,
   },
   {
+    family: 'content-matrix-actions',
+    toolNames: contentMatrixActionTools.map(tool => tool.name),
+    handler: handleContentMatrixActionTool,
+  },
+  {
     family: 'schema-actions',
     toolNames: schemaActionTools.map(tool => tool.name),
     handler: handleSchemaActionTool,
@@ -167,7 +176,7 @@ async function assertDefinitionIsDispatched(entry: McpToolRegistryEntry): Promis
 
 describe('MCP definition-to-handler dispatch census', () => {
   it('pairs every production family definition with its exact family handler', () => {
-    expect(EXPECTED_FAMILY_REGISTRATIONS).toHaveLength(13);
+    expect(EXPECTED_FAMILY_REGISTRATIONS).toHaveLength(14);
 
     for (const expected of EXPECTED_FAMILY_REGISTRATIONS) {
       const entries = [...MCP_TOOL_REGISTRY.values()]
@@ -207,7 +216,7 @@ describe('MCP definition-to-handler dispatch census', () => {
   });
 
   it('routes every registered production definition into its family handler', async () => {
-    expect(MCP_TOOL_REGISTRY.size).toBe(61);
+    expect(MCP_TOOL_REGISTRY.size).toBe(65);
     for (const entry of MCP_TOOL_REGISTRY.values()) {
       await assertDefinitionIsDispatched(entry);
     }

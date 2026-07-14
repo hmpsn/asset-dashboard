@@ -96,10 +96,10 @@ retained, reflected, or classified by a finite credential denylist.
 
 The registry assigns each tool an explicit error contract:
 
-- The existing **61 tools** remain `legacy_text`; registered handler-owned responses are unchanged.
+- The original **61 tools** remain `legacy_text`; registered handler-owned responses are unchanged.
   Registry-owned unknown-tool and authorization rejections are deliberately generic so caller
   tool/workspace values cannot be reflected as secrets.
-- New tools use `json_v1`: an error is a text content item containing a JSON
+- The four content-matrix structural tools use `json_v1`: an error is a text content item containing a JSON
   `{ code, message, retryable, details? }` envelope.
 
 `server/mcp/tool-errors.ts` builds and privately marks the `json_v1` response and filters optional
@@ -114,11 +114,11 @@ failure classes; unknown names and mismatched workspace values are never logged 
 ## Tool inventory
 
 `MCP_TOOL_REGISTRY` (`server/mcp/tool-registry.ts`) is the single authority for discovery,
-dispatch, workspace scope, and error compatibility. It composes **13 categories** for a total of
-**61 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
+dispatch, workspace scope, and error compatibility. It composes **14 categories** for a total of
+**65 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
 dispatcher in `server/mcp/tools/<category>.ts`; the registry snapshots immutable definitions and
 connects each one to its category handler. A production dispatch census calls every registered
-name with inert invalid input, asserts the exact 13 family-array→handler identities, and pins the
+name with inert invalid input, asserts the exact 14 family-array→handler identities, and pins the
 handled-name manifests for families that validate workspace input before dispatch. Discovery
 therefore cannot silently outgrow or be paired with the wrong family switch.
 
@@ -215,6 +215,14 @@ increments the paid-call counter.
 |------|-----|---------|
 | `start_brief_generation` | W | **[Paid API]** Background job: full research-backed brief generation. Returns `job_id`. |
 | `start_post_generation` | W | **[Paid API]** Background job: full post generation from a saved brief. Returns `job_id`. |
+
+### content-matrix-actions (`tools/content-matrix-actions.ts`) — free structural planning
+| Tool | R/W | Purpose |
+|------|-----|---------|
+| `list_content_matrices` | R | Cursor-paged matrix summaries, optionally filtered by template. |
+| `get_content_matrix` | R | Matrix metadata plus a revision-bound cursor page of cells. |
+| `resolve_content_matrix_cells` | R | Resolve selected durable cell IDs into deterministic structural targets, blockers, or an exact legacy-template upgrade proposal. No AI call or generation run. |
+| `accept_content_template_generation_upgrade` | W | Explicitly accept or reject the exact version-conditional deterministic template upgrade proposal. |
 
 ### schema-actions (`tools/schema-actions.ts`)
 | Tool | R/W | Purpose |
@@ -326,7 +334,8 @@ The `/mcp` endpoint has its own per-IP limiter (`mcpLimiter` in `server/middlewa
 
 Four steps, all in the same commit:
 
-1. **Define the input schema** in `shared/types/mcp-action-schemas.ts`. Every top-level property
+1. **Define the input schema** in `shared/types/mcp-action-schemas.ts` or a bounded MCP schema
+   module such as `shared/types/mcp-matrix-schemas.ts`. Every top-level property
    needs a `.describe()` (enforced by the contract test below). Build the MCP JSON Schema with
    `toMcpJsonSchema(...)`.
 2. **Add the tool def + handler** in the right `server/mcp/tools/<category>.ts` file: push a

@@ -360,11 +360,14 @@ generic string ID cannot satisfy a different gate.
   only a non-empty already-previewed `MatrixGenerationSelection`, so no M0 caller
   may fabricate a preview fingerprint or imply paid readiness.
 - Internal persisted matrix runs carry an explicitly passed
-  `McpToolExecutionContext | null`; public run DTOs omit it. Run uniqueness is
-  `(workspace_id, matrix_id, idempotency_key)`, with a same-fingerprint replay
-  and different-fingerprint conflict. Attempts are unique by item + stage +
-  attempt number. Run snapshots deliberately have no cascading matrix/template
-  foreign key and survive source deletion.
+  `McpToolExecutionContext | null` plus their idempotency key. Public run DTOs
+  omit both fields. Their creator projection reduces MCP/system attribution to
+  `{ actorType }` while retaining operator/client IDs and optional labels for
+  human review history. Run uniqueness is `(workspace_id, matrix_id,
+  idempotency_key)`, with a same-fingerprint replay and different-fingerprint
+  conflict. Attempts are unique by item + stage + attempt number. Run snapshots
+  deliberately have no cascading matrix/template foreign key and survive
+  source deletion.
 - Matrix cell evidence is append-only/versioned, not one mutable row per
   requirement. It snapshots stable requirement identity, exact source revision,
   typed value/source/resolver attribution, idempotency identity, and
@@ -407,8 +410,13 @@ generic string ID cannot satisfy a different gate.
 - New tools use snake_case workspace inputs and described top-level schemas.
 - M0 registers a dedicated `content-matrix-actions` family with four `json_v1`
   tools. Matrix summaries use stable `updated_at DESC, id ASC` cursors bound to
-  the active template filter; cell cursors bind matrix ID + revision. Limits are
-  25 default, 100 maximum, and 25 unique structural selections.
+  the active template filter; cell cursors bind matrix ID, matrix revision, and
+  the exact cell-snapshot fingerprint. Limits are 25 default, 100 maximum, and
+  25 unique structural selections.
+- Accepted template upgrades durably bind the caller's idempotency key to the
+  exact proposal fingerprint and source template revision. Identical acceptance
+  replays; key reuse for a different proposal conflicts. Rejection does not
+  mutate the template.
 - Tool discovery, dispatch, unique-name census, input-schema census, and
   declared-workspace-argument census derive from one canonical registry.
 - Registry construction snapshots immutable definitions, and a production

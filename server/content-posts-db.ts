@@ -11,7 +11,7 @@ import { contentPostGenerationDiagnosticSchema, postSectionSchema, reviewCheckli
 import { validateTransition, POST_STATUS_TRANSITIONS } from './state-machines.js';
 import { resolveContentGenerationStyle } from './page-type-copy-contract.js';
 import { getScoredOutcomeReadbacks } from './outcome-tracking.js';
-import { pageAddressSlug } from './utils/page-address.js';
+import { normalizePageUrl, pageAddressSlug } from './utils/page-address.js';
 import { IncompleteContentPostError, isCompleteGeneratedPost } from './domains/content/generation-integrity.js';
 
 const log = createLogger('content-posts-db');
@@ -219,9 +219,7 @@ const stmts = createStmtCache(() => ({
     `SELECT published_slug
        FROM content_posts
       WHERE workspace_id = ?
-        AND (published_at IS NOT NULL OR webflow_item_id IS NOT NULL)
-        AND published_slug IS NOT NULL
-        AND trim(published_slug) <> ''`,
+        AND (published_at IS NOT NULL OR webflow_item_id IS NOT NULL)`,
   ),
 }));
 
@@ -311,13 +309,59 @@ export function listPosts(workspaceId: string): GeneratedPost[] {
   return rows.map(rowToPost);
 }
 
-export function listPublishedPostPagePaths(workspaceId: string): Set<string> {
+export interface PublishedPostPagePathCensus {
+  paths: Set<string>;
+  unresolvedSlugs: Set<string>;
+  totalCount: number;
+  validCount: number;
+  complete: boolean;
+}
+
+function publishedPageIdentity(raw: string | null): { path?: string; slug?: string } | null {
+  if (typeof raw !== 'string' || raw.trim().length === 0) return null;
+  const value = raw.trim();
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value);
+      return parsed.username || parsed.password
+        ? null
+        : { path: normalizePageUrl(parsed.pathname) };
+    } catch { // catch-ok: malformed durable page identity makes the census incomplete.
+      return null;
+    }
+  }
+  if (value.startsWith('/') || value.includes('/')) {
+    return { path: normalizePageUrl(value.startsWith('/') ? value : `/${value}`) };
+  }
+  const slug = pageAddressSlug(value);
+  return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(slug) ? { slug } : null;
+}
+
+export function getPublishedPostPagePathCensus(
+  workspaceId: string,
+): PublishedPostPagePathCensus {
   const rows = stmts().selectPublishedPaths.all(workspaceId) as PublishedPathRow[];
-  return new Set(
-    rows
-      .map(row => row.published_slug ? pageAddressSlug(row.published_slug) : '')
-      .filter(Boolean),
-  );
+  const normalized = rows.map(row => publishedPageIdentity(row.published_slug));
+  const valid = normalized.filter((identity): identity is { path?: string; slug?: string } => (
+    identity !== null
+  ));
+  const paths = valid.flatMap(identity => identity.path ? [identity.path] : []);
+  const unresolvedSlugs = valid.flatMap(identity => identity.slug ? [identity.slug] : []);
+  return {
+    paths: new Set(paths),
+    unresolvedSlugs: new Set(unresolvedSlugs),
+    totalCount: rows.length,
+    validCount: valid.length,
+    complete: valid.length === rows.length && unresolvedSlugs.length === 0,
+  };
+}
+
+export function listPublishedPostPagePaths(workspaceId: string): Set<string> {
+  const census = getPublishedPostPagePathCensus(workspaceId);
+  return new Set([
+    ...[...census.paths].map(pageAddressSlug).filter(Boolean),
+    ...census.unresolvedSlugs,
+  ]);
 }
 
 /**

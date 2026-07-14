@@ -52,8 +52,9 @@ export function ContentPlanner({ workspaceId, embedded = false }: ContentPlanner
 
   const handleTemplateSave = useCallback(async (template: ContentTemplate) => {
     try {
-      if (template.id && templates.some(t => t.id === template.id)) {
-        await contentTemplates.update(workspaceId, template.id, template);
+      setError(null);
+      if (view.mode === 'template-editor' && view.templateId) {
+        await contentTemplates.update(workspaceId, view.templateId, template);
       } else {
         await contentTemplates.create(workspaceId, template);
       }
@@ -62,12 +63,13 @@ export function ContentPlanner({ workspaceId, embedded = false }: ContentPlanner
     } catch (err) {
       setError(extractErrorMessage(err, 'Failed to save template'));
     }
-  }, [workspaceId, templates, loadData]);
+  }, [workspaceId, view, loadData]);
 
   // ── Matrix callbacks ──
 
   const handleMatrixComplete = useCallback(async (matrix: ContentMatrix) => {
     try {
+      setError(null);
       await contentMatrices.create(workspaceId, {
         name: matrix.name,
         templateId: matrix.templateId,
@@ -110,7 +112,18 @@ export function ContentPlanner({ workspaceId, embedded = false }: ContentPlanner
   const handleCellUpdate = useCallback(async (cellId: string, updates: Partial<MatrixCell>) => {
     if (view.mode !== 'matrix-grid') return;
     try {
-      const updated = await contentMatrices.updateCell(workspaceId, view.matrixId, cellId, updates);
+      setError(null);
+      const currentCell = matrices
+        .find(matrix => matrix.id === view.matrixId)
+        ?.cells.find(cell => cell.id === cellId);
+      if (!currentCell) {
+        setError('This page changed or was removed. Refresh the planner and try again.');
+        return;
+      }
+      const updated = await contentMatrices.updateCell(workspaceId, view.matrixId, cellId, {
+        ...updates,
+        expectedCellRevision: currentCell.revision ?? 0,
+      });
       queryClient.setQueryData<ContentMatrix[]>(
         queryKeys.admin.contentMatrices(workspaceId),
         prev => (prev ?? []).map(m => m.id === view.matrixId ? updated : m),
@@ -118,29 +131,36 @@ export function ContentPlanner({ workspaceId, embedded = false }: ContentPlanner
     } catch (err) {
       setError(extractErrorMessage(err, 'Failed to update cell'));
     }
-  }, [workspaceId, view, queryClient]);
+  }, [workspaceId, view, matrices, queryClient]);
 
   // ── Render sub-views ──
 
   if (view.mode === 'template-editor') {
     return (
-      <TemplateEditor
-        workspaceId={workspaceId}
-        templateId={view.templateId}
-        onSave={handleTemplateSave}
-        onCancel={() => setView({ mode: 'list' })}
-      />
+      <div className="space-y-3">
+        {error && <InlineBanner>{error}</InlineBanner>}
+        <TemplateEditor
+          workspaceId={workspaceId}
+          templateId={view.templateId}
+          template={templates.find(item => item.id === view.templateId)}
+          onSave={handleTemplateSave}
+          onCancel={() => setView({ mode: 'list' })}
+        />
+      </div>
     );
   }
 
   if (view.mode === 'matrix-builder') {
     return (
-      <MatrixBuilder
-        workspaceId={workspaceId}
-        templates={templates}
-        onComplete={handleMatrixComplete}
-        onCancel={() => setView({ mode: 'list' })}
-      />
+      <div className="space-y-3">
+        {error && <InlineBanner>{error}</InlineBanner>}
+        <MatrixBuilder
+          workspaceId={workspaceId}
+          templates={templates}
+          onComplete={handleMatrixComplete}
+          onCancel={() => setView({ mode: 'list' })}
+        />
+      </div>
     );
   }
 
@@ -175,6 +195,7 @@ export function ContentPlanner({ workspaceId, embedded = false }: ContentPlanner
         >
           ← Back to Planner
         </Button>
+        {error && <InlineBanner>{error}</InlineBanner>}
         <MatrixGrid
           workspaceId={workspaceId}
           matrix={matrix}

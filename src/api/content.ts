@@ -6,6 +6,7 @@ import type {
   ContentTopicRequest,
   ContentTemplate,
   ContentMatrix,
+  MatrixCell,
   KeywordRecommendationOptions,
   KeywordRecommendationResult,
   AiFixRequest,
@@ -270,10 +271,10 @@ export const contentMatrices = {
   create: (wsId: string, body: { name: string; templateId: string; dimensions: ContentMatrix['dimensions']; urlPattern: string; keywordPattern: string }) =>
     post<ContentMatrix>(`/api/content-matrices/${wsId}`, body),
 
-  update: (wsId: string, matrixId: string, body: Partial<Pick<ContentMatrix, 'name' | 'dimensions' | 'urlPattern' | 'keywordPattern' | 'cells'>>) =>
+  update: (wsId: string, matrixId: string, body: Partial<Pick<ContentMatrix, 'name' | 'dimensions' | 'urlPattern' | 'keywordPattern'>> & { expectedMatrixRevision?: number }) =>
     put<ContentMatrix>(`/api/content-matrices/${wsId}/${matrixId}`, body),
 
-  updateCell: (wsId: string, matrixId: string, cellId: string, body: Record<string, unknown>) =>
+  updateCell: (wsId: string, matrixId: string, cellId: string, body: Partial<MatrixCell> & { expectedCellRevision: number }) =>
     patch<ContentMatrix>(`/api/content-matrices/${wsId}/${matrixId}/cells/${cellId}`, body),
 
   remove: (wsId: string, matrixId: string) =>

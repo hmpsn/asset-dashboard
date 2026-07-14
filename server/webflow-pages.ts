@@ -6,7 +6,7 @@ import { createLogger } from './logger.js';
 import { resolvePagePath } from './utils/page-address.js';
 import { getToken, paginateWebflow, webflowFetch, webflowJson, webflowMutation } from './webflow-client.js';
 import { parseJsonFallback } from './db/json-validation.js';
-import { fetchPublicWebText } from './external-fetch.js';
+import { fetchPublicWebText, fetchPublicWebTextBounded } from './external-fetch.js';
 import type { SchemaDeliveryDecision, SchemaPublishResponse } from '../shared/types/schema-generation.js';
 
 const log = createLogger('webflow-pages');
@@ -26,8 +26,105 @@ export interface WebflowPage {
 }
 
 export async function listPages(siteId: string, tokenOverride?: string): Promise<WebflowPage[]> {
-  const result = await webflowJson<{ pages?: WebflowPage[] }>(`/sites/${siteId}/pages?limit=100`, {}, tokenOverride);
-  return result.ok ? result.data.pages || [] : [];
+  return paginateWebflow<
+    { pages?: WebflowPage[]; pagination?: { total?: number } },
+    WebflowPage
+  >({
+    buildEndpoint: (offset, limit) => `/sites/${siteId}/pages?limit=${limit}&offset=${offset}`,
+    extractItems: page => page.pages,
+    getTotal: page => page.pagination?.total,
+    tokenOverride,
+    advanceBy: 'items-length',
+  });
+}
+
+export interface CompleteWebflowPageList {
+  pages: WebflowPage[];
+  complete: boolean;
+}
+
+export interface CompleteWebflowPageListOptions {
+  /** Fail incomplete before retaining more than this many fresh pages. */
+  maxPages?: number;
+}
+
+/**
+ * Fetch a fresh, availability-aware page census.
+ *
+ * Unlike the general cached page accessor and the best-effort paginator, this
+ * preserves whether every advertised page was read. Generation preflight uses
+ * that distinction so a stale cache or a partial API response cannot authorize
+ * paid work.
+ */
+export async function listPagesWithCompleteness(
+  siteId: string,
+  tokenOverride?: string,
+  options: CompleteWebflowPageListOptions = {},
+): Promise<CompleteWebflowPageList> {
+  const pages: WebflowPage[] = [];
+  const seenPageIds = new Set<string>();
+  const limit = 100;
+  let offset = 0;
+  let expectedTotal: number | undefined;
+  const maxPages = options.maxPages ?? Number.POSITIVE_INFINITY;
+
+  try {
+    while (true) {
+      const result = await webflowJson<{
+        pages?: WebflowPage[];
+        pagination?: { total?: number };
+      }>(`/sites/${siteId}/pages?limit=${limit}&offset=${offset}`, {}, tokenOverride);
+      if (!result.ok || !Array.isArray(result.data.pages)) {
+        return { pages, complete: false };
+      }
+
+      const batch = result.data.pages;
+      const reportedTotal = result.data.pagination?.total;
+      if (
+        reportedTotal !== undefined
+        && (!Number.isInteger(reportedTotal) || reportedTotal < 0)
+      ) {
+        return { pages, complete: false };
+      }
+      if (
+        expectedTotal !== undefined
+        && reportedTotal !== undefined
+        && reportedTotal !== expectedTotal
+      ) {
+        return { pages, complete: false };
+      }
+      if (expectedTotal === undefined && reportedTotal !== undefined) {
+        expectedTotal = reportedTotal;
+      }
+      if (
+        (expectedTotal !== undefined && expectedTotal > maxPages)
+        || pages.length + batch.length > maxPages
+      ) {
+        return { pages, complete: false };
+      }
+
+      for (const page of batch) {
+        if (!page || typeof page.id !== 'string' || !page.id || seenPageIds.has(page.id)) {
+          return { pages, complete: false };
+        }
+        seenPageIds.add(page.id);
+        pages.push(page);
+      }
+
+      if (expectedTotal !== undefined) {
+        if (pages.length === expectedTotal) return { pages, complete: true };
+        if (pages.length > expectedTotal || batch.length === 0) {
+          return { pages, complete: false };
+        }
+      } else if (batch.length < limit) {
+        return { pages, complete: true };
+      }
+
+      offset += batch.length;
+    }
+  } catch { // catch-ok: callers need an explicit incomplete result on auth/network failure.
+    return { pages, complete: false };
+  }
 }
 
 // Filter to only published, non-collection, non-draft pages
@@ -534,8 +631,33 @@ export async function discoverCmsUrls(
   } catch (err) { log.debug({ err }, 'webflow-pages: sitemap fetch failed'); return { cmsUrls: [], totalFound: 0 }; } // catch-ok: network failure — expected
 }
 
-export async function discoverSitemapUrls(baseUrl: string): Promise<string[]> {
+export interface DiscoverSitemapUrlsOptions {
+  /**
+   * Throw when any required sitemap document is unavailable or malformed.
+   * Collision-sensitive callers use this to distinguish a complete crawl from
+   * the legacy best-effort behavior used by inventory surfaces.
+   */
+  requireComplete?: boolean;
+  maxDocuments?: number;
+  maxDepth?: number;
+  maxDocumentBytes?: number;
+  maxAggregateBytes?: number;
+  maxLocations?: number;
+}
+
+export async function discoverSitemapUrls(
+  baseUrl: string,
+  options: DiscoverSitemapUrlsOptions = {},
+): Promise<string[]> {
   const urls: string[] = [];
+  const visitedSitemaps = new Set<string>();
+  const maxDocuments = options.maxDocuments ?? Number.POSITIVE_INFINITY;
+  const maxDepth = options.maxDepth ?? Number.POSITIVE_INFINITY;
+  const maxDocumentBytes = options.maxDocumentBytes ?? Number.POSITIVE_INFINITY;
+  const maxAggregateBytes = options.maxAggregateBytes ?? Number.POSITIVE_INFINITY;
+  const maxLocations = options.maxLocations ?? Number.POSITIVE_INFINITY;
+  let aggregateBytes = 0;
+  let locationCount = 0;
   const extractLocs = (xml: string): string[] => {
     const locs: string[] = [];
     const re = /<loc>([^<]+)<\/loc>/gi;
@@ -544,34 +666,62 @@ export async function discoverSitemapUrls(baseUrl: string): Promise<string[]> {
     return locs;
   };
 
-  try {
-    const text = await fetchPublicWebText({
-      url: `${baseUrl}/sitemap.xml`,
-      redirect: 'follow',
+  const readSitemap = async (
+    sitemapUrl: string,
+    fetchPath: string,
+    depth: number,
+  ): Promise<void> => {
+    if (visitedSitemaps.has(sitemapUrl)) return;
+    if (depth > maxDepth) throw new Error('Sitemap depth limit exceeded');
+    if (visitedSitemaps.size >= maxDocuments) throw new Error('Sitemap document limit exceeded');
+    visitedSitemaps.add(sitemapUrl);
+
+    const fetchOptions = {
+      url: sitemapUrl,
+      redirect: 'follow' as const,
       timeoutMs: 8_000,
       defaultHeaders: { Accept: 'application/xml,text/xml,text/plain;q=0.8,*/*;q=0.5' },
-      logContext: { module: 'webflow-pages', fetchPath: 'discover-sitemap-root' },
-    });
-    if (!text.includes('<urlset') && !text.includes('<sitemapindex')) return urls;
-
-    if (text.includes('<sitemapindex')) {
-      const subUrls = extractLocs(text);
-      for (const subUrl of subUrls) {
-        try {
-          const subText = await fetchPublicWebText({
-            url: subUrl,
-            redirect: 'follow',
-            timeoutMs: 8_000,
-            defaultHeaders: { Accept: 'application/xml,text/xml,text/plain;q=0.8,*/*;q=0.5' },
-            logContext: { module: 'webflow-pages', fetchPath: 'discover-sitemap-child' },
-          });
-          urls.push(...extractLocs(subText));
-        } catch { /* skip failed sub-sitemap */ } // catch-ok
-      }
-    } else {
-      urls.push(...extractLocs(text));
+      logContext: { module: 'webflow-pages', fetchPath },
+    };
+    const text = Number.isFinite(maxDocumentBytes)
+      ? await fetchPublicWebTextBounded(fetchOptions, maxDocumentBytes)
+      : await fetchPublicWebText(fetchOptions);
+    aggregateBytes += Buffer.byteLength(text, 'utf8');
+    if (aggregateBytes > maxAggregateBytes) throw new Error('Sitemap aggregate byte limit exceeded');
+    const isUrlSet = text.includes('<urlset');
+    const isSitemapIndex = text.includes('<sitemapindex');
+    if (!isUrlSet && !isSitemapIndex) {
+      throw new Error(`Invalid sitemap document: ${sitemapUrl}`);
     }
-  } catch { /* sitemap fetch failed */ } // catch-ok
+
+    const locations = extractLocs(text);
+    locationCount += locations.length;
+    if (locationCount > maxLocations) throw new Error('Sitemap location limit exceeded');
+    if (isSitemapIndex) {
+      if (locations.length === 0) {
+        throw new Error(`Empty sitemap index: ${sitemapUrl}`);
+      }
+      for (const childUrl of locations) {
+        try {
+          await readSitemap(childUrl, 'discover-sitemap-child', depth + 1);
+        } catch (error) {
+          if (options.requireComplete) throw error;
+          // Best-effort inventory callers preserve successfully discovered URLs.
+        }
+      }
+      return;
+    }
+
+    urls.push(...locations);
+  };
+
+  try {
+    const sitemapRoot = `${baseUrl.replace(/\/+$/, '')}/sitemap.xml`;
+    await readSitemap(sitemapRoot, 'discover-sitemap-root', 0);
+  } catch (error) {
+    if (options.requireComplete) throw error;
+    // catch-ok: best-effort callers treat an unavailable sitemap as no extra URLs.
+  }
   return urls;
 }
 

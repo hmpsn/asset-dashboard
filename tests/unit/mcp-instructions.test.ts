@@ -40,6 +40,20 @@ describe('MCP server instructions', () => {
     expect(MCP_SERVER_INSTRUCTIONS).toContain('expectedVersion');
   });
 
+  it('explains the free, revision-safe content-matrix structural workflow', () => {
+    for (const tool of [
+      'list_content_matrices',
+      'get_content_matrix',
+      'resolve_content_matrix_cells',
+      'accept_content_template_generation_upgrade',
+    ]) {
+      expect(MCP_SERVER_INSTRUCTIONS).toContain(tool);
+    }
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('expected_source_revision');
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/does not call AI/i);
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/does not.+create a generation run/i);
+  });
+
   it('flags the paid tools and that start_* tools are polled jobs', () => {
     expect(MCP_SERVER_INSTRUCTIONS).toContain('research_keywords');
     expect(MCP_SERVER_INSTRUCTIONS).toContain('start_local_seo_refresh');
