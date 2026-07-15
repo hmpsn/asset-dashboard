@@ -94,4 +94,10 @@ describe('verification governance wiring', () => {
     expect(coverageDoc).toMatch(/Staging\s+and main push CI also stay fast/);
     expect(coverageDoc).toContain('The manually dispatched coverage job');
   });
+
+  it('bounds the local full-suite verifier so integration servers can start reliably', () => {
+    const verifier = readText('scripts/verify-platform.ts');
+
+    expect(verifier).toContain("args: ['vitest', 'run', '--maxWorkers=4']");
+  });
 });
