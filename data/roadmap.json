@@ -90,10 +90,11 @@
           "source": "2026-07-13 generation quality/performance audit C1-C3/C6-C8/A6",
           "est": "XL — two phase PRs",
           "priority": "P0",
-          "status": "in_progress",
+          "status": "done",
           "createdAt": "2026-07-13",
+          "shippedAt": "2026-07-14",
           "owner": "content-pipeline",
-          "notes": "In progress 2026-07-14. C1 is implemented: strict initial brief/copy schemas, exact copy-section census with one bounded repair, typed needs_attention partial posts, atomic regeneration/unification failure behavior, incomplete-artifact delivery gates, and MCP post shape/brief-census enforcement. C2 implementation, adversarial reconciliation, and local closeout gates are complete on codex/content-edit-safety-c2; the PR, required GitHub CI, staging merge, and post-merge staging verification remain pending. Current C2 scope includes monotonic generation revisions and typed durable provenance for briefs/posts/copy sections; exact server-prepared-context fingerprints for MCP external prose with provider external/model unreported; atomic source-revision/one-time-handle adoption and send-time handle consumption; exact explicit-request authority; version-conditional generation, operator/client/lifecycle, send, schedule, revert, review, and publish paths; serialized artifact autosaves; linked-artifact event/cache coherence; resource-scoped job claims; explicit public/export redaction; post-version provenance (migration 191); Webflow publish reconciliation plus frozen config/token/brief authority and cross-collection duplicate prevention (migration 190); detached-worker rejection observers; and independently guarded post-commit effects so committed status remains truthful. Local verification is green across typecheck, pr-check, hooks lint, platform verifiers, production/manifest builds, exact-delta bundle budget, 1,906 contract tests, 5,083 passing component tests, 15,697 unit tests, and 7,685 integration tests in the three CI-equivalent shards. Depends on genq-ai-execution-governance; after C2 merges and staging is green, unlocks genq-content-context-v2 and paid matrix generation."
+          "notes": "Done 2026-07-14. C1 enforces strict complete artifacts, truthful needs_attention/error outcomes, one bounded copy repair, and delivery gates. C2 adds monotonic revisions, durable provider-neutral provenance, version-conditional generation and human/lifecycle mutations, exact MCP prepared-context authority, resource-scoped job claims, serialized autosaves, public redaction, Webflow reconciliation, and guarded post-commit effects. C2 merged to staging through PR #1537 with required CI and post-merge checks green, unlocking content context v2 and paid matrix generation."
         },
         {
           "id": "genq-recommendation-integrity",
@@ -135,10 +136,11 @@
           "source": "2026-07-13 generation quality/performance audit C4/C5/C8",
           "est": "L",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-07-13",
+          "shippedAt": "2026-07-14",
           "owner": "content-pipeline",
-          "notes": "Wave 4 after content integrity. Build one brief-relevant budgeted context, remove repeated page-map injection, preserve exact-once voice/guardrail authority, and wrap scraped evidence as untrusted with freshness metadata. Output semantics are staged behind per-workspace content-generation-context-v2 and promoted only with quality parity plus measured token/latency improvement."
+          "notes": "Done 2026-07-14 behind the default-OFF, workspace-aware content-generation-context-v2 flag. One intelligence build returns bounded brief, draft, and voiceReview projections plus one captured system-prompt authority; initial brief generation, staged post generation and section regeneration, voice scoring, and MCP brief/post preparation consume those projections without a second brand/context read. The brief projection carries only the matching page-map row, timestamped external SERP/reference/style evidence is sanitized as untrusted data, and missing metrics/SERP facts remain unknown/needs_research. A representative 20-row matrix reduces the page-map projection from 723 to 57 estimated tokens (92%); deterministic quality fixtures and legacy flag-OFF suites pass. Staging runtime p95/quality smoke remains the promotion gate before enabling or retiring the flag."
         },
         {
           "id": "genq-ordered-recommendation-convergence",

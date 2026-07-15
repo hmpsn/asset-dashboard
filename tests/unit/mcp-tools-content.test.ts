@@ -6,6 +6,10 @@ vi.mock('../../server/workspaces.js', () => ({
 }));
 vi.mock('../../server/intelligence/generation-context-builders.js', () => ({
   buildContentGenerationContext: vi.fn(),
+  buildContentGenerationContextV2: vi.fn(),
+}));
+vi.mock('../../server/feature-flags.js', () => ({
+  isFeatureEnabled: vi.fn(() => false),
 }));
 vi.mock('../../server/workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: vi.fn(),
@@ -88,7 +92,11 @@ import { onContentRequestLive } from '../../server/domains/content/on-content-re
 import { BriefNotFoundError, sendBriefToClientForReview } from '../../server/domains/content/send-brief-to-client.js';
 import { PostNotFoundError, sendPostToClientForReview } from '../../server/domains/content/send-post-to-client.js';
 import { createBrandReviewDeliverable } from '../../server/domains/brand/review-service.js';
-import { buildContentGenerationContext } from '../../server/intelligence/generation-context-builders.js';
+import {
+  buildContentGenerationContext,
+  buildContentGenerationContextV2,
+} from '../../server/intelligence/generation-context-builders.js';
+import { isFeatureEnabled } from '../../server/feature-flags.js';
 import { buildWorkspaceIntelligence } from '../../server/workspace-intelligence.js';
 import { deleteBriefAtRevision, getBrief, listBriefs, updateBriefAtRevision, upsertBrief } from '../../server/content-brief.js';
 import { deletePostAtRevision, getPost, listPostVersions, listPosts, revertToVersion, savePost, updatePostField } from '../../server/content-posts-db.js';
@@ -106,6 +114,7 @@ describe('mcp content action tools', () => {
   beforeEach(() => {
     __resetHandleStoreForTests();
     vi.clearAllMocks();
+    (isFeatureEnabled as ReturnType<typeof vi.fn>).mockReturnValue(false);
     (getWorkspace as ReturnType<typeof vi.fn>).mockReturnValue({
       id: 'ws-1',
       name: 'Workspace',
@@ -1081,6 +1090,113 @@ describe('mcp content action tools', () => {
     expect(buildContentGenerationContext).toHaveBeenCalledWith('ws-1', {
       learningsDomain: 'content',
     });
+  });
+
+  it('prepare_brief_context uses one v2 build and separates captured system authority when enabled', async () => {
+    (isFeatureEnabled as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (buildContentGenerationContextV2 as ReturnType<typeof vi.fn>).mockResolvedValue({
+      intelligence: {
+        brand: {
+          availability: 'ready',
+          identity: { mission: 'Help homeowners' },
+          voice: { status: 'calibrated', readiness: 'finalized', profileRevision: 4, voiceVersion: 2 },
+        },
+      },
+      authority: {
+        systemVoiceBlock: '[V2 system voice]',
+        userVoiceBlock: '[V2 user voice]',
+        identityPromptBlock: '[V2 identity]',
+        customNotes: null,
+        voice: { status: 'calibrated', readiness: 'finalized', profileRevision: 4, voiceVersion: 2 },
+      },
+      projections: { brief: '[V2 brief context]', draft: '[V2 draft context]', voiceReview: '[V2 review context]' },
+      tokenEstimates: { brief: 200, draft: 100, voiceReview: 50 },
+      evidence: {
+        capturedAt: '2026-07-14T12:00:00.000Z',
+        freshThrough: '2026-07-14T12:00:00.000Z',
+        observedAt: ['2026-07-14T12:00:00.000Z'],
+        missing: [],
+      },
+      effectiveInputFingerprint: 'c'.repeat(64),
+    });
+
+    const result = await handleContentActionTool('prepare_brief_context', {
+      workspace_id: 'ws-1',
+      topic: 'HVAC tips',
+      target_keyword: 'hvac maintenance',
+      layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(buildContentGenerationContextV2).toHaveBeenCalledTimes(1);
+    expect(buildContentGenerationContext).not.toHaveBeenCalled();
+    expect(buildWorkspaceIntelligence).not.toHaveBeenCalled();
+    const payload = JSON.parse(result.content[0].text) as {
+      prompt_context: string;
+      system_prompt_context: string;
+      context_fingerprint: string;
+    };
+    expect(payload.prompt_context).toContain('[V2 brief context]');
+    expect(payload.prompt_context).not.toContain('[V2 system voice]');
+    expect(payload.system_prompt_context.match(/\[V2 system voice\]/g)).toHaveLength(1);
+    expect(payload.context_fingerprint).toBe('c'.repeat(64));
+  });
+
+  it('prepare_post_context uses the v2 draft projection without a second brand read', async () => {
+    (isFeatureEnabled as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac maintenance',
+      generationRevision: 3,
+      sourceEvidence: { capturedAt: '2026-07-14T11:00:00.000Z' },
+    });
+    (buildContentGenerationContextV2 as ReturnType<typeof vi.fn>).mockResolvedValue({
+      intelligence: {
+        brand: {
+          availability: 'ready',
+          identity: { mission: 'Help homeowners' },
+          voice: { status: 'calibrated', readiness: 'finalized', profileRevision: 4, voiceVersion: 2 },
+        },
+      },
+      authority: {
+        systemVoiceBlock: '[V2 post system voice]',
+        userVoiceBlock: '[V2 user voice]',
+        identityPromptBlock: '[V2 identity]',
+        customNotes: null,
+        voice: { status: 'calibrated', readiness: 'finalized', profileRevision: 4, voiceVersion: 2 },
+      },
+      projections: { brief: '[V2 brief context]', draft: '[V2 draft context]', voiceReview: '[V2 review context]' },
+      tokenEstimates: { brief: 200, draft: 100, voiceReview: 50 },
+      evidence: {
+        capturedAt: '2026-07-14T12:00:00.000Z',
+        freshThrough: '2026-07-14T11:00:00.000Z',
+        observedAt: ['2026-07-14T11:00:00.000Z'],
+        missing: [],
+      },
+      effectiveInputFingerprint: 'd'.repeat(64),
+    });
+
+    const result = await handleContentActionTool('prepare_post_context', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(buildContentGenerationContextV2).toHaveBeenCalledWith('ws-1', expect.objectContaining({
+      targetKeyword: 'hvac maintenance',
+      sourceEvidence: { capturedAt: '2026-07-14T11:00:00.000Z' },
+    }));
+    expect(buildContentGenerationContext).not.toHaveBeenCalled();
+    expect(buildWorkspaceIntelligence).not.toHaveBeenCalled();
+    const payload = JSON.parse(result.content[0].text) as {
+      prompt_context: string;
+      system_prompt_context: string;
+      context_fingerprint: string;
+    };
+    expect(payload.prompt_context).toBe('[V2 draft context]');
+    expect(payload.system_prompt_context.match(/\[V2 post system voice\]/g)).toHaveLength(1);
+    expect(payload.context_fingerprint).toBe('d'.repeat(64));
   });
 
   it('prepare_brief_context surfaces brand identity + voice status and injects DNA + identity blocks once', async () => {

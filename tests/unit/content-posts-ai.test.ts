@@ -2,9 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContentBrief } from '../../server/content-brief.js';
 import type { GeneratedPost } from '../../shared/types/content.ts';
 
-const { callAIMock, isAnthropicConfiguredMock } = vi.hoisted(() => ({
+const {
+  callAIMock,
+  isAnthropicConfiguredMock,
+  isFeatureEnabledMock,
+  buildContentGenerationContextV2Mock,
+} = vi.hoisted(() => ({
   callAIMock: vi.fn(),
   isAnthropicConfiguredMock: vi.fn(() => false),
+  isFeatureEnabledMock: vi.fn(() => false),
+  buildContentGenerationContextV2Mock: vi.fn(),
 }));
 
 vi.mock('../../server/ai.js', async importOriginal => ({
@@ -14,6 +21,15 @@ vi.mock('../../server/ai.js', async importOriginal => ({
 
 vi.mock('../../server/anthropic-helpers.js', () => ({
   isAnthropicConfigured: isAnthropicConfiguredMock,
+}));
+
+vi.mock('../../server/feature-flags.js', () => ({
+  isFeatureEnabled: isFeatureEnabledMock,
+}));
+
+vi.mock('../../server/intelligence/generation-context-builders.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../server/intelligence/generation-context-builders.js')>()),
+  buildContentGenerationContextV2: buildContentGenerationContextV2Mock,
 }));
 
 vi.mock('../../server/workspace-intelligence.js', () => ({
@@ -89,6 +105,9 @@ beforeEach(() => {
   callAIMock.mockReset();
   isAnthropicConfiguredMock.mockReset();
   isAnthropicConfiguredMock.mockReturnValue(false);
+  isFeatureEnabledMock.mockReset();
+  isFeatureEnabledMock.mockReturnValue(false);
+  buildContentGenerationContextV2Mock.mockReset();
 });
 
 describe('callCreativeAI fallback correlation', () => {
@@ -260,6 +279,23 @@ describe('callCreativeAI fallback correlation', () => {
 });
 
 describe('generateSeoMeta', () => {
+  it('uses captured prompt authority exactly once when supplied by context v2', async () => {
+    callAIMock.mockResolvedValueOnce({
+      text: '{"seoTitle":"SEO Audit Checklist","seoMetaDescription":"A strong meta description."}',
+    });
+
+    await generateSeoMeta(makePost(), makeBrief(), 'ws_test', {
+      promptAuthority: {
+        systemVoiceBlock: '[Captured system voice]',
+        customNotes: 'Captured notes',
+      },
+    });
+
+    const system = callAIMock.mock.calls[0][0].system as string;
+    expect(system.match(/\[Captured system voice\]/g)).toHaveLength(1);
+    expect(system).toContain('Captured notes');
+  });
+
   it('parses fenced JSON through the structured-output boundary', async () => {
     callAIMock.mockResolvedValueOnce({
       text: '```json\n{"seoTitle":"SEO Audit Checklist","seoMetaDescription":"A strong meta description."}\n```',
@@ -409,6 +445,35 @@ describe('unifyPost', () => {
 });
 
 describe('scoreVoiceMatch', () => {
+  it('uses one v2 voice-review projection with captured system authority', async () => {
+    isFeatureEnabledMock.mockReturnValue(true);
+    buildContentGenerationContextV2Mock.mockResolvedValue({
+      authority: {
+        systemVoiceBlock: '[Captured score voice]',
+        userVoiceBlock: '[Voice examples]',
+        identityPromptBlock: '',
+        customNotes: null,
+        voice: { status: 'calibrated', readiness: 'finalized', profileRevision: 3, voiceVersion: 2 },
+      },
+      projections: {
+        brief: '[Brief context]',
+        draft: '[Draft context]',
+        voiceReview: '[V2 voice review context]',
+      },
+    });
+    callAIMock.mockResolvedValueOnce({
+      text: '{"voiceScore": 92, "voiceFeedback":"Strong match."}',
+    });
+
+    await scoreVoiceMatch(makePost(), makeBrief(), 'ws_test');
+
+    expect(buildContentGenerationContextV2Mock).toHaveBeenCalledTimes(1);
+    const call = callAIMock.mock.calls[0][0];
+    expect((call.system as string).match(/\[Captured score voice\]/g)).toHaveLength(1);
+    expect(call.messages[0].content).toContain('[V2 voice review context]');
+    expect(call.messages[0].content).not.toContain('[Captured score voice]');
+  });
+
   it('fails closed when AI returns a non-finite voiceScore', async () => {
     callAIMock.mockResolvedValueOnce({
       text: '{"voiceScore":"NaN","voiceFeedback":"Looks okay."}',

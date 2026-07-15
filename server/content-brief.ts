@@ -10,9 +10,19 @@ import { callAI, renderAIProviderInput, type AICallResult } from './ai.js';
 import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
 import type { ScrapedPage } from './web-scraper.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
-import type { IntelligenceOptions, IntelligenceSlice, LearningsSlice, PromptVerbosity, WorkspaceIntelligence } from '../shared/types/intelligence.js';
-import { buildSystemPrompt } from './prompt-assembly.js';
+import type {
+  ContentGenerationContextV2Options,
+  ContentGenerationContextV2Result,
+  IntelligenceOptions,
+  IntelligenceSlice,
+  LearningsSlice,
+  PromptVerbosity,
+  WorkspaceIntelligence,
+} from '../shared/types/intelligence.js';
+import type { PageKeywordMap } from '../shared/types/workspace.js';
+import { buildSystemPrompt, buildSystemPromptFromAuthority } from './prompt-assembly.js';
 import { sanitizeQueryForPrompt } from './utils/text.js';
+import { isFeatureEnabled } from './feature-flags.js';
 
 export type { ContentBrief } from '../shared/types/content.ts';
 import type {
@@ -77,6 +87,10 @@ interface GenerationContextBuildersModule {
     workspaceId: string,
     opts?: ContentGenerationContextOptions,
   ): Promise<ContentGenerationContextResult>;
+  buildContentGenerationContextV2(
+    workspaceId: string,
+    opts: ContentGenerationContextV2Options,
+  ): Promise<ContentGenerationContextV2Result>;
 }
 
 function intelligenceModulePath(name: string): string {
@@ -90,6 +104,14 @@ async function buildContentGenerationContext(
   opts?: ContentGenerationContextOptions,
 ): Promise<ContentGenerationContextResult> {
   const { buildContentGenerationContext: build } = await import(generationContextBuildersModule) as GenerationContextBuildersModule; // dynamic-import-ok - content brief generation lazily reads workspace intelligence to avoid import-cycle fan-in.
+  return build(workspaceId, opts);
+}
+
+async function buildContentGenerationContextV2(
+  workspaceId: string,
+  opts: ContentGenerationContextV2Options,
+): Promise<ContentGenerationContextV2Result> {
+  const { buildContentGenerationContextV2: build } = await import(generationContextBuildersModule) as GenerationContextBuildersModule; // dynamic-import-ok - same cycle-safe generation-context boundary as the legacy builder.
   return build(workspaceId, opts);
 }
 
@@ -1473,20 +1495,37 @@ export async function generateBrief(
 
   const pagesStr = context.existingPages?.slice(0, 50).join('\n') || 'No existing pages provided';
 
-  // Pull in keyword strategy context for alignment
-  const { intelligence: seoContextResult, promptContext: seoPromptContext } = await buildContentGenerationContext(workspaceId, {
-    slices: ['seoContext', 'eeatAssets'],
-    tokenBudget: 3600,
-  });
+  // Pull in keyword strategy context for alignment. Flag ON assembles the full
+  // brief-relevant context once; OFF preserves the legacy call sequence.
+  const contextV2 = isFeatureEnabled('content-generation-context-v2', workspaceId)
+    ? await buildContentGenerationContextV2(workspaceId, {
+        targetKeyword,
+        sourceEvidence: context.sourceEvidence,
+        providerMetricsObservedAt: context.keywordMetrics
+          ? context.keywordValidation?.validatedAt ?? null
+          : null,
+      })
+    : null;
+  const legacySeoContext = contextV2
+    ? null
+    : await buildContentGenerationContext(workspaceId, {
+        slices: ['seoContext', 'eeatAssets'],
+        tokenBudget: 3600,
+      });
+  const seoContextResult = contextV2?.intelligence ?? legacySeoContext!.intelligence;
+  const seoPromptContext = contextV2?.projections.brief ?? legacySeoContext!.promptContext;
   const evidenceCapturedAtCandidates: Array<string | undefined> = [
     seoContextResult?.assembledAt,
     context.sourceEvidence?.capturedAt,
+    ...(contextV2?.evidence.observedAt ?? []),
     ...((context.scrapedReferences ?? []).map(page => page.fetchedAt)),
     ...((context.styleExamples ?? []).map(page => page.fetchedAt)),
   ];
   const seo = seoContextResult.seoContext;
-  const workspaceContextBlock = formatContentGenerationPromptBlock(seoPromptContext);
-  const kwMapContext = formatPageMapForPrompt(seo);
+  const workspaceContextBlock = contextV2
+    ? `\n\n${seoPromptContext}`
+    : formatContentGenerationPromptBlock(seoPromptContext);
+  const kwMapContext = contextV2 ? '' : formatPageMapForPrompt(seo);
   const fallbackEeatRecommendations: EeatAssetRecommendation[] = (seoContextResult.eeatAssets?.assets ?? [])
     .slice(0, 4)
     .map(asset => ({
@@ -1509,12 +1548,17 @@ export async function generateBrief(
   );
   let pageAnalysisBlock = '';
   if (matchedPage) {
-    const { intelligence: pageProfileResult } = await buildContentGenerationContext(workspaceId, {
-      pagePath: matchedPage.pagePath,
-      slices: ['pageProfile'],
-      includeLocalSeo: false,
-    });
-    const profile = pageProfileResult.pageProfile;
+    let profile: PageKeywordMap | WorkspaceIntelligence['pageProfile'];
+    if (contextV2) {
+      profile = matchedPage;
+    } else {
+      const { intelligence: pageProfileResult } = await buildContentGenerationContext(workspaceId, {
+        pagePath: matchedPage.pagePath,
+        slices: ['pageProfile'],
+        includeLocalSeo: false,
+      });
+      profile = pageProfileResult.pageProfile;
+    }
     if (profile) {
       const parts: string[] = [];
       // Use optimizationIssues (AI per-page keyword analysis) — not auditIssues (structural Webflow audit)
@@ -1589,9 +1633,13 @@ export async function generateBrief(
   // is used only when no matched page was found — so we get SERP directives even on gap keywords
   // that don't yet have a matching page in page_keywords.
   let serpFeaturesDirectiveBlock = '';
-  const serpFeaturesSource = matchedPage?.serpFeatures?.length
-    ? matchedPage.serpFeatures
-    : context.pageAnalysisContext?.serpFeatures ?? [];
+  // The v2 path only presents provider facts that carry an observation timestamp.
+  // Legacy page-map SERP feature flags do not, so keep them out of the v2 prompt.
+  const serpFeaturesSource = contextV2
+    ? []
+    : matchedPage?.serpFeatures?.length
+      ? matchedPage.serpFeatures
+      : context.pageAnalysisContext?.serpFeatures ?? [];
   if (serpFeaturesSource.length > 0) {
     const feats = serpFeaturesSource;
     const directives: string[] = [];
@@ -1616,12 +1664,12 @@ export async function generateBrief(
   }
 
   // Reference URL context (competitor/inspiration pages)
-  const referenceBlock = context.scrapedReferences?.length
+  const referenceBlock = !contextV2 && context.scrapedReferences?.length
     ? buildReferenceContext(context.scrapedReferences)
     : '';
 
   // Real SERP data (PAA + top results)
-  const serpBlock = context.serpData
+  const serpBlock = !contextV2 && context.serpData
     ? buildSerpContext({
         query: targetKeyword,
         peopleAlsoAsk: context.serpData.peopleAlsoAsk,
@@ -1631,13 +1679,14 @@ export async function generateBrief(
     : '';
 
   // Style examples from top-performing pages on the site
-  const styleBlock = context.styleExamples?.length
+  const styleBlock = !contextV2 && context.styleExamples?.length
     ? buildStyleExampleContext(context.styleExamples)
     : '';
 
   // Build provider metrics block (real metrics replace hallucinated data)
   let providerMetricsBlock = '';
-  if (context.keywordMetrics) {
+  const providerEvidenceHasTimestamp = !contextV2 || Boolean(context.keywordValidation?.validatedAt);
+  if (context.keywordMetrics && providerEvidenceHasTimestamp) {
     const m = context.keywordMetrics;
     providerMetricsBlock += `\n\nREAL KEYWORD DATA (from ${providerLabel} — use these exact numbers, do NOT hallucinate different values):
 - Monthly search volume: ${m.volume.toLocaleString()}
@@ -1651,7 +1700,7 @@ export async function generateBrief(
       providerMetricsBlock += `\n- 12-month volume trend: ${m.trend.join(', ')}`;
     }
   }
-  if (context.relatedKeywords?.length) {
+  if (context.relatedKeywords?.length && providerEvidenceHasTimestamp) {
     providerMetricsBlock += `\n\nRELATED KEYWORDS (from ${providerLabel} — real data, use for secondary keywords and topical entities):\n`;
     providerMetricsBlock += context.relatedKeywords.slice(0, 15)
       .map(r => `"${r.keyword}" (vol: ${r.volume.toLocaleString()}, KD: ${r.difficulty}, CPC: $${r.cpc.toFixed(2)})`)
@@ -1698,42 +1747,46 @@ The outline sections MUST match the following template sections in order. You ma
     : '';
 
   let intelligenceBlock = '';
-  try {
-    const { intelligence } = await buildContentGenerationContext(workspaceId, {
-      slices: ['insights'],
-      includeLocalSeo: false,
-    });
-    evidenceCapturedAtCandidates.push(intelligence?.assembledAt);
-    intelligenceBlock = buildBriefIntelligenceBlockFromSlice(
-      targetKeyword,
-      workspaceId,
-      intelligence.insights?.all,
-    );
-  } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'content-brief: programming error');
-    /* intelligence layer not ready — skip */
+  if (!contextV2) {
+    try {
+      const { intelligence } = await buildContentGenerationContext(workspaceId, {
+        slices: ['insights'],
+        includeLocalSeo: false,
+      });
+      evidenceCapturedAtCandidates.push(intelligence?.assembledAt);
+      intelligenceBlock = buildBriefIntelligenceBlockFromSlice(
+        targetKeyword,
+        workspaceId,
+        intelligence.insights?.all,
+      );
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'content-brief: programming error');
+      /* intelligence layer not ready — skip */
+    }
   }
 
   let learningsBlock = '';
   let learningsStatusBlock = '';
-  try {
-    const { intelligence, promptContext, learningsAvailability } = await buildContentGenerationContext(workspaceId, {
-      slices: ['learnings'],
-      learningsDomain: 'content',
-      includeLocalSeo: false,
-    });
-    evidenceCapturedAtCandidates.push(intelligence?.assembledAt);
-    if (hasMeaningfulBuilderPromptContext(promptContext)) {
-      learningsBlock = `\n\n${promptContext}`;
-    } else {
-      const statusNote = buildOutcomeLearningStatusNote(learningsAvailability, 'content');
-      if (statusNote) {
-        learningsStatusBlock = `\n\nOUTCOME LEARNING STATUS:\n${statusNote}`;
+  if (!contextV2) {
+    try {
+      const { intelligence, promptContext, learningsAvailability } = await buildContentGenerationContext(workspaceId, {
+        slices: ['learnings'],
+        learningsDomain: 'content',
+        includeLocalSeo: false,
+      });
+      evidenceCapturedAtCandidates.push(intelligence?.assembledAt);
+      if (hasMeaningfulBuilderPromptContext(promptContext)) {
+        learningsBlock = `\n\n${promptContext}`;
+      } else {
+        const statusNote = buildOutcomeLearningStatusNote(learningsAvailability, 'content');
+        if (statusNote) {
+          learningsStatusBlock = `\n\nOUTCOME LEARNING STATUS:\n${statusNote}`;
+        }
       }
+    } catch (err) {
+      if (isProgrammingError(err)) log.warn({ err }, 'content-brief: programming error');
+      /* learnings not available — skip */
     }
-  } catch (err) {
-    if (isProgrammingError(err)) log.warn({ err }, 'content-brief: programming error');
-    /* learnings not available — skip */
   }
 
   // Strategy card context from content request
@@ -1741,6 +1794,8 @@ The outline sections MUST match the following template sections in order. You ma
 
   // Decay context — injected when this brief targets a page with declining search traffic
   const decayBlock = context.decayQueryContext ? `\n\n${context.decayQueryContext}` : '';
+  const v2MissingSerp = contextV2?.evidence.missing.includes('serp') ?? false;
+  const v2MissingKeywordMetrics = contextV2?.evidence.missing.includes('keyword_metrics') ?? false;
 
   const prompt = `Generate a right-sized, production-ready content brief for a new piece of content targeting the keyword "${targetKeyword}".${pageTypeBlock}
 
@@ -1770,17 +1825,17 @@ Generate a content brief in the following JSON format:
   "wordCountTarget": ${ptConfig.wordCountTarget},
   "intent": "Search intent (informational/transactional/navigational/commercial)",
   "audience": "Detailed target audience description including their pain points and what they need from this content",
-  "peopleAlsoAsk": ["Question 1 searchers commonly ask?", "Question 2?", "Question 3?", "Question 4?", "Question 5?"],
+  "peopleAlsoAsk": ${v2MissingSerp ? '[]' : '["Question 1 searchers commonly ask?", "Question 2?", "Question 3?", "Question 4?", "Question 5?"]'},
   "topicalEntities": ["entity1", "entity2", "entity3", "entity4", "entity5", "entity6", "entity7", "entity8"],
-  "serpAnalysis": {
+${v2MissingSerp ? '' : `  "serpAnalysis": {
     "contentType": "What type of content dominates the SERP for this keyword",
     "avgWordCount": ${ptConfig.wordCountTarget},
     "commonElements": ["Elements found in top-ranking content (e.g., comparison tables, images, expert quotes)"],
     "gaps": ["Content angles missing from top results that represent an opportunity"]
   },
-  "difficultyScore": 45,
-  "trafficPotential": "Estimated monthly search volume range and traffic potential (e.g., '500-1,000 monthly searches, moderate competition')",
-  "competitorInsights": "Detailed analysis of what top-ranking content covers, their strengths, weaknesses, and how to differentiate",
+`}${v2MissingKeywordMetrics ? '' : `  "difficultyScore": 45,
+`}  "trafficPotential": "${v2MissingKeywordMetrics ? 'Needs research — no verified keyword metrics supplied' : "Estimated monthly search volume range and traffic potential (e.g., '500-1,000 monthly searches, moderate competition')"}",
+  "competitorInsights": "${v2MissingSerp ? 'Needs research — no verified SERP evidence supplied' : 'Detailed analysis of what top-ranking content covers, their strengths, weaknesses, and how to differentiate'}",
   "ctaRecommendations": ["Primary CTA the content should drive", "Secondary CTA or micro-conversion"],
   "internalLinkSuggestions": ["/services/strategy", "/our-work/case-study", "/insights/blog-post"],
   "eeatGuidance": {
@@ -1808,11 +1863,11 @@ Requirements:
 - Conversion-page outlines must stay compact: no duplicate CTA/conclusion/contact sections, no blog-style teaching sprawl, and no extra sections added because brand, business, or SEO context is available
 - Each outline section must include keywords to weave naturally into that section
 - Secondary keywords: 6-8 naturally related terms including long-tail variations
-- People Also Ask: 5 real questions searchers ask about this topic
+- People Also Ask: ${v2MissingSerp ? 'return an empty array because no observed SERP evidence is available; do not invent questions' : '5 real questions searchers ask about this topic'}
 - Topical entities: 8+ specific concepts, terms, or entities to cover for topical authority
 - For service, location, landing, and product pages, keep PAA, entities, E-E-A-T guidance, checklist items, and schema recommendations compact and directly useful; do not let them expand the outline into an article
-- SERP analysis should reflect realistic analysis of what ranks for this keyword
-- difficultyScore: 1-100 based on estimated keyword competition
+- ${v2MissingSerp ? 'Omit serpAnalysis and mark competitorInsights as needs research because no observed SERP evidence is available' : 'SERP analysis should reflect realistic analysis of what ranks for this keyword'}
+- ${v2MissingKeywordMetrics ? 'Omit difficultyScore and keep trafficPotential at needs research because no timestamped provider metrics are available' : 'difficultyScore: 1-100 based on observed keyword competition'}
 - Make every section actionable and specific — a copywriter or AI tool should be able to write directly from this brief
 - CASE STUDY RULE: If including a case study section, write the outline notes as generic guidance (e.g., "Share a client case study showing content strategy results"). Do NOT name specific clients or projects in the outline notes — the writer will pull the right case study from the knowledge base. Do NOT put industry-specific keywords (e.g., "dental practice branding") in the case study section's keyword list unless the target keyword is specifically about that industry
 - FAQ RULE: If including an FAQ section, allocate at least 150 words (not 100). The writer needs room to format individual Q&A pairs with proper headings. Each question should get its own answer paragraph
@@ -1841,7 +1896,9 @@ LANGUAGE RULES for the brief itself:
 Return ONLY valid JSON, no markdown fences, no explanation.`;
 
   const systemInstructions = 'You are an expert SEO content strategist. Generate a right-sized content brief as a JSON object. Return ONLY valid JSON matching the expected schema — no markdown fences, no explanation.';
-  const systemPrompt = buildSystemPrompt(workspaceId, systemInstructions);
+  const systemPrompt = contextV2
+    ? buildSystemPromptFromAuthority(systemInstructions, contextV2.authority)
+    : buildSystemPrompt(workspaceId, systemInstructions);
 
   throwIfSignalAborted(options?.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
   const aiResult = await callAI({

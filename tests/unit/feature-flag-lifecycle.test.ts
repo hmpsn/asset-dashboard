@@ -22,7 +22,7 @@ import type { RoadmapData } from '../../shared/types/roadmap.js';
 
 const ROADMAP_PATH = path.resolve(process.cwd(), 'data/roadmap.json');
 const ROADMAP_ARCHIVE_PATH = path.resolve(process.cwd(), 'data/roadmap.archive.json');
-const CURRENT_AUDIT_AS_OF = '2026-07-13';
+const CURRENT_AUDIT_AS_OF = '2026-07-14';
 
 // Shipped roadmap items move to roadmap.archive.json; a flag's linkedRoadmapItemId still
 // references its archived item until the flag is retired, so resolve links against BOTH

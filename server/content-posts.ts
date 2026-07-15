@@ -34,6 +34,8 @@ import { BACKGROUND_JOB_TYPES, JOB_RESOURCE_TYPES } from '../shared/types/backgr
 import { sanitizePlainText, sanitizeRichText } from './html-sanitize.js';
 import { invalidateContentPipelineIntelligence } from './intelligence-freshness.js';
 import { resolveContentGenerationStyle } from './page-type-copy-contract.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import { buildContentGenerationContextV2 } from './intelligence/generation-context-builders.js';
 import { POST_STATUS_TRANSITIONS, validateTransition } from './state-machines.js';
 import {
   createContentGenerationDiagnostic,
@@ -855,7 +857,15 @@ export async function generatePost(
   throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
   reportProgress('Preparing content context...', 0);
   assertCurrentAuthority();
-  const voiceCtx = await buildVoiceContext(workspaceId);
+  const contextV2 = isFeatureEnabled('content-generation-context-v2', workspaceId)
+    ? await buildContentGenerationContextV2(workspaceId, {
+        targetKeyword: brief.targetKeyword,
+        sourceEvidence: brief.sourceEvidence,
+        providerMetricsObservedAt: brief.keywordValidation?.validatedAt ?? null,
+      })
+    : null;
+  const voiceCtx = contextV2?.projections.draft ?? await buildVoiceContext(workspaceId);
+  const promptAuthority = contextV2?.authority;
   throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
   assertCurrentAuthority();
 
@@ -872,6 +882,7 @@ export async function generatePost(
     const generatedIntroduction = await generateIntroduction(brief, voiceCtx, workspaceId, siteDomain, {
       signal: options.signal,
       executionChainId,
+      promptAuthority,
       onExecution: execution => { introductionExecution = execution; },
     });
     assertCurrentAuthority();
@@ -920,6 +931,7 @@ export async function generatePost(
         {
           signal: options.signal,
           executionChainId,
+          promptAuthority,
           onExecution: execution => { sectionExecution = execution; },
         },
       );
@@ -965,6 +977,7 @@ export async function generatePost(
     const generatedConclusion = await generateConclusion(brief, voiceCtx, workspaceId, siteDomain, {
       signal: options.signal,
       executionChainId,
+      promptAuthority,
       onExecution: execution => { conclusionExecution = execution; },
     });
     assertCurrentAuthority();
@@ -1025,6 +1038,7 @@ export async function generatePost(
     const unified = await unifyPost(post, brief, voiceCtx, workspaceId, {
       signal: options.signal,
       executionChainId,
+      promptAuthority,
       onExecution: execution => { unificationExecution = execution; },
     });
     assertCurrentAuthority();
@@ -1107,6 +1121,7 @@ export async function generatePost(
     const seoMeta = await generateSeoMeta(post, brief, workspaceId, {
       signal: options.signal,
       executionChainId,
+      promptAuthority,
       onExecution: execution => { seoExecution = execution; },
     });
     assertCurrentAuthority();
@@ -1267,7 +1282,14 @@ export async function regenerateSection(
     ? previousPost.generationProvenance.executionChainId
     : randomUUID();
   try {
-    const voiceCtx = await buildVoiceContext(workspaceId);
+    const contextV2 = isFeatureEnabled('content-generation-context-v2', workspaceId)
+      ? await buildContentGenerationContextV2(workspaceId, {
+          targetKeyword: brief.targetKeyword,
+          sourceEvidence: brief.sourceEvidence,
+          providerMetricsObservedAt: brief.keywordValidation?.validatedAt ?? null,
+        })
+      : null;
+    const voiceCtx = contextV2?.projections.draft ?? await buildVoiceContext(workspaceId);
     assertPostGenerationRevision(workspaceId, postId, sourceRevision);
     assertBriefGenerationRevision(
       workspaceId,
@@ -1282,6 +1304,7 @@ export async function regenerateSection(
       undefined,
       {
         executionChainId,
+        promptAuthority: contextV2?.authority,
         onExecution: execution => { sectionExecution = execution; },
       },
     );

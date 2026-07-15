@@ -7,6 +7,7 @@ import {
   voiceDNAToPromptInstructions,
   guardrailsToPromptInstructions,
   buildSystemPrompt,
+  buildSystemPromptFromAuthority,
   getCustomPromptNotes,
 } from '../../server/prompt-assembly.js';
 import type { VoiceDNA, VoiceGuardrails } from '../../shared/types/brand-engine.js';
@@ -513,5 +514,34 @@ describe('getCustomPromptNotes', () => {
     expect(result).toBe('Important notes');
     // reset
     db.prepare('UPDATE workspaces SET custom_prompt_notes = NULL WHERE id = ?').run(ws.workspaceId);
+  });
+});
+
+describe('buildSystemPromptFromAuthority', () => {
+  it('renders captured voice and notes once without reading workspace state', () => {
+    const result = buildSystemPromptFromAuthority(
+      'Base instructions',
+      {
+        systemVoiceBlock: 'Captured voice DNA and guardrails',
+        customNotes: 'Captured operator notes',
+      },
+      { skipProseRules: true },
+    );
+
+    expect(result).toBe([
+      'Base instructions',
+      'Captured voice DNA and guardrails',
+      'Additional context for this client:\nCaptured operator notes',
+    ].join('\n\n'));
+    expect(result.match(/Captured voice DNA and guardrails/g)).toHaveLength(1);
+  });
+
+  it('keeps the universal prose layer unless explicitly skipped', () => {
+    const result = buildSystemPromptFromAuthority('Base', {
+      systemVoiceBlock: '',
+      customNotes: null,
+    });
+
+    expect(result).toBe(`Base\n\n${PROSE_QUALITY_RULES}`);
   });
 });

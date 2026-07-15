@@ -7,7 +7,11 @@ import { callAI, renderAIProviderInput, type AICallOptions, type AICallResult } 
 import { getAIOperationRuntimeDefaults, type AIOperationId } from './ai-operation-registry.js';
 import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structured-output.js';
 import { isAnthropicConfigured } from './anthropic-helpers.js';
-import { buildSystemPrompt } from './prompt-assembly.js';
+import {
+  buildSystemPrompt,
+  buildSystemPromptFromAuthority,
+  type SystemPromptAuthority,
+} from './prompt-assembly.js';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import type { ContentBrief } from '../shared/types/content.js';
@@ -20,7 +24,11 @@ import {
   getPageTypeCopyContract,
   requiresPageTypeDensityReview,
 } from './page-type-copy-contract.js';
-import { buildSeoPromptContext } from './intelligence/generation-context-builders.js';
+import {
+  buildContentGenerationContextV2,
+  buildSeoPromptContext,
+} from './intelligence/generation-context-builders.js';
+import { isFeatureEnabled } from './feature-flags.js';
 import { countVisibleHtmlWords, visibleTextFromHtml } from '../shared/content-post-integrity.js';
 import {
   fingerprintRenderedAIInput,
@@ -256,6 +264,19 @@ export interface ContentAIGenerationOptions {
   signal?: AbortSignal;
   executionChainId?: string;
   onExecution?: (execution: AcceptedGenerationExecution) => void;
+  /** Captured once by content-generation-context-v2 and reused across every stage. */
+  promptAuthority?: SystemPromptAuthority;
+}
+
+function buildContentSystemPrompt(
+  workspaceId: string,
+  baseInstructions: string,
+  options: ContentAIGenerationOptions,
+  opts?: { skipProseRules?: boolean },
+): string {
+  return options.promptAuthority
+    ? buildSystemPromptFromAuthority(baseInstructions, options.promptAuthority, opts)
+    : buildSystemPrompt(workspaceId, baseInstructions, undefined, opts);
 }
 
 const PAGE_TYPE_INTRO_INSTRUCTIONS: Record<string, string> = {
@@ -465,10 +486,10 @@ ${CREATIVE_WRITING_RULES}
 Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no markdown.`;
 
   // Split role (system) from the writing instructions (user)
-  const systemPrompt = buildSystemPrompt(
+  const systemPrompt = buildContentSystemPrompt(
     workspaceId,
     `${role} Return only clean HTML for the introduction field requested by the user prompt. No markdown.`,
-    undefined,
+    options,
     { skipProseRules: true },
   );
   return callCreativeAI({
@@ -568,10 +589,10 @@ ${CREATIVE_WRITING_RULES}
 Return ONLY the section content in clean HTML (starting with <h2>). No labels, no meta-commentary, no markdown.`;
 
   // Split role (system) from the writing instructions (user)
-  const systemPrompt = buildSystemPrompt(
+  const systemPrompt = buildContentSystemPrompt(
     workspaceId,
     `${role} Return only clean HTML for the section field requested by the user prompt. No markdown.`,
-    undefined,
+    options,
     { skipProseRules: true },
   );
   return callCreativeAI({
@@ -639,10 +660,10 @@ ${CREATIVE_WRITING_RULES}
 Return ONLY the closing section in clean HTML (starting with <h2>). No labels, no meta-commentary, no markdown.`;
 
   // Split role (system) from the writing instructions (user)
-  const systemPrompt = buildSystemPrompt(
+  const systemPrompt = buildContentSystemPrompt(
     workspaceId,
     `${role} Return only clean HTML for the conclusion field requested by the user prompt. No markdown.`,
-    undefined,
+    options,
     { skipProseRules: true },
   );
   return callCreativeAI({
@@ -722,9 +743,10 @@ Return valid JSON only:
 }`;
 
   try {
-    const systemPrompt = buildSystemPrompt(
+    const systemPrompt = buildContentSystemPrompt(
       workspaceId,
       'You are an expert SEO copywriter. Return only valid JSON with seoTitle and seoMetaDescription.',
+      options,
     );
     const result = await callAI({
       operation: 'content-post-seo-meta',
@@ -857,10 +879,10 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
 
   const rawResult = await callCreativeAI({
     operation: 'content-post-unify',
-    systemPrompt: buildSystemPrompt(
+    systemPrompt: buildContentSystemPrompt(
       workspaceId,
       'You are a senior editor performing a cohesion and word-count review. Return only valid JSON.',
-      undefined,
+      options,
       { skipProseRules: true },
     ),
     userPrompt: prompt,
@@ -904,7 +926,17 @@ export async function scoreVoiceMatch(
   workspaceId: string,
   options: ContentAIGenerationOptions = {},
 ): Promise<{ voiceScore: number | null; voiceFeedback: string }> {
-  const voiceCtx = await buildVoiceContext(workspaceId);
+  const contextV2 = isFeatureEnabled('content-generation-context-v2', workspaceId)
+    ? await buildContentGenerationContextV2(workspaceId, {
+        targetKeyword: brief.targetKeyword,
+        sourceEvidence: brief.sourceEvidence,
+        providerMetricsObservedAt: brief.keywordValidation?.validatedAt ?? null,
+      })
+    : null;
+  const voiceCtx = contextV2?.projections.voiceReview ?? await buildVoiceContext(workspaceId);
+  const promptOptions = contextV2
+    ? { ...options, promptAuthority: contextV2.authority }
+    : options;
 
   // Build a text summary of the post content for analysis
   const allContent = [
@@ -945,9 +977,10 @@ Return ONLY valid JSON in this exact format:
   "voiceFeedback": "<2-4 sentences: specific callouts about voice match, including both positives and areas for improvement>"
 }`;
 
-  const systemPrompt = buildSystemPrompt(
+  const systemPrompt = buildContentSystemPrompt(
     workspaceId,
     'You are a brand voice analyst. Return only valid JSON with voiceScore and voiceFeedback.',
+    promptOptions,
   );
 
   const result = await callAI({

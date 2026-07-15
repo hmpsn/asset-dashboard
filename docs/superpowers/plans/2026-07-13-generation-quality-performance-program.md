@@ -220,6 +220,32 @@ A + B + C + D → controller diff/full-suite review
 - Treat scraped text as untrusted evidence with observed-at/freshness; missing evidence produces unknown/needs-research, never invented certainty.
 - Flag-OFF parity and flag-ON real-render/generation smoke are mandatory. Promote only with no completeness/first-pass-quality regression and measured token/latency improvement.
 
+**Bounded implementation contract:** extend the existing intelligence builder and
+prompt-assembly seams; do not add a second context framework. C3 exports
+`buildContentGenerationContextV2()` plus one captured prompt-authority shape that
+`buildSystemPromptFromAuthority()` can render without re-reading voice state. One
+flag-ON build supplies `brief`, `draft`, and `voiceReview` projections to initial
+brief generation, post stages/voice scoring, and MCP brief/post preparation. The
+brief projection contains only the matching page-map row, not the workspace-wide
+map. External reference/SERP/style text is wrapped as untrusted content and carries
+its real observed timestamp; absent provider/SERP facts produce an explicit
+unknown/needs-research instruction. M1 may pass its already-frozen finalized voice
+and approved identity through the same authority input rather than inventing a
+parallel builder.
+
+**Non-goals:** no migration, UI, new route, new job type, provider call, generalized
+evidence store, or rewrite of unrelated brief/outline regeneration paths. Existing
+flag-OFF calls and output remain unchanged.
+
+**Red first / focused proof:** builder tests assert one intelligence assembly,
+budget ceilings, one matching page-map row, exactly one user-voice and one
+system-voice block, untrusted wrappers/timestamps, honest missing-evidence copy,
+and stable fingerprints. Prompt tests assert legacy byte parity and captured
+authority reuse. MCP/content integration tests assert OFF parity and ON use of the
+single projection without the second brand/intelligence read. Record deterministic
+before/after context-token estimates in the PR; latency is inferred only from the
+removed builder/read count until staging runtime telemetry is available.
+
 ### S3 — Ordered Intelligence Convergence
 
 **Owner:** `analytics-intelligence`; GPT-5.5. **Depends:** S2.
