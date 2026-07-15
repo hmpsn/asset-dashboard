@@ -223,6 +223,7 @@ export function matrixArtifactRevisionExpectations(
 
 export const MATRIX_CELL_EVIDENCE_REQUIREMENT_SUFFIXES = {
   serviceAvailability: 'service-availability',
+  serviceDetails: 'service-details',
   locationRelevance: 'location-relevance',
   ctaDetails: 'cta-details',
 } as const;
@@ -267,6 +268,14 @@ export function buildMatrixCellEvidenceRequirements(
       reason: 'Service and location pages cannot imply an offering that has not been verified.',
       requirementStage: 'preflight',
       clientSafePrompt: 'Confirm that this service is available for the page target.',
+    });
+    definitions.push({
+      id: requirementId(target.cellId, MATRIX_CELL_EVIDENCE_REQUIREMENT_SUFFIXES.serviceDetails),
+      fieldPath: 'service.details',
+      claim: 'The page has substantive, source-backed details about the target service.',
+      reason: 'A service name and availability alone cannot support a grounded full-page explanation.',
+      requirementStage: 'preflight',
+      clientSafePrompt: 'Provide verified details covering what the service is, what to expect, and relevant considerations or common questions.',
     });
   }
   if (target.pageType === 'location') {
@@ -336,7 +345,7 @@ export function renderMatrixCellEvidencePrompt(
     return [];
   });
   return lines.length > 0
-    ? `VERIFIED CELL EVIDENCE (use only these facts):\n${lines.join('\n')}`
+    ? `MATRIX PAGE FACTS (state naturally; never call them evidence, context, supplied, provided, or verified):\n${lines.join('\n')}`
     : '';
 }
 
@@ -372,6 +381,16 @@ function assertRequirementValue(requirementIdValue: string, value: GenerationEvi
     throw new MatrixGenerationEvidenceError(
       'precondition_failed',
       'Service availability evidence must affirm or describe the available service',
+    );
+  }
+  if (requirementIdValue.endsWith(`:${MATRIX_CELL_EVIDENCE_REQUIREMENT_SUFFIXES.serviceDetails}`)) {
+    if (value.kind === 'text' && value.value.trim().length >= 300) return;
+    if (value.kind === 'text_list'
+      && value.value.length >= 3
+      && value.value.every(item => item.trim().length >= 40)) return;
+    throw new MatrixGenerationEvidenceError(
+      'precondition_failed',
+      'Service details require a substantive verified summary or at least three verified facts',
     );
   }
   if (requirementIdValue.endsWith(`:${MATRIX_CELL_EVIDENCE_REQUIREMENT_SUFFIXES.locationRelevance}`)) {

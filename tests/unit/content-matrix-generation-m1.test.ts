@@ -14,7 +14,9 @@ import { createMatrix, getMatrix, updateMatrixCell } from '../../server/content-
 import { createTemplate } from '../../server/content-templates.js';
 import { getPost } from '../../server/content-posts-db.js';
 import {
+  listCurrentMatrixCellEvidence,
   MatrixGenerationEvidenceError,
+  renderMatrixCellEvidencePrompt,
   resolveContentMatrixEvidence,
 } from '../../server/domains/content/matrix-generation/evidence.js';
 import { previewMatrixGeneration } from '../../server/domains/content/matrix-generation/preview.js';
@@ -153,7 +155,7 @@ function seedBrandAuthority(workspaceId: string): void {
   );
 }
 
-async function resolveServiceEvidence(fixture: Fixture, cellId: string) {
+async function resolveServiceAvailabilityEvidence(fixture: Fixture, cellId: string) {
   const revision = sourceRevision(fixture, cellId);
   const preview = await previewMatrixGeneration({
     workspaceId: fixture.workspaceId,
@@ -184,6 +186,56 @@ async function resolveServiceEvidence(fixture: Fixture, cellId: string) {
   } as const;
   const result = await resolveContentMatrixEvidence(request);
   return { request, result };
+}
+
+async function resolveServiceDetailsEvidence(
+  fixture: Fixture,
+  cellId: string,
+  capturedAt = new Date().toISOString(),
+) {
+  const revision = sourceRevision(fixture, cellId);
+  const preview = await previewMatrixGeneration({
+    workspaceId: fixture.workspaceId,
+    matrixId: fixture.matrix.id,
+    selections: [{ cellId, expectedSourceRevision: revision }],
+  });
+  const blocked = preview.results[0];
+  if (!blocked || blocked.status !== 'blocked') throw new Error('Expected blocked preview');
+  const requirementId = `matrix-cell:${cellId}:service-details`;
+  const request = {
+    workspaceId: fixture.workspaceId,
+    matrixId: fixture.matrix.id,
+    cellId,
+    requirementId,
+    value: {
+      kind: 'text_list',
+      value: [
+        'The service starts with a review of the customer\'s goals and current situation.',
+        'The team explains the recommended process and answers questions before work begins.',
+        'The customer receives clear next steps based on the findings from the service.',
+      ],
+    },
+    sourceRef: {
+      sourceType: 'external_research',
+      sourceId: `service-reference-${cellId}`,
+      uri: 'https://example.com/verified-service-guide',
+      capturedAt,
+    },
+    resolvedBy: {
+      actorType: 'operator',
+      actorId: 'matrix-generation-test-operator',
+    },
+    expectedSourceRevision: revision,
+    expectedArtifactRevisions: blocked.expectedArtifactRevisions,
+    idempotencyKey: `service-details-${cellId}`,
+  } as const;
+  const result = await resolveContentMatrixEvidence(request);
+  return { request, result };
+}
+
+async function resolveRequiredServiceEvidence(fixture: Fixture, cellId: string): Promise<void> {
+  await resolveServiceAvailabilityEvidence(fixture, cellId);
+  await resolveServiceDetailsEvidence(fixture, cellId);
 }
 
 async function readyTarget(fixture: Fixture, cellId: string): Promise<MatrixGenerationPreviewTarget> {
@@ -359,6 +411,7 @@ describe('content matrix generation M1', () => {
     expect(blocked.evidenceRequirements.map(requirement => requirement.id)).toEqual(
       expect.arrayContaining([
         `matrix-cell:${cell.id}:service-availability`,
+        `matrix-cell:${cell.id}:service-details`,
         `matrix-cell:${cell.id}:cta-details`,
         `matrix-cell:${cell.id}:finalized-voice`,
         `matrix-cell:${cell.id}:approved-identity`,
@@ -385,7 +438,7 @@ describe('content matrix generation M1', () => {
       code: 'precondition_failed',
     });
 
-    const { request, result } = await resolveServiceEvidence(fixture, cell.id);
+    const { request, result } = await resolveServiceAvailabilityEvidence(fixture, cell.id);
     expect(result.created).toBe(true);
     expect(result.currentSourceRevision).toEqual({
       ...initialRevision,
@@ -417,10 +470,52 @@ describe('content matrix generation M1', () => {
     expect(currentResult.evidenceRequirements.find(requirement => (
       requirement.id === `matrix-cell:${cell.id}:service-availability`
     ))?.status).toBe('verified');
+    const serviceDetailsRequirementId = `matrix-cell:${cell.id}:service-details`;
+    expect(currentResult.blockingRequirementIds).toContain(serviceDetailsRequirementId);
+
+    await expect(resolveContentMatrixEvidence({
+      workspaceId: fixture.workspaceId,
+      matrixId: fixture.matrix.id,
+      cellId: cell.id,
+      requirementId: serviceDetailsRequirementId,
+      value: { kind: 'boolean', value: true },
+      sourceRef: {
+        sourceType: 'operator_attestation',
+        sourceId: 'service-details-too-thin',
+        capturedAt: new Date().toISOString(),
+      },
+      resolvedBy: { actorType: 'operator', actorId: 'test-operator' },
+      expectedSourceRevision: sourceRevision(fixture, cell.id),
+      expectedArtifactRevisions: currentResult.expectedArtifactRevisions,
+      idempotencyKey: 'service-details-too-thin',
+    })).rejects.toMatchObject<Partial<MatrixGenerationEvidenceError>>({
+      code: 'precondition_failed',
+    });
+
+    const historicalServiceCapture = '2020-01-02T03:04:05.000Z';
+    await resolveServiceDetailsEvidence(fixture, cell.id, historicalServiceCapture);
+    const resolutions = listCurrentMatrixCellEvidence(
+      fixture.workspaceId,
+      fixture.matrix.id,
+      cell.id,
+    );
+    const afterDetails = await previewMatrixGeneration({
+      workspaceId: fixture.workspaceId,
+      matrixId: fixture.matrix.id,
+      selections: [{ cellId: cell.id, expectedSourceRevision: sourceRevision(fixture, cell.id) }],
+    });
+    const afterDetailsResult = afterDetails.results[0];
+    expect(afterDetailsResult?.status).toBe('blocked');
+    if (!afterDetailsResult || afterDetailsResult.status !== 'blocked') return;
+    expect(renderMatrixCellEvidencePrompt(afterDetailsResult.evidenceRequirements, resolutions))
+      .toContain('MATRIX PAGE FACTS');
+    expect(renderMatrixCellEvidencePrompt(afterDetailsResult.evidenceRequirements, resolutions))
+      .toContain('service.details: The service starts with a review');
 
     seedBrandAuthority(fixture.workspaceId);
     const ready = await readyTarget(fixture, cell.id);
     expect(ready.blockingRequirementIds).toEqual([]);
+    expect(ready.evidenceFreshThrough).toBe(historicalServiceCapture);
     expect(ready.identitySnapshot).toHaveLength(1);
     expect(ready.evidenceRequirements.find(requirement => (
       requirement.id === `matrix-cell:${cell.id}:cta-details`
@@ -433,8 +528,8 @@ describe('content matrix generation M1', () => {
     const fixture = createFixture();
     seedBrandAuthority(fixture.workspaceId);
     const [firstCell, staleCell] = fixture.matrix.cells;
-    await resolveServiceEvidence(fixture, firstCell.id);
-    await resolveServiceEvidence(fixture, staleCell.id);
+    await resolveRequiredServiceEvidence(fixture, firstCell.id);
+    await resolveRequiredServiceEvidence(fixture, staleCell.id);
     const firstTarget = await readyTarget(fixture, firstCell.id);
     const staleTarget = await readyTarget(fixture, staleCell.id);
 

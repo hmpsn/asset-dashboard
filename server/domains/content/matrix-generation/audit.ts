@@ -52,6 +52,12 @@ export class MatrixGenerationAuditContractError extends Error {
   }
 }
 
+export const MATRIX_READER_FACING_PROSE_CONTRACT = `Write final reader-facing copy.
+Never narrate internal evidence, supplied or provided context, source availability, verification status, research gaps, guardrails, or generation mechanics.
+Never write phrases such as "provided evidence," "provided data," "provided information," "the available evidence," "this context supports," or "source verification."
+State supported facts naturally and omit unsupported optional claims. Exact [NEEDS CLIENT INPUT: ...] placeholders are exempt and must remain unchanged.
+Do not repeat the full address, phone number, booking URL, or equivalent CTA wording across multiple blocks. A full address may appear once in a cell-specific local-proof block or the locked CTA/close; keep the phone number, booking URL, and complete CTA wording in the locked CTA or close.`;
+
 interface CandidateBlock {
   contract: ResolvedPageBlock;
   html: string;

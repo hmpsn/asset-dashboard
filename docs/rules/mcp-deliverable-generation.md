@@ -44,9 +44,12 @@ before any AI or paid-provider call.
 The evidence policy is typed per requirement:
 
 - `preflight` requirements block paid generation. They include verified service
-  availability, substantive location relevance for a location target, source
-  identity, supported page type/template shape, and finalized voice for content
-  generation.
+  availability, substantive source-backed service details for a service target,
+  substantive location relevance for a location target, source identity,
+  supported page type/template shape, and finalized voice for content generation.
+  A service name plus an availability confirmation is not enough grounding for a
+  full service page; the detail requirement must explain the service, what to
+  expect, and relevant considerations or common questions.
 - `ready` requirements may render the canonical typed placeholder and produce a
   `needs_attention` draft, but they block `ready_for_human_review`, client send,
   and `ready_to_publish`. Typical examples are required hours, pricing, staff,
@@ -142,6 +145,13 @@ never sufficient to dispatch paid work.
   required for every generated candidate because an AI-authored claim ledger
   cannot prove that it contains every assertion in the prose; AI review never
   auto-passes provenance-sensitive items.
+- Exact resolved evidence values must survive every matrix-to-brief-to-post
+  adapter. Do not rely on an AI-authored brief summary to carry factual authority
+  into the post stage. Reader-facing prose states supported facts naturally and
+  never narrates internal evidence, supplied context, verification, research, or
+  generation mechanics. Source freshness comes from the evidence source's own
+  capture timestamp, never the later resolution timestamp, and the conservative
+  fresh-through time must survive into brief and post artifact provenance.
 - Local and service page sets require cell-specific grounded value. Pure
   variable substitution cannot pass the substantive-uniqueness audit.
 
@@ -347,6 +357,13 @@ never sufficient to dispatch paid work.
   set-level audits; the shared audit, brand-item, and matrix-item counter type is
   exactly `0|1`. Continued failures become actionable findings instead of an
   unbounded AI loop.
+- Revision receives the exact authorized typed-placeholder census. It preserves
+  those tokens exactly and may neither invent a new placeholder nor retain an
+  unauthorized one.
+- A conservative model finding may truthfully leave an otherwise deterministic-
+  passing page in `needs_attention`. Do not weaken the audit contract or add
+  canary-specific heuristics merely to manufacture a ready verdict; explicit
+  human review remains the safe fallback.
 - Matrix revision output cannot introduce or retarget links. Any new or changed
   anchor is unwrapped to plain text before the revised draft is validated. Link
   identity is its decoded href plus normalized anchor text within the frozen

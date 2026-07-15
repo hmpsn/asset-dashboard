@@ -503,7 +503,7 @@ export async function prepareMatrixGenerationCell(
     ...context.evidence.observedAt,
     voiceSnapshot.finalizedAt,
     ...identity.evidenceTimestamps,
-    ...resolutions.map(resolution => resolution.resolvedAt),
+    ...resolutions.map(resolution => resolution.sourceRef.capturedAt),
   ], context.evidence.capturedAt);
   const previewCore = {
     structuralFingerprint: target.structuralFingerprint,
