@@ -919,7 +919,7 @@ export function replacePostWithSnapshot(
   provenance?: GenerationProvenance | null,
   sourceBriefAuthority?: ContentPostSourceBriefAuthority,
 ): PersistedGeneratedPost {
-  return db.transaction(() => {
+  const replace = () => {
     const current = getPost(workspaceId, replacement.id);
     if (!current || current.generationRevision !== expectedRevision) {
       throw new GenerationRevisionConflictError('content_post', replacement.id, expectedRevision);
@@ -938,7 +938,8 @@ export function replacePostWithSnapshot(
       expectedRevision,
       provenance === undefined ? current.generationProvenance : provenance,
     );
-  }).immediate();
+  };
+  return db.inTransaction ? replace() : db.transaction(replace).immediate();
 }
 
 /** List all versions for a post (newest first). */

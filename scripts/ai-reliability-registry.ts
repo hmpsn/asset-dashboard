@@ -77,6 +77,7 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
       'server/content-posts-ai-jobs.ts',
       'server/prompt-assembly.ts',
       'server/workspace-intelligence.ts',
+      'server/domains/content/matrix-generation/operations.ts',
     ],
     dispatcherModules: [
       'server/ai.ts',
@@ -84,17 +85,20 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
       'server/content-posts-ai.ts',
       'server/content-posts-ai-jobs.ts',
       'server/content-posts-db.ts',
+      'server/domains/content/matrix-generation/operations.ts',
     ],
     parserOrValidationSignals: [
       'zod schema validation',
       "responseFormat: { type: 'json_object' }",
       'validateTransition',
+      'parseMatrixGenerationModelAuditAIOutput',
     ],
     writeSideEffects: [
       'saveBrief',
       'savePost',
       'addActivity',
       'broadcastToWorkspace',
+      'commitMatrixGenerationRevision',
     ],
     wsEvents: [
       'CONTENT_UPDATED',
@@ -109,6 +113,8 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
       'tests/integration/content-posts-ai-fix.test.ts',
       'tests/integration/content-posts-workflow.test.ts',
       'tests/integration/public-content-request-workflow-broadcasts.test.ts',
+      'tests/unit/content-matrix-generation-audit.test.ts',
+      'tests/unit/content-matrix-generation-item-audit.test.ts',
     ],
   },
   {
@@ -613,6 +619,23 @@ export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
       { allOf: ['buildSystemPromptFromAuthority', "not.toContain('[V2 system voice]')", 'toHaveLength(1)'] },
     ],
     notes: 'Pins target-only context, untrusted evidence, honest missing facts, and separate exact-once system voice authority for C3.',
+  },
+  {
+    id: 'content-matrix-audit-grounding-and-format',
+    pipelineId: 'content-brief-review',
+    title: 'Matrix page audit keeps structured output, evidence placeholders, and human provenance gates',
+    dimension: 'evidence_grounding',
+    severity: 'hard',
+    evidenceFiles: [
+      'server/domains/content/matrix-generation/operations.ts',
+      'tests/unit/content-matrix-generation-audit.test.ts',
+      'tests/unit/content-matrix-generation-item-audit.test.ts',
+    ],
+    assertions: [
+      { allOf: ['parseMatrixGenerationModelAuditAIOutput', 'Return only JSON in this exact shape', 'responseFormat'] },
+      { allOf: ['NEEDS CLIENT INPUT', 'Factual accuracy and no-hallucination remain human-review tasks', 'added or changed a link'] },
+    ],
+    notes: 'Pins M2 audit/revision authority and output contracts without a live-model quality score.',
   },
   {
     id: 'seo-editor-assist-format-sanitization',

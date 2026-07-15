@@ -43,8 +43,13 @@ import {
   computeStructuralTargetFingerprint,
 } from './fingerprint.js';
 import { getBrief, persistGeneratedBrief } from '../../../content-brief.js';
-import { updateMatrixCell } from '../../../content-matrices.js';
-import { getPost, persistGeneratedPost } from '../../../content-posts-db.js';
+import { getMatrix, updateMatrixCell } from '../../../content-matrices.js';
+import { getTemplate } from '../../../content-templates.js';
+import {
+  getPost,
+  persistGeneratedPost,
+  replacePostWithSnapshot,
+} from '../../../content-posts-db.js';
 import {
   MATRIX_GENERATION_ATTEMPT_TRANSITIONS,
   MATRIX_GENERATION_ITEM_TRANSITIONS,
@@ -1165,6 +1170,8 @@ function writeMatrixGenerationItem(input: {
   previewTarget?: MatrixGenerationItem['previewTarget'];
   briefId?: string;
   postId?: string;
+  auditReport?: MatrixGenerationItem['auditReport'];
+  automaticRevisionCount?: MatrixGenerationItem['automaticRevisionCount'];
   error?: MatrixGenerationItem['error'];
 }): MatrixGenerationItem {
   const current = getMatrixGenerationItem(input.workspaceId, input.itemId);
@@ -1191,8 +1198,11 @@ function writeMatrixGenerationItem(input: {
     preview_target: previewTarget ? JSON.stringify(previewTarget) : null,
     brief_id: input.briefId ?? current.briefId,
     post_id: input.postId ?? current.postId,
-    audit_report: current.auditReport ? JSON.stringify(current.auditReport) : null,
-    automatic_revision_count: current.automaticRevisionCount,
+    audit_report: input.auditReport === undefined
+      ? current.auditReport ? JSON.stringify(current.auditReport) : null
+      : input.auditReport ? JSON.stringify(input.auditReport) : null,
+    automatic_revision_count: input.automaticRevisionCount
+      ?? current.automaticRevisionCount,
     error: input.error === undefined
       ? current.error ? JSON.stringify(current.error) : null
       : input.error ? JSON.stringify(input.error) : null,
@@ -1216,6 +1226,8 @@ export function transitionMatrixGenerationItem(input: {
   previewTarget?: MatrixGenerationItem['previewTarget'];
   briefId?: string;
   postId?: string;
+  auditReport?: MatrixGenerationItem['auditReport'];
+  automaticRevisionCount?: MatrixGenerationItem['automaticRevisionCount'];
   error?: MatrixGenerationItem['error'];
 }): MatrixGenerationItem {
   const write = () => writeMatrixGenerationItem(input);
@@ -1418,6 +1430,42 @@ export function finishMatrixGenerationAttempt(input: {
   return db.inTransaction ? write() : db.transaction(write).immediate();
 }
 
+/** Completes one stage and advances its item in the same transaction. */
+export function finishMatrixGenerationAttemptAndTransitionItem(input: {
+  workspaceId: string;
+  itemId: string;
+  expectedItemRevision: number;
+  attemptId: string;
+  attemptStatus: Exclude<MatrixGenerationAttemptStatus, 'running'>;
+  nextItemStatus: MatrixGenerationItemStatus;
+  provenance?: MatrixGenerationAttempt['provenance'];
+  attemptError?: MatrixGenerationAttempt['error'];
+  auditReport?: MatrixGenerationItem['auditReport'];
+  automaticRevisionCount?: MatrixGenerationItem['automaticRevisionCount'];
+  itemError?: MatrixGenerationItem['error'];
+}): { item: MatrixGenerationItem; attempt: MatrixGenerationAttempt } {
+  return db.transaction(() => {
+    const attempt = finishMatrixGenerationAttempt({
+      workspaceId: input.workspaceId,
+      itemId: input.itemId,
+      attemptId: input.attemptId,
+      nextStatus: input.attemptStatus,
+      provenance: input.provenance,
+      error: input.attemptError,
+    });
+    const item = writeMatrixGenerationItem({
+      workspaceId: input.workspaceId,
+      itemId: input.itemId,
+      expectedRevision: input.expectedItemRevision,
+      nextStatus: input.nextItemStatus,
+      auditReport: input.auditReport,
+      automaticRevisionCount: input.automaticRevisionCount,
+      error: input.itemError,
+    });
+    return { item, attempt };
+  }).immediate();
+}
+
 export interface CommitMatrixGenerationDraftResult {
   item: MatrixGenerationItem;
   brief: PersistedContentBrief;
@@ -1478,6 +1526,78 @@ export function commitMatrixGenerationDraft(input: {
       post,
       cellRevision: cell.revision ?? 0,
     };
+  }).immediate();
+}
+
+export interface CommitMatrixGenerationRevisionResult {
+  item: MatrixGenerationItem;
+  post: PersistedGeneratedPost;
+}
+
+/** Atomically adopts one audited revision and reopens deterministic audit. */
+export function commitMatrixGenerationRevision(input: {
+  workspaceId: string;
+  itemId: string;
+  expectedItemRevision: number;
+  expectedPostRevision: number;
+  attemptId: string;
+  replacement: PersistedGeneratedPost;
+  provenance: NonNullable<MatrixGenerationAttempt['provenance']>;
+}): CommitMatrixGenerationRevisionResult {
+  return db.transaction((): CommitMatrixGenerationRevisionResult => {
+    const item = getMatrixGenerationItem(input.workspaceId, input.itemId);
+    if (
+      !item
+      || item.revision !== input.expectedItemRevision
+      || item.status !== 'revising'
+      || item.automaticRevisionCount !== 0
+      || !item.previewTarget
+      || !item.postId
+      || item.postId !== input.replacement.id
+    ) {
+      throw new MatrixGenerationRevisionConflictError('item', input.itemId);
+    }
+    const target = item.previewTarget;
+    const matrix = getMatrix(input.workspaceId, target.matrixId);
+    const template = matrix ? getTemplate(input.workspaceId, matrix.templateId) : null;
+    const cell = matrix?.cells.find(candidate => candidate.id === target.cellId);
+    if (
+      !matrix
+      || !template
+      || !cell
+      || (matrix.revision ?? 0) !== target.sourceRevision.matrixRevision
+      || (template.revision ?? 0) !== target.sourceRevision.templateRevision
+      || (cell.revision ?? 0) !== target.sourceRevision.cellRevision + 1
+      || cell.briefId !== item.briefId
+      || cell.postId !== item.postId
+    ) {
+      throw new MatrixGenerationRevisionConflictError('item', input.itemId);
+    }
+    const post = replacePostWithSnapshot(
+      input.workspaceId,
+      input.replacement,
+      input.expectedPostRevision,
+      'bulk_regenerate',
+      `matrix_generation_item:${item.id}`,
+      input.provenance,
+    );
+    finishMatrixGenerationAttempt({
+      workspaceId: input.workspaceId,
+      itemId: item.id,
+      attemptId: input.attemptId,
+      nextStatus: 'completed',
+      provenance: input.provenance,
+    });
+    const updatedItem = writeMatrixGenerationItem({
+      workspaceId: input.workspaceId,
+      itemId: item.id,
+      expectedRevision: item.revision,
+      nextStatus: 'auditing_deterministic',
+      auditReport: null,
+      automaticRevisionCount: 1,
+      error: null,
+    });
+    return { item: updatedItem, post };
   }).immediate();
 }
 
