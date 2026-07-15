@@ -306,6 +306,19 @@ never sufficient to dispatch paid work.
   publish policy or a CMS job—even when auto-publish is configured. Every
   selected page must be individually approved before a page-set workflow becomes
   `ready_to_publish`.
+- Brand-to-content onboarding is one monotonic coordinator row over existing
+  brand, review, voice, matrix, and post records. It stores durable references
+  and gate evidence only; it never duplicates child-run state or keeps a generic
+  job running while a human decision is pending.
+- Onboarding start and resume require both the brand-deliverable and
+  content-matrix rollout flags. Start, get, and one-gate resume are available to
+  MCP; human content authorization and page approval remain at authenticated
+  human boundaries and cannot be supplied by an MCP key.
+- Content authorization re-previews the exact selected cells, budget, finalized
+  voice, and approved identity before paid matrix work. Later brand/voice drift
+  moves the coordinator to `needs_attention`; it never silently rebases the page
+  set. Final resume performs read-only publish preflight and stops at
+  `ready_to_publish` without sending, approving, or publishing anything.
 
 ## 8. Audit and revision limits
 
@@ -498,6 +511,17 @@ never sufficient to dispatch paid work.
 - An intake-to-brand-to-content orchestration is a durable workflow that pauses
   at review/approval boundaries. Human gates are resumable states, not long-
   running jobs and not bypasses hidden behind “one click.”
+- Its start rejects mixed, duplicate, missing, or stale matrix source refs before
+  paid brand work. Every accepted transition command is retained in an immutable
+  normalized ledger, so an older exact retry remains replayable after later gates.
+- Page generation freezes only the canonical page-type subset of the approved
+  full-brand identity while the coordinator continues checking the whole approved
+  suite for drift. An exact paid matrix child is reconciled by its deterministic
+  idempotency key before a retry performs a live preview.
+- A voice-foundation `changes_requested` decision terminalizes this coordinator
+  run because the current foundation child has no supported revision action.
+  Starting a new coordinator is required; recovery must not loop on a terminal
+  review decision.
 - Content authorization carries a durable authorization ID and a named
   operator/client authorizer. A system/MCP recorder cannot stand in for the
   human authorization proof.

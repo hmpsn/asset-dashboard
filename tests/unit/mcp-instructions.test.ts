@@ -108,6 +108,20 @@ describe('MCP server instructions', () => {
     expect(MCP_SERVER_INSTRUCTIONS).toMatch(/creative proposals/i);
   });
 
+  it('explains the gated brand-to-content onboarding workflow', () => {
+    for (const tool of [
+      'start_brand_content_onboarding',
+      'get_brand_content_onboarding',
+      'resume_brand_content_onboarding',
+    ]) {
+      expect(MCP_SERVER_INSTRUCTIONS).toContain(tool);
+    }
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('paid_job_id');
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/at most one gate/i);
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/cannot provide the human content authorization/i);
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/does not publish anything/i);
+  });
+
   it('flags the paid tools and that start_* tools are polled jobs', () => {
     expect(MCP_SERVER_INSTRUCTIONS).toContain('research_keywords');
     expect(MCP_SERVER_INSTRUCTIONS).toContain('start_local_seo_refresh');

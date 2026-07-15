@@ -25,6 +25,7 @@ import type {
   BrandGenerationItemStatus,
   BrandGenerationRunStatus,
 } from '../shared/types/brand-generation.js';
+import type { BrandContentOnboardingStatus } from '../shared/types/brand-content-onboarding.js';
 
 // ── Approval Item ──
 // pending ↔ approved ↔ applied
@@ -654,6 +655,41 @@ export const BRAND_GENERATION_ATTEMPT_TRANSITIONS = {
   cancelled: [],
 } as const satisfies Record<BrandGenerationAttemptStatus, readonly BrandGenerationAttemptStatus[]>;
 
+// ── Brand → Content Onboarding ──
+// Coordinates the existing brand and matrix generators through explicit human
+// gates. Publish readiness is terminal here; publishing remains a separate act.
+export const BRAND_CONTENT_ONBOARDING_TRANSITIONS = {
+  intake_ready: ['brand_generating', 'cancelled', 'failed'],
+  brand_generating: ['awaiting_voice_review', 'needs_attention', 'cancelled', 'failed'],
+  awaiting_voice_review: ['awaiting_voice_finalization', 'needs_attention', 'cancelled', 'failed'],
+  awaiting_voice_finalization: ['brand_generating_dependents', 'needs_attention', 'cancelled', 'failed'],
+  brand_generating_dependents: ['awaiting_operator_review', 'needs_attention', 'cancelled', 'failed'],
+  awaiting_operator_review: ['awaiting_client_review', 'needs_attention', 'cancelled', 'failed'],
+  awaiting_client_review: ['awaiting_content_authorization', 'needs_attention', 'cancelled', 'failed'],
+  awaiting_content_authorization: ['content_generating', 'needs_attention', 'cancelled', 'failed'],
+  content_generating: ['awaiting_content_review', 'needs_attention', 'cancelled', 'failed'],
+  awaiting_content_review: ['ready_to_publish', 'needs_attention', 'cancelled', 'failed'],
+  ready_to_publish: [],
+  needs_attention: [
+    'brand_generating',
+    'awaiting_voice_review',
+    'awaiting_voice_finalization',
+    'brand_generating_dependents',
+    'awaiting_operator_review',
+    'awaiting_client_review',
+    'awaiting_content_authorization',
+    'content_generating',
+    'awaiting_content_review',
+    'cancelled',
+    'failed',
+  ],
+  cancelled: [],
+  failed: [],
+} as const satisfies Record<
+  BrandContentOnboardingStatus,
+  readonly BrandContentOnboardingStatus[]
+>;
+
 // ── Lifecycle envelope registration ──
 // A typed VIEW over the transition tables above — never a second source of truth.
 // Each entry's `states` is derived from the table keys, so it can never drift from
@@ -708,6 +744,7 @@ registerTransitionTable('matrix_generation_attempt', MATRIX_GENERATION_ATTEMPT_T
 registerTransitionTable('brand_generation_run', BRAND_GENERATION_RUN_TRANSITIONS);
 registerTransitionTable('brand_generation_item', BRAND_GENERATION_ITEM_TRANSITIONS);
 registerTransitionTable('brand_generation_attempt', BRAND_GENERATION_ATTEMPT_TRANSITIONS);
+registerTransitionTable('brand_content_onboarding', BRAND_CONTENT_ONBOARDING_TRANSITIONS);
 
 // ── Generic validator ──
 

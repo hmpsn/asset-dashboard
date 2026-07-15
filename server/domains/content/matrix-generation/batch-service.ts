@@ -147,6 +147,20 @@ function getStartReplay(
   };
 }
 
+/** Read-only reconciliation seam for a caller that accepted the child before recording its ID. */
+export function getMatrixGenerationByIdempotency(
+  workspaceId: string,
+  matrixId: string,
+  idempotencyKey: string,
+): MatrixGenerationRun | null {
+  const run = getPersistedMatrixGenerationRunByIdempotency(
+    workspaceId,
+    matrixId,
+    idempotencyKey,
+  );
+  return run ? projectMatrixGenerationRun(run) : null;
+}
+
 class MatrixGenerationStartReplay extends Error {
   readonly result: StartMatrixGenerationResult;
 

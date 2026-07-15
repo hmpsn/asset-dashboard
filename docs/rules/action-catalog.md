@@ -87,7 +87,7 @@ zod schema's `.options`) instead of a `satisfies` clause.
 5. **Label wording follows the R1 word classes and
    [`docs/workflows/ui-vocabulary.md`](../workflows/ui-vocabulary.md)** —
    canonical admin-facing wording, not ad hoc phrasing.
-6. **MCP context is additive-only.** 80 MCP tools and long-lived
+6. **MCP context is additive-only.** 83 MCP tools and long-lived
    per-workspace API keys (migration 163) depend on the wire vocabulary never
    changing shape. Never rename an existing `mcp` catalog key or the verb it
    documents — that is a breaking change to persisted integrations, out of

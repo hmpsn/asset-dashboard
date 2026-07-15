@@ -734,8 +734,11 @@ state, hold jobs open across human gates, auto-send, auto-approve, or publish.
   `content_generating`, `awaiting_content_review`, `ready_to_publish`,
   `needs_attention`, `cancelled`, and `failed`.
 - Add a version-conditional durable record referencing intake, brand run/review,
-  finalized voice, approved identity snapshot, and matrix run. Idempotency scope
-  is `(workspaceId, intakeRevisionId, idempotencyKey)`.
+  finalized voice, approved identity snapshot, and matrix run. Start requires a
+  non-empty exact matrix selection; standalone brand-only generation remains in
+  B2. Reject mixed, duplicate, missing, or stale matrix sources before paid brand
+  work. Idempotency scope is `(workspaceId, intakeRevisionId, idempotencyKey)`;
+  an immutable normalized command ledger keeps every accepted transition retry.
 - Start brand work, then pause at operator review, client review, and content
   authorization. After content generation, create/reference the existing page
   review surface and pause at `awaiting_content_review`. Resume only after every
@@ -744,7 +747,9 @@ state, hold jobs open across human gates, auto-send, auto-approve, or publish.
   Generation cannot jump directly to publish readiness.
 - Expose start/get/resume MCP tools; require both existing rollout flags.
 - Freeze the approved brand snapshot for the page run and mark remaining work
-  stale if authority changes.
+  stale if authority changes. Compare each page preview with the canonical
+  page-type identity subset, and reconcile an exact already-accepted matrix child
+  before live re-preview after a crash.
 
 Red first: every pause/resume edge, direct content-generating→ready-to-publish
 rejection, duplicate resume, rejected/changes-requested brand review, authority

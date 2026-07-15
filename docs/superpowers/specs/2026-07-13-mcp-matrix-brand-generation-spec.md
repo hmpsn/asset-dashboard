@@ -163,7 +163,8 @@ after consumers migrate and telemetry shows zero omission.
 ### Onboarding orchestration
 
 `start_brand_content_onboarding` creates a durable workflow referencing an
-intake revision and optional matrix selection. `get_brand_content_onboarding`
+intake revision and a non-empty exact matrix selection. Brand-only work remains
+owned by the standalone brand-generation tools. `get_brand_content_onboarding`
 returns its current gate. `resume_brand_content_onboarding` advances only when
 the named operator/client approval or content authorization is durably present.
 The workflow never leaves a generic background job running while awaiting a
@@ -558,14 +559,22 @@ deliverables enter `BrandSlice` and `ClientBrandSummary`.
 
 `brand_content_onboarding_runs` owns the monotonic workflow revision,
 idempotency scope `(workspaceId, intakeRevisionId, idempotencyKey)`, immutable
-source refs, child brand and page-review IDs, and gate-evidence snapshots. Resume
+source refs, child brand and page-review IDs, and gate-evidence snapshots. Its
+normalized immutable command ledger preserves every accepted transition retry,
+including result revision/status and paid child job. Start rejects mixed,
+duplicate, missing, or stale matrix source refs before paid brand work. Resume
 requires `expected_revision`, the named current gate, and durable evidence that
 its human decision exists. The only route to `ready_to_publish` is
 `awaiting_content_review` → explicit page approval → export/publish precondition
 check → `ready_to_publish`, and every selected ready page must carry the review-
 only approval evidence. Content authorization carries a durable authorization
 ID and named operator/client authorizer; a system/MCP recorder cannot substitute
-for that proof. A workflow waiting on humans has no running generic job.
+for that proof. A workflow waiting on humans has no running generic job. Page
+preview identity is compared with the canonical page-type subset of the frozen
+approved suite, while full-suite drift remains independently enforced. An exact
+matrix child accepted before a coordinator crash is reconciled before live
+re-preview. Voice-foundation changes-requested is terminal for that run because
+the foundation child has no supported revision command.
 
 ## 11. Query cache and real-time contract
 
