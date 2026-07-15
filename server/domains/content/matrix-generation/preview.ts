@@ -35,11 +35,10 @@ import { getMatrix } from '../../../content-matrices.js';
 import { getTemplate } from '../../../content-templates.js';
 import { getPost } from '../../../content-posts-db.js';
 import { buildContentGenerationContextV2 } from '../../../intelligence/generation-context-builders.js';
-import { getCustomPromptNotes } from '../../../prompt-assembly.js';
 import {
-  guardrailsToPromptInstructions,
-  voiceDNAToPromptInstructions,
-} from '../../../voice-dna-layer2.js';
+  getCustomPromptNotes,
+  renderSystemVoiceAuthorityBlock,
+} from '../../../prompt-assembly.js';
 import {
   buildMatrixCellEvidenceRequirements,
   listCurrentMatrixCellEvidence,
@@ -330,10 +329,10 @@ export async function prepareMatrixGenerationCell(
     };
   }
 
-  const systemVoiceBlock = `BRAND VOICE RULES (you MUST follow these — do not deviate):\n${[
-    voiceDNAToPromptInstructions(voiceSnapshot.voiceDNA),
-    guardrailsToPromptInstructions(voiceSnapshot.guardrails),
-  ].join('\n\n')}`;
+  const systemVoiceBlock = renderSystemVoiceAuthorityBlock(
+    voiceSnapshot.voiceDNA,
+    voiceSnapshot.guardrails,
+  );
   const context = await buildContentGenerationContextV2(workspaceId, {
     targetKeyword: target.targetKeyword.value,
     pagePath: target.plannedUrl,

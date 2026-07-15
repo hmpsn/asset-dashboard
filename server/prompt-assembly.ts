@@ -30,6 +30,17 @@ export interface SystemPromptAuthority {
   customNotes: string | null;
 }
 
+/** Render exact captured voice authority without re-reading mutable profile state. */
+export function renderSystemVoiceAuthorityBlock(
+  voiceDNA: VoiceDNA,
+  guardrails: VoiceGuardrails,
+): string {
+  return `BRAND VOICE RULES (you MUST follow these — do not deviate):\n${[
+    voiceDNAToPromptInstructions(voiceDNA),
+    guardrailsToPromptInstructions(guardrails),
+  ].join('\n\n')}`;
+}
+
 /**
  * Render a system prompt from authority captured earlier in the same logical
  * generation run. This avoids re-reading mutable voice state between stages.
