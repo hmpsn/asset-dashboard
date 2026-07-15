@@ -48,8 +48,11 @@ export function useSendPostToClient(wsId: string) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: ({ postId, note }: { postId: string; note?: string }) =>
-      contentPosts.sendToClient(wsId, postId, note),
+    mutationFn: ({ postId, expectedRevision, note }: {
+      postId: string;
+      expectedRevision: number;
+      note?: string;
+    }) => contentPosts.sendToClient(wsId, postId, expectedRevision, note),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.posts(wsId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.requests(wsId) });

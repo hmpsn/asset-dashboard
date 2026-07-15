@@ -120,6 +120,19 @@ beforeAll(async () => {
 
   // ── Brief ──────────────────────────────────────────────────────────────────
   wsABriefId = insertBriefDirect(wsAId, 'export-test-keyword');
+  db.prepare(`
+    UPDATE content_briefs
+    SET generation_revision = 3, generation_provenance = ?
+    WHERE id = ? AND workspace_id = ?
+  `).run(JSON.stringify({
+    runId: 'run_private_export',
+    operation: 'content-brief-generate',
+    provider: 'openai',
+    model: 'gpt-5.4',
+    inputFingerprint: 'c'.repeat(64),
+    startedAt: '2026-07-13T10:00:00.000Z',
+    completedAt: '2026-07-13T10:00:01.000Z',
+  }), wsABriefId, wsAId);
 
   // ── Content request ────────────────────────────────────────────────────────
   const req = createContentRequest(wsAId, {
@@ -231,6 +244,16 @@ describe('GET /api/export/:workspaceId/briefs — JSON format', () => {
     expect(body.length).toBeGreaterThan(0);
     const ids = body.map(b => b.id);
     expect(ids).toContain(wsABriefId);
+  });
+
+  it('omits internal generation revision and provenance fields', async () => {
+    const res = await api(`/api/export/${wsAId}/briefs`);
+    const body = await res.json() as Array<Record<string, unknown>>;
+    const brief = body.find(item => item.id === wsABriefId);
+    expect(brief).toBeDefined();
+    expect(brief).not.toHaveProperty('generationRevision');
+    expect(brief).not.toHaveProperty('generationProvenance');
+    expect(JSON.stringify(brief)).not.toContain('run_private_export');
   });
 
   it('sets Content-Type application/json', async () => {

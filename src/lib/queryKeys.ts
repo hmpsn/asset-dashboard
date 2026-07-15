@@ -37,6 +37,7 @@ export const queryKeys = {
     // Content
     briefs: (wsId: string) => ['admin-briefs', wsId] as const,
     brief: (wsId: string, briefId: string) => ['admin-brief', wsId, briefId] as const,
+    briefsDetailAll: (wsId: string) => ['admin-brief', wsId] as const,
     briefingDrafts: (wsId: string) => ['admin-briefing-drafts', wsId] as const,
     briefingDraft: (wsId: string, draftId: string) => ['admin-briefing-draft', wsId, draftId] as const,
     requests: (wsId: string) => ['admin-requests', wsId] as const,

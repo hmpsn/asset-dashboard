@@ -130,11 +130,27 @@ export function consumeHandle<T = unknown>(
   expectedKind: HandleKind,
   expectedWorkspaceId: string,
 ): T {
+  const payload = readHandleForAtomicConsumption<T>(id, expectedKind, expectedWorkspaceId);
+  // Single-use: delete on successful consume.
+  stmts().deleteByToken.run(id);
+  return payload;
+}
+
+/**
+ * Validate and read a handle without deleting it. This is only for callers that
+ * must inspect identity/revision fields before entering the domain transaction
+ * that will invoke `consumeHandle` as its final synchronous authorization step.
+ */
+export function readHandleForAtomicConsumption<T = unknown>(
+  id: string,
+  expectedKind: HandleKind,
+  expectedWorkspaceId: string,
+): T {
   const row = stmts().getByToken.get(id) as HandleRow | undefined;
   if (!row) {
     throw new HandleNotFoundError(id);
   }
-  if (Date.now() > Date.parse(row.expires_at)) {
+  if (Date.now() >= Date.parse(row.expires_at)) {
     stmts().deleteByToken.run(id);
     throw new HandleExpiredError(id);
   }
@@ -144,11 +160,26 @@ export function consumeHandle<T = unknown>(
   if (row.workspace_id !== expectedWorkspaceId) {
     throw new HandleWorkspaceMismatchError(id, expectedWorkspaceId, row.workspace_id);
   }
-  // Single-use: delete on successful consume.
-  stmts().deleteByToken.run(id);
   // Payload was produced internally via JSON.stringify on issue; fall back to
   // null only if the stored row was somehow corrupted.
   return parseJsonFallback<T>(row.payload, null as T);
+}
+
+/**
+ * Consume a one-time handle in the same IMMEDIATE transaction as the durable mutation it
+ * authorizes. If the callback throws, both its writes and the handle deletion roll back, so a
+ * transient validation/link failure cannot strand the caller after producing no artifact.
+ */
+export function consumeHandleAtomically<T, TResult>(
+  id: string,
+  expectedKind: HandleKind,
+  expectedWorkspaceId: string,
+  commit: (payload: T) => TResult,
+): TResult {
+  return db.transaction(() => {
+    const payload = consumeHandle<T>(id, expectedKind, expectedWorkspaceId);
+    return commit(payload);
+  }).immediate();
 }
 
 /**

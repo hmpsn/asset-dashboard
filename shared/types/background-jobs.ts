@@ -55,6 +55,23 @@ export type BackgroundJobStatus =
   | 'error'
   | 'cancelled';
 
+export const JOB_RESOURCE_TYPES = {
+  CONTENT_REQUEST_BRIEF: 'content_request_brief',
+  CONTENT_BRIEF_TARGET: 'content_brief_target',
+  CONTENT_BRIEF: 'content_brief',
+  CONTENT_POST_FOR_BRIEF: 'content_post_for_brief',
+  CONTENT_POST: 'content_post',
+  COPY_ENTRY: 'copy_entry',
+} as const;
+
+export type JobResourceType = typeof JOB_RESOURCE_TYPES[keyof typeof JOB_RESOURCE_TYPES];
+
+/** Trusted domain-owned identity used for atomic generation-job acceptance. */
+export interface JobResourceRef {
+  resourceType: JobResourceType;
+  resourceId: string;
+}
+
 export interface BackgroundJobRecord {
   id: string;
   type: BackgroundJobType | string;

@@ -126,6 +126,10 @@ function insertSection(workspaceId: string, eid: string, status: string): string
   return id;
 }
 
+function sectionUpdatedAt(id: string): string {
+  return (db.prepare('SELECT updated_at FROM copy_sections WHERE id = ?').get(id) as { updated_at: string }).updated_at;
+}
+
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 beforeAll(async () => {
@@ -546,7 +550,13 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/approve', () => 
 
     const res = await authedFetch(
       `${ctx.BASE}/api/public/copy/${ws.workspaceId}/section/${freshSection}/approve`,
-      { method: 'POST', workspaceId: ws.workspaceId, token: clientToken },
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedUpdatedAt: sectionUpdatedAt(freshSection) }),
+        workspaceId: ws.workspaceId,
+        token: clientToken,
+      },
     );
     expect(res.status).toBe(200);
     const body = await res.json() as { section: { id: string; status: string } };
@@ -566,11 +576,19 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/approve', () => 
 
     const res = await authedFetch(
       `${ctx.BASE}/api/public/copy/${ws.workspaceId}/section/${freshSection2}/approve`,
-      { method: 'POST', workspaceId: ws.workspaceId, token: clientToken },
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedUpdatedAt: sectionUpdatedAt(freshSection2) }),
+        workspaceId: ws.workspaceId,
+        token: clientToken,
+      },
     );
     expect(res.status).toBe(200);
     const body = await res.json() as { section: Record<string, unknown> };
     expect('aiReasoning' in body.section).toBe(false);
+    expect('generationRevision' in body.section).toBe(false);
+    expect('generationProvenance' in body.section).toBe(false);
 
     db.prepare('DELETE FROM copy_sections WHERE id = ?').run(freshSection2);
     db.prepare('DELETE FROM blueprint_entries WHERE id = ?').run(freshEntry2);
@@ -582,7 +600,13 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/approve', () => 
 
     await authedFetch(
       `${ctx.BASE}/api/public/copy/${ws.workspaceId}/section/${freshSection3}/approve`,
-      { method: 'POST', workspaceId: ws.workspaceId, token: clientToken },
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedUpdatedAt: sectionUpdatedAt(freshSection3) }),
+        workspaceId: ws.workspaceId,
+        token: clientToken,
+      },
     );
 
     const row = db
@@ -601,7 +625,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/approve', () => 
 
 describe('POST /api/public/copy/:workspaceId/section/:sectionId/suggest', () => {
   const validSuggestion = {
-    originalText: 'Original copy text here.',
+    originalText: 'Generated copy text for section test.',
     suggestedText: 'Improved copy text from client.',
   };
 
@@ -611,7 +635,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/suggest', () => 
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-no-auto-public-auth': 'true' },
-        body: JSON.stringify(validSuggestion),
+        body: JSON.stringify({ ...validSuggestion, expectedUpdatedAt: sectionUpdatedAt(sectionId) }),
       },
     );
     expect(res.status).toBe(401);
@@ -665,7 +689,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/suggest', () => 
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(validSuggestion),
+        body: JSON.stringify({ ...validSuggestion, expectedUpdatedAt: sectionUpdatedAt(draftSectionId) }),
         workspaceId: ws.workspaceId,
         token: clientToken,
       },
@@ -696,7 +720,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/suggest', () => 
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(validSuggestion),
+        body: JSON.stringify({ ...validSuggestion, expectedUpdatedAt: sectionUpdatedAt(freshSection) }),
         workspaceId: ws.workspaceId,
         token: clientToken,
       },
@@ -722,7 +746,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/suggest', () => 
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(validSuggestion),
+        body: JSON.stringify({ ...validSuggestion, expectedUpdatedAt: sectionUpdatedAt(freshSection) }),
         workspaceId: ws.workspaceId,
         token: clientToken,
       },
@@ -730,6 +754,8 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/suggest', () => 
     expect(res.status).toBe(200);
     const body = await res.json() as { section: Record<string, unknown> };
     expect('aiReasoning' in body.section).toBe(false);
+    expect('generationRevision' in body.section).toBe(false);
+    expect('generationProvenance' in body.section).toBe(false);
 
     db.prepare('DELETE FROM copy_sections WHERE id = ?').run(freshSection);
     db.prepare('DELETE FROM blueprint_entries WHERE id = ?').run(freshEntry);
@@ -744,7 +770,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/suggest', () => 
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(validSuggestion),
+        body: JSON.stringify({ ...validSuggestion, expectedUpdatedAt: sectionUpdatedAt(freshSection) }),
         workspaceId: ws.workspaceId,
         token: clientToken,
       },

@@ -7,7 +7,8 @@ const { callAIMock, isAnthropicConfiguredMock } = vi.hoisted(() => ({
   isAnthropicConfiguredMock: vi.fn(() => false),
 }));
 
-vi.mock('../../server/ai.js', () => ({
+vi.mock('../../server/ai.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../server/ai.js')>()),
   callAI: callAIMock,
 }));
 
@@ -34,7 +35,10 @@ import {
   generateSeoMeta,
   scoreVoiceMatch,
   unifyPost,
+  renderCreativeProviderCallInput,
 } from '../../server/content-posts-ai.js';
+import { renderAIProviderInput } from '../../server/ai.js';
+import { fingerprintRenderedAIInput } from '../../server/generation-provenance.js';
 
 function makeBrief(): ContentBrief {
   return {
@@ -191,6 +195,67 @@ describe('callCreativeAI fallback correlation', () => {
       beforeProviderDispatch: () => { throw budgetError; },
     })).rejects.toThrow(budgetError);
     expect(callAIMock).not.toHaveBeenCalled();
+  });
+
+  it('does not buy a fallback when metadata observation rejects a successful Claude call', async () => {
+    isAnthropicConfiguredMock.mockReturnValue(true);
+    callAIMock.mockResolvedValueOnce({
+      text: 'Claude draft',
+      tokens: { prompt: 20, completion: 5, total: 25 },
+      execution: {
+        runId: 'run_claude',
+        executionChainId: 'chain_claude',
+        operation: 'copy-generation',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-6',
+        attempts: 1,
+        cacheOutcome: 'miss',
+        startedAt: '2026-07-13T12:00:00.000Z',
+        completedAt: '2026-07-13T12:00:01.000Z',
+        durationMs: 1_000,
+      },
+    });
+
+    await expect(callCreativeAIWithMetadata({
+      ...opts,
+      onExecution: () => { throw new Error('provenance observer failed'); },
+    })).rejects.toThrow('provenance observer failed');
+    expect(callAIMock).toHaveBeenCalledOnce();
+  });
+
+  it('fingerprints registry-default research instructions exactly as dispatched', async () => {
+    const execution = {
+      runId: 'run_research',
+      executionChainId: 'chain_research',
+      operation: 'content-post-introduction',
+      provider: 'openai' as const,
+      model: 'gpt-5.4',
+      attempts: 1,
+      cacheOutcome: 'miss' as const,
+      startedAt: '2026-07-13T12:00:00.000Z',
+      completedAt: '2026-07-13T12:00:01.000Z',
+      durationMs: 1_000,
+    };
+    callAIMock.mockResolvedValueOnce({
+      text: 'Primary GPT draft',
+      tokens: { prompt: 20, completion: 5, total: 25 },
+      execution,
+    });
+    const onExecution = vi.fn();
+
+    await callCreativeAIWithMetadata({
+      ...opts,
+      operation: 'content-post-introduction',
+      onExecution,
+    });
+    const providerInput = renderCreativeProviderCallInput(opts, 'openai');
+    const expectedFingerprint = fingerprintRenderedAIInput(renderAIProviderInput({
+      provider: 'openai',
+      ...providerInput,
+      researchMode: true,
+    }));
+    expect(onExecution).toHaveBeenCalledWith({ execution, inputFingerprint: expectedFingerprint });
+    expect(callAIMock).toHaveBeenCalledWith(expect.objectContaining({ researchMode: true }));
   });
 });
 

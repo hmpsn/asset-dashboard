@@ -51,7 +51,15 @@ import { clearContentGapVote, listContentGapVotes, setContentGapVote } from '../
 import { parsePaginationParams } from '../pagination.js';
 import { listKeywordGaps } from '../keyword-gaps.js';
 import { projectCompetitorGaps } from '../competitor-gaps-projection.js';
-import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
+import {
+  addClientSuggestion,
+  CopySuggestionOriginalMismatchError,
+  getEntryCopyStatus,
+  getSection,
+  getSectionsForEntry,
+  updateSectionStatus,
+} from '../copy-review.js';
+import { GenerationRevisionConflictError } from '../generation-provenance.js';
 import {
   CLIENT_BUSINESS_PRIORITIES_MARKER,
   clientBusinessPrioritiesBodySchema,
@@ -100,6 +108,25 @@ function runBrandIntakePostCommitEffect(
     run();
   } catch (err) {
     log.warn({ err, workspaceId, effectName }, 'brand intake post-commit effect failed');
+  }
+}
+
+function runPublicCopyReviewPostCommitEffect(
+  workspaceId: string,
+  sectionId: string,
+  effect: 'broadcast' | 'activity' | 'audit-log',
+  run: () => void,
+): void {
+  try {
+    run();
+  } catch (err) {
+    try {
+      log.warn(
+        { err, workspaceId, sectionId, effect },
+        'public copy review post-commit effect failed',
+      );
+    } catch { // catch-ok -- failure reporting cannot rewrite a committed public mutation as failed.
+    }
   }
 }
 
@@ -709,8 +736,19 @@ function toClientSection(s: { id: string; entryId: string; sectionPlanItemId: st
   };
 }
 
+const publicCopyRevisionSchema = {
+  // Public copy payloads omit the internal generation revision. The client
+  // echoes the existing updatedAt field and this route resolves it to CAS.
+  expectedUpdatedAt: z.string().datetime(),
+};
+
+const copyApprovalSchema = z.object(publicCopyRevisionSchema).strict();
+
 const copySuggestionSchema = z.object({
-  originalText: z.string().trim().min(1, 'originalText is required').max(5000),
+  ...publicCopyRevisionSchema,
+  // This is an optimistic source snapshot, so preserve whitespace exactly for
+  // the domain-level equality check against the authoritative generated copy.
+  originalText: z.string().min(1, 'originalText is required').max(5000),
   suggestedText: z.string().trim().min(1, 'suggestedText is required').max(5000),
 }).strict();
 
@@ -775,7 +813,7 @@ router.get('/api/public/copy/:workspaceId/entry/:entryId/sections', requireClien
 });
 
 // Client approves a section
-router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', requireClientCopyReviewAuth, (req, res) => {
+router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', requireClientCopyReviewAuth, validate(copyApprovalSchema), (req, res, next) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -790,48 +828,100 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', requireC
   if (!existing || existing.status !== 'client_review') {
     return res.status(400).json({ error: 'Could not approve section. It may not be in a reviewable state.' });
   }
+  if (existing.updatedAt !== req.body.expectedUpdatedAt) {
+    return res.status(409).json({
+      error: 'This section changed since you opened it. Refresh before approving.',
+      code: 'copy_section_changed',
+    });
+  }
 
-  const section = updateSectionStatus(sectionId, wsId, 'approved');
+  let section;
+  try {
+    section = updateSectionStatus(sectionId, wsId, 'approved', existing.generationRevision);
+  } catch (err) {
+    if (err instanceof GenerationRevisionConflictError) {
+      return res.status(409).json({
+        error: 'This section changed while approval was saving. Refresh before trying again.',
+        code: err.code,
+      });
+    }
+    return next(err);
+  }
   if (!section) {
     return res.status(400).json({ error: 'Could not approve section. It may not be in a reviewable state.' });
   }
 
-  broadcastToWorkspace(wsId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
-  // client-visibility-ok: copy review actions update the copy UI directly; activity is internal audit history.
-  addActivity(wsId, 'copy_approved', `Client approved copy section`, 'Via client portal');
-  log.info({ wsId, sectionId }, 'Client approved copy section');
+  runPublicCopyReviewPostCommitEffect(wsId, sectionId, 'broadcast', () => {
+    broadcastToWorkspace(wsId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
+  });
+  runPublicCopyReviewPostCommitEffect(wsId, sectionId, 'activity', () => {
+    // client-visibility-ok: copy review actions update the copy UI directly; activity is internal audit history.
+    addActivity(wsId, 'copy_approved', `Client approved copy section`, 'Via client portal');
+  });
+  runPublicCopyReviewPostCommitEffect(wsId, sectionId, 'audit-log', () => {
+    log.info({ wsId, sectionId }, 'Client approved copy section');
+  });
   // Strip internal-only fields before returning to client
   res.json({ section: toClientSection(section) });
 });
 
 // Client suggests an edit on a section
-router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', requireClientCopyReviewAuth, validate(copySuggestionSchema), (req, res) => {
+router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', requireClientCopyReviewAuth, validate(copySuggestionSchema), (req, res, next) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
 
   const { sectionId } = req.params;
-  const { originalText, suggestedText } = req.body;
+  const { expectedUpdatedAt, originalText, suggestedText } = req.body;
 
   // Only client_review sections accept suggestions via the client portal
   const existing = getSection(sectionId, wsId);
   if (!existing || existing.status !== 'client_review') {
     return res.status(400).json({ error: 'Section is not in a reviewable state.' });
   }
+  if (existing.updatedAt !== expectedUpdatedAt) {
+    return res.status(409).json({
+      error: 'This section changed since you opened it. Refresh before suggesting an edit.',
+      code: 'copy_section_changed',
+    });
+  }
 
-  const section = addClientSuggestion(sectionId, wsId, {
-    originalText,
-    suggestedText,
-  });
+  let section;
+  try {
+    section = addClientSuggestion(sectionId, wsId, {
+      originalText,
+      suggestedText,
+    }, existing.generationRevision);
+  } catch (err) {
+    if (err instanceof GenerationRevisionConflictError) {
+      return res.status(409).json({
+        error: 'This section changed while your suggestion was saving. Refresh before trying again.',
+        code: err.code,
+      });
+    }
+    if (err instanceof CopySuggestionOriginalMismatchError) {
+      return res.status(409).json({
+        error: 'The original copy no longer matches this section. Refresh before suggesting an edit.',
+        code: err.code,
+      });
+    }
+    return next(err);
+  }
   if (!section) {
     return res.status(400).json({ error: 'Could not add suggestion. Section not found.' });
   }
 
-  broadcastToWorkspace(wsId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
-  // client-visibility-ok: copy review actions update the copy UI directly; activity is internal audit history.
-  addActivity(wsId, 'copy_suggestion_added', `Client suggested copy edit`, 'Via client portal');
-  log.info({ wsId, sectionId }, 'Client suggested copy edit');
+  runPublicCopyReviewPostCommitEffect(wsId, sectionId, 'broadcast', () => {
+    broadcastToWorkspace(wsId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
+  });
+  runPublicCopyReviewPostCommitEffect(wsId, sectionId, 'activity', () => {
+    // client-visibility-ok: copy review actions update the copy UI directly; activity is internal audit history.
+    addActivity(wsId, 'copy_suggestion_added', `Client suggested copy edit`, 'Via client portal');
+  });
+  runPublicCopyReviewPostCommitEffect(wsId, sectionId, 'audit-log', () => {
+    log.info({ wsId, sectionId }, 'Client suggested copy edit');
+  });
   // Strip internal-only fields before returning to client
   res.json({ section: toClientSection(section) });
 });

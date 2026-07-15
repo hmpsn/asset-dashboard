@@ -3,8 +3,8 @@
  * Handles creative writing with Claude/GPT, page-type-specific prompts,
  * unification passes, and SEO meta generation.
  */
-import { callAI, type AICallOptions, type AICallResult } from './ai.js';
-import type { AIOperationId } from './ai-operation-registry.js';
+import { callAI, renderAIProviderInput, type AICallOptions, type AICallResult } from './ai.js';
+import { getAIOperationRuntimeDefaults, type AIOperationId } from './ai-operation-registry.js';
 import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structured-output.js';
 import { isAnthropicConfigured } from './anthropic-helpers.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
@@ -22,6 +22,10 @@ import {
 } from './page-type-copy-contract.js';
 import { buildSeoPromptContext } from './intelligence/generation-context-builders.js';
 import { countVisibleHtmlWords, visibleTextFromHtml } from '../shared/content-post-integrity.js';
+import {
+  fingerprintRenderedAIInput,
+  type AcceptedGenerationExecution,
+} from './generation-provenance.js';
 export { CREATIVE_WRITING_RULES, WRITING_QUALITY_RULES } from './writing-quality.js';
 
 const log = createLogger('content-posts-ai');
@@ -107,6 +111,10 @@ export interface CreativeAICallOptions {
     provider: 'anthropic' | 'openai';
     fallback: boolean;
   }) => void | Promise<void>;
+  /** Logical workflow/job correlation shared across composite content stages. */
+  executionChainId?: string;
+  /** Receives each successful provider result; callers retain it only if that output is adopted. */
+  onExecution?: (execution: AcceptedGenerationExecution) => void;
 }
 
 export const CREATIVE_JSON_ONLY_INSTRUCTION = 'IMPORTANT: Return ONLY a single valid JSON object. No prose, no preamble, no markdown code fences. The response must start with { and end with }.';
@@ -141,14 +149,17 @@ export async function callCreativeAIWithMetadata(
   const temperature = opts.temperature ?? CLAUDE_TEMP;
   const json = opts.json === true;
   const featureLabel = feature ?? opts.operation ?? 'creative-ai';
-  const executionChainId = randomUUID();
+  const executionChainId = opts.executionChainId ?? randomUUID();
+  const researchMode = opts.researchMode
+    ?? (opts.operation ? getAIOperationRuntimeDefaults(opts.operation).defaultResearchMode : false);
   let claudeAttemptFailed = false;
 
   if (isAnthropicConfigured()) {
     await opts.beforeProviderDispatch?.({ provider: 'anthropic', fallback: false });
+    const providerInput = renderCreativeProviderCallInput({ systemPrompt, userPrompt, json }, 'anthropic');
+    let result: AICallResult | undefined;
     try {
-      const providerInput = renderCreativeProviderCallInput({ systemPrompt, userPrompt, json }, 'anthropic');
-      const result = await callAI({
+      result = await callAI({
         operation: opts.operation,
         provider: 'anthropic',
         model: CLAUDE_MODEL,
@@ -159,17 +170,27 @@ export async function callCreativeAIWithMetadata(
         workspaceId,
         maxRetries: opts.maxRetries,
         timeoutMs: 90_000,
-        researchMode: opts.researchMode,
+        researchMode,
         signal: opts.signal,
         executionChainId,
       });
-      log.info(`[${featureLabel}] Generated with Claude`);
-      const text = result.text.trim();
-      return { ...result, text: json ? stripCodeFence(text) : text };
     } catch (err) {
       if (opts.signal?.aborted) throw err;
       claudeAttemptFailed = true;
       log.info(`[${featureLabel}] Claude failed (${err instanceof Error ? err.message : err}), falling back to GPT`);
+    }
+    if (result) {
+      opts.onExecution?.({
+        execution: result.execution,
+        inputFingerprint: fingerprintRenderedAIInput(renderAIProviderInput({
+          provider: 'anthropic',
+          ...providerInput,
+          researchMode,
+        })),
+      });
+      log.info(`[${featureLabel}] Generated with Claude`);
+      const text = result.text.trim();
+      return { ...result, text: json ? stripCodeFence(text) : text };
     }
   }
 
@@ -189,11 +210,19 @@ export async function callCreativeAIWithMetadata(
     feature,
     workspaceId,
     maxRetries: opts.maxRetries,
-    researchMode: opts.researchMode,
+    researchMode,
     signal: opts.signal,
     executionChainId,
     ...(claudeAttemptFailed ? { fallbackUsed: true } : {}),
     ...(json ? { responseFormat: { type: 'json_object' as const } } : {}),
+  });
+  opts.onExecution?.({
+    execution: result.execution,
+    inputFingerprint: fingerprintRenderedAIInput(renderAIProviderInput({
+      provider: 'openai',
+      ...providerInput,
+      researchMode,
+    })),
   });
   log.info(`[${featureLabel}] Generated with GPT`);
   const text = result.text.trim();
@@ -223,8 +252,10 @@ const PAGE_TYPE_WRITER_ROLE: Record<string, string> = {
   resource: 'You are an educational content writer creating actionable guides and resources that establish thought leadership.',
 };
 
-interface ContentAIGenerationOptions {
+export interface ContentAIGenerationOptions {
   signal?: AbortSignal;
+  executionChainId?: string;
+  onExecution?: (execution: AcceptedGenerationExecution) => void;
 }
 
 const PAGE_TYPE_INTRO_INSTRUCTIONS: Record<string, string> = {
@@ -441,6 +472,7 @@ Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no mar
     { skipProseRules: true },
   );
   return callCreativeAI({
+    operation: 'content-post-introduction',
     systemPrompt,
     userPrompt: prompt.replace(role + '\n\n', ''),
     maxTokens: 600,
@@ -448,6 +480,8 @@ Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no mar
     workspaceId,
     researchMode: true,
     signal: options.signal,
+    executionChainId: options.executionChainId,
+    onExecution: options.onExecution,
   });
 }
 
@@ -541,6 +575,7 @@ Return ONLY the section content in clean HTML (starting with <h2>). No labels, n
     { skipProseRules: true },
   );
   return callCreativeAI({
+    operation: 'content-post-section',
     systemPrompt,
     userPrompt: prompt.replace(role + '\n\n', ''),
     maxTokens: Math.max(800, sectionTarget * 2),
@@ -548,6 +583,8 @@ Return ONLY the section content in clean HTML (starting with <h2>). No labels, n
     workspaceId,
     researchMode: true,
     signal: options.signal,
+    executionChainId: options.executionChainId,
+    onExecution: options.onExecution,
   });
 }
 
@@ -609,6 +646,7 @@ Return ONLY the closing section in clean HTML (starting with <h2>). No labels, n
     { skipProseRules: true },
   );
   return callCreativeAI({
+    operation: 'content-post-conclusion',
     systemPrompt,
     userPrompt: prompt.replace(role + '\n\n', ''),
     maxTokens: 800,
@@ -616,6 +654,8 @@ Return ONLY the closing section in clean HTML (starting with <h2>). No labels, n
     workspaceId,
     researchMode: true,
     signal: options.signal,
+    executionChainId: options.executionChainId,
+    onExecution: options.onExecution,
   });
 }
 
@@ -694,9 +734,21 @@ Return valid JSON only:
       temperature: 0.5,
       workspaceId,
       signal: options.signal,
+      executionChainId: options.executionChainId,
     });
     const parsed = parseStructuredAIOutput(result.text, seoMetaResponseSchema, 'content-post-seo-meta');
-    if (parsed.seoTitle && parsed.seoMetaDescription) return parsed;
+    if (parsed.seoTitle && parsed.seoMetaDescription) {
+      options.onExecution?.({
+        execution: result.execution,
+        inputFingerprint: fingerprintRenderedAIInput(renderAIProviderInput({
+          provider: result.execution.provider,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: prompt }],
+          researchMode: false,
+        })),
+      });
+      return parsed;
+    }
     return null;
   } catch (err) {
     log.warn({ err: err }, 'SEO meta generation failed');
@@ -819,6 +871,8 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
     json: true,
     researchMode: true,
     signal: options.signal,
+    executionChainId: options.executionChainId,
+    onExecution: options.onExecution,
   });
 
   try {
@@ -848,6 +902,7 @@ export async function scoreVoiceMatch(
   post: GeneratedPost,
   brief: ContentBrief,
   workspaceId: string,
+  options: ContentAIGenerationOptions = {},
 ): Promise<{ voiceScore: number | null; voiceFeedback: string }> {
   const voiceCtx = await buildVoiceContext(workspaceId);
 
@@ -902,6 +957,8 @@ Return ONLY valid JSON in this exact format:
     maxTokens: 500,
     temperature: 0.3,
     workspaceId,
+    executionChainId: options.executionChainId,
+    signal: options.signal,
   });
 
   try {
@@ -910,6 +967,15 @@ Return ONLY valid JSON in this exact format:
     const feedback = typeof parsed.voiceFeedback === 'string' && parsed.voiceFeedback.trim()
       ? parsed.voiceFeedback
       : 'No feedback provided.';
+    options.onExecution?.({
+      execution: result.execution,
+      inputFingerprint: fingerprintRenderedAIInput(renderAIProviderInput({
+        provider: result.execution.provider,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: prompt }],
+        researchMode: false,
+      })),
+    });
     log.info(`Voice score for post ${post.id}: ${score}/100`);
     return { voiceScore: score, voiceFeedback: feedback };
   } catch (err) {

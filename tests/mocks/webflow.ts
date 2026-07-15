@@ -27,7 +27,7 @@ type EndpointMatcher = string | RegExp;
 
 interface MockRule {
   matcher: EndpointMatcher;
-  handler: (endpoint: string) => Response | Promise<never>;
+  handler: (endpoint: string) => Response | Promise<Response>;
 }
 
 // ---------------------------------------------------------------------------
@@ -219,6 +219,38 @@ export function mockWebflowTimeout(endpoint: EndpointMatcher): void {
       // Intentionally never resolves to simulate a network timeout.
     }),
   });
+}
+
+/** Hold one matching Webflow response until a concurrency test releases it. */
+export function mockWebflowDeferred(
+  endpoint: EndpointMatcher,
+  data: unknown = {},
+): {
+  entered: Promise<void>;
+  release: () => void;
+} {
+  let markEntered: (() => void) | undefined;
+  let releaseResponse: ((response: Response) => void) | undefined;
+  const entered = new Promise<void>(resolve => { markEntered = resolve; });
+  const pending = new Promise<Response>(resolve => { releaseResponse = resolve; });
+  let enteredOnce = false;
+  mockState.rules.push({
+    matcher: endpoint,
+    handler: () => {
+      if (!enteredOnce) {
+        enteredOnce = true;
+        markEntered?.();
+      }
+      return pending;
+    },
+  });
+  return {
+    entered,
+    release: () => releaseResponse?.(new Response(JSON.stringify(data), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })),
+  };
 }
 
 // ---------------------------------------------------------------------------

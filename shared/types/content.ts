@@ -1,5 +1,6 @@
 // ── Content domain types ────────────────────────────────────────
 
+import type { GenerationProvenance, GenerationTrackedArtifact } from './ai-execution.js';
 import type { OutcomeReadback } from './outcome-tracking.js';
 
 export const CONTENT_GENERATION_STYLES = ['standard', 'concise', 'hybrid'] as const;
@@ -69,7 +70,14 @@ export interface ContentBrief {
   sourceEvidence?: BriefSourceEvidence;
   // W2.5 lineage: set to the new brief's id when this brief is superseded by a regeneration
   supersededBy?: string;
+  /** Internal concurrency token. Public/client serializers must omit this field. */
+  generationRevision?: number;
+  /** Internal generation attribution. Public/client serializers must omit this field. */
+  generationProvenance?: GenerationProvenance | null;
 }
+
+/** Internal persisted brief shape returned by server storage adapters. */
+export type PersistedContentBrief = ContentBrief & GenerationTrackedArtifact;
 
 export interface BriefTemplateCrossrefSection {
   id: string;
@@ -263,8 +271,28 @@ export interface PostSummary {
   totalWordCount: number;
   status: string;
   generationStyle?: ContentGenerationStyle;
+  /** Internal concurrency token used by admin mutation preconditions. */
+  generationRevision?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Server-authored calendar proposal. `generationRevision` is the exact post
+ * authority observed while the proposal was assembled and must be used
+ * verbatim when applying it; clients must not reconstruct it from cache.
+ */
+export interface ContentCalendarDateSuggestion {
+  draftId: string;
+  suggestedDate: string;
+  reason: string;
+  title: string;
+  generationRevision: number;
+}
+
+export interface ContentCalendarDateSuggestionsResponse {
+  suggestions: ContentCalendarDateSuggestion[];
+  unscheduledCount: number;
 }
 
 export interface GeneratedPost {
@@ -315,9 +343,30 @@ export interface GeneratedPost {
    * read-side decoration. Positions are honest (lower=better); trust `direction`.
    */
   outcome?: OutcomeReadback;
+  /** Internal concurrency token. Public/client serializers must omit this field. */
+  generationRevision?: number;
+  /** Internal generation attribution. Public/client serializers must omit this field. */
+  generationProvenance?: GenerationProvenance | null;
   createdAt: string;
   updatedAt: string;
 }
+
+/**
+ * Client-review projection. Internal diagnostics, scheduling intent, and
+ * generation authority never cross the public API boundary. `updatedAt` is the
+ * existing opaque precondition token used by public mutations.
+ */
+export type PublicContentPost = Omit<
+  GeneratedPost,
+  | 'aiReview'
+  | 'generationDiagnostics'
+  | 'generationRevision'
+  | 'generationProvenance'
+  | 'plannedPublishAt'
+>;
+
+/** Internal persisted post shape returned by server storage adapters. */
+export type PersistedGeneratedPost = GeneratedPost & GenerationTrackedArtifact;
 
 export interface ContentRequestComment {
   id: string;
@@ -361,6 +410,32 @@ export interface ContentTopicRequest {
   comments?: ContentRequestComment[];
   requestedAt: string;
   updatedAt: string;
+}
+
+/**
+ * Client-safe content-request contract shared by public reads and mutations.
+ * Workspace identity, operator notes/reasoning, targeting internals, and
+ * recommendation context are intentionally absent from this boundary.
+ */
+export interface PublicContentTopicRequest {
+  id: string;
+  topic: string;
+  targetKeyword: string;
+  intent: string;
+  priority: string;
+  status: ContentTopicRequest['status'];
+  source?: ContentTopicRequest['source'];
+  serviceType: NonNullable<ContentTopicRequest['serviceType']>;
+  pageType: NonNullable<ContentTopicRequest['pageType']>;
+  upgradedAt?: string;
+  comments: ContentRequestComment[];
+  requestedAt: string;
+  updatedAt: string;
+  deliveryUrl?: string;
+  deliveryNotes?: string;
+  briefId?: string;
+  postId?: string;
+  clientFeedback?: string;
 }
 
 export interface ContentPerformanceGscMetrics {
@@ -770,6 +845,14 @@ export interface AiFixResult {
   originalText: string;
   suggestedText: string;
   explanation: string;
+}
+
+/** Durable background-job result used as the authority for explicit AI-fix adoption. */
+export interface AiFixJobResult extends AiFixResult {
+  /** Exact post revision the worker read when it produced this suggestion. */
+  sourceRevision: number;
+  /** Accepted worker execution persisted only when this stored suggestion is adopted. */
+  provenance: GenerationProvenance;
 }
 
 export const AI_FEEDBACK_TARGETS = ['section', 'post', 'meta'] as const;

@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __resetHandleStoreForTests,
   consumeHandle,
+  consumeHandleAtomically,
   HandleExpiredError,
   HandleKindMismatchError,
   HandleNotFoundError,
   HandleWorkspaceMismatchError,
   issueHandle,
+  readHandleForAtomicConsumption,
 } from '../../server/mcp/handles.js';
 
 beforeEach(() => {
@@ -43,5 +45,53 @@ describe('mcp handle lifecycle', () => {
 
     expect(() => consumeHandle(id, 'post', 'ws_1')).toThrow(HandleExpiredError);
     expect(() => consumeHandle(id, 'post', 'ws_1')).toThrow(HandleNotFoundError);
+  });
+
+  it('expires a handle exactly at its TTL boundary', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-25T00:00:00.000Z'));
+
+    const id = issueHandle('post', 'ws_1', { postId: 'p1' }, { ttlMs: 1000 });
+    vi.advanceTimersByTime(1000);
+
+    expect(() => readHandleForAtomicConsumption(id, 'post', 'ws_1'))
+      .toThrow(HandleExpiredError);
+    expect(() => consumeHandle(id, 'post', 'ws_1')).toThrow(HandleNotFoundError);
+  });
+
+  it('rolls the consume back when the authorized durable mutation fails', () => {
+    const id = issueHandle('post-request', 'ws_1', { postId: 'p1' });
+
+    expect(() => consumeHandleAtomically(
+      id,
+      'post-request',
+      'ws_1',
+      () => {
+        throw new Error('durable commit failed');
+      },
+    )).toThrow('durable commit failed');
+
+    expect(consumeHandleAtomically<{ postId: string }, string>(
+      id,
+      'post-request',
+      'ws_1',
+      payload => payload.postId,
+    )).toBe('p1');
+    expect(() => consumeHandle(id, 'post-request', 'ws_1')).toThrow(HandleNotFoundError);
+  });
+
+  it('reads authority without consuming it so the domain transaction can commit it later', () => {
+    const id = issueHandle('brief', 'ws_1', { briefId: 'brief_1', generationRevision: 4 });
+
+    expect(readHandleForAtomicConsumption(id, 'brief', 'ws_1')).toEqual({
+      briefId: 'brief_1',
+      generationRevision: 4,
+    });
+    expect(consumeHandle(id, 'brief', 'ws_1')).toEqual({
+      briefId: 'brief_1',
+      generationRevision: 4,
+    });
+    expect(() => readHandleForAtomicConsumption(id, 'brief', 'ws_1'))
+      .toThrow(HandleNotFoundError);
   });
 });

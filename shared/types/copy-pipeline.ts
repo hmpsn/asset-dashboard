@@ -1,6 +1,8 @@
 // shared/types/copy-pipeline.ts
 // Full Copy Pipeline shared types (Phase 3)
 
+import type { GenerationProvenance, GenerationTrackedArtifact } from './ai-execution.js';
+
 // ── Status types ──
 
 export type CopySectionStatus =
@@ -64,9 +66,16 @@ export interface CopySection {
   clientSuggestions: ClientSuggestion[] | null;
   qualityFlags: QualityFlag[] | null;
   version: number;
+  /** Internal concurrency token, distinct from the review-attempt version. */
+  generationRevision?: number;
+  /** Internal generation attribution. Public/client projections must omit this field. */
+  generationProvenance?: GenerationProvenance | null;
   createdAt: string;
   updatedAt: string;
 }
+
+/** Internal persisted copy-section shape returned by server storage adapters. */
+export type PersistedCopySection = CopySection & GenerationTrackedArtifact;
 
 export interface CopyMetadata {
   id: string;

@@ -238,10 +238,11 @@ function configurePublishTarget(workspaceId: string): void {
 }
 
 async function publishPost(workspaceId: string, postId: string): Promise<Response> {
+  const post = getPost(workspaceId, postId);
   return fetch(`${baseUrl}/api/content-posts/${workspaceId}/${postId}/publish-to-webflow`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
+    body: JSON.stringify({ expectedRevision: post?.generationRevision ?? 0 }),
   });
 }
 

@@ -1,6 +1,7 @@
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
-import { generateBrief, updateBrief } from './content-brief.js';
+import { generateBrief, getBrief, persistGeneratedBrief } from './content-brief.js';
+import db from './db/index.js';
 import { collectBriefEnrichment, deriveStylePageUrls } from './content-brief-scrape-enrichment.js';
 import type { BriefScrapeEnrichment } from './content-brief-scrape-enrichment.js';
 import { resolveBriefTemplateCrossref, toBriefPageType } from './content-brief-template-crossref.js';
@@ -12,7 +13,7 @@ import { getGA4LandingPages } from './google-analytics.js';
 import { normalizePageUrl } from './utils/page-address.js';
 import { sanitizeQueryForPrompt } from './utils/text.js';
 import { invalidateContentPipelineIntelligence } from './intelligence-freshness.js';
-import { createJob, updateJob } from './jobs.js';
+import { createResourceScopedJob, getJob, runResourceScopedJobWorker, updateJob } from './jobs.js';
 import { createLogger } from './logger.js';
 import { resolveWorkspaceLocationCode } from './local-seo.js';
 import { recordAction } from './outcome-tracking.js';
@@ -22,8 +23,21 @@ import type { KeywordMetrics, RelatedKeyword } from './seo-data-provider.js';
 import { getWorkspace } from './workspaces.js';
 import { getSearchOverview } from './search-console.js';
 import { WS_EVENTS } from './ws-events.js';
-import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
-import type { BriefJourneyStage, BriefSourceEvidence, ContentBrief, ContentGenerationStyle, StrategyCardContext } from '../shared/types/content.js';
+import { BACKGROUND_JOB_TYPES, JOB_RESOURCE_TYPES } from '../shared/types/background-jobs.js';
+import type {
+  BriefJourneyStage,
+  BriefSourceEvidence,
+  ContentBrief,
+  ContentGenerationStyle,
+  ContentTopicRequest,
+  StrategyCardContext,
+} from '../shared/types/content.js';
+import { canonicalGenerationFingerprint } from './generation-provenance.js';
+import {
+  CONTENT_REQUEST_TRANSITIONS,
+  InvalidTransitionError,
+  validateTransition,
+} from './state-machines.js';
 
 const log = createLogger('content-brief-generation-job');
 
@@ -60,6 +74,8 @@ export interface RequestContentBriefGenerationParams {
   workspaceId: string;
   requestId: string;
   generationStyle?: ContentGenerationStyle;
+  /** Durable request authority token observed by the caller. */
+  expectedRequestUpdatedAt?: string;
 }
 
 export type ContentBriefGenerationParams =
@@ -70,9 +86,97 @@ export interface StartedContentBriefGenerationJob {
   jobId: string;
 }
 
-function notifyContentUpdated(workspaceId: string, payload: Record<string, unknown>) {
-  invalidateContentPipelineIntelligence(workspaceId);
-  broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-briefs', ...payload });
+export class ContentRequestGenerationConflictError extends Error {
+  readonly code = 'content_request_generation_conflict';
+  readonly requestId: string;
+  readonly expectedRequestUpdatedAt: string;
+
+  constructor(
+    requestId: string,
+    expectedRequestUpdatedAt: string,
+  ) {
+    super('The content request changed while brief generation was running');
+    this.name = 'ContentRequestGenerationConflictError';
+    this.requestId = requestId;
+    this.expectedRequestUpdatedAt = expectedRequestUpdatedAt;
+  }
+}
+
+export class ContentRequestGenerationLifecycleError extends Error {
+  readonly code = 'content_request_generation_lifecycle_invalid';
+  readonly requestId: string;
+  readonly status: ContentTopicRequest['status'];
+
+  constructor(requestId: string, status: ContentTopicRequest['status']) {
+    super(`Content request '${requestId}' cannot generate a brief from status '${status}'`);
+    this.name = 'ContentRequestGenerationLifecycleError';
+    this.requestId = requestId;
+    this.status = status;
+  }
+}
+
+function assertRequestBriefGenerationLifecycle(request: ContentTopicRequest): void {
+  // Recover a partially-linked request whose lifecycle advanced but whose brief
+  // reference did not persist. An already-linked request must use the brief
+  // regeneration path instead of creating and adopting a second artifact.
+  if (request.status === 'brief_generated' && !request.briefId) return;
+  try {
+    validateTransition(
+      'content_request',
+      CONTENT_REQUEST_TRANSITIONS,
+      request.status,
+      'brief_generated',
+    );
+  } catch (err) {
+    if (err instanceof InvalidTransitionError) {
+      throw new ContentRequestGenerationLifecycleError(request.id, request.status);
+    }
+    throw err;
+  }
+}
+
+function assertRequestAuthority(
+  workspaceId: string,
+  requestId: string,
+  expectedRequestUpdatedAt: string,
+) {
+  const current = getContentRequest(workspaceId, requestId);
+  if (!current || current.updatedAt !== expectedRequestUpdatedAt) {
+    throw new ContentRequestGenerationConflictError(requestId, expectedRequestUpdatedAt);
+  }
+  return current;
+}
+
+function runBriefPostCommitEffect(
+  workspaceId: string,
+  briefId: string,
+  effect: string,
+  run: () => void,
+): void {
+  try {
+    run();
+  } catch (err) {
+    log.warn(
+      { err, workspaceId, briefId, effect },
+      'content brief generation post-commit effect failed',
+    );
+  }
+}
+
+function notifyContentUpdated(
+  workspaceId: string,
+  briefId: string,
+  payload: Record<string, unknown>,
+): void {
+  runBriefPostCommitEffect(workspaceId, briefId, 'intelligence-cache', () => {
+    invalidateContentPipelineIntelligence(workspaceId);
+  });
+  runBriefPostCommitEffect(workspaceId, briefId, 'content-updated-broadcast', () => {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, {
+      domain: 'content-briefs',
+      ...payload,
+    });
+  });
 }
 
 /**
@@ -96,23 +200,6 @@ function buildBriefSourceEvidence(enrichment: BriefScrapeEnrichment): BriefSourc
   };
 }
 
-/**
- * Persist the scraped source text on the freshly generated brief row.
- * Runs before the brief_generated broadcast in both job paths so the existing
- * CONTENT_UPDATED event covers the write. Returns the updated brief when
- * evidence was attached, otherwise the original.
- */
-function persistBriefSourceEvidence(
-  workspaceId: string,
-  brief: ContentBrief,
-  enrichment: BriefScrapeEnrichment,
-): ContentBrief {
-  const sourceEvidence = buildBriefSourceEvidence(enrichment);
-  if (!sourceEvidence) return brief;
-  const updated = updateBrief(workspaceId, brief.id, { sourceEvidence });
-  return updated ?? brief;
-}
-
 function deriveJourneyStage(intent?: string): BriefJourneyStage | undefined {
   if (!intent) return undefined;
   const lower = intent.toLowerCase();
@@ -122,7 +209,12 @@ function deriveJourneyStage(intent?: string): BriefJourneyStage | undefined {
   return undefined;
 }
 
-async function generateStandaloneBrief(params: StandaloneContentBriefGenerationParams): Promise<ContentBrief> {
+async function generateStandaloneBrief(
+  params: StandaloneContentBriefGenerationParams,
+  executionChainId: string,
+  signal: AbortSignal,
+): Promise<ContentBrief> {
+  signal.throwIfAborted();
   // Page resolution is slug-only by design. `params.targetPageId` (a Webflow page ID)
   // is threaded through from the route but NOT consumed here: the decay-context lookup
   // below matches against `decay.decayingPages[].page`, which is a normalized URL/slug,
@@ -218,7 +310,8 @@ async function generateStandaloneBrief(params: StandaloneContentBriefGenerationP
     }
   }
 
-  let brief = await generateBrief(workspaceId, targetKeyword, {
+  const sourceEvidence = buildBriefSourceEvidence({ scrapedRefs, serpData, stylePages });
+  const brief = await generateBrief(workspaceId, targetKeyword, {
     relatedQueries,
     businessContext: businessContext || ws.keywordStrategy?.businessContext,
     existingPages,
@@ -246,51 +339,31 @@ async function generateStandaloneBrief(params: StandaloneContentBriefGenerationP
     styleExamples: stylePages.length > 0 ? stylePages : undefined,
     pageAnalysisContext,
     decayQueryContext: standaloneDecayQueryContext,
+    sourceEvidence: sourceEvidence ?? undefined,
+  }, {
+    executionChainId,
+    signal,
   });
 
-  // C4: persist the scraped source text (bodyText, SERP snippets, fetch timestamps)
-  // before the brief_generated broadcast below covers the write.
-  brief = persistBriefSourceEvidence(workspaceId, brief, { scrapedRefs, serpData, stylePages });
-
-  try {
-    recordAction({ // recordAction-ok — workspaceId is validated before job creation
-      workspaceId,
-      actionType: 'brief_created',
-      sourceType: 'brief',
-      sourceId: brief.id,
-      pageUrl: null,
-      targetKeyword,
-      baselineSnapshot: {
-        captured_at: new Date().toISOString(),
-      },
-      attribution: 'platform_executed',
-      // R6 (B11): the brief's suggested title is its identity — snapshot it so the win
-      // title survives brief edits/regeneration. Guarded on a real title (FM-2).
-      ...(brief.suggestedTitle?.trim()
-        ? { source: { label: brief.suggestedTitle.trim(), snapshot: { title: brief.suggestedTitle.trim(), type: 'brief' } } }
-        : {}),
-    });
-  } catch (err) {
-    log.warn({ err, keyword: targetKeyword }, 'Failed to record outcome action for brief creation');
-  }
-
-  addActivity(
-    workspaceId,
-    'brief_generated',
-    `Generated content brief for "${brief.targetKeyword}"`,
-    brief.suggestedTitle,
-    { briefId: brief.id, action: 'brief_generated' },
-  );
-  notifyContentUpdated(workspaceId, { briefId: brief.id, action: 'brief_generated' });
   return brief;
 }
 
-async function generateBriefForRequest(params: RequestContentBriefGenerationParams): Promise<ContentBrief> {
+async function generateBriefForRequest(
+  params: RequestContentBriefGenerationParams,
+  executionChainId: string,
+  signal: AbortSignal,
+): Promise<ContentBrief> {
+  signal.throwIfAborted();
   const { workspaceId, requestId, generationStyle } = params;
   const ws = getWorkspace(workspaceId);
   if (!ws) throw new Error('Workspace not found');
   const request = getContentRequest(workspaceId, requestId);
   if (!request) throw new Error('Request not found');
+  const expectedRequestUpdatedAt = params.expectedRequestUpdatedAt ?? request.updatedAt;
+  if (request.updatedAt !== expectedRequestUpdatedAt) {
+    throw new ContentRequestGenerationConflictError(requestId, expectedRequestUpdatedAt);
+  }
+  assertRequestBriefGenerationLifecycle(request);
 
   let relatedQueries: { query: string; position: number; clicks: number; impressions: number }[] = [];
   let cachedGscRows: Awaited<ReturnType<typeof getQueryPageData>> | null = null;
@@ -378,7 +451,8 @@ async function generateBriefForRequest(params: RequestContentBriefGenerationPara
     }
   }
 
-  let brief = await generateBrief(workspaceId, request.targetKeyword, {
+  const sourceEvidence = buildBriefSourceEvidence(requestEnrichment);
+  const brief = await generateBrief(workspaceId, request.targetKeyword, {
     relatedQueries,
     businessContext: ws.keywordStrategy?.businessContext || '',
     existingPages,
@@ -393,81 +467,240 @@ async function generateBriefForRequest(params: RequestContentBriefGenerationPara
     scrapedReferences: scrapedRefs.length > 0 ? scrapedRefs : undefined,
     serpData: serpData ? { peopleAlsoAsk: serpData.peopleAlsoAsk, organicResults: serpData.organicResults } : undefined,
     styleExamples: stylePages.length > 0 ? stylePages : undefined,
+    sourceEvidence: sourceEvidence ?? undefined,
+  }, {
+    executionChainId,
+    persist: false,
+    signal,
   });
 
-  // C4: persist scraped source text before the broadcasts below cover the write.
-  brief = persistBriefSourceEvidence(workspaceId, brief, requestEnrichment);
+  const persistedBrief = db.transaction(() => {
+    signal.throwIfAborted();
+    const currentRequest = assertRequestAuthority(workspaceId, requestId, expectedRequestUpdatedAt);
+    assertRequestBriefGenerationLifecycle(currentRequest);
+    persistGeneratedBrief(workspaceId, brief);
+    const updatedRequest = updateContentRequest(workspaceId, requestId, {
+      status: 'brief_generated',
+      briefId: brief.id,
+    });
+    if (!updatedRequest) throw new Error('Request not found');
+    const saved = getBrief(workspaceId, brief.id);
+    if (!saved) throw new Error('Generated content brief did not persist');
+    return saved;
+  }).immediate();
 
-  updateContentRequest(workspaceId, requestId, {
-    status: 'brief_generated',
+  return persistedBrief;
+}
+
+function emitStandaloneBriefPostCommitEffects(
+  workspaceId: string,
+  brief: ContentBrief,
+): void {
+  runBriefPostCommitEffect(workspaceId, brief.id, 'outcome-action', () => {
+    recordAction({ // recordAction-ok — workspaceId is validated before job creation
+      workspaceId,
+      actionType: 'brief_created',
+      sourceType: 'brief',
+      sourceId: brief.id,
+      pageUrl: null,
+      targetKeyword: brief.targetKeyword,
+      baselineSnapshot: {
+        captured_at: new Date().toISOString(),
+      },
+      attribution: 'platform_executed',
+      // R6 (B11): snapshot the generated brief's durable display identity.
+      ...(brief.suggestedTitle?.trim()
+        ? { source: { label: brief.suggestedTitle.trim(), snapshot: { title: brief.suggestedTitle.trim(), type: 'brief' } } }
+        : {}),
+    });
+  });
+  runBriefPostCommitEffect(workspaceId, brief.id, 'activity', () => {
+    addActivity(
+      workspaceId,
+      'brief_generated',
+      `Generated content brief for "${brief.targetKeyword}"`,
+      brief.suggestedTitle,
+      { briefId: brief.id, action: 'brief_generated' },
+    );
+  });
+  notifyContentUpdated(workspaceId, brief.id, {
     briefId: brief.id,
+    action: 'brief_generated',
   });
+}
 
-  try {
+function emitRequestBriefPostCommitEffects(
+  workspaceId: string,
+  requestId: string,
+  brief: ContentBrief,
+): void {
+  runBriefPostCommitEffect(workspaceId, brief.id, 'outcome-action', () => {
     recordAction({ // recordAction-ok — workspaceId is validated before job creation
       workspaceId,
       actionType: 'brief_created',
       sourceType: 'content_request',
       sourceId: brief.id,
       pageUrl: null,
-      targetKeyword: request.targetKeyword,
+      targetKeyword: brief.targetKeyword,
       baselineSnapshot: {
         captured_at: new Date().toISOString(),
       },
       attribution: 'platform_executed',
-      // R6 (B11): the brief generated for this request carries the display identity —
-      // snapshot its suggested title. Guarded on a real title (FM-2).
+      // R6 (B11): snapshot the generated brief's durable display identity.
       ...(brief.suggestedTitle?.trim()
         ? { source: { label: brief.suggestedTitle.trim(), snapshot: { title: brief.suggestedTitle.trim(), type: 'content_request' } } }
         : {}),
     });
-  } catch (err) {
-    log.warn({ err, keyword: request.targetKeyword }, 'Failed to record outcome action for request brief creation');
-  }
-
-  broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: request.id, status: 'brief_generated' });
-  addActivity(workspaceId, 'brief_generated', `Content brief generated for "${request.targetKeyword}"`, `Title: ${brief.suggestedTitle}`, { requestId: request.id, briefId: brief.id });
-  notifyContentUpdated(workspaceId, { briefId: brief.id, requestId: request.id, action: 'request_brief_generated' });
-  return brief;
+  });
+  runBriefPostCommitEffect(workspaceId, brief.id, 'request-updated-broadcast', () => {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, {
+      id: requestId,
+      status: 'brief_generated',
+    });
+  });
+  runBriefPostCommitEffect(workspaceId, brief.id, 'activity', () => {
+    addActivity(
+      workspaceId,
+      'brief_generated',
+      `Content brief generated for "${brief.targetKeyword}"`,
+      `Title: ${brief.suggestedTitle}`,
+      { requestId, briefId: brief.id },
+    );
+  });
+  notifyContentUpdated(workspaceId, brief.id, {
+    briefId: brief.id,
+    requestId,
+    action: 'request_brief_generated',
+  });
 }
 
 export async function runContentBriefGenerationJob(jobId: string, params: ContentBriefGenerationParams): Promise<void> {
-  try {
-    updateJob(jobId, { status: 'running', progress: 0, total: 1, message: 'Generating content brief...' });
-    const brief = params.source === 'request'
-      ? await generateBriefForRequest(params)
-      : await generateStandaloneBrief(params);
-    updateJob(jobId, {
-      status: 'done',
-      progress: 1,
-      total: 1,
-      result: {
-        brief,
-        briefId: brief.id,
-        requestId: params.source === 'request' ? params.requestId : undefined,
-      },
-      message: `Brief generated — ${brief.suggestedTitle || brief.targetKeyword}`,
-    });
-  } catch (err) {
-    updateJob(jobId, {
-      status: 'error',
-      error: err instanceof Error ? err.message : String(err),
-      message: 'Content brief generation failed',
-    });
+  await runResourceScopedJobWorker(jobId, async (signal) => {
+    let brief: ContentBrief;
+    try {
+      updateJob(jobId, { status: 'running', progress: 0, total: 1, message: 'Generating content brief...' });
+      brief = params.source === 'request'
+        ? await generateBriefForRequest(params, jobId, signal)
+        : await generateStandaloneBrief(params, jobId, signal);
+    } catch (err) {
+      updateJob(jobId, {
+        status: 'error',
+        error: err instanceof Error ? err.message : String(err),
+        message: 'Content brief generation failed',
+      });
+      return;
+    }
+
+    // The artifact is committed. Record the terminal success before optional
+    // effects, and tolerate only the job-event throw that can happen after
+    // updateJob has already committed `done`.
+    try {
+      updateJob(jobId, {
+        status: 'done',
+        progress: 1,
+        total: 1,
+        result: {
+          brief,
+          briefId: brief.id,
+          requestId: params.source === 'request' ? params.requestId : undefined,
+        },
+        message: `Brief generated — ${brief.suggestedTitle || brief.targetKeyword}`,
+      });
+    } catch (err) {
+      if (getJob(jobId)?.status === 'done') {
+        log.warn(
+          { err, jobId, briefId: brief.id },
+          'content brief job success committed but its job event failed',
+        );
+      } else {
+        const error = err instanceof Error ? err.message : String(err);
+        try {
+          updateJob(jobId, {
+            status: 'error',
+            error,
+            message: 'Brief committed, but completion tracking failed',
+            result: {
+              briefId: brief.id,
+              requestId: params.source === 'request' ? params.requestId : undefined,
+              generationRevision: brief.generationRevision,
+              code: 'completion_tracking_failed',
+              artifactCommitted: true,
+            },
+          });
+        } catch (fallbackErr) {
+          log.error({ err: fallbackErr, jobId, briefId: brief.id }, 'Committed brief completion could not be recorded');
+        }
+        return;
+      }
+    }
+
+    if (params.source === 'request') {
+      emitRequestBriefPostCommitEffects(params.workspaceId, params.requestId, brief);
+    } else {
+      emitStandaloneBriefPostCommitEffects(params.workspaceId, brief);
+    }
+  });
+}
+
+function generationResource(params: ContentBriefGenerationParams) {
+  if (params.source === 'request') {
+    return {
+      resourceType: JOB_RESOURCE_TYPES.CONTENT_REQUEST_BRIEF,
+      resourceId: params.requestId,
+    } as const;
   }
+  return {
+    resourceType: JOB_RESOURCE_TYPES.CONTENT_BRIEF_TARGET,
+    resourceId: canonicalGenerationFingerprint({
+      targetKeyword: params.targetKeyword.trim().replace(/\s+/g, ' ').toLowerCase(),
+      pageType: params.pageType?.trim().toLowerCase(),
+      targetPageId: params.targetPageId?.trim(),
+      targetPageSlug: params.targetPageSlug?.trim(),
+    }),
+  } as const;
 }
 
 export function startContentBriefGenerationJob(params: ContentBriefGenerationParams): StartedContentBriefGenerationJob {
+  const initialRequest = params.source === 'request'
+    ? getContentRequest(params.workspaceId, params.requestId)
+    : undefined;
+  if (params.source === 'request' && !initialRequest) {
+    throw new Error('Request not found');
+  }
   const label = params.source === 'request'
-    ? getContentRequest(params.workspaceId, params.requestId)?.targetKeyword ?? 'client request'
+    ? initialRequest?.targetKeyword ?? 'client request'
     : params.targetKeyword;
-  const job = createJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION, {
+  const expectedRequestUpdatedAt = params.source === 'request'
+    ? params.expectedRequestUpdatedAt
+      ?? initialRequest?.updatedAt
+    : undefined;
+  if (params.source === 'request' && !expectedRequestUpdatedAt) {
+    throw new Error('Request not found');
+  }
+  const { job, accepted } = createResourceScopedJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION, {
     workspaceId: params.workspaceId,
+    resources: [generationResource(params)],
     total: 1,
     message: `Generating brief for ${label}...`,
+    accept: () => {
+      if (params.source === 'request') {
+        const currentRequest = assertRequestAuthority(
+          params.workspaceId,
+          params.requestId,
+          expectedRequestUpdatedAt!,
+        );
+        assertRequestBriefGenerationLifecycle(currentRequest);
+      }
+      return expectedRequestUpdatedAt;
+    },
   });
+  const acceptedParams: ContentBriefGenerationParams = params.source === 'request'
+    ? { ...params, expectedRequestUpdatedAt: accepted }
+    : params;
   setTimeout(() => {
-    void runContentBriefGenerationJob(job.id, params);
+    void runContentBriefGenerationJob(job.id, acceptedParams).catch(err => {
+      log.error({ err, jobId: job.id, workspaceId: params.workspaceId }, 'content brief worker rejected after launch');
+    });
   }, 100);
   return { jobId: job.id };
 }

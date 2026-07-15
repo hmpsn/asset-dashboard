@@ -12,14 +12,17 @@ import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { parseWebflowFieldMapping, type AiWebflowFieldMapping } from '../schemas/ai-content-publish.js';
-import { publishPostToWebflow, PublishPostError } from '../domains/content/publish-post-to-webflow.js';
+import { PublishPostError } from '../domains/content/publish-post-to-webflow.js';
+import { publishPostToWebflowWithClaim } from '../content-publish-job.js';
+import { ActiveJobResourceConflict } from '../jobs.js';
 
 const log = createLogger('content-publish');
 const router = Router();
 
 const publishContentPostSchema = z.object({
+  expectedRevision: z.number().int().nonnegative(),
   generateImage: z.boolean().optional(),
-}).strict().default({});
+}).strict();
 
 const FIELD_MAPPING_KEYS = [
   'title',
@@ -56,10 +59,16 @@ function keepKnownFieldSlugs(
 // publish stays inline (see docs/superpowers/plans/2026-06-10-c3-publish-service.md).
 router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requireWorkspaceAccess('workspaceId'), validate(publishContentPostSchema), async (req, res) => {
   const { workspaceId, postId } = req.params;
-  const { generateImage } = req.body as { generateImage?: boolean };
+  const { generateImage, expectedRevision } = req.body as {
+    generateImage?: boolean;
+    expectedRevision: number;
+  };
 
   try {
-    const result = await publishPostToWebflow(workspaceId, postId, {
+    const { result } = await publishPostToWebflowWithClaim({
+      workspaceId,
+      postId,
+      expectedRevision,
       generateImage,
       activitySource: 'manual',
     });
@@ -71,8 +80,19 @@ router.post('/api/content-posts/:workspaceId/:postId/publish-to-webflow', requir
       post: result.post,
     });
   } catch (err) {
+    if (err instanceof ActiveJobResourceConflict) {
+      return res.status(409).json({
+        error: 'A publish or generation job is already active for this post',
+        code: err.code,
+        jobId: err.jobId,
+      });
+    }
     if (err instanceof PublishPostError) {
-      return res.status(err.httpStatus).json({ error: err.message });
+      return res.status(err.httpStatus).json({
+        error: err.message,
+        code: err.code,
+        ...(err.reconciliation ? { reconciliation: err.reconciliation } : {}),
+      });
     }
     log.error({ err }, 'Publish to Webflow failed');
     res.status(500).json({ error: err instanceof Error ? err.message : 'Publish failed' });

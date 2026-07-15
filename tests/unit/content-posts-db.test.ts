@@ -19,12 +19,28 @@ import {
   getPublishedPostPagePathCensus,
   listPublishedPostPagePaths,
   updatePostField,
+  updatePostFieldWithSnapshot,
+  deletePostAtRevision,
   snapshotPostVersion,
   listPostVersions,
   revertToVersion,
 } from '../../server/content-posts-db.js';
 import type { GeneratedPost } from '../../shared/types/content.ts';
+import type { GenerationProvenance } from '../../shared/types/ai-execution.ts';
 import { InvalidTransitionError } from '../../server/state-machines.js';
+import { GenerationRevisionConflictError } from '../../server/generation-provenance.js';
+import {
+  ActiveJobResourceConflict,
+  createResourceScopedJob,
+  updateJob,
+} from '../../server/jobs.js';
+import { BACKGROUND_JOB_TYPES, JOB_RESOURCE_TYPES } from '../../shared/types/background-jobs.js';
+import {
+  getUnresolvedContentPublishReconciliationForPost,
+  recordContentPublishReconciliation,
+  resolveContentPublishReconciliation,
+  UnresolvedContentPublishReconciliationError,
+} from '../../server/content-publish-reconciliation.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -60,6 +76,18 @@ function makePost(
     voiceFeedback: undefined,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+  };
+}
+
+function makeGenerationProvenance(runId: string): GenerationProvenance {
+  return {
+    runId,
+    operation: 'content-post-section',
+    provider: 'openai',
+    model: 'test-model',
+    inputFingerprint: 'a'.repeat(64),
+    startedAt: '2026-07-14T00:00:00.000Z',
+    completedAt: '2026-07-14T00:00:01.000Z',
   };
 }
 
@@ -580,9 +608,58 @@ describe('updatePostField', () => {
 
   it('updatedAt is bumped after update', () => {
     const before = getPost(ws.workspaceId, postId)!.updatedAt;
-    // Small delay to ensure timestamp differs
     const result = updatePostField(ws.workspaceId, postId, { title: 'Changed' });
-    expect(result!.updatedAt >= before).toBe(true);
+    expect(result!.updatedAt > before).toBe(true);
+  });
+
+  it('increments generationRevision exactly once for a changed write', () => {
+    const before = getPost(ws.workspaceId, postId)!;
+    const result = updatePostField(
+      ws.workspaceId,
+      postId,
+      { title: 'Changed once' },
+      before.generationRevision,
+    )!;
+    expect(result.generationRevision).toBe(before.generationRevision + 1);
+  });
+
+  it('returns the same revision and timestamp for primitive and deep no-op writes', () => {
+    const before = getPost(ws.workspaceId, postId)!;
+    const primitiveNoOp = updatePostField(
+      ws.workspaceId,
+      postId,
+      { title: before.title },
+      before.generationRevision,
+    )!;
+    const deepNoOp = updatePostField(
+      ws.workspaceId,
+      postId,
+      { sections: before.sections.map(section => ({ ...section })) },
+      before.generationRevision,
+    )!;
+    expect(primitiveNoOp.generationRevision).toBe(before.generationRevision);
+    expect(deepNoOp.generationRevision).toBe(before.generationRevision);
+    expect(deepNoOp.updatedAt).toBe(before.updatedAt);
+  });
+
+  it('rejects a stale expected revision without changing the winner', () => {
+    const source = getPost(ws.workspaceId, postId)!;
+    const winner = updatePostField(
+      ws.workspaceId,
+      postId,
+      { title: 'Winning edit' },
+      source.generationRevision,
+    )!;
+    expect(() => updatePostField(
+      ws.workspaceId,
+      postId,
+      { title: 'Stale edit' },
+      source.generationRevision,
+    )).toThrow(GenerationRevisionConflictError);
+    expect(getPost(ws.workspaceId, postId)).toMatchObject({
+      title: 'Winning edit',
+      generationRevision: winner.generationRevision,
+    });
   });
 
   it('review→draft is valid (send back for edits)', () => {
@@ -653,6 +730,18 @@ describe('snapshotPostVersion', () => {
     expect(version.workspaceId).toBe(ws.workspaceId);
   });
 
+  it('round-trips the exact nullable generation provenance with the snapshot', () => {
+    const postId = randomUUID();
+    const post = makePost(postId, ws.workspaceId, null, 'draft');
+    post.generationProvenance = makeGenerationProvenance('snapshot-provenance');
+    const persisted = savePost(ws.workspaceId, post);
+
+    const version = snapshotPostVersion(persisted, 'manual_edit', 'provenance');
+    expect(version.generationProvenance).toEqual(post.generationProvenance);
+    expect(listPostVersions(ws.workspaceId, postId)[0].generationProvenance)
+      .toEqual(post.generationProvenance);
+  });
+
   it('trigger and triggerDetail are stored correctly', () => {
     const postId = randomUUID();
     const post = makePost(postId, ws.workspaceId, null, 'draft');
@@ -696,6 +785,184 @@ describe('snapshotPostVersion', () => {
     expect(versions).toHaveLength(3);
     expect(versions[0].versionNumber).toBe(3);
     expect(versions[2].versionNumber).toBe(1);
+  });
+});
+
+describe('revision-aware snapshot and delete mutations', () => {
+  let ws: SeededFullWorkspace;
+
+  beforeAll(() => {
+    ws = seedWorkspace();
+  });
+  afterAll(() => {
+    ws?.cleanup();
+  });
+
+  it('creates a snapshot only when the field CAS adopts a real change', () => {
+    const postId = randomUUID();
+    savePost(ws.workspaceId, makePost(postId, ws.workspaceId, null, 'draft'));
+    const source = getPost(ws.workspaceId, postId)!;
+
+    const noOp = updatePostFieldWithSnapshot(
+      ws.workspaceId,
+      postId,
+      { title: source.title },
+      source.generationRevision,
+      { trigger: 'manual_edit', triggerDetail: 'no-op' },
+    )!;
+    expect(noOp.generationRevision).toBe(source.generationRevision);
+    expect(listPostVersions(ws.workspaceId, postId)).toHaveLength(0);
+
+    const updated = updatePostFieldWithSnapshot(
+      ws.workspaceId,
+      postId,
+      { title: 'Atomic winner' },
+      source.generationRevision,
+      { trigger: 'manual_edit', triggerDetail: 'client_edit' },
+    )!;
+    expect(updated.generationRevision).toBe(source.generationRevision + 1);
+    expect(listPostVersions(ws.workspaceId, postId)).toMatchObject([
+      { title: source.title, triggerDetail: 'client_edit' },
+    ]);
+  });
+
+  it('rolls back snapshot creation when the expected revision is stale', () => {
+    const postId = randomUUID();
+    savePost(ws.workspaceId, makePost(postId, ws.workspaceId, null, 'draft'));
+    const source = getPost(ws.workspaceId, postId)!;
+    updatePostField(ws.workspaceId, postId, { title: 'Winning edit' }, source.generationRevision);
+
+    expect(() => updatePostFieldWithSnapshot(
+      ws.workspaceId,
+      postId,
+      { title: 'Stale edit' },
+      source.generationRevision,
+      { trigger: 'manual_edit', triggerDetail: 'stale' },
+    )).toThrow(GenerationRevisionConflictError);
+    expect(listPostVersions(ws.workspaceId, postId)).toHaveLength(0);
+    expect(getPost(ws.workspaceId, postId)?.title).toBe('Winning edit');
+  });
+
+  it('deletes the post and its versions atomically only at the winning revision', () => {
+    const postId = randomUUID();
+    const post = makePost(postId, ws.workspaceId, null, 'draft');
+    savePost(ws.workspaceId, post);
+    snapshotPostVersion(post, 'manual_edit', 'before-delete');
+    const source = getPost(ws.workspaceId, postId)!;
+    const winner = updatePostField(
+      ws.workspaceId,
+      postId,
+      { title: 'Latest' },
+      source.generationRevision,
+    )!;
+
+    expect(() => deletePostAtRevision(
+      ws.workspaceId,
+      postId,
+      source.generationRevision,
+    )).toThrow(GenerationRevisionConflictError);
+    expect(getPost(ws.workspaceId, postId)?.title).toBe('Latest');
+    expect(listPostVersions(ws.workspaceId, postId)).toHaveLength(1);
+
+    expect(deletePostAtRevision(ws.workspaceId, postId, winner.generationRevision)).toBe(true);
+    expect(getPost(ws.workspaceId, postId)).toBeUndefined();
+    expect(listPostVersions(ws.workspaceId, postId)).toHaveLength(0);
+  });
+
+  it('rejects deletion atomically while external publish reconciliation is unresolved', () => {
+    const postId = randomUUID();
+    const post = savePost(
+      ws.workspaceId,
+      makePost(postId, ws.workspaceId, null, 'draft'),
+    );
+    snapshotPostVersion(post, 'manual_edit', 'before-blocked-delete');
+    const reconciliation = recordContentPublishReconciliation({
+      workspaceId: ws.workspaceId,
+      postId,
+      collectionId: 'collection-unresolved-delete',
+      itemId: 'item-unresolved-delete',
+      externalState: 'published',
+      sourceGenerationRevision: post.generationRevision,
+    });
+
+    expect(() => deletePostAtRevision(
+      ws.workspaceId,
+      postId,
+      post.generationRevision,
+    )).toThrow(UnresolvedContentPublishReconciliationError);
+
+    expect(getPost(ws.workspaceId, postId)).toBeDefined();
+    expect(listPostVersions(ws.workspaceId, postId)).toHaveLength(1);
+    expect(getUnresolvedContentPublishReconciliationForPost(ws.workspaceId, postId))
+      .toMatchObject({ id: reconciliation.id, itemId: 'item-unresolved-delete' });
+  });
+
+  it('rejects deletion while a resource-scoped post job is still active', () => {
+    const postId = randomUUID();
+    const post = savePost(
+      ws.workspaceId,
+      makePost(postId, ws.workspaceId, null, 'draft'),
+    );
+    const owner = createResourceScopedJob(BACKGROUND_JOB_TYPES.CONTENT_PUBLISH, {
+      workspaceId: ws.workspaceId,
+      resources: [{ resourceType: JOB_RESOURCE_TYPES.CONTENT_POST, resourceId: postId }],
+    });
+
+    expect(() => deletePostAtRevision(
+      ws.workspaceId,
+      postId,
+      post.generationRevision,
+    )).toThrow(ActiveJobResourceConflict);
+    expect(getPost(ws.workspaceId, postId)).toBeDefined();
+
+    updateJob(owner.job.id, { status: 'error', error: 'test owner drained' });
+    expect(deletePostAtRevision(
+      ws.workspaceId,
+      postId,
+      post.generationRevision,
+    )).toBe(true);
+  });
+
+  it('preserves stale-revision precedence and permits deletion after reconciliation resolves', () => {
+    const postId = randomUUID();
+    const source = savePost(
+      ws.workspaceId,
+      makePost(postId, ws.workspaceId, null, 'draft'),
+    );
+    const winner = updatePostField(
+      ws.workspaceId,
+      postId,
+      { title: 'Revision winner before reconciliation' },
+      source.generationRevision,
+    )!;
+    recordContentPublishReconciliation({
+      workspaceId: ws.workspaceId,
+      postId,
+      collectionId: 'collection-resolved-delete',
+      itemId: 'item-resolved-delete',
+      externalState: 'draft',
+      sourceGenerationRevision: source.generationRevision,
+    });
+
+    expect(() => deletePostAtRevision(
+      ws.workspaceId,
+      postId,
+      source.generationRevision,
+    )).toThrow(GenerationRevisionConflictError);
+    expect(getPost(ws.workspaceId, postId)?.title).toBe(winner.title);
+
+    expect(resolveContentPublishReconciliation({
+      workspaceId: ws.workspaceId,
+      postId,
+      collectionId: 'collection-resolved-delete',
+      itemId: 'item-resolved-delete',
+    })).toBe(true);
+    expect(deletePostAtRevision(
+      ws.workspaceId,
+      postId,
+      winner.generationRevision,
+    )).toBe(true);
+    expect(getPost(ws.workspaceId, postId)).toBeUndefined();
   });
 });
 
@@ -788,6 +1055,53 @@ describe('revertToVersion', () => {
     expect(fromDb!.title).toBe('DB Check Title');
   });
 
+  it('restores the version provenance instead of attributing old content to the current run', () => {
+    const postId = randomUUID();
+    const original = makePost(postId, ws.workspaceId, null, 'draft');
+    original.generationProvenance = makeGenerationProvenance('original-run');
+    const persisted = savePost(ws.workspaceId, original);
+    const version = snapshotPostVersion(persisted, 'manual_edit', 'original-run');
+    const current = savePost(ws.workspaceId, {
+      ...persisted,
+      title: 'New generated content',
+      generationProvenance: makeGenerationProvenance('newer-run'),
+    });
+
+    const reverted = revertToVersion(
+      ws.workspaceId,
+      postId,
+      version.id,
+      current.generationRevision,
+    );
+
+    expect(reverted?.title).toBe(original.title);
+    expect(reverted?.generationProvenance).toEqual(original.generationProvenance);
+  });
+
+  it('restores null provenance for a legacy snapshot', () => {
+    const postId = randomUUID();
+    const original = savePost(
+      ws.workspaceId,
+      makePost(postId, ws.workspaceId, null, 'draft'),
+    );
+    const legacyVersion = snapshotPostVersion(original, 'manual_edit', 'legacy-null');
+    expect(legacyVersion.generationProvenance).toBeNull();
+    const current = savePost(ws.workspaceId, {
+      ...original,
+      title: 'Generated after the legacy snapshot',
+      generationProvenance: makeGenerationProvenance('current-run'),
+    });
+
+    const reverted = revertToVersion(
+      ws.workspaceId,
+      postId,
+      legacyVersion.id,
+      current.generationRevision,
+    );
+
+    expect(reverted?.generationProvenance).toBeNull();
+  });
+
   it('snapshots current state before reverting (version count increases by 1)', () => {
     const postId = randomUUID();
     const post = makePost(postId, ws.workspaceId, null, 'draft');
@@ -800,6 +1114,30 @@ describe('revertToVersion', () => {
     const afterCount = listPostVersions(ws.workspaceId, postId).length;
 
     expect(afterCount).toBe(beforeCount + 1);
+  });
+
+  it('rejects a stale revert without adding a rollback snapshot', () => {
+    const postId = randomUUID();
+    const post = makePost(postId, ws.workspaceId, null, 'draft');
+    savePost(ws.workspaceId, post);
+    const source = getPost(ws.workspaceId, postId)!;
+    const version = snapshotPostVersion(source, 'manual_edit', 'original');
+    updatePostField(
+      ws.workspaceId,
+      postId,
+      { title: 'Winning edit' },
+      source.generationRevision,
+    );
+    const versionCount = listPostVersions(ws.workspaceId, postId).length;
+
+    expect(() => revertToVersion(
+      ws.workspaceId,
+      postId,
+      version.id,
+      source.generationRevision,
+    )).toThrow(GenerationRevisionConflictError);
+    expect(getPost(ws.workspaceId, postId)?.title).toBe('Winning edit');
+    expect(listPostVersions(ws.workspaceId, postId)).toHaveLength(versionCount);
   });
 
   it('the pre-revert snapshot uses trigger=manual_edit', () => {

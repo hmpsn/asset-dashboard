@@ -137,7 +137,10 @@ describe('schema integrity — analytics_insights', () => {
 describe('schema integrity — content_briefs', () => {
   it('has columns added by later migrations', () => {
     const cols = columnNames('content_briefs');
-    const added = ['status', 'keyword_locked', 'title_variants', 'meta_desc_variants', 'generation_style'];
+    const added = [
+      'status', 'keyword_locked', 'title_variants', 'meta_desc_variants',
+      'generation_style', 'generation_revision', 'generation_provenance',
+    ];
     for (const col of added) {
       expect(cols, `content_briefs.${col} should exist`).toContain(col);
     }
@@ -161,10 +164,23 @@ describe('schema integrity — content_posts', () => {
   it('has columns added by later migrations', () => {
     const cols = columnNames('content_posts');
     // 007: webflow publish columns; 010: review_checklist; 028: voice_score/voice_feedback; 102: generation_style
-    const added = ['webflow_item_id', 'published_at', 'review_checklist', 'voice_score', 'voice_feedback', 'generation_style'];
+    const added = [
+      'webflow_item_id', 'published_at', 'review_checklist', 'voice_score',
+      'voice_feedback', 'generation_style', 'generation_revision',
+      'generation_provenance',
+    ];
     for (const col of added) {
       expect(cols, `content_posts.${col} should exist`).toContain(col);
     }
+  });
+});
+
+describe('schema integrity — copy_sections', () => {
+  it('keeps business version separate from generation safety columns', () => {
+    const cols = columnNames('copy_sections');
+    expect(cols).toContain('version');
+    expect(cols).toContain('generation_revision');
+    expect(cols).toContain('generation_provenance');
   });
 });
 
@@ -335,6 +351,8 @@ describe('CRUD preservation — content_briefs', () => {
     expect(row!['id']).toBe(briefId);
     expect(row!['status']).toBe('draft');
     expect(row!['generation_style']).toBe('standard');
+    expect(row!['generation_revision']).toBe(0);
+    expect(row!['generation_provenance']).toBeNull();
   });
 });
 
@@ -393,6 +411,8 @@ describe('CRUD preservation — content_posts', () => {
     expect(row!['webflow_item_id']).toBeNull();
     expect(row!['published_at']).toBeNull();
     expect(row!['generation_style']).toBe('standard');
+    expect(row!['generation_revision']).toBe(0);
+    expect(row!['generation_provenance']).toBeNull();
   });
 });
 

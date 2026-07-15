@@ -22,11 +22,18 @@ import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { getBrief, regenerateBrief, regenerateOutline } from './content-brief.js';
 import { invalidateContentPipelineIntelligence } from './intelligence-freshness.js';
-import { createJob, updateJob, hasActiveJob } from './jobs.js';
+import {
+  createResourceScopedJob,
+  getActiveJobForResource,
+  getJob,
+  runResourceScopedJobWorker,
+  updateJob,
+} from './jobs.js';
 import { createLogger } from './logger.js';
 import { WS_EVENTS } from './ws-events.js';
-import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
+import { BACKGROUND_JOB_TYPES, JOB_RESOURCE_TYPES } from '../shared/types/background-jobs.js';
 import type { ContentBrief } from '../shared/types/content.js';
+import { GenerationRevisionConflictError } from './generation-provenance.js';
 
 const log = createLogger('content-brief-regenerate-job');
 
@@ -35,6 +42,8 @@ export interface BriefRegenerateJobParams {
   workspaceId: string;
   briefId: string;
   feedback: string;
+  /** Revision observed before the command was accepted. */
+  expectedRevision?: number;
 }
 
 export interface BriefOutlineJobParams {
@@ -42,6 +51,8 @@ export interface BriefOutlineJobParams {
   workspaceId: string;
   briefId: string;
   feedback?: string;
+  /** Revision observed before the command was accepted. */
+  expectedRevision?: number;
 }
 
 export type ContentBriefRegenerateJobParams = BriefRegenerateJobParams | BriefOutlineJobParams;
@@ -50,103 +61,218 @@ export interface StartedContentBriefRegenerateJob {
   jobId: string;
 }
 
-function notifyContentUpdated(workspaceId: string, payload: Record<string, unknown>) {
-  invalidateContentPipelineIntelligence(workspaceId);
-  broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-briefs', ...payload });
+function runBriefRegenerationPostCommitEffect(
+  workspaceId: string,
+  briefId: string,
+  effect: string,
+  run: () => void,
+): void {
+  try {
+    run();
+  } catch (err) {
+    log.warn(
+      { err, workspaceId, briefId, effect },
+      'content brief regeneration post-commit effect failed',
+    );
+  }
 }
 
-async function runRegenerate(params: BriefRegenerateJobParams): Promise<ContentBrief> {
+function notifyContentUpdated(
+  workspaceId: string,
+  briefId: string,
+  payload: Record<string, unknown>,
+): void {
+  runBriefRegenerationPostCommitEffect(workspaceId, briefId, 'intelligence-cache', () => {
+    invalidateContentPipelineIntelligence(workspaceId);
+  });
+  runBriefRegenerationPostCommitEffect(workspaceId, briefId, 'content-updated-broadcast', () => {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, {
+      domain: 'content-briefs',
+      ...payload,
+    });
+  });
+}
+
+async function runRegenerate(
+  params: BriefRegenerateJobParams,
+  executionChainId: string,
+  signal: AbortSignal,
+): Promise<ContentBrief> {
   const { workspaceId, briefId, feedback } = params;
   const existing = getBrief(workspaceId, briefId);
   if (!existing) throw new Error('Brief not found');
-  const newBrief = await regenerateBrief(workspaceId, existing, feedback);
-  addActivity(
-    workspaceId,
-    'brief_generated',
-    `Regenerated content brief for "${existing.targetKeyword}"`,
-    `New brief: ${newBrief.suggestedTitle}`,
-    { briefId: newBrief.id, previousBriefId: existing.id, action: 'brief_regenerated' },
-  );
-  notifyContentUpdated(workspaceId, {
-    briefId: newBrief.id,
-    previousBriefId: existing.id,
-    action: 'brief_regenerated',
+  const newBrief = await regenerateBrief(workspaceId, existing, feedback, {
+    expectedRevision: params.expectedRevision,
+    executionChainId,
+    signal,
   });
-  broadcastToWorkspace(workspaceId, WS_EVENTS.BRIEF_UPDATED, {
-    briefId: newBrief.id,
-    previousBriefId: existing.id,
-    action: 'brief_regenerated',
-  });
-  log.info(`REGENERATED brief ${briefId} -> ${newBrief.id} for "${existing.targetKeyword}"`);
   return newBrief;
 }
 
-async function runOutline(params: BriefOutlineJobParams): Promise<ContentBrief> {
+async function runOutline(
+  params: BriefOutlineJobParams,
+  executionChainId: string,
+  signal: AbortSignal,
+): Promise<ContentBrief> {
   const { workspaceId, briefId, feedback } = params;
-  const result = await regenerateOutline(workspaceId, briefId, feedback);
-  if (!result) throw new Error('Brief not found');
-  addActivity(
-    workspaceId,
-    'content_updated',
-    `Regenerated outline for "${result.suggestedTitle || result.targetKeyword}"`,
-    undefined,
-    { briefId: result.id, action: 'brief_outline_regenerated' },
-  );
-  notifyContentUpdated(workspaceId, { briefId: result.id, action: 'brief_outline_regenerated' });
-  broadcastToWorkspace(workspaceId, WS_EVENTS.BRIEF_UPDATED, {
-    briefId: result.id,
-    action: 'brief_outline_regenerated',
+  const result = await regenerateOutline(workspaceId, briefId, feedback, {
+    expectedRevision: params.expectedRevision,
+    executionChainId,
+    signal,
   });
-  log.info(`REGENERATED OUTLINE for brief ${briefId} in workspace ${workspaceId}`);
+  if (!result) throw new Error('Brief not found');
   return result;
+}
+
+function emitRegenerationPostCommitEffects(
+  params: ContentBriefRegenerateJobParams,
+  brief: ContentBrief,
+): void {
+  const { workspaceId, briefId } = params;
+  const action = params.mode === 'outline'
+    ? 'brief_outline_regenerated'
+    : 'brief_regenerated';
+
+  runBriefRegenerationPostCommitEffect(workspaceId, brief.id, 'activity', () => {
+    addActivity(
+      workspaceId,
+      params.mode === 'outline' ? 'content_updated' : 'brief_generated',
+      params.mode === 'outline'
+        ? `Regenerated outline for "${brief.suggestedTitle || brief.targetKeyword}"`
+        : `Regenerated content brief for "${brief.targetKeyword}"`,
+      params.mode === 'outline' ? undefined : `New brief: ${brief.suggestedTitle}`,
+      params.mode === 'outline'
+        ? { briefId: brief.id, action }
+        : { briefId: brief.id, previousBriefId: briefId, action },
+    );
+  });
+  notifyContentUpdated(workspaceId, brief.id, params.mode === 'outline'
+    ? { briefId: brief.id, action }
+    : { briefId: brief.id, previousBriefId: briefId, action });
+  runBriefRegenerationPostCommitEffect(workspaceId, brief.id, 'brief-updated-broadcast', () => {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.BRIEF_UPDATED, params.mode === 'outline'
+      ? { briefId: brief.id, action }
+      : { briefId: brief.id, previousBriefId: briefId, action });
+  });
+
+  if (params.mode === 'outline') {
+    log.info(`REGENERATED OUTLINE for brief ${briefId} in workspace ${workspaceId}`);
+  } else {
+    log.info(`REGENERATED brief ${briefId} -> ${brief.id} for "${brief.targetKeyword}"`);
+  }
 }
 
 export async function runContentBriefRegenerateJob(
   jobId: string,
   params: ContentBriefRegenerateJobParams,
 ): Promise<void> {
-  try {
-    updateJob(jobId, {
-      status: 'running',
-      progress: 0,
-      total: 1,
-      message: params.mode === 'outline' ? 'Regenerating outline...' : 'Regenerating brief...',
-    });
-    const brief = params.mode === 'outline'
-      ? await runOutline(params)
-      : await runRegenerate(params);
-    updateJob(jobId, {
-      status: 'done',
-      progress: 1,
-      total: 1,
-      result: { brief, briefId: brief.id, mode: params.mode },
-      message: params.mode === 'outline'
-        ? `Outline regenerated — ${brief.suggestedTitle || brief.targetKeyword}`
-        : `Brief regenerated — ${brief.suggestedTitle || brief.targetKeyword}`,
-    });
-  } catch (err) {
-    updateJob(jobId, {
-      status: 'error',
-      error: err instanceof Error ? err.message : String(err),
-      message: params.mode === 'outline' ? 'Outline regeneration failed' : 'Brief regeneration failed',
-    });
-  }
+  await runResourceScopedJobWorker(jobId, async (signal) => {
+    let brief: ContentBrief;
+    try {
+      updateJob(jobId, {
+        status: 'running',
+        progress: 0,
+        total: 1,
+        message: params.mode === 'outline' ? 'Regenerating outline...' : 'Regenerating brief...',
+      });
+      brief = params.mode === 'outline'
+        ? await runOutline(params, jobId, signal)
+        : await runRegenerate(params, jobId, signal);
+    } catch (err) {
+      updateJob(jobId, {
+        status: 'error',
+        error: err instanceof Error ? err.message : String(err),
+        message: params.mode === 'outline' ? 'Outline regeneration failed' : 'Brief regeneration failed',
+      });
+      return;
+    }
+
+    try {
+      updateJob(jobId, {
+        status: 'done',
+        progress: 1,
+        total: 1,
+        result: { brief, briefId: brief.id, mode: params.mode },
+        message: params.mode === 'outline'
+          ? `Outline regenerated — ${brief.suggestedTitle || brief.targetKeyword}`
+          : `Brief regenerated — ${brief.suggestedTitle || brief.targetKeyword}`,
+      });
+    } catch (err) {
+      if (getJob(jobId)?.status === 'done') {
+        log.warn(
+          { err, jobId, briefId: brief.id },
+          'content brief regeneration job success committed but its job event failed',
+        );
+      } else {
+        const error = err instanceof Error ? err.message : String(err);
+        try {
+          updateJob(jobId, {
+            status: 'error',
+            error,
+            message: 'Brief regeneration committed, but completion tracking failed',
+            result: {
+              briefId: brief.id,
+              mode: params.mode,
+              generationRevision: brief.generationRevision,
+              code: 'completion_tracking_failed',
+              artifactCommitted: true,
+            },
+          });
+        } catch (fallbackErr) {
+          log.error({ err: fallbackErr, jobId, briefId: brief.id }, 'Committed brief regeneration completion could not be recorded');
+        }
+        return;
+      }
+    }
+
+    emitRegenerationPostCommitEffects(params, brief);
+  });
 }
 
 export function startContentBriefRegenerateJob(
   params: ContentBriefRegenerateJobParams,
 ): StartedContentBriefRegenerateJob {
-  const job = createJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE, {
+  const brief = getBrief(params.workspaceId, params.briefId);
+  if (!brief) throw new Error('Brief not found');
+  const expectedRevision = params.expectedRevision ?? brief.generationRevision;
+  if (brief.generationRevision !== expectedRevision || brief.supersededBy) {
+    throw new GenerationRevisionConflictError('content_brief', params.briefId, expectedRevision);
+  }
+  const { job, accepted } = createResourceScopedJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE, {
     workspaceId: params.workspaceId,
+    resources: [{
+      resourceType: JOB_RESOURCE_TYPES.CONTENT_BRIEF,
+      resourceId: params.briefId,
+    }],
     total: 1,
     message: params.mode === 'outline' ? 'Regenerating outline...' : 'Regenerating brief...',
+    accept: () => {
+      const current = getBrief(params.workspaceId, params.briefId);
+      if (!current
+        || current.generationRevision !== expectedRevision
+        || current.supersededBy) {
+        throw new GenerationRevisionConflictError(
+          'content_brief',
+          params.briefId,
+          expectedRevision,
+        );
+      }
+      return expectedRevision;
+    },
   });
+  const acceptedParams = { ...params, expectedRevision: accepted };
   setTimeout(() => {
-    void runContentBriefRegenerateJob(job.id, params);
+    void runContentBriefRegenerateJob(job.id, acceptedParams).catch(err => {
+      log.error({ err, jobId: job.id, workspaceId: params.workspaceId, briefId: params.briefId }, 'content brief regeneration worker rejected after launch');
+    });
   }, 100);
   return { jobId: job.id };
 }
 
-export function hasActiveBriefRegenerateJob(workspaceId: string) {
-  return hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE, workspaceId);
+export function hasActiveBriefRegenerateJob(workspaceId: string, briefId?: string) {
+  if (!briefId) return undefined;
+  return getActiveJobForResource(workspaceId, {
+    resourceType: JOB_RESOURCE_TYPES.CONTENT_BRIEF,
+    resourceId: briefId,
+  });
 }

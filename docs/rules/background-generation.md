@@ -52,6 +52,32 @@ Cancellation must remain observable after `cancelJob()` is called. Workers that
 poll `isJobCancelled(jobId)` must continue to see `true` even if their abort
 controller has already been unregistered during cleanup.
 
+## Resource-Scoped Acceptance
+
+Generation jobs that mutate a durable artifact must use a canonical resource
+identity. Do not use `hasActiveJob(type, workspaceId)` as the acceptance guard:
+it blocks unrelated artifacts and its separate check/create sequence races.
+
+- Insert the generic job, every normalized resource claim, and any domain
+  acceptance row or skeleton in one transaction. Update in-memory job state and
+  broadcast only after commit.
+- Active uniqueness spans job types for `(workspace, resource)`, because review,
+  regeneration, and batch jobs can otherwise mutate the same artifact.
+- Multi-resource work claims the complete sorted, unique resource set atomically.
+  An overlapping copy batch must roll back as a unit; disjoint batches may run.
+- A claim conflict returns the owning active job ID and starts no paid work.
+- Completion/error releases claims transactionally. Cancellation retains claims
+  until the aborting worker reaches `finally`; restart recovery may release them
+  after marking the unreachable job terminal.
+- Resource identities are trusted domain values, never raw caller-provided keys,
+  and are omitted from public/client job payloads.
+
+The SQLite job platform assumes one application process owns a given
+`dashboard.db` file. Resource acceptance is DB-atomic, but abort controllers and
+worker ownership are process-local. A multi-process deployment must first add an
+external queue or durable worker lease/status-CAS contract; do not point multiple
+server processes at the same SQLite job ledger.
+
 ## Worker Module Contract
 
 `server/routes/jobs.ts` should stay a thin dispatcher. For heavyweight jobs, keep

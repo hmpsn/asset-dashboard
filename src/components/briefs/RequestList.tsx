@@ -4,7 +4,7 @@ import {
   Inbox, CheckCircle2, XCircle, Clock, Zap,
   Check, ExternalLink, Link2, PenLine, Eye, Send, MessageSquare,
 } from 'lucide-react';
-import { BriefDetail } from './BriefDetail';
+import { BriefDetail, StaleBriefFormNotice } from './BriefDetail';
 import { SectionCard, Icon, Button, FormInput, FormSelect, FormTextarea, StatusBadge } from '../ui';
 import {
   CONTENT_GENERATION_STYLE_OPTIONS,
@@ -18,7 +18,16 @@ import { formatDate } from '../../utils/formatDates';
 // Subset of PostSummary that RequestList needs. Pick keeps it in lock-step with the
 // canonical type — if PostSummary changes, TypeScript catches mismatches here.
 // (PostSummary import is at top of file with other imports.)
-export type RequestPostSummary = Pick<PostSummary, 'id' | 'briefId' | 'status' | 'totalWordCount' | 'generationStyle'>;
+export type RequestPostSummary = Pick<
+  PostSummary,
+  'id' | 'briefId' | 'status' | 'totalWordCount' | 'generationStyle' | 'generationRevision'
+>;
+
+interface RequestBriefFormAuthority {
+  requestId: string;
+  briefId: string;
+  expectedRevision: number | null;
+}
 
 export interface RequestListProps {
   clientRequests: ContentTopicRequest[];
@@ -34,7 +43,18 @@ export interface RequestListProps {
   onGenerateBriefForRequest: (req: ContentTopicRequest, generationStyle?: ContentGenerationStyle) => void;
   generationStyle: ContentGenerationStyle;
   onGenerationStyleChange: (value: ContentGenerationStyle) => void;
-  onUpdateRequestStatus: (reqId: string, status: ContentTopicRequest['status'] | undefined, extra?: { deliveryUrl?: string; deliveryNotes?: string; briefId?: string; clientFeedback?: string; serviceType?: 'brief_only' | 'full_post'; upgradedAt?: string; internalNote?: string }) => void;
+  onUpdateRequestStatus: (reqId: string, status: ContentTopicRequest['status'] | undefined, extra?: {
+    deliveryUrl?: string;
+    deliveryNotes?: string;
+    briefId?: string;
+    clientFeedback?: string;
+    serviceType?: 'brief_only' | 'full_post';
+    upgradedAt?: string;
+    clientNote?: string;
+    internalNote?: string;
+    expectedBriefRevision?: number;
+    expectedPostRevision?: number;
+  }) => void;
   onConfirmDeleteRequest: (req: ContentTopicRequest) => void;
   onSetDeliveringReqId: (reqId: string | null) => void;
   onSetDeliveryUrl: (value: string) => void;
@@ -46,18 +66,26 @@ export interface RequestListProps {
   // Brief editing/regeneration (threaded from ContentBriefs)
   editingBrief: string | null;
   onSetEditingBrief: (id: string | null) => void;
-  onSaveBriefField: (briefId: string, updates: Partial<ContentBrief>) => void;
+  onSaveBriefField: (
+    briefId: string,
+    updates: Partial<ContentBrief>,
+    expectedRevision?: number,
+  ) => boolean | void | Promise<boolean | void>;
   regeneratingBrief: string | null;
-  onRegenerateBrief: (briefId: string, feedback: string, requestId?: string) => void;
+  onRegenerateBrief: (briefId: string, feedback: string, expectedRevision?: number, requestId?: string) => void;
   regeneratingOutline?: string | null;
-  onRegenerateOutline?: (briefId: string, feedback?: string) => void;
+  onRegenerateOutline?: (briefId: string, feedback?: string, expectedRevision?: number) => void;
   sendingToClient?: string | null;
   // Post production (full_post requests after brief approval)
   posts?: RequestPostSummary[];
   generatingPostFor?: string | null;
   /** Returns true on success, false on failure. Caller must check before advancing
    *  request status, otherwise a generation failure leaves the request stuck. */
-  onGeneratePost?: (briefId: string, generationStyle?: ContentGenerationStyle) => Promise<boolean>;
+  onGeneratePost?: (
+    briefId: string,
+    generationStyle?: ContentGenerationStyle,
+    expectedBriefRevision?: number,
+  ) => Promise<boolean>;
   onOpenPost?: (postId: string) => void;
 }
 
@@ -99,7 +127,7 @@ export function RequestList({
 }: RequestListProps) {
   // Send-to-client inline note (Admin Send Convention: one button + optional note).
   // Tracks which request's brief is in note-entry mode, plus the note text.
-  const [sendNoteFor, setSendNoteFor] = useState<string | null>(null);
+  const [sendNoteAuthority, setSendNoteAuthority] = useState<RequestBriefFormAuthority | null>(null);
   const [sendNote, setSendNote] = useState('');
 
   if (clientRequests.length === 0) return null;
@@ -133,7 +161,16 @@ export function RequestList({
           const StatusIcon = statusIcons[req.status] || Clock;
           const isGenerating = generatingBriefFor === req.id;
           const hasBrief = !!req.briefId;
-          const inlineBrief = hasBrief && expandedRequest === req.id ? getBriefById(req.briefId!) : null;
+          const requestBrief = hasBrief ? getBriefById(req.briefId!) : undefined;
+          const inlineBrief = expandedRequest === req.id ? requestBrief ?? null : null;
+          const sendNoteFor = sendNoteAuthority?.requestId ?? null;
+          const activeSendNoteAuthority = sendNoteAuthority?.requestId === req.id ? sendNoteAuthority : null;
+          const staleSendNoteAuthority = sendNoteFor === req.id && (
+            activeSendNoteAuthority?.briefId !== req.briefId
+            || activeSendNoteAuthority?.expectedRevision === null
+            || requestBrief?.id !== activeSendNoteAuthority?.briefId
+            || (requestBrief?.generationRevision ?? 0) !== activeSendNoteAuthority?.expectedRevision
+          );
           return (
             <div key={req.id} className="rounded-[var(--radius-lg)] bg-[var(--surface-2)] border border-[var(--brand-border)] overflow-hidden">
               <div className="px-3 py-2.5">
@@ -183,7 +220,14 @@ export function RequestList({
                         </>
                       )}
                       {req.status === 'brief_generated' && sendNoteFor !== req.id && (
-                        <Button onClick={() => { setSendNoteFor(req.id); setSendNote(''); }} variant="ghost" size="sm" className="rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"><Icon as={Send} size="sm" /> Send to client</Button>
+                        <Button onClick={() => {
+                          setSendNoteAuthority({
+                            requestId: req.id,
+                            briefId: req.briefId ?? '',
+                            expectedRevision: requestBrief?.generationRevision ?? null,
+                          });
+                          setSendNote('');
+                        }} variant="ghost" size="sm" className="rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"><Icon as={Send} size="sm" /> Send to client</Button>
                       )}
                       {req.status === 'client_review' && (
                         <span className="t-caption-sm text-teal-400/70 italic">Awaiting client feedback</span>
@@ -229,7 +273,10 @@ export function RequestList({
                         }
                         return (
                           <Button
-                            onClick={() => onUpdateRequestStatus(req.id, 'client_review', { clientFeedback: '' })}
+                            onClick={() => onUpdateRequestStatus(req.id, 'client_review', {
+                              clientFeedback: '',
+                              expectedBriefRevision: requestBrief?.generationRevision ?? 0,
+                            })}
                             variant="ghost"
                             size="sm"
                             className="rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
@@ -246,7 +293,9 @@ export function RequestList({
                         if (!canSendToClient) return null;
                         return (
                           <Button
-                            onClick={() => onUpdateRequestStatus(req.id, 'post_review')}
+                            onClick={() => onUpdateRequestStatus(req.id, 'post_review', {
+                              expectedPostRevision: existingPost.generationRevision ?? 0,
+                            })}
                             variant="ghost"
                             size="sm"
                             className="rounded bg-teal-600/20 border border-teal-500/30 t-caption-sm text-teal-300 hover:bg-teal-600/30 transition-colors"
@@ -269,9 +318,24 @@ export function RequestList({
                     <div className="flex items-center gap-1.5 mb-1"><Icon as={Send} size="md" className="text-teal-400" /><span className="t-caption-sm uppercase tracking-wider text-teal-400 font-medium">Send to client</span></div>
                     <div className="t-caption-sm text-[var(--brand-text-muted)]">Send this brief to the client for review. Add an optional note:</div>
                     <FormInput value={sendNote} onChange={setSendNote} placeholder="Optional note for the client…" maxLength={5000} aria-label="Optional note for the client" className="w-full" />
+                    {staleSendNoteAuthority && <StaleBriefFormNotice />}
                     <div className="flex items-center gap-2">
-                      <Button onClick={async () => { await onUpdateRequestStatus(req.id, 'client_review', { internalNote: sendNote.trim() || undefined }); setSendNoteFor(null); setSendNote(''); }} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm font-medium text-teal-300 hover:bg-teal-600/30 transition-colors"><Icon as={Send} size="sm" /> Send to client</Button>
-                      <Button onClick={() => { setSendNoteFor(null); setSendNote(''); }} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">Cancel</Button>
+                      <Button
+                        onClick={async () => {
+                          if (!sendNoteAuthority || staleSendNoteAuthority || sendNoteAuthority.expectedRevision === null) return;
+                          await onUpdateRequestStatus(req.id, 'client_review', {
+                            clientNote: sendNote.trim() || undefined,
+                            expectedBriefRevision: sendNoteAuthority.expectedRevision,
+                          });
+                          setSendNoteAuthority(null);
+                          setSendNote('');
+                        }}
+                        disabled={staleSendNoteAuthority}
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-[var(--radius-lg)] bg-teal-600/20 border border-teal-500/30 t-caption-sm font-medium text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+                      ><Icon as={Send} size="sm" /> Send to client</Button>
+                      <Button onClick={() => { setSendNoteAuthority(null); setSendNote(''); }} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors">Cancel</Button>
                     </div>
                   </div>
                 )}
@@ -338,9 +402,9 @@ export function RequestList({
                   sendingToClient={sendingToClient ?? null}
                   onSaveBriefField={onSaveBriefField}
                   onSetEditingBrief={onSetEditingBrief}
-                  onGeneratePost={async (briefId, generationStyle) => {
+                  onGeneratePost={async (briefId, generationStyle, expectedBriefRevision) => {
                     if (!onGeneratePost) return;
-                    const ok = await onGeneratePost(briefId, generationStyle);
+                    const ok = await onGeneratePost(briefId, generationStyle, expectedBriefRevision);
                     if (!ok) return;
                     if ((req.serviceType || 'brief_only') === 'brief_only') {
                       await onUpdateRequestStatus(req.id, undefined, { serviceType: 'full_post', upgradedAt: new Date().toISOString() });
@@ -349,7 +413,7 @@ export function RequestList({
                     const canAdvance = ['requested', 'brief_generated', 'client_review', 'changes_requested', 'approved'].includes(req.status);
                     if (canAdvance) onUpdateRequestStatus(req.id, 'in_progress');
                   }}
-                  onRegenerate={(briefId, feedback) => onRegenerateBrief(briefId, feedback, req.id)}
+                  onRegenerate={(briefId, feedback, expectedRevision) => onRegenerateBrief(briefId, feedback, expectedRevision, req.id)}
                   onRegenerateOutline={onRegenerateOutline}
                   regeneratingOutline={regeneratingOutline}
                   onCopyAsMarkdown={onCopyAsMarkdown}

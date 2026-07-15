@@ -19,12 +19,12 @@ afterAll(async () => {
 
 describe('Fixture content-publish edge routes', () => {
   it('returns 404 for unknown workspace publish-to-webflow', async () => {
-    const res = await authPostJson('/api/content-posts/ws_fixture_pub_missing/post_missing/publish-to-webflow', {});
+    const res = await authPostJson('/api/content-posts/ws_fixture_pub_missing/post_missing/publish-to-webflow', { expectedRevision: 0 });
     expect(res.status).toBe(404);
   });
 
   it('validates generateImage boolean input', async () => {
-    const res = await authPostJson(`/api/content-posts/${wsId}/post_missing/publish-to-webflow`, { generateImage: 'yes' });
+    const res = await authPostJson(`/api/content-posts/${wsId}/post_missing/publish-to-webflow`, { expectedRevision: 0, generateImage: 'yes' });
     expect(res.status).toBe(400);
   });
 

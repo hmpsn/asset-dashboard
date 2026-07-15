@@ -2,6 +2,7 @@
  * content-posts routes — extracted from server/index.ts
  */
 import { Router } from 'express';
+import { isDeepStrictEqual } from 'node:util';
 
 import { requireWorkspaceAccess } from '../auth.js';
 import { addActivity } from '../activity-log.js';
@@ -12,15 +13,14 @@ import {
   enrichPostsWithOutcomes,
   getPost,
   updatePostField,
-  deletePost,
+  updatePostFieldWithSnapshot,
+  deletePostAtRevision,
   createContentPostGenerationJob,
-  notifyContentUpdated,
   runContentPostGenerationJob,
   regenerateSection,
   ContentSectionRegenerationError,
   exportPostMarkdown,
   exportPostHTML,
-  snapshotPostVersion,
   listPostVersions,
   getPostVersion,
   revertToVersion,
@@ -28,6 +28,8 @@ import {
 } from '../content-posts.js';
 import { countHtmlWords } from '../content-posts-ai.js';
 import {
+  AiFixApplyError,
+  applyAiFixJobResult,
   aiFixPromptAndTarget,
   aiFixRequestSchema,
   startAiReviewJob,
@@ -38,21 +40,108 @@ import { invalidateContentPipelineIntelligence } from '../intelligence-freshness
 import { renderPostHTML } from '../post-export-html.js';
 import { getWorkspace, getTokenForSite } from '../workspaces.js';
 import { WS_EVENTS } from '../ws-events.js';
-import { hasActiveJob, createJob } from '../jobs.js';
-import { runContentPublishJob } from '../content-publish-job.js';
+import {
+  ActiveJobResourceConflict,
+  createResourceScopedJob,
+  getJob,
+  runResourceScopedJobWorker,
+  updateJob,
+} from '../jobs.js';
+import {
+  createContentPublishJob,
+  runContentPublishJob,
+} from '../content-publish-job.js';
+import type { ContentPublishAuthority } from '../domains/content/publish-post-to-webflow.js';
 import { getInsights } from '../analytics-insights-store.js';
 import { suggestPublishDates, suggestDraftSchedule } from '../content-calendar-intelligence.js';
 import { validate, z } from '../middleware/validate.js';
-import type { AiFixRequest, PostSection } from '../../shared/types/content.js';
+import type {
+  AiFixRequest,
+  ContentCalendarDateSuggestion,
+  ContentCalendarDateSuggestionsResponse,
+  PersistedContentBrief,
+  PostSection,
+} from '../../shared/types/content.js';
 import { CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
-import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { BACKGROUND_JOB_TYPES, JOB_RESOURCE_TYPES } from '../../shared/types/background-jobs.js';
 import { sanitizePlainText } from '../html-sanitize.js';
 import { IncompleteContentPostError, isPostDeliverable } from '../domains/content/generation-integrity.js';
+import { GenerationRevisionConflictError } from '../generation-provenance.js';
+import { createLogger } from '../logger.js';
+import { UnresolvedContentPublishReconciliationError } from '../content-publish-reconciliation.js';
 
 const router = Router();
+const log = createLogger('content-posts-routes');
+const expectedRevisionSchema = z.number().int().nonnegative();
+
+function runPostRoutePostCommitEffect(
+  workspaceId: string,
+  postId: string,
+  effect: string,
+  callback: () => void,
+): void {
+  try {
+    callback();
+  } catch (err) {
+    log.warn({ err, workspaceId, postId, effect }, 'content post route post-commit effect failed');
+  }
+}
+
+function persistCommittedSectionRegeneration(
+  jobId: string,
+  postId: string,
+  sectionIndex: number,
+  generationRevision: number,
+): string | null {
+  try {
+    updateJob(jobId, {
+      status: 'done',
+      message: `Regenerated section ${sectionIndex + 1}`,
+      result: { postId, sectionIndex, generationRevision },
+    });
+    if (getJob(jobId)?.status !== 'done') {
+      throw new Error('Committed section regeneration completion was not persisted');
+    }
+    return null;
+  } catch (err) {
+    if (getJob(jobId)?.status === 'done') return null;
+    const error = err instanceof Error ? err.message : String(err);
+    try {
+      updateJob(jobId, {
+        status: 'error',
+        message: 'Section regenerated, but completion tracking failed',
+        error,
+        result: {
+          postId,
+          sectionIndex,
+          generationRevision,
+          code: 'completion_tracking_failed',
+          artifactCommitted: true,
+        },
+      });
+    } catch (fallbackErr) {
+      log.error({ err: fallbackErr, jobId, postId, sectionIndex }, 'Committed section regeneration could not be recorded');
+    }
+    return error;
+  }
+}
+
+function conflictResponse(err: unknown): { error: string; code: string; jobId?: string } | null {
+  if (err instanceof GenerationRevisionConflictError) {
+    return { error: err.message, code: err.code };
+  }
+  if (err instanceof ActiveJobResourceConflict) {
+    return { error: err.message, code: err.code, jobId: err.jobId };
+  }
+  if (err instanceof UnresolvedContentPublishReconciliationError) {
+    return { error: err.message, code: err.code };
+  }
+  return null;
+}
 
 const generatePostSchema = z.object({
   briefId: z.string({ required_error: 'briefId required' }).trim().min(1, 'briefId required'),
+  expectedBriefRevision: expectedRevisionSchema,
   generationStyle: z.enum(CONTENT_GENERATION_STYLES).optional(),
 }).strict();
 
@@ -126,6 +215,26 @@ function normalizeTrustedAdminSectionUpdates(sectionUpdates: PostSectionUpdate[]
 
 const regenerateSectionSchema = z.object({
   sectionIndex: z.number({ required_error: 'sectionIndex required' }).int().min(0),
+  expectedRevision: expectedRevisionSchema,
+  expectedBriefRevision: expectedRevisionSchema,
+}).strict();
+
+const revisionCommandSchema = z.object({
+  expectedRevision: expectedRevisionSchema,
+}).strict();
+
+const aiFixRouteSchema = z.object({
+  expectedRevision: expectedRevisionSchema,
+}).passthrough().superRefine((value, ctx) => {
+  const { expectedRevision: _expectedRevision, ...body } = value;
+  const parsed = aiFixRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    for (const issue of parsed.error.issues) ctx.addIssue(issue);
+  }
+});
+
+const aiFixApplySchema = z.object({
+  jobId: z.string().uuid(),
 }).strict();
 
 // --- Content Post Generator (#194) ---
@@ -151,7 +260,8 @@ router.get('/api/content-posts/:workspaceId/suggest-dates', requireWorkspaceAcce
 
   const drafts = listPosts(workspaceId).filter(p => !p.plannedPublishAt && !p.publishedAt && p.status === 'draft');
   if (drafts.length === 0) {
-    return res.json({ suggestions: [], unscheduledCount: 0 });
+    const response: ContentCalendarDateSuggestionsResponse = { suggestions: [], unscheduledCount: 0 };
+    return res.json(response);
   }
 
   // Derive page priorities from analytics insights (the original consumer-less heuristic).
@@ -178,11 +288,25 @@ router.get('/api/content-posts/:workspaceId/suggest-dates', requireWorkspaceAcce
     priorityPages,
   });
 
-  const titleById = new Map(drafts.map(d => [d.id, d.title]));
-  res.json({
-    suggestions: schedule.map(s => ({ ...s, title: titleById.get(s.draftId) ?? '' })),
+  const draftById = new Map(drafts.map(draft => [draft.id, draft]));
+  const suggestions: ContentCalendarDateSuggestion[] = [];
+  for (const scheduled of schedule) {
+    const draft = draftById.get(scheduled.draftId);
+    if (!draft || draft.generationRevision === undefined) {
+      log.error({ workspaceId, postId: scheduled.draftId }, 'calendar proposal source authority is unavailable');
+      return res.status(500).json({ error: 'Could not establish proposal source authority' });
+    }
+    suggestions.push({
+      ...scheduled,
+      title: draft.title,
+      generationRevision: draft.generationRevision,
+    });
+  }
+  const response: ContentCalendarDateSuggestionsResponse = {
+    suggestions,
     unscheduledCount: drafts.length,
-  });
+  };
+  res.json(response);
 });
 
 // Get a single post
@@ -194,7 +318,7 @@ router.get('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('wo
 
 // Generate a full post from a brief (async — returns immediately with skeleton, generates in background)
 router.post('/api/content-posts/:workspaceId/generate', requireWorkspaceAccess('workspaceId'), validate(generatePostSchema), async (req, res) => {
-  const { briefId, generationStyle } = req.body;
+  const { briefId, generationStyle, expectedBriefRevision } = req.body;
 
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -205,57 +329,157 @@ router.post('/api/content-posts/:workspaceId/generate', requireWorkspaceAccess('
   if (!brief) return res.status(404).json({ error: 'Brief not found' });
 
   try {
-    const activeJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, req.params.workspaceId);
-    if (activeJob) return res.status(409).json({ error: 'Content post generation is already running for this workspace', jobId: activeJob.id });
-    const started = createContentPostGenerationJob(req.params.workspaceId, brief, generationStyle);
+    const started = createContentPostGenerationJob(
+      req.params.workspaceId,
+      brief,
+      generationStyle,
+      expectedBriefRevision,
+    );
     res.json({ ...started.post, jobId: started.jobId });
     runContentPostGenerationJob({
       workspaceId: req.params.workspaceId,
       brief: started.brief,
       postId: started.postId,
       jobId: started.jobId,
+      expectedRevision: started.expectedRevision,
     });
   } catch (err) {
+    const conflict = conflictResponse(err);
+    if (conflict) return res.status(409).json(conflict);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to start generation' });
   }
 });
 
 // Regenerate a single section
 router.post('/api/content-posts/:workspaceId/:postId/regenerate-section', requireWorkspaceAccess('workspaceId'), validate(regenerateSectionSchema), async (req, res) => {
-  const { sectionIndex } = req.body;
+  const { sectionIndex, expectedRevision, expectedBriefRevision } = req.body;
 
   const post = getPost(req.params.workspaceId, req.params.postId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
 
   const brief = getBrief(req.params.workspaceId, post.briefId);
   if (!brief) return res.status(404).json({ error: 'Source brief not found' });
+  if (sectionIndex < 0 || sectionIndex >= post.sections.length) {
+    return res.status(404).json({ error: 'Section not found' });
+  }
 
+  let jobId: string | undefined;
   try {
-    const updated = await regenerateSection(req.params.workspaceId, req.params.postId, sectionIndex, brief);
-    if (!updated) return res.status(404).json({ error: 'Section not found' });
-    addActivity(
-      req.params.workspaceId,
-      'content_updated',
-      `Regenerated section ${sectionIndex + 1} for "${updated.title}"`,
-      undefined,
-      { postId: updated.id, sectionIndex, action: 'post_section_regenerated' },
-    );
-    notifyContentUpdated(req.params.workspaceId, {
-      postId: updated.id,
-      sectionIndex,
-      action: 'post_section_regenerated',
+    const started = createResourceScopedJob<PersistedContentBrief>(BACKGROUND_JOB_TYPES.CONTENT_POST_FIX, {
+      workspaceId: req.params.workspaceId,
+      message: `Regenerating section ${sectionIndex + 1}...`,
+      resources: [
+        {
+          resourceType: JOB_RESOURCE_TYPES.CONTENT_BRIEF,
+          resourceId: brief.id,
+        },
+        {
+          resourceType: JOB_RESOURCE_TYPES.CONTENT_POST,
+          resourceId: req.params.postId,
+        },
+      ],
+      accept: () => {
+        const current = getPost(req.params.workspaceId, req.params.postId);
+        if (!current || current.generationRevision !== expectedRevision) {
+          throw new GenerationRevisionConflictError(
+            'content_post',
+            req.params.postId,
+            expectedRevision,
+          );
+        }
+        const currentBrief = getBrief(req.params.workspaceId, current.briefId);
+        if (!currentBrief || currentBrief.generationRevision !== expectedBriefRevision) {
+          throw new GenerationRevisionConflictError(
+            'content_brief',
+            current.briefId,
+            expectedBriefRevision,
+          );
+        }
+        return currentBrief;
+      },
     });
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: updated.id });
+    jobId = started.job.id;
+    const outcome = await runResourceScopedJobWorker(started.job.id, async () => {
+      updateJob(started.job.id, {
+        status: 'running',
+        message: `Regenerating section ${sectionIndex + 1}...`,
+      });
+      let result: Awaited<ReturnType<typeof regenerateSection>>;
+      try {
+        result = await regenerateSection(
+          req.params.workspaceId,
+          req.params.postId,
+          sectionIndex,
+          started.accepted,
+          expectedRevision,
+          expectedBriefRevision,
+        );
+        if (!result) throw new Error('Section not found');
+      } catch (err) {
+        updateJob(started.job.id, {
+          status: 'error',
+          message: `Section ${sectionIndex + 1} regeneration failed`,
+          error: err instanceof Error ? err.message : String(err),
+          result: { postId: req.params.postId, sectionIndex, status: 'error' },
+        });
+        throw err;
+      }
+      const completionTrackingError = persistCommittedSectionRegeneration(
+        started.job.id,
+        result.id,
+        sectionIndex,
+        result.generationRevision,
+      );
+      return { updated: result, completionTrackingError };
+    });
+    if (outcome.completionTrackingError) {
+      return res.status(500).json({
+        error: 'Section regenerated, but completion tracking failed',
+        code: 'completion_tracking_failed',
+        artifactCommitted: true,
+        jobId: started.job.id,
+        postId: outcome.updated.id,
+        sectionIndex,
+        generationRevision: outcome.updated.generationRevision,
+      });
+    }
+    const updated = outcome.updated;
+    runPostRoutePostCommitEffect(req.params.workspaceId, updated.id, 'activity', () => {
+      addActivity(
+        req.params.workspaceId,
+        'content_updated',
+        `Regenerated section ${sectionIndex + 1} for "${updated.title}"`,
+        undefined,
+        { postId: updated.id, sectionIndex, action: 'post_section_regenerated' },
+      );
+    });
+    runPostRoutePostCommitEffect(req.params.workspaceId, updated.id, 'intelligence-cache', () => {
+      invalidateContentPipelineIntelligence(req.params.workspaceId);
+    });
+    runPostRoutePostCommitEffect(req.params.workspaceId, updated.id, 'content-updated-broadcast', () => {
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_UPDATED, {
+        domain: 'content-posts',
+        postId: updated.id,
+        sectionIndex,
+        action: 'post_section_regenerated',
+      });
+    });
+    runPostRoutePostCommitEffect(req.params.workspaceId, updated.id, 'post-updated-broadcast', () => {
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: updated.id });
+    });
     res.json(updated);
   } catch (err) {
+    const conflict = conflictResponse(err);
+    if (conflict) return res.status(409).json(conflict);
     if (err instanceof ContentSectionRegenerationError) {
       return res.status(502).json({ error: err.message, diagnostic: err.diagnostic });
     }
-    res.status(500).json({ error: 'Regeneration failed' });
+    res.status(500).json({ error: 'Regeneration failed', ...(jobId ? { jobId } : {}) });
   }
 });
 
 const updatePostSchema = z.object({
+  expectedRevision: expectedRevisionSchema,
   title: z.string().max(500).optional(),
   metaDescription: z.string().max(500).optional(),
   introduction: z.string().optional(),
@@ -283,14 +507,15 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
   const previous = getPost(req.params.workspaceId, req.params.postId);
   if (!previous) return res.status(404).json({ error: 'Post not found' });
 
-  const updates = { ...req.body };
+  const { expectedRevision, ...requestedUpdates } = req.body;
+  const updates: Parameters<typeof updatePostField>[2] = { ...requestedUpdates };
   if (typeof updates.title === 'string') updates.title = sanitizePlainText(updates.title).trim();
   if (typeof updates.metaDescription === 'string') updates.metaDescription = sanitizePlainText(updates.metaDescription).trim();
   if (typeof updates.seoTitle === 'string') updates.seoTitle = sanitizePlainText(updates.seoTitle).trim();
   if (typeof updates.seoMetaDescription === 'string') updates.seoMetaDescription = sanitizePlainText(updates.seoMetaDescription).trim();
   if (typeof updates.voiceFeedback === 'string') updates.voiceFeedback = sanitizePlainText(updates.voiceFeedback).trim();
-  if (req.body.sections !== undefined) {
-    const merged = mergeSectionUpdates(previous.sections, normalizeTrustedAdminSectionUpdates(req.body.sections));
+  if (requestedUpdates.sections !== undefined) {
+    const merged = mergeSectionUpdates(previous.sections, normalizeTrustedAdminSectionUpdates(requestedUpdates.sections));
     if ('error' in merged) return res.status(400).json({ error: merged.error });
     updates.sections = merged.sections;
   }
@@ -303,7 +528,11 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
   // from <60 s ago — same pattern as the public `client-edit` route.
   const ADMIN_EDIT_COALESCE_WINDOW_MS = 60_000;
   const contentFields = ['title', 'metaDescription', 'introduction', 'sections', 'conclusion', 'seoTitle', 'seoMetaDescription'];
-  const editedContentFields = contentFields.filter(f => f in req.body);
+  const editedContentFields = contentFields.filter((field) => {
+    if (!(field in requestedUpdates)) return false;
+    const key = field as keyof typeof updates;
+    return !isDeepStrictEqual(previous[key], updates[key]);
+  });
   const isContentEdit = editedContentFields.length > 0;
   let withinEditCoalesceWindow = false;
   if (isContentEdit) {
@@ -314,10 +543,72 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
       && (Date.now() - new Date(recentVersion.createdAt).getTime()) < ADMIN_EDIT_COALESCE_WINDOW_MS;
   }
 
+  // Word count is part of this same human mutation. Computing it before the CAS
+  // avoids a second revision bump and prevents a newer edit from being overwritten.
+  if (isContentEdit) {
+    const introduction = typeof updates.introduction === 'string'
+      ? updates.introduction
+      : previous.introduction;
+    const conclusion = typeof updates.conclusion === 'string'
+      ? updates.conclusion
+      : previous.conclusion;
+    const sections = Array.isArray(updates.sections) ? updates.sections : previous.sections;
+    updates.totalWordCount = countHtmlWords(introduction || '')
+      + countHtmlWords(conclusion || '')
+      + sections.reduce((sum, section) => sum + section.wordCount, 0);
+  }
+
+  const applyUpdate = () => isContentEdit && !withinEditCoalesceWindow
+    ? updatePostFieldWithSnapshot(
+        req.params.workspaceId,
+        req.params.postId,
+        updates,
+        expectedRevision,
+        { trigger: 'manual_edit', triggerDetail: `field:${editedContentFields.join(',')}` },
+      )
+    : updatePostField(
+        req.params.workspaceId,
+        req.params.postId,
+        updates,
+        expectedRevision,
+      );
+
   let updated;
+  let publishJobId: string | undefined;
+  let publishAuthority: ContentPublishAuthority | undefined;
+  let publishDispatchError: unknown;
   try {
-    updated = updatePostField(req.params.workspaceId, req.params.postId, updates);
+    const ws = requestedUpdates.status === 'approved'
+      && previous.status !== 'approved'
+      && !previous.webflowItemId
+      ? getWorkspace(req.params.workspaceId)
+      : undefined;
+    const shouldAutoPublish = Boolean(
+      ws?.publishTarget
+      && ws.webflowSiteId
+      && getTokenForSite(ws.webflowSiteId),
+    );
+    // The human lifecycle decision commits first. An in-flight AI/publish claim
+    // must never prevent approval from becoming authoritative; its later CAS
+    // loses to this revision. Auto-publish is a follow-on side effect.
+    updated = applyUpdate();
+    if (shouldAutoPublish && updated && updated.generationRevision !== expectedRevision) {
+      try {
+        const started = createContentPublishJob({
+          workspaceId: req.params.workspaceId,
+          postId: req.params.postId,
+          expectedRevision: updated.generationRevision,
+          message: 'Publishing to Webflow...',
+        });
+        publishJobId = started.job.id;
+        publishAuthority = started.accepted.authority;
+      } catch (err) {
+        publishDispatchError = err;
+      }
+    }
   } catch (err: unknown) {
+    const conflict = conflictResponse(err);
+    if (conflict) return res.status(409).json(conflict);
     if (err instanceof Error && err.name === 'InvalidTransitionError') {
       return res.status(400).json({ error: err.message });
     }
@@ -327,8 +618,32 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
     return next(err);
   }
   if (!updated) return res.status(404).json({ error: 'Post not found' });
-  if (isContentEdit && !withinEditCoalesceWindow) {
-    snapshotPostVersion(previous, 'manual_edit', `field:${editedContentFields.join(',')}`);
+  if (updated.generationRevision === expectedRevision) return res.json(updated);
+
+  if (publishDispatchError) {
+    const activeJobId = publishDispatchError instanceof ActiveJobResourceConflict
+      ? publishDispatchError.jobId
+      : undefined;
+    runPostRoutePostCommitEffect(req.params.workspaceId, updated.id, 'auto-publish-deferred-activity', () => {
+      addActivity(
+        req.params.workspaceId,
+        'content_publish_failed',
+        `Auto-publish of "${updated.title}" was deferred`,
+        activeJobId
+          ? 'Another content operation was still running. The approval was saved; publish again after it finishes.'
+          : publishDispatchError instanceof Error
+            ? publishDispatchError.message
+            : 'The publish job could not be started.',
+        {
+          postId: updated.id,
+          source: 'auto-publish',
+          code: publishDispatchError instanceof ActiveJobResourceConflict
+            ? publishDispatchError.code
+            : 'dispatch_failed',
+          ...(activeJobId ? { activeJobId } : {}),
+        },
+      );
+    });
   }
 
   // Auto-publish on approval — runs as a background CONTENT_PUBLISH job (C3, audit item #12).
@@ -342,52 +657,41 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
   //
   // The approve PATCH response is unchanged (`res.json(updated)` below, 200 + post) — publish was
   // already detached, so the response never carried publish results.
-  if (req.body.status === 'approved' && previous.status !== 'approved' && !updated.webflowItemId) {
-    const ws = getWorkspace(req.params.workspaceId);
-    if (ws?.publishTarget && ws.webflowSiteId && getTokenForSite(ws.webflowSiteId)) {
-      // Each approval gets its own job — no workspace-level hasActiveJob guard here,
-      // because that would silently drop the second of two back-to-back approvals of
-      // DIFFERENT posts (the guard cannot see postId). Same-post re-entry is already
-      // safe: the job short-circuits on webflowItemId and the service re-reads the post.
-      const publishJob = createJob(BACKGROUND_JOB_TYPES.CONTENT_PUBLISH, {
-        workspaceId: req.params.workspaceId,
-        message: 'Publishing to Webflow...',
+  if (publishJobId && publishAuthority) {
+    const { workspaceId, postId } = req.params;
+    setImmediate(() => {
+      void runContentPublishJob({
+        jobId: publishJobId,
+        workspaceId,
+        postId,
+        expectedRevision: updated.generationRevision,
+        authority: publishAuthority,
       });
-      const { workspaceId, postId } = req.params;
-      setImmediate(() => {
-        void runContentPublishJob({ jobId: publishJob.id, workspaceId, postId });
-      });
-    }
+    });
   }
 
   // Activity entry coalesced on the same 60s window as the snapshot above —
   // we only want one `content_updated` entry per editing session, not one per
   // 2s auto-save tick.
   if (isContentEdit && !withinEditCoalesceWindow) {
-    addActivity(
-      req.params.workspaceId,
-      'content_updated',
-      `Edited post "${updated.title}"`,
-      `Fields: ${editedContentFields.join(', ')}`,
-      { postId: req.params.postId, fields: editedContentFields },
-    );
+    runPostRoutePostCommitEffect(req.params.workspaceId, updated.id, 'edit-activity', () => {
+      addActivity(
+        req.params.workspaceId,
+        'content_updated',
+        `Edited post "${updated.title}"`,
+        `Fields: ${editedContentFields.join(', ')}`,
+        { postId: req.params.postId, fields: editedContentFields },
+      );
+    });
   }
-  // Recompute totalWordCount server-side when content fields change (matches
-  // the pattern in the client-edit route at public-content.ts).
-  if (isContentEdit) {
-    const introWords = countHtmlWords(updated.introduction || '');
-    const conclusionWords = countHtmlWords(updated.conclusion || '');
-    const sectionWords = updated.sections.reduce((sum: number, s: { wordCount?: number }) => sum + (s.wordCount || 0), 0);
-    const newTotal = introWords + conclusionWords + sectionWords;
-    if (newTotal !== updated.totalWordCount) {
-      updatePostField(req.params.workspaceId, req.params.postId, { totalWordCount: newTotal });
-      updated.totalWordCount = newTotal;
-    }
-  }
-  invalidateContentPipelineIntelligence(req.params.workspaceId);
-  const hasNonContentChange = Object.keys(req.body).some(f => !contentFields.includes(f));
+  runPostRoutePostCommitEffect(req.params.workspaceId, updated.id, 'intelligence-cache', () => {
+    invalidateContentPipelineIntelligence(req.params.workspaceId);
+  });
+  const hasNonContentChange = Object.keys(requestedUpdates).some(f => !contentFields.includes(f));
   if (!isContentEdit || !withinEditCoalesceWindow || hasNonContentChange) {
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: req.params.postId });
+    runPostRoutePostCommitEffect(req.params.workspaceId, updated.id, 'post-updated-broadcast', () => {
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: req.params.postId });
+    });
   }
   res.json(updated);
 });
@@ -400,6 +704,7 @@ router.patch('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('
 // (strict) so the intent is always explicit.
 const plannedPublishDateSchema = z.object({
   plannedPublishAt: z.string().datetime({ message: 'plannedPublishAt must be an ISO datetime' }).nullable(),
+  expectedRevision: expectedRevisionSchema,
 }).strict();
 
 router.patch('/api/content-posts/:workspaceId/:postId/planned-date',
@@ -410,20 +715,39 @@ router.patch('/api/content-posts/:workspaceId/:postId/planned-date',
     if (!post) return res.status(404).json({ error: 'Post not found' });
 
     const plannedPublishAt: string | undefined = req.body.plannedPublishAt ?? undefined;
-    const updated = updatePostField(req.params.workspaceId, req.params.postId, { plannedPublishAt });
+    let updated;
+    try {
+      updated = updatePostField(
+        req.params.workspaceId,
+        req.params.postId,
+        { plannedPublishAt },
+        req.body.expectedRevision,
+      );
+    } catch (err) {
+      const conflict = conflictResponse(err);
+      if (conflict) return res.status(409).json(conflict);
+      throw err;
+    }
     if (!updated) return res.status(404).json({ error: 'Post not found' });
+    if (updated.generationRevision === req.body.expectedRevision) return res.json(updated);
 
-    addActivity(
-      req.params.workspaceId,
-      'content_updated',
-      plannedPublishAt
-        ? `Scheduled "${updated.title}" for ${plannedPublishAt.slice(0, 10)}`
-        : `Cleared planned date for "${updated.title}"`,
-      undefined,
-      { postId: updated.id, action: 'post_planned_date_updated', plannedPublishAt: plannedPublishAt ?? null },
-    );
-    invalidateContentPipelineIntelligence(req.params.workspaceId);
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: updated.id });
+    runPostRoutePostCommitEffect(req.params.workspaceId, updated.id, 'planned-date-activity', () => {
+      addActivity(
+        req.params.workspaceId,
+        'content_updated',
+        plannedPublishAt
+          ? `Scheduled "${updated.title}" for ${plannedPublishAt.slice(0, 10)}`
+          : `Cleared planned date for "${updated.title}"`,
+        undefined,
+        { postId: updated.id, action: 'post_planned_date_updated', plannedPublishAt: plannedPublishAt ?? null },
+      );
+    });
+    runPostRoutePostCommitEffect(req.params.workspaceId, updated.id, 'intelligence-cache', () => {
+      invalidateContentPipelineIntelligence(req.params.workspaceId);
+    });
+    runPostRoutePostCommitEffect(req.params.workspaceId, updated.id, 'post-updated-broadcast', () => {
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: updated.id });
+    });
     res.json(updated);
   },
 );
@@ -464,13 +788,21 @@ router.get('/api/content-posts/:workspaceId/:postId/export/pdf', requireWorkspac
 // The CONTENT_POST_REVIEW job persists the verdicts to the post (aiReview) and returns
 // { review, evidence } in job.result for the editor to read back. Provenance-sensitive
 // items are surfaced for human review only inside the worker.
-router.post('/api/content-posts/:workspaceId/:postId/ai-review', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.post('/api/content-posts/:workspaceId/:postId/ai-review', requireWorkspaceAccess('workspaceId'), validate(revisionCommandSchema), (req, res) => {
   const post = getPost(req.params.workspaceId, req.params.postId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
-  const activeJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_REVIEW, req.params.workspaceId);
-  if (activeJob) return res.status(409).json({ error: 'An AI review is already running for this workspace', jobId: activeJob.id });
-  const started = startAiReviewJob({ workspaceId: req.params.workspaceId, postId: req.params.postId });
-  res.status(202).json(started);
+  try {
+    const started = startAiReviewJob({
+      workspaceId: req.params.workspaceId,
+      postId: req.params.postId,
+      expectedRevision: req.body.expectedRevision,
+    });
+    res.status(202).json(started);
+  } catch (err) {
+    const conflict = conflictResponse(err);
+    if (conflict) return res.status(409).json(conflict);
+    throw err;
+  }
 });
 
 // AI fix — generates a targeted fix for a specific failed review item.
@@ -481,9 +813,10 @@ router.post('/api/content-posts/:workspaceId/:postId/ai-review', requireWorkspac
 // the AiFixResult draft lands in job.result for review-before-apply.
 router.post('/api/content-posts/:workspaceId/:postId/ai-fix',
   requireWorkspaceAccess('workspaceId'),
-  validate(aiFixRequestSchema),
+  validate(aiFixRouteSchema),
   (req, res) => {
-    const body = req.body as AiFixRequest;
+    const { expectedRevision, ...rawBody } = req.body;
+    const body = rawBody as AiFixRequest;
     const post = getPost(req.params.workspaceId, req.params.postId);
     if (!post) return res.status(404).json({ error: 'Post not found' });
 
@@ -494,10 +827,44 @@ router.post('/api/content-posts/:workspaceId/:postId/ai-fix',
       return res.status(promptTarget.error === 'Unknown issue key' ? 400 : 422).json({ error: promptTarget.error });
     }
 
-    const activeJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_FIX, req.params.workspaceId);
-    if (activeJob) return res.status(409).json({ error: 'An AI fix is already running for this workspace', jobId: activeJob.id });
-    const started = startAiFixJob({ workspaceId: req.params.workspaceId, postId: req.params.postId, body });
-    res.status(202).json(started);
+    try {
+      const started = startAiFixJob({
+        workspaceId: req.params.workspaceId,
+        postId: req.params.postId,
+        body,
+        expectedRevision,
+      });
+      res.status(202).json(started);
+    } catch (err) {
+      const conflict = conflictResponse(err);
+      if (conflict) return res.status(409).json(conflict);
+      throw err;
+    }
+  },
+);
+
+// Explicit adoption boundary for a reviewed AI fix. The client sends only the
+// durable job identity; the server reloads the stored suggestion, source revision,
+// resource claim, and worker provenance before committing the repair atomically.
+router.post('/api/content-posts/:workspaceId/:postId/ai-fix/apply',
+  requireWorkspaceAccess('workspaceId'),
+  validate(aiFixApplySchema),
+  (req, res) => {
+    try {
+      const updated = applyAiFixJobResult(
+        req.params.workspaceId,
+        req.params.postId,
+        req.body.jobId,
+      );
+      res.json(updated);
+    } catch (err) {
+      const conflict = conflictResponse(err);
+      if (conflict) return res.status(409).json(conflict);
+      if (err instanceof AiFixApplyError) {
+        return res.status(err.statusCode).json({ error: err.message, code: err.code });
+      }
+      throw err;
+    }
   },
 );
 
@@ -525,22 +892,44 @@ router.get('/api/content-posts/:workspaceId/:postId/versions/:versionId', requir
 });
 
 // Revert to a specific version
-router.post('/api/content-posts/:workspaceId/:postId/versions/:versionId/revert', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  const reverted = revertToVersion(req.params.workspaceId, req.params.postId, req.params.versionId);
+router.post('/api/content-posts/:workspaceId/:postId/versions/:versionId/revert', requireWorkspaceAccess('workspaceId'), validate(revisionCommandSchema), (req, res) => {
+  let reverted;
+  try {
+    reverted = revertToVersion(
+      req.params.workspaceId,
+      req.params.postId,
+      req.params.versionId,
+      req.body.expectedRevision,
+    );
+  } catch (err) {
+    const conflict = conflictResponse(err);
+    if (conflict) return res.status(409).json(conflict);
+    throw err;
+  }
   if (!reverted) return res.status(404).json({ error: 'Post or version not found' });
-  addActivity(
-    req.params.workspaceId,
-    'post_reverted',
-    `Reverted "${reverted.title}" to a previous version`,
-    undefined,
-    { postId: reverted.id, versionId: req.params.versionId, action: 'post_reverted' },
-  );
-  notifyContentUpdated(req.params.workspaceId, {
-    postId: reverted.id,
-    versionId: req.params.versionId,
-    action: 'post_reverted',
+  runPostRoutePostCommitEffect(req.params.workspaceId, reverted.id, 'revert-activity', () => {
+    addActivity(
+      req.params.workspaceId,
+      'post_reverted',
+      `Reverted "${reverted.title}" to a previous version`,
+      undefined,
+      { postId: reverted.id, versionId: req.params.versionId, action: 'post_reverted' },
+    );
   });
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: reverted.id });
+  runPostRoutePostCommitEffect(req.params.workspaceId, reverted.id, 'intelligence-cache', () => {
+    invalidateContentPipelineIntelligence(req.params.workspaceId);
+  });
+  runPostRoutePostCommitEffect(req.params.workspaceId, reverted.id, 'content-updated-broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_UPDATED, {
+      domain: 'content-posts',
+      postId: reverted.id,
+      versionId: req.params.versionId,
+      action: 'post_reverted',
+    });
+  });
+  runPostRoutePostCommitEffect(req.params.workspaceId, reverted.id, 'post-updated-broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: reverted.id });
+  });
   res.json(reverted);
 });
 
@@ -548,31 +937,61 @@ router.post('/api/content-posts/:workspaceId/:postId/versions/:versionId/revert'
 // W6.2: moved onto the background job platform. The CONTENT_POST_VOICE_SCORE job
 // persists voiceScore/voiceFeedback to the post and returns the updated post in
 // job.result. Failures surface via the job error state.
-router.post('/api/content-posts/:workspaceId/:postId/score-voice', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.post('/api/content-posts/:workspaceId/:postId/score-voice', requireWorkspaceAccess('workspaceId'), validate(revisionCommandSchema), (req, res) => {
   const post = getPost(req.params.workspaceId, req.params.postId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
   const brief = getBrief(req.params.workspaceId, post.briefId);
   if (!brief) return res.status(404).json({ error: 'Brief not found' });
-  const activeJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE, req.params.workspaceId);
-  if (activeJob) return res.status(409).json({ error: 'Voice scoring is already running for this workspace', jobId: activeJob.id });
-  const started = startVoiceScoreJob({ workspaceId: req.params.workspaceId, postId: req.params.postId });
-  res.status(202).json(started);
+  try {
+    const started = startVoiceScoreJob({
+      workspaceId: req.params.workspaceId,
+      postId: req.params.postId,
+      expectedRevision: req.body.expectedRevision,
+    });
+    res.status(202).json(started);
+  } catch (err) {
+    const conflict = conflictResponse(err);
+    if (conflict) return res.status(409).json(conflict);
+    throw err;
+  }
 });
 
 // Delete a post
-router.delete('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.delete('/api/content-posts/:workspaceId/:postId', requireWorkspaceAccess('workspaceId'), validate(revisionCommandSchema), (req, res) => {
   const existing = getPost(req.params.workspaceId, req.params.postId);
   if (!existing) return res.status(404).json({ error: 'Post not found' });
-  deletePost(req.params.workspaceId, req.params.postId);
-  addActivity(
-    req.params.workspaceId,
-    'content_updated',
-    `Deleted post "${existing.title}"`,
-    undefined,
-    { postId: existing.id, action: 'post_deleted' },
-  );
-  notifyContentUpdated(req.params.workspaceId, { postId: existing.id, action: 'post_deleted', deleted: true });
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: existing.id, deleted: true });
+  try {
+    if (!deletePostAtRevision(req.params.workspaceId, req.params.postId, req.body.expectedRevision)) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+  } catch (err) {
+    const conflict = conflictResponse(err);
+    if (conflict) return res.status(409).json(conflict);
+    throw err;
+  }
+  runPostRoutePostCommitEffect(req.params.workspaceId, existing.id, 'delete-activity', () => {
+    addActivity(
+      req.params.workspaceId,
+      'content_updated',
+      `Deleted post "${existing.title}"`,
+      undefined,
+      { postId: existing.id, action: 'post_deleted' },
+    );
+  });
+  runPostRoutePostCommitEffect(req.params.workspaceId, existing.id, 'intelligence-cache', () => {
+    invalidateContentPipelineIntelligence(req.params.workspaceId);
+  });
+  runPostRoutePostCommitEffect(req.params.workspaceId, existing.id, 'content-updated-broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_UPDATED, {
+      domain: 'content-posts',
+      postId: existing.id,
+      action: 'post_deleted',
+      deleted: true,
+    });
+  });
+  runPostRoutePostCommitEffect(req.params.workspaceId, existing.id, 'post-updated-broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: existing.id, deleted: true });
+  });
   res.json({ ok: true });
 });
 

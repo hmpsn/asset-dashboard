@@ -29,6 +29,7 @@ import type { EventDisplayConfig, EventGroup, ResolvedSegmentProfile } from '../
 import type { MetricsSource } from '../../../shared/types/keywords.js';
 import type { KeywordStrategyUxPayload } from '../../../shared/types/keyword-strategy-ux.js';
 import type { AuditCategoryScore, AuditDisplayCategory } from '../../../shared/types/seo-audit.js';
+import type { PublicContentTopicRequest } from '../../../shared/types/content.js';
 
 export interface ContentPricing { briefPrice: number; fullPostPrice: number; currency: string; briefLabel?: string; fullPostLabel?: string; briefDescription?: string; fullPostDescription?: string; }
 export interface BusinessProfile { phone?: string; email?: string; address?: { street?: string; city?: string; state?: string; zip?: string; country?: string }; socialProfiles?: string[]; openingHours?: string; foundedDate?: string; numberOfEmployees?: string; }
@@ -74,15 +75,8 @@ export interface ContentPlanReviewCell {
 
 export type ApprovalPageKeyword = { pagePath: string; primaryKeyword: string; secondaryKeywords?: string[] };
 
-export interface ClientContentRequest {
-  id: string; topic: string; targetKeyword: string; intent: string; priority: string;
-  status: 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'post_review' | 'delivered' | 'published' | 'declined';
-  source?: 'strategy' | 'client'; briefId?: string; postId?: string;
-  serviceType?: 'brief_only' | 'full_post'; pageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource'; upgradedAt?: string;
-  deliveryUrl?: string; deliveryNotes?: string; clientFeedback?: string;
-  comments?: { id: string; author: 'client' | 'team'; content: string; createdAt: string }[];
-  requestedAt: string; updatedAt: string;
-}
+/** Client-facing alias for the shared public content-request boundary. */
+export type ClientContentRequest = PublicContentTopicRequest;
 
 /**
  * Disambiguates the dual-purpose `changes_requested` status for progress-bar display.

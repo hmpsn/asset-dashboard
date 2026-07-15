@@ -11,7 +11,41 @@ A job is successful only when every required artifact component has passed its c
 - Do not replace a prior valid artifact when validation or repair fails.
 - Persist a distinct attention/error state when useful partial work is intentionally retained.
 - Do not emit success-semantic activity, broadcasts, notifications, or downstream jobs for partial or failed output. A committed partial/status mutation still broadcasts its canonical artifact/status-updated event so clients converge truthfully.
-- The terminal job result, durable artifact status, activity entry, and user-visible message must agree.
+- The terminal job result, durable artifact/domain status, activity entry, and
+  user-visible message must tell the same truth. If terminal bookkeeping itself
+  fails after commit, any fallback result identifies that tracking failure and
+  preserves the committed domain outcome.
+- Commit the required artifact/domain transition, then persist and verify the
+  terminal job state before optional success effects. Activity, broadcasts,
+  cache invalidation, notifications, outcome tracking, reconciliation cleanup,
+  and follow-on scheduling are each isolated effects: one failure cannot turn
+  committed work into an HTTP/job failure or suppress the remaining effects.
+  Retryable effects use durable idempotency/reconciliation keys rather than
+  replaying the primary mutation.
+- A terminal-job bookkeeping failure after artifact/domain commit is an explicit
+  `completion_tracking_failed` outcome, not a generation failure. Never relabel
+  or rewrite the committed artifact/domain result through a fallback failure
+  path. Suppress optional completion effects until the durable terminal job state
+  is verified. A manually managed worker releases resource claims idempotently
+  only in its final drained cleanup, including when both terminal bookkeeping
+  writes fail; claim release does not reclassify the committed outcome.
+- When an external publish succeeds and the subsequent local
+  version-conditional stamp loses, persist the external item identity and state in a
+  reconciliation ledger. A retry reuses that item rather than creating a
+  duplicate, and the platform does not claim locally reconciled publication
+  until the conditional stamp succeeds. Post deletion is blocked while a
+  resource-scoped post/publish job is active or an unresolved reconciliation
+  exists; it becomes eligible only after the worker drains and reconciliation is
+  resolved.
+- External publish acceptance freezes the effective non-secret target/field-map
+  configuration, a one-way token identity, and every source-artifact value used
+  in the payload. Revalidate that authority before each external mutation and
+  after external success. A partial local item stamp, a stamp from another
+  collection, or unresolved identity in any collection fails closed; never
+  create a second external item under a newly configured target.
+- Every detached worker launch observes its outer promise rejection and logs it
+  with job/resource identity. A durable terminal fallback does not make an
+  unhandled rejected promise safe.
 
 ## 2. Long-running saves are version conditional
 
@@ -21,8 +55,38 @@ Any AI or provider call that occurs between reading and writing a durable artifa
 - A version mismatch means the newer durable state wins.
 - Automatic/background work never replaces an operator edit or client decision.
 - Explicit replacement still uses a revision check; user intent does not authorize overwriting work created after the action began.
+- Debounced editor writes bind their authority when the edit is authored, before
+  the timer or flush enqueues it. A newer canonical token rejects the stale
+  payload without rebasing it onto that token or issuing a write.
+- A client suggestion's claimed original text is provenance-sensitive authority,
+  not descriptive caller input. Compare it to the authoritative artifact inside
+  the same revision-conditional boundary and reject a mismatch without appending
+  a suggestion or advancing the revision.
 - A retry may reuse already-generated output only after revalidating it against current authority. Never rerun a paid provider solely because the commit conflicted.
+- An explicitly selected durable parent/request identity is command authority,
+  never a best-effort reuse hint. If it is missing or belongs to another
+  workspace, abort the whole mutation; do not fall back to another row or create
+  a replacement.
+- A one-time saved-artifact handle used by a durable send is consumed as the
+  final synchronous authorization step inside that send transaction. A failed
+  lifecycle, revision, link, or write leaves the handle available for a safe
+  retry; post-commit notifications run only after both writes commit.
+- When a request mutation advances linked artifact revisions, its established
+  workspace event must invalidate both request readers and every linked
+  brief/post authority cache on admin and client surfaces. Do not add a
+  caller-specific duplicate artifact event as a substitute for the shared
+  invalidation contract.
 - Multi-table finalization and the revision comparison belong in one transaction.
+- A dependent artifact adopts output only if its exact source generation
+  revision still matches inside that transaction. One-time preparation-handle
+  consumption, artifact creation, and any parent/link mutation are one atomic
+  unit; validation, source conflict, or link failure rolls back both the handle
+  deletion and every artifact write.
+- When an external prepared flow will advance a parent lifecycle, prove that
+  transition is legal before the caller performs paid work, repeat the check in
+  the final authoritative preparation snapshot, and revalidate it inside atomic
+  adoption. Later authority drift requires a fresh preparation, not a rebase of
+  the old handle.
 
 ## 3. Cache policy belongs to the named operation
 
@@ -72,7 +136,24 @@ Every durable generated artifact brought under this contract by its owning imple
 - evidence captured/freshness time when evidence is used;
 - generation start and completion times.
 
+For a multi-call artifact, the top-level run/provider/model identify the accepted
+execution that authorizes the adopted output. Store an `executionChainId` for
+the logical workflow and an ordered bounded list of accepted contributing
+executions, each with its exact effective-input fingerprint. The artifact-level
+fingerprint is a canonical digest of those ordered fingerprints plus any
+deterministic authority inputs. Rejected, malformed, or superseded attempts stay
+in execution traces and must not be presented as adopted artifact provenance.
+
 The fingerprint covers the exact rendered system and user inputs, excluding only an explicit force-refresh nonce. Join job traces, provider attempts, token/cost records, and the artifact through the run ID. Do not store raw prompts or secrets in telemetry. Provenance is internal unless a separate public contract explicitly exposes a safe projection.
+
+When the server prepares context for prose generated outside the platform, it
+can attest only to the exact server-prepared context and its lifecycle. The
+preparation record therefore fingerprints that complete prepared context after
+authority resolution, and adopted output records `provider: 'external'` and
+`model: 'unreported'` with a server-issued external run ID and named external
+operation. Never invent a provider or model from caller text. Consuming the
+preparation record still follows the source-revision and atomic-adoption rules
+above.
 
 ## 7. Feature flags protect semantics, not correctness
 
@@ -96,6 +177,17 @@ Before merging generation work, reviewers confirm:
 3. The named operation has an explicit safe cache policy.
 4. Authoritative evidence survives its real storage/read/scoring path.
 5. Dependent recompute ordering is durable and observable.
-6. The artifact, job, AI call, and provider attempt share a run ID.
-7. Flags cover only new semantics and include OFF/ON/retirement evidence.
-8. Failure tests prove that the prior valid artifact and newer human state are preserved.
+6. The artifact, job, AI call, and provider attempt share a run ID, or an
+   external MCP artifact truthfully records `external`/`unreported` against the
+   exact prepared-context fingerprint.
+7. Source revision, suggestion-original identity, and parent-lifecycle legality
+   are preflighted and revalidated;
+   one-time handle consumption, artifact adoption, and parent/link updates are
+   atomic where applicable.
+8. Required artifact/domain completion is never relabeled when terminal-job
+   bookkeeping fails; optional effects wait for a verified durable terminal, and
+   manually managed claims release only after the worker drains.
+9. External-success/local-conflict retries reuse retained identity, and deletion
+   remains blocked during an active claim or unresolved reconciliation.
+10. Flags cover only new semantics and include OFF/ON/retirement evidence.
+11. Failure tests prove that the prior valid artifact and newer human state are preserved.

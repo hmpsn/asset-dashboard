@@ -5,6 +5,12 @@ import { randomUUID } from 'crypto';
 
 const broadcastState = vi.hoisted(() => ({
   calls: [] as Array<{ workspaceId: string; event: string; payload: { sectionId?: string; status?: string } }>,
+  throwEvents: new Set<string>(),
+}));
+
+const activityState = vi.hoisted(() => ({
+  calls: [] as Array<{ workspaceId: string; type: string }>,
+  throwTypes: new Set<string>(),
 }));
 
 vi.mock('../../server/broadcast.js', () => ({
@@ -12,8 +18,21 @@ vi.mock('../../server/broadcast.js', () => ({
   broadcast: vi.fn(),
   broadcastToWorkspace: vi.fn((workspaceId: string, event: string, payload: { sectionId?: string; status?: string }) => {
     broadcastState.calls.push({ workspaceId, event, payload });
+    if (broadcastState.throwEvents.has(event)) throw new Error(`Injected ${event} broadcast failure`);
   }),
 }));
+
+vi.mock('../../server/activity-log.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/activity-log.js')>();
+  return {
+    ...actual,
+    addActivity: vi.fn((...args: Parameters<typeof actual.addActivity>) => {
+      activityState.calls.push({ workspaceId: args[0], type: args[1] });
+      if (activityState.throwTypes.has(args[1])) throw new Error(`Injected ${args[1]} activity failure`);
+      return actual.addActivity(...args);
+    }),
+  };
+});
 
 import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
 import db from '../../server/db/index.js';
@@ -109,6 +128,10 @@ function getSectionRow(sectionId: string): { status: string; client_suggestions:
   };
 }
 
+function getSectionUpdatedAt(sectionId: string): string {
+  return (db.prepare('SELECT updated_at FROM copy_sections WHERE id = ?').get(sectionId) as { updated_at: string }).updated_at;
+}
+
 function countActivities(type: string): number {
   const row = db.prepare(`
     SELECT COALESCE(COUNT(*), 0) AS count
@@ -140,6 +163,9 @@ beforeAll(async () => {
 
 beforeEach(() => {
   broadcastState.calls = [];
+  broadcastState.throwEvents.clear();
+  activityState.calls = [];
+  activityState.throwTypes.clear();
 });
 
 afterAll(async () => {
@@ -162,7 +188,9 @@ describe('public copy review broadcasts and workflow side effects', () => {
     insertSection('draft', entryId);
     const beforeActivity = countActivities('copy_approved');
 
-    const res = await clientPostJson(`/api/public/copy/${wsId}/section/${sectionId}/approve`, {});
+    const res = await clientPostJson(`/api/public/copy/${wsId}/section/${sectionId}/approve`, {
+      expectedUpdatedAt: getSectionUpdatedAt(sectionId),
+    });
     expect(res.status).toBe(200);
     const body = await res.json() as { section: { id: string; status: string } };
     expect(body.section).toMatchObject({ id: sectionId, status: 'approved' });
@@ -178,11 +206,33 @@ describe('public copy review broadcasts and workflow side effects', () => {
     expect(countActivities('copy_approved')).toBe(beforeActivity + 1);
   });
 
+  it('keeps a committed approval successful and attempts activity after broadcast failure', async () => {
+    const sectionId = insertSection('client_review');
+    broadcastState.throwEvents.add(WS_EVENTS.COPY_SECTION_UPDATED);
+    activityState.throwTypes.add('copy_approved');
+
+    const res = await clientPostJson(`/api/public/copy/${wsId}/section/${sectionId}/approve`, {
+      expectedUpdatedAt: getSectionUpdatedAt(sectionId),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ section: { id: sectionId, status: 'approved' } });
+    expect(getSectionRow(sectionId).status).toBe('approved');
+    expect(copySectionBroadcasts()).toEqual([{
+      workspaceId: wsId,
+      event: WS_EVENTS.COPY_SECTION_UPDATED,
+      payload: { sectionId, status: 'approved' },
+    }]);
+    expect(activityState.calls).toContainEqual({ workspaceId: wsId, type: 'copy_approved' });
+  });
+
   it('does not broadcast or mutate when approval is not reviewable', async () => {
     const sectionId = insertSection('draft');
     const beforeActivity = countActivities('copy_approved');
 
-    const res = await clientPostJson(`/api/public/copy/${wsId}/section/${sectionId}/approve`, {});
+    const res = await clientPostJson(`/api/public/copy/${wsId}/section/${sectionId}/approve`, {
+      expectedUpdatedAt: getSectionUpdatedAt(sectionId),
+    });
     expect(res.status).toBe(400);
 
     expect(getSectionRow(sectionId).status).toBe('draft');
@@ -195,6 +245,7 @@ describe('public copy review broadcasts and workflow side effects', () => {
     const beforeActivity = countActivities('copy_suggestion_added');
 
     const res = await clientPostJson(`/api/public/copy/${wsId}/section/${sectionId}/suggest`, {
+      expectedUpdatedAt: getSectionUpdatedAt(sectionId),
       originalText: 'Original copy for client review broadcasts.',
       suggestedText: 'Updated client suggestion for the copy.',
     });
@@ -217,11 +268,36 @@ describe('public copy review broadcasts and workflow side effects', () => {
     expect(countActivities('copy_suggestion_added')).toBe(beforeActivity + 1);
   });
 
+  it('keeps a committed suggestion successful and attempts activity after broadcast failure', async () => {
+    const sectionId = insertSection('client_review');
+    broadcastState.throwEvents.add(WS_EVENTS.COPY_SECTION_UPDATED);
+    activityState.throwTypes.add('copy_suggestion_added');
+
+    const res = await clientPostJson(`/api/public/copy/${wsId}/section/${sectionId}/suggest`, {
+      expectedUpdatedAt: getSectionUpdatedAt(sectionId),
+      originalText: 'Original copy for client review broadcasts.',
+      suggestedText: 'Committed suggestion despite optional-effect failures.',
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      section: { id: sectionId, status: 'revision_requested' },
+    });
+    expect(getSectionRow(sectionId).status).toBe('revision_requested');
+    expect(copySectionBroadcasts()).toEqual([{
+      workspaceId: wsId,
+      event: WS_EVENTS.COPY_SECTION_UPDATED,
+      payload: { sectionId, status: 'revision_requested' },
+    }]);
+    expect(activityState.calls).toContainEqual({ workspaceId: wsId, type: 'copy_suggestion_added' });
+  });
+
   it('does not broadcast or mutate when suggestion validation fails', async () => {
     const sectionId = insertSection('client_review');
     const beforeActivity = countActivities('copy_suggestion_added');
 
     const res = await clientPostJson(`/api/public/copy/${wsId}/section/${sectionId}/suggest`, {
+      expectedUpdatedAt: getSectionUpdatedAt(sectionId),
       originalText: { text: 'Structured input should fail validation.' },
       suggestedText: 'Updated copy.',
     });

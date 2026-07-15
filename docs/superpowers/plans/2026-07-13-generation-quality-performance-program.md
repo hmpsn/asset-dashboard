@@ -177,6 +177,8 @@ A + B + C + D → controller diff/full-suite review
 
 **Owner:** `content-pipeline`; GPT-5.5. **Depends:** G1 + C1.
 
+**Binding phase plan:** `docs/superpowers/plans/2026-07-13-content-edit-safety-c2.md`.
+
 - Add additive generation revisions and typed internal provenance for content posts, content briefs, and copy sections using the shared contract; cover every mapper, mutation, and internal/public serializer in lockstep.
 - Save only against the expected revision. Operator edits and approved content win; automatic work never replaces them. Explicit replacement is a distinct authorized action.
 - Scope job dedupe by resource, not workspace, so unrelated artifacts run concurrently and the same artifact cannot duplicate.

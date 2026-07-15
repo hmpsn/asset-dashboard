@@ -19,17 +19,14 @@ import {
 import {
   listBriefs,
   getBrief,
-  updateBrief,
-  deleteBrief,
+  updateBriefAtRevision,
+  deleteBriefAtRevision,
 } from '../content-brief.js';
-import { createContentRequest, getOpenRequestForBrief, updateContentRequest } from '../content-requests.js';
-import db from '../db/index.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { addActivity } from '../activity-log.js';
-import { notifyClientBriefReady } from '../email.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';
-import { buildClientInboxReviewsUrl, getWorkspace } from '../workspaces.js';
+import { getWorkspace } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { buildPipelineSignals } from '../insight-feedback.js';
 import { getInsights } from '../analytics-insights-store.js';
@@ -38,15 +35,21 @@ import { resolveWorkspaceLocationCode } from '../local-seo.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 import { BRIEF_PAGE_TYPES, CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
 import { normalizeBriefKeyword, resolveBriefTemplateCrossref } from '../content-brief-template-crossref.js';
-import { hasActiveJob } from '../jobs.js';
+import { ActiveJobResourceConflict } from '../jobs.js';
 import { startContentBriefGenerationJob } from '../content-brief-generation-job.js';
-import { startContentBriefRegenerateJob, hasActiveBriefRegenerateJob } from '../content-brief-regenerate-job.js';
-import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { startContentBriefRegenerateJob } from '../content-brief-regenerate-job.js';
+import { GenerationRevisionConflictError } from '../generation-provenance.js';
+import {
+  BriefNotFoundError,
+  sendBriefToClientForReview,
+} from '../domains/content/send-brief-to-client.js';
 
 const router = Router();
 const log = createLogger('content-briefs');
+const expectedRevisionSchema = z.number().int().nonnegative();
 
 const contentBriefPatchSchema = z.object({
+  expectedRevision: expectedRevisionSchema,
   targetKeyword: z.string().trim().min(1).max(200).optional(),
   secondaryKeywords: z.array(z.string().trim().min(1).max(200)).optional(),
   suggestedTitle: z.string().trim().min(1).max(300).optional(),
@@ -81,13 +84,55 @@ const contentBriefPatchSchema = z.object({
   metaDescVariants: z.array(z.string().trim().min(1).max(500)).optional(),
   generationStyle: z.enum(CONTENT_GENERATION_STYLES).optional(),
 }).refine(
-  (body) => Object.values(body).some((value) => value !== undefined),
+  (body) => Object.entries(body).some(([key, value]) => key !== 'expectedRevision' && value !== undefined),
   { message: 'At least one editable field required' },
 );
 
+const regenerateBriefSchema = z.object({
+  feedback: z.string().trim().min(1).max(5000),
+  expectedRevision: expectedRevisionSchema,
+}).strict();
+
+const regenerateOutlineSchema = z.object({
+  feedback: z.string().trim().max(5000).optional(),
+  expectedRevision: expectedRevisionSchema,
+}).strict();
+
+const deleteBriefSchema = z.object({
+  expectedRevision: expectedRevisionSchema,
+}).strict();
+
+function conflictResponse(err: unknown): { error: string; code: string; jobId?: string } | null {
+  if (err instanceof GenerationRevisionConflictError) {
+    return { error: err.message, code: err.code };
+  }
+  if (err instanceof ActiveJobResourceConflict) {
+    return { error: err.message, code: err.code, jobId: err.jobId };
+  }
+  return null;
+}
+
+function runBriefRoutePostCommitEffect(
+  workspaceId: string,
+  briefId: string,
+  effect: string,
+  callback: () => void,
+): void {
+  try {
+    callback();
+  } catch (err) {
+    log.warn({ err, workspaceId, briefId, effect }, 'content brief route post-commit effect failed');
+  }
+}
+
 function notifyContentUpdated(workspaceId: string, payload: Record<string, unknown>) {
-  invalidateContentPipelineIntelligence(workspaceId);
-  broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-briefs', ...payload });
+  const briefId = typeof payload.briefId === 'string' ? payload.briefId : 'unknown';
+  runBriefRoutePostCommitEffect(workspaceId, briefId, 'intelligence-cache', () => {
+    invalidateContentPipelineIntelligence(workspaceId);
+  });
+  runBriefRoutePostCommitEffect(workspaceId, briefId, 'content-updated-broadcast', () => {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-briefs', ...payload });
+  });
 }
 
 // --- Content Briefs ---
@@ -137,15 +182,31 @@ router.get('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess('
 
 // Update a content brief (inline editing)
 router.patch('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess('workspaceId'), validate(contentBriefPatchSchema), (req, res) => {
-  const updated = updateBrief(req.params.workspaceId, req.params.briefId, req.body);
+  const { expectedRevision, ...updates } = req.body;
+  let updated;
+  try {
+    updated = updateBriefAtRevision(
+      req.params.workspaceId,
+      req.params.briefId,
+      expectedRevision,
+      updates,
+    );
+  } catch (err) {
+    const conflict = conflictResponse(err);
+    if (conflict) return res.status(409).json(conflict);
+    throw err;
+  }
   if (!updated) return res.status(404).json({ error: 'Brief not found' });
-  addActivity(
-    req.params.workspaceId,
-    'content_updated',
-    `Updated content brief "${updated.suggestedTitle || updated.targetKeyword}"`,
-    undefined,
-    { briefId: updated.id, action: 'brief_updated' },
-  );
+  if (updated.generationRevision === expectedRevision) return res.json(updated);
+  runBriefRoutePostCommitEffect(req.params.workspaceId, updated.id, 'update-activity', () => {
+    addActivity(
+      req.params.workspaceId,
+      'content_updated',
+      `Updated content brief "${updated.suggestedTitle || updated.targetKeyword}"`,
+      undefined,
+      { briefId: updated.id, action: 'brief_updated' },
+    );
+  });
   notifyContentUpdated(req.params.workspaceId, { briefId: updated.id, action: 'brief_updated' });
   res.json(updated);
 });
@@ -164,8 +225,6 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
       }
       const ws = getWorkspace(req.params.workspaceId);
       if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-      const activeBriefJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION, req.params.workspaceId);
-      if (activeBriefJob) return res.status(409).json({ error: 'Content brief generation is already running for this workspace', jobId: activeBriefJob.id });
       const refUrlList: string[] = Array.isArray(referenceUrls)
         ? referenceUrls.filter((u: unknown) => typeof u === 'string' && (u as string).startsWith('http')).slice(0, 5)
         : [];
@@ -182,6 +241,8 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
       return res.json(started);
     }
   } catch (err) {
+    const conflict = conflictResponse(err);
+    if (conflict) return res.status(409).json(conflict);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate brief' });
   }
 });
@@ -193,36 +254,45 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
 // store and broadcasts BRIEF_UPDATED on completion (declared cross-lane contract:
 // ContentBriefs.tsx is re-wired by a sibling lane). Failures surface via the job
 // error state, not the HTTP response.
-router.post('/api/content-briefs/:workspaceId/:briefId/regenerate', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  const { feedback } = req.body;
-  if (!feedback) return res.status(400).json({ error: 'feedback required' });
+router.post('/api/content-briefs/:workspaceId/:briefId/regenerate', requireWorkspaceAccess('workspaceId'), validate(regenerateBriefSchema), (req, res) => {
+  const { feedback, expectedRevision } = req.body;
   const existing = getBrief(req.params.workspaceId, req.params.briefId);
   if (!existing) return res.status(404).json({ error: 'Brief not found' });
-  const activeJob = hasActiveBriefRegenerateJob(req.params.workspaceId);
-  if (activeJob) return res.status(409).json({ error: 'A brief regeneration is already running for this workspace', jobId: activeJob.id });
-  const started = startContentBriefRegenerateJob({
-    mode: 'regenerate',
-    workspaceId: req.params.workspaceId,
-    briefId: req.params.briefId,
-    feedback,
-  });
-  res.status(202).json(started);
+  try {
+    const started = startContentBriefRegenerateJob({
+      mode: 'regenerate',
+      workspaceId: req.params.workspaceId,
+      briefId: req.params.briefId,
+      feedback,
+      expectedRevision,
+    });
+    res.status(202).json(started);
+  } catch (err) {
+    const conflict = conflictResponse(err);
+    if (conflict) return res.status(409).json(conflict);
+    throw err;
+  }
 });
 
 // Regenerate outline only (preserves all other brief fields) — async, returns 202 { jobId }
-router.post('/api/content-briefs/:workspaceId/:briefId/regenerate-outline', requireWorkspaceAccess('workspaceId'), (req, res) => {
-  const { feedback } = req.body || {};
+router.post('/api/content-briefs/:workspaceId/:briefId/regenerate-outline', requireWorkspaceAccess('workspaceId'), validate(regenerateOutlineSchema), (req, res) => {
+  const { feedback, expectedRevision } = req.body;
   const existing = getBrief(req.params.workspaceId, req.params.briefId);
   if (!existing) return res.status(404).json({ error: 'Brief not found' });
-  const activeJob = hasActiveBriefRegenerateJob(req.params.workspaceId);
-  if (activeJob) return res.status(409).json({ error: 'A brief regeneration is already running for this workspace', jobId: activeJob.id });
-  const started = startContentBriefRegenerateJob({
-    mode: 'outline',
-    workspaceId: req.params.workspaceId,
-    briefId: req.params.briefId,
-    feedback: typeof feedback === 'string' ? feedback : undefined,
-  });
-  res.status(202).json(started);
+  try {
+    const started = startContentBriefRegenerateJob({
+      mode: 'outline',
+      workspaceId: req.params.workspaceId,
+      briefId: req.params.briefId,
+      feedback,
+      expectedRevision,
+    });
+    res.status(202).json(started);
+  } catch (err) {
+    const conflict = conflictResponse(err);
+    if (conflict) return res.status(409).json(conflict);
+    throw err;
+  }
 });
 
 // Export a brief as branded HTML
@@ -240,95 +310,49 @@ router.get('/api/content-briefs/:workspaceId/:briefId/export', requireWorkspaceA
 // operator's message to the client). Mirrors the post path (sendPostToClientForReview).
 const sendBriefToClientSchema = z.object({
   note: z.string().max(5000).optional(),
+  expectedRevision: expectedRevisionSchema,
 }).strict();
 router.post('/api/content-briefs/:workspaceId/:briefId/send-to-client', requireWorkspaceAccess('workspaceId'), validate(sendBriefToClientSchema), (req, res) => {
-  const brief = getBrief(req.params.workspaceId, req.params.briefId);
-  if (!brief) return res.status(404).json({ error: 'Brief not found' });
-
-  const { note } = req.body as { note?: string };
-  const ws = getWorkspace(req.params.workspaceId);
-
-  // Bug 2 fix: wrap dedupe-check + create + link in a single transaction so the
-  // check-then-create sequence is atomic. Re-checking INSIDE the transaction (not
-  // before it) closes the TOCTOU window where two concurrent send-to-client calls
-  // both pass an outside-the-txn check and each create a request. The serialized
-  // transaction guarantees the second caller sees the first caller's row and
-  // early-returns its id instead of inserting a duplicate.
-  let request: ReturnType<typeof createContentRequest> | null = null;
-  let dedupedRequestId: string | null = null;
-  db.transaction(() => {
-    const existing = getOpenRequestForBrief(req.params.workspaceId, brief.id);
-    if (existing) {
-      dedupedRequestId = existing.id;
-      return;
+  const { note, expectedRevision } = req.body as { note?: string; expectedRevision: number };
+  try {
+    const result = sendBriefToClientForReview(
+      req.params.workspaceId,
+      req.params.briefId,
+      { note, expectedRevision, activitySource: 'admin' },
+    );
+    res.json({ ok: true, requestId: result.request.id });
+  } catch (err) {
+    if (err instanceof BriefNotFoundError) {
+      return res.status(404).json({ error: 'Brief not found' });
     }
-    request = createContentRequest(req.params.workspaceId, {
-      topic: brief.suggestedTitle,
-      targetKeyword: brief.targetKeyword,
-      intent: brief.intent || 'informational',
-      priority: 'medium',
-      rationale: brief.executiveSummary || `Content brief for "${brief.targetKeyword}"`,
-      source: 'strategy',
-      serviceType: 'brief_only',
-      pageType: (brief.pageType as 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource') || 'blog',
-      initialStatus: 'brief_generated',
-      clientNote: note,
-      dedupe: false,
-    });
-    // Link the brief and set to client_review
-    updateContentRequest(req.params.workspaceId, request!.id, {
-      briefId: brief.id,
-      status: 'client_review',
-      internalNote: note,
-    });
-  })();
-
-  // Dedupe hit — an open request already covers this brief; return it without
-  // re-broadcasting, re-notifying, or re-logging (no new work was done).
-  if (dedupedRequestId) {
-    return res.json({ ok: true, requestId: dedupedRequestId });
+    const conflict = conflictResponse(err);
+    if (conflict) return res.status(409).json(conflict);
+    throw err;
   }
-
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request!.id });
-  notifyContentUpdated(req.params.workspaceId, { briefId: brief.id, requestId: request!.id, action: 'brief_sent_to_client' });
-  addActivity(
-    req.params.workspaceId,
-    'brief_generated',
-    `Sent brief "${brief.suggestedTitle}" to client`,
-    `Keyword: ${brief.targetKeyword}`,
-    { briefId: brief.id, requestId: request!.id, action: 'brief_sent_to_client', note },
-  );
-
-  // Send email notification
-  if (ws?.clientEmail) {
-    const origin = req.get('origin') || `${req.protocol}://${req.get('host')}`;
-    const dashUrl = buildClientInboxReviewsUrl(origin, req.params.workspaceId);
-    notifyClientBriefReady({
-      clientEmail: ws.clientEmail,
-      workspaceName: ws.name,
-      workspaceId: req.params.workspaceId,
-      topic: brief.suggestedTitle,
-      targetKeyword: brief.targetKeyword,
-      dashboardUrl: dashUrl,
-    });
-  }
-
-  log.info(`Brief ${brief.id} sent to client via request ${request!.id}`);
-  res.json({ ok: true, requestId: request!.id });
 });
 
 // Delete a brief
-router.delete('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess('workspaceId'), (req, res) => {
+router.delete('/api/content-briefs/:workspaceId/:briefId', requireWorkspaceAccess('workspaceId'), validate(deleteBriefSchema), (req, res) => {
   const existing = getBrief(req.params.workspaceId, req.params.briefId);
   if (!existing) return res.status(404).json({ error: 'Brief not found' });
-  deleteBrief(req.params.workspaceId, req.params.briefId);
-  addActivity(
-    req.params.workspaceId,
-    'content_updated',
-    `Deleted content brief "${existing.suggestedTitle || existing.targetKeyword}"`,
-    undefined,
-    { briefId: existing.id, action: 'brief_deleted' },
-  );
+  try {
+    if (!deleteBriefAtRevision(req.params.workspaceId, req.params.briefId, req.body.expectedRevision)) {
+      return res.status(404).json({ error: 'Brief not found' });
+    }
+  } catch (err) {
+    const conflict = conflictResponse(err);
+    if (conflict) return res.status(409).json(conflict);
+    throw err;
+  }
+  runBriefRoutePostCommitEffect(req.params.workspaceId, existing.id, 'delete-activity', () => {
+    addActivity(
+      req.params.workspaceId,
+      'content_updated',
+      `Deleted content brief "${existing.suggestedTitle || existing.targetKeyword}"`,
+      undefined,
+      { briefId: existing.id, action: 'brief_deleted' },
+    );
+  });
   notifyContentUpdated(req.params.workspaceId, { briefId: existing.id, action: 'brief_deleted', deleted: true });
   res.json({ ok: true });
 });

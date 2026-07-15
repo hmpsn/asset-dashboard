@@ -23,15 +23,33 @@ export interface AIExecutionMetadata {
   durationMs: number;
 }
 
-/** Internal durable-artifact attribution. Raw prompts and secrets are never stored. */
-export interface GenerationProvenance {
+/** One accepted execution that contributed to a durable generated artifact. */
+export interface GenerationExecutionProvenance {
   runId: string;
+  /** Logical workflow/job correlation shared by every call in a composite generation. */
+  executionChainId?: string;
   operation: string;
-  /** Includes deterministic engines; AIExecutionMetadata remains limited to actual AI providers. */
-  provider: 'openai' | 'anthropic' | 'deterministic';
+  /**
+   * Includes deterministic engines and externally executed MCP generation. `external` means the
+   * platform prepared and fingerprinted the exact context but cannot attest the caller's model;
+   * AIExecutionMetadata remains limited to provider calls executed by this server.
+   */
+  provider: 'openai' | 'anthropic' | 'deterministic' | 'external';
   model: string;
   inputFingerprint: string;
-  evidenceCapturedAt?: string;
   startedAt: string;
   completedAt: string;
+}
+
+/** Internal durable-artifact attribution. Raw prompts and secrets are never stored. */
+export interface GenerationProvenance extends GenerationExecutionProvenance {
+  /** Ordered accepted executions for a composite artifact; rejected attempts remain trace-only. */
+  executions?: GenerationExecutionProvenance[];
+  evidenceCapturedAt?: string;
+}
+
+/** Required internal persistence shape; public projections intentionally omit these fields. */
+export interface GenerationTrackedArtifact {
+  generationRevision: number;
+  generationProvenance: GenerationProvenance | null;
 }

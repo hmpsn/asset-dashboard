@@ -15,14 +15,24 @@ import { WS_EVENTS } from '../ws-events.js';
 import {
   listContentRequests,
   getContentRequest,
+  ExplicitContentRequestNotFoundError,
   updateContentRequest,
   deleteContentRequest,
 } from '../content-requests.js';
 import { getContentPerformanceTrend, handleContentPerformance } from '../domains/content/content-performance.js';
-import { sendPostToClientForReview, PostNotFoundError } from '../domains/content/send-post-to-client.js';
+import {
+  PostNotFoundError,
+  PostReviewRequestLifecycleConflictError,
+  sendPostToClientForReview,
+} from '../domains/content/send-post-to-client.js';
+import {
+  BriefNotFoundError,
+  BriefReviewRequestLifecycleConflictError,
+  sendBriefToClientForReview,
+} from '../domains/content/send-brief-to-client.js';
 import { IncompleteContentPostError } from '../domains/content/generation-integrity.js';
 import { listPosts } from '../content-posts.js';
-import { notifyClientBriefReady, notifyClientContentPublished, notifyClientPostReady } from '../email.js';
+import { notifyClientContentPublished } from '../email.js';
 import { CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
 import {
   getSiteSubdomain,
@@ -36,15 +46,36 @@ import { onContentRequestLive } from '../domains/content/on-content-request-live
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
 import { isProgrammingError } from '../errors.js';
-import { hasActiveJob } from '../jobs.js';
-import { startContentBriefGenerationJob } from '../content-brief-generation-job.js';
-import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { ActiveJobResourceConflict } from '../jobs.js';
+import {
+  ContentRequestGenerationConflictError,
+  ContentRequestGenerationLifecycleError,
+  startContentBriefGenerationJob,
+} from '../content-brief-generation-job.js';
+import { GenerationRevisionConflictError } from '../generation-provenance.js';
 
 const log = createLogger('content-requests');
 export { handleContentPerformance };
 
+function runContentRequestPostCommitEffect(
+  workspaceId: string,
+  requestId: string,
+  effect: string,
+  callback: () => void,
+): void {
+  try {
+    callback();
+  } catch (err) {
+    try {
+      log.warn({ err, workspaceId, requestId, effect }, 'content request post-commit effect failed');
+    } catch { // catch-ok -- failure reporting must not undo a committed request mutation.
+    }
+  }
+}
+
 const updateContentRequestSchema = z.object({
   status: z.enum(['pending_payment', 'requested', 'brief_generated', 'client_review', 'approved', 'changes_requested', 'in_progress', 'post_review', 'delivered', 'published', 'declined']).optional(),
+  clientNote: z.string().max(5000).optional(),
   internalNote: z.string().max(5000).optional(),
   deliveryUrl: z.string().url().optional().or(z.literal('')),
   deliveryNotes: z.string().max(5000).optional(),
@@ -52,16 +83,35 @@ const updateContentRequestSchema = z.object({
   serviceType: z.enum(['brief_only', 'full_post']).optional(),
   upgradedAt: z.string().datetime().optional(),
   clientFeedback: z.string().max(2000).optional().or(z.literal('')),
+  expectedBriefRevision: z.number().int().nonnegative().optional(),
+  expectedPostRevision: z.number().int().nonnegative().optional(),
+}).superRefine((body, ctx) => {
+  if (body.status === 'client_review' && body.expectedBriefRevision === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['expectedBriefRevision'],
+      message: 'expectedBriefRevision is required when sending a brief to client review',
+    });
+  }
+  if (body.status === 'post_review' && body.expectedPostRevision === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['expectedPostRevision'],
+      message: 'expectedPostRevision is required when sending a post to client review',
+    });
+  }
 });
 
 const generateRequestBriefSchema = z.object({
   generationStyle: z.enum(CONTENT_GENERATION_STYLES).optional(),
+  expectedRequestUpdatedAt: z.string().datetime(),
 }).strict();
 
 // Admin Send Convention: a single "Send to client" action + an OPTIONAL inline note (no
 // "Send for Review" / "Flag for Client" split). The note is the operator's message to the client.
 const sendPostToClientSchema = z.object({
   note: z.string().max(5000).optional(),
+  expectedRevision: z.number().int().nonnegative(),
 }).strict();
 
 // --- Internal Content Request Management ---
@@ -76,14 +126,27 @@ router.get('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('wor
 });
 
 router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), validate(updateContentRequestSchema), (req, res, next) => {
-  const { status, internalNote, deliveryUrl, deliveryNotes, briefId, serviceType, upgradedAt, clientFeedback } = req.body;
+  const {
+    status,
+    clientNote,
+    internalNote,
+    deliveryUrl,
+    deliveryNotes,
+    briefId,
+    serviceType,
+    upgradedAt,
+    clientFeedback,
+    expectedBriefRevision,
+    expectedPostRevision,
+  } = req.body;
+  const currentRequest = getContentRequest(req.params.workspaceId, req.params.id);
+  if (!currentRequest) return res.status(404).json({ error: 'Request not found' });
   // Auto-populate postId when sending to post_review.
   // The state machine has already validated the transition by this point.
   let postIdToSet: string | undefined;
   if (status === 'post_review') {
-    const existing = getContentRequest(req.params.workspaceId, req.params.id);
-    if (existing?.briefId) {
-      const post = listPosts(req.params.workspaceId).find(p => p.briefId === existing.briefId);
+    if (currentRequest.briefId) {
+      const post = listPosts(req.params.workspaceId).find(p => p.briefId === currentRequest.briefId);
       postIdToSet = post?.id;
     }
   }
@@ -92,10 +155,65 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
       error: 'No generated post found for this request. Generate a post before sending to client.',
     });
   }
+  if (status === 'post_review') {
+    try {
+      const result = sendPostToClientForReview(req.params.workspaceId, postIdToSet!, {
+        note: clientNote,
+        requestId: currentRequest.id,
+        expectedRevision: expectedPostRevision,
+        activitySource: 'admin',
+      });
+      return res.json(result.request);
+    } catch (err) {
+      if (err instanceof GenerationRevisionConflictError) {
+        return res.status(409).json({ error: err.message, code: err.code });
+      }
+      if (err instanceof ExplicitContentRequestNotFoundError) {
+        return res.status(409).json({ error: err.message, code: err.code });
+      }
+      if (err instanceof PostReviewRequestLifecycleConflictError) {
+        return res.status(409).json({ error: err.message, code: err.code });
+      }
+      if (err instanceof IncompleteContentPostError) return res.status(409).json({ error: err.message });
+      if (err instanceof PostNotFoundError) return res.status(404).json({ error: err.message });
+      if (err instanceof Error && err.name === 'InvalidTransitionError') {
+        return res.status(400).json({ error: err.message });
+      }
+      return next(err);
+    }
+  }
+  if (status === 'client_review') {
+    const targetBriefId = briefId ?? currentRequest.briefId;
+    if (!targetBriefId) return res.status(400).json({ error: 'No content brief is linked to this request' });
+    try {
+      const result = sendBriefToClientForReview(req.params.workspaceId, targetBriefId, {
+        note: clientNote,
+        requestId: currentRequest.id,
+        expectedRevision: expectedBriefRevision,
+        activitySource: 'admin',
+      });
+      return res.json(result.request);
+    } catch (err) {
+      if (err instanceof GenerationRevisionConflictError) {
+        return res.status(409).json({ error: err.message, code: err.code });
+      }
+      if (err instanceof ExplicitContentRequestNotFoundError) {
+        return res.status(409).json({ error: err.message, code: err.code });
+      }
+      if (err instanceof BriefReviewRequestLifecycleConflictError) {
+        return res.status(409).json({ error: err.message, code: err.code });
+      }
+      if (err instanceof BriefNotFoundError) return res.status(404).json({ error: err.message });
+      if (err instanceof Error && err.name === 'InvalidTransitionError') {
+        return res.status(400).json({ error: err.message });
+      }
+      return next(err);
+    }
+  }
   let updated;
   try {
     updated = updateContentRequest(req.params.workspaceId, req.params.id, {
-      status, internalNote, deliveryUrl, deliveryNotes, briefId, serviceType, upgradedAt, clientFeedback,
+      status, clientNote, internalNote, deliveryUrl, deliveryNotes, briefId, serviceType, upgradedAt, clientFeedback,
       ...(postIdToSet ? { postId: postIdToSet } : {}),
     });
   } catch (err: unknown) {
@@ -105,31 +223,6 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
     return next(err);
   }
   if (!updated) return res.status(404).json({ error: 'Request not found' });
-  // Send email when brief is sent to client review
-  if (status === 'client_review') {
-    const wsInfo = getWorkspace(req.params.workspaceId);
-    if (wsInfo?.clientEmail) {
-      const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
-      const dashUrl = buildClientInboxReviewsUrl(origin, req.params.workspaceId);
-      notifyClientBriefReady({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, workspaceId: req.params.workspaceId, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl });
-    }
-  }
-  // Notify client when post is sent for their review
-  if (status === 'post_review') {
-    const wsInfo = getWorkspace(req.params.workspaceId);
-    if (wsInfo?.clientEmail) {
-      const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
-      const dashUrl = buildClientInboxReviewsUrl(origin, req.params.workspaceId);
-      notifyClientPostReady({
-        clientEmail: wsInfo.clientEmail,
-        workspaceName: wsInfo.name,
-        workspaceId: req.params.workspaceId,
-        topic: updated.topic,
-        targetKeyword: updated.targetKeyword,
-        dashboardUrl: dashUrl,
-      });
-    }
-  }
   // When content is delivered/published and has a target page, mark the page live
   // and enqueue the debounced post-update follow-ons (recs regen + llms.txt) —
   // a new/updated live page changes the inventory the recommendation engine ranks
@@ -138,26 +231,30 @@ router.patch('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('w
   // stay in lockstep (no-op when there's no target page; follow-on enqueue is
   // self-guarded so a failure can never abort the request update).
   if (status === 'delivered' || status === 'published') {
-    onContentRequestLive(req.params.workspaceId, updated);
+    runContentRequestPostCommitEffect(req.params.workspaceId, updated.id, 'content-live-follow-ons', () => {
+      onContentRequestLive(req.params.workspaceId, updated);
+    });
   }
   // Notify client when content is published
   if (status === 'published') {
-    const wsInfo = getWorkspace(req.params.workspaceId);
-    if (wsInfo?.clientEmail) {
-      const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
-      const dashUrl = buildClientInboxReviewsUrl(origin, req.params.workspaceId);
-      notifyClientContentPublished({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, workspaceId: req.params.workspaceId, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl });
-    }
-  }
-  // Activity log entry for post_review transition
-  if (status === 'post_review') {
-    addActivity(req.params.workspaceId, 'post_sent_for_review', `Post sent to client for review: "${updated.topic}"`, '', { requestId: updated.id });
+    runContentRequestPostCommitEffect(req.params.workspaceId, updated.id, 'published-email', () => {
+      const wsInfo = getWorkspace(req.params.workspaceId);
+      if (wsInfo?.clientEmail) {
+        const origin = req.get('origin') || req.get('referer')?.replace(/\/[^/]*$/, '') || '';
+        const dashUrl = buildClientInboxReviewsUrl(origin, req.params.workspaceId);
+        notifyClientContentPublished({ clientEmail: wsInfo.clientEmail, workspaceName: wsInfo.name, workspaceId: req.params.workspaceId, topic: updated.topic, targetKeyword: updated.targetKeyword, dashboardUrl: dashUrl });
+      }
+    });
   }
   // Activity log entry for serviceType upgrade (matches public endpoint behavior)
   if (serviceType === 'full_post') {
-    addActivity(req.params.workspaceId, 'content_upgraded', `Admin upgraded "${updated.topic}" to full blog post`, '', { requestId: updated.id });
+    runContentRequestPostCommitEffect(req.params.workspaceId, updated.id, 'upgrade-activity', () => {
+      addActivity(req.params.workspaceId, 'content_upgraded', `Admin upgraded "${updated.topic}" to full blog post`, '', { requestId: updated.id });
+    });
   }
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
+  runContentRequestPostCommitEffect(req.params.workspaceId, updated.id, 'request-updated-broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
+  });
   res.json(updated);
 });
 
@@ -167,14 +264,18 @@ router.delete('/api/content-requests/:workspaceId/:id', requireWorkspaceAccess('
   if (!existing) return res.status(404).json({ error: 'Request not found' });
   const deleted = deleteContentRequest(req.params.workspaceId, req.params.id);
   if (!deleted) return res.status(404).json({ error: 'Request not found' });
-  addActivity(
-    req.params.workspaceId,
-    'content_request_deleted',
-    `Content request deleted: "${existing.topic}"`,
-    existing.targetKeyword ? `Keyword: "${existing.targetKeyword}"` : '',
-    { requestId: existing.id },
-  );
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: req.params.id, deleted: true });
+  runContentRequestPostCommitEffect(req.params.workspaceId, existing.id, 'delete-activity', () => {
+    addActivity(
+      req.params.workspaceId,
+      'content_request_deleted',
+      `Content request deleted: "${existing.topic}"`,
+      existing.targetKeyword ? `Keyword: "${existing.targetKeyword}"` : '',
+      { requestId: existing.id },
+    );
+  });
+  runContentRequestPostCommitEffect(req.params.workspaceId, existing.id, 'request-deleted-broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: req.params.id, deleted: true });
+  });
   res.json({ ok: true });
 });
 
@@ -192,9 +293,13 @@ router.post(
   validate(sendPostToClientSchema),
   (req, res, next) => {
     const { workspaceId, postId } = req.params;
-    const { note } = req.body as { note?: string };
+    const { note, expectedRevision } = req.body as { note?: string; expectedRevision: number };
     try {
-      const { request } = sendPostToClientForReview(workspaceId, postId, { note, activitySource: 'admin' });
+      const { request } = sendPostToClientForReview(workspaceId, postId, {
+        note,
+        expectedRevision,
+        activitySource: 'admin',
+      });
       res.json(request);
     } catch (err: unknown) {
       if (err instanceof PostNotFoundError) {
@@ -202,6 +307,9 @@ router.post(
       }
       if (err instanceof IncompleteContentPostError) {
         return res.status(409).json({ error: err.message });
+      }
+      if (err instanceof GenerationRevisionConflictError) {
+        return res.status(409).json({ error: err.message, code: err.code });
       }
       if (err instanceof Error && err.name === 'InvalidTransitionError') {
         return res.status(400).json({ error: err.message });
@@ -274,21 +382,27 @@ router.post('/api/content-requests/:workspaceId/:id/generate-brief', requireWork
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const request = getContentRequest(req.params.workspaceId, req.params.id);
   if (!request) return res.status(404).json({ error: 'Request not found' });
-  const { generationStyle } = req.body;
+  const { generationStyle, expectedRequestUpdatedAt } = req.body;
 
   try {
-    {
-      const activeBriefJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION, req.params.workspaceId);
-      if (activeBriefJob) return res.status(409).json({ error: 'Content brief generation is already running for this workspace', jobId: activeBriefJob.id });
-      const started = startContentBriefGenerationJob({
-        source: 'request',
-        workspaceId: req.params.workspaceId,
-        requestId: req.params.id,
-        generationStyle,
-      });
-      return res.json(started);
-    }
+    const started = startContentBriefGenerationJob({
+      source: 'request',
+      workspaceId: req.params.workspaceId,
+      requestId: req.params.id,
+      generationStyle,
+      expectedRequestUpdatedAt,
+    });
+    return res.json(started);
   } catch (err: unknown) {
+    if (err instanceof ActiveJobResourceConflict) {
+      return res.status(409).json({ error: err.message, code: err.code, jobId: err.jobId });
+    }
+    if (err instanceof ContentRequestGenerationConflictError) {
+      return res.status(409).json({ error: err.message, code: err.code });
+    }
+    if (err instanceof ContentRequestGenerationLifecycleError) {
+      return res.status(409).json({ error: err.message, code: err.code, status: err.status });
+    }
     const msg = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({ error: msg });
   }

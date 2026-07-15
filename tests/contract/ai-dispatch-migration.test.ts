@@ -124,7 +124,7 @@ describe('AI dispatch migration', () => {
     for (const file of migratedAnthropicGenerationFiles) {
       const source = readFileSync(file.path, 'utf-8');
       expect(source, file.path).toContain(file.aiImport);
-      expect(source, file.path).toContain('callAI({');
+      expect(source, file.path).toMatch(/\bcallAI\s*\(/);
       expect(source, file.path).toContain("provider: 'anthropic'");
       expect(source, file.path).not.toContain("from './anthropic-helpers.js'");
       expect(source, file.path).not.toContain('callAnthropic({');

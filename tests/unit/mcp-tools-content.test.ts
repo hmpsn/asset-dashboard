@@ -11,14 +11,14 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: vi.fn(),
 }));
 vi.mock('../../server/content-brief.js', () => ({
-  deleteBrief: vi.fn(),
+  deleteBriefAtRevision: vi.fn(),
   getBrief: vi.fn(),
   listBriefs: vi.fn(),
-  updateBrief: vi.fn(),
+  updateBriefAtRevision: vi.fn(),
   upsertBrief: vi.fn(),
 }));
 vi.mock('../../server/content-posts-db.js', () => ({
-  deletePost: vi.fn(),
+  deletePostAtRevision: vi.fn(),
   getPost: vi.fn(),
   listPostVersions: vi.fn(),
   listPosts: vi.fn(),
@@ -38,6 +38,9 @@ vi.mock('../../server/broadcast.js', () => ({
 vi.mock('../../server/activity-log.js', () => ({
   addActivity: vi.fn(),
 }));
+vi.mock('../../server/intelligence-freshness.js', () => ({
+  invalidateContentPipelineIntelligence: vi.fn(),
+}));
 vi.mock('../../server/domains/content/publish-post-to-webflow.js', () => {
   class PublishPostError extends Error {
     code: string;
@@ -50,24 +53,53 @@ vi.mock('../../server/domains/content/publish-post-to-webflow.js', () => {
   }
   return { publishPostToWebflow: vi.fn(), PublishPostError };
 });
+vi.mock('../../server/content-publish-job.js', () => ({
+  publishPostToWebflowWithClaim: vi.fn(),
+}));
 vi.mock('../../server/domains/content/on-content-request-live.js', () => ({
   onContentRequestLive: vi.fn(),
 }));
+vi.mock('../../server/domains/content/send-brief-to-client.js', () => {
+  class BriefNotFoundError extends Error {
+    constructor(_workspaceId: string, briefId: string) {
+      super(`Brief not found: ${briefId}`);
+      this.name = 'BriefNotFoundError';
+    }
+  }
+  return { sendBriefToClientForReview: vi.fn(), BriefNotFoundError };
+});
+vi.mock('../../server/domains/content/send-post-to-client.js', () => {
+  class PostNotFoundError extends Error {
+    constructor(_workspaceId: string, postId: string) {
+      super(`Post not found: ${postId}`);
+      this.name = 'PostNotFoundError';
+    }
+  }
+  return { sendPostToClientForReview: vi.fn(), PostNotFoundError };
+});
 vi.mock('../../server/domains/brand/review-service.js', () => ({
   createBrandReviewDeliverable: vi.fn(),
 }));
 
 import { getWorkspace } from '../../server/workspaces.js';
 import { publishPostToWebflow, PublishPostError } from '../../server/domains/content/publish-post-to-webflow.js';
+import { publishPostToWebflowWithClaim } from '../../server/content-publish-job.js';
 import { onContentRequestLive } from '../../server/domains/content/on-content-request-live.js';
+import { BriefNotFoundError, sendBriefToClientForReview } from '../../server/domains/content/send-brief-to-client.js';
+import { PostNotFoundError, sendPostToClientForReview } from '../../server/domains/content/send-post-to-client.js';
 import { createBrandReviewDeliverable } from '../../server/domains/brand/review-service.js';
 import { buildContentGenerationContext } from '../../server/intelligence/generation-context-builders.js';
 import { buildWorkspaceIntelligence } from '../../server/workspace-intelligence.js';
-import { deleteBrief, getBrief, listBriefs, updateBrief, upsertBrief } from '../../server/content-brief.js';
-import { deletePost, getPost, listPostVersions, listPosts, revertToVersion, savePost, updatePostField } from '../../server/content-posts-db.js';
+import { deleteBriefAtRevision, getBrief, listBriefs, updateBriefAtRevision, upsertBrief } from '../../server/content-brief.js';
+import { deletePostAtRevision, getPost, listPostVersions, listPosts, revertToVersion, savePost, updatePostField } from '../../server/content-posts-db.js';
 import { createContentRequest, getContentRequest, listContentRequests, updateContentRequest } from '../../server/content-requests.js';
 import { broadcastToWorkspace } from '../../server/broadcast.js';
 import { addActivity } from '../../server/activity-log.js';
+import { invalidateContentPipelineIntelligence } from '../../server/intelligence-freshness.js';
+import { UnresolvedContentPublishReconciliationError } from '../../server/content-publish-reconciliation.js';
+import { GenerationRevisionConflictError } from '../../server/generation-provenance.js';
+import { ActiveJobResourceConflict } from '../../server/jobs.js';
+import { JOB_RESOURCE_TYPES } from '../../shared/types/background-jobs.js';
 import { contentActionTools, handleContentActionTool } from '../../server/mcp/tools/content-actions.js';
 
 describe('mcp content action tools', () => {
@@ -92,7 +124,7 @@ describe('mcp content action tools', () => {
       },
     });
     (listBriefs as ReturnType<typeof vi.fn>).mockReturnValue([]);
-    (updateBrief as ReturnType<typeof vi.fn>).mockImplementation((_: string, __: string, updates: unknown) => ({
+    (updateBriefAtRevision as ReturnType<typeof vi.fn>).mockImplementation((_: string, __: string, revision: number, updates: unknown) => ({
       id: 'brief_1',
       workspaceId: 'ws-1',
       targetKeyword: 'kw',
@@ -106,10 +138,12 @@ describe('mcp content action tools', () => {
       competitorInsights: '',
       internalLinkSuggestions: [],
       createdAt: '2026-01-01T00:00:00.000Z',
+      generationRevision: revision + 1,
+      generationProvenance: null,
       ...updates as Record<string, unknown>,
     }));
     (listPosts as ReturnType<typeof vi.fn>).mockReturnValue([]);
-    (updatePostField as ReturnType<typeof vi.fn>).mockImplementation((_: string, postId: string, updates: unknown) => ({
+    (updatePostField as ReturnType<typeof vi.fn>).mockImplementation((_: string, postId: string, updates: unknown, revision: number) => ({
       id: postId,
       workspaceId: 'ws-1',
       briefId: 'brief_1',
@@ -124,7 +158,14 @@ describe('mcp content action tools', () => {
       status: 'draft',
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
+      generationRevision: revision + 1,
+      generationProvenance: null,
       ...updates as Record<string, unknown>,
+    }));
+    (savePost as ReturnType<typeof vi.fn>).mockImplementation((_: string, post: Record<string, unknown>) => ({
+      ...post,
+      generationRevision: post.generationRevision ?? 0,
+      generationProvenance: post.generationProvenance ?? null,
     }));
     (createContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'cr_1' });
     // updateContentRequest returns the updated request (the shared send-post service consumes the
@@ -140,10 +181,32 @@ describe('mcp content action tools', () => {
     );
     (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     (listContentRequests as ReturnType<typeof vi.fn>).mockReturnValue([]);
-    (deleteBrief as ReturnType<typeof vi.fn>).mockReturnValue(true);
-    (deletePost as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (deleteBriefAtRevision as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (deletePostAtRevision as ReturnType<typeof vi.fn>).mockReturnValue(true);
     (listPostVersions as ReturnType<typeof vi.fn>).mockReturnValue([]);
     (revertToVersion as ReturnType<typeof vi.fn>).mockReturnValue(null);
+    (sendBriefToClientForReview as ReturnType<typeof vi.fn>).mockImplementation(
+      (_workspaceId: string, _briefId: string, options?: { commitAuthorization?: () => void }) => {
+        options?.commitAuthorization?.();
+        return {
+          request: { id: 'cr_1', status: 'client_review' },
+          brief: { id: 'brief_1', generationRevision: 1 },
+          created: true,
+          changed: true,
+        };
+      },
+    );
+    (sendPostToClientForReview as ReturnType<typeof vi.fn>).mockImplementation(
+      (_workspaceId: string, _postId: string, options?: { commitAuthorization?: () => void }) => {
+        options?.commitAuthorization?.();
+        return {
+          request: { id: 'cr_1', status: 'post_review' },
+          post: { id: 'post_1', briefId: 'brief_1', generationRevision: 1 },
+          created: true,
+          changed: true,
+        };
+      },
+    );
     (createBrandReviewDeliverable as ReturnType<typeof vi.fn>).mockResolvedValue({
       deliverableId: 'cd_brand_review',
       reviewKind: 'brand_suite',
@@ -153,6 +216,42 @@ describe('mcp content action tools', () => {
       itemCount: 3,
       existing: false,
     });
+    (publishPostToWebflowWithClaim as ReturnType<typeof vi.fn>).mockImplementation(
+      async (options: {
+        workspaceId: string;
+        postId: string;
+        expectedRevision: number;
+        generateImage?: boolean;
+        activitySource: 'manual' | 'mcp-chat';
+        approvedOnly?: boolean;
+      }) => {
+        const post = (getPost as ReturnType<typeof vi.fn>)(options.workspaceId, options.postId) as {
+          status?: string;
+          generationRevision?: number;
+        } | null;
+        if (!post) throw new PublishPostError('post_not_found', `Post not found: ${options.postId}`, 404);
+        if (post.generationRevision !== options.expectedRevision) {
+          throw new PublishPostError('local_revision_conflict', 'The post changed.', 409);
+        }
+        if (options.approvedOnly && post.status !== 'approved') {
+          throw new PublishPostError(
+            'invalid_status',
+            `Post status is '${post.status}' — only 'approved' posts can be published via MCP.`,
+            400,
+          );
+        }
+        const result = await (publishPostToWebflow as ReturnType<typeof vi.fn>)(
+          options.workspaceId,
+          options.postId,
+          {
+            generateImage: options.generateImage,
+            activitySource: options.activitySource,
+            expectedRevision: options.expectedRevision,
+          },
+        );
+        return { jobId: 'job_publish_1', result };
+      },
+    );
   });
 
   it('registers content action tool names', () => {
@@ -292,7 +391,7 @@ describe('mcp content action tools', () => {
     expect(addActivity).not.toHaveBeenCalled();
   });
 
-  it('lists and fetches briefs with revision tokens', async () => {
+  it('lists and fetches briefs with persisted numeric revisions', async () => {
     const brief = {
       id: 'brief_1',
       workspaceId: 'ws-1',
@@ -307,22 +406,24 @@ describe('mcp content action tools', () => {
       competitorInsights: 'none',
       internalLinkSuggestions: ['/a'],
       createdAt: '2026-01-01T00:00:00.000Z',
+      generationRevision: 7,
+      generationProvenance: null,
     };
     (listBriefs as ReturnType<typeof vi.fn>).mockReturnValue([brief]);
     (getBrief as ReturnType<typeof vi.fn>).mockReturnValue(brief);
 
     const listed = await handleContentActionTool('list_briefs', { workspace_id: 'ws-1' });
     expect(listed.isError).toBeUndefined();
-    const listedPayload = JSON.parse(listed.content[0].text) as { briefs: Array<{ brief_id: string; revision: string }> };
+    const listedPayload = JSON.parse(listed.content[0].text) as { briefs: Array<{ brief_id: string; revision: number }> };
     expect(listedPayload.briefs).toHaveLength(1);
     expect(listedPayload.briefs[0].brief_id).toBe('brief_1');
-    expect(typeof listedPayload.briefs[0].revision).toBe('string');
+    expect(listedPayload.briefs[0].revision).toBe(7);
 
     const fetched = await handleContentActionTool('get_brief', { workspace_id: 'ws-1', brief_id: 'brief_1' });
     expect(fetched.isError).toBeUndefined();
-    const fetchedPayload = JSON.parse(fetched.content[0].text) as { brief: { id: string }; revision: string };
+    const fetchedPayload = JSON.parse(fetched.content[0].text) as { brief: { id: string }; revision: number };
     expect(fetchedPayload.brief.id).toBe('brief_1');
-    expect(typeof fetchedPayload.revision).toBe('string');
+    expect(fetchedPayload.revision).toBe(7);
   });
 
   it('updates brief in patch and replace modes with revision checks', async () => {
@@ -340,11 +441,13 @@ describe('mcp content action tools', () => {
       competitorInsights: 'none',
       internalLinkSuggestions: ['/a'],
       createdAt: '2026-01-01T00:00:00.000Z',
+      generationRevision: 7,
+      generationProvenance: null,
     };
     (getBrief as ReturnType<typeof vi.fn>).mockReturnValue(baseBrief);
 
     const fetched = await handleContentActionTool('get_brief', { workspace_id: 'ws-1', brief_id: 'brief_1' });
-    const revision = (JSON.parse(fetched.content[0].text) as { revision: string }).revision;
+    const revision = (JSON.parse(fetched.content[0].text) as { revision: number }).revision;
 
     const patched = await handleContentActionTool('update_brief', {
       workspace_id: 'ws-1',
@@ -353,7 +456,7 @@ describe('mcp content action tools', () => {
       mode: 'patch',
       updates: {
         suggestedTitle: 'Tighter HVAC Tips',
-        // Enhanced ContentBrief fields must merge through to updateBrief in patch mode.
+        // Enhanced ContentBrief fields must merge through to the atomic update in patch mode.
         toneAndStyle: 'crisp',
         peopleAlsoAsk: ['Why patch?'],
         schemaRecommendations: [{ type: 'FAQPage', notes: 'add FAQ' }],
@@ -363,7 +466,7 @@ describe('mcp content action tools', () => {
       },
     });
     expect(patched.isError).toBeUndefined();
-    expect(updateBrief).toHaveBeenCalledWith('ws-1', 'brief_1', expect.objectContaining({
+    expect(updateBriefAtRevision).toHaveBeenCalledWith('ws-1', 'brief_1', 7, expect.objectContaining({
       suggestedTitle: 'Tighter HVAC Tips',
       toneAndStyle: 'crisp',
       peopleAlsoAsk: ['Why patch?'],
@@ -390,7 +493,7 @@ describe('mcp content action tools', () => {
         audience: 'homeowners',
         competitorInsights: 'none',
         internalLinkSuggestions: ['/a'],
-        // Enhanced ContentBrief fields must overwrite through to updateBrief in replace mode.
+        // Enhanced ContentBrief fields must overwrite through to the atomic update in replace mode.
         topicalEntities: ['filters'],
         ctaRecommendations: ['Schedule service'],
         realTopResults: [{ position: 1, title: 'Top', url: 'https://example.com/top' }],
@@ -400,7 +503,7 @@ describe('mcp content action tools', () => {
       },
     });
     expect(replaced.isError).toBeUndefined();
-    expect(updateBrief).toHaveBeenCalledWith('ws-1', 'brief_1', expect.objectContaining({
+    expect(updateBriefAtRevision).toHaveBeenCalledWith('ws-1', 'brief_1', 7, expect.objectContaining({
       targetKeyword: 'hvac checklist',
       topicalEntities: ['filters'],
       ctaRecommendations: ['Schedule service'],
@@ -410,15 +513,23 @@ describe('mcp content action tools', () => {
       generationStyle: 'standard',
     }));
 
+    (broadcastToWorkspace as ReturnType<typeof vi.fn>).mockClear();
+    (addActivity as ReturnType<typeof vi.fn>).mockClear();
+    (updateBriefAtRevision as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new GenerationRevisionConflictError('content_brief', 'brief_1', 6);
+    });
     const conflicted = await handleContentActionTool('update_brief', {
       workspace_id: 'ws-1',
       brief_id: 'brief_1',
-      expected_revision: 'stale-revision',
+      expected_revision: 6,
       mode: 'patch',
       updates: { suggestedTitle: 'Should fail' },
     });
     expect(conflicted.isError).toBe(true);
     expect(conflicted.content[0].text).toContain('Revision conflict');
+    expect(conflicted.content[0].text).toContain('Current revision: 7');
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(addActivity).not.toHaveBeenCalled();
   });
 
   it('lists, fetches, and updates posts with revision checks', async () => {
@@ -445,17 +556,20 @@ describe('mcp content action tools', () => {
       status: 'draft' as const,
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
+      generationRevision: 4,
+      generationProvenance: null,
     };
     (listPosts as ReturnType<typeof vi.fn>).mockReturnValue([basePost]);
     (getPost as ReturnType<typeof vi.fn>).mockReturnValue(basePost);
 
     const listed = await handleContentActionTool('list_posts', { workspace_id: 'ws-1' });
     expect(listed.isError).toBeUndefined();
-    const listedPayload = JSON.parse(listed.content[0].text) as { posts: Array<{ post_id: string; revision: string }> };
+    const listedPayload = JSON.parse(listed.content[0].text) as { posts: Array<{ post_id: string; revision: number }> };
     expect(listedPayload.posts[0].post_id).toBe('post_1');
+    expect(listedPayload.posts[0].revision).toBe(4);
 
     const fetched = await handleContentActionTool('get_post', { workspace_id: 'ws-1', post_id: 'post_1' });
-    const revision = (JSON.parse(fetched.content[0].text) as { revision: string }).revision;
+    const revision = (JSON.parse(fetched.content[0].text) as { revision: number }).revision;
 
     const patched = await handleContentActionTool('update_post', {
       workspace_id: 'ws-1',
@@ -465,17 +579,107 @@ describe('mcp content action tools', () => {
       updates: { title: 'Updated title', sections: [{ index: 0, content: '<p>Updated body</p>' }] },
     });
     expect(patched.isError).toBeUndefined();
-    expect(updatePostField).toHaveBeenCalled();
+    expect(updatePostField).toHaveBeenCalledWith(
+      'ws-1',
+      'post_1',
+      expect.objectContaining({ title: 'Updated title' }),
+      4,
+    );
 
+    (broadcastToWorkspace as ReturnType<typeof vi.fn>).mockClear();
+    (addActivity as ReturnType<typeof vi.fn>).mockClear();
+    (updatePostField as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new GenerationRevisionConflictError('content_post', 'post_1', 3);
+    });
     const conflicted = await handleContentActionTool('update_post', {
       workspace_id: 'ws-1',
       post_id: 'post_1',
-      expected_revision: 'stale-revision',
+      expected_revision: 3,
       mode: 'patch',
       updates: { title: 'Should fail' },
     });
     expect(conflicted.isError).toBe(true);
     expect(conflicted.content[0].text).toContain('Revision conflict');
+    expect(conflicted.content[0].text).toContain('Current revision: 4');
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(addActivity).not.toHaveBeenCalled();
+  });
+
+  it('returns changed=false and emits no success side effects for semantic no-op updates', async () => {
+    const brief = {
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac tips',
+      secondaryKeywords: [],
+      suggestedTitle: 'Existing title',
+      suggestedMetaDesc: 'Meta',
+      outline: [],
+      wordCountTarget: 1200,
+      intent: 'informational',
+      audience: 'homeowners',
+      competitorInsights: '',
+      internalLinkSuggestions: [],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      generationRevision: 7,
+      generationProvenance: null,
+    };
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue(brief);
+    (updateBriefAtRevision as ReturnType<typeof vi.fn>).mockReturnValueOnce(brief);
+
+    const briefResult = await handleContentActionTool('update_brief', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+      expected_revision: 7,
+      mode: 'patch',
+      updates: { suggestedTitle: 'Existing title' },
+    });
+
+    expect(JSON.parse(briefResult.content[0].text)).toMatchObject({
+      ok: true,
+      changed: false,
+      revision: 7,
+    });
+    expect(invalidateContentPipelineIntelligence).not.toHaveBeenCalled();
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(addActivity).not.toHaveBeenCalled();
+
+    const post = {
+      id: 'post_1',
+      workspaceId: 'ws-1',
+      briefId: 'brief_1',
+      targetKeyword: 'hvac tips',
+      title: 'Existing post',
+      metaDescription: 'Meta',
+      introduction: '<p>Intro</p>',
+      sections: [],
+      conclusion: '<p>End</p>',
+      totalWordCount: 3,
+      targetWordCount: 1200,
+      status: 'draft',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      generationRevision: 4,
+      generationProvenance: null,
+    };
+    (getPost as ReturnType<typeof vi.fn>).mockReturnValue(post);
+    (updatePostField as ReturnType<typeof vi.fn>).mockReturnValueOnce(post);
+
+    const postResult = await handleContentActionTool('update_post', {
+      workspace_id: 'ws-1',
+      post_id: 'post_1',
+      expected_revision: 4,
+      mode: 'patch',
+      updates: { title: 'Existing post' },
+    });
+
+    expect(JSON.parse(postResult.content[0].text)).toMatchObject({
+      ok: true,
+      changed: false,
+      revision: 4,
+    });
+    expect(invalidateContentPipelineIntelligence).not.toHaveBeenCalled();
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(addActivity).not.toHaveBeenCalled();
   });
 
   it('applies optional status/page_type filters to list_briefs and list_posts', async () => {
@@ -582,19 +786,23 @@ describe('mcp content action tools', () => {
       outline: [{ heading: 'H2' }],
       suggestedTitle: 'HVAC brief',
       createdAt: '2026-01-01T00:00:00.000Z',
+      generationRevision: 3,
+      generationProvenance: null,
     });
     const briefDeleted = await handleContentActionTool('delete_brief', {
       workspace_id: 'ws-1',
       brief_id: 'brief_1',
+      expected_revision: 3,
     });
     expect(briefDeleted.isError).toBeUndefined();
-    expect(deleteBrief).toHaveBeenCalledWith('ws-1', 'brief_1');
+    expect(deleteBriefAtRevision).toHaveBeenCalledWith('ws-1', 'brief_1', 3);
     expect(broadcastToWorkspace).toHaveBeenCalledWith('ws-1', 'content:updated', expect.objectContaining({ action: 'mcp_brief_deleted' }));
 
     (getBrief as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const missingBrief = await handleContentActionTool('delete_brief', {
       workspace_id: 'ws-1',
       brief_id: 'brief_missing',
+      expected_revision: 0,
     });
     expect(missingBrief.isError).toBe(true);
 
@@ -613,21 +821,113 @@ describe('mcp content action tools', () => {
       status: 'draft',
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
+      generationRevision: 5,
+      generationProvenance: null,
     });
     const postDeleted = await handleContentActionTool('delete_post', {
       workspace_id: 'ws-1',
       post_id: 'post_1',
+      expected_revision: 5,
     });
     expect(postDeleted.isError).toBeUndefined();
-    expect(deletePost).toHaveBeenCalledWith('ws-1', 'post_1');
+    expect(deletePostAtRevision).toHaveBeenCalledWith('ws-1', 'post_1', 5);
     expect(broadcastToWorkspace).toHaveBeenCalledWith('ws-1', 'post:updated', expect.objectContaining({ action: 'mcp_post_deleted' }));
 
     (getPost as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const missingPost = await handleContentActionTool('delete_post', {
       workspace_id: 'ws-1',
       post_id: 'post_missing',
+      expected_revision: 0,
     });
     expect(missingPost.isError).toBe(true);
+  });
+
+  it('keeps committed deletes successful when independent post-commit effects fail', async () => {
+    (getPost as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'post_1',
+      workspaceId: 'ws-1',
+      briefId: 'brief_1',
+      targetKeyword: 'hvac',
+      title: 'HVAC post',
+      generationRevision: 5,
+    });
+    (invalidateContentPipelineIntelligence as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new Error('invalidation failed');
+    });
+    (broadcastToWorkspace as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new Error('broadcast failed');
+    });
+    (addActivity as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new Error('activity failed');
+    });
+
+    const result = await handleContentActionTool('delete_post', {
+      workspace_id: 'ws-1',
+      post_id: 'post_1',
+      expected_revision: 5,
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(JSON.parse(result.content[0].text)).toMatchObject({ ok: true, deleted: true });
+    expect(deletePostAtRevision).toHaveBeenCalledWith('ws-1', 'post_1', 5);
+    expect(invalidateContentPipelineIntelligence).toHaveBeenCalledTimes(1);
+    expect(broadcastToWorkspace).toHaveBeenCalledTimes(1);
+    expect(addActivity).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces unresolved external publish reconciliation without delete side effects', async () => {
+    (getPost as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'post_1',
+      workspaceId: 'ws-1',
+      title: 'Externally created post',
+      generationRevision: 5,
+    });
+    (deletePostAtRevision as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new UnresolvedContentPublishReconciliationError('ws-1', 'post_1');
+    });
+
+    const result = await handleContentActionTool('delete_post', {
+      workspace_id: 'ws-1',
+      post_id: 'post_1',
+      expected_revision: 5,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('external publish state is unresolved');
+    expect(invalidateContentPipelineIntelligence).not.toHaveBeenCalled();
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(addActivity).not.toHaveBeenCalled();
+  });
+
+  it('surfaces an active post owner when delete races claimed work', async () => {
+    (getPost as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'post_1',
+      workspaceId: 'ws-1',
+      title: 'Claimed post',
+      generationRevision: 5,
+    });
+    (deletePostAtRevision as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new ActiveJobResourceConflict([{
+        jobId: 'job_publish_1',
+        resource: {
+          resourceType: JOB_RESOURCE_TYPES.CONTENT_POST,
+          resourceId: 'post_1',
+        },
+      }]);
+    });
+
+    const result = await handleContentActionTool('delete_post', {
+      workspace_id: 'ws-1',
+      post_id: 'post_1',
+      expected_revision: 5,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('[active_job_resource_conflict]');
+    expect(result.content[0].text).toContain('active_job_id=job_publish_1');
+    expect(invalidateContentPipelineIntelligence).not.toHaveBeenCalled();
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(addActivity).not.toHaveBeenCalled();
   });
 
   it('supports list_post_versions and revert_post_version branches', async () => {
@@ -646,6 +946,8 @@ describe('mcp content action tools', () => {
       status: 'draft',
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
+      generationRevision: 9,
+      generationProvenance: null,
     });
     (listPostVersions as ReturnType<typeof vi.fn>).mockReturnValue([
       {
@@ -664,7 +966,11 @@ describe('mcp content action tools', () => {
       workspace_id: 'ws-1',
       post_id: 'post_1',
     });
-    const listedPayload = JSON.parse(listed.content[0].text) as { versions: Array<{ version_id: string }> };
+    const listedPayload = JSON.parse(listed.content[0].text) as {
+      revision: number;
+      versions: Array<{ version_id: string }>;
+    };
+    expect(listedPayload.revision).toBe(9);
     expect(listedPayload.versions).toHaveLength(1);
     expect(listedPayload.versions[0]?.version_id).toBe('ver_1');
 
@@ -683,15 +989,18 @@ describe('mcp content action tools', () => {
       status: 'draft',
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-02T00:00:00.000Z',
+      generationRevision: 10,
+      generationProvenance: null,
     });
 
     const reverted = await handleContentActionTool('revert_post_version', {
       workspace_id: 'ws-1',
       post_id: 'post_1',
       version_id: 'ver_1',
+      expected_revision: 9,
     });
     expect(reverted.isError).toBeUndefined();
-    expect(revertToVersion).toHaveBeenCalledWith('ws-1', 'post_1', 'ver_1');
+    expect(revertToVersion).toHaveBeenCalledWith('ws-1', 'post_1', 'ver_1', 9);
     expect(broadcastToWorkspace).toHaveBeenCalledWith('ws-1', 'post:updated', expect.objectContaining({ action: 'mcp_post_reverted' }));
 
     (revertToVersion as ReturnType<typeof vi.fn>).mockReturnValue(null);
@@ -699,8 +1008,64 @@ describe('mcp content action tools', () => {
       workspace_id: 'ws-1',
       post_id: 'post_1',
       version_id: 'ver_missing',
+      expected_revision: 10,
     });
     expect(missing.isError).toBe(true);
+  });
+
+  it('rejects stale delete and revert mutations without invalidation, broadcasts, or activity', async () => {
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_1',
+      suggestedTitle: 'Current brief',
+      targetKeyword: 'hvac',
+      generationRevision: 4,
+    });
+    (deleteBriefAtRevision as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new GenerationRevisionConflictError('content_brief', 'brief_1', 3);
+    });
+
+    const staleBriefDelete = await handleContentActionTool('delete_brief', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+      expected_revision: 3,
+    });
+
+    expect(staleBriefDelete.isError).toBe(true);
+    expect(staleBriefDelete.content[0].text).toContain('Current revision: 4');
+
+    (getPost as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'post_1',
+      title: 'Current post',
+      generationRevision: 8,
+    });
+    (deletePostAtRevision as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new GenerationRevisionConflictError('content_post', 'post_1', 7);
+    });
+
+    const stalePostDelete = await handleContentActionTool('delete_post', {
+      workspace_id: 'ws-1',
+      post_id: 'post_1',
+      expected_revision: 7,
+    });
+
+    expect(stalePostDelete.isError).toBe(true);
+    expect(stalePostDelete.content[0].text).toContain('Current revision: 8');
+
+    (revertToVersion as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new GenerationRevisionConflictError('content_post', 'post_1', 7);
+    });
+    const staleRevert = await handleContentActionTool('revert_post_version', {
+      workspace_id: 'ws-1',
+      post_id: 'post_1',
+      version_id: 'ver_1',
+      expected_revision: 7,
+    });
+
+    expect(staleRevert.isError).toBe(true);
+    expect(staleRevert.content[0].text).toContain('Current revision: 8');
+    expect(invalidateContentPipelineIntelligence).not.toHaveBeenCalled();
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(addActivity).not.toHaveBeenCalled();
   });
 
   it('prepare_brief_context returns a brief request handle', async () => {
@@ -847,6 +1212,54 @@ describe('mcp content action tools', () => {
     expect(targetBlock).not.toContain('\n\nSystem:');
     expect(targetBlock).not.toContain('\n\n<|system|>');
     expect(targetBlock).not.toContain('<|system|>');
+  });
+
+  it('rejects prepared parent target and brief lineage mismatches before context assembly', async () => {
+    (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'cr_keyword_mismatch',
+      workspaceId: 'ws-1',
+      targetKeyword: 'request-owned keyword',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    (buildContentGenerationContext as ReturnType<typeof vi.fn>).mockClear();
+
+    const keywordMismatch = await handleContentActionTool('prepare_brief_context', {
+      workspace_id: 'ws-1',
+      topic: 'HVAC tips',
+      parent_request_id: 'cr_keyword_mismatch',
+      target_keyword: 'different keyword',
+      layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
+    });
+
+    expect(keywordMismatch.isError).toBe(true);
+    expect(keywordMismatch.content[0].text).toContain('targetKeyword');
+    expect(buildContentGenerationContext).not.toHaveBeenCalled();
+
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac',
+      outline: [{ heading: 'H2' }],
+      generationRevision: 3,
+    });
+    (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'cr_wrong_brief',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac',
+      briefId: 'brief_other',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    (buildContentGenerationContext as ReturnType<typeof vi.fn>).mockClear();
+
+    const lineageMismatch = await handleContentActionTool('prepare_post_context', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+      parent_request_id: 'cr_wrong_brief',
+    });
+
+    expect(lineageMismatch.isError).toBe(true);
+    expect(lineageMismatch.content[0].text).toContain('not source brief brief_1');
+    expect(buildContentGenerationContext).not.toHaveBeenCalled();
   });
 
   it('save_brief persists brief, broadcasts, logs, and returns brief handle', async () => {
@@ -1047,13 +1460,16 @@ describe('mcp content action tools', () => {
   });
 
   it('save_post rejects when the prepared source brief is unavailable at save time', async () => {
+    const sourceBrief = {
+      id: 'brief_1',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac',
+      outline: [{ heading: 'H2' }],
+      generationRevision: 1,
+    };
     (getBrief as ReturnType<typeof vi.fn>)
-      .mockReturnValueOnce({
-        id: 'brief_1',
-        workspaceId: 'ws-1',
-        targetKeyword: 'hvac',
-        outline: [{ heading: 'H2' }],
-      })
+      .mockReturnValueOnce(sourceBrief)
+      .mockReturnValueOnce(sourceBrief)
       .mockReturnValueOnce(undefined);
     const prepared = await handleContentActionTool('prepare_post_context', {
       workspace_id: 'ws-1',
@@ -1086,7 +1502,7 @@ describe('mcp content action tools', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/Source brief is unavailable/);
+    expect(result.content[0].text).toMatch(/Revision conflict|artifact no longer exists/);
     expect(savePost).not.toHaveBeenCalled();
     expect(broadcastToWorkspace).not.toHaveBeenCalled();
     expect(addActivity).not.toHaveBeenCalled();
@@ -1134,16 +1550,25 @@ describe('mcp content action tools', () => {
     expect(savePost).not.toHaveBeenCalled();
   });
 
-  it('save_post accepts parent_request_id and post send_to_client updates parent request', async () => {
+  it('save_post carries its revision and parent request into post send_to_client', async () => {
     (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
       id: 'brief_1',
       workspaceId: 'ws-1',
       targetKeyword: 'hvac',
       outline: [{ heading: 'H2' }],
     });
+    (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'cr_parent_post',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac',
+      briefId: 'brief_1',
+      status: 'brief_generated',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
     const prepared = await handleContentActionTool('prepare_post_context', {
       workspace_id: 'ws-1',
       brief_id: 'brief_1',
+      parent_request_id: 'cr_parent_post',
     });
     const preparedPayload = JSON.parse(prepared.content[0].text) as { post_request_handle: string };
 
@@ -1174,18 +1599,13 @@ describe('mcp content action tools', () => {
       },
     });
     const savedPayload = JSON.parse(saved.content[0].text) as { post_id: string; post_handle: string };
-    (getPost as ReturnType<typeof vi.fn>).mockReturnValue({
-      id: savedPayload.post_id,
-      workspaceId: 'ws-1',
-      briefId: 'brief_1',
-      targetKeyword: 'hvac',
-      title: 'Post title',
-      status: 'draft',
-      introduction: '<p>Intro</p>',
-      sections: [{ status: 'done', content: '<p>Body</p>' }],
-      conclusion: '<p>End</p>',
+    (sendPostToClientForReview as ReturnType<typeof vi.fn>).mockReturnValueOnce({
+      request: { id: 'cr_parent_post', status: 'post_review' },
+      post: { id: savedPayload.post_id, briefId: 'brief_1', generationRevision: 1 },
+      created: false,
+      changed: true,
     });
-    (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValueOnce({ id: 'cr_parent_post' });
+    (broadcastToWorkspace as ReturnType<typeof vi.fn>).mockClear();
 
     const result = await handleContentActionTool('send_to_client', {
       workspace_id: 'ws-1',
@@ -1194,31 +1614,20 @@ describe('mcp content action tools', () => {
     });
 
     expect(result.isError).toBeUndefined();
-    expect(createContentRequest).not.toHaveBeenCalled();
-    expect(updateContentRequest).toHaveBeenCalledWith(
+    expect(sendPostToClientForReview).toHaveBeenCalledWith(
       'ws-1',
-      'cr_parent_post',
-      expect.objectContaining({
-        briefId: 'brief_1',
-        postId: savedPayload.post_id,
-        status: 'post_review',
-      }),
+      savedPayload.post_id,
+      {
+        note: 'Ready for client',
+        requestId: 'cr_parent_post',
+        expectedRevision: 1,
+        activitySource: 'mcp-chat',
+        activityMetadata: { action: 'mcp_post_sent_to_client' },
+        commitAuthorization: expect.any(Function),
+      },
     );
-    expect(broadcastToWorkspace).toHaveBeenCalledWith(
-      'ws-1',
-      'content-request:update',
-      expect.objectContaining({ id: 'cr_parent_post' }),
-    );
-    expect(addActivity).toHaveBeenCalledWith(
-      'ws-1',
-      'post_sent_for_review',
-      expect.stringContaining('for review'),
-      expect.any(String),
-      expect.objectContaining({
-        source: 'mcp-chat',
-        action: 'mcp_post_sent_to_client',
-      }),
-    );
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(JSON.parse(result.content[0].text)).toMatchObject({ changed: true, revision: 1 });
   });
 
   it('send_to_client from brief handle creates a request', async () => {
@@ -1245,10 +1654,11 @@ describe('mcp content action tools', () => {
       },
     });
     const savedPayload = JSON.parse(saved.content[0].text) as { brief_id: string; brief_handle: string };
-    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
-      id: savedPayload.brief_id,
-      suggestedTitle: 'Best HVAC Tips',
-      targetKeyword: 'hvac tips',
+    (sendBriefToClientForReview as ReturnType<typeof vi.fn>).mockReturnValueOnce({
+      request: { id: 'cr_brief', status: 'client_review' },
+      brief: { id: savedPayload.brief_id, generationRevision: 1 },
+      created: true,
+      changed: true,
     });
 
     const result = await handleContentActionTool('send_to_client', {
@@ -1257,18 +1667,23 @@ describe('mcp content action tools', () => {
       note: 'Please review',
     });
     expect(result.isError).toBeUndefined();
-    expect(createContentRequest).toHaveBeenCalledOnce();
-    expect(updateContentRequest).toHaveBeenCalled();
-    expect(addActivity).toHaveBeenCalledWith(
+    expect(sendBriefToClientForReview).toHaveBeenCalledWith(
       'ws-1',
-      'brief_sent_for_review',
-      expect.stringContaining('for review'),
-      expect.any(String),
-      expect.objectContaining({
-        source: 'mcp-chat',
-        action: 'mcp_brief_sent_to_client',
-      }),
+      savedPayload.brief_id,
+      {
+        note: 'Please review',
+        requestId: undefined,
+        expectedRevision: 1,
+        activitySource: 'mcp-chat',
+        activityMetadata: { action: 'mcp_brief_sent_to_client' },
+        commitAuthorization: expect.any(Function),
+      },
     );
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      request_id: 'cr_brief',
+      target: 'brief',
+      revision: 1,
+    });
   });
 
   it('send_to_client supports brief_id without a handle', async () => {
@@ -1287,27 +1702,46 @@ describe('mcp content action tools', () => {
       internalLinkSuggestions: [],
       createdAt: '2026-01-01T00:00:00.000Z',
     });
-    (createContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'cr_123' });
+    (sendBriefToClientForReview as ReturnType<typeof vi.fn>).mockReturnValueOnce({
+      request: { id: 'cr_123', status: 'client_review' },
+      brief: { id: 'brief_123', generationRevision: 9 },
+      created: true,
+      changed: true,
+    });
 
     const result = await handleContentActionTool('send_to_client', {
       workspace_id: 'ws-1',
       brief_id: 'brief_123',
+      expected_revision: 8,
     });
 
     expect(result.isError).toBeUndefined();
     const payload = JSON.parse(result.content[0].text) as { request_id: string; target: string };
     expect(payload.request_id).toBe('cr_123');
     expect(payload.target).toBe('brief');
+    expect(sendBriefToClientForReview).toHaveBeenCalledWith(
+      'ws-1',
+      'brief_123',
+      expect.objectContaining({ expectedRevision: 8 }),
+    );
   });
 
   it('send_to_client updates existing parent request with update event', async () => {
+    const parentRequestId = 'cr_parent';
+    (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: parentRequestId,
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac tips',
+      status: 'requested',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
     const prepared = await handleContentActionTool('prepare_brief_context', {
       workspace_id: 'ws-1',
       topic: 'HVAC tips',
+      parent_request_id: parentRequestId,
       layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
     });
     const preparedPayload = JSON.parse(prepared.content[0].text) as { brief_request_handle: string };
-    const parentRequestId = 'cr_parent';
     const saved = await handleContentActionTool('save_brief', {
       workspace_id: 'ws-1',
       brief_request_handle: preparedPayload.brief_request_handle,
@@ -1326,14 +1760,12 @@ describe('mcp content action tools', () => {
       },
     });
     const savedPayload = JSON.parse(saved.content[0].text) as { brief_id: string; brief_handle: string };
-    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
-      id: savedPayload.brief_id,
-      suggestedTitle: 'Best HVAC Tips',
-      targetKeyword: 'hvac tips',
-      intent: 'informational',
-      pageType: 'blog',
+    (sendBriefToClientForReview as ReturnType<typeof vi.fn>).mockReturnValueOnce({
+      request: { id: parentRequestId, status: 'client_review' },
+      brief: { id: savedPayload.brief_id, generationRevision: 1 },
+      created: false,
+      changed: true,
     });
-    (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValueOnce({ id: parentRequestId });
 
     const result = await handleContentActionTool('send_to_client', {
       workspace_id: 'ws-1',
@@ -1342,20 +1774,55 @@ describe('mcp content action tools', () => {
     });
 
     expect(result.isError).toBeUndefined();
-    expect(createContentRequest).not.toHaveBeenCalled();
-    expect(updateContentRequest).toHaveBeenCalledWith(
+    expect(sendBriefToClientForReview).toHaveBeenCalledWith(
       'ws-1',
-      parentRequestId,
+      savedPayload.brief_id,
       expect.objectContaining({
-        briefId: savedPayload.brief_id,
-        status: 'client_review',
+        requestId: parentRequestId,
+        expectedRevision: 1,
       }),
     );
-    expect(broadcastToWorkspace).toHaveBeenCalledWith(
-      'ws-1',
-      'content-request:update',
-      expect.objectContaining({ id: parentRequestId }),
-    );
+  });
+
+  it('keeps idempotent and stale send_to_client calls free of MCP success side effects', async () => {
+    (sendPostToClientForReview as ReturnType<typeof vi.fn>).mockReturnValueOnce({
+      request: { id: 'cr_existing', status: 'post_review' },
+      post: { id: 'post_1', briefId: 'brief_1', generationRevision: 5 },
+      created: false,
+      changed: false,
+    });
+
+    const noOpPostSend = await handleContentActionTool('send_to_client', {
+      workspace_id: 'ws-1',
+      post_id: 'post_1',
+      expected_revision: 5,
+    });
+
+    expect(JSON.parse(noOpPostSend.content[0].text)).toMatchObject({
+      ok: true,
+      changed: false,
+      revision: 5,
+    });
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+
+    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'brief_1',
+      generationRevision: 6,
+    });
+    (sendBriefToClientForReview as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new GenerationRevisionConflictError('content_brief', 'brief_1', 5);
+    });
+    const staleBriefSend = await handleContentActionTool('send_to_client', {
+      workspace_id: 'ws-1',
+      brief_id: 'brief_1',
+      expected_revision: 5,
+    });
+
+    expect(staleBriefSend.isError).toBe(true);
+    expect(staleBriefSend.content[0].text).toContain('Current revision: 6');
+    expect(invalidateContentPipelineIntelligence).not.toHaveBeenCalled();
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(addActivity).not.toHaveBeenCalled();
   });
 
   it('returns validation/workspace errors and unknown tool errors', async () => {
@@ -1403,7 +1870,7 @@ describe('mcp content action tools', () => {
     expect(postCtx.content[0].text).toContain('Failed to prepare post context: boom');
   });
 
-  it('returns handle and parent-request update failures for save paths', async () => {
+  it('returns handle and atomic parent-request failures for save paths', async () => {
     const badBriefHandle = await handleContentActionTool('save_brief', {
       workspace_id: 'ws-1',
       brief_request_handle: 'brief-request_00000000-0000-0000-0000-000000000000',
@@ -1422,9 +1889,17 @@ describe('mcp content action tools', () => {
     });
     expect(badBriefHandle.isError).toBe(true);
 
+    (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'cr_parent',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac tips',
+      status: 'requested',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
     const preparedBrief = await handleContentActionTool('prepare_brief_context', {
       workspace_id: 'ws-1',
       topic: 'HVAC tips',
+      parent_request_id: 'cr_parent',
       layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
     });
     const preparedBriefPayload = JSON.parse(preparedBrief.content[0].text) as { brief_request_handle: string };
@@ -1449,7 +1924,7 @@ describe('mcp content action tools', () => {
       },
     });
     expect(failedParentBrief.isError).toBe(true);
-    expect(failedParentBrief.content[0].text).toContain('Brief saved but failed to update parent request');
+    expect(failedParentBrief.content[0].text).toContain('request write failed');
 
     (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
       id: 'brief_1',
@@ -1457,9 +1932,18 @@ describe('mcp content action tools', () => {
       targetKeyword: 'hvac',
       outline: [{ heading: 'H2' }],
     });
+    (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'cr_parent_post',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac',
+      briefId: 'brief_1',
+      status: 'brief_generated',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
     const preparedPost = await handleContentActionTool('prepare_post_context', {
       workspace_id: 'ws-1',
       brief_id: 'brief_1',
+      parent_request_id: 'cr_parent_post',
     });
     const preparedPostPayload = JSON.parse(preparedPost.content[0].text) as { post_request_handle: string };
     (updateContentRequest as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
@@ -1492,7 +1976,7 @@ describe('mcp content action tools', () => {
       },
     });
     expect(failedParentPost.isError).toBe(true);
-    expect(failedParentPost.content[0].text).toContain('Post saved but failed to update parent request');
+    expect(failedParentPost.content[0].text).toContain('post parent write failed');
   });
 
   it('returns send_to_client failures for missing entities and invalid handles', async () => {
@@ -1526,7 +2010,9 @@ describe('mcp content action tools', () => {
       },
     });
     const savedPayload = JSON.parse(saved.content[0].text) as { brief_handle: string };
-    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+    (sendBriefToClientForReview as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw new BriefNotFoundError('ws-1', 'brief_missing');
+    });
     const missingBrief = await handleContentActionTool('send_to_client', {
       workspace_id: 'ws-1',
       brief_handle: savedPayload.brief_handle,
@@ -1573,7 +2059,9 @@ describe('mcp content action tools', () => {
     });
     if (!savedPost.isError) {
       const postPayload = JSON.parse(savedPost.content[0].text) as { post_handle: string };
-      (getPost as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+      (sendPostToClientForReview as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+        throw new PostNotFoundError('ws-1', 'post_missing');
+      });
       const missingPost = await handleContentActionTool('send_to_client', {
         workspace_id: 'ws-1',
         post_handle: postPayload.post_handle,
@@ -1619,9 +2107,17 @@ describe('mcp content action tools', () => {
     const savedBrief = (upsertBrief as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[1] as { outline: Array<{ notes: string }> };
     expect(savedBrief.outline[0]?.notes).toBe('');
 
+    (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'cr_parent',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac tips',
+      status: 'requested',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
     const preparedForParent = await handleContentActionTool('prepare_brief_context', {
       workspace_id: 'ws-1',
       topic: 'HVAC tips',
+      parent_request_id: 'cr_parent',
       layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
     });
     const preparedForParentPayload = JSON.parse(preparedForParent.content[0].text) as { brief_request_handle: string };
@@ -1725,9 +2221,18 @@ describe('mcp content action tools', () => {
       targetKeyword: 'hvac',
       outline: [{ heading: 'H2' }],
     });
+    (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'cr_parent',
+      workspaceId: 'ws-1',
+      targetKeyword: 'hvac',
+      briefId: 'brief_1',
+      status: 'brief_generated',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
     const preparedPost = await handleContentActionTool('prepare_post_context', {
       workspace_id: 'ws-1',
       brief_id: 'brief_1',
+      parent_request_id: 'cr_parent',
     });
     const preparedPostPayload = JSON.parse(preparedPost.content[0].text) as { post_request_handle: string };
     (updateContentRequest as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
@@ -1837,29 +2342,27 @@ describe('mcp content action tools', () => {
     });
     expect(savedPost.isError).toBeUndefined();
     const savedPostPayload = JSON.parse(savedPost.content[0].text) as { post_id: string; post_handle: string };
-    (getPost as ReturnType<typeof vi.fn>).mockReturnValue({
-      id: savedPostPayload.post_id,
-      workspaceId: 'ws-1',
-      briefId: 'brief_1',
-      targetKeyword: 'hvac',
-      title: 'Post title',
-      status: 'draft',
-      introduction: '<p>Intro</p>',
-      sections: [{ status: 'done', content: '<p>Body</p>' }],
-      conclusion: '<p>End</p>',
+    (sendPostToClientForReview as ReturnType<typeof vi.fn>).mockReturnValueOnce({
+      request: { id: 'cr_1', status: 'post_review' },
+      post: { id: savedPostPayload.post_id, briefId: 'brief_1', generationRevision: 1 },
+      created: true,
+      changed: true,
     });
-    (getContentRequest as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const sent = await handleContentActionTool('send_to_client', {
       workspace_id: 'ws-1',
       post_handle: savedPostPayload.post_handle,
       note: 'Please review',
     });
     expect(sent.isError).toBeUndefined();
-    expect(createContentRequest).toHaveBeenCalled();
+    expect(sendPostToClientForReview).toHaveBeenCalledWith(
+      'ws-1',
+      savedPostPayload.post_id,
+      expect.objectContaining({ expectedRevision: 1 }),
+    );
     expect(broadcastToWorkspace).toHaveBeenCalledWith(
       'ws-1',
-      'content-request:created',
-      expect.objectContaining({ id: 'cr_1' }),
+      'post:updated',
+      expect.objectContaining({ postId: savedPostPayload.post_id }),
     );
   });
 
@@ -1910,15 +2413,8 @@ describe('mcp content action tools', () => {
     });
     const savedBriefPayload = JSON.parse(savedBrief.content[0].text) as { brief_handle: string };
 
-    (createContentRequest as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+    (sendBriefToClientForReview as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
       throw 'send-to-client-exploded';
-    });
-    (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
-      id: 'brief_1',
-      suggestedTitle: 'Best HVAC Tips',
-      targetKeyword: 'hvac tips',
-      intent: 'informational',
-      pageType: 'blog',
     });
     const sendFailure = await handleContentActionTool('send_to_client', {
       workspace_id: 'ws-1',
@@ -1952,6 +2448,30 @@ describe('mcp content action tools', () => {
       expect(res.isError).toBeFalsy();
       // delivered makes the target page live → must trigger the shared follow-on helper.
       expect(onContentRequestLive).toHaveBeenCalledWith('ws-1', updated);
+    });
+
+    it('keeps a committed status advance successful when all post-commit effects fail', async () => {
+      const updated = { id: 'req_1', status: 'delivered' };
+      (updateContentRequest as ReturnType<typeof vi.fn>).mockReturnValue(updated);
+      (onContentRequestLive as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+        throw new Error('follow-on failed');
+      });
+      (addActivity as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+        throw new Error('activity failed');
+      });
+      (broadcastToWorkspace as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+        throw new Error('broadcast failed');
+      });
+
+      const res = await handleContentActionTool('advance_content_status', {
+        workspace_id: 'ws-1', request_id: 'req_1', status: 'delivered',
+      });
+
+      expect(res.isError).toBeFalsy();
+      expect(JSON.parse(res.content[0].text)).toMatchObject({ ok: true, request: updated });
+      expect(onContentRequestLive).toHaveBeenCalledTimes(1);
+      expect(addActivity).toHaveBeenCalledTimes(1);
+      expect(broadcastToWorkspace).toHaveBeenCalledTimes(1);
     });
 
     it('does NOT run live-page side effects on in_progress', async () => {
@@ -1991,36 +2511,107 @@ describe('mcp content action tools', () => {
   // ── publish_post (live publish — APPROVED-ONLY) ─────────────────────────────
   describe('publish_post', () => {
     it('publishes an approved post via the shared service tagged mcp-chat', async () => {
-      (getPost as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'post_1', status: 'approved' });
-      (publishPostToWebflow as ReturnType<typeof vi.fn>).mockResolvedValue({ itemId: 'wf_1', slug: 'my-post', isUpdate: false, post: { id: 'post_1' } });
-      const res = await handleContentActionTool('publish_post', { workspace_id: 'ws-1', post_id: 'post_1' });
+      (getPost as ReturnType<typeof vi.fn>).mockReturnValue({
+        id: 'post_1',
+        status: 'approved',
+        generationRevision: 11,
+      });
+      (publishPostToWebflow as ReturnType<typeof vi.fn>).mockResolvedValue({
+        itemId: 'wf_1',
+        slug: 'my-post',
+        isUpdate: false,
+        post: { id: 'post_1', generationRevision: 12 },
+      });
+      const res = await handleContentActionTool('publish_post', {
+        workspace_id: 'ws-1',
+        post_id: 'post_1',
+        expected_revision: 11,
+      });
       expect(res.isError).toBeFalsy();
-      expect(publishPostToWebflow).toHaveBeenCalledWith('ws-1', 'post_1', { generateImage: false, activitySource: 'mcp-chat' });
-      expect(JSON.parse(res.content[0].text)).toMatchObject({ ok: true, item_id: 'wf_1', slug: 'my-post' });
+      expect(publishPostToWebflow).toHaveBeenCalledWith('ws-1', 'post_1', {
+        generateImage: false,
+        activitySource: 'mcp-chat',
+        expectedRevision: 11,
+      });
+      expect(JSON.parse(res.content[0].text)).toMatchObject({
+        ok: true,
+        item_id: 'wf_1',
+        slug: 'my-post',
+        revision: 12,
+      });
     });
 
     it('REFUSES to publish a non-approved post (draft/review) and never calls the publish service', async () => {
       for (const status of ['draft', 'review', 'generating', 'error']) {
-        (getPost as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'post_1', status });
-        const res = await handleContentActionTool('publish_post', { workspace_id: 'ws-1', post_id: 'post_1' });
+        (getPost as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'post_1', status, generationRevision: 3 });
+        const res = await handleContentActionTool('publish_post', {
+          workspace_id: 'ws-1',
+          post_id: 'post_1',
+          expected_revision: 3,
+        });
         expect(res.isError, `status ${status} must be refused`).toBe(true);
         expect(res.content[0].text).toContain("only 'approved'");
       }
       expect(publishPostToWebflow).not.toHaveBeenCalled();
     });
 
+    it('reports stale and in-service publish races as deterministic revision conflicts', async () => {
+      (getPost as ReturnType<typeof vi.fn>).mockReturnValue({
+        id: 'post_1',
+        status: 'approved',
+        generationRevision: 6,
+      });
+      const stale = await handleContentActionTool('publish_post', {
+        workspace_id: 'ws-1',
+        post_id: 'post_1',
+        expected_revision: 5,
+      });
+      expect(stale.isError).toBe(true);
+      expect(stale.content[0].text).toContain('Current revision: 6');
+      expect(publishPostToWebflow).not.toHaveBeenCalled();
+
+      (getPost as ReturnType<typeof vi.fn>)
+        .mockReturnValueOnce({ id: 'post_1', status: 'approved', generationRevision: 6 })
+        .mockReturnValue({ id: 'post_1', status: 'approved', generationRevision: 7 });
+      (publishPostToWebflow as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new PublishPostError('local_revision_conflict', 'The post changed.', 409),
+      );
+      const raced = await handleContentActionTool('publish_post', {
+        workspace_id: 'ws-1',
+        post_id: 'post_1',
+        expected_revision: 6,
+      });
+      expect(raced.isError).toBe(true);
+      expect(raced.content[0].text).toContain('Current revision: 7');
+      expect(invalidateContentPipelineIntelligence).not.toHaveBeenCalled();
+      expect(broadcastToWorkspace).not.toHaveBeenCalled();
+      expect(addActivity).not.toHaveBeenCalled();
+    });
+
     it('returns not found when the post is missing', async () => {
       (getPost as ReturnType<typeof vi.fn>).mockReturnValue(null);
-      const res = await handleContentActionTool('publish_post', { workspace_id: 'ws-1', post_id: 'gone' });
+      const res = await handleContentActionTool('publish_post', {
+        workspace_id: 'ws-1',
+        post_id: 'gone',
+        expected_revision: 0,
+      });
       expect(res.isError).toBe(true);
       expect(res.content[0].text).toContain('not found');
       expect(publishPostToWebflow).not.toHaveBeenCalled();
     });
 
     it('surfaces a PublishPostError message cleanly', async () => {
-      (getPost as ReturnType<typeof vi.fn>).mockReturnValue({ id: 'post_1', status: 'approved' });
+      (getPost as ReturnType<typeof vi.fn>).mockReturnValue({
+        id: 'post_1',
+        status: 'approved',
+        generationRevision: 5,
+      });
       (publishPostToWebflow as ReturnType<typeof vi.fn>).mockRejectedValue(new PublishPostError('no_publish_target', 'No publish target configured.', 400));
-      const res = await handleContentActionTool('publish_post', { workspace_id: 'ws-1', post_id: 'post_1' });
+      const res = await handleContentActionTool('publish_post', {
+        workspace_id: 'ws-1',
+        post_id: 'post_1',
+        expected_revision: 5,
+      });
       expect(res.isError).toBe(true);
       expect(res.content[0].text).toContain('No publish target configured');
     });

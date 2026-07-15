@@ -1,8 +1,9 @@
 // server/copy-generation.ts
 // 8-layer context assembly and AI copy generation engine for the Copy Pipeline.
 
+import { randomUUID } from 'node:crypto';
 import { createLogger } from './logger.js';
-import { callAI } from './ai.js';
+import { callAI, renderAIProviderInput, type AICallOptions } from './ai.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
 import { getVoiceProfile, buildVoiceCalibrationContext } from './voice-calibration.js';
 import { listDeliverables } from './brand-identity.js';
@@ -16,21 +17,58 @@ import {
 import { getActivePatterns } from './copy-intelligence.js';
 import { CREATIVE_WRITING_RULES } from './writing-quality.js';
 import { BRAND_CONTEXT_HIERARCHY, getPageTypeCopyContract } from './page-type-copy-contract.js';
-import db from './db/index.js';
 import {
-  initializeSections,
+  commitGeneratedEntryCopy,
   saveGeneratedCopy,
-  saveMetadata,
   addSteeringEntry,
   getSectionsForEntry,
+  snapshotCopyEntryGeneration,
 } from './copy-review.js';
+import {
+  buildGenerationProvenance,
+  fingerprintRenderedAIInput,
+  GenerationRevisionConflictError,
+  type AcceptedGenerationExecution,
+} from './generation-provenance.js';
 import { parseGeneratedPageCopyForPlan, parseRegeneratedSectionCopy } from './schemas/ai-copy-generation.js';
 import type { CopySection, CopyMetadata, QualityFlag } from '../shared/types/copy-pipeline.js';
 import type { SectionPlanItem, SiteBlueprint, BlueprintEntry } from '../shared/types/page-strategy.js';
 import type { IntelligencePatternType } from '../shared/types/copy-pipeline.js';
 import { isProgrammingError } from './errors.js';
+import type { AICallResult } from './ai.js';
 
 const log = createLogger('copy-generation');
+
+interface TrackedCopyCall {
+  response: AICallResult;
+  accepted: AcceptedGenerationExecution;
+}
+
+async function callTrackedCopyAI(
+  options: AICallOptions & { provider: 'anthropic' | 'openai' },
+): Promise<TrackedCopyCall> {
+  const inputFingerprint = fingerprintRenderedAIInput(renderAIProviderInput({
+    provider: options.provider,
+    system: options.system,
+    messages: options.messages,
+    researchMode: options.researchMode,
+  }));
+  const response = await callAI(options);
+  return {
+    response,
+    accepted: { execution: response.execution, inputFingerprint },
+  };
+}
+
+export interface CopyGenerationRunOptions {
+  executionChainId?: string;
+}
+
+export interface CopySectionRegenerationOptions extends CopyGenerationRunOptions {
+  expectedRevision?: number;
+  /** Post-commit notification for the separately durable steering mutation. */
+  onSteeringAccepted?: (section: CopySection) => void;
+}
 
 // ── Public API ──
 
@@ -44,12 +82,18 @@ export async function generateCopyForEntry(
   blueprintId: string,
   entryId: string,
   accumulatedSteering?: string[],
+  runOptions: CopyGenerationRunOptions = {},
 ): Promise<{ sections: CopySection[]; metadata: CopyMetadata }> {
   const blueprint = getBlueprint(wsId, blueprintId);
   if (!blueprint) throw new Error(`Blueprint not found: ${blueprintId}`);
 
   const entry = getEntry(wsId, blueprintId, entryId);
   if (!entry) throw new Error(`Entry not found: ${entryId}`);
+
+  // Capture plan + section authority before context assembly, which can itself perform
+  // long-running brief enrichment. The final artifact transaction rechecks this census.
+  const generationSnapshot = snapshotCopyEntryGeneration(wsId, entryId, entry.sectionPlan);
+  const executionChainId = runOptions.executionChainId ?? randomUUID();
 
   // Build context (uses getSectionsForEntry internally for cross-page awareness)
   const context = await buildCopyGenerationContext(wsId, blueprint, entry, accumulatedSteering);
@@ -100,7 +144,7 @@ ${context}`;
 
   const systemPrompt = buildSystemPrompt(wsId, baseInstructions, undefined, { skipProseRules: true });
 
-  const response = await callAI({
+  const initialCall = await callTrackedCopyAI({
     operation: 'copy-generation',
     provider: 'anthropic',
     model: 'claude-sonnet-4-6',
@@ -109,15 +153,18 @@ ${context}`;
     messages: [{ role: 'user', content: `Generate copy for "${entry.name}" (${entry.pageType} page). Return only valid JSON.` }],
     feature: 'copy-generation',
     workspaceId: wsId,
+    executionChainId,
   });
+  const response = initialCall.response;
 
-  const plannedSectionIds = entry.sectionPlan.map(section => section.id);
+  const plannedSectionIds = generationSnapshot.plannedSections.map(section => section.id);
+  let acceptedExecution = initialCall.accepted;
   let generated;
   try {
     generated = parseGeneratedPageCopyForPlan(response.text, plannedSectionIds);
   } catch (initialError) {
     log.warn({ err: initialError, entryId, blueprintId }, 'Copy generation output failed the exact section census; attempting one repair');
-    const repairResponse = await callAI({
+    const repairCall = await callTrackedCopyAI({
       operation: 'copy-generation',
       provider: 'anthropic',
       model: 'claude-sonnet-4-6',
@@ -129,48 +176,55 @@ ${context}`;
       }],
       feature: 'copy-generation',
       workspaceId: wsId,
+      executionChainId,
     });
+    const repairResponse = repairCall.response;
     try {
       generated = parseGeneratedPageCopyForPlan(repairResponse.text, plannedSectionIds);
+      // The malformed first response was rejected and remains trace-only. Artifact
+      // provenance names the repair execution that directly authorized the adopted copy.
+      acceptedExecution = repairCall.accepted;
     } catch (repairError) {
       log.error({ err: repairError, initialError, entryId, blueprintId }, 'Copy generation repair failed exact section census');
       throw new Error('Copy generation failed: output did not match the planned section census after one repair');
     }
   }
-  // AI call succeeded — now initialize sections and save in a single transaction.
-  // Deferred initialization prevents data loss: if the AI call above fails,
-  // previously approved copy is preserved.
-  const { sections: savedSections, metadata } = db.transaction(() => {
-    const initialSections = initializeSections(wsId, entryId, entry.sectionPlan);
-
-    const sections: CopySection[] = generated.sections.map((s) => {
-      const section = initialSections.find(sec => sec.sectionPlanItemId === s.sectionPlanItemId);
-      if (!section) throw new Error(`Initialized copy section missing for planned id: ${s.sectionPlanItemId}`);
-      const sectionPlan = entry.sectionPlan.find(p => p.id === s.sectionPlanItemId);
-      const qualityFlags = sectionPlan ? runQualityCheck(s.copy, sectionPlan, guardrailsText) : [];
-      const saved = saveGeneratedCopy(section.id, wsId, {
-        generatedCopy: s.copy,
-        aiAnnotation: s.annotation,
-        aiReasoning: s.reasoning,
+  const provenance = buildGenerationProvenance({
+    accepted: acceptedExecution,
+    executions: [acceptedExecution],
+    executionChainId,
+    authorityInputs: {
+      blueprintId,
+      entryId,
+      plannedSections: generationSnapshot.plannedSections,
+    },
+  });
+  const committed = commitGeneratedEntryCopy(
+    generationSnapshot,
+    generated.sections.map(section => {
+      const sectionPlan = entry.sectionPlan.find(item => item.id === section.sectionPlanItemId);
+      if (!sectionPlan) throw new Error(`Section plan item disappeared: ${section.sectionPlanItemId}`);
+      const qualityFlags = runQualityCheck(section.copy, sectionPlan, guardrailsText);
+      return {
+        sectionPlanItemId: section.sectionPlanItemId,
+        generatedCopy: section.copy,
+        aiAnnotation: section.annotation,
+        aiReasoning: section.reasoning,
         qualityFlags: qualityFlags.length > 0 ? qualityFlags : undefined,
-      });
-      if (!saved) throw new Error(`Failed to persist generated copy section: ${section.id}`);
-      return saved;
-    });
-
-    const meta = saveMetadata(entryId, wsId, {
+      };
+    }),
+    {
       seoTitle: generated.seoTitle,
       metaDescription: generated.metaDescription,
       ogTitle: generated.ogTitle,
       ogDescription: generated.ogDescription,
-    });
-
-    return { sections, metadata: meta };
-  })();
+    },
+    provenance,
+  );
 
   return {
-    sections: savedSections,
-    metadata,
+    sections: committed.sections,
+    metadata: committed.metadata,
   };
 }
 
@@ -185,23 +239,40 @@ export async function regenerateSection(
   sectionId: string,
   steeringNote: string,
   highlight?: string,
+  runOptions: CopySectionRegenerationOptions = {},
 ): Promise<CopySection | null> {
   const blueprint = getBlueprint(wsId, blueprintId);
   const entry = getEntry(wsId, blueprintId, entryId);
   const sections = getSectionsForEntry(entryId, wsId);
   const targetSection = sections.find(s => s.id === sectionId);
   if (!blueprint || !entry || !targetSection) return null;
+  if (runOptions.expectedRevision !== undefined
+    && runOptions.expectedRevision !== targetSection.generationRevision) {
+    throw new GenerationRevisionConflictError(
+      'copy_section',
+      sectionId,
+      runOptions.expectedRevision,
+    );
+  }
+  if (targetSection.status === 'client_review' || targetSection.status === 'approved') return null;
 
   const sectionPlanItem = entry.sectionPlan.find(p => p.id === targetSection.sectionPlanItemId);
   if (!sectionPlanItem) return null;
 
   // Save the steering entry first
-  addSteeringEntry(sectionId, wsId, {
+  const steeredSection = addSteeringEntry(sectionId, wsId, {
     type: highlight ? 'highlight' : 'note',
     note: steeringNote,
     highlight,
     resultVersion: targetSection.version,
-  });
+  }, runOptions.expectedRevision);
+  if (!steeredSection) return null;
+  try {
+    runOptions.onSteeringAccepted?.(steeredSection);
+  } catch (err) {
+    log.warn({ err, sectionId }, 'Copy steering committed but its post-commit notification failed');
+  }
+  const executionChainId = runOptions.executionChainId ?? randomUUID();
 
   // Build targeted regeneration prompt — skip brief enrichment (a single-section
   // steer doesn't need a full brief read/generation; the steering note is the context).
@@ -223,7 +294,7 @@ ${context}`;
 
   const systemPrompt = buildSystemPrompt(wsId, baseInstructions, undefined, { skipProseRules: true });
 
-  const response = await callAI({
+  const trackedCall = await callTrackedCopyAI({
     operation: 'copy-regeneration',
     provider: 'anthropic',
     model: 'claude-sonnet-4-6',
@@ -232,7 +303,9 @@ ${context}`;
     messages: [{ role: 'user', content: 'Regenerate this section. Return only valid JSON.' }],
     feature: 'copy-regeneration',
     workspaceId: wsId,
+    executionChainId,
   });
+  const response = trackedCall.response;
 
   let result;
   try {
@@ -255,16 +328,27 @@ ${context}`;
     // voice_profiles table may not exist in all environments — graceful degradation
   }
 
-  // Save in a transaction so copy + metadata are atomic
-  return db.transaction(() => {
-    const qualityFlags = runQualityCheck(result.copy, sectionPlanItem, guardrailsText);
-    return saveGeneratedCopy(sectionId, wsId, {
-      generatedCopy: result.copy,
-      aiAnnotation: result.annotation,
-      aiReasoning: result.reasoning,
-      qualityFlags: qualityFlags.length > 0 ? qualityFlags : undefined,
-    });
-  })();
+  const qualityFlags = runQualityCheck(result.copy, sectionPlanItem, guardrailsText);
+  const provenance = buildGenerationProvenance({
+    accepted: trackedCall.accepted,
+    executions: [trackedCall.accepted],
+    executionChainId,
+    authorityInputs: {
+      blueprintId,
+      entryId,
+      sectionId,
+      sectionPlanItemId: sectionPlanItem.id,
+      expectedRevision: steeredSection.generationRevision,
+    },
+  });
+  return saveGeneratedCopy(sectionId, wsId, {
+    generatedCopy: result.copy,
+    aiAnnotation: result.annotation,
+    aiReasoning: result.reasoning,
+    qualityFlags: qualityFlags.length > 0 ? qualityFlags : undefined,
+    expectedRevision: steeredSection.generationRevision,
+    generationProvenance: provenance,
+  });
 }
 
 /**

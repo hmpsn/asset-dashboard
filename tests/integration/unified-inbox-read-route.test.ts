@@ -12,11 +12,15 @@
  * fetches it; the read itself is inert until cutover). It is exercised here with seeded rows.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
+import db from '../../server/db/index.js';
 import { upsertDeliverable } from '../../server/client-deliverables.js';
 import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
+import { saveMetadata } from '../../server/copy-review.js';
+import { addEntry, createBlueprint } from '../../server/page-strategy.js';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable.js';
 
 const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
@@ -204,7 +208,7 @@ describe('GET /api/public/deliverables/:workspaceId — physical child items[] (
 });
 
 describe('GET /api/public/deliverables/:workspaceId — projected content_request', () => {
-  it('projects a content request in a client-facing production state into the unified list', async () => {
+  it('projects only the client-safe note and never exposes the operator internal note', async () => {
     // Seed a content request, advance it to client_review (a client-facing state) with a brief.
     const request = createContentRequest(pwless.workspaceId, {
       topic: 'Unified inbox projection test',
@@ -218,6 +222,8 @@ describe('GET /api/public/deliverables/:workspaceId — projected content_reques
     updateContentRequest(pwless.workspaceId, request.id, {
       briefId: 'brief_test_123',
       status: 'client_review',
+      clientNote: 'Please review the proposed outline.',
+      internalNote: 'PRIVATE_OPERATOR_REQUEST_NOTE_SENTINEL',
     });
 
     const res = await ctx.api(listUrl(pwless.workspaceId));
@@ -231,6 +237,104 @@ describe('GET /api/public/deliverables/:workspaceId — projected content_reques
     expect(projected!.status).toBe('awaiting_client'); // client_review → awaiting_client (M4)
     // The raw production state is carried in payload so it's never lost.
     expect(projected!.payload.contentRequestStatus).toBe('client_review');
+    expect(projected!.note).toBe('Please review the proposed outline.');
+    const raw = JSON.stringify(body);
+    expect(raw).not.toContain('PRIVATE_OPERATOR_REQUEST_NOTE_SENTINEL');
+    expect(projected).not.toHaveProperty('internalNote');
+  });
+});
+
+describe('GET /api/public/deliverables/:workspaceId — projected copy_section privacy', () => {
+  it('keeps operator reasoning, flags, steering, workspace identity, and provenance private', async () => {
+    const blueprint = createBlueprint({
+      workspaceId: pwless.workspaceId,
+      name: `Unified copy privacy ${randomUUID().slice(0, 8)}`,
+    });
+    const entry = addEntry(pwless.workspaceId, blueprint.id, {
+      name: 'Client review page',
+      pageType: 'service',
+      sectionPlan: [],
+    });
+    expect(entry).toBeTruthy();
+
+    const now = new Date().toISOString();
+    const sectionId = `copy_${randomUUID().slice(0, 8)}`;
+    db.prepare(`
+      INSERT INTO copy_sections (
+        id, workspace_id, entry_id, section_plan_item_id, generated_copy, status,
+        ai_annotation, ai_reasoning, steering_history, client_suggestions, quality_flags,
+        version, generation_revision, generation_provenance, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, 'client_review', ?, ?, ?, NULL, ?, 1, 9, ?, ?, ?)
+    `).run(
+      sectionId,
+      pwless.workspaceId,
+      entry!.id,
+      `plan_${randomUUID().slice(0, 8)}`,
+      'Client-safe generated copy.',
+      'Client-safe annotation.',
+      'PRIVATE_COPY_REASONING_SENTINEL',
+      JSON.stringify([{ type: 'note', note: 'PRIVATE_COPY_STEERING_SENTINEL', resultVersion: 1, timestamp: now }]),
+      JSON.stringify([{ type: 'guardrail_violation', message: 'PRIVATE_COPY_FLAG_SENTINEL', severity: 'warning' }]),
+      JSON.stringify({
+        runId: 'PRIVATE_COPY_RUN_SENTINEL',
+        operation: 'copy-generation',
+        provider: 'anthropic',
+        model: 'private-model',
+        inputFingerprint: 'a'.repeat(64),
+        startedAt: now,
+        completedAt: now,
+      }),
+      now,
+      now,
+    );
+    const metadata = saveMetadata(entry!.id, pwless.workspaceId, {
+      seoTitle: 'Client-safe SEO title',
+      metaDescription: 'Client-safe meta description',
+      ogTitle: 'Client-safe OG title',
+      ogDescription: 'Client-safe OG description',
+    });
+    db.prepare('UPDATE copy_metadata SET steering_history = ? WHERE id = ?').run(
+      JSON.stringify([{ type: 'note', note: 'PRIVATE_METADATA_STEERING_SENTINEL', resultVersion: 1, timestamp: now }]),
+      metadata.id,
+    );
+
+    const res = await ctx.api(listUrl(pwless.workspaceId));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { deliverables: ClientDeliverable[] };
+    const projected = body.deliverables.find((d) => d.id === `copy:${entry!.id}`);
+    expect(projected).toBeTruthy();
+    const payload = projected!.payload as {
+      sections: Array<Record<string, unknown>>;
+      copyMetadata: Record<string, unknown> | null;
+    };
+    expect(payload.sections[0]).toMatchObject({
+      id: sectionId,
+      generatedCopy: 'Client-safe generated copy.',
+      aiAnnotation: 'Client-safe annotation.',
+    });
+    for (const privateKey of [
+      'workspaceId',
+      'aiReasoning',
+      'qualityFlags',
+      'steeringHistory',
+      'generationRevision',
+      'generationProvenance',
+    ]) {
+      expect(payload.sections[0]).not.toHaveProperty(privateKey);
+    }
+    expect(payload.copyMetadata).toMatchObject({ seoTitle: 'Client-safe SEO title' });
+    expect(payload.copyMetadata).not.toHaveProperty('workspaceId');
+    expect(payload.copyMetadata).not.toHaveProperty('steeringHistory');
+    const raw = JSON.stringify(body);
+    for (const sentinel of [
+      'PRIVATE_COPY_REASONING_SENTINEL',
+      'PRIVATE_COPY_STEERING_SENTINEL',
+      'PRIVATE_COPY_FLAG_SENTINEL',
+      'PRIVATE_COPY_RUN_SENTINEL',
+      'PRIVATE_METADATA_STEERING_SENTINEL',
+    ]) {
+      expect(raw).not.toContain(sentinel);
+    }
   });
 });
 

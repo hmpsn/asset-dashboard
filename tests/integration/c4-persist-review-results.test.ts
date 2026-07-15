@@ -201,7 +201,9 @@ async function runReviewJob(postIdForReview: string, timeoutMs = 10_000): Promis
   result?: { review: Record<string, { pass: boolean }> };
   jobError?: string;
 }> {
-  const res = await postJson(`/api/content-posts/${wsId}/${postIdForReview}/ai-review`, {});
+  const res = await postJson(`/api/content-posts/${wsId}/${postIdForReview}/ai-review`, {
+    expectedRevision: getPost(wsId, postIdForReview)?.generationRevision ?? 0,
+  });
   if (res.status !== 202) return { httpStatus: res.status };
   const { jobId } = await res.json() as { jobId: string };
   const deadline = Date.now() + timeoutMs;
@@ -577,6 +579,8 @@ describe('Public boundary — admin-internal fields stripped from client respons
     expect(status).toBe(200);
     expect(body.title).toBe('C4 Test Post');
     expect((body as Record<string, unknown>).aiReview).toBeUndefined();
+    expect((body as Record<string, unknown>).generationRevision).toBeUndefined();
+    expect((body as Record<string, unknown>).generationProvenance).toBeUndefined();
 
     // The client-edit PATCH response is the third strip site — pin it too
     // (same post_review setup; review M2: a mutation removing this strip
@@ -584,12 +588,14 @@ describe('Public boundary — admin-internal fields stripped from client respons
     const editRes = await fetch(`${baseUrl}/api/public/content-posts/${wsId}/${postId}/client-edit`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'x-auth-token': signAdminToken() },
-      body: JSON.stringify({ title: 'C4 Client Edited Title' }),
+      body: JSON.stringify({ expectedUpdatedAt: body.updatedAt, title: 'C4 Client Edited Title' }),
     });
     expect(editRes.status).toBe(200);
     const edited = await editRes.json() as Record<string, unknown>;
     expect(edited.title).toBe('C4 Client Edited Title');
     expect(edited.aiReview).toBeUndefined();
+    expect(edited.generationRevision).toBeUndefined();
+    expect(edited.generationProvenance).toBeUndefined();
     // The strip is response-only: the stored row keeps the review.
     expect(getPost(wsId, postId)?.aiReview).toBeDefined();
   });

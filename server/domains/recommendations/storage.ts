@@ -9,8 +9,8 @@ import { parseJsonFallback, parseJsonSafe, parseJsonSafeArray } from '../../db/j
 import { createStmtCache } from '../../db/stmt-cache.js';
 import { createLogger } from '../../logger.js';
 import { recommendationSchema, recommendationSummarySchema } from '../../schemas/workspace-schemas.js';
+import { generationProvenanceSchema } from '../../schemas/generation-provenance.js';
 import { Sentry, isSentryEnabled } from '../../sentry.js';
-import { z } from 'zod';
 import type { GenerationProvenance } from '../../../shared/types/ai-execution.js';
 import type { Recommendation, RecommendationSet, RecStatus } from '../../../shared/types/recommendations.js';
 
@@ -64,17 +64,6 @@ const emptySummaryFallback: RecommendationSet['summary'] = {
   actionableOpportunityValue: 0,
   topRecommendationId: null,
 };
-
-const generationProvenanceSchema = z.object({
-  runId: z.string(),
-  operation: z.string(),
-  provider: z.enum(['openai', 'anthropic', 'deterministic']),
-  model: z.string(),
-  inputFingerprint: z.string(),
-  evidenceCapturedAt: z.string().optional(),
-  startedAt: z.string(),
-  completedAt: z.string(),
-});
 
 const stmts = createStmtCache(() => ({
   selectSet: db.prepare<[workspaceId: string]>(

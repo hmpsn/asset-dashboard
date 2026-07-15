@@ -135,8 +135,8 @@ function isClientFacingStatus(status: ContentRequestStatus): boolean {
 }
 
 /**
- * The full payload carried in `client_deliverable.payload` for a projected content request. Nothing
- * from the source is dropped (M4): the FKs (`briefId`/`postId`), the full `comments[]` thread, the
+ * The client-safe payload carried in `client_deliverable.payload` for a projected content request:
+ * the FKs (`briefId`/`postId`), the full client/team `comments[]` thread, the
  * `deliveryUrl`, `upgradedAt`, the brief-vs-post discriminators (`serviceType` + `hasBrief`/`hasPost`
  * so Phase-2 can pick the right surface), and — ALWAYS — the raw `contentRequestStatus` so the
  * production state survives the canonical mapping.
@@ -282,9 +282,9 @@ export const contentRequestAdapter: DeliverableAdapter<ContentTopicRequest, Cont
       title: requestTitle(request),
       summary: requestSummary(request),
       payload: buildRequestPayload(request),
-      // The client/team thread is carried in payload.comments[]; the operator/decline notes map to
-      // the deliverable note fields so a reader gets them without re-deriving.
-      note: request.internalNote ?? null,
+      // The client/team thread is carried in payload.comments[]. Only the explicitly client-safe
+      // note crosses this boundary; internalNote remains operator-only.
+      note: request.clientNote ?? null,
       clientResponseNote: request.clientFeedback ?? request.declineReason ?? null,
       parentDeliverableId: null,
       // Projected at read time — no physical send/decide/apply lifecycle on a client_deliverable

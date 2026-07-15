@@ -1,28 +1,10 @@
-import { createHash } from 'node:crypto';
 import type {
   ResolvedMatrixStructuralTarget,
   ResolvedPageBlockManifest,
 } from '../../../../shared/types/matrix-generation.js';
+import { canonicalGenerationFingerprint } from '../../../generation-provenance.js';
 
-function canonicalize(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (value === null || typeof value !== 'object') return value;
-
-  const record = value as Record<string, unknown>;
-  return Object.fromEntries(
-    Object.keys(record)
-      .filter(key => record[key] !== undefined)
-      .sort()
-      .map(key => [key, canonicalize(record[key])]),
-  );
-}
-
-/** Stable SHA-256 over recursively key-sorted JSON-compatible inputs. */
-export function canonicalGenerationFingerprint(value: unknown): string {
-  return createHash('sha256')
-    .update(JSON.stringify(canonicalize(value)))
-    .digest('hex');
-}
+export { canonicalGenerationFingerprint };
 
 type BlockManifestFingerprintSource = Pick<
   ResolvedPageBlockManifest,

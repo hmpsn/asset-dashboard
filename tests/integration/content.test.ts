@@ -23,9 +23,66 @@ import { createEphemeralTestContext } from './helpers.js';
 import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
 
 const ctx = createEphemeralTestContext(import.meta.url);
-const { api, postJson, patchJson, del } = ctx;
+const { api, postJson: rawPostJson, patchJson: rawPatchJson } = ctx;
 
 const testWsId = 'ws_integ_content_' + Date.now();
+
+function briefRevision(workspaceId: string, briefId: string): number {
+  const row = db.prepare(
+    'SELECT generation_revision FROM content_briefs WHERE workspace_id = ? AND id = ?',
+  ).get(workspaceId, briefId) as { generation_revision: number } | undefined;
+  return row?.generation_revision ?? 0;
+}
+
+function postRevision(workspaceId: string, postId: string): number {
+  const row = db.prepare(
+    'SELECT generation_revision FROM content_posts WHERE workspace_id = ? AND id = ?',
+  ).get(workspaceId, postId) as { generation_revision: number } | undefined;
+  return row?.generation_revision ?? 0;
+}
+
+function patchJson(path: string, body: unknown): Promise<Response> {
+  const briefMatch = path.match(/^\/api\/content-briefs\/([^/]+)\/([^/]+)$/);
+  const postMatch = path.match(/^\/api\/content-posts\/([^/]+)\/([^/]+)$/);
+  let requestBody = body;
+  if (body && typeof body === 'object' && !('expectedRevision' in body)) {
+    if (briefMatch) requestBody = { ...body, expectedRevision: briefRevision(briefMatch[1], briefMatch[2]) };
+    if (postMatch) requestBody = { ...body, expectedRevision: postRevision(postMatch[1], postMatch[2]) };
+  }
+  return rawPatchJson(path, requestBody);
+}
+
+function postJson(path: string, body: unknown): Promise<Response> {
+  const sectionMatch = path.match(/^\/api\/content-posts\/([^/]+)\/([^/]+)\/regenerate-section$/);
+  const generationMatch = path.match(/^\/api\/content-posts\/([^/]+)\/generate$/);
+  let requestBody = body;
+  if (body && typeof body === 'object') {
+    if (sectionMatch && !('expectedRevision' in body)) {
+      requestBody = { ...body, expectedRevision: postRevision(sectionMatch[1], sectionMatch[2]) };
+    } else if (generationMatch && !('expectedBriefRevision' in body)) {
+      const briefId = typeof (body as { briefId?: unknown }).briefId === 'string'
+        ? (body as { briefId: string }).briefId
+        : '';
+      requestBody = { ...body, expectedBriefRevision: briefRevision(generationMatch[1], briefId) };
+    }
+  }
+  return rawPostJson(path, requestBody);
+}
+
+function del(path: string): Promise<Response> {
+  const briefMatch = path.match(/^\/api\/content-briefs\/([^/]+)\/([^/]+)$/);
+  const postMatch = path.match(/^\/api\/content-posts\/([^/]+)\/([^/]+)$/);
+  const expectedRevision = briefMatch
+    ? briefRevision(briefMatch[1], briefMatch[2])
+    : postMatch
+      ? postRevision(postMatch[1], postMatch[2])
+      : 0;
+  return api(path, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expectedRevision }),
+  });
+}
 
 beforeAll(async () => {
   // Seed workspace so FK constraints on content tables are satisfied
@@ -187,7 +244,7 @@ describe('Content Briefs API', () => {
     const res = await api(`/api/content-briefs/${testWsId}/${briefId}/send-to-client`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: 'https://app.example.test' },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ expectedRevision: briefRevision(testWsId, briefId) }),
     });
     expect(res.status).toBe(200);
     const body = await res.json();

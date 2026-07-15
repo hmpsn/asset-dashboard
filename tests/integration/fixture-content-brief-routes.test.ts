@@ -4,7 +4,15 @@ import { createEphemeralTestContext } from './helpers.js';
 import { seedContentData, type SeededContent } from '../fixtures/content-seed.js';
 
 const ctx = createEphemeralTestContext(import.meta.url);
-const { api, del, patchJson, postJson } = ctx;
+const { api, patchJson, postJson } = ctx;
+
+function deleteJson(path: string, body: unknown): Promise<Response> {
+  return api(path, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
 
 let seeded: SeededContent | null = null;
 let isolatedSeeded: SeededContent | null = null;
@@ -103,9 +111,11 @@ describe('Content brief routes with fixture-seeded content data', () => {
 
     const beforeRes = await api(`/api/content-briefs/${seeded.workspaceId}/${seeded.briefId}`);
     expect(beforeRes.status).toBe(200);
-    const before = await beforeRes.json() as { suggestedTitle: string; targetKeyword: string };
+    const before = await beforeRes.json() as { suggestedTitle: string; targetKeyword: string; generationRevision: number };
 
-    const res = await patchJson(`/api/content-briefs/${seeded.workspaceId}/${seeded.briefId}`, {});
+    const res = await patchJson(`/api/content-briefs/${seeded.workspaceId}/${seeded.briefId}`, {
+      expectedRevision: before.generationRevision,
+    });
     expect(res.status).toBe(400);
     const body = await res.json() as { error: string };
     expect(body.error).toBe('At least one editable field required');
@@ -121,7 +131,9 @@ describe('Content brief routes with fixture-seeded content data', () => {
     expect(seeded).toBeTruthy();
     if (!seeded) return;
 
+    const brief = await (await api(`/api/content-briefs/${seeded.workspaceId}/${seeded.briefId}`)).json() as { generationRevision: number };
     const res = await patchJson(`/api/content-briefs/${seeded.workspaceId}/${seeded.briefId}`, {
+      expectedRevision: brief.generationRevision,
       wordCountTarget: 99,
       keywordSource: 'invalid-source',
       secondaryKeywords: ['valid', ''],
@@ -138,6 +150,7 @@ describe('Content brief routes with fixture-seeded content data', () => {
     if (!seeded || !isolatedSeeded) return;
 
     const res = await patchJson(`/api/content-briefs/${seeded.workspaceId}/${isolatedSeeded.briefId}`, {
+      expectedRevision: 0,
       suggestedTitle: 'Cross-tenant write attempt',
     });
     expect(res.status).toBe(404);
@@ -156,7 +169,9 @@ describe('Content brief routes with fixture-seeded content data', () => {
 
     const patchedKeyword = 'fixture adversarial keyword update';
     const patchedTitle = 'Adversarial keyword brief title';
+    const before = await (await api(`/api/content-briefs/${seeded.workspaceId}/${seeded.briefId}`)).json() as { generationRevision: number };
     const res = await patchJson(`/api/content-briefs/${seeded.workspaceId}/${seeded.briefId}`, {
+      expectedRevision: before.generationRevision,
       targetKeyword: patchedKeyword,
       suggestedTitle: patchedTitle,
       keywordLocked: true,
@@ -221,7 +236,13 @@ describe('Content brief routes with fixture-seeded content data', () => {
     expect(isolatedSeeded).toBeTruthy();
     if (!isolatedSeeded) return;
 
-    const deleteRes = await del(`/api/content-briefs/${isolatedSeeded.workspaceId}/${isolatedSeeded.briefId}`);
+    const beforeDelete = await (await api(
+      `/api/content-briefs/${isolatedSeeded.workspaceId}/${isolatedSeeded.briefId}`,
+    )).json() as { generationRevision: number };
+    const deleteRes = await deleteJson(
+      `/api/content-briefs/${isolatedSeeded.workspaceId}/${isolatedSeeded.briefId}`,
+      { expectedRevision: beforeDelete.generationRevision },
+    );
     expect(deleteRes.status).toBe(200);
     const deleteBody = await deleteRes.json() as { ok: boolean };
     expect(deleteBody.ok).toBe(true);

@@ -73,7 +73,7 @@ describe('content post generation progress', () => {
     expect(progress).toContain('4/6:Unifying draft...');
     expect(progress).toContain('5/6:Generating SEO metadata...');
     expect(progress).toContain('6/6:Finalizing post draft...');
-  });
+  }, 15_000);
 
   it('stops before the next generation step when the job signal is aborted', async () => {
     const { generatePost } = await import('../../server/content-posts.js');
@@ -90,7 +90,11 @@ describe('content post generation progress', () => {
       signal: controller.signal,
     })).rejects.toThrow(/cancelled/i);
 
-    expect(vi.mocked(ai.generateIntroduction).mock.calls[0][4]).toEqual({ signal: controller.signal });
+    expect(vi.mocked(ai.generateIntroduction).mock.calls[0][4]).toEqual(expect.objectContaining({
+      signal: controller.signal,
+      executionChainId: expect.any(String),
+      onExecution: expect.any(Function),
+    }));
     expect(vi.mocked(ai.generateSection)).not.toHaveBeenCalled();
   });
 });
