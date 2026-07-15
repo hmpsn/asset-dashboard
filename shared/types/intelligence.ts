@@ -154,6 +154,8 @@ export interface ContentGenerationPromptAuthority {
 export interface ContentGenerationContextV2Options {
   targetKeyword: string;
   pagePath?: string;
+  /** Explicit matrix targets disable keyword-only page-map matching. */
+  allowKeywordTargetMatch?: boolean;
   sourceEvidence?: BriefSourceEvidence;
   /** A real provider observation timestamp. Null/omitted means metrics are unavailable. */
   providerMetricsObservedAt?: string | null;

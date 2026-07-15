@@ -1483,9 +1483,16 @@ export async function generateBrief(
     executionChainId?: string;
     /** Cooperative cancellation owned by the background-job worker. */
     signal?: AbortSignal;
+    /** Frozen context captured by a larger generation run. */
+    generationContextV2?: ContentGenerationContextV2Result;
+    /** Explicit matrix targets must not be selected again by keyword equality. */
+    skipKeywordStrategyCrossref?: boolean;
+    /** Cheap source/authority CAS check around paid work. */
+    assertAuthority?: () => void;
   },
 ): Promise<ContentBrief> {
   throwIfSignalAborted(options?.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
+  options?.assertAuthority?.();
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) throw new Error('OPENAI_API_KEY not configured');
 
@@ -1497,7 +1504,7 @@ export async function generateBrief(
 
   // Pull in keyword strategy context for alignment. Flag ON assembles the full
   // brief-relevant context once; OFF preserves the legacy call sequence.
-  const contextV2 = isFeatureEnabled('content-generation-context-v2', workspaceId)
+  const contextV2 = options?.generationContextV2 ?? (isFeatureEnabled('content-generation-context-v2', workspaceId)
     ? await buildContentGenerationContextV2(workspaceId, {
         targetKeyword,
         sourceEvidence: context.sourceEvidence,
@@ -1505,7 +1512,8 @@ export async function generateBrief(
           ? context.keywordValidation?.validatedAt ?? null
           : null,
       })
-    : null;
+    : null);
+  options?.assertAuthority?.();
   const legacySeoContext = contextV2
     ? null
     : await buildContentGenerationContext(workspaceId, {
@@ -1542,10 +1550,12 @@ export async function generateBrief(
   // Use intel.seoContext.strategy.pageMap (populated from the live page_keywords table
   // by assembleSeoContext) rather than getWorkspace().keywordStrategy (which has pageMap
   // stripped before storage).
-  const matchedPage = seo?.strategy?.pageMap?.find(p =>
-    p.primaryKeyword?.toLowerCase() === targetKeyword.toLowerCase()
-    || p.secondaryKeywords?.some(sk => sk.toLowerCase() === targetKeyword.toLowerCase())
-  );
+  const matchedPage = options?.skipKeywordStrategyCrossref
+    ? undefined
+    : seo?.strategy?.pageMap?.find(p =>
+        p.primaryKeyword?.toLowerCase() === targetKeyword.toLowerCase()
+        || p.secondaryKeywords?.some(sk => sk.toLowerCase() === targetKeyword.toLowerCase())
+      );
   let pageAnalysisBlock = '';
   if (matchedPage) {
     let profile: PageKeywordMap | WorkspaceIntelligence['pageProfile'];
@@ -1901,6 +1911,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     : buildSystemPrompt(workspaceId, systemInstructions);
 
   throwIfSignalAborted(options?.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
+  options?.assertAuthority?.();
   const aiResult = await callAI({
     operation: 'content-brief-generate',
     model: 'gpt-5.4',
@@ -1915,6 +1926,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     signal: options?.signal,
   });
   throwIfSignalAborted(options?.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
+  options?.assertAuthority?.();
 
   const raw = aiResult.text || '{}';
   const parsed = parseContentBriefSchema(raw);

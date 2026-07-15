@@ -48,6 +48,8 @@ describe('MCP server instructions', () => {
       'get_content_matrix',
       'resolve_content_matrix_cells',
       'accept_content_template_generation_upgrade',
+      'preview_content_matrix_generation',
+      'resolve_content_matrix_evidence',
     ]) {
       expect(MCP_SERVER_INSTRUCTIONS).toContain(tool);
     }

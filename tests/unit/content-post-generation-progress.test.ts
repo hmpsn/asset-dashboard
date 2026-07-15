@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import db from '../../server/db/index.js';
 import type { ContentBrief } from '../../shared/types/content.js';
+import { getPost } from '../../server/content-posts-db.js';
 
 vi.mock('../../server/content-posts-ai.js', () => ({
   buildVoiceContext: vi.fn(async () => 'Voice context'),
@@ -125,6 +126,52 @@ describe('content post generation progress', () => {
     expect(vi.mocked(ai.generateConclusion).mock.calls[0][1]).toBe('[Draft context]');
     expect(vi.mocked(ai.unifyPost).mock.calls[0][2]).toBe('[Draft context]');
     expect(vi.mocked(ai.generateSeoMeta).mock.calls[0][3]).toEqual(expect.objectContaining({ promptAuthority: authority }));
+  }, 15_000);
+
+  it('returns a provenance-carrying candidate without writing a post row', async () => {
+    const { generatePost } = await import('../../server/content-posts.js');
+    const ai = await import('../../server/content-posts-ai.js');
+    const workspaceId = `ws_post_candidate_${Date.now()}`;
+    const postId = 'post_candidate_only';
+    workspaceIds.add(workspaceId);
+    const assertAuthority = vi.fn();
+    vi.mocked(ai.generateIntroduction).mockImplementationOnce(async (...args) => {
+      const options = args[4];
+      const timestamp = new Date().toISOString();
+      options?.onExecution?.({
+        execution: {
+          runId: 'candidate-introduction-run',
+          executionChainId: options.executionChainId,
+          operation: 'content-post-introduction',
+          provider: 'openai',
+          model: 'gpt-5.4-mini',
+          attempts: 1,
+          cacheOutcome: 'miss',
+          startedAt: timestamp,
+          completedAt: timestamp,
+          durationMs: 0,
+        },
+        inputFingerprint: 'a'.repeat(64),
+      });
+      return '<p>Intro words for the candidate post.</p>';
+    });
+
+    const candidate = await generatePost(workspaceId, makeBrief(workspaceId), postId, {
+      persist: false,
+      assertAuthority,
+    });
+
+    expect(candidate).toMatchObject({
+      id: postId,
+      status: 'draft',
+      generationRevision: 0,
+      generationProvenance: {
+        runId: 'candidate-introduction-run',
+      },
+    });
+    expect(candidate.generationProvenance?.inputFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(getPost(workspaceId, postId)).toBeUndefined();
+    expect(assertAuthority).toHaveBeenCalled();
   }, 15_000);
 
   it('stops before the next generation step when the job signal is aborted', async () => {

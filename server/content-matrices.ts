@@ -521,6 +521,8 @@ export function updateMatrixCell(
     expectedMatrixRevision?: number;
     expectedTemplateRevision?: number;
     requireExpectedCellRevision?: boolean;
+    /** Domain-owned revision advance for a normalized evidence mutation. */
+    revisionReason?: 'evidence_resolution';
   } = {},
 ): ContentMatrix | undefined {
   if (options.requireExpectedCellRevision && options.expectedCellRevision === undefined) {
@@ -601,7 +603,7 @@ export function updateMatrixCell(
       id: cell.id,
       revision: cellRevision,
     };
-    const changed = cellChanged(cell, candidate);
+    const changed = cellChanged(cell, candidate) || options.revisionReason === 'evidence_resolution';
     if (!changed) return { matrix: existing, previousCell: cell, changed: false };
 
     const nextCell: MatrixCell = { ...candidate, revision: cellRevision + 1 };

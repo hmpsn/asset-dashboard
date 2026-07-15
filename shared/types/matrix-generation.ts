@@ -1034,6 +1034,49 @@ export interface MatrixGenerationPreviewTarget extends ResolvedMatrixStructuralT
   estimatedPaidBudget: MatrixGenerationCostEstimate;
 }
 
+export interface PreviewMatrixGenerationSelection {
+  cellId: string;
+  expectedSourceRevision: MatrixSourceRevision;
+}
+
+export type PreviewMatrixGenerationSelections = readonly [
+  PreviewMatrixGenerationSelection,
+  ...PreviewMatrixGenerationSelection[],
+];
+
+export interface PreviewMatrixGenerationRequest {
+  workspaceId: string;
+  matrixId: string;
+  selections: PreviewMatrixGenerationSelections;
+}
+
+interface MatrixGenerationPreviewIdentity {
+  matrixId: string;
+  templateId: string;
+  cellId: string;
+  sourceRevision: MatrixSourceRevision;
+}
+
+export type MatrixGenerationPreviewResult =
+  | (MatrixGenerationPreviewIdentity & {
+      status: 'ready';
+      target: MatrixGenerationPreviewTarget;
+    })
+  | (MatrixGenerationPreviewIdentity & {
+      status: 'upgrade_required';
+      proposal: ContentTemplateGenerationUpgradeProposal;
+    })
+  | (MatrixGenerationPreviewIdentity & {
+      status: 'blocked';
+      evidenceRequirements: GenerationEvidenceRequirement[];
+      blockingRequirementIds: string[];
+      expectedArtifactRevisions: MatrixArtifactRevisionExpectations;
+    });
+
+export interface PreviewMatrixGenerationResult {
+  results: MatrixGenerationPreviewResult[];
+}
+
 export interface ContentTemplateGenerationUpgradeProposal {
   templateId: string;
   expectedTemplateRevision: number;
@@ -1177,6 +1220,12 @@ export interface ResolveMatrixGenerationEvidenceRequest {
   expectedSourceRevision: MatrixSourceRevision;
   expectedArtifactRevisions: MatrixArtifactRevisionExpectations;
   idempotencyKey: string;
+}
+
+export interface ResolveMatrixGenerationEvidenceResult {
+  resolution: MatrixGenerationEvidenceResolution;
+  currentSourceRevision: MatrixSourceRevision;
+  created: boolean;
 }
 
 interface MatrixGenerationRunBase {

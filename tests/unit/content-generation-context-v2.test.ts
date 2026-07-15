@@ -171,6 +171,17 @@ describe('buildContentGenerationContextV2', () => {
       providerMetricsObservedAt: null,
     });
     expect(repeat.effectiveInputFingerprint).toBe(result.effectiveInputFingerprint);
+
+    vi.mocked(buildWorkspaceIntelligence).mockResolvedValueOnce({
+      ...intelligence,
+      assembledAt: '2026-07-14T12:05:00.000Z',
+    });
+    const reassembled = await buildContentGenerationContextV2('ws-context-v2', {
+      targetKeyword: 'SEO Platform Pricing',
+      sourceEvidence,
+      providerMetricsObservedAt: null,
+    });
+    expect(reassembled.effectiveInputFingerprint).toBe(result.effectiveInputFingerprint);
   });
 
   it('retains target-row metrics only when their provider observation time is supplied', async () => {

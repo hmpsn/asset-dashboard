@@ -1,13 +1,25 @@
 import { randomUUID } from 'node:crypto';
 import type {
   CreateMatrixGenerationRunRequest,
+  MatrixGenerationAttempt,
   MatrixGenerationItem,
+  MatrixGenerationItemStatus,
   MatrixGenerationReadySelectionItem,
   MatrixGenerationRun,
+  MatrixGenerationRunStatus,
+  MatrixGenerationStage,
+  MatrixGenerationAttemptStatus,
+  MatrixGenerationPreviewTarget,
   MatrixGenerationSelection,
   PersistedMatrixGenerationRun,
   PublicMatrixGenerationCreatorAttribution,
 } from '../../../../shared/types/matrix-generation.js';
+import type {
+  ContentBrief,
+  GeneratedPost,
+  PersistedContentBrief,
+  PersistedGeneratedPost,
+} from '../../../../shared/types/content.js';
 import { normalizeMatrixGenerationSchemaTypes } from '../../../../shared/types/matrix-generation.js';
 import type {
   GenerationResolverAttribution,
@@ -30,6 +42,17 @@ import {
   computeBlockManifestFingerprint,
   computeStructuralTargetFingerprint,
 } from './fingerprint.js';
+import { getBrief, persistGeneratedBrief } from '../../../content-brief.js';
+import { updateMatrixCell } from '../../../content-matrices.js';
+import { getPost, persistGeneratedPost } from '../../../content-posts-db.js';
+import {
+  MATRIX_GENERATION_ATTEMPT_TRANSITIONS,
+  MATRIX_GENERATION_ITEM_TRANSITIONS,
+  MATRIX_GENERATION_RUN_TRANSITIONS,
+  validateTransition,
+} from '../../../state-machines.js';
+import { assertPreviewIdentityCurrent } from './preview.js';
+import { generationProvenanceSchema } from '../../../schemas/generation-provenance.js';
 
 interface MatrixGenerationRunRow {
   id: string;
@@ -92,6 +115,19 @@ interface MatrixGenerationItemRow {
   error: string | null;
   created_at: string;
   updated_at: string;
+  completed_at: string | null;
+}
+
+interface MatrixGenerationAttemptRow {
+  id: string;
+  item_id: string;
+  attempt_number: number;
+  stage: MatrixGenerationAttempt['stage'];
+  status: MatrixGenerationAttempt['status'];
+  effective_input_fingerprint: string;
+  provenance: string | null;
+  error: string | null;
+  started_at: string;
   completed_at: string | null;
 }
 
@@ -541,6 +577,87 @@ const stmts = createStmtCache(() => ({
     WHERE item.workspace_id = ? AND item.run_id = ?
     ORDER BY item.created_at ASC, item.id ASC
   `),
+  selectItemById: db.prepare(`
+    SELECT item.*,
+           run.matrix_id AS run_matrix_id,
+           run.template_id AS run_template_id
+    FROM content_matrix_generation_items item
+    JOIN content_matrix_generation_runs run
+      ON run.id = item.run_id
+     AND run.workspace_id = item.workspace_id
+    WHERE item.id = ? AND item.workspace_id = ?
+  `),
+  updateItem: db.prepare(`
+    UPDATE content_matrix_generation_items
+    SET status = @next_status, -- status-ok: writeMatrixGenerationItem validates MATRIX_GENERATION_ITEM_TRANSITIONS before this CAS
+        revision = revision + 1,
+        structural_target = @structural_target,
+        preview_target = @preview_target,
+        brief_id = @brief_id,
+        post_id = @post_id,
+        audit_report = @audit_report,
+        automatic_revision_count = @automatic_revision_count,
+        error = @error,
+        updated_at = @updated_at,
+        completed_at = @completed_at
+    WHERE id = @id AND workspace_id = @workspace_id
+      AND revision = @expected_revision AND status = @expected_status
+  `),
+  bumpItemAttempt: db.prepare(`
+    UPDATE content_matrix_generation_items
+    SET revision = revision + 1,
+        attempt_count = attempt_count + 1,
+        updated_at = @updated_at
+    WHERE id = @id AND workspace_id = @workspace_id
+      AND revision = @expected_revision
+  `),
+  updateRun: db.prepare(`
+    UPDATE content_matrix_generation_runs
+    SET status = @next_status, -- status-ok: transitionMatrixGenerationRun validates MATRIX_GENERATION_RUN_TRANSITIONS before this CAS
+        revision = revision + 1,
+        queued_count = @queued_count,
+        running_count = @running_count,
+        ready_for_human_review_count = @ready_count,
+        needs_attention_count = @needs_attention_count,
+        blocked_count = @blocked_count,
+        conflict_count = @conflict_count,
+        failed_count = @failed_count,
+        cancelled_count = @cancelled_count,
+        updated_at = @updated_at,
+        completed_at = @completed_at
+    WHERE id = @id AND workspace_id = @workspace_id
+      AND revision = @expected_revision AND status = @expected_status
+  `),
+  insertAttempt: db.prepare(`
+    INSERT INTO content_matrix_generation_attempts (
+      id, item_id, attempt_number, stage, status,
+      effective_input_fingerprint, provenance, error, started_at, completed_at
+    ) VALUES (
+      @id, @item_id, @attempt_number, @stage, 'running',
+      @effective_input_fingerprint, NULL, NULL, @started_at, NULL
+    )
+  `),
+  updateAttempt: db.prepare(`
+    UPDATE content_matrix_generation_attempts
+    SET status = @next_status, -- status-ok: finishMatrixGenerationAttempt validates MATRIX_GENERATION_ATTEMPT_TRANSITIONS before this CAS
+        provenance = @provenance,
+        error = @error,
+        completed_at = @completed_at
+    WHERE id = @id AND item_id = @item_id AND status = @expected_status
+  `),
+  selectAttemptById: db.prepare(`
+    SELECT attempt.*
+    FROM content_matrix_generation_attempts attempt
+    JOIN content_matrix_generation_items item ON item.id = attempt.item_id
+    WHERE attempt.id = ? AND attempt.item_id = ? AND item.workspace_id = ?
+  `),
+  listAttempts: db.prepare(`
+    SELECT attempt.*
+    FROM content_matrix_generation_attempts attempt
+    JOIN content_matrix_generation_items item ON item.id = attempt.item_id
+    WHERE attempt.item_id = ? AND item.workspace_id = ?
+    ORDER BY attempt.attempt_number, attempt.started_at, attempt.id
+  `),
   insertRun: db.prepare(`
     INSERT INTO content_matrix_generation_runs (
       id, workspace_id, matrix_id, template_id, status, revision,
@@ -969,6 +1086,19 @@ export function getPersistedMatrixGenerationRun(
   return row ? rowToRun(row) : null;
 }
 
+export function getPersistedMatrixGenerationRunByIdempotency(
+  workspaceId: string,
+  matrixId: string,
+  idempotencyKey: string,
+): PersistedMatrixGenerationRun | null {
+  const row = stmts().selectByIdempotency.get(
+    workspaceId,
+    matrixId,
+    idempotencyKey,
+  ) as MatrixGenerationRunRow | undefined;
+  return row ? rowToRun(row) : null;
+}
+
 /** Public-safe run read. Internal callers needing evidence use the explicit persisted read. */
 export function getMatrixGenerationRun(
   workspaceId: string,
@@ -985,6 +1115,370 @@ export function listMatrixGenerationItems(
 ): MatrixGenerationItem[] {
   const rows = stmts().listItems.all(workspaceId, runId) as MatrixGenerationItemRow[];
   return rows.map(rowToItem);
+}
+
+export function getMatrixGenerationItem(
+  workspaceId: string,
+  itemId: string,
+): MatrixGenerationItem | null {
+  const row = stmts().selectItemById.get(itemId, workspaceId) as MatrixGenerationItemRow | undefined;
+  return row ? rowToItem(row) : null;
+}
+
+export class MatrixGenerationRevisionConflictError extends Error {
+  readonly entity: 'run' | 'item' | 'attempt';
+  readonly id: string;
+
+  constructor(entity: 'run' | 'item' | 'attempt', id: string) {
+    super(`Matrix generation ${entity} changed since it was read`);
+    this.name = 'MatrixGenerationRevisionConflictError';
+    this.entity = entity;
+    this.id = id;
+  }
+}
+
+const TERMINAL_ITEM_STATUSES = new Set<MatrixGenerationItemStatus>([
+  'ready_for_human_review',
+  'needs_attention',
+  'blocked_missing_evidence',
+  'conflict',
+  'cancelled',
+  'failed',
+]);
+
+const ACTIVE_ITEM_STATUSES = new Set<MatrixGenerationItemStatus>([
+  'preflighting',
+  'preflighted',
+  'generating_brief',
+  'generating_post',
+  'auditing_deterministic',
+  'auditing_model',
+  'revising',
+]);
+
+function writeMatrixGenerationItem(input: {
+  workspaceId: string;
+  itemId: string;
+  expectedRevision: number;
+  nextStatus: MatrixGenerationItemStatus;
+  structuralTarget?: MatrixGenerationItem['structuralTarget'];
+  previewTarget?: MatrixGenerationItem['previewTarget'];
+  briefId?: string;
+  postId?: string;
+  error?: MatrixGenerationItem['error'];
+}): MatrixGenerationItem {
+  const current = getMatrixGenerationItem(input.workspaceId, input.itemId);
+  if (!current || current.revision !== input.expectedRevision) {
+    throw new MatrixGenerationRevisionConflictError('item', input.itemId);
+  }
+  validateTransition(
+    'matrix_generation_item',
+    MATRIX_GENERATION_ITEM_TRANSITIONS,
+    current.status,
+    input.nextStatus,
+  );
+  const now = new Date().toISOString();
+  const completedAt = TERMINAL_ITEM_STATUSES.has(input.nextStatus) ? now : null;
+  const structuralTarget = input.structuralTarget ?? current.structuralTarget;
+  const previewTarget = input.previewTarget ?? current.previewTarget;
+  const info = stmts().updateItem.run({
+    id: input.itemId,
+    workspace_id: input.workspaceId,
+    expected_revision: input.expectedRevision,
+    expected_status: current.status,
+    next_status: input.nextStatus,
+    structural_target: structuralTarget ? JSON.stringify(structuralTarget) : null,
+    preview_target: previewTarget ? JSON.stringify(previewTarget) : null,
+    brief_id: input.briefId ?? current.briefId,
+    post_id: input.postId ?? current.postId,
+    audit_report: current.auditReport ? JSON.stringify(current.auditReport) : null,
+    automatic_revision_count: current.automaticRevisionCount,
+    error: input.error === undefined
+      ? current.error ? JSON.stringify(current.error) : null
+      : input.error ? JSON.stringify(input.error) : null,
+    updated_at: now,
+    completed_at: completedAt,
+  });
+  if (info.changes !== 1) {
+    throw new MatrixGenerationRevisionConflictError('item', input.itemId);
+  }
+  const updated = getMatrixGenerationItem(input.workspaceId, input.itemId);
+  if (!updated) throw new MatrixGenerationRevisionConflictError('item', input.itemId);
+  return updated;
+}
+
+export function transitionMatrixGenerationItem(input: {
+  workspaceId: string;
+  itemId: string;
+  expectedRevision: number;
+  nextStatus: MatrixGenerationItemStatus;
+  structuralTarget?: MatrixGenerationItem['structuralTarget'];
+  previewTarget?: MatrixGenerationItem['previewTarget'];
+  briefId?: string;
+  postId?: string;
+  error?: MatrixGenerationItem['error'];
+}): MatrixGenerationItem {
+  const write = () => writeMatrixGenerationItem(input);
+  return db.inTransaction ? write() : db.transaction(write).immediate();
+}
+
+function countsForItems(items: readonly MatrixGenerationItem[]): GenerationRunCounts {
+  const count = (status: MatrixGenerationItemStatus) => items.filter(item => item.status === status).length;
+  return {
+    selected: items.length,
+    queued: count('queued'),
+    running: items.filter(item => ACTIVE_ITEM_STATUSES.has(item.status)).length,
+    readyForHumanReview: count('ready_for_human_review'),
+    needsAttention: count('needs_attention'),
+    blocked: count('blocked_missing_evidence'),
+    conflicts: count('conflict'),
+    failed: count('failed'),
+    cancelled: count('cancelled'),
+  };
+}
+
+const TERMINAL_RUN_STATUSES = new Set<MatrixGenerationRunStatus>([
+  'completed',
+  'completed_with_errors',
+  'blocked',
+  'conflict',
+  'cancelled',
+  'failed',
+]);
+
+export function transitionMatrixGenerationRun(input: {
+  workspaceId: string;
+  runId: string;
+  expectedRevision: number;
+  nextStatus: MatrixGenerationRunStatus;
+}): PersistedMatrixGenerationRun {
+  const write = (): PersistedMatrixGenerationRun => {
+    const current = getPersistedMatrixGenerationRun(input.workspaceId, input.runId);
+    if (!current || current.revision !== input.expectedRevision) {
+      throw new MatrixGenerationRevisionConflictError('run', input.runId);
+    }
+    validateTransition(
+      'matrix_generation_run',
+      MATRIX_GENERATION_RUN_TRANSITIONS,
+      current.status,
+      input.nextStatus,
+    );
+    const counts = countsForItems(listMatrixGenerationItems(input.workspaceId, input.runId));
+    const now = new Date().toISOString();
+    const info = stmts().updateRun.run({
+      id: input.runId,
+      workspace_id: input.workspaceId,
+      expected_revision: input.expectedRevision,
+      expected_status: current.status,
+      next_status: input.nextStatus,
+      queued_count: counts.queued,
+      running_count: counts.running,
+      ready_count: counts.readyForHumanReview,
+      needs_attention_count: counts.needsAttention,
+      blocked_count: counts.blocked,
+      conflict_count: counts.conflicts,
+      failed_count: counts.failed,
+      cancelled_count: counts.cancelled,
+      updated_at: now,
+      completed_at: TERMINAL_RUN_STATUSES.has(input.nextStatus) ? now : null,
+    });
+    if (info.changes !== 1) throw new MatrixGenerationRevisionConflictError('run', input.runId);
+    const updated = getPersistedMatrixGenerationRun(input.workspaceId, input.runId);
+    if (!updated) throw new MatrixGenerationRevisionConflictError('run', input.runId);
+    return updated;
+  };
+  return db.inTransaction ? write() : db.transaction(write).immediate();
+}
+
+function rowToAttempt(row: MatrixGenerationAttemptRow, workspaceId: string): MatrixGenerationAttempt {
+  const provenance = row.provenance
+    ? parseJsonSafe(row.provenance, generationProvenanceSchema, null, {
+        workspaceId,
+        table: 'content_matrix_generation_attempts',
+        field: 'provenance',
+      })
+    : null;
+  const error = row.error
+    ? parseJsonSafe(row.error, sanitizedErrorSchema, null, {
+        workspaceId,
+        table: 'content_matrix_generation_attempts',
+        field: 'error',
+      })
+    : null;
+  if (row.provenance && !provenance) {
+    throw new MatrixGenerationPersistenceContractError('Stored matrix attempt provenance is invalid');
+  }
+  if (row.error && !error) {
+    throw new MatrixGenerationPersistenceContractError('Stored matrix attempt error is invalid');
+  }
+  return {
+    id: row.id,
+    itemId: row.item_id,
+    attemptNumber: row.attempt_number,
+    stage: row.stage,
+    status: row.status,
+    effectiveInputFingerprint: row.effective_input_fingerprint,
+    provenance,
+    error,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+  };
+}
+
+export function listMatrixGenerationAttempts(
+  workspaceId: string,
+  itemId: string,
+): MatrixGenerationAttempt[] {
+  return (stmts().listAttempts.all(itemId, workspaceId) as MatrixGenerationAttemptRow[])
+    .map(row => rowToAttempt(row, workspaceId));
+}
+
+export function startMatrixGenerationAttempt(input: {
+  workspaceId: string;
+  itemId: string;
+  expectedItemRevision: number;
+  stage: MatrixGenerationStage;
+  effectiveInputFingerprint: string;
+}): { item: MatrixGenerationItem; attempt: MatrixGenerationAttempt } {
+  const write = () => {
+    const item = getMatrixGenerationItem(input.workspaceId, input.itemId);
+    if (!item || item.revision !== input.expectedItemRevision) {
+      throw new MatrixGenerationRevisionConflictError('item', input.itemId);
+    }
+    const now = new Date().toISOString();
+    const attemptId = `mga_${randomUUID()}`;
+    stmts().insertAttempt.run({
+      id: attemptId,
+      item_id: item.id,
+      attempt_number: item.attemptCount + 1,
+      stage: input.stage,
+      effective_input_fingerprint: input.effectiveInputFingerprint,
+      started_at: now,
+    });
+    const info = stmts().bumpItemAttempt.run({
+      id: item.id,
+      workspace_id: input.workspaceId,
+      expected_revision: input.expectedItemRevision,
+      updated_at: now,
+    });
+    if (info.changes !== 1) throw new MatrixGenerationRevisionConflictError('item', item.id);
+    const updatedItem = getMatrixGenerationItem(input.workspaceId, item.id);
+    const attemptRow = stmts().selectAttemptById.get(
+      attemptId,
+      item.id,
+      input.workspaceId,
+    ) as MatrixGenerationAttemptRow | undefined;
+    if (!updatedItem || !attemptRow) throw new MatrixGenerationRevisionConflictError('attempt', attemptId);
+    return { item: updatedItem, attempt: rowToAttempt(attemptRow, input.workspaceId) };
+  };
+  return db.inTransaction ? write() : db.transaction(write).immediate();
+}
+
+export function finishMatrixGenerationAttempt(input: {
+  workspaceId: string;
+  itemId: string;
+  attemptId: string;
+  nextStatus: Exclude<MatrixGenerationAttemptStatus, 'running'>;
+  provenance?: MatrixGenerationAttempt['provenance'];
+  error?: MatrixGenerationAttempt['error'];
+}): MatrixGenerationAttempt {
+  const write = () => {
+    const row = stmts().selectAttemptById.get(
+      input.attemptId,
+      input.itemId,
+      input.workspaceId,
+    ) as MatrixGenerationAttemptRow | undefined;
+    if (!row) throw new MatrixGenerationRevisionConflictError('attempt', input.attemptId);
+    validateTransition(
+      'matrix_generation_attempt',
+      MATRIX_GENERATION_ATTEMPT_TRANSITIONS,
+      row.status,
+      input.nextStatus,
+    );
+    const info = stmts().updateAttempt.run({
+      id: input.attemptId,
+      item_id: input.itemId,
+      expected_status: row.status,
+      next_status: input.nextStatus,
+      provenance: input.provenance ? JSON.stringify(input.provenance) : null,
+      error: input.error ? JSON.stringify(input.error) : null,
+      completed_at: new Date().toISOString(),
+    });
+    if (info.changes !== 1) {
+      throw new MatrixGenerationRevisionConflictError('attempt', input.attemptId);
+    }
+    const updated = stmts().selectAttemptById.get(
+      input.attemptId,
+      input.itemId,
+      input.workspaceId,
+    ) as MatrixGenerationAttemptRow | undefined;
+    if (!updated) throw new MatrixGenerationRevisionConflictError('attempt', input.attemptId);
+    return rowToAttempt(updated, input.workspaceId);
+  };
+  return db.inTransaction ? write() : db.transaction(write).immediate();
+}
+
+export interface CommitMatrixGenerationDraftResult {
+  item: MatrixGenerationItem;
+  brief: PersistedContentBrief;
+  post: PersistedGeneratedPost;
+  cellRevision: number;
+}
+
+export function commitMatrixGenerationDraft(input: {
+  workspaceId: string;
+  itemId: string;
+  expectedItemRevision: number;
+  target: MatrixGenerationPreviewTarget;
+  brief: ContentBrief;
+  post: GeneratedPost;
+}): CommitMatrixGenerationDraftResult {
+  return db.transaction((): CommitMatrixGenerationDraftResult => {
+    const item = getMatrixGenerationItem(input.workspaceId, input.itemId);
+    if (!item || item.revision !== input.expectedItemRevision || item.status !== 'generating_post') {
+      throw new MatrixGenerationRevisionConflictError('item', input.itemId);
+    }
+    if (input.brief.id !== input.post.briefId) {
+      throw new MatrixGenerationPersistenceContractError('Generated post must reference its candidate brief');
+    }
+    if (getBrief(input.workspaceId, input.brief.id) || getPost(input.workspaceId, input.post.id)) {
+      throw new MatrixGenerationPersistenceContractError('Generated candidate IDs must be insert-only');
+    }
+    assertPreviewIdentityCurrent(input.workspaceId, input.target);
+
+    const brief = persistGeneratedBrief(input.workspaceId, input.brief);
+    const post = persistGeneratedPost(input.workspaceId, input.post);
+    const updatedMatrix = updateMatrixCell(
+      input.workspaceId,
+      input.target.matrixId,
+      input.target.cellId,
+      { briefId: brief.id, postId: post.id, status: 'draft' },
+      {
+        expectedMatrixRevision: input.target.sourceRevision.matrixRevision,
+        expectedTemplateRevision: input.target.sourceRevision.templateRevision,
+        expectedCellRevision: input.target.sourceRevision.cellRevision,
+        requireExpectedCellRevision: true,
+      },
+    );
+    const cell = updatedMatrix?.cells.find(candidate => candidate.id === input.target.cellId);
+    if (!cell) throw new MatrixGenerationRevisionConflictError('item', input.itemId);
+    const updatedItem = writeMatrixGenerationItem({
+      workspaceId: input.workspaceId,
+      itemId: input.itemId,
+      expectedRevision: input.expectedItemRevision,
+      nextStatus: 'auditing_deterministic',
+      previewTarget: input.target,
+      briefId: brief.id,
+      postId: post.id,
+      error: null,
+    });
+    return {
+      item: updatedItem,
+      brief,
+      post,
+      cellRevision: cell.revision ?? 0,
+    };
+  }).immediate();
 }
 
 /**

@@ -16,6 +16,7 @@ import type {
   GenerationExecutionProvenance,
   GenerationProvenance,
 } from '../shared/types/ai-execution.js';
+import type { ContentGenerationContextV2Result } from '../shared/types/intelligence.js';
 import { randomUUID } from 'node:crypto';
 import { createLogger } from './logger.js';
 import { addActivity } from './activity-log.js';
@@ -240,13 +241,19 @@ function collectIncompletePostDiagnostics(
   return diagnostics;
 }
 
-interface GeneratePostOptions {
+export interface GeneratePostOptions {
   signal?: AbortSignal;
   onProgress?: (progress: ContentPostGenerationProgress) => void;
   expectedRevision?: number;
   expectedBriefRevision?: number;
   executionChainId?: string;
   onRevision?: (revision: number) => void;
+  /** Return a complete candidate without writing progress or artifacts. */
+  persist?: boolean;
+  /** Frozen context captured by a larger generation run. */
+  generationContextV2?: ContentGenerationContextV2Result;
+  /** Cheap source/authority CAS check around paid work. */
+  assertAuthority?: () => void;
 }
 
 export function notifyContentUpdated(workspaceId: string, payload: Record<string, unknown>) {
@@ -771,6 +778,7 @@ export async function generatePost(
   options: GeneratePostOptions = {},
 ): Promise<GeneratedPost> {
   const postId = existingPostId || `post_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const shouldPersist = options.persist !== false;
   const totalSteps = contentPostGenerationTotalSteps(brief);
   const executionChainId = options.executionChainId ?? randomUUID();
   const acceptedExecutions: AcceptedGenerationExecution[] = [];
@@ -779,7 +787,15 @@ export async function generatePost(
     options.onProgress?.({ message, progress, total: totalSteps });
   };
 
-  const existingPost = getPost(workspaceId, postId);
+  const storedPost = getPost(workspaceId, postId);
+  if (!shouldPersist && storedPost) {
+    throw new GenerationRevisionConflictError(
+      'content_post',
+      postId,
+      options.expectedRevision ?? 0,
+    );
+  }
+  const existingPost = shouldPersist ? storedPost : undefined;
   const preservesPriorArtifact = Boolean(existingPost && ['draft', 'review', 'approved'].includes(existingPost.status));
   if (existingPost?.status === 'approved') {
     throw new Error('Approved posts cannot be replaced by automatic generation');
@@ -792,13 +808,13 @@ export async function generatePost(
         generationProvenance: existingPost!.generationProvenance,
       }
     : existingPost ?? createPostSkeleton(workspaceId, brief, postId);
-  if (!existingPost) post = createPost(workspaceId, post);
+  if (!existingPost && shouldPersist) post = createPost(workspaceId, post);
   let expectedRevision = options.expectedRevision ?? post.generationRevision;
   if (post.generationRevision !== expectedRevision) {
     throw new GenerationRevisionConflictError('content_post', postId, expectedRevision);
   }
   const expectedBriefRevision = options.expectedBriefRevision ?? brief.generationRevision;
-  const sourceBriefAuthority = expectedBriefRevision === undefined
+  const sourceBriefAuthority = !shouldPersist || expectedBriefRevision === undefined
     ? undefined
     : { briefId: brief.id, expectedRevision: expectedBriefRevision };
   options.onRevision?.(expectedRevision);
@@ -820,6 +836,10 @@ export async function generatePost(
     });
   };
   const persistProgress = () => {
+    if (!shouldPersist) {
+      options.assertAuthority?.();
+      return;
+    }
     if (preservesPriorArtifact) {
       assertPostGenerationRevision(workspaceId, postId, expectedRevision);
       if (sourceBriefAuthority) {
@@ -842,6 +862,8 @@ export async function generatePost(
     options.onRevision?.(expectedRevision);
   };
   const assertCurrentAuthority = () => {
+    options.assertAuthority?.();
+    if (!shouldPersist) return;
     assertPostGenerationRevision(workspaceId, postId, expectedRevision);
     if (sourceBriefAuthority) {
       assertBriefGenerationRevision(
@@ -857,13 +879,13 @@ export async function generatePost(
   throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
   reportProgress('Preparing content context...', 0);
   assertCurrentAuthority();
-  const contextV2 = isFeatureEnabled('content-generation-context-v2', workspaceId)
+  const contextV2 = options.generationContextV2 ?? (isFeatureEnabled('content-generation-context-v2', workspaceId)
     ? await buildContentGenerationContextV2(workspaceId, {
         targetKeyword: brief.targetKeyword,
         sourceEvidence: brief.sourceEvidence,
         providerMetricsObservedAt: brief.keywordValidation?.validatedAt ?? null,
       })
-    : null;
+    : null);
   const voiceCtx = contextV2?.projections.draft ?? await buildVoiceContext(workspaceId);
   const promptAuthority = contextV2?.authority;
   throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
@@ -1013,6 +1035,11 @@ export async function generatePost(
     if (preservesPriorArtifact) {
       throw new Error(requiredStageDiagnostics.map(diagnostic => diagnostic.message).join('; ') || post.unificationNote);
     }
+    if (!shouldPersist) {
+      post.generationRevision = 0;
+      post.generationProvenance = currentProvenance();
+      return post;
+    }
     post = commitPostGeneration(
       workspaceId,
       post,
@@ -1158,6 +1185,11 @@ export async function generatePost(
     if (preservesPriorArtifact) {
       throw new Error('Regeneration produced an incomplete artifact; the prior post was preserved.');
     }
+    if (!shouldPersist) {
+      post.generationRevision = 0;
+      post.generationProvenance = currentProvenance();
+      return post;
+    }
     post = commitPostGeneration(
       workspaceId,
       post,
@@ -1173,6 +1205,11 @@ export async function generatePost(
   post.generationDiagnostics = undefined;
   post.updatedAt = new Date().toISOString();
   const provenance = currentProvenance();
+  if (!shouldPersist) {
+    post.generationRevision = 0;
+    post.generationProvenance = provenance;
+    return post;
+  }
   post = preservesPriorArtifact
     ? replacePostWithSnapshot(
         workspaceId,
